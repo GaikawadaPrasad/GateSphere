@@ -13,6 +13,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    Integer,
     String,
     Text,
     UniqueConstraint,
@@ -151,3 +152,19 @@ class IncidentAction(Base, TimestampMixin):
     )
 
     incident: Mapped[SecurityIncident] = relationship(back_populates="actions")
+
+
+class IncidentAttachment(Base, TimestampMixin):
+    __tablename__ = "incident_attachments"
+
+    id: Mapped[uuid.UUID] = pk()
+    incident_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("security_incidents.id", ondelete="CASCADE"), index=True
+    )
+    uploaded_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    file_url: Mapped[str] = mapped_column(Text)
+    file_name: Mapped[str] = mapped_column(String(255))
+    mime_type: Mapped[str | None] = mapped_column(String(120))
+    file_size_bytes: Mapped[int | None] = mapped_column(Integer)

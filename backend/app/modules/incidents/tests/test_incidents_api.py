@@ -66,3 +66,17 @@ def test_cross_community_gate_reference_is_404(as_role, seed_ids):
         },
     )
     assert r.status_code == 404
+
+
+def test_incident_attachments(as_role, seed_ids):
+    resident = as_role("resident")
+    iid = resident.post(
+        P, json={"incident_type": "other", "community_id": seed_ids["community_id"]}
+    ).json()["data"]["id"]
+    sup = as_role("security_supervisor")
+    r = sup.post(
+        f"{P}/{iid}/attachments",
+        json={"file_url": "s3://b/x.png", "file_name": "x.png"},
+    )
+    assert r.status_code == 201, r.text
+    assert sup.get(f"{P}/{iid}/attachments").json()["data"][0]["file_name"] == "x.png"

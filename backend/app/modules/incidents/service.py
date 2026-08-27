@@ -23,6 +23,7 @@ from app.modules.incidents import schemas
 from app.modules.incidents.models import (
     IncidentAction,
     IncidentAssignment,
+    IncidentAttachment,
     IncidentStatusHistory,
     SecurityIncident,
 )
@@ -276,6 +277,31 @@ class IncidentService:
                 select(IncidentAction)
                 .where(IncidentAction.incident_id == incident_id)
                 .order_by(IncidentAction.action_at)
+            ).all()
+        )
+
+    def add_attachment(self, incident_id: uuid.UUID, payload) -> IncidentAttachment:
+        inc = self.get_incident(incident_id)
+        obj = IncidentAttachment(
+            incident_id=inc.id,
+            uploaded_by_user_id=self.actor.id,
+            file_url=payload.file_url,
+            file_name=payload.file_name,
+            mime_type=payload.mime_type,
+            file_size_bytes=payload.file_size_bytes,
+        )
+        self.db.add(obj)
+        self.db.flush()
+        self._audit("incident.attachment", inc.community_id, "incident_attachment", obj.id)
+        return obj
+
+    def list_attachments(self, incident_id: uuid.UUID) -> list[IncidentAttachment]:
+        self.get_incident(incident_id)
+        return list(
+            self.db.scalars(
+                select(IncidentAttachment)
+                .where(IncidentAttachment.incident_id == incident_id)
+                .order_by(IncidentAttachment.created_at)
             ).all()
         )
 

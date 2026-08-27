@@ -33,12 +33,19 @@ class TargetIn(_Write):
     tower_id: uuid.UUID | None = None
     unit_id: uuid.UUID | None = None
     role_id: uuid.UUID | None = None
+    resident_group_id: uuid.UUID | None = None
     target_all_community: bool = False
 
     @model_validator(mode="after")
     def _valid(self) -> TargetIn:
-        if not (self.target_all_community or self.tower_id or self.unit_id or self.role_id):
-            raise ValueError("target must set one of tower_id / unit_id / role_id / all")
+        if not (
+            self.target_all_community
+            or self.tower_id
+            or self.unit_id
+            or self.role_id
+            or self.resident_group_id
+        ):
+            raise ValueError("target must set tower_id / unit_id / role_id / group / all")
         return self
 
 
@@ -47,7 +54,39 @@ class TargetRead(_Read):
     tower_id: uuid.UUID | None
     unit_id: uuid.UUID | None
     role_id: uuid.UUID | None
+    resident_group_id: uuid.UUID | None
     target_all_community: bool
+
+
+# -- resident groups ------------------------------------------- #
+class GroupCreate(_Write):
+    name: str = Field(min_length=1, max_length=120)
+    description: str | None = Field(default=None, max_length=2000)
+
+
+class GroupUpdate(_Write):
+    name: str | None = Field(default=None, max_length=120)
+    description: str | None = Field(default=None, max_length=2000)
+    is_active: bool | None = None
+
+
+class GroupRead(_Read):
+    community_id: uuid.UUID
+    name: str
+    description: str | None
+    created_by_user_id: uuid.UUID | None
+    is_active: bool
+    member_count: int = 0
+
+
+class GroupMemberIn(_Write):
+    user_id: uuid.UUID
+
+
+class GroupMemberRead(_Read):
+    group_id: uuid.UUID
+    user_id: uuid.UUID
+    added_at: datetime
 
 
 # -- announcements ----------------------------------------- #

@@ -163,3 +163,29 @@ def add_action(
         schemas.ActionRead.model_validate(svc.add_action(incident_id, payload)),
         message="Logged",
     )
+
+
+@router.get(
+    "/{incident_id}/attachments",
+    response_model=Envelope[list[schemas.AttachmentRead]],
+    dependencies=[VIEW],
+)
+def incident_attachments(incident_id: uuid.UUID, svc: Svc = Depends(incident_service)) -> dict:
+    return ok([schemas.AttachmentRead.model_validate(a) for a in svc.list_attachments(incident_id)])
+
+
+@router.post(
+    "/{incident_id}/attachments",
+    response_model=Envelope[schemas.AttachmentRead],
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[UPDATE],
+)
+def add_attachment(
+    incident_id: uuid.UUID,
+    payload: schemas.AttachmentIn,
+    svc: Svc = Depends(incident_service),
+) -> dict:
+    return ok(
+        schemas.AttachmentRead.model_validate(svc.add_attachment(incident_id, payload)),
+        message="Attached",
+    )

@@ -72,3 +72,19 @@ def test_cross_community_unit_is_404(as_role, seed_ids):
     cat = _category_in(seed_ids["community_id"])
     r = resident.post(f"{P}/tickets", json={"unit_id": other, "category_id": cat, "subject": "x"})
     assert r.status_code == 404
+
+
+def test_attachments(as_role, seed_ids):
+    cid = seed_ids["community_id"]
+    resident = as_role("resident")
+    tid = resident.post(
+        f"{P}/tickets",
+        json={"unit_id": _unit_in(cid), "category_id": _category_in(cid), "subject": "Photo"},
+    ).json()["data"]["id"]
+    r = resident.post(
+        f"{P}/tickets/{tid}/attachments",
+        json={"file_url": "s3://bucket/a.jpg", "file_name": "a.jpg", "mime_type": "image/jpeg"},
+    )
+    assert r.status_code == 201, r.text
+    lst = resident.get(f"{P}/tickets/{tid}/attachments")
+    assert lst.status_code == 200 and lst.json()["data"][0]["file_name"] == "a.jpg"

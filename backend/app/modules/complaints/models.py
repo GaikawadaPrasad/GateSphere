@@ -205,3 +205,22 @@ class TicketFeedback(Base, TimestampMixin):
     )
     rating: Mapped[int] = mapped_column(SmallInteger)
     comments: Mapped[str | None] = mapped_column(Text)
+
+
+class TicketAttachment(Base, TimestampMixin):
+    __tablename__ = "ticket_attachments"
+
+    id: Mapped[uuid.UUID] = pk()
+    ticket_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("service_tickets.id", ondelete="CASCADE"), index=True
+    )
+    message_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("ticket_messages.id", ondelete="SET NULL")
+    )
+    uploaded_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    file_url: Mapped[str] = mapped_column(Text)
+    file_name: Mapped[str] = mapped_column(String(255))
+    mime_type: Mapped[str | None] = mapped_column(String(120))
+    file_size_bytes: Mapped[int | None] = mapped_column(Integer)

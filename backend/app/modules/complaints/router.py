@@ -235,3 +235,29 @@ def add_feedback(
         schemas.FeedbackRead.model_validate(svc.add_feedback(ticket_id, payload)),
         message="Thanks",
     )
+
+
+@router.get(
+    "/tickets/{ticket_id}/attachments",
+    response_model=Envelope[list[schemas.AttachmentRead]],
+    dependencies=[VIEW],
+)
+def list_attachments(ticket_id: uuid.UUID, svc: Svc = Depends(complaint_service)) -> dict:
+    return ok([schemas.AttachmentRead.model_validate(a) for a in svc.list_attachments(ticket_id)])
+
+
+@router.post(
+    "/tickets/{ticket_id}/attachments",
+    response_model=Envelope[schemas.AttachmentRead],
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[VIEW],
+)
+def add_attachment(
+    ticket_id: uuid.UUID,
+    payload: schemas.AttachmentIn,
+    svc: Svc = Depends(complaint_service),
+) -> dict:
+    return ok(
+        schemas.AttachmentRead.model_validate(svc.add_attachment(ticket_id, payload)),
+        message="Attached",
+    )

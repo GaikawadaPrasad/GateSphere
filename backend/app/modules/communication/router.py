@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response, status
 
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
@@ -177,3 +177,93 @@ def vote(
 )
 def poll_results(poll_id: uuid.UUID, svc: Svc = Depends(communication_service)) -> dict:
     return ok(svc.results(poll_id))
+
+
+# --- resident groups ------------------------------------------- #
+def _group_read(grp, count: int) -> schemas.GroupRead:
+    return schemas.GroupRead(
+        id=grp.id,
+        created_at=grp.created_at,
+        updated_at=grp.updated_at,
+        community_id=grp.community_id,
+        name=grp.name,
+        description=grp.description,
+        created_by_user_id=grp.created_by_user_id,
+        is_active=grp.is_active,
+        member_count=count,
+    )
+
+
+@router.get("/groups", response_model=Envelope[list[schemas.GroupRead]], dependencies=[VIEW])
+def list_groups(
+    community_id: uuid.UUID | None = None, svc: Svc = Depends(communication_service)
+) -> dict:
+    return ok([_group_read(g, n) for g, n in svc.list_groups(community_id=community_id)])
+
+
+@router.post(
+    "/groups",
+    response_model=Envelope[schemas.GroupRead],
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[CREATE],
+)
+def create_group(
+    payload: schemas.GroupCreate,
+    community_id: uuid.UUID | None = None,
+    svc: Svc = Depends(communication_service),
+) -> dict:
+    return ok(
+        _group_read(svc.create_group(payload, community_id=community_id), 0),
+        message="Group created",
+    )
+
+
+@router.patch(
+    "/groups/{group_id}", response_model=Envelope[schemas.GroupRead], dependencies=[UPDATE]
+)
+def update_group(
+    group_id: uuid.UUID,
+    payload: schemas.GroupUpdate,
+    svc: Svc = Depends(communication_service),
+) -> dict:
+    grp = svc.update_group(group_id, payload)
+    return ok(_group_read(grp, len(grp.members)), message="Updated")
+
+
+@router.get(
+    "/groups/{group_id}/members",
+    response_model=Envelope[list[schemas.GroupMemberRead]],
+    dependencies=[VIEW],
+)
+def list_members(group_id: uuid.UUID, svc: Svc = Depends(communication_service)) -> dict:
+    return ok([schemas.GroupMemberRead.model_validate(m) for m in svc.list_members(group_id)])
+
+
+@router.post(
+    "/groups/{group_id}/members",
+    response_model=Envelope[schemas.GroupMemberRead],
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[UPDATE],
+)
+def add_member(
+    group_id: uuid.UUID,
+    payload: schemas.GroupMemberIn,
+    svc: Svc = Depends(communication_service),
+) -> dict:
+    return ok(
+        schemas.GroupMemberRead.model_validate(svc.add_member(group_id, payload)),
+        message="Added",
+    )
+
+
+@router.delete(
+    "/groups/{group_id}/members/{member_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    dependencies=[UPDATE],
+)
+def remove_member(
+    group_id: uuid.UUID, member_id: uuid.UUID, svc: Svc = Depends(communication_service)
+) -> Response:
+    svc.remove_member(group_id, member_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

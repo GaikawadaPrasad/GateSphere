@@ -67,6 +67,22 @@ class ActionIn(_Write):
     details: str | None = Field(default=None, max_length=4000)
 
 
+class AttachmentIn(_Write):
+    file_url: str = Field(min_length=1, max_length=8000)
+    file_name: str = Field(min_length=1, max_length=255)
+    mime_type: str | None = Field(default=None, max_length=120)
+    file_size_bytes: int | None = Field(default=None, ge=0)
+
+
+class AttachmentRead(_Read):
+    incident_id: uuid.UUID
+    uploaded_by_user_id: uuid.UUID | None
+    file_url: str
+    file_name: str
+    mime_type: str | None
+    file_size_bytes: int | None
+
+
 class HistoryRead(_Read):
     incident_id: uuid.UUID
     old_status: str | None

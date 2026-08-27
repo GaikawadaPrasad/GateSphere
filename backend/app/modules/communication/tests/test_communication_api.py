@@ -56,3 +56,34 @@ def test_admin_announcement_and_poll_flow(as_role, seed_ids):
     v = resident.post(f"{P}/polls/{pid}/vote", json={"option_ids": [opt]})
     assert v.status_code == 201, v.text
     assert v.json()["data"]["total_responses"] == 1
+
+
+def test_resident_groups_and_group_target(as_role, seed_ids):
+    admin = as_role("community_admin")
+    import uuid as _u
+
+    from sqlalchemy import select
+
+    from app.db.session import SessionLocal
+    from app.modules.users.models import User
+
+    g = admin.post(f"{P}/groups", json={"name": f"Owners-{_u.uuid4().hex[:6]}"})
+    assert g.status_code == 201, g.text
+    gid = g.json()["data"]["id"]
+
+    with SessionLocal() as db:
+        uid = str(db.scalar(select(User).where(User.email == "resident@gatesphere.com")).id)
+    m = admin.post(f"{P}/groups/{gid}/members", json={"user_id": uid})
+    assert m.status_code == 201, m.text
+    assert len(admin.get(f"{P}/groups/{gid}/members").json()["data"]) == 1
+
+    a = admin.post(
+        f"{P}/announcements",
+        json={
+            "title": "Owners only",
+            "body": "AGM",
+            "targets": [{"resident_group_id": gid}],
+        },
+    )
+    assert a.status_code == 201, a.text
+    assert a.json()["data"]["targets"][0]["resident_group_id"] == gid

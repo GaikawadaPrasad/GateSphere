@@ -27,6 +27,8 @@ from app.modules.communication.models import (
     PollOption,
     PollResponse,
     PollResponseOption,
+    ResidentGroup,
+    ResidentGroupMember,
 )
 from app.modules.communication.repository import (
     AnnouncementRepository,
@@ -94,6 +96,10 @@ class CommunicationService:
                     raise NotFoundError("Unit not found")
             if t.role_id is not None and self.db.get(Role, t.role_id) is None:
                 raise NotFoundError("Role not found")
+            if t.resident_group_id is not None:
+                grp = self.db.get(ResidentGroup, t.resident_group_id)
+                if grp is None or grp.community_id != community_id:
+                    raise NotFoundError("Resident group not found")
 
     def _apply_targets(self, ann: Announcement, targets: list[schemas.TargetIn]) -> None:
         ann.targets.clear()
@@ -103,9 +109,94 @@ class CommunicationService:
                     tower_id=t.tower_id,
                     unit_id=t.unit_id,
                     role_id=t.role_id,
+                    resident_group_id=t.resident_group_id,
                     target_all_community=t.target_all_community,
                 )
             )
+
+    # -- resident groups ----------------------------------- #
+    def list_groups(self, *, community_id: uuid.UUID | None):
+        cid = self._one_community(community_id)
+        groups = list(
+            self.db.scalars(
+                select(ResidentGroup)
+                .where(ResidentGroup.community_id == cid)
+                .order_by(ResidentGroup.name)
+            ).all()
+        )
+        return [(g, len(g.members)) for g in groups]
+
+    def _get_group(self, group_id: uuid.UUID) -> ResidentGroup:
+        grp = self.db.get(ResidentGroup, group_id)
+        if grp is None or (
+            not self.scope.is_global and grp.community_id not in self.scope.community_ids
+        ):
+            raise NotFoundError("Resident group not found")
+        return grp
+
+    def create_group(self, payload: schemas.GroupCreate, *, community_id: uuid.UUID | None):
+        cid = self._one_community(community_id)
+        if self.db.scalar(
+            select(ResidentGroup).where(
+                ResidentGroup.community_id == cid, ResidentGroup.name == payload.name
+            )
+        ):
+            raise ConflictError("A group with that name exists", code="GROUP_EXISTS")
+        grp = ResidentGroup(
+            community_id=cid,
+            name=payload.name,
+            description=payload.description,
+            created_by_user_id=self.actor.id,
+        )
+        self.db.add(grp)
+        self.db.flush()
+        self._audit("group.create", cid, "resident_group", grp.id)
+        return grp
+
+    def update_group(self, group_id: uuid.UUID, payload: schemas.GroupUpdate):
+        grp = self._get_group(group_id)
+        patch = payload.model_dump(exclude_unset=True)
+        for k, v in patch.items():
+            setattr(grp, k, v)
+        self.db.flush()
+        self._audit("group.update", grp.community_id, "resident_group", grp.id, new=patch)
+        return grp
+
+    def list_members(self, group_id: uuid.UUID) -> list[ResidentGroupMember]:
+        self._get_group(group_id)
+        return list(
+            self.db.scalars(
+                select(ResidentGroupMember)
+                .where(ResidentGroupMember.group_id == group_id)
+                .order_by(ResidentGroupMember.added_at)
+            ).all()
+        )
+
+    def add_member(self, group_id: uuid.UUID, payload: schemas.GroupMemberIn):
+        grp = self._get_group(group_id)
+        if self.db.get(User, payload.user_id) is None:
+            raise NotFoundError("User not found")
+        if self.db.scalar(
+            select(ResidentGroupMember).where(
+                ResidentGroupMember.group_id == grp.id,
+                ResidentGroupMember.user_id == payload.user_id,
+            )
+        ):
+            raise ConflictError("Already a member", code="MEMBER_EXISTS")
+        m = ResidentGroupMember(group_id=grp.id, user_id=payload.user_id)
+        self.db.add(m)
+        self.db.flush()
+        self._audit("group.member_add", grp.community_id, "resident_group", grp.id)
+        return m
+
+    def remove_member(self, group_id: uuid.UUID, member_id: uuid.UUID) -> None:
+        grp = self._get_group(group_id)
+        m = self.db.get(ResidentGroupMember, member_id)
+        if m is None or m.group_id != grp.id:
+            raise NotFoundError("Member not found")
+        self.db.delete(m)
+        self.db.flush()
+        self._audit("group.member_remove", grp.community_id, "resident_group", grp.id)
 
     # -- announcements -------------------------------------- #
     def create_announcement(

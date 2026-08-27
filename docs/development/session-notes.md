@@ -18,6 +18,26 @@ Format per entry:
 
 ---
 
+## 2026-08-28 — Deferred child tables (attachments + resident groups)
+
+**By:** post-module integration/polish, item 4 of the "still open" list
+**Branch / commit:** `main`
+**What changed:**
+- migration `0018` — `ticket_attachments` (FR-10), `incident_attachments` (FR-13),
+  `resident_groups` + `resident_group_members` (FR-12), and a `resident_group_id` column on
+  `announcement_targets` (CHECK widened to allow group targets). RLS on `resident_groups`.
+- `complaints` — `GET/POST /complaints/tickets/{id}/attachments` (metadata records; the
+  client uploads to S3 then registers the `file_url`). `ticket.attachment` audit.
+- `incidents` — `GET/POST /incidents/{id}/attachments` (`incidents:update` to add).
+- `communication` — resident groups: `GET/POST /communication/groups`,
+  `PATCH /groups/{id}`, `GET/POST /groups/{id}/members`,
+  `DELETE /groups/{id}/members/{member_id}`; announcements can now target
+  `resident_group_id` (validated against the announcement's community).
+**Verified:** `ruff` + `black` clean; `pytest -q` → **194 passed**;
+`alembic downgrade 0017_notifications && upgrade head` round-trip; reseed.
+
+---
+
 ## 2026-08-28 — FR-02 User/role management + FR-16 Audit read API
 
 **By:** post-module integration/polish, item 3 of the "still open" list

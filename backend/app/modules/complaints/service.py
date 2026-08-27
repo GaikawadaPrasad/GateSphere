@@ -28,6 +28,7 @@ from app.modules.complaints.models import (
     ServiceTicket,
     SlaPolicy,
     TicketAssignment,
+    TicketAttachment,
     TicketFeedback,
     TicketMessage,
     TicketStatusHistory,
@@ -397,3 +398,33 @@ class ComplaintService:
         self.db.flush()
         self._audit("ticket.feedback", ticket.community_id, "ticket_feedback", fb.id)
         return fb
+
+    def add_attachment(self, ticket_id: uuid.UUID, payload) -> TicketAttachment:
+        ticket = self.get_ticket(ticket_id)
+        if payload.message_id is not None:
+            msg = self.db.get(TicketMessage, payload.message_id)
+            if msg is None or msg.ticket_id != ticket.id:
+                raise NotFoundError("Message not found")
+        obj = TicketAttachment(
+            ticket_id=ticket.id,
+            message_id=payload.message_id,
+            uploaded_by_user_id=self.actor.id,
+            file_url=payload.file_url,
+            file_name=payload.file_name,
+            mime_type=payload.mime_type,
+            file_size_bytes=payload.file_size_bytes,
+        )
+        self.db.add(obj)
+        self.db.flush()
+        self._audit("ticket.attachment", ticket.community_id, "ticket_attachment", obj.id)
+        return obj
+
+    def list_attachments(self, ticket_id: uuid.UUID) -> list[TicketAttachment]:
+        self.get_ticket(ticket_id)
+        return list(
+            self.db.scalars(
+                select(TicketAttachment)
+                .where(TicketAttachment.ticket_id == ticket_id)
+                .order_by(TicketAttachment.created_at)
+            ).all()
+        )
