@@ -22,8 +22,10 @@ See [ADR-003](../decisions/ADR-003-authentication.md).
 is **not** the system of record. Logout / password change / role change set `revoked_at` (and
 delete the Redis key). Presenting a `revoked_at` key is a compromise signal — reject and log.
 
-> Scaffold status: sessions currently live in Redis only. Add the `user_sessions` table and
-> write through to it. See [`AGENTS.md §23`](../../AGENTS.md).
+> Status: **implemented** (migration `0002`). `app/core/security.py` creates the `user_sessions`
+> row, caches the lookup in Redis, and `revoke_all_user_sessions()` is called on password / role
+> change. `_load_session` falls back to the DB row on a cache miss and re-checks
+> `revoked_at` / `expires_at`.
 
 ### Login flow
 

@@ -19,7 +19,10 @@ import `fastapi`. Cross-cutting concerns are dependencies/middleware, applied un
 - Separate `*Create` / `*Update` / `*Read`. Only `*Read` leaves the API — never an ORM model.
 - No `Any`. `Annotated` + validators. Enums for fixed sets (visitor category, delivery protocol,
   incident severity, ticket status, …).
-- Responses follow the envelope: `{data, meta}` for lists, `{data}` for single, `{error:{code,message,fields}}` for errors.
+- Responses go through the envelope helpers in `app/core/responses.py`: `ok(data, message=...)`
+  for single, `paginated(rows, total=..., params=...)` for lists. Errors are raised as
+  `AppError` subclasses (`app/core/errors.py`); the central handlers emit
+  `{success:false, message, data:null, error:{code, fields?}}`.
 
 ## Services
 - All business rules and state-machine transitions (see root §10). Own the transaction boundary.
@@ -30,11 +33,14 @@ import `fastapi`. Cross-cutting concerns are dependencies/middleware, applied un
 
 ## Repositories
 - Only place with SQLAlchemy queries. Return models or scalars.
-- **Always** filter tenant tables by `community_id`, applied before execution.
-- `selectinload` / `joinedload` to kill N+1.
+- Extend `TenantRepository` (`app/db/repository.py`) for tenant tables — the `TenantScope`
+  predicate is injected on every read and checked on write. Non-tenant tables use `Repository`.
+- Get the scope + RLS-bound session from `Depends(tenant_context)` (`app/core/tenancy.py`).
+- `selectinload` / `joinedload` sparingly, only for small bounded results (§4.7 root).
 
 ## Models
-- `id BIGINT` identity per ERD v1.2 (_scaffold currently UUID — see root §17_).
+- `id` = **UUID v4** via `pk()` from `app/db/base_class.py` ([ADR-009](../docs/decisions/ADR-009-identifiers.md)).
+  Use `fk()` for foreign keys and `TenantMixin` for `community_id`.
 - `community_id` FK + index on every tenant table; composite tenant-safe FKs to parents.
 - `created_at` / `updated_at` (`TIMESTAMPTZ`) + `created_by` where an actor exists.
 - Encode invariants as `UNIQUE` / `CHECK` / `EXCLUDE` — not only in Python (see schema.md).

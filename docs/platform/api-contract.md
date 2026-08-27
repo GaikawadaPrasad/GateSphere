@@ -24,33 +24,43 @@ Canonical, cross-application API rules. The FastAPI backend defines the contract
 
 ## Response envelope
 
+Every response has the shape `{ success, message, data, meta }`. Implemented in
+`backend/app/core/responses.py` and `backend/app/core/errors.py`.
+
 ```jsonc
 // list success — 200
 {
+  "success": true,
+  "message": "OK",
   "data": [ /* array of *Read objects */ ],
   "meta": { "page": 1, "page_size": 20, "total": 137 }
 }
 
 // single success — 200 / 201
-{ "data": { /* *Read object */ } }
+{ "success": true, "message": "OK", "data": { /* *Read object */ }, "meta": null }
 
-// no-body success — 204  (empty response)
+// no-body success — 204  (empty response, no envelope)
 
 // error — 4xx / 5xx
 {
+  "success": false,
+  "message": "Slot already booked for 06:00–07:00",   // safe to display
+  "data": null,
   "error": {
-    "code": "AMENITY_SLOT_CONFLICT",      // stable machine-readable string
-    "message": "Slot already booked for 06:00–07:00",  // safe to display
-    "fields": {                            // present for 400 / 422 only
+    "code": "AMENITY_SLOT_CONFLICT",                   // stable machine string
+    "fields": {                                        // present for 400 / 422 only
       "slot_id": "not available for the requested time"
     }
   }
 }
 ```
 
-- `*Read` schemas only — **never serialize an ORM model** directly.
-- `error.message` never contains a stack trace, SQL, internal path, or another tenant's data.
+- Routers return `ok(data, message=...)` / `paginated(rows, total=..., params=...)` — **never**
+  serialize an ORM model directly; `*Read` schemas only.
+- `message` never contains a stack trace, SQL, internal path, or another tenant's data.
 - `error.code` values are documented per module in `docs/backend/api/<module>.md`.
+- Frontend: `frontend/lib/api.ts` unwraps to `data` and throws `ApiError { status, code, message,
+  fields }` on `success: false` or a non-2xx.
 
 ## HTTP status mapping
 

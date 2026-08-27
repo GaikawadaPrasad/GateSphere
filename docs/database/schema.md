@@ -7,9 +7,11 @@ must update this page in the same PR.
 
 ## Conventions (apply to every table)
 
-- **PK** `id BIGINT GENERATED ALWAYS AS IDENTITY` (ERD v1.2). _Scaffold currently uses UUID —
-  see AGENTS.md §17._
-- Every tenant-scoped table carries `community_id BIGINT NOT NULL` + index, and uses
+- **PK** `id` = **UUID v4** (application-generated) — a deliberate deviation from ERD v1.2's
+  BIGINT identity, recorded in [ADR-009](../decisions/ADR-009-identifiers.md). Every other
+  detail below still holds. Helpers: `pk()` / `fk()` / `TenantMixin` in
+  `backend/app/db/base_class.py`.
+- Every tenant-scoped table carries `community_id NOT NULL` (UUID FK) + index, and uses
   **composite tenant-safe FKs** to parents (`(community_id, parent_id)`).
 - Mutable tables: `created_at`, `updated_at` `TIMESTAMPTZ` (+ `created_by` where an actor exists).
 - Append-only tables: `created_at`/`occurred_at`/`changed_at` only — **INSERT only**, enforced by
@@ -29,7 +31,7 @@ must update this page in the same PR.
 | Table | Key columns | Notes |
 |-------|-------------|-------|
 | `users` | `email` (UQ), `phone`, `password_hash`, `first_name`, `last_name`, `status`, `is_verified`, `last_login_at` | Argon2 hash. |
-| `user_sessions` | `user_id` FK, `session_key_hash` (UQ, VARCHAR 128), `ip_address` INET, `user_agent`, `created_at`, `expires_at`, `revoked_at` | **Canonical session store** for the cookie auth. |
+| `user_sessions` | `user_id` FK, `session_key_hash` (UQ, VARCHAR 128 — SHA-256 of the cookie token), `csrf_token`, `ip_address` INET, `user_agent`, `created_at`, `expires_at`, `revoked_at` | **Canonical session store** (migration `0002`). Redis caches lookups. Revoked on logout / password / role change. |
 | `communities` | `code` (UQ) | Tenant root. |
 | `user_communities` | `user_id`, `community_id`, `membership_status`, `joined_at`, `left_at` | UQ `(user_id, community_id)`. |
 | `roles` | `code` (UQ), `name`, `scope_level` (`GLOBAL`/`COMMUNITY`), `is_system` | Fixed enumeration of the 10 roles. |

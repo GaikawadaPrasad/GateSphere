@@ -467,21 +467,29 @@ Full contract: [`docs/platform/api-contract.md`](docs/platform/api-contract.md).
 - Verbs: `GET` read · `POST` create · `PATCH` partial update · `PUT` full replace (rare) ·
   `DELETE` = **soft‑delete** where audit/history matters (residents, staff), hard‑delete otherwise.
 
-### Response envelope (canonical — TRD §8.2)
+### Response envelope (canonical)
+
+**Every** response — success or error — has the shape `{ success, message, data, meta }`.
 
 ```jsonc
-{ "data": [ ... ], "meta": { "page": 1, "page_size": 20, "total": 137 } }   // list
-{ "data": { ... } }                                                          // single
-{ "error": { "code": "AMENITY_SLOT_CONFLICT",                                // error
-             "message": "Slot already booked",
+// success — single
+{ "success": true, "message": "OK", "data": { ... }, "meta": null }
+// success — list
+{ "success": true, "message": "OK", "data": [ ... ],
+  "meta": { "page": 1, "page_size": 20, "total": 137 } }
+// error
+{ "success": false, "message": "Slot already booked", "data": null,
+  "error": { "code": "AMENITY_SLOT_CONFLICT",
              "fields": { "slot_id": "not available for 06:00–07:00" } } }
 ```
 
-`fields` populated for `400`/`422`. `code` is a stable machine string documented per module.
-`message` is safe for display — never a stack trace, SQL, internal path, or another tenant's data.
-
-> The current scaffold returns FastAPI's default `{"detail": ...}` — migrate all endpoints to the
-> envelope + central handlers, and update `frontend/lib/api.ts` in the same change (§17).
+- Implemented: `app/core/responses.py` (`ok()`, `paginated()`, `Response[T]`, `PageResponse[T]`),
+  `app/core/errors.py` (`AppError` hierarchy + central handlers), `frontend/lib/api.ts` (unwraps
+  to `data`, throws `ApiError` with `code` + `fields`).
+- `error.fields` is populated for `400`/`422`. `error.code` is a stable machine string documented
+  per module. `message` is safe for display — never a stack trace, SQL, internal path, or another
+  tenant's data.
+- Routers return `ok(...)` / `paginated(...)` — never a raw ORM model.
 
 ### HTTP status mapping
 
@@ -535,8 +543,11 @@ Approved reference: **DB ERD v1.2**. Full table catalogue with per‑table const
 
 ### 8.1 Identity, keys, columns
 
-- **PK**: `id BIGINT GENERATED ALWAYS AS IDENTITY` per ERD v1.2. _Scaffold currently uses UUID —
-  reconcile repo‑wide (§17); don't mix._
+- **PK**: `id` = **UUID v4**, generated in the app layer (`app/db/base_class.py::pk`). This is a
+  deliberate deviation from ERD v1.2's BIGINT identity, recorded in
+  [ADR‑009](docs/decisions/ADR-009-identifiers.md) — sequential ids are enumerable in a security
+  product. Every other detail in the ERD still holds. Use `pk()` / `fk()` / `TenantMixin` from
+  `base_class.py`; never invent a per‑model id type.
 - **FK**: `<entity>_id`, always with an explicit `ON DELETE` (default `NO ACTION` turns an
   ordinary delete into a constraint violation at an unrelated call site months later). Composite
   **tenant‑safe FKs** where a child must stay in its parent's community.
@@ -960,22 +971,34 @@ Silence on an area is not the same as "checked and fine" — say which one it is
 
 ## 23. Known gaps (state plainly so they're tracked, not rediscovered)
 
-The running scaffold is deliberately minimal. Before / at Phase‑1 ERD sign‑off, reconcile:
+### Done in the foundation upgrade (2026‑08‑27)
 
-1. **PK type** — scaffold uses `UUID`; ERD v1.2 specifies `BIGINT` identity. Pick one repo‑wide,
-   or record a deliberate ADR deviation.
-2. **Session store** — scaffold is Redis‑only; add the `user_sessions` table as the system of record.
-3. **Response envelope** — scaffold returns `{"detail": ...}`; migrate to `{data,meta}` / `{error}`
-   + central exception handlers, and update `frontend/lib/api.ts` in the same change.
-4. **Full schema** — scaffold ships only core tables (communities / property / RBAC / audit);
-   build out the remaining module tables per `docs/database/schema.md`, each with its
-   CHECK/UNIQUE/EXCLUDE constraints and append‑only triggers.
-5. **RLS** — add PostgreSQL Row‑Level Security on tenant tables for staging/production, plus a
-   dedicated RLS enforcement test suite that connects as the restricted role (§12).
-6. **OTP login, community switcher, SSE/WebSocket gate feed** — not yet scaffolded (FR‑04/05).
-7. **Frontend** — TanStack Query / Zustand / RHF+Zod / shadcn wiring, `queryClient.clear()` on
-   identity change, the route groups in §5.1, and the design‑token file are specified here but not
-   yet built beyond the login/dashboard stubs.
-8. **`docs/development/session-notes.md`** — create it on the first real feature PR.
+- ✅ **Identity** — UUID v4 repo‑wide, [ADR‑009](docs/decisions/ADR-009-identifiers.md).
+- ✅ **Session store** — `user_sessions` table is the system of record (migration `0002`); Redis
+  caches. Revoked on logout / password change / role change.
+- ✅ **Response envelope** — `{success, message, data, meta}` + `{error}` via `app/core/responses.py`
+  and `app/core/errors.py` (central handlers); `frontend/lib/api.ts` unwraps it.
+- ✅ **Tenancy infra** — `app/core/tenancy.py` (`get_tenant_scope`, `TenantScope`, `tenant_context`,
+  `bind_rls_scope`) + `app/db/repository.py` (`TenantRepository`). Module routers use these.
+- ✅ **RLS** — migration `0003` enables Row‑Level Security + a GUC‑based policy on the tenant
+  tables that exist today; `bind_rls_scope` sets `app.community_ids` per request.
+- ✅ **Frontend structure** — `(public)` / `(protected)` route groups + `/unauthorized`,
+  `lib/{api,query,permissions}`, `store/ui.ts` (Zustand), `hooks/use-auth.ts` with
+  `queryClient.clear()` on every identity change, global 401 → `/login`, RHF+Zod login form,
+  `package-lock.json` committed.
+- ✅ **`docs/development/session-notes.md`** — created.
+
+### Still open (feature work, not foundation)
+
+1. **Full schema** — only core tables exist (communities / property / RBAC / audit / user_sessions).
+   Build out the remaining ~85 module tables per `docs/database/schema.md`, each with its
+   CHECK/UNIQUE/EXCLUDE constraints and append‑only triggers, **and add each to
+   `TENANT_TABLES` in a follow‑up RLS migration**.
+2. **RLS enforcement test suite** — `tests/test_tenant_isolation.py` must connect as a
+   **restricted** DB role against the migrated DB (local Postgres superuser bypasses RLS, §12).
+3. **OTP login, community switcher UI, SSE/WebSocket gate feed** (FR‑04/05).
+4. **Frontend design system** — Tailwind + shadcn/ui + Recharts + TanStack Table + the shared
+   component library. Plain CSS with the design tokens is the placeholder.
+5. **Permission caching** (`permission_version` bump) — evaluation is live per request today.
 
 Record any deliberate deviation as an ADR in `docs/decisions/`.
