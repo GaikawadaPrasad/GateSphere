@@ -1007,7 +1007,8 @@ Silence on an area is not the same as "checked and fine" — say which one it is
 | 11 | amenities | ✅ **implemented** — 5 tables (amenities, weekly `amenity_slots`, config-as-data `amenity_rules`, maintenance `amenity_blocks`, `amenity_bookings`), atomic `FOR UPDATE` overlap + capacity check, rule engine (advance/limit/cancel-notice), migration `0014` (+ RLS), seed, unit + integration tests, README + API doc |
 | 12 | communication | ✅ **implemented** — 6 tables (announcements + scoped `announcement_targets`, polls + options + responses + response_options), publish-freeze, poll status machine + one-vote-per-user + live tally, migration `0015` (+ RLS), seed, unit + integration tests, README + API doc |
 | 13 | incidents | ✅ **implemented** — 4 tables (`security_incidents` linkable to a panic alert, append-only `incident_status_history` + `incident_actions`, `incident_assignments`), response lifecycle w/ resolve-needs-summary, migration `0016` (+ RLS), seed, unit + integration tests, README + API doc |
-| 14 | dashboards | ⏳ next | 15 | notifications | ⏳ |
+| 14 | dashboards | ✅ **implemented** — no tables; 4 read-only aggregate views (overview / security / financial / resident), every query community-scoped before aggregation, integration tests, README + API doc |
+| 15 | notifications | ⏳ next |
 
 **Reference module = `communities`.** Every new module follows its shape: `models.py`
 (TenantMixin + DB constraints) → `schemas.py` (`extra="forbid"`, `*Create/*Update/*Read`) →

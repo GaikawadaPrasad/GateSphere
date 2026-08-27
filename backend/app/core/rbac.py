@@ -108,6 +108,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "vehicles:update",
         "incidents:view",
         "incidents:create",
+        "dashboards:view",
     ],
     "resident": [
         "visitors:view",
@@ -123,6 +124,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "communication:view",
         "incidents:view",
         "incidents:create",
+        "dashboards:view",
         "complaints:view",
         "complaints:create",
         "amenities:view",

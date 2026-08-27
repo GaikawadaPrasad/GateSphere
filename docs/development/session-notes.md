@@ -18,6 +18,31 @@ Format per entry:
 
 ---
 
+## 2026-08-28 — FR-14 Dashboards module
+
+**By:** backend module build-out, module 13 of the plan
+**Branch / commit:** `main`
+**What changed:**
+- **`dashboards` module** — **no tables**, no migration. `service.py` runs scoped
+  `COUNT`/`SUM` queries across every other module; **every query filtered by the viewer's
+  community before aggregation** (AGENTS.md §14). 4 views:
+  - `overview` — community KPIs (residents, units, pending visitor reqs, visitors inside,
+    pending deliveries, open tickets/incidents, active panic alerts, outstanding balance).
+  - `security` — visitors/vehicles/staff inside, pending approvals, panic alerts, open
+    incidents, guards on active roster.
+  - `financial` — invoices by status, total billed / collected, outstanding.
+  - `resident` — scoped to the caller's occupancy: my open tickets / visitor reqs / upcoming
+    bookings / dues, published announcements.
+  - `router.py` — `dashboards:view`; optional `?community_id=` for a global caller.
+  - RBAC: `resident` + `security_guard` gained `dashboards:view`.
+  - docs: `docs/backend/modules/dashboards/README.md`, `docs/backend/api/dashboards.md`.
+**Why:** FR-14.
+**Verified:** `ruff check` + `black --check` clean; `pytest -q` → **170 passed**
+(dashboards: 7 api new). No migration → no round-trip.
+**Open / next:** FR-15 `notifications` module (last).
+
+---
+
 ## 2026-08-28 — FR-13 Emergency & Incident Management module
 
 **By:** backend module build-out, module 12 of the plan
