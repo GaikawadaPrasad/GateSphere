@@ -1,48 +1,72 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
-import { auth, ApiError } from "@/lib/api";
+import { Suspense } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { ApiError } from "@/lib/api";
+import { useLogin } from "@/hooks/use-auth";
+
+const schema = z.object({
+  email: z.string().email("Enter a valid email"),
+  password: z.string().min(1, "Password is required"),
+});
+type FormValues = z.infer<typeof schema>;
 
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const [email, setEmail] = useState("super_admin@gatesphere.com");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const login = useLogin();
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
+  const {
+    register,
+    handleSubmit,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: { email: "super_admin@gatesphere.com", password: "" },
+  });
+
+  const onSubmit = handleSubmit(async (values) => {
     try {
-      await auth.login(email, password);
+      await login.mutateAsync(values);
       router.replace(params.get("next") || "/dashboard");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Login failed");
-    } finally {
-      setBusy(false);
+      if (err instanceof ApiError && Object.keys(err.fields).length) {
+        for (const [field, message] of Object.entries(err.fields)) {
+          setError(field as keyof FormValues, { message });
+        }
+      } else {
+        setError("root", {
+          message: err instanceof ApiError ? err.message : "Sign in failed",
+        });
+      }
     }
-  }
+  });
 
   return (
     <main className="container">
       <h1>Sign in</h1>
-      <form className="card" onSubmit={onSubmit}>
+      <form className="card" onSubmit={onSubmit} noValidate>
         <label htmlFor="email">Email</label>
-        <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <input id="email" type="email" autoComplete="username" {...register("email")} />
+        {errors.email && <p className="error">{errors.email.message}</p>}
+
         <label htmlFor="password">Password</label>
         <input
           id="password"
           type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
+          autoComplete="current-password"
+          {...register("password")}
         />
-        {error && <p className="error">{error}</p>}
-        <button type="submit" disabled={busy}>
-          {busy ? "Signing in…" : "Sign in"}
+        {errors.password && <p className="error">{errors.password.message}</p>}
+
+        {errors.root && <p className="error">{errors.root.message}</p>}
+
+        <button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? "Signing in…" : "Sign in"}
         </button>
       </form>
     </main>

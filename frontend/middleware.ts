@@ -2,14 +2,40 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 /**
- * Route guard. Presence-only check on the session cookie — the backend is the
- * authority and re-validates every request. Deep RBAC gating happens in the pages.
+ * Coarse route guard (AGENTS.md §5.1): presence-only check on the session
+ * cookie. The backend re-validates every request and is the real authority;
+ * `app/(protected)/layout.tsx` re-checks against `/auth/me`; per-action RBAC
+ * is done in the pages with `can()`.
  */
-const PROTECTED = ["/dashboard"];
+const PROTECTED_PREFIXES = [
+  "/dashboard",
+  "/communities",
+  "/towers",
+  "/floors",
+  "/units",
+  "/residents",
+  "/visitors",
+  "/gate",
+  "/deliveries",
+  "/domestic-staff",
+  "/vehicles",
+  "/parking",
+  "/violations",
+  "/billing",
+  "/payments",
+  "/complaints",
+  "/amenities",
+  "/communications",
+  "/notifications",
+  "/incidents",
+  "/reports",
+  "/audit-logs",
+  "/profile",
+];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  const needsAuth = PROTECTED.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  const needsAuth = PROTECTED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   if (!needsAuth) return NextResponse.next();
 
   if (!req.cookies.has("gs_session")) {
@@ -21,4 +47,7 @@ export function middleware(req: NextRequest) {
   return NextResponse.next();
 }
 
-export const config = { matcher: ["/dashboard/:path*"] };
+export const config = {
+  // Run on everything except Next internals and static assets.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api).*)"],
+};
