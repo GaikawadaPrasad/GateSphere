@@ -7,6 +7,7 @@ from app.db.base_class import Base  # noqa: F401
 from app.modules.audit import models as audit_models  # noqa: F401
 from app.modules.auth import models as auth_models  # noqa: F401
 from app.modules.communities import models as communities_models  # noqa: F401
+from app.modules.domestic_staff import models as domestic_staff_models  # noqa: F401
 from app.modules.gate import models as gate_models  # noqa: F401
 from app.modules.residents import models as residents_models  # noqa: F401
 from app.modules.users import models as users_models  # noqa: F401

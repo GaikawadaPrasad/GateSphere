@@ -241,6 +241,37 @@ def seed_gate(db: Session, communities: list[Community]) -> None:
             )
 
 
+def seed_domestic_staff(db: Session, communities: list[Community]) -> None:
+    from app.modules.communities.models import Unit
+    from app.modules.domestic_staff.models import DomesticStaff, StaffUnitAssignment
+
+    for c in communities:
+        unit = db.scalar(select(Unit).where(Unit.community_id == c.id).order_by(Unit.unit_number))
+        for i, (name, kind) in enumerate(
+            [("Lakshmi Bai", "maid"), ("Ravi Kumar", "cook"), ("Suresh Yadav", "driver")], start=1
+        ):
+            staff, created = _get_or_create(
+                db,
+                DomesticStaff,
+                community_id=c.id,
+                phone=f"+9197{c.code[-2:]}00{i:04d}",
+                defaults={
+                    "full_name": name,
+                    "staff_type": kind,
+                    "police_verification_status": "verified",
+                },
+            )
+            if created and unit is not None and i == 1:
+                db.add(
+                    StaffUnitAssignment(
+                        community_id=c.id,
+                        staff_id=staff.id,
+                        unit_id=unit.id,
+                        work_type="part_time",
+                    )
+                )
+
+
 def main() -> None:
     with SessionLocal() as db:
         seed_rbac(db)
@@ -249,6 +280,7 @@ def main() -> None:
         seed_residents(db, communities)
         seed_visitors(db, communities)
         seed_gate(db, communities)
+        seed_domestic_staff(db, communities)
         db.commit()
     log.info("seed.done")
     print(f"Seed complete. Demo users: <role>@{DEMO_DOMAIN} / <role>{DEMO_PASSWORD_SUFFIX}")

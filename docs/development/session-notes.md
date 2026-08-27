@@ -18,6 +18,34 @@ Format per entry:
 
 ---
 
+## 2026-08-28 — FR-06 Domestic Staff module
+
+**By:** backend module build-out, module 5 of the plan
+**Branch / commit:** `main`
+**What changed:**
+- **`domestic_staff` module** end to end (filled the scaffold):
+  - 4 tenant tables — `domestic_staff` (UQ `(community_id, phone)`, HMAC `id_number_hash`),
+    `staff_unit_assignments` (partial-unique active `(staff, unit)`, `CHECK start<=end`),
+    `staff_attendance` (partial-unique open row per staff, `CHECK check_out>=check_in`),
+    `staff_ratings` (UQ `(staff, unit, resident)`, `CHECK rating 1..5`). Composite tenant-safe
+    FKs to `units` + `domestic_staff`.
+  - `service.py` — upsert-by-phone guard; one active assignment per `(staff,unit)`;
+    single open attendance row; rating upsert per resident. `record_audit` on every write.
+  - `router.py` — prefix `/domestic-staff` (hyphen); `domestic_staff:{view,create,update,approve}`;
+    static routes before `/{staff_id}`.
+  - migration `0009` — 4 tables + partial-unique indexes + RLS.
+  - RBAC: `security_guard` / `security_supervisor` gained `domestic_staff:create`+`:update`
+    (gate attendance); `resident` gained `domestic_staff:view`+`:create` (onboard + rate).
+  - `seed_domestic_staff()` — 3 staff + 1 assignment per community.
+  - docs: `docs/backend/modules/domestic_staff/README.md`, `docs/backend/api/domestic-staff.md`.
+**Why:** FR-06.
+**Verified:** `ruff check` + `black --check` clean; `pytest -q` → **90 passed**
+(domestic_staff: 6 unit + 6 api new); `alembic downgrade 0008_gate && alembic upgrade head`
+round-trip; reseed.
+**Open / next:** FR-07 `deliveries` module.
+
+---
+
 ## 2026-08-28 — FR-05 Gate / Security Operations module
 
 **By:** backend module build-out, module 4 of the plan

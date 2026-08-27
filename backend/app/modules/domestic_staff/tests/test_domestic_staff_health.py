@@ -1,4 +1,4 @@
 def test_module_health(client):
-    r = client.get("/api/v1/domestic_staff/health")
+    r = client.get("/api/v1/domestic-staff/health")
     assert r.status_code == 200
     assert r.json()["data"]["module"] == "domestic_staff"
