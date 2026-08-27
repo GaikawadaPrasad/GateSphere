@@ -18,6 +18,33 @@ Format per entry:
 
 ---
 
+## 2026-08-28 — FR-07 Delivery Management module
+
+**By:** backend module build-out, module 6 of the plan
+**Branch / commit:** `main`
+**What changed:**
+- **`deliveries` module** end to end (filled the scaffold):
+  - 3 tables — `delivery_protocols` (config-as-data, UQ `(community_id, delivery_type)`),
+    `deliveries` (composite tenant-safe FKs to units + protocols), `delivery_events`
+    (append-only timeline).
+  - `service.py` — protocol auto-created with safe default if missing; auto-approve when
+    `allow_direct_entry AND NOT requires_otp`; decision only on pending; arrival gated on
+    approval; `mark_delivered` picks `delivered` vs `collected` from `protocol.leave_at_gate`.
+    Every step emits a `delivery_events` row + `record_audit`.
+  - `router.py` — `deliveries:{view,create,update,approve}`; `/protocols` PUT upsert.
+  - migration `0010` — 3 tables + RLS on the 2 tenant tables.
+  - RBAC: `resident` gained `deliveries:{view,create,approve}` (approve own deliveries);
+    `security_supervisor` gained `deliveries:{create,update}`.
+  - `seed_deliveries()` — 3 protocol presets per community.
+  - docs: `docs/backend/modules/deliveries/README.md`, `docs/backend/api/deliveries.md`.
+**Why:** FR-07.
+**Verified:** `ruff check` + `black --check` clean; `pytest -q` → **100 passed**
+(deliveries: 5 unit + 5 api new); `alembic downgrade 0009_domestic_staff && alembic upgrade head`
+round-trip; reseed.
+**Open / next:** FR-08 `vehicles` module.
+
+---
+
 ## 2026-08-28 — FR-06 Domestic Staff module
 
 **By:** backend module build-out, module 5 of the plan

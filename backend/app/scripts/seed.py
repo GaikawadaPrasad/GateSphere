@@ -272,6 +272,25 @@ def seed_domestic_staff(db: Session, communities: list[Community]) -> None:
                 )
 
 
+def seed_deliveries(db: Session, communities: list[Community]) -> None:
+    from app.modules.deliveries.models import DeliveryProtocol
+
+    presets = {
+        "food": {"protocol_type": "collect_at_gate", "leave_at_gate": False},
+        "ecommerce": {"protocol_type": "leave_at_gate", "leave_at_gate": True},
+        "courier": {"protocol_type": "call_resident", "requires_otp": True},
+    }
+    for c in communities:
+        for dtype, cfg in presets.items():
+            _get_or_create(
+                db,
+                DeliveryProtocol,
+                community_id=c.id,
+                delivery_type=dtype,
+                defaults=cfg,
+            )
+
+
 def main() -> None:
     with SessionLocal() as db:
         seed_rbac(db)
@@ -281,6 +300,7 @@ def main() -> None:
         seed_visitors(db, communities)
         seed_gate(db, communities)
         seed_domestic_staff(db, communities)
+        seed_deliveries(db, communities)
         db.commit()
     log.info("seed.done")
     print(f"Seed complete. Demo users: <role>@{DEMO_DOMAIN} / <role>{DEMO_PASSWORD_SUFFIX}")

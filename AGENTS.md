@@ -1000,7 +1000,8 @@ Silence on an area is not the same as "checked and fine" — say which one it is
 | 04 | visitors | ✅ **implemented** — 7 tables (blacklist HMAC screening, host-approval workflow, QR/PIN/OTP passes, gate entry/exit), per-community policy, migration `0007` (+ RLS + audit-index rename), seed, unit + integration tests, README + API doc |
 | 05 | gate | ✅ **implemented** — 4 tables (append-only `gate_events`, guard rosters, gate assignments, panic/SOS alerts), roster + alert state machines, one-active-assignment rule, migration `0008` (+ RLS), seed, unit + integration tests, README + API doc |
 | 06 | domestic_staff | ✅ **implemented** — 4 tables (staff directory, multi-unit assignments w/ partial-unique active, gate attendance w/ single-open-row, resident ratings w/ upsert), migration `0009` (+ RLS), seed, unit + integration tests, README + API doc |
-| 07 | deliveries | ⏳ next | 08 | vehicles | ⏳ | 09 | billing | ⏳ |
+| 07 | deliveries | ✅ **implemented** — 3 tables (config-as-data `delivery_protocols`, `deliveries` approval+arrival workflow, append-only `delivery_events`), protocol-driven auto-approval, migration `0010` (+ RLS), seed, unit + integration tests, README + API doc |
+| 08 | vehicles | ⏳ next | 09 | billing | ⏳ |
 | 10 | complaints | ⏳ | 11 | amenities | ⏳ | 12 | communication | ⏳ |
 | 13 | incidents | ⏳ | 14 | dashboards | ⏳ | 15 | notifications | ⏳ |
 
