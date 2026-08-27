@@ -1,0 +1,98 @@
+"""Canonical role and permission catalogue.
+
+Single source of truth for RBAC seeding. The PRD defines 10 roles; permissions are
+`"<module>:<action>"`. Keep this in sync with docs/security/roles-permissions.md.
+"""
+
+from __future__ import annotations
+
+ROLES: dict[str, str] = {
+    "super_admin": "Super Admin — global platform control",
+    "community_admin": "Community Admin — single-community management",
+    "association_committee": "Association Committee — governance & oversight",
+    "facility_manager": "Facility Manager — operations & maintenance",
+    "security_supervisor": "Security Supervisor — gate security oversight",
+    "security_guard": "Security Guard — live gate operations",
+    "resident": "Owner / Tenant — residential unit control",
+    "domestic_staff": "Domestic Staff — workforce access",
+    "vendor_technician": "Vendor / Technician — service execution",
+    "auditor": "Auditor — read-only compliance",
+}
+
+_MODULES = [
+    "users",
+    "communities",
+    "residents",
+    "visitors",
+    "gate",
+    "domestic_staff",
+    "deliveries",
+    "vehicles",
+    "billing",
+    "complaints",
+    "amenities",
+    "communication",
+    "incidents",
+    "notifications",
+    "audit",
+    "dashboards",
+]
+_ACTIONS = ["view", "create", "update", "delete", "approve", "export"]
+
+PERMISSIONS: dict[str, str] = {
+    f"{m}:{a}": f"{a.title()} {m.replace('_', ' ')}" for m in _MODULES for a in _ACTIONS
+}
+
+# Starter grants — refine per docs/security/roles-permissions.md.
+ROLE_PERMISSIONS: dict[str, list[str]] = {
+    "super_admin": ["*"],
+    "community_admin": [p for p in PERMISSIONS if not p.startswith("audit:")],
+    "association_committee": [
+        "billing:view",
+        "billing:export",
+        "incidents:view",
+        "dashboards:view",
+        "audit:view",
+    ],
+    "facility_manager": [
+        "amenities:view",
+        "amenities:create",
+        "amenities:update",
+        "complaints:view",
+        "complaints:update",
+        "dashboards:view",
+    ],
+    "security_supervisor": [
+        "visitors:view",
+        "visitors:approve",
+        "gate:view",
+        "gate:update",
+        "incidents:view",
+        "incidents:create",
+        "dashboards:view",
+    ],
+    "security_guard": [
+        "visitors:view",
+        "visitors:create",
+        "gate:view",
+        "gate:create",
+        "gate:update",
+        "deliveries:view",
+        "deliveries:create",
+    ],
+    "resident": [
+        "visitors:view",
+        "visitors:create",
+        "visitors:approve",
+        "billing:view",
+        "complaints:view",
+        "complaints:create",
+        "amenities:view",
+        "amenities:create",
+        "vehicles:view",
+        "vehicles:create",
+    ],
+    "domestic_staff": ["gate:view"],
+    "vendor_technician": ["complaints:view", "complaints:update", "gate:view"],
+    "auditor": [f"{m}:view" for m in _MODULES] + ["billing:export", "audit:view", "audit:export"],
+}

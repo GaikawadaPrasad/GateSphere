@@ -1,0 +1,41 @@
+[project]
+name = "gatesphere-backend"
+version = "0.1.0"
+description = "GateSphere enterprise community/visitor/security/facility management API"
+requires-python = ">=3.12"
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["app", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "C4", "SIM", "RUF"]
+# B008: FastAPI's `Depends()` in defaults is the idiomatic pattern.
+ignore = ["S101", "B008"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "B"]
+"**/tests/**" = ["S", "B"]
+"conftest.py" = ["S"]
+"app/scripts/**" = ["S"]
+"alembic/**" = ["ALL"]
+
+[tool.mypy]
+python_version = "3.12"
+plugins = ["pydantic.mypy"]
+disallow_untyped_defs = true
+warn_unused_ignores = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+addopts = "-q"
+pythonpath = ["."]
+testpaths = ["tests", "app"]

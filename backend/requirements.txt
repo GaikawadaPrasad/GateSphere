@@ -1,0 +1,27 @@
+# GateSphere backend — pinned top-level dependencies
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+gunicorn==23.0.0
+pydantic[email]==2.10.4
+pydantic-settings==2.7.1
+email-validator==2.2.0
+SQLAlchemy==2.0.36
+alembic==1.14.0
+psycopg[binary]==3.2.3
+redis==5.2.1
+celery==5.4.0
+argon2-cffi==23.1.0
+itsdangerous==2.2.0
+python-multipart==0.0.20
+httpx==0.28.1
+boto3==1.35.90
+sib-api-v3-sdk==7.6.0
+structlog==24.4.0
+slowapi==0.1.9
+
+# dev / test
+pytest==8.3.4
+pytest-cov==6.0.0
+ruff==0.8.6
+black==24.10.0
+mypy==1.14.1
