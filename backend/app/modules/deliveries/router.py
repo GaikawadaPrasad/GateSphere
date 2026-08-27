@@ -13,7 +13,12 @@ router = APIRouter(prefix="/deliveries", tags=["Delivery Management"])
 
 @router.get("/health", summary="Delivery Management module liveness")
 async def module_health() -> dict:
-    return {"module": "deliveries", "status": "ok"}
+    return {
+        "success": True,
+        "message": "OK",
+        "meta": None,
+        "data": {"module": "deliveries", "status": "ok"},
+    }
 
 
 # TODO(deliveries): implement endpoints per docs/backend/modules/deliveries/README.md

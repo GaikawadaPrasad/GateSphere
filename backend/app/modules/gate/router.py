@@ -13,7 +13,12 @@ router = APIRouter(prefix="/gate", tags=["Gate Operations"])
 
 @router.get("/health", summary="Gate Operations module liveness")
 async def module_health() -> dict:
-    return {"module": "gate", "status": "ok"}
+    return {
+        "success": True,
+        "message": "OK",
+        "meta": None,
+        "data": {"module": "gate", "status": "ok"},
+    }
 
 
 # TODO(gate): implement endpoints per docs/backend/modules/gate/README.md

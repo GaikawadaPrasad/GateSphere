@@ -13,7 +13,12 @@ router = APIRouter(prefix="/billing", tags=["Maintenance & Billing"])
 
 @router.get("/health", summary="Maintenance & Billing module liveness")
 async def module_health() -> dict:
-    return {"module": "billing", "status": "ok"}
+    return {
+        "success": True,
+        "message": "OK",
+        "meta": None,
+        "data": {"module": "billing", "status": "ok"},
+    }
 
 
 # TODO(billing): implement endpoints per docs/backend/modules/billing/README.md

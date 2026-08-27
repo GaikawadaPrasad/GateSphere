@@ -13,7 +13,12 @@ router = APIRouter(prefix="/communication", tags=["Community Communication"])
 
 @router.get("/health", summary="Community Communication module liveness")
 async def module_health() -> dict:
-    return {"module": "communication", "status": "ok"}
+    return {
+        "success": True,
+        "message": "OK",
+        "meta": None,
+        "data": {"module": "communication", "status": "ok"},
+    }
 
 
 # TODO(communication): implement endpoints per docs/backend/modules/communication/README.md

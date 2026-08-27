@@ -13,7 +13,12 @@ router = APIRouter(prefix="/notifications", tags=["Notification Engine"])
 
 @router.get("/health", summary="Notification Engine module liveness")
 async def module_health() -> dict:
-    return {"module": "notifications", "status": "ok"}
+    return {
+        "success": True,
+        "message": "OK",
+        "meta": None,
+        "data": {"module": "notifications", "status": "ok"},
+    }
 
 
 # TODO(notifications): implement endpoints per docs/backend/modules/notifications/README.md

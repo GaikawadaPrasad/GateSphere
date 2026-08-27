@@ -13,7 +13,12 @@ router = APIRouter(prefix="/dashboards", tags=["Dashboards & Reports"])
 
 @router.get("/health", summary="Dashboards & Reports module liveness")
 async def module_health() -> dict:
-    return {"module": "dashboards", "status": "ok"}
+    return {
+        "success": True,
+        "message": "OK",
+        "meta": None,
+        "data": {"module": "dashboards", "status": "ok"},
+    }
 
 
 # TODO(dashboards): implement endpoints per docs/backend/modules/dashboards/README.md

@@ -13,7 +13,12 @@ router = APIRouter(prefix="/amenities", tags=["Amenity Booking"])
 
 @router.get("/health", summary="Amenity Booking module liveness")
 async def module_health() -> dict:
-    return {"module": "amenities", "status": "ok"}
+    return {
+        "success": True,
+        "message": "OK",
+        "meta": None,
+        "data": {"module": "amenities", "status": "ok"},
+    }
 
 
 # TODO(amenities): implement endpoints per docs/backend/modules/amenities/README.md

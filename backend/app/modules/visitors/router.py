@@ -13,7 +13,12 @@ router = APIRouter(prefix="/visitors", tags=["Visitor Management"])
 
 @router.get("/health", summary="Visitor Management module liveness")
 async def module_health() -> dict:
-    return {"module": "visitors", "status": "ok"}
+    return {
+        "success": True,
+        "message": "OK",
+        "meta": None,
+        "data": {"module": "visitors", "status": "ok"},
+    }
 
 
 # TODO(visitors): implement endpoints per docs/backend/modules/visitors/README.md

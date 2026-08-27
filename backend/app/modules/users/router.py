@@ -13,7 +13,12 @@ router = APIRouter(prefix="/users", tags=["Users & RBAC"])
 
 @router.get("/health", summary="Users & RBAC module liveness")
 async def module_health() -> dict:
-    return {"module": "users", "status": "ok"}
+    return {
+        "success": True,
+        "message": "OK",
+        "meta": None,
+        "data": {"module": "users", "status": "ok"},
+    }
 
 
 # TODO(users): implement endpoints per docs/backend/modules/users/README.md

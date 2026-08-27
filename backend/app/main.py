@@ -3,18 +3,31 @@
 from __future__ import annotations
 
 import structlog
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from app.api.router import api_router
 from app.core.config import settings
+from app.core.errors import register_exception_handlers
 from app.core.logging import CorrelationIdMiddleware, configure_logging
+from app.core.responses import ok
 from app.modules.auth.router import limiter
 
 log = structlog.get_logger(__name__)
+
+
+def _rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    return JSONResponse(
+        status_code=429,
+        content={
+            "success": False,
+            "message": "Too many requests — slow down and try again shortly.",
+            "data": None,
+            "error": {"code": "RATE_LIMITED"},
+        },
+    )
 
 
 def create_app() -> FastAPI:
@@ -27,7 +40,8 @@ def create_app() -> FastAPI:
     )
 
     app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
+    register_exception_handlers(app)
 
     app.add_middleware(CorrelationIdMiddleware)
     app.add_middleware(
@@ -42,26 +56,29 @@ def create_app() -> FastAPI:
 
     @app.get("/", tags=["ops"], summary="Service metadata")
     def root() -> dict:
-        return {
-            "name": settings.PROJECT_NAME,
-            "service": "gatesphere-backend",
-            "version": app.version,
-            "environment": settings.ENVIRONMENT,
-            "status": "ok",
-            "api_prefix": settings.API_V1_PREFIX,
-            "docs": "/docs",
-            "openapi": f"{settings.API_V1_PREFIX}/openapi.json",
-            "health": {"live": "/healthz", "ready": "/readyz"},
-        }
+        return ok(
+            {
+                "name": settings.PROJECT_NAME,
+                "service": "gatesphere-backend",
+                "version": app.version,
+                "environment": settings.ENVIRONMENT,
+                "api_prefix": settings.API_V1_PREFIX,
+                "docs": "/docs",
+                "openapi": f"{settings.API_V1_PREFIX}/openapi.json",
+                "health": {"live": "/healthz", "ready": "/readyz"},
+            }
+        )
 
     @app.get("/healthz", tags=["ops"], summary="Liveness probe")
     def healthz() -> dict:
-        return {
-            "status": "ok",
-            "name": settings.PROJECT_NAME,
-            "version": app.version,
-            "environment": settings.ENVIRONMENT,
-        }
+        return ok(
+            {
+                "name": settings.PROJECT_NAME,
+                "version": app.version,
+                "environment": settings.ENVIRONMENT,
+            },
+            message="alive",
+        )
 
     @app.get("/readyz", tags=["ops"], summary="Readiness probe (checks dependencies)")
     def readyz() -> JSONResponse:
@@ -86,7 +103,12 @@ def create_app() -> FastAPI:
         ready = all(v == "ok" for v in checks.values())
         return JSONResponse(
             status_code=200 if ready else 503,
-            content={"status": "ready" if ready else "degraded", "checks": checks},
+            content={
+                "success": ready,
+                "message": "ready" if ready else "degraded",
+                "data": {"checks": checks},
+                "meta": None,
+            },
         )
 
     log.info("app.started", env=settings.ENVIRONMENT)

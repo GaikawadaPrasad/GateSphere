@@ -13,7 +13,12 @@ router = APIRouter(prefix="/audit", tags=["Audit Logging"])
 
 @router.get("/health", summary="Audit Logging module liveness")
 async def module_health() -> dict:
-    return {"module": "audit", "status": "ok"}
+    return {
+        "success": True,
+        "message": "OK",
+        "meta": None,
+        "data": {"module": "audit", "status": "ok"},
+    }
 
 
 # TODO(audit): implement endpoints per docs/backend/modules/audit/README.md

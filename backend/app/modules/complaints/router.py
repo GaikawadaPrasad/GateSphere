@@ -13,7 +13,12 @@ router = APIRouter(prefix="/complaints", tags=["Complaint & Service Desk"])
 
 @router.get("/health", summary="Complaint & Service Desk module liveness")
 async def module_health() -> dict:
-    return {"module": "complaints", "status": "ok"}
+    return {
+        "success": True,
+        "message": "OK",
+        "meta": None,
+        "data": {"module": "complaints", "status": "ok"},
+    }
 
 
 # TODO(complaints): implement endpoints per docs/backend/modules/complaints/README.md
