@@ -1,0 +1,17 @@
+# Normalize line endings. Text files stored as LF in the repo.
+* text=auto eol=lf
+
+# Files that MUST stay LF (run inside Linux containers / are shell-parsed)
+*.sh            text eol=lf
+*.py            text eol=lf
+*.mako          text eol=lf
+Dockerfile*     text eol=lf
+Makefile        text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf
+
+# Binary
+*.png binary
+*.jpg binary
+*.pdf binary
+*.ico binary
