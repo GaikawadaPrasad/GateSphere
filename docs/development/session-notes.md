@@ -18,6 +18,41 @@ Format per entry:
 
 ---
 
+## 2026-08-28 — FR-03 Residents module
+
+**By:** backend module build-out, module 2 of the plan
+**Branch / commit:** `main`
+**What changed:**
+- **`residents` module** end to end, following the `communities` shape:
+  - 5 tenant tables (`resident_profiles`, `unit_occupancies`, `family_members`,
+    `emergency_contacts`, `move_records`) with **composite tenant-safe FKs** to `units` and
+    `resident_profiles`; **partial unique index** `uq_unit_primary_active` = one primary active
+    occupant per unit.
+  - `service.py` — active-community resolution (single-community scope, or `?community_id=` for
+    global; else `COMMUNITY_REQUIRED`); cross-tenant user/unit/profile → 404; one profile per
+    `(community,user)`; occupancy conflict + primary-occupant conflict; occupancy end-date > start;
+    **move-record state machine** (`_MOVE_TRANSITIONS`) — `requested→scheduled→approved→completed`
+    / `→rejected` / `→cancelled`, invalid → `422 INVALID_TRANSITION`; `approve` stamps approver;
+    a completed `move_out` deactivates the occupancy. `record_audit` on every write.
+  - `router.py` — static-prefix routes (`/move-records`, `/occupancies`, `/units/...`,
+    `/emergency-contacts/...`, `/family-members`) declared **before** the `/{profile_id}`
+    catch-all so `GET /residents/move-records` isn't parsed as a profile id (regression test).
+  - migration `0006` — the 5 tables + `UQ(id, community_id)` on `units` + RLS on all five.
+  - `seed.py` — `seed_residents()`: 6 profiles + primary occupancies + 1 emergency contact each,
+    per community.
+- Tests: `test_residents_unit.py` (9 service-rule cases incl. move state machine + occupancy
+  deactivation) + `test_residents_api.py` (6 integration incl. 401, resident-role 403, the
+  move-records route-order regression, full CA flow with `try/finally` cleanup, cross-community
+  404). **50 tests total**, run twice for idempotence.
+**Verified:** `ruff` + `black --check` clean; `pytest -q` 50 pass (x2); migration
+`downgrade→base→head` x2 clean; live curl — list profiles (6), `/move-records` resolves (200),
+emergency-contacts list.
+**Open / next:** FR-04 **visitors** (visitors, visitor_blacklist, visitor_groups,
+visitor_requests, visitor_approvals, visitor_passes, visitor_entries, visitor_policies) — the
+first module with a real approval workflow + QR/OTP passes.
+
+---
+
 ## 2026-08-27 — FR-03 Community & Property module (reference implementation)
 
 **By:** backend module build-out, module 1 of the plan

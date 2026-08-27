@@ -131,11 +131,63 @@ def seed_users(db: Session, communities: list[Community]) -> None:
         _get_or_create(db, UserRole, user_id=user.id, role_id=roles[slug].id, community_id=scope)
 
 
+def seed_residents(db: Session, communities: list[Community]) -> None:
+    from app.modules.communities.models import Unit
+    from app.modules.residents.models import (
+        EmergencyContact,
+        ResidentProfile,
+        UnitOccupancy,
+    )
+
+    for c in communities:
+        units = db.scalars(
+            select(Unit).where(Unit.community_id == c.id).order_by(Unit.unit_number).limit(6)
+        ).all()
+        for i, unit in enumerate(units, start=1):
+            email = f"resident{i}.{c.code}@{DEMO_DOMAIN}"
+            user, _ = _get_or_create(
+                db,
+                User,
+                email=email,
+                defaults={
+                    "full_name": f"Resident {i} ({c.code})",
+                    "password_hash": hash_password("Resident#2026"),
+                },
+            )
+            profile, created = _get_or_create(
+                db,
+                ResidentProfile,
+                community_id=c.id,
+                user_id=user.id,
+                defaults={"profile_status": "active", "kyc_status": "verified"},
+            )
+            _get_or_create(
+                db,
+                UnitOccupancy,
+                community_id=c.id,
+                unit_id=unit.id,
+                resident_profile_id=profile.id,
+                defaults={"occupancy_role": "primary_owner", "is_primary": True},
+            )
+            if created:
+                db.add(
+                    EmergencyContact(
+                        community_id=c.id,
+                        resident_profile_id=profile.id,
+                        name=f"Kin of Resident {i}",
+                        relationship_type="spouse",
+                        phone="+91 90000 0000" + str(i),
+                        priority=1,
+                    )
+                )
+
+
 def main() -> None:
     with SessionLocal() as db:
         seed_rbac(db)
         communities = seed_property(db)
         seed_users(db, communities)
+        seed_residents(db, communities)
         db.commit()
     log.info("seed.done")
     print(f"Seed complete. Demo users: <role>@{DEMO_DOMAIN} / <role>{DEMO_PASSWORD_SUFFIX}")

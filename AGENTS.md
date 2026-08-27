@@ -996,8 +996,8 @@ Silence on an area is not the same as "checked and fine" — say which one it is
 | 02 | users / RBAC | ✅ catalogue + `require_permission` + `TenantScope`; ⏳ no user/role **management** endpoints yet |
 | 16 | audit | ✅ `audit_logs` ERD-shaped (migration `0005`) + `record_audit()` helper |
 | **03** | **communities & property** | ✅ **implemented** — models (composite tenant-safe FKs), `TenantRepository`, service (scope rules, enum/conflict checks), router (envelope + RBAC), migration `0004` (+ RLS on gates/towers/floors/units), seed, unit + integration tests, module README + API doc |
-| 03 | residents | ⏳ next — `resident_profiles`, `unit_occupancies`, `family_members`, `emergency_contacts`, `move_records` |
-| 04 | visitors | ⏳ |
+| 03 | residents | ✅ **implemented** — 5 tables (composite tenant-safe FKs, partial-unique primary occupant), move-record state machine, migration `0006` (+ RLS), seed, unit + integration tests, README + API doc |
+| 04 | visitors | ⏳ next |
 | 05 | gate | ⏳ | 06 | domestic_staff | ⏳ |
 | 07 | deliveries | ⏳ | 08 | vehicles | ⏳ | 09 | billing | ⏳ |
 | 10 | complaints | ⏳ | 11 | amenities | ⏳ | 12 | communication | ⏳ |
