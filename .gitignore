@@ -245,3 +245,6 @@ miniodata/
 # Coverage / reports
 coverage.xml
 zap-report.*
+
+# TS build info
+*.tsbuildinfo
