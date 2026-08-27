@@ -988,17 +988,36 @@ Silence on an area is not the same as "checked and fine" — say which one it is
   `package-lock.json` committed.
 - ✅ **`docs/development/session-notes.md`** — created.
 
-### Still open (feature work, not foundation)
+### Backend module build-out (one at a time, per the 13-day plan)
 
-1. **Full schema** — only core tables exist (communities / property / RBAC / audit / user_sessions).
-   Build out the remaining ~85 module tables per `docs/database/schema.md`, each with its
-   CHECK/UNIQUE/EXCLUDE constraints and append‑only triggers, **and add each to
-   `TENANT_TABLES` in a follow‑up RLS migration**.
-2. **RLS enforcement test suite** — `tests/test_tenant_isolation.py` must connect as a
+| FR | Module | Status |
+|----|--------|--------|
+| 01 | auth / session | ✅ sessions + RBAC + envelope + rate limit |
+| 02 | users / RBAC | ✅ catalogue + `require_permission` + `TenantScope`; ⏳ no user/role **management** endpoints yet |
+| 16 | audit | ✅ `audit_logs` ERD-shaped (migration `0005`) + `record_audit()` helper |
+| **03** | **communities & property** | ✅ **implemented** — models (composite tenant-safe FKs), `TenantRepository`, service (scope rules, enum/conflict checks), router (envelope + RBAC), migration `0004` (+ RLS on gates/towers/floors/units), seed, unit + integration tests, module README + API doc |
+| 03 | residents | ⏳ next — `resident_profiles`, `unit_occupancies`, `family_members`, `emergency_contacts`, `move_records` |
+| 04 | visitors | ⏳ |
+| 05 | gate | ⏳ | 06 | domestic_staff | ⏳ |
+| 07 | deliveries | ⏳ | 08 | vehicles | ⏳ | 09 | billing | ⏳ |
+| 10 | complaints | ⏳ | 11 | amenities | ⏳ | 12 | communication | ⏳ |
+| 13 | incidents | ⏳ | 14 | dashboards | ⏳ | 15 | notifications | ⏳ |
+
+**Reference module = `communities`.** Every new module follows its shape: `models.py`
+(TenantMixin + DB constraints) → `schemas.py` (`extra="forbid"`, `*Create/*Update/*Read`) →
+`repository.py` (`TenantRepository`) → `service.py` (rules + `record_audit`) → `deps.py`
+(`tenant_context`) → `router.py` (thin, envelope, `require_permission`) → migration (+ add its
+tenant tables to a new RLS migration) → extend `seed.py` → `tests/test_<m>_{unit,api}.py` (incl.
+401/403 and cross-tenant 404) → module README + API doc → this table + session-notes.
+
+### Still open (feature work)
+
+1. **RLS enforcement test suite** — `tests/test_tenant_isolation.py` must connect as a
    **restricted** DB role against the migrated DB (local Postgres superuser bypasses RLS, §12).
-3. **OTP login, community switcher UI, SSE/WebSocket gate feed** (FR‑04/05).
-4. **Frontend design system** — Tailwind + shadcn/ui + Recharts + TanStack Table + the shared
+2. **OTP login, community switcher UI, SSE/WebSocket gate feed** (FR‑04/05).
+3. **Frontend design system** — Tailwind + shadcn/ui + Recharts + TanStack Table + the shared
    component library. Plain CSS with the design tokens is the placeholder.
-5. **Permission caching** (`permission_version` bump) — evaluation is live per request today.
+4. **Permission caching** (`permission_version` bump) — evaluation is live per request today.
+5. **User / role management endpoints** (FR-02) — assign/revoke roles, invite users.
 
 Record any deliberate deviation as an ADR in `docs/decisions/`.

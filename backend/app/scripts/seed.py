@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.core.rbac import PERMISSIONS, ROLE_PERMISSIONS, ROLES
 from app.core.security import hash_password
 from app.db.session import SessionLocal
-from app.modules.communities.models import Community, Floor, Tower, Unit
+from app.modules.communities.models import Community, Floor, Gate, Tower, Unit
 from app.modules.users.models import Permission, Role, RolePermission, User, UserRole
 
 log = structlog.get_logger(__name__)
@@ -53,40 +53,60 @@ def seed_rbac(db: Session) -> None:
             _get_or_create(db, RolePermission, role_id=role.id, permission_id=perms[code].id)
 
 
+_COMMUNITY_NAMES = ["Green Park Enclave", "Sunrise Heights"]
+
+
 def seed_property(db: Session) -> list[Community]:
     communities = []
     for ci in range(1, 3):
         c, _ = _get_or_create(
             db,
             Community,
-            code=f"GS-{ci:02d}",
-            defaults={"name": f"GateSphere Community {ci}", "address": f"{ci} Sphere Avenue"},
+            code=f"gs-{ci:02d}",
+            defaults={
+                "name": _COMMUNITY_NAMES[ci - 1],
+                "address_line1": f"{ci} Sphere Avenue",
+                "city": "Hyderabad",
+                "state": "Telangana",
+                "postal_code": f"5000{ci:02d}",
+            },
         )
         communities.append(c)
+        for gi, gtype in enumerate(("main", "service"), start=1):
+            _get_or_create(
+                db,
+                Gate,
+                community_id=c.id,
+                code=f"G{gi}",
+                defaults={"name": f"{gtype.title()} Gate", "gate_type": gtype},
+            )
         for ti in range(1, 3):  # 2 towers each -> 4 towers
+            letter = chr(64 + ti)
             t, _ = _get_or_create(
                 db,
                 Tower,
                 community_id=c.id,
-                name=f"Tower {chr(64 + ti)}",
-                defaults={"floors_count": 2},
+                name=f"Tower {letter}",
+                defaults={"code": f"T{letter}", "structure_type": "tower", "total_floors": 2},
             )
             for fn in range(1, 3):  # 2 floors each -> 8 floors
                 f, _ = _get_or_create(
-                    db, Floor, tower_id=t.id, number=fn, defaults={"community_id": c.id}
+                    db,
+                    Floor,
+                    community_id=c.id,
+                    tower_id=t.id,
+                    floor_number=fn,
+                    defaults={"label": f"Floor {fn}"},
                 )
                 for un in range(1, 8):  # 7 units/floor -> 56 units
                     _get_or_create(
                         db,
                         Unit,
                         community_id=c.id,
-                        label=f"{chr(64 + ti)}-{fn}{un:02d}",
-                        defaults={
-                            "tower_id": t.id,
-                            "floor_id": f.id,
-                            "unit_type": "apartment",
-                            "bedrooms": 2,
-                        },
+                        tower_id=t.id,
+                        floor_id=f.id,
+                        unit_number=f"{letter}-{fn}{un:02d}",
+                        defaults={"unit_type": "apartment", "bedrooms": 2, "area_sqft": 1150},
                     )
     return communities
 

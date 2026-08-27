@@ -1,0 +1,103 @@
+"""Integration tests — full router -> service -> DB, incl. RBAC + tenant scope."""
+
+from __future__ import annotations
+
+P = "/api/v1/communities"
+
+
+def test_health_envelope(client):
+    r = client.get(f"{P}/health")
+    assert r.status_code == 200
+    assert r.json()["data"]["module"] == "communities"
+
+
+def test_list_requires_auth(client):
+    r = client.get(P)
+    assert r.status_code == 401
+    assert r.json()["error"]["code"] == "NOT_AUTHENTICATED"
+
+
+def test_resident_cannot_create_community(as_role, unique_code):
+    r = as_role("resident").post(P, json={"code": unique_code, "name": "X"})
+    assert r.status_code == 403
+    assert r.json()["error"]["code"] == "PERMISSION_DENIED"
+
+
+def test_superadmin_full_property_hierarchy(auth_client, unique_code):
+    # community
+    r = auth_client.post(P, json={"code": unique_code, "name": "Test Community"})
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["success"] and body["message"] == "Community created"
+    community_id = body["data"]["id"]
+
+    # duplicate code -> 409
+    r = auth_client.post(P, json={"code": unique_code, "name": "Dup"})
+    assert r.status_code == 409
+    assert r.json()["error"]["code"] == "COMMUNITY_CODE_TAKEN"
+
+    # unknown field -> 422 (extra=forbid)
+    r = auth_client.post(P, json={"code": unique_code + "z", "name": "Y", "nope": 1})
+    assert r.status_code == 422
+
+    # gate
+    r = auth_client.post(f"{P}/{community_id}/gates", json={"code": "G1", "name": "Main Gate"})
+    assert r.status_code == 201, r.text
+
+    # tower -> floor -> unit
+    r = auth_client.post(f"{P}/{community_id}/towers", json={"code": "TA", "name": "Tower A"})
+    assert r.status_code == 201, r.text
+    tower_id = r.json()["data"]["id"]
+
+    r = auth_client.post(f"{P}/floors", json={"tower_id": tower_id, "floor_number": 1})
+    assert r.status_code == 201, r.text
+    floor_id = r.json()["data"]["id"]
+
+    r = auth_client.post(
+        f"{P}/units", json={"floor_id": floor_id, "unit_number": "A-101", "bedrooms": 3}
+    )
+    assert r.status_code == 201, r.text
+    unit = r.json()["data"]
+    assert unit["community_id"] == community_id
+    assert unit["tower_id"] == tower_id
+
+    # list units on the floor -> envelope with meta
+    r = auth_client.get(f"{P}/floors/{floor_id}/units")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["meta"]["total"] == 1
+    assert body["data"][0]["unit_number"] == "A-101"
+
+    # cleanup
+    assert auth_client.delete(f"{P}/{community_id}").status_code == 204
+
+
+def test_community_admin_is_scoped_to_own_community(as_role, seed_ids, unique_code):
+    ca = as_role("community_admin")
+
+    # can create a tower in their own community
+    own = seed_ids["community_id"]
+    r = ca.post(
+        f"{P}/{own}/towers", json={"code": unique_code[:8], "name": f"Tower {unique_code[:6]}"}
+    )
+    assert r.status_code == 201, r.text
+
+    # cannot create a community (global-only) -> 403
+    r = ca.post(P, json={"code": unique_code, "name": "X"})
+    assert r.status_code == 403
+    assert r.json()["error"]["code"] == "GLOBAL_ONLY"
+
+    # another community is not found for them -> 404, never 403
+    other = seed_ids["other_community_id"]
+    r = ca.get(f"{P}/{other}")
+    assert r.status_code == 404
+    r = ca.post(f"{P}/{other}/towers", json={"code": "ZZ", "name": "Nope"})
+    assert r.status_code == 404
+
+
+def test_auditor_can_view_but_not_create(as_role, seed_ids):
+    auditor = as_role("auditor")
+    r = auditor.get(P)
+    assert r.status_code == 200
+    r = auditor.post(P, json={"code": "auditx", "name": "X"})
+    assert r.status_code == 403

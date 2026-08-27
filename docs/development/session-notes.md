@@ -18,6 +18,50 @@ Format per entry:
 
 ---
 
+## 2026-08-27 — FR-03 Community & Property module (reference implementation)
+
+**By:** backend module build-out, module 1 of the plan
+**Branch / commit:** `main`
+**What changed:**
+- **`communities` module implemented end to end** as the reference for every subsequent module:
+  - `models.py` — `Community` (tenant root, not scoped), `Gate`/`Tower`/`Floor`/`Unit` (TenantMixin
+    + **composite tenant-safe FKs**: `floors(tower_id,community_id)→towers`,
+    `units(floor_id,community_id,tower_id)→floors`). Enum tuples for gate/structure/unit type.
+  - `schemas.py` — `*Create/*Update/*Read` per entity, all `extra="forbid"`, code pattern + range validators.
+  - `repository.py` — `CommunityRepository` (scoped on `id`, since communities has no `community_id`)
+    + `Gate/Tower/Floor/Unit` repos on `TenantRepository`.
+  - `service.py` — `CommunityService`: community create/delete = global-scope only; child entities
+    created in the caller's active community (from `TenantScope.require()`, never the payload);
+    `floor.tower` / `unit.floor` resolved within scope (cross-tenant → 404); enum → 422
+    `INVALID_ENUM`; duplicates → 409 with stable codes; every write calls `record_audit()`.
+  - `deps.py` / `router.py` — thin endpoints, canonical envelope, `require_permission("communities:*")`,
+    `tenant_context`. `/communities`, `/{id}`, `/{id}/{gates,towers}`, `/towers/{id}[/floors]`,
+    `/floors[/{id}/units]`, `/units[/{id}]`.
+- **`audit` module** — `AuditLog` reshaped to the AGENTS §10 column names (`created_at`, `user_id`,
+  `session_id` uuid, `old_values`, `new_values`, `ip_address` inet, `user_agent`) via migration
+  `0005`; new `audit/service.py::record_audit()` (called inside the operation's transaction).
+- **Migrations** `0004` (reshape towers/floors/units to ERD + add gates + RLS on all four) and
+  `0005` (audit shape). Full `downgrade→base→head` round-trip verified twice.
+- **seed.py** — Green Park Enclave / Sunrise Heights, 2 gates + 2 towers + 2 floors + 7 units each
+  (56 units), new column names.
+- **conftest.py** — `as_role(slug)` factory, `seed_ids`, `unique_code` fixtures; session-scoped
+  autouse fixture disables the login rate limiter for tests.
+- **Tests** — `test_communities_unit.py` (7 service-rule tests: global-only, conflict, bad enum,
+  cross-tenant 404, inheritance, audit-row) + `test_communities_api.py` (6 integration: full
+  hierarchy, 401, resident 403, community-admin scoping + 404-not-403, auditor read-only,
+  extra-field 422). 35 tests total, all green.
+- Docs: `docs/backend/modules/communities/README.md` + `docs/backend/api/communities.md` filled
+  in; AGENTS.md §23 gains the module build-out status table.
+**Why:** FR-03 is the master-data spine every other module references; doing it first + fully
+establishes the pattern.
+**Verified:** `ruff` + `black --check` clean; `pytest -q` 35 pass; migration round-trip x2;
+live curl — list communities (envelope + meta), list gates, create tower (201 + envelope).
+**Open / next:** FR-03 **residents** (resident_profiles, unit_occupancies, family_members,
+emergency_contacts, move_records), then FR-04 visitors. Each: add its tenant tables to a new RLS
+migration; extend seed; unit + integration tests.
+
+---
+
 ## 2026-08-27 — Foundation upgrade: identity, sessions, envelope, tenancy, RLS, frontend structure
 
 **By:** foundation upgrade pass (per AGENTS.md §23)
