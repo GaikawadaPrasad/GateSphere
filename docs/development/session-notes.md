@@ -18,6 +18,37 @@ Format per entry:
 
 ---
 
+## 2026-08-28 — FR-09 Maintenance & Billing module
+
+**By:** backend module build-out, module 8 of the plan
+**Branch / commit:** `main`
+**What changed:**
+- **`billing` module** end to end (filled the scaffold):
+  - 7 tables — `charge_heads`, `billing_rules` (config-as-data), `maintenance_invoices`
+    (composite tenant-safe FK to units) + `invoice_items`, `payments` (simulated) +
+    `payment_allocations`, `ledger_entries` (append-only, Postgres `Identity` `entry_seq`
+    for a monotonic running balance).
+  - `service.py` — server-computed totals (`subtotal`, `tax` from `rule.tax_percent`, `total`,
+    `balance_due`), all quantised to 2 dp; `draft→posted` freeze writes a ledger debit;
+    simulated payment requires allocations to sum exactly to `amount`, never exceed an
+    invoice balance, and advances `posted→partially_paid→paid` with a ledger credit per
+    allocation; cancel refused when `amount_paid > 0`.
+  - Also hardened `audit.service._jsonable` to handle `Decimal` / `datetime` / `date`.
+  - `router.py` — `billing:{view,create,approve,export}`; static routes before `/invoices/*`.
+  - migration `0012` — 7 tables + `entry_seq` Identity + RLS on the 5 tenant tables.
+  - RBAC: `resident` + `association_committee` gained `billing:create`;
+    `association_committee` also `billing:approve`.
+  - `seed_billing()` — rules (18% tax) + 3 charge heads per community.
+  - docs: `docs/backend/modules/billing/README.md`, `docs/backend/api/billing.md`.
+**Why:** FR-09.
+**Verified:** `ruff check` + `black --check` clean; `pytest -q` → **121 passed**
+(billing: 5 unit + 5 api new); `alembic downgrade 0011_vehicles && alembic upgrade head`
+round-trip; reseed.
+**Open / next:** FR-10 `complaints` (paused here at the user's request — see
+`backend-handover-document.md`).
+
+---
+
 ## 2026-08-28 — FR-08 Vehicle & Parking module
 
 **By:** backend module build-out, module 7 of the plan

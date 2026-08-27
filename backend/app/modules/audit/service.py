@@ -7,6 +7,8 @@ auditing. Never update or delete an audit row.
 from __future__ import annotations
 
 import uuid
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Any
 
 from fastapi import Request
@@ -21,8 +23,10 @@ def _jsonable(value: Any) -> Any:
         return {k: _jsonable(v) for k, v in value.items()}
     if isinstance(value, list | tuple):
         return [_jsonable(v) for v in value]
-    if isinstance(value, uuid.UUID):
+    if isinstance(value, uuid.UUID | Decimal):
         return str(value)
+    if isinstance(value, datetime | date):
+        return value.isoformat()
     return value
 
 

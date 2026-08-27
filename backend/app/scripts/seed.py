@@ -326,6 +326,35 @@ def seed_vehicles(db: Session, communities: list[Community]) -> None:
             )
 
 
+def seed_billing(db: Session, communities: list[Community]) -> None:
+    from decimal import Decimal
+
+    from app.modules.billing.models import BillingRule, ChargeHead
+
+    heads = [
+        ("MAINT", "Monthly Maintenance", "per_sqft", Decimal("2.50"), False),
+        ("WATER", "Water Charges", "flat", Decimal("300.00"), False),
+        ("SINK", "Sinking Fund", "flat", Decimal("500.00"), True),
+    ]
+    for c in communities:
+        _get_or_create(
+            db, BillingRule, community_id=c.id, defaults={"tax_percent": Decimal("18.00")}
+        )
+        for code, name, calc, amt, taxable in heads:
+            _get_or_create(
+                db,
+                ChargeHead,
+                community_id=c.id,
+                code=code,
+                defaults={
+                    "name": name,
+                    "calculation_type": calc,
+                    "default_amount": amt,
+                    "taxable": taxable,
+                },
+            )
+
+
 def main() -> None:
     with SessionLocal() as db:
         seed_rbac(db)
@@ -337,6 +366,7 @@ def main() -> None:
         seed_domestic_staff(db, communities)
         seed_deliveries(db, communities)
         seed_vehicles(db, communities)
+        seed_billing(db, communities)
         db.commit()
     log.info("seed.done")
     print(f"Seed complete. Demo users: <role>@{DEMO_DOMAIN} / <role>{DEMO_PASSWORD_SUFFIX}")

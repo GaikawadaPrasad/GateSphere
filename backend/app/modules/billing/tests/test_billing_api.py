@@ -1,0 +1,76 @@
+"""Integration tests — Billing router, RBAC, tenant scope."""
+
+from __future__ import annotations
+
+import uuid
+
+from sqlalchemy import select
+
+from app.db.session import SessionLocal
+from app.modules.communities.models import Unit
+
+P = "/api/v1/billing"
+
+
+def _unit_in(community_id: str) -> str:
+    with SessionLocal() as db:
+        u = db.scalar(
+            select(Unit).where(Unit.community_id == community_id).order_by(Unit.unit_number)
+        )
+        return str(u.id)
+
+
+def test_health(client):
+    assert client.get(f"{P}/health").json()["data"]["module"] == "billing"
+
+
+def test_invoices_need_auth(client):
+    assert client.get(f"{P}/invoices").status_code == 401
+
+
+def test_admin_invoice_lifecycle(as_role, seed_ids):
+    admin = as_role("community_admin")
+    unit_id = _unit_in(seed_ids["community_id"])
+    r = admin.post(
+        f"{P}/invoices",
+        json={
+            "unit_id": unit_id,
+            "items": [{"description": "Maintenance", "quantity": "1", "unit_rate": "1200.00"}],
+        },
+    )
+    assert r.status_code == 201, r.text
+    inv = r.json()["data"]
+    assert inv["status"] == "draft" and inv["total_amount"] == "1200.00"
+
+    assert admin.post(f"{P}/invoices/{inv['id']}/post").json()["data"]["status"] == "posted"
+
+    pay = admin.post(
+        f"{P}/payments",
+        json={
+            "amount": "1200.00",
+            "allocations": [{"invoice_id": inv["id"], "amount": "1200.00"}],
+            "community_id": seed_ids["community_id"],
+        },
+    )
+    assert pay.status_code == 201, pay.text
+    got = admin.get(f"{P}/invoices/{inv['id']}").json()["data"]
+    assert got["status"] == "paid" and got["balance_due"] == "0.00"
+
+
+def test_facility_manager_cannot_create_invoice(as_role):
+    # facility_manager has no billing:create
+    r = as_role("facility_manager").post(
+        f"{P}/invoices",
+        json={"unit_id": str(uuid.uuid4()), "items": [{"description": "x", "unit_rate": "1"}]},
+    )
+    assert r.status_code == 403
+
+
+def test_cross_community_invoice_is_404(as_role, seed_ids):
+    admin = as_role("community_admin")
+    other_unit = _unit_in(seed_ids["other_community_id"])
+    r = admin.post(
+        f"{P}/invoices",
+        json={"unit_id": other_unit, "items": [{"description": "x", "unit_rate": "1"}]},
+    )
+    assert r.status_code == 404

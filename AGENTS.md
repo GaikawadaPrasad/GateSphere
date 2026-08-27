@@ -1002,8 +1002,8 @@ Silence on an area is not the same as "checked and fine" — say which one it is
 | 06 | domestic_staff | ✅ **implemented** — 4 tables (staff directory, multi-unit assignments w/ partial-unique active, gate attendance w/ single-open-row, resident ratings w/ upsert), migration `0009` (+ RLS), seed, unit + integration tests, README + API doc |
 | 07 | deliveries | ✅ **implemented** — 3 tables (config-as-data `delivery_protocols`, `deliveries` approval+arrival workflow, append-only `delivery_events`), protocol-driven auto-approval, migration `0010` (+ RLS), seed, unit + integration tests, README + API doc |
 | 08 | vehicles | ✅ **implemented** — 6 tables (vehicle registry w/ owner XOR CHECK, parking rules config-as-data, slots, allocations w/ partial-unique active, automated plate `vehicle_entries`, `parking_violations`), migration `0011` (+ RLS), seed, unit + integration tests, README + API doc |
-| 09 | billing | ⏳ next |
-| 10 | complaints | ⏳ | 11 | amenities | ⏳ | 12 | communication | ⏳ |
+| 09 | billing | ✅ **implemented** — 7 tables (charge heads, config-as-data `billing_rules`, `maintenance_invoices`+items, simulated `payments`+allocations, append-only `ledger_entries` w/ `Identity` sequence), server-computed totals + tax, post/pay state machine, migration `0012` (+ RLS), seed, unit + integration tests, README + API doc |
+| 10 | complaints | ⏳ next | 11 | amenities | ⏳ | 12 | communication | ⏳ |
 | 13 | incidents | ⏳ | 14 | dashboards | ⏳ | 15 | notifications | ⏳ |
 
 **Reference module = `communities`.** Every new module follows its shape: `models.py`
