@@ -216,3 +216,32 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ---- GateSphere additions ----
+# Node / Next.js
+node_modules/
+.next/
+next-env.d.ts
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Env files (keep the examples)
+.env
+.env.*
+!.env.example
+!frontend/.env.example
+!backend/.env.example
+
+# Docker / local data
+pgdata/
+miniodata/
+
+# Editor
+.idea/
+.vscode/
+.DS_Store
+
+# Coverage / reports
+coverage.xml
+zap-report.*
