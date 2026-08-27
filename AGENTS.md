@@ -1005,8 +1005,8 @@ Silence on an area is not the same as "checked and fine" — say which one it is
 | 09 | billing | ✅ **implemented** — 7 tables (charge heads, config-as-data `billing_rules`, `maintenance_invoices`+items, simulated `payments`+allocations, append-only `ledger_entries` w/ `Identity` sequence), server-computed totals + tax, post/pay state machine, migration `0012` (+ RLS), seed, unit + integration tests, README + API doc |
 | 10 | complaints | ✅ **implemented** — 7 tables (categories, config-as-data `sla_policies`, `service_tickets` w/ SLA clocks, append-only `ticket_status_history`, assignments w/ executor XOR, messages, feedback), lifecycle state machine w/ mandatory resident confirmation, migration `0013` (+ RLS), seed, unit + integration tests, README + API doc |
 | 11 | amenities | ✅ **implemented** — 5 tables (amenities, weekly `amenity_slots`, config-as-data `amenity_rules`, maintenance `amenity_blocks`, `amenity_bookings`), atomic `FOR UPDATE` overlap + capacity check, rule engine (advance/limit/cancel-notice), migration `0014` (+ RLS), seed, unit + integration tests, README + API doc |
-| 12 | communication | ⏳ next |
-| 13 | incidents | ⏳ | 14 | dashboards | ⏳ | 15 | notifications | ⏳ |
+| 12 | communication | ✅ **implemented** — 6 tables (announcements + scoped `announcement_targets`, polls + options + responses + response_options), publish-freeze, poll status machine + one-vote-per-user + live tally, migration `0015` (+ RLS), seed, unit + integration tests, README + API doc |
+| 13 | incidents | ⏳ next | 14 | dashboards | ⏳ | 15 | notifications | ⏳ |
 
 **Reference module = `communities`.** Every new module follows its shape: `models.py`
 (TenantMixin + DB constraints) → `schemas.py` (`extra="forbid"`, `*Create/*Update/*Read`) →

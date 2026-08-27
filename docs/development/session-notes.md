@@ -18,6 +18,33 @@ Format per entry:
 
 ---
 
+## 2026-08-28 — FR-12 Communication & Broadcasts module
+
+**By:** backend module build-out, module 11 of the plan
+**Branch / commit:** `main`
+**What changed:**
+- **`communication` module** end to end (filled the scaffold):
+  - 6 tables — `announcements` (+ `announcement_targets` with a valid-combination CHECK),
+    `polls` (1:1 with announcement) + `poll_options` + `poll_responses`
+    (UQ `(poll_id, user_id)`) + `poll_response_options`.
+  - `service.py` — announcement editable only while unpublished; **publish freezes** it and
+    requires ≥ 1 target; poll status machine `draft→open→closed` where opening needs a
+    published announcement; voting enforces open window, option membership, single-vs-multi
+    choice, one response per user; live `tally()` for results.
+  - `router.py` — `communication:{view,create,update,approve}`; voting gated on `:view`.
+  - migration `0015` — 6 tables + RLS on `announcements` / `polls`.
+  - RBAC: `resident` gained `communication:view`; `association_committee` gained
+    `communication:{view,create,update,approve}`.
+  - `seed_communication()` — one published all-community welcome notice per community.
+  - docs: `docs/backend/modules/communication/README.md`, `docs/backend/api/communication.md`.
+**Why:** FR-12.
+**Verified:** `ruff check` + `black --check` clean; `pytest -q` → **153 passed**
+(communication: 6 unit + 4 api new); `alembic downgrade 0014_amenities && alembic upgrade head`
+round-trip; reseed.
+**Open / next:** FR-13 `incidents` module. `resident_groups` deferred.
+
+---
+
 ## 2026-08-28 — FR-11 Amenity Booking module
 
 **By:** backend module build-out, module 10 of the plan

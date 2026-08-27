@@ -1,1 +1,139 @@
-"""Pydantic request/response models for Community Communication. Strong typing only, no `Any`."""
+"""Pydantic models for Communication & Broadcasts (FR-12). Write bodies are `extra="forbid"`."""
+
+from __future__ import annotations
+
+import uuid
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from app.modules.communication.models import ANNOUNCEMENT_TYPES, POLL_STATUS, PRIORITIES
+
+ALLOWED = {
+    "announcement_type": set(ANNOUNCEMENT_TYPES),
+    "priority": set(PRIORITIES),
+    "poll_status": set(POLL_STATUS),
+}
+
+
+class _Write(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+
+class _Read(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+# -- targets ---------------------------------------------------- #
+class TargetIn(_Write):
+    tower_id: uuid.UUID | None = None
+    unit_id: uuid.UUID | None = None
+    role_id: uuid.UUID | None = None
+    target_all_community: bool = False
+
+    @model_validator(mode="after")
+    def _valid(self) -> TargetIn:
+        if not (self.target_all_community or self.tower_id or self.unit_id or self.role_id):
+            raise ValueError("target must set one of tower_id / unit_id / role_id / all")
+        return self
+
+
+class TargetRead(_Read):
+    announcement_id: uuid.UUID
+    tower_id: uuid.UUID | None
+    unit_id: uuid.UUID | None
+    role_id: uuid.UUID | None
+    target_all_community: bool
+
+
+# -- announcements ----------------------------------------- #
+class AnnouncementCreate(_Write):
+    announcement_type: str = "notice"
+    title: str = Field(min_length=1, max_length=200)
+    body: str = Field(min_length=1, max_length=20000)
+    priority: str = "normal"
+    publish_at: datetime | None = None
+    expires_at: datetime | None = None
+    event_start_at: datetime | None = None
+    event_end_at: datetime | None = None
+    targets: list[TargetIn] = Field(default_factory=list)
+
+
+class AnnouncementUpdate(_Write):
+    title: str | None = Field(default=None, max_length=200)
+    body: str | None = Field(default=None, max_length=20000)
+    priority: str | None = None
+    publish_at: datetime | None = None
+    expires_at: datetime | None = None
+    event_start_at: datetime | None = None
+    event_end_at: datetime | None = None
+    targets: list[TargetIn] | None = None
+
+
+class AnnouncementRead(_Read):
+    community_id: uuid.UUID
+    created_by_user_id: uuid.UUID | None
+    announcement_type: str
+    title: str
+    body: str
+    priority: str
+    publish_at: datetime | None
+    expires_at: datetime | None
+    event_start_at: datetime | None
+    event_end_at: datetime | None
+    is_published: bool
+    targets: list[TargetRead] = []
+
+
+# -- polls ------------------------------------------------ #
+class PollOptionIn(_Write):
+    option_text: str = Field(min_length=1, max_length=200)
+    display_order: int = 0
+
+
+class PollCreate(_Write):
+    announcement_id: uuid.UUID
+    question: str = Field(min_length=1, max_length=400)
+    allow_multiple: bool = False
+    opens_at: datetime | None = None
+    closes_at: datetime | None = None
+    options: list[PollOptionIn] = Field(min_length=2)
+
+
+class PollOptionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    option_text: str
+    display_order: int
+
+
+class PollRead(_Read):
+    community_id: uuid.UUID
+    announcement_id: uuid.UUID
+    question: str
+    allow_multiple: bool
+    opens_at: datetime | None
+    closes_at: datetime | None
+    status: str
+    options: list[PollOptionRead] = []
+
+
+class VoteIn(_Write):
+    option_ids: list[uuid.UUID] = Field(min_length=1)
+
+
+class PollResultRow(BaseModel):
+    option_id: uuid.UUID
+    option_text: str
+    votes: int
+
+
+class PollResults(BaseModel):
+    poll_id: uuid.UUID
+    total_responses: int
+    results: list[PollResultRow]

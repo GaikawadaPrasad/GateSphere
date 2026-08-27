@@ -461,6 +461,31 @@ def seed_amenities(db: Session, communities: list[Community]) -> None:
                 )
 
 
+def seed_communication(db: Session, communities: list[Community]) -> None:
+    from datetime import UTC, datetime
+
+    from app.modules.communication.models import Announcement, AnnouncementTarget
+
+    for c in communities:
+        exists = db.scalar(
+            select(Announcement).where(
+                Announcement.community_id == c.id, Announcement.title == "Welcome to GateSphere"
+            )
+        )
+        if exists is None:
+            ann = Announcement(
+                community_id=c.id,
+                announcement_type="notice",
+                title="Welcome to GateSphere",
+                body="Your community portal is live. Raise tickets, book amenities, pay dues.",
+                priority="normal",
+                is_published=True,
+                publish_at=datetime.now(UTC),
+            )
+            ann.targets.append(AnnouncementTarget(target_all_community=True))
+            db.add(ann)
+
+
 def main() -> None:
     with SessionLocal() as db:
         seed_rbac(db)
@@ -475,6 +500,7 @@ def main() -> None:
         seed_complaints(db, communities)
         seed_billing(db, communities)
         seed_amenities(db, communities)
+        seed_communication(db, communities)
         db.commit()
     log.info("seed.done")
     print(f"Seed complete. Demo users: <role>@{DEMO_DOMAIN} / <role>{DEMO_PASSWORD_SUFFIX}")

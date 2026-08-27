@@ -8,6 +8,7 @@ from app.modules.amenities import models as amenities_models  # noqa: F401
 from app.modules.audit import models as audit_models  # noqa: F401
 from app.modules.auth import models as auth_models  # noqa: F401
 from app.modules.billing import models as billing_models  # noqa: F401
+from app.modules.communication import models as communication_models  # noqa: F401
 from app.modules.communities import models as communities_models  # noqa: F401
 from app.modules.complaints import models as complaints_models  # noqa: F401
 from app.modules.deliveries import models as deliveries_models  # noqa: F401
