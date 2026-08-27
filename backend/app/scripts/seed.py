@@ -355,6 +355,37 @@ def seed_billing(db: Session, communities: list[Community]) -> None:
             )
 
 
+def seed_complaints(db: Session, communities: list[Community]) -> None:
+    from app.modules.complaints.models import ServiceCategory, SlaPolicy
+
+    cats = [
+        ("PLUMB", "Plumbing", "high"),
+        ("ELEC", "Electrical", "high"),
+        ("HOUSE", "Housekeeping", "low"),
+        ("LIFT", "Lifts", "critical"),
+    ]
+    for c in communities:
+        for code, name, prio in cats:
+            cat, created = _get_or_create(
+                db,
+                ServiceCategory,
+                community_id=c.id,
+                code=code,
+                defaults={"name": name, "default_priority": prio},
+            )
+            if created:
+                db.add(
+                    SlaPolicy(
+                        community_id=c.id,
+                        category_id=cat.id,
+                        priority=prio,
+                        response_minutes=60 if prio in ("high", "critical") else 240,
+                        resolution_minutes=480 if prio == "critical" else 1440,
+                        escalation_minutes=240 if prio == "critical" else 2880,
+                    )
+                )
+
+
 def main() -> None:
     with SessionLocal() as db:
         seed_rbac(db)
@@ -366,6 +397,7 @@ def main() -> None:
         seed_domestic_staff(db, communities)
         seed_deliveries(db, communities)
         seed_vehicles(db, communities)
+        seed_complaints(db, communities)
         seed_billing(db, communities)
         db.commit()
     log.info("seed.done")

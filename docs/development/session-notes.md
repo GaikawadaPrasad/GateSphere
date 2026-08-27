@@ -18,6 +18,33 @@ Format per entry:
 
 ---
 
+## 2026-08-28 — FR-10 Complaint & Service Desk module
+
+**By:** backend module build-out, module 9 of the plan
+**Branch / commit:** `main`
+**What changed:**
+- **`complaints` module** end to end (filled the scaffold):
+  - 7 tables — `service_categories`, `sla_policies` (config-as-data, composite tenant-safe FK
+    to categories), `service_tickets` (composite tenant-safe FKs to units + categories,
+    `RESTRICT` on category delete, SLA clock columns), `ticket_status_history` (append-only),
+    `ticket_assignments` (executor XOR CHECK), `ticket_messages`, `ticket_feedback` (1 per ticket).
+  - `service.py` — SLA due-dates stamped from the `(category, priority)` policy at creation;
+    lifecycle `created→assigned→acknowledged→in_progress→resolved→resident_confirmation`;
+    `closed`/`reopened` reachable **only** through `confirm_ticket` (no close without resident
+    confirmation); first-response + resolution SLA-breach stamping; one active assignment.
+  - `router.py` — `complaints:{view,create,update,approve}`; `/categories` + `/sla` before
+    `/tickets/*`.
+  - migration `0013` — 7 tables + RLS on the 3 tenant tables.
+  - `seed_complaints()` — 4 categories + matching SLA policies per community.
+  - docs: `docs/backend/modules/complaints/README.md`, `docs/backend/api/complaints.md`.
+**Why:** FR-10.
+**Verified:** `ruff check` + `black --check` clean; `pytest -q` → **131 passed**
+(complaints: 5 unit + 5 api new); `alembic downgrade 0012_billing && alembic upgrade head`
+round-trip; reseed.
+**Open / next:** FR-11 `amenities` module. `ticket_attachments` deferred.
+
+---
+
 ## 2026-08-28 — FR-09 Maintenance & Billing module
 
 **By:** backend module build-out, module 8 of the plan
