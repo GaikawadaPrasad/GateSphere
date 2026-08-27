@@ -1008,7 +1008,7 @@ Silence on an area is not the same as "checked and fine" — say which one it is
 | 12 | communication | ✅ **implemented** — 6 tables (announcements + scoped `announcement_targets`, polls + options + responses + response_options), publish-freeze, poll status machine + one-vote-per-user + live tally, migration `0015` (+ RLS), seed, unit + integration tests, README + API doc |
 | 13 | incidents | ✅ **implemented** — 4 tables (`security_incidents` linkable to a panic alert, append-only `incident_status_history` + `incident_actions`, `incident_assignments`), response lifecycle w/ resolve-needs-summary, migration `0016` (+ RLS), seed, unit + integration tests, README + API doc |
 | 14 | dashboards | ✅ **implemented** — no tables; 4 read-only aggregate views (overview / security / financial / resident), every query community-scoped before aggregation, integration tests, README + API doc |
-| 15 | notifications | ⏳ next |
+| 15 | notifications | ✅ **implemented** — 4 tables (per-community templates, per-user `notifications`, append-only `notification_deliveries`, `user_notification_preferences` w/ quiet hours), `dispatch()` fan-out (in_app real, others simulated), migration `0017` (+ RLS), seed, unit + integration tests, README + API doc |
 
 **Reference module = `communities`.** Every new module follows its shape: `models.py`
 (TenantMixin + DB constraints) → `schemas.py` (`extra="forbid"`, `*Create/*Update/*Read`) →
@@ -1026,5 +1026,11 @@ tenant tables to a new RLS migration) → extend `seed.py` → `tests/test_<m>_{
    component library. Plain CSS with the design tokens is the placeholder.
 4. **Permission caching** (`permission_version` bump) — evaluation is live per request today.
 5. **User / role management endpoints** (FR-02) — assign/revoke roles, invite users.
+6. **Audit read API** (FR-16) — `audit_logs` query endpoints for Auditor.
+7. **Notification wiring** — the domain modules currently emit audit-only events; route the
+   user-facing ones (visitor approved, dues reminder, incident/panic alert, complaint SLA
+   breach) through `NotificationService.dispatch()` + the Celery `tasks.py` hooks.
+8. **Deferred child tables** — `ticket_attachments` (FR-10), `incident_attachments` (FR-13),
+   `resident_groups` + members (FR-12).
 
 Record any deliberate deviation as an ADR in `docs/decisions/`.

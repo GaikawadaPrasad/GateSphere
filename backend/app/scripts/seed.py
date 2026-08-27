@@ -520,6 +520,26 @@ def seed_incidents(db: Session, communities: list[Community]) -> None:
             )
 
 
+def seed_notifications(db: Session, communities: list[Community]) -> None:
+    from app.modules.notifications.models import NotificationTemplate
+
+    templates = [
+        ("visitor_approved", "in_app", "Visitor approved", "{visitor} is approved for {unit}."),
+        ("dues_reminder", "email", "Maintenance due", "Invoice {invoice} of {amount} is due."),
+        ("incident_alert", "sms", "Security alert", "{severity} incident: {summary}"),
+    ]
+    for c in communities:
+        for code, channel, title, body in templates:
+            _get_or_create(
+                db,
+                NotificationTemplate,
+                community_id=c.id,
+                code=code,
+                channel=channel,
+                defaults={"title_template": title, "body_template": body},
+            )
+
+
 def main() -> None:
     with SessionLocal() as db:
         seed_rbac(db)
@@ -536,6 +556,7 @@ def main() -> None:
         seed_amenities(db, communities)
         seed_communication(db, communities)
         seed_incidents(db, communities)
+        seed_notifications(db, communities)
         db.commit()
     log.info("seed.done")
     print(f"Seed complete. Demo users: <role>@{DEMO_DOMAIN} / <role>{DEMO_PASSWORD_SUFFIX}")

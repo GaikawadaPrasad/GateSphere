@@ -162,35 +162,23 @@ models.py → schemas.py → repository.py → service.py → deps.py → router
 | 07 | deliveries | ✅ implemented | 0010 |
 | 08 | vehicles & parking | ✅ implemented | 0011 |
 | 09 | billing | ✅ implemented | 0012 |
-| 10 | complaints | ⏳ **next** | — |
-| 11 | amenities | ⏳ | — |
-| 12 | communication | ⏳ | — |
-| 13 | incidents | ⏳ | — |
-| 14 | dashboards | ⏳ | — |
-| 15 | notifications | ⏳ | — |
+| 10 | complaints | ✅ implemented | 0013 |
+| 11 | amenities | ✅ implemented | 0014 |
+| 12 | communication | ✅ implemented | 0015 |
+| 13 | incidents | ✅ implemented | 0016 |
+| 14 | dashboards | ✅ implemented (no tables) | — |
+| 15 | notifications | ✅ implemented | 0017 |
 
-Also open: user/role management endpoints (FR-02 CRUD), audit read API (FR-16), and the
-async notification fan-out (FR-15) that several modules currently only stub via audit rows.
+**All 15 FR modules + the auth/RBAC/audit foundation are implemented.** Migrations `0001`–`0017`.
 
-Test count at handover: **121 passing** (`pytest -q`).
+Still open (integration/polish — see `AGENTS.md §23`):
+- **RLS enforcement test suite** — connect as a restricted DB role (superuser bypasses RLS).
+- **Notification wiring** — domain modules emit audit-only events today; route the user-facing
+  ones through `NotificationService.dispatch()` + the Celery `tasks.py` hooks.
+- **Audit read API** (FR-16), **user/role management endpoints** (FR-02).
+- **Deferred child tables** — `ticket_attachments`, `incident_attachments`, `resident_groups`.
 
-## 6. Remaining modules — schema pointers
-
-All table shapes are in [`docs/database/schema.md`](docs/database/schema.md). Quick map:
-
-- **§09 Complaints** — `complaint_categories`, `complaints` (SLA clock, assignment,
-  escalation), `complaint_updates`, `complaint_feedback`, `complaint_sla_rules`.
-- **§10 Amenities** — `amenities`, `amenity_slots`, `amenity_bookings` (overlap / quota rules),
-  `amenity_booking_rules`, `amenity_maintenance_blocks`.
-- **§11 Communication** — `announcements`, `announcement_reads`, `polls`, `poll_options`,
-  `poll_votes`, `discussion_threads`, `discussion_posts`, `document_library`.
-- **§12 Incidents** — `security_incidents` (links `panic_alert_id` from FR-05), `incident_updates`,
-  `incident_attachments`, `incident_watchers`.
-- **§13 Dashboards** — read-only aggregation endpoints; **every query scoped by role + community
-  before aggregation**. No new tenant tables (reads from all the others).
-- **§14 Notifications** — `notification_templates`, `notifications`, `notification_preferences`,
-  `notification_deliveries`; Celery-driven fan-out (Brevo email + in-app). Wire the existing
-  modules' audit-only events to real notifications here.
+Test count: **180 passing** (`pytest -q`).
 
 ## 7. Key decisions (ADRs — see `docs/decisions/`)
 

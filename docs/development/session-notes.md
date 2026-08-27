@@ -18,6 +18,37 @@ Format per entry:
 
 ---
 
+## 2026-08-28 — FR-15 Notifications module (backend module build-out COMPLETE)
+
+**By:** backend module build-out, module 14 of the plan — **final FR module**
+**Branch / commit:** `main`
+**What changed:**
+- **`notifications` module** end to end (filled the scaffold):
+  - 4 tables — `notification_templates` (UQ `(community_id, code, channel)`, `{token}`
+    rendering), `notifications` (per-user inbox), `notification_deliveries` (append-only,
+    one row per channel), `user_notification_preferences` (UQ `(user, community, channel)`,
+    quiet hours with midnight wrap; community row overrides account-wide `NULL` row).
+  - `service.py` — `dispatch()` renders from a template or explicit content
+    (`422 CONTENT_REQUIRED`), fans out per channel: `in_app` always delivered, others
+    **simulated** delivered unless the channel is disabled / in quiet hours → `skipped`.
+    Inbox is strictly the caller's own; `mark_read` / `mark_all_read`.
+  - `router.py` — `notifications:{view,create}`; static routes before `/{notification_id}`.
+  - migration `0017` — 4 tables + RLS on `notification_templates` / `notifications`.
+  - RBAC: **`notifications:view` granted to all 10 roles**; `notifications:create` to admins.
+  - `seed_notifications()` — 3 templates per community.
+  - docs: `docs/backend/modules/notifications/README.md`, `docs/backend/api/notifications.md`.
+**Why:** FR-15.
+**Verified:** `ruff check` + `black --check` clean; `pytest -q` → **180 passed**
+(notifications: 5 unit + 5 api new); `alembic downgrade 0016_incidents && alembic upgrade head`
+round-trip; reseed.
+**Open / next:** All 15 FR modules are implemented (FR-01…FR-15 + audit/RBAC foundation).
+Remaining is integration/polish — see `AGENTS.md §23 "Still open"` and
+`backend-handover-document.md`: RLS enforcement test suite, notification wiring into the
+domain modules, audit read API (FR-16), user/role management endpoints (FR-02), and the
+deferred child tables. Migrations `0001`–`0017`. **Not yet pushed** — awaiting the owner's word.
+
+---
+
 ## 2026-08-28 — FR-14 Dashboards module
 
 **By:** backend module build-out, module 13 of the plan

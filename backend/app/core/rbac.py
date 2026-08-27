@@ -67,6 +67,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "complaints:view",
         "complaints:update",
         "dashboards:view",
+        "notifications:view",
     ],
     "security_supervisor": [
         "visitors:view",
@@ -89,6 +90,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "incidents:create",
         "incidents:update",
         "dashboards:view",
+        "notifications:view",
     ],
     "security_guard": [
         "visitors:view",
@@ -109,6 +111,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "incidents:view",
         "incidents:create",
         "dashboards:view",
+        "notifications:view",
     ],
     "resident": [
         "visitors:view",
@@ -125,6 +128,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "incidents:view",
         "incidents:create",
         "dashboards:view",
+        "notifications:view",
         "complaints:view",
         "complaints:create",
         "amenities:view",
@@ -132,7 +136,12 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "vehicles:view",
         "vehicles:create",
     ],
-    "domestic_staff": ["gate:view"],
-    "vendor_technician": ["complaints:view", "complaints:update", "gate:view"],
+    "domestic_staff": ["gate:view", "notifications:view"],
+    "vendor_technician": [
+        "complaints:view",
+        "complaints:update",
+        "gate:view",
+        "notifications:view",
+    ],
     "auditor": [f"{m}:view" for m in _MODULES] + ["billing:export", "audit:view", "audit:export"],
 }
