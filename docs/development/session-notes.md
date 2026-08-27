@@ -18,6 +18,33 @@ Format per entry:
 
 ---
 
+## 2026-08-28 — FR-05 Gate / Security Operations module
+
+**By:** backend module build-out, module 4 of the plan
+**Branch / commit:** `main`
+**What changed:**
+- **`gate` module** end to end (filled the pre-existing scaffold):
+  - 4 tenant tables — `gate_events` (**append-only**, `(community_id, gate_id, occurred_at)`
+    index, JSONB `metadata` mapped as `event_metadata`), `guard_rosters`
+    (UQ `(community_id, guard, shift_date, shift_start)`), `gate_assignments`,
+    `panic_alerts`.
+  - `service.py` — community derived from the referenced gate or a single-community scope;
+    events are insert-only; roster machine `planned→active→completed` / `→cancelled`;
+    one `active` assignment per guard (`409 ASSIGNMENT_ACTIVE`); panic machine
+    `active→acknowledged→resolved`, `cancel` only by the raiser (`403 NOT_ALERT_OWNER`).
+    `record_audit` on every write.
+  - `router.py` — `gate:{view,create,update}`; **raising** a panic alert needs only a session
+    (residents can SOS), **cancelling** is restricted to the raiser in the service.
+  - migration `0008` — 4 tables + RLS.
+  - `seed_gate()` — active roster + assignment + `gate_open` event per community.
+  - docs: `docs/backend/modules/gate/README.md`, `docs/backend/api/gate.md`.
+**Why:** FR-05; shared event log that visitor/delivery/staff/vehicle flows will write into.
+**Verified:** `ruff check` + `black --check` clean; `pytest -q` → **78 passed**
+(gate: 9 unit + 6 api new); `alembic downgrade 0007_visitors && alembic upgrade head` round-trip; reseed.
+**Open / next:** FR-06 `domestic_staff` module.
+
+---
+
 ## 2026-08-28 — FR-04 Visitor Management module
 
 **By:** backend module build-out, module 3 of the plan

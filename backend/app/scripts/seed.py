@@ -197,6 +197,50 @@ def seed_visitors(db: Session, communities: list[Community]) -> None:
             )
 
 
+def seed_gate(db: Session, communities: list[Community]) -> None:
+    from datetime import date, time
+
+    from app.modules.communities.models import Gate
+    from app.modules.gate.models import GateAssignment, GateEvent, GuardRoster
+
+    guard = db.scalar(select(User).where(User.email == f"security_guard@{DEMO_DOMAIN}"))
+    supervisor = db.scalar(select(User).where(User.email == f"security_supervisor@{DEMO_DOMAIN}"))
+    if guard is None:
+        return
+    for c in communities:
+        gate = db.scalar(select(Gate).where(Gate.community_id == c.id).order_by(Gate.code))
+        roster, created = _get_or_create(
+            db,
+            GuardRoster,
+            community_id=c.id,
+            guard_user_id=guard.id,
+            shift_date=date(2026, 8, 28),
+            shift_start=time(8, 0),
+            defaults={
+                "shift_end": time(20, 0),
+                "supervisor_user_id": supervisor.id if supervisor else None,
+                "status": "active",
+            },
+        )
+        if created and gate is not None:
+            db.add(
+                GateAssignment(
+                    community_id=c.id,
+                    guard_user_id=guard.id,
+                    gate_id=gate.id,
+                    roster_id=roster.id,
+                )
+            )
+            db.add(
+                GateEvent(
+                    community_id=c.id,
+                    gate_id=gate.id,
+                    actor_user_id=guard.id,
+                    event_type="gate_open",
+                )
+            )
+
+
 def main() -> None:
     with SessionLocal() as db:
         seed_rbac(db)
@@ -204,6 +248,7 @@ def main() -> None:
         seed_users(db, communities)
         seed_residents(db, communities)
         seed_visitors(db, communities)
+        seed_gate(db, communities)
         db.commit()
     log.info("seed.done")
     print(f"Seed complete. Demo users: <role>@{DEMO_DOMAIN} / <role>{DEMO_PASSWORD_SUFFIX}")
