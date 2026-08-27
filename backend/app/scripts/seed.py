@@ -291,6 +291,41 @@ def seed_deliveries(db: Session, communities: list[Community]) -> None:
             )
 
 
+def seed_vehicles(db: Session, communities: list[Community]) -> None:
+    from app.modules.communities.models import Tower
+    from app.modules.residents.models import ResidentProfile
+    from app.modules.vehicles.models import ParkingRule, ParkingSlot, Vehicle
+
+    for c in communities:
+        _get_or_create(db, ParkingRule, community_id=c.id, defaults={})
+        tower = db.scalar(select(Tower).where(Tower.community_id == c.id).order_by(Tower.name))
+        for n in range(1, 6):
+            _get_or_create(
+                db,
+                ParkingSlot,
+                community_id=c.id,
+                slot_code=f"P-{n:02d}",
+                defaults={
+                    "slot_type": "car",
+                    "tower_id": tower.id if tower else None,
+                    "level": "B1",
+                },
+            )
+        profile = db.scalar(select(ResidentProfile).where(ResidentProfile.community_id == c.id))
+        if profile is not None:
+            _get_or_create(
+                db,
+                Vehicle,
+                community_id=c.id,
+                registration_number=f"KA{c.code[-2:]}AB{c.code[-2:]}01",
+                defaults={
+                    "resident_profile_id": profile.id,
+                    "vehicle_type": "car",
+                    "make": "Maruti",
+                },
+            )
+
+
 def main() -> None:
     with SessionLocal() as db:
         seed_rbac(db)
@@ -301,6 +336,7 @@ def main() -> None:
         seed_gate(db, communities)
         seed_domestic_staff(db, communities)
         seed_deliveries(db, communities)
+        seed_vehicles(db, communities)
         db.commit()
     log.info("seed.done")
     print(f"Seed complete. Demo users: <role>@{DEMO_DOMAIN} / <role>{DEMO_PASSWORD_SUFFIX}")

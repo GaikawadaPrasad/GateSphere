@@ -1,0 +1,42 @@
+from __future__ import annotations
+
+import uuid
+
+import pytest
+from sqlalchemy import select
+
+from app.core.tenancy import TenantScope
+from app.db.session import SessionLocal
+from app.modules.communities.models import Community
+from app.modules.users.models import User
+
+
+@pytest.fixture()
+def db():
+    s = SessionLocal()
+    try:
+        yield s
+    finally:
+        s.rollback()
+        s.close()
+
+
+@pytest.fixture()
+def superadmin(db) -> User:
+    return db.scalar(select(User).where(User.is_superadmin.is_(True)))
+
+
+@pytest.fixture()
+def community(db) -> Community:
+    c = Community(code=f"vh-{uuid.uuid4().hex[:8]}", name="Vehicles Test Community")
+    db.add(c)
+    db.flush()
+    return c
+
+
+@pytest.fixture()
+def scope_for(superadmin):
+    def _make(cid: uuid.UUID) -> TenantScope:
+        return TenantScope(superadmin.id, is_global=False, community_ids=frozenset({cid}))
+
+    return _make

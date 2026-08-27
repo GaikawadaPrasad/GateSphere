@@ -18,6 +18,33 @@ Format per entry:
 
 ---
 
+## 2026-08-28 — FR-08 Vehicle & Parking module
+
+**By:** backend module build-out, module 7 of the plan
+**Branch / commit:** `main`
+**What changed:**
+- **`vehicles` module** end to end (filled the scaffold):
+  - 6 tables — `vehicles` (owner **XOR** DB CHECK, plate upper-cased, UQ `(community_id, plate)`),
+    `parking_rules` (config-as-data), `parking_slots`, `parking_allocations` (composite
+    tenant-safe FKs, partial-unique active per slot + per vehicle), `vehicle_entries`
+    (plate log, `is_flagged` for unknown plates), `parking_violations`.
+  - `service.py` — owner XOR (schema + DB); one active allocation per slot/vehicle;
+    `max_active_slots_per_unit` cap from `parking_rules`; unknown-plate entries flagged;
+    violation state machine. `record_audit` on every write.
+  - `router.py` — `/vehicles`, `vehicles:{view,create,update,approve}`; `/parking/*` +
+    `/entries/*` before `/{vehicle_id}`.
+  - migration `0011` — 6 tables + partial-unique indexes + RLS on all six.
+  - RBAC: `security_guard` / `security_supervisor` gained `vehicles:create` (plate entry).
+  - `seed_vehicles()` — rules + 5 slots + 1 resident car per community.
+  - docs: `docs/backend/modules/vehicles/README.md`, `docs/backend/api/vehicles.md`.
+**Why:** FR-08.
+**Verified:** `ruff check` + `black --check` clean; `pytest -q` → **111 passed**
+(vehicles: 5 unit + 6 api new); `alembic downgrade 0010_deliveries && alembic upgrade head`
+round-trip; reseed.
+**Open / next:** FR-09 `billing` module.
+
+---
+
 ## 2026-08-28 — FR-07 Delivery Management module
 
 **By:** backend module build-out, module 6 of the plan
