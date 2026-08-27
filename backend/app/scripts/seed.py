@@ -486,6 +486,40 @@ def seed_communication(db: Session, communities: list[Community]) -> None:
             db.add(ann)
 
 
+def seed_incidents(db: Session, communities: list[Community]) -> None:
+    from app.modules.incidents.models import IncidentStatusHistory, SecurityIncident
+
+    for c in communities:
+        exists = db.scalar(
+            select(SecurityIncident).where(
+                SecurityIncident.community_id == c.id,
+                SecurityIncident.incident_number == "INC-2026-00001",
+            )
+        )
+        if exists is None:
+            inc = SecurityIncident(
+                community_id=c.id,
+                incident_number="INC-2026-00001",
+                incident_type="suspicious",
+                severity="medium",
+                status="resolved",
+                location_text="Basement B1",
+                description="Unattended bag reported; cleared by security.",
+                resolution_summary="Bag belonged to a resident. No threat.",
+            )
+            db.add(inc)
+            db.flush()
+            db.add(
+                IncidentStatusHistory(
+                    community_id=c.id,
+                    incident_id=inc.id,
+                    old_status=None,
+                    new_status="resolved",
+                    reason="seed",
+                )
+            )
+
+
 def main() -> None:
     with SessionLocal() as db:
         seed_rbac(db)
@@ -501,6 +535,7 @@ def main() -> None:
         seed_billing(db, communities)
         seed_amenities(db, communities)
         seed_communication(db, communities)
+        seed_incidents(db, communities)
         db.commit()
     log.info("seed.done")
     print(f"Seed complete. Demo users: <role>@{DEMO_DOMAIN} / <role>{DEMO_PASSWORD_SUFFIX}")

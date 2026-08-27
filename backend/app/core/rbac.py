@@ -121,6 +121,8 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "billing:view",
         "billing:create",
         "communication:view",
+        "incidents:view",
+        "incidents:create",
         "complaints:view",
         "complaints:create",
         "amenities:view",

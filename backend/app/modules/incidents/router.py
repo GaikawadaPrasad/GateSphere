@@ -1,26 +1,165 @@
-"""API router for the Emergency & Incident Management module.
+"""Emergency & Incident Management API (FR-13). HTTP boundary only — see service.py.
 
-Layer: HTTP boundary only. Validate input, resolve the current session/permission
-dependency, delegate to the service layer, format the response. No business logic here.
+Canonical envelope. RBAC: `incidents:{view,create,update}`.
+Contract: docs/backend/api/incidents.md.
 """
 
-from fastapi import APIRouter
+from __future__ import annotations
 
-from app.core.security import require_auth  # noqa: F401
+import uuid
+
+from fastapi import APIRouter, Depends, status
+
+from app.core.responses import PageParams, ok, page_params, paginated
+from app.core.responses import Response as Envelope
+from app.core.security import require_permission
+from app.modules.incidents import schemas
+from app.modules.incidents.deps import incident_service
+from app.modules.incidents.service import IncidentService
 
 router = APIRouter(prefix="/incidents", tags=["Emergency & Incident Management"])
 
+VIEW = Depends(require_permission("incidents:view"))
+CREATE = Depends(require_permission("incidents:create"))
+UPDATE = Depends(require_permission("incidents:update"))
 
-@router.get("/health", summary="Emergency & Incident Management module liveness")
+Svc = IncidentService
+
+
+@router.get("/health", summary="Incident Management module liveness")
 async def module_health() -> dict:
-    return {
-        "success": True,
-        "message": "OK",
-        "meta": None,
-        "data": {"module": "incidents", "status": "ok"},
-    }
+    return ok({"module": "incidents", "status": "ok"})
 
 
-# TODO(incidents): implement endpoints per docs/backend/modules/incidents/README.md
-# Every write endpoint MUST: enforce permission, validate payload, run in a
-# transaction, emit audit + notification events where applicable.
+@router.get("", response_model=Envelope[list[schemas.IncidentRead]], dependencies=[VIEW])
+def list_incidents(
+    community_id: uuid.UUID | None = None,
+    incident_status: str | None = None,
+    severity: str | None = None,
+    params: PageParams = Depends(page_params),
+    svc: Svc = Depends(incident_service),
+) -> dict:
+    rows, total = svc.list_incidents(
+        community_id=community_id,
+        incident_status=incident_status,
+        severity=severity,
+        offset=params.offset,
+        limit=params.page_size,
+    )
+    return paginated(
+        [schemas.IncidentRead.model_validate(r) for r in rows], total=total, params=params
+    )
+
+
+@router.post(
+    "",
+    response_model=Envelope[schemas.IncidentRead],
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[CREATE],
+)
+def create_incident(payload: schemas.IncidentCreate, svc: Svc = Depends(incident_service)) -> dict:
+    return ok(
+        schemas.IncidentRead.model_validate(svc.create_incident(payload)),
+        message="Incident logged",
+    )
+
+
+@router.get("/{incident_id}", response_model=Envelope[schemas.IncidentRead], dependencies=[VIEW])
+def get_incident(incident_id: uuid.UUID, svc: Svc = Depends(incident_service)) -> dict:
+    return ok(schemas.IncidentRead.model_validate(svc.get_incident(incident_id)))
+
+
+@router.patch(
+    "/{incident_id}", response_model=Envelope[schemas.IncidentRead], dependencies=[UPDATE]
+)
+def update_incident(
+    incident_id: uuid.UUID,
+    payload: schemas.IncidentUpdate,
+    svc: Svc = Depends(incident_service),
+) -> dict:
+    return ok(
+        schemas.IncidentRead.model_validate(svc.update_incident(incident_id, payload)),
+        message="Updated",
+    )
+
+
+@router.post(
+    "/{incident_id}/transition",
+    response_model=Envelope[schemas.IncidentRead],
+    dependencies=[UPDATE],
+)
+def transition_incident(
+    incident_id: uuid.UUID,
+    payload: schemas.IncidentTransition,
+    svc: Svc = Depends(incident_service),
+) -> dict:
+    return ok(
+        schemas.IncidentRead.model_validate(svc.transition_incident(incident_id, payload)),
+        message="Updated",
+    )
+
+
+@router.get(
+    "/{incident_id}/history",
+    response_model=Envelope[list[schemas.HistoryRead]],
+    dependencies=[VIEW],
+)
+def incident_history(incident_id: uuid.UUID, svc: Svc = Depends(incident_service)) -> dict:
+    return ok([schemas.HistoryRead.model_validate(h) for h in svc.list_history(incident_id)])
+
+
+@router.get(
+    "/{incident_id}/assignments",
+    response_model=Envelope[list[schemas.AssignmentRead]],
+    dependencies=[VIEW],
+)
+def incident_assignments(incident_id: uuid.UUID, svc: Svc = Depends(incident_service)) -> dict:
+    return ok([schemas.AssignmentRead.model_validate(a) for a in svc.list_assignments(incident_id)])
+
+
+@router.post(
+    "/{incident_id}/assignments",
+    response_model=Envelope[schemas.AssignmentRead],
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[UPDATE],
+)
+def assign(
+    incident_id: uuid.UUID, payload: schemas.AssignIn, svc: Svc = Depends(incident_service)
+) -> dict:
+    return ok(
+        schemas.AssignmentRead.model_validate(svc.assign(incident_id, payload)),
+        message="Assigned",
+    )
+
+
+@router.post(
+    "/assignments/{assignment_id}/release",
+    response_model=Envelope[schemas.AssignmentRead],
+    dependencies=[UPDATE],
+)
+def release(assignment_id: uuid.UUID, svc: Svc = Depends(incident_service)) -> dict:
+    return ok(schemas.AssignmentRead.model_validate(svc.release(assignment_id)), message="Released")
+
+
+@router.get(
+    "/{incident_id}/actions",
+    response_model=Envelope[list[schemas.ActionRead]],
+    dependencies=[VIEW],
+)
+def incident_actions(incident_id: uuid.UUID, svc: Svc = Depends(incident_service)) -> dict:
+    return ok([schemas.ActionRead.model_validate(a) for a in svc.list_actions(incident_id)])
+
+
+@router.post(
+    "/{incident_id}/actions",
+    response_model=Envelope[schemas.ActionRead],
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[UPDATE],
+)
+def add_action(
+    incident_id: uuid.UUID, payload: schemas.ActionIn, svc: Svc = Depends(incident_service)
+) -> dict:
+    return ok(
+        schemas.ActionRead.model_validate(svc.add_action(incident_id, payload)),
+        message="Logged",
+    )

@@ -14,6 +14,7 @@ from app.modules.complaints import models as complaints_models  # noqa: F401
 from app.modules.deliveries import models as deliveries_models  # noqa: F401
 from app.modules.domestic_staff import models as domestic_staff_models  # noqa: F401
 from app.modules.gate import models as gate_models  # noqa: F401
+from app.modules.incidents import models as incidents_models  # noqa: F401
 from app.modules.residents import models as residents_models  # noqa: F401
 from app.modules.users import models as users_models  # noqa: F401
 from app.modules.vehicles import models as vehicles_models  # noqa: F401

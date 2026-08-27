@@ -18,6 +18,32 @@ Format per entry:
 
 ---
 
+## 2026-08-28 — FR-13 Emergency & Incident Management module
+
+**By:** backend module build-out, module 12 of the plan
+**Branch / commit:** `main`
+**What changed:**
+- **`incidents` module** end to end (filled the scaffold):
+  - 4 tables — `security_incidents` (optional `panic_alert_id → panic_alerts`,
+    tower/unit/gate refs, UQ `(community_id, incident_number)`), append-only
+    `incident_status_history` + `incident_actions`, `incident_assignments`.
+  - `service.py` — `INC-<year>-<seq>` numbering; response lifecycle
+    `reported→acknowledged→responding→{contained,resolved}→closed` (+ `false_alarm`);
+    **resolve requires `resolution_summary`**; closed/false_alarm are terminal;
+    one active assignment per `(incident, user)`; append-only action + history logs.
+  - `router.py` — `incidents:{view,create,update}`; `/assignments/{id}/release` static prefix.
+  - migration `0016` — 4 tables + RLS on `security_incidents` / `incident_status_history`.
+  - RBAC: `resident` gained `incidents:{view,create}` (self-report / SOS).
+  - `seed_incidents()` — one resolved sample incident per community.
+  - docs: `docs/backend/modules/incidents/README.md`, `docs/backend/api/incidents.md`.
+**Why:** FR-13; consumes FR-05 panic alerts.
+**Verified:** `ruff check` + `black --check` clean; `pytest -q` → **163 passed**
+(incidents: 5 unit + 5 api new); `alembic downgrade 0015_communication && alembic upgrade head`
+round-trip; reseed.
+**Open / next:** FR-14 `dashboards` module. `incident_attachments` deferred.
+
+---
+
 ## 2026-08-28 — FR-12 Communication & Broadcasts module
 
 **By:** backend module build-out, module 11 of the plan
