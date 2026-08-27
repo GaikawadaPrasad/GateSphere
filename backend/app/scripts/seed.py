@@ -181,6 +181,36 @@ def seed_residents(db: Session, communities: list[Community]) -> None:
                     )
                 )
 
+    # Give the demo `resident@` role account a home in community 0 (used by tests / UI).
+    demo = db.scalar(select(User).where(User.email == f"resident@{DEMO_DOMAIN}"))
+    if demo is not None and communities:
+        c0 = communities[0]
+        # 7th unit ascending — outside the first-6 seeded residents and the last unit
+        # that residents-module tests exercise.
+        home = db.scalars(
+            select(Unit)
+            .where(Unit.community_id == c0.id)
+            .order_by(Unit.unit_number)
+            .offset(6)
+            .limit(1)
+        ).first()
+        dp, _ = _get_or_create(
+            db,
+            ResidentProfile,
+            community_id=c0.id,
+            user_id=demo.id,
+            defaults={"profile_status": "active", "kyc_status": "verified"},
+        )
+        if home is not None:
+            _get_or_create(
+                db,
+                UnitOccupancy,
+                community_id=c0.id,
+                unit_id=home.id,
+                resident_profile_id=dp.id,
+                defaults={"occupancy_role": "primary_owner", "is_primary": True},
+            )
+
 
 def seed_visitors(db: Session, communities: list[Community]) -> None:
     from app.modules.visitors.models import Visitor, VisitorPolicy
@@ -386,6 +416,51 @@ def seed_complaints(db: Session, communities: list[Community]) -> None:
                 )
 
 
+def seed_amenities(db: Session, communities: list[Community]) -> None:
+    from datetime import time
+
+    from app.modules.amenities.models import Amenity, AmenityRule, AmenitySlot
+
+    presets = [("CLUB", "Clubhouse", "clubhouse", 60), ("GYM", "Gym", "gym", 20)]
+    for c in communities:
+        for code, name, atype, cap in presets:
+            am, created = _get_or_create(
+                db,
+                Amenity,
+                community_id=c.id,
+                code=code,
+                defaults={"name": name, "amenity_type": atype, "capacity": cap},
+            )
+            if created:
+                for dow in range(0, 7):
+                    db.add(
+                        AmenitySlot(
+                            community_id=c.id,
+                            amenity_id=am.id,
+                            day_of_week=dow,
+                            start_time=time(6, 0),
+                            end_time=time(22, 0),
+                            capacity=cap,
+                        )
+                    )
+                db.add(
+                    AmenityRule(
+                        community_id=c.id,
+                        amenity_id=am.id,
+                        rule_type="max_advance_days",
+                        rule_value={"value": 14},
+                    )
+                )
+                db.add(
+                    AmenityRule(
+                        community_id=c.id,
+                        amenity_id=am.id,
+                        rule_type="max_active_per_unit",
+                        rule_value={"value": 3},
+                    )
+                )
+
+
 def main() -> None:
     with SessionLocal() as db:
         seed_rbac(db)
@@ -399,6 +474,7 @@ def main() -> None:
         seed_vehicles(db, communities)
         seed_complaints(db, communities)
         seed_billing(db, communities)
+        seed_amenities(db, communities)
         db.commit()
     log.info("seed.done")
     print(f"Seed complete. Demo users: <role>@{DEMO_DOMAIN} / <role>{DEMO_PASSWORD_SUFFIX}")

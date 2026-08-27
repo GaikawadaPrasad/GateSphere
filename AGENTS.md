@@ -1004,7 +1004,8 @@ Silence on an area is not the same as "checked and fine" — say which one it is
 | 08 | vehicles | ✅ **implemented** — 6 tables (vehicle registry w/ owner XOR CHECK, parking rules config-as-data, slots, allocations w/ partial-unique active, automated plate `vehicle_entries`, `parking_violations`), migration `0011` (+ RLS), seed, unit + integration tests, README + API doc |
 | 09 | billing | ✅ **implemented** — 7 tables (charge heads, config-as-data `billing_rules`, `maintenance_invoices`+items, simulated `payments`+allocations, append-only `ledger_entries` w/ `Identity` sequence), server-computed totals + tax, post/pay state machine, migration `0012` (+ RLS), seed, unit + integration tests, README + API doc |
 | 10 | complaints | ✅ **implemented** — 7 tables (categories, config-as-data `sla_policies`, `service_tickets` w/ SLA clocks, append-only `ticket_status_history`, assignments w/ executor XOR, messages, feedback), lifecycle state machine w/ mandatory resident confirmation, migration `0013` (+ RLS), seed, unit + integration tests, README + API doc |
-| 11 | amenities | ⏳ next | 12 | communication | ⏳ |
+| 11 | amenities | ✅ **implemented** — 5 tables (amenities, weekly `amenity_slots`, config-as-data `amenity_rules`, maintenance `amenity_blocks`, `amenity_bookings`), atomic `FOR UPDATE` overlap + capacity check, rule engine (advance/limit/cancel-notice), migration `0014` (+ RLS), seed, unit + integration tests, README + API doc |
+| 12 | communication | ⏳ next |
 | 13 | incidents | ⏳ | 14 | dashboards | ⏳ | 15 | notifications | ⏳ |
 
 **Reference module = `communities`.** Every new module follows its shape: `models.py`

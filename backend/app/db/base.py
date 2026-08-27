@@ -4,6 +4,7 @@ Add a line here whenever a module gains real ORM models.
 """
 
 from app.db.base_class import Base  # noqa: F401
+from app.modules.amenities import models as amenities_models  # noqa: F401
 from app.modules.audit import models as audit_models  # noqa: F401
 from app.modules.auth import models as auth_models  # noqa: F401
 from app.modules.billing import models as billing_models  # noqa: F401

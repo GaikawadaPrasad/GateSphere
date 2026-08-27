@@ -18,6 +18,33 @@ Format per entry:
 
 ---
 
+## 2026-08-28 — FR-11 Amenity Booking module
+
+**By:** backend module build-out, module 10 of the plan
+**Branch / commit:** `main`
+**What changed:**
+- **`amenities` module** end to end (filled the scaffold):
+  - 5 tables — `amenities`, `amenity_slots` (weekly availability), `amenity_rules`
+    (config-as-data, `{"value": N}` JSONB), `amenity_blocks` (maintenance windows),
+    `amenity_bookings` (composite tenant-safe FKs to amenities + units).
+  - `service.py` — slot/weekday validation; booker's unit from active occupancy;
+    rule engine (`max_advance_days`, `max_hours_per_booking`, `max_active_per_unit`,
+    `min_cancel_hours`); **atomic conflict check** = `SELECT … FOR UPDATE` on the amenity,
+    then maintenance-block overlap, then capacity across overlapping confirmed bookings.
+  - `router.py` — `amenities:{view,create,update,approve}`; `/bookings/*` before `/{amenity_id}`.
+  - migration `0014` — 5 tables + RLS on all five.
+  - `seed_amenities()` — CLUB + GYM per community with per-weekday slots + 2 rules;
+    `seed_residents()` now links `resident@gatesphere.com` to a unit (7th, to avoid the
+    residents-module tests' last-unit) so bookings work out of the box.
+  - docs: `docs/backend/modules/amenities/README.md`, `docs/backend/api/amenities.md`.
+**Why:** FR-11.
+**Verified:** `ruff check` + `black --check` clean; `pytest -q` → **143 passed**
+(amenities: 6 unit + 5 api new); full `alembic downgrade base && upgrade head` + reseed +
+`alembic downgrade 0013_complaints && upgrade head` round-trip.
+**Open / next:** FR-12 `communication` module.
+
+---
+
 ## 2026-08-28 — FR-10 Complaint & Service Desk module
 
 **By:** backend module build-out, module 9 of the plan
