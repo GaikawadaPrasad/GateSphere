@@ -993,8 +993,8 @@ Silence on an area is not the same as "checked and fine" — say which one it is
 | FR | Module | Status |
 |----|--------|--------|
 | 01 | auth / session | ✅ sessions + RBAC + envelope + rate limit |
-| 02 | users / RBAC | ✅ catalogue + `require_permission` + `TenantScope`; ⏳ no user/role **management** endpoints yet |
-| 16 | audit | ✅ `audit_logs` ERD-shaped (migration `0005`) + `record_audit()` helper |
+| 02 | users / RBAC | ✅ **implemented** — catalogue + `require_permission` + `TenantScope`, **management API** (`GET/POST /users`, `PATCH`, `POST /{id}/roles`, `DELETE /{id}/roles/{grant}`, `GET /users/roles`); scoped grants, session revoke on any RBAC change; README + API doc |
+| 16 | audit | ✅ **implemented** — `audit_logs` (migration `0005`) + `record_audit()` helper + **query API** (`GET /audit/logs` w/ filters, `GET /audit/logs/{id}`, `GET /audit/logs.csv`); `audit:view` / `audit:export`, community-scoped; README + API doc |
 | **03** | **communities & property** | ✅ **implemented** — models (composite tenant-safe FKs), `TenantRepository`, service (scope rules, enum/conflict checks), router (envelope + RBAC), migration `0004` (+ RLS on gates/towers/floors/units), seed, unit + integration tests, module README + API doc |
 | 03 | residents | ✅ **implemented** — 5 tables (composite tenant-safe FKs, partial-unique primary occupant), move-record state machine, migration `0006` (+ RLS), seed, unit + integration tests, README + API doc |
 | 04 | visitors | ✅ **implemented** — 7 tables (blacklist HMAC screening, host-approval workflow, QR/PIN/OTP passes, gate entry/exit), per-community policy, migration `0007` (+ RLS + audit-index rename), seed, unit + integration tests, README + API doc |
@@ -1025,12 +1025,12 @@ tenant tables to a new RLS migration) → extend `seed.py` → `tests/test_<m>_{
 3. **Frontend design system** — Tailwind + shadcn/ui + Recharts + TanStack Table + the shared
    component library. Plain CSS with the design tokens is the placeholder.
 4. **Permission caching** (`permission_version` bump) — evaluation is live per request today.
-5. **User / role management endpoints** (FR-02) — assign/revoke roles, invite users.
-6. **Audit read API** (FR-16) — `audit_logs` query endpoints for Auditor.
-7. **Notification wiring** — the domain modules currently emit audit-only events; route the
+5. **Notification wiring** — the domain modules currently emit audit-only events; route the
    user-facing ones (visitor approved, dues reminder, incident/panic alert, complaint SLA
    breach) through `NotificationService.dispatch()` + the Celery `tasks.py` hooks.
-8. **Deferred child tables** — `ticket_attachments` (FR-10), `incident_attachments` (FR-13),
-   `resident_groups` + members (FR-12).
+
+Done since first cut: **user/role management** (FR-02), **audit read API** (FR-16),
+**deferred child tables** (`ticket_attachments`, `incident_attachments`, `resident_groups`),
+**RLS enforcement test suite** — see session-notes.
 
 Record any deliberate deviation as an ADR in `docs/decisions/`.

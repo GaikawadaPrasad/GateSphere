@@ -18,6 +18,31 @@ Format per entry:
 
 ---
 
+## 2026-08-28 — FR-02 User/role management + FR-16 Audit read API
+
+**By:** post-module integration/polish, item 3 of the "still open" list
+**Branch / commit:** `main`
+**What changed:**
+- **`users` module** — real management API on the existing RBAC tables (no migration):
+  `GET /users` (filters), `POST /users` (+ inline role grant), `GET/PATCH /users/{id}`,
+  `POST /users/{id}/roles`, `DELETE /users/{id}/roles/{grant}`, `GET /users/roles` (roles +
+  effective permission codes). Scoped: a community admin only sees users with no grants or a
+  grant in their community; grants can only target a community in scope; `super_admin` /
+  `auditor` stay platform-global. **Every grant / revoke / deactivate calls
+  `revoke_all_user_sessions`.** `users:{view,create,update,delete}` — community_admin has them,
+  auditor does not.
+- **`audit` module** — read-only query API on `audit_logs` (no migration):
+  `GET /audit/logs` (filter by module/action/entity/user/date + `?community_id=`),
+  `GET /audit/logs/{id}`, `GET /audit/logs.csv` (`audit:export`, 10k cap). Community-scoped;
+  Community Admin still has no `audit:*` by design.
+- docs: `docs/backend/api/users.md`, `docs/backend/api/audit.md`; AGENTS.md §23 table + gaps.
+**Why:** FR-02 + FR-16 from `AGENTS.md §23 "Still open"`.
+**Verified:** `ruff check` + `black --check` clean; `pytest -q` → **191 passed**
+(users: 6 api, audit: 5 api new). No migration.
+**Open / next:** deferred child tables, notification wiring, RLS enforcement test suite.
+
+---
+
 ## 2026-08-28 — FR-15 Notifications module (backend module build-out COMPLETE)
 
 **By:** backend module build-out, module 14 of the plan — **final FR module**

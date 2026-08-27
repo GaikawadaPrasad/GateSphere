@@ -1,26 +1,81 @@
-"""API router for the Audit Logging module.
+"""Audit Logging query API (FR-16). Read-only — `audit_logs` is immutable.
 
-Layer: HTTP boundary only. Validate input, resolve the current session/permission
-dependency, delegate to the service layer, format the response. No business logic here.
+Canonical envelope. RBAC: `audit:view` (+ `audit:export` for CSV). Results are community-scoped.
+Contract: docs/backend/api/audit.md.
 """
 
-from fastapi import APIRouter
+from __future__ import annotations
 
-from app.core.security import require_auth  # noqa: F401
+import uuid
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, Response
+
+from app.core.responses import PageParams, ok, page_params, paginated
+from app.core.responses import Response as Envelope
+from app.core.security import require_permission
+from app.modules.audit import schemas
+from app.modules.audit.deps import audit_query_service
+from app.modules.audit.query_service import AuditQueryService
 
 router = APIRouter(prefix="/audit", tags=["Audit Logging"])
+
+VIEW = Depends(require_permission("audit:view"))
+EXPORT = Depends(require_permission("audit:export"))
+Svc = AuditQueryService
+
+
+def _filters(
+    community_id: uuid.UUID | None = None,
+    module: str | None = None,
+    action: str | None = None,
+    entity_type: str | None = None,
+    entity_id: str | None = None,
+    user_id: uuid.UUID | None = None,
+    since: datetime | None = None,
+    until: datetime | None = None,
+) -> dict:
+    return {
+        "community_id": community_id,
+        "module": module,
+        "action": action,
+        "entity_type": entity_type,
+        "entity_id": entity_id,
+        "user_id": user_id,
+        "since": since,
+        "until": until,
+    }
 
 
 @router.get("/health", summary="Audit Logging module liveness")
 async def module_health() -> dict:
-    return {
-        "success": True,
-        "message": "OK",
-        "meta": None,
-        "data": {"module": "audit", "status": "ok"},
-    }
+    return ok({"module": "audit", "status": "ok"})
 
 
-# TODO(audit): implement endpoints per docs/backend/modules/audit/README.md
-# Every write endpoint MUST: enforce permission, validate payload, run in a
-# transaction, emit audit + notification events where applicable.
+@router.get("/logs", response_model=Envelope[list[schemas.AuditLogRead]], dependencies=[VIEW])
+def list_logs(
+    filters: dict = Depends(_filters),
+    params: PageParams = Depends(page_params),
+    svc: Svc = Depends(audit_query_service),
+) -> dict:
+    rows, total = svc.list_logs(offset=params.offset, limit=params.page_size, **filters)
+    return paginated(
+        [schemas.AuditLogRead.model_validate(r) for r in rows], total=total, params=params
+    )
+
+
+@router.get("/logs.csv", dependencies=[EXPORT])
+def export_logs(
+    filters: dict = Depends(_filters), svc: Svc = Depends(audit_query_service)
+) -> Response:
+    csv_text = svc.export_csv(**filters)
+    return Response(
+        content=csv_text,
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="audit_logs.csv"'},
+    )
+
+
+@router.get("/logs/{log_id}", response_model=Envelope[schemas.AuditLogRead], dependencies=[VIEW])
+def get_log(log_id: uuid.UUID, svc: Svc = Depends(audit_query_service)) -> dict:
+    return ok(schemas.AuditLogRead.model_validate(svc.get_log(log_id)))
