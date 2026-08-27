@@ -58,13 +58,21 @@ def auth_client(client: TestClient) -> TestClient:
 
 
 @pytest.fixture()
-def as_role(client: TestClient):
-    """Factory: `as_role("community_admin")` -> a logged-in client for that seeded role."""
+def as_role():
+    """Factory: `as_role("community_admin")` -> a fresh logged-in client for that seeded role.
+
+    Each call returns an INDEPENDENT client so a test can hold several roles at once.
+    """
+    clients: list[TestClient] = []
 
     def _make(role_slug: str) -> TestClient:
-        return _login(client, f"{role_slug}@{DEMO_DOMAIN}", demo_password(role_slug))
+        c = TestClient(app)
+        clients.append(c)
+        return _login(c, f"{role_slug}@{DEMO_DOMAIN}", demo_password(role_slug))
 
-    return _make
+    yield _make
+    for c in clients:
+        c.close()
 
 
 @pytest.fixture()

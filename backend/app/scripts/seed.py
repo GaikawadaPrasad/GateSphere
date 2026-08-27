@@ -182,12 +182,28 @@ def seed_residents(db: Session, communities: list[Community]) -> None:
                 )
 
 
+def seed_visitors(db: Session, communities: list[Community]) -> None:
+    from app.modules.visitors.models import Visitor, VisitorPolicy
+
+    for c in communities:
+        _get_or_create(db, VisitorPolicy, community_id=c.id, defaults={})
+        for i, name in enumerate(("Arjun Mehta", "Priya Iyer", "Zomato Delivery"), start=1):
+            _get_or_create(
+                db,
+                Visitor,
+                community_id=c.id,
+                phone=f"+9198{c.code[-2:]}00{i:04d}",
+                defaults={"full_name": name},
+            )
+
+
 def main() -> None:
     with SessionLocal() as db:
         seed_rbac(db)
         communities = seed_property(db)
         seed_users(db, communities)
         seed_residents(db, communities)
+        seed_visitors(db, communities)
         db.commit()
     log.info("seed.done")
     print(f"Seed complete. Demo users: <role>@{DEMO_DOMAIN} / <role>{DEMO_PASSWORD_SUFFIX}")

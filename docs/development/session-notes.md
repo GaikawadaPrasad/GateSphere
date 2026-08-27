@@ -18,6 +18,40 @@ Format per entry:
 
 ---
 
+## 2026-08-28 — FR-04 Visitor Management module
+
+**By:** backend module build-out, module 3 of the plan
+**Branch / commit:** `main`
+**What changed:**
+- **`visitors` module** end to end, following the `communities` shape:
+  - 7 tables — `visitors` (UQ `(community_id, phone)`, `id_number_hash` HMAC only),
+    `visitor_blacklist` (`phone_hash` / `id_number_hash` HMAC, indexed), `visitor_policies`
+    (one per community, auto-created), `visitor_requests` (composite tenant-safe FKs to
+    `visitors` + `units`), `visitor_approvals` (UQ `(request_id, approver_user_id)`),
+    `visitor_passes` (`token_hash` HMAC, shown once), `visitor_entries` (`inside/exited/denied`).
+  - `service.py` — blacklist screening at request time **and** re-check at the gate
+    (`blacklist_mode="block"` → `403 VISITOR_BLACKLISTED`, denied entry row recorded);
+    `recurring` visitor type skips approval; host = unit's primary active occupant;
+    decision only on `pending` (one per approver → `409 ALREADY_DECIDED`); pass issuance
+    pre-approves a pending request, `valid_to` defaults to `now + pass_ttl_minutes`;
+    gate entry gated on `PASS_REVOKED/EXPIRED/EXHAUSTED` + `NOT_APPROVED` + `ALREADY_INSIDE`,
+    bumps `visit_count` / `frequent_visitor_flag` (≥5); exit → `NOT_INSIDE` guard, completes
+    the request. `record_audit` on every write.
+  - `router.py` — static-prefix routes before the `GET ""` directory list; `visitors:approve`
+    on the decision route so a resident host can approve.
+  - migration `0007` — the 7 tables + RLS on the 5 tenant tables; also renames the `audit_logs`
+    indexes orphaned by `0005`'s column rename.
+  - RBAC: `security_supervisor` / `security_guard` gained the visitor permissions they need
+    (blacklist view, entry/exit, request create/update).
+  - `seed_visitors()` — a policy per community + 3 sample visitors.
+  - docs: `docs/backend/modules/visitors/README.md`, `docs/backend/api/visitors.md`.
+**Why:** FR-04; the security-desk core of the product.
+**Verified:** `ruff check` + `black --check` clean (200 files); `pytest -q` → **64 passed**
+(8 unit + 6 api new); `alembic downgrade 0006_residents && alembic upgrade head` round-trip; seed re-run.
+**Open / next:** FR-05 `gate` module.
+
+---
+
 ## 2026-08-28 — FR-03 Residents module
 
 **By:** backend module build-out, module 2 of the plan

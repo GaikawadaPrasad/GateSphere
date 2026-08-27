@@ -997,8 +997,8 @@ Silence on an area is not the same as "checked and fine" — say which one it is
 | 16 | audit | ✅ `audit_logs` ERD-shaped (migration `0005`) + `record_audit()` helper |
 | **03** | **communities & property** | ✅ **implemented** — models (composite tenant-safe FKs), `TenantRepository`, service (scope rules, enum/conflict checks), router (envelope + RBAC), migration `0004` (+ RLS on gates/towers/floors/units), seed, unit + integration tests, module README + API doc |
 | 03 | residents | ✅ **implemented** — 5 tables (composite tenant-safe FKs, partial-unique primary occupant), move-record state machine, migration `0006` (+ RLS), seed, unit + integration tests, README + API doc |
-| 04 | visitors | ⏳ next |
-| 05 | gate | ⏳ | 06 | domestic_staff | ⏳ |
+| 04 | visitors | ✅ **implemented** — 7 tables (blacklist HMAC screening, host-approval workflow, QR/PIN/OTP passes, gate entry/exit), per-community policy, migration `0007` (+ RLS + audit-index rename), seed, unit + integration tests, README + API doc |
+| 05 | gate | ⏳ next | 06 | domestic_staff | ⏳ |
 | 07 | deliveries | ⏳ | 08 | vehicles | ⏳ | 09 | billing | ⏳ |
 | 10 | complaints | ⏳ | 11 | amenities | ⏳ | 12 | communication | ⏳ |
 | 13 | incidents | ⏳ | 14 | dashboards | ⏳ | 15 | notifications | ⏳ |
