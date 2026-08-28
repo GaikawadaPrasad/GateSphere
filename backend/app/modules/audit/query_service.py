@@ -13,8 +13,8 @@ import uuid
 from datetime import datetime
 
 from fastapi import Request
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import NotFoundError
 from app.core.tenancy import TenantScope
@@ -24,7 +24,7 @@ from app.modules.users.models import User
 
 class AuditQueryService:
     def __init__(
-        self, db: Session, scope: TenantScope, actor: User, request: Request | None = None
+        self, db: AsyncSession, scope: TenantScope, actor: User, request: Request | None = None
     ):
         self.db = db
         self.scope = scope
@@ -68,21 +68,19 @@ class AuditQueryService:
             stmt = stmt.where(AuditLog.created_at <= until)
         return stmt
 
-    def list_logs(self, *, offset: int, limit: int, **filters):
+    async def list_logs(self, *, offset: int, limit: int, **filters):
         stmt = self._filtered(**filters).order_by(AuditLog.created_at.desc())
-        from sqlalchemy import func
-
-        total = int(self.db.scalar(stmt.with_only_columns(func.count()).order_by(None)) or 0)
-        rows = list(self.db.scalars(stmt.offset(offset).limit(limit)).all())
+        total = int(await self.db.scalar(stmt.with_only_columns(func.count()).order_by(None)) or 0)
+        rows = list((await self.db.scalars(stmt.offset(offset).limit(limit))).all())
         return rows, total
 
-    def get_log(self, log_id: uuid.UUID) -> AuditLog:
-        row = self.db.scalar(self._scoped(select(AuditLog).where(AuditLog.id == log_id)))
+    async def get_log(self, log_id: uuid.UUID) -> AuditLog:
+        row = await self.db.scalar(self._scoped(select(AuditLog).where(AuditLog.id == log_id)))
         if row is None:
             raise NotFoundError("Audit log not found")
         return row
 
-    def export_csv(self, *, max_rows: int = 10000, **filters) -> str:
+    async def export_csv(self, *, max_rows: int = 10000, **filters) -> str:
         stmt = self._filtered(**filters).order_by(AuditLog.created_at.desc()).limit(max_rows)
         buf = io.StringIO()
         w = csv.writer(buf)
@@ -98,7 +96,7 @@ class AuditQueryService:
                 "ip_address",
             ]
         )
-        for r in self.db.scalars(stmt).all():
+        for r in (await self.db.scalars(stmt)).all():
             w.writerow(
                 [
                     r.created_at.isoformat(),

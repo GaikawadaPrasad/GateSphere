@@ -13,15 +13,15 @@ from fastapi import APIRouter, Depends, Response
 
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
-from app.core.security import require_permission
+from app.core.security import require_permission_async
 from app.modules.audit import schemas
 from app.modules.audit.deps import audit_query_service
 from app.modules.audit.query_service import AuditQueryService
 
 router = APIRouter(prefix="/audit", tags=["Audit Logging"])
 
-VIEW = Depends(require_permission("audit:view"))
-EXPORT = Depends(require_permission("audit:export"))
+VIEW = Depends(require_permission_async("audit:view"))
+EXPORT = Depends(require_permission_async("audit:export"))
 Svc = AuditQueryService
 
 
@@ -53,22 +53,22 @@ async def module_health() -> dict:
 
 
 @router.get("/logs", response_model=Envelope[list[schemas.AuditLogRead]], dependencies=[VIEW])
-def list_logs(
+async def list_logs(
     filters: dict = Depends(_filters),
     params: PageParams = Depends(page_params),
     svc: Svc = Depends(audit_query_service),
 ) -> dict:
-    rows, total = svc.list_logs(offset=params.offset, limit=params.page_size, **filters)
+    rows, total = await svc.list_logs(offset=params.offset, limit=params.page_size, **filters)
     return paginated(
         [schemas.AuditLogRead.model_validate(r) for r in rows], total=total, params=params
     )
 
 
 @router.get("/logs.csv", dependencies=[EXPORT])
-def export_logs(
+async def export_logs(
     filters: dict = Depends(_filters), svc: Svc = Depends(audit_query_service)
 ) -> Response:
-    csv_text = svc.export_csv(**filters)
+    csv_text = await svc.export_csv(**filters)
     return Response(
         content=csv_text,
         media_type="text/csv",
@@ -77,5 +77,5 @@ def export_logs(
 
 
 @router.get("/logs/{log_id}", response_model=Envelope[schemas.AuditLogRead], dependencies=[VIEW])
-def get_log(log_id: uuid.UUID, svc: Svc = Depends(audit_query_service)) -> dict:
-    return ok(schemas.AuditLogRead.model_validate(svc.get_log(log_id)))
+async def get_log(log_id: uuid.UUID, svc: Svc = Depends(audit_query_service)) -> dict:
+    return ok(schemas.AuditLogRead.model_validate(await svc.get_log(log_id)))
