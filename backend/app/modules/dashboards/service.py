@@ -13,7 +13,7 @@ from decimal import Decimal
 
 from fastapi import Request
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import BusinessRuleError
 from app.core.tenancy import TenantScope
@@ -37,7 +37,7 @@ _OPEN_INCIDENT = ("reported", "acknowledged", "responding", "contained")
 
 class DashboardService:
     def __init__(
-        self, db: Session, scope: TenantScope, actor: User, request: Request | None = None
+        self, db: AsyncSession, scope: TenantScope, actor: User, request: Request | None = None
     ):
         self.db = db
         self.scope = scope
@@ -53,11 +53,11 @@ class DashboardService:
             "Specify a community", code="COMMUNITY_REQUIRED", fields={"community_id": "required"}
         )
 
-    def _count(self, model, *where) -> int:
-        return int(self.db.scalar(select(func.count()).select_from(model).where(*where)) or 0)
+    async def _count(self, model, *where) -> int:
+        return int(await self.db.scalar(select(func.count()).select_from(model).where(*where)) or 0)
 
-    def _outstanding(self, cid: uuid.UUID, *extra) -> Decimal:
-        val = self.db.scalar(
+    async def _outstanding(self, cid: uuid.UUID, *extra) -> Decimal:
+        val = await self.db.scalar(
             select(func.coalesce(func.sum(MaintenanceInvoice.balance_due), 0)).where(
                 MaintenanceInvoice.community_id == cid,
                 MaintenanceInvoice.status.in_(("posted", "partially_paid", "overdue")),
@@ -67,79 +67,79 @@ class DashboardService:
         return Decimal(val or 0)
 
     # -- overview ------------------------------------------ #
-    def overview(self, community_id: uuid.UUID | None):
+    async def overview(self, community_id: uuid.UUID | None):
         cid = self._community(community_id)
         from app.modules.dashboards import schemas
 
         return schemas.OverviewStats(
             community_id=cid,
-            residents=self._count(ResidentProfile, ResidentProfile.community_id == cid),
-            units=self._count(Unit, Unit.community_id == cid),
-            pending_visitor_requests=self._count(
+            residents=await self._count(ResidentProfile, ResidentProfile.community_id == cid),
+            units=await self._count(Unit, Unit.community_id == cid),
+            pending_visitor_requests=await self._count(
                 VisitorRequest,
                 VisitorRequest.community_id == cid,
                 VisitorRequest.status == "pending",
             ),
-            visitors_inside=self._count(
+            visitors_inside=await self._count(
                 VisitorEntry,
                 VisitorEntry.community_id == cid,
                 VisitorEntry.status == "inside",
             ),
-            pending_deliveries=self._count(
+            pending_deliveries=await self._count(
                 Delivery, Delivery.community_id == cid, Delivery.approval_status == "pending"
             ),
-            open_tickets=self._count(
+            open_tickets=await self._count(
                 ServiceTicket,
                 ServiceTicket.community_id == cid,
                 ServiceTicket.status.in_(_OPEN_TICKET),
             ),
-            open_incidents=self._count(
+            open_incidents=await self._count(
                 SecurityIncident,
                 SecurityIncident.community_id == cid,
                 SecurityIncident.status.in_(_OPEN_INCIDENT),
             ),
-            active_panic_alerts=self._count(
+            active_panic_alerts=await self._count(
                 PanicAlert, PanicAlert.community_id == cid, PanicAlert.status == "active"
             ),
-            outstanding_balance=self._outstanding(cid),
+            outstanding_balance=await self._outstanding(cid),
         )
 
     # -- security ----------------------------------------- #
-    def security(self, community_id: uuid.UUID | None):
+    async def security(self, community_id: uuid.UUID | None):
         cid = self._community(community_id)
         from app.modules.dashboards import schemas
 
         return schemas.SecurityStats(
             community_id=cid,
-            visitors_inside=self._count(
+            visitors_inside=await self._count(
                 VisitorEntry,
                 VisitorEntry.community_id == cid,
                 VisitorEntry.status == "inside",
             ),
-            vehicles_inside=self._count(
+            vehicles_inside=await self._count(
                 VehicleEntry,
                 VehicleEntry.community_id == cid,
                 VehicleEntry.status == "inside",
             ),
-            staff_inside=self._count(
+            staff_inside=await self._count(
                 StaffAttendance,
                 StaffAttendance.community_id == cid,
                 StaffAttendance.check_out_at.is_(None),
             ),
-            pending_visitor_approvals=self._count(
+            pending_visitor_approvals=await self._count(
                 VisitorRequest,
                 VisitorRequest.community_id == cid,
                 VisitorRequest.status == "pending",
             ),
-            active_panic_alerts=self._count(
+            active_panic_alerts=await self._count(
                 PanicAlert, PanicAlert.community_id == cid, PanicAlert.status == "active"
             ),
-            open_incidents=self._count(
+            open_incidents=await self._count(
                 SecurityIncident,
                 SecurityIncident.community_id == cid,
                 SecurityIncident.status.in_(_OPEN_INCIDENT),
             ),
-            guards_on_active_roster=self._count(
+            guards_on_active_roster=await self._count(
                 GateAssignment,
                 GateAssignment.community_id == cid,
                 GateAssignment.status == "active",
@@ -147,25 +147,27 @@ class DashboardService:
         )
 
     # -- financial --------------------------------------- #
-    def financial(self, community_id: uuid.UUID | None):
+    async def financial(self, community_id: uuid.UUID | None):
         cid = self._community(community_id)
         from app.modules.dashboards import schemas
 
         by_status = {
             s: int(n)
-            for s, n in self.db.execute(
-                select(MaintenanceInvoice.status, func.count())
-                .where(MaintenanceInvoice.community_id == cid)
-                .group_by(MaintenanceInvoice.status)
+            for s, n in (
+                await self.db.execute(
+                    select(MaintenanceInvoice.status, func.count())
+                    .where(MaintenanceInvoice.community_id == cid)
+                    .group_by(MaintenanceInvoice.status)
+                )
             ).all()
         }
-        total_billed = self.db.scalar(
+        total_billed = await self.db.scalar(
             select(func.coalesce(func.sum(MaintenanceInvoice.total_amount), 0)).where(
                 MaintenanceInvoice.community_id == cid,
                 MaintenanceInvoice.status != "draft",
             )
         )
-        total_collected = self.db.scalar(
+        total_collected = await self.db.scalar(
             select(func.coalesce(func.sum(Payment.amount), 0)).where(
                 Payment.community_id == cid, Payment.payment_status == "success"
             )
@@ -175,15 +177,15 @@ class DashboardService:
             invoices_by_status=by_status,
             total_billed=Decimal(total_billed or 0),
             total_collected=Decimal(total_collected or 0),
-            outstanding_balance=self._outstanding(cid),
+            outstanding_balance=await self._outstanding(cid),
         )
 
     # -- resident --------------------------------------- #
-    def resident(self, community_id: uuid.UUID | None):
+    async def resident(self, community_id: uuid.UUID | None):
         cid = self._community(community_id)
         from app.modules.dashboards import schemas
 
-        occ = self.db.scalar(
+        occ = await self.db.scalar(
             select(UnitOccupancy)
             .join(ResidentProfile, ResidentProfile.id == UnitOccupancy.resident_profile_id)
             .where(
@@ -195,19 +197,19 @@ class DashboardService:
         )
         unit_id = occ.unit_id if occ else None
         now = datetime.now(UTC)
-        my_tickets = self._count(
+        my_tickets = await self._count(
             ServiceTicket,
             ServiceTicket.community_id == cid,
             ServiceTicket.raised_by_user_id == self.actor.id,
             ServiceTicket.status.in_(_OPEN_TICKET),
         )
-        my_reqs = self._count(
+        my_reqs = await self._count(
             VisitorRequest,
             VisitorRequest.community_id == cid,
             VisitorRequest.created_by_user_id == self.actor.id,
             VisitorRequest.status == "pending",
         )
-        my_bookings = self._count(
+        my_bookings = await self._count(
             AmenityBooking,
             AmenityBooking.community_id == cid,
             AmenityBooking.resident_user_id == self.actor.id,
@@ -221,11 +223,11 @@ class DashboardService:
             my_pending_visitor_requests=my_reqs,
             my_upcoming_bookings=my_bookings,
             my_outstanding_balance=(
-                self._outstanding(cid, MaintenanceInvoice.unit_id == unit_id)
+                await self._outstanding(cid, MaintenanceInvoice.unit_id == unit_id)
                 if unit_id
                 else Decimal(0)
             ),
-            published_announcements=self._count(
+            published_announcements=await self._count(
                 Announcement,
                 Announcement.community_id == cid,
                 Announcement.is_published.is_(True),
