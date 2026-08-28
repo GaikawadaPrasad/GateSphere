@@ -12,17 +12,17 @@ from fastapi import APIRouter, Depends, status
 
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
-from app.core.security import require_permission
+from app.core.security import require_permission_async
 from app.modules.domestic_staff import schemas
 from app.modules.domestic_staff.deps import domestic_staff_service
 from app.modules.domestic_staff.service import DomesticStaffService
 
 router = APIRouter(prefix="/domestic-staff", tags=["Domestic Staff"])
 
-VIEW = Depends(require_permission("domestic_staff:view"))
-CREATE = Depends(require_permission("domestic_staff:create"))
-UPDATE = Depends(require_permission("domestic_staff:update"))
-APPROVE = Depends(require_permission("domestic_staff:approve"))
+VIEW = Depends(require_permission_async("domestic_staff:view"))
+CREATE = Depends(require_permission_async("domestic_staff:create"))
+UPDATE = Depends(require_permission_async("domestic_staff:update"))
+APPROVE = Depends(require_permission_async("domestic_staff:approve"))
 
 Svc = DomesticStaffService
 
@@ -36,14 +36,14 @@ async def module_health() -> dict:
 @router.get(
     "/assignments", response_model=Envelope[list[schemas.AssignmentRead]], dependencies=[VIEW]
 )
-def list_assignments(
+async def list_assignments(
     staff_id: uuid.UUID | None = None,
     unit_id: uuid.UUID | None = None,
     active_only: bool = False,
     params: PageParams = Depends(page_params),
     svc: Svc = Depends(domestic_staff_service),
 ) -> dict:
-    rows, total = svc.list_assignments(
+    rows, total = await svc.list_assignments(
         staff_id=staff_id,
         unit_id=unit_id,
         active_only=active_only,
@@ -61,10 +61,12 @@ def list_assignments(
     status_code=status.HTTP_201_CREATED,
     dependencies=[APPROVE],
 )
-def assign_unit(
+async def assign_unit(
     payload: schemas.AssignmentCreate, svc: Svc = Depends(domestic_staff_service)
 ) -> dict:
-    return ok(schemas.AssignmentRead.model_validate(svc.assign_unit(payload)), message="Assigned")
+    return ok(
+        schemas.AssignmentRead.model_validate(await svc.assign_unit(payload)), message="Assigned"
+    )
 
 
 @router.post(
@@ -72,9 +74,12 @@ def assign_unit(
     response_model=Envelope[schemas.AssignmentRead],
     dependencies=[UPDATE],
 )
-def end_assignment(assignment_id: uuid.UUID, svc: Svc = Depends(domestic_staff_service)) -> dict:
+async def end_assignment(
+    assignment_id: uuid.UUID, svc: Svc = Depends(domestic_staff_service)
+) -> dict:
     return ok(
-        schemas.AssignmentRead.model_validate(svc.end_assignment(assignment_id)), message="Ended"
+        schemas.AssignmentRead.model_validate(await svc.end_assignment(assignment_id)),
+        message="Ended",
     )
 
 
@@ -82,14 +87,14 @@ def end_assignment(assignment_id: uuid.UUID, svc: Svc = Depends(domestic_staff_s
 @router.get(
     "/attendance", response_model=Envelope[list[schemas.AttendanceRead]], dependencies=[VIEW]
 )
-def list_attendance(
+async def list_attendance(
     community_id: uuid.UUID | None = None,
     staff_id: uuid.UUID | None = None,
     open_only: bool = False,
     params: PageParams = Depends(page_params),
     svc: Svc = Depends(domestic_staff_service),
 ) -> dict:
-    rows, total = svc.list_attendance(
+    rows, total = await svc.list_attendance(
         community_id=community_id,
         staff_id=staff_id,
         open_only=open_only,
@@ -107,8 +112,12 @@ def list_attendance(
     status_code=status.HTTP_201_CREATED,
     dependencies=[CREATE],
 )
-def check_in(payload: schemas.CheckInCreate, svc: Svc = Depends(domestic_staff_service)) -> dict:
-    return ok(schemas.AttendanceRead.model_validate(svc.check_in(payload)), message="Checked in")
+async def check_in(
+    payload: schemas.CheckInCreate, svc: Svc = Depends(domestic_staff_service)
+) -> dict:
+    return ok(
+        schemas.AttendanceRead.model_validate(await svc.check_in(payload)), message="Checked in"
+    )
 
 
 @router.patch(
@@ -116,9 +125,9 @@ def check_in(payload: schemas.CheckInCreate, svc: Svc = Depends(domestic_staff_s
     response_model=Envelope[schemas.AttendanceRead],
     dependencies=[UPDATE],
 )
-def check_out(attendance_id: uuid.UUID, svc: Svc = Depends(domestic_staff_service)) -> dict:
+async def check_out(attendance_id: uuid.UUID, svc: Svc = Depends(domestic_staff_service)) -> dict:
     return ok(
-        schemas.AttendanceRead.model_validate(svc.check_out(attendance_id)),
+        schemas.AttendanceRead.model_validate(await svc.check_out(attendance_id)),
         message="Checked out",
     )
 
@@ -130,8 +139,10 @@ def check_out(attendance_id: uuid.UUID, svc: Svc = Depends(domestic_staff_servic
     status_code=status.HTTP_201_CREATED,
     dependencies=[VIEW],
 )
-def rate_staff(payload: schemas.RatingCreate, svc: Svc = Depends(domestic_staff_service)) -> dict:
-    return ok(schemas.RatingRead.model_validate(svc.rate_staff(payload)), message="Rated")
+async def rate_staff(
+    payload: schemas.RatingCreate, svc: Svc = Depends(domestic_staff_service)
+) -> dict:
+    return ok(schemas.RatingRead.model_validate(await svc.rate_staff(payload)), message="Rated")
 
 
 @router.get(
@@ -139,12 +150,12 @@ def rate_staff(payload: schemas.RatingCreate, svc: Svc = Depends(domestic_staff_
     response_model=Envelope[list[schemas.RatingRead]],
     dependencies=[VIEW],
 )
-def list_ratings(
+async def list_ratings(
     staff_id: uuid.UUID,
     params: PageParams = Depends(page_params),
     svc: Svc = Depends(domestic_staff_service),
 ) -> dict:
-    rows, total = svc.list_ratings(staff_id, offset=params.offset, limit=params.page_size)
+    rows, total = await svc.list_ratings(staff_id, offset=params.offset, limit=params.page_size)
     return paginated(
         [schemas.RatingRead.model_validate(r) for r in rows], total=total, params=params
     )
@@ -152,13 +163,13 @@ def list_ratings(
 
 # --- staff directory ------------------------------------------ #
 @router.get("", response_model=Envelope[list[schemas.StaffRead]], dependencies=[VIEW])
-def list_staff(
+async def list_staff(
     community_id: uuid.UUID | None = None,
     q: str | None = None,
     params: PageParams = Depends(page_params),
     svc: Svc = Depends(domestic_staff_service),
 ) -> dict:
-    rows, total = svc.list_staff(
+    rows, total = await svc.list_staff(
         community_id=community_id, q=q, offset=params.offset, limit=params.page_size
     )
     return paginated(
@@ -172,28 +183,31 @@ def list_staff(
     status_code=status.HTTP_201_CREATED,
     dependencies=[CREATE],
 )
-def create_staff(
+async def create_staff(
     payload: schemas.StaffCreate,
     community_id: uuid.UUID | None = None,
     svc: Svc = Depends(domestic_staff_service),
 ) -> dict:
     return ok(
-        schemas.StaffRead.model_validate(svc.create_staff(payload, community_id=community_id)),
+        schemas.StaffRead.model_validate(
+            await svc.create_staff(payload, community_id=community_id)
+        ),
         message="Staff created",
     )
 
 
 @router.get("/{staff_id}", response_model=Envelope[schemas.StaffRead], dependencies=[VIEW])
-def get_staff(staff_id: uuid.UUID, svc: Svc = Depends(domestic_staff_service)) -> dict:
-    return ok(schemas.StaffRead.model_validate(svc.get_staff(staff_id)))
+async def get_staff(staff_id: uuid.UUID, svc: Svc = Depends(domestic_staff_service)) -> dict:
+    return ok(schemas.StaffRead.model_validate(await svc.get_staff(staff_id)))
 
 
 @router.patch("/{staff_id}", response_model=Envelope[schemas.StaffRead], dependencies=[UPDATE])
-def update_staff(
+async def update_staff(
     staff_id: uuid.UUID,
     payload: schemas.StaffUpdate,
     svc: Svc = Depends(domestic_staff_service),
 ) -> dict:
     return ok(
-        schemas.StaffRead.model_validate(svc.update_staff(staff_id, payload)), message="Updated"
+        schemas.StaffRead.model_validate(await svc.update_staff(staff_id, payload)),
+        message="Updated",
     )

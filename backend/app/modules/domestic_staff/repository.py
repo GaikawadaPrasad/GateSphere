@@ -1,4 +1,4 @@
-"""Data-access for Domestic Staff (FR-06). Queries only."""
+"""Data-access for Domestic Staff (FR-06). Queries only. Async (ADR-010)."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import uuid
 
 from sqlalchemy import select
 
-from app.db.repository import TenantRepository
+from app.db.repository import AsyncTenantRepository
 from app.modules.domestic_staff.models import (
     DomesticStaff,
     StaffAttendance,
@@ -15,24 +15,24 @@ from app.modules.domestic_staff.models import (
 )
 
 
-class StaffRepository(TenantRepository[DomesticStaff]):
+class StaffRepository(AsyncTenantRepository[DomesticStaff]):
     model = DomesticStaff
 
-    def by_phone(self, community_id: uuid.UUID, phone: str) -> DomesticStaff | None:
-        return self.db.scalar(
+    async def by_phone(self, community_id: uuid.UUID, phone: str) -> DomesticStaff | None:
+        return await self.db.scalar(
             select(DomesticStaff).where(
                 DomesticStaff.community_id == community_id, DomesticStaff.phone == phone
             )
         )
 
 
-class AssignmentRepository(TenantRepository[StaffUnitAssignment]):
+class AssignmentRepository(AsyncTenantRepository[StaffUnitAssignment]):
     model = StaffUnitAssignment
 
-    def active_for_pair(
+    async def active_for_pair(
         self, staff_id: uuid.UUID, unit_id: uuid.UUID
     ) -> StaffUnitAssignment | None:
-        return self.db.scalar(
+        return await self.db.scalar(
             select(StaffUnitAssignment).where(
                 StaffUnitAssignment.staff_id == staff_id,
                 StaffUnitAssignment.unit_id == unit_id,
@@ -41,11 +41,11 @@ class AssignmentRepository(TenantRepository[StaffUnitAssignment]):
         )
 
 
-class AttendanceRepository(TenantRepository[StaffAttendance]):
+class AttendanceRepository(AsyncTenantRepository[StaffAttendance]):
     model = StaffAttendance
 
-    def open_for_staff(self, staff_id: uuid.UUID) -> StaffAttendance | None:
-        return self.db.scalar(
+    async def open_for_staff(self, staff_id: uuid.UUID) -> StaffAttendance | None:
+        return await self.db.scalar(
             select(StaffAttendance).where(
                 StaffAttendance.staff_id == staff_id,
                 StaffAttendance.check_out_at.is_(None),
@@ -53,5 +53,5 @@ class AttendanceRepository(TenantRepository[StaffAttendance]):
         )
 
 
-class RatingRepository(TenantRepository[StaffRating]):
+class RatingRepository(AsyncTenantRepository[StaffRating]):
     model = StaffRating
