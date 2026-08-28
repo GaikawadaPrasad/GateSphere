@@ -1,4 +1,4 @@
-"""Data-access for Residents (FR-03). Queries only."""
+"""Data-access for Residents (FR-03). Queries only. Async stack (ADR-010)."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import uuid
 
 from sqlalchemy import select
 
-from app.db.repository import TenantRepository
+from app.db.repository import AsyncTenantRepository
 from app.modules.residents.models import (
     EmergencyContact,
     FamilyMember,
@@ -16,33 +16,35 @@ from app.modules.residents.models import (
 )
 
 
-class ResidentProfileRepository(TenantRepository[ResidentProfile]):
+class ResidentProfileRepository(AsyncTenantRepository[ResidentProfile]):
     model = ResidentProfile
 
-    def by_user(self, community_id: uuid.UUID, user_id: uuid.UUID) -> ResidentProfile | None:
-        return self.db.scalar(
+    async def by_user(self, community_id: uuid.UUID, user_id: uuid.UUID) -> ResidentProfile | None:
+        return await self.db.scalar(
             select(ResidentProfile).where(
                 ResidentProfile.community_id == community_id, ResidentProfile.user_id == user_id
             )
         )
 
 
-class OccupancyRepository(TenantRepository[UnitOccupancy]):
+class OccupancyRepository(AsyncTenantRepository[UnitOccupancy]):
     model = UnitOccupancy
 
-    def active_for_unit(self, unit_id: uuid.UUID) -> list[UnitOccupancy]:
+    async def active_for_unit(self, unit_id: uuid.UUID) -> list[UnitOccupancy]:
         return list(
-            self.db.scalars(
-                select(UnitOccupancy).where(
-                    UnitOccupancy.unit_id == unit_id, UnitOccupancy.is_active.is_(True)
+            (
+                await self.db.scalars(
+                    select(UnitOccupancy).where(
+                        UnitOccupancy.unit_id == unit_id, UnitOccupancy.is_active.is_(True)
+                    )
                 )
             ).all()
         )
 
-    def active_for_pair(
+    async def active_for_pair(
         self, unit_id: uuid.UUID, resident_profile_id: uuid.UUID
     ) -> UnitOccupancy | None:
-        return self.db.scalar(
+        return await self.db.scalar(
             select(UnitOccupancy).where(
                 UnitOccupancy.unit_id == unit_id,
                 UnitOccupancy.resident_profile_id == resident_profile_id,
@@ -51,13 +53,13 @@ class OccupancyRepository(TenantRepository[UnitOccupancy]):
         )
 
 
-class FamilyMemberRepository(TenantRepository[FamilyMember]):
+class FamilyMemberRepository(AsyncTenantRepository[FamilyMember]):
     model = FamilyMember
 
 
-class EmergencyContactRepository(TenantRepository[EmergencyContact]):
+class EmergencyContactRepository(AsyncTenantRepository[EmergencyContact]):
     model = EmergencyContact
 
 
-class MoveRecordRepository(TenantRepository[MoveRecord]):
+class MoveRecordRepository(AsyncTenantRepository[MoveRecord]):
     model = MoveRecord

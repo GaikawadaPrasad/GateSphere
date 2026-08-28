@@ -1023,7 +1023,7 @@ tenant tables to a new RLS migration) → extend `seed.py` → `tests/test_<m>_{
 0. **Async stack migration** (ADR-010) — in progress, incremental. Landed: async engine +
    `AsyncSessionLocal` + `get_async_db`; shared twins (`AsyncTenantRepository`,
    `require_auth_async` / `require_permission_async`, `async_tenant_context`,
-   `record_audit_async`). **Converted modules:** `communities`. Remaining: everything else —
+   `record_audit_async`, `revoke_all_user_sessions_async`). XX   `uploads`, `audit`, `users`. Remaining: everything else —
    convert `repository → service → router → deps → unit tests` one module at a time, suite
    green at each step. Then async Alembic env + drop the sync engine at cutover. Auth stays
    session-cookie (no JWT).

@@ -15,17 +15,17 @@ from fastapi import APIRouter, Depends, Response, status
 
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
-from app.core.security import require_permission
+from app.core.security import require_permission_async
 from app.modules.residents import schemas
 from app.modules.residents.deps import resident_service
 from app.modules.residents.service import ResidentService
 
 router = APIRouter(prefix="/residents", tags=["Residents"])
 
-VIEW = Depends(require_permission("residents:view"))
-CREATE = Depends(require_permission("residents:create"))
-UPDATE = Depends(require_permission("residents:update"))
-DELETE = Depends(require_permission("residents:delete"))
+VIEW = Depends(require_permission_async("residents:view"))
+CREATE = Depends(require_permission_async("residents:create"))
+UPDATE = Depends(require_permission_async("residents:update"))
+DELETE = Depends(require_permission_async("residents:delete"))
 
 
 @router.get("/health", summary="Residents module liveness")
@@ -35,12 +35,12 @@ async def module_health() -> dict:
 
 # --- resident profiles: collection --------------------------------------- #
 @router.get("", response_model=Envelope[list[schemas.ResidentProfileRead]], dependencies=[VIEW])
-def list_profiles(
+async def list_profiles(
     community_id: uuid.UUID | None = None,
     params: PageParams = Depends(page_params),
     svc: ResidentService = Depends(resident_service),
 ) -> dict:
-    rows, total = svc.list_profiles(
+    rows, total = await svc.list_profiles(
         community_id=community_id, offset=params.offset, limit=params.page_size
     )
     return paginated(
@@ -54,12 +54,12 @@ def list_profiles(
     status_code=status.HTTP_201_CREATED,
     dependencies=[CREATE],
 )
-def create_profile(
+async def create_profile(
     payload: schemas.ResidentProfileCreate,
     community_id: uuid.UUID | None = None,
     svc: ResidentService = Depends(resident_service),
 ) -> dict:
-    obj = svc.create_profile(payload, community_id=community_id)
+    obj = await svc.create_profile(payload, community_id=community_id)
     return ok(schemas.ResidentProfileRead.model_validate(obj), message="Resident profile created")
 
 
@@ -69,12 +69,12 @@ def create_profile(
     response_model=Envelope[list[schemas.OccupancyRead]],
     dependencies=[VIEW],
 )
-def list_occupancies(
+async def list_occupancies(
     unit_id: uuid.UUID,
     params: PageParams = Depends(page_params),
     svc: ResidentService = Depends(resident_service),
 ) -> dict:
-    rows, total = svc.list_occupancies(
+    rows, total = await svc.list_occupancies(
         unit_id=unit_id, offset=params.offset, limit=params.page_size
     )
     return paginated(
@@ -87,12 +87,14 @@ def list_occupancies(
     response_model=Envelope[list[schemas.FamilyMemberRead]],
     dependencies=[VIEW],
 )
-def list_family(
+async def list_family(
     unit_id: uuid.UUID,
     params: PageParams = Depends(page_params),
     svc: ResidentService = Depends(resident_service),
 ) -> dict:
-    rows, total = svc.list_family(unit_id=unit_id, offset=params.offset, limit=params.page_size)
+    rows, total = await svc.list_family(
+        unit_id=unit_id, offset=params.offset, limit=params.page_size
+    )
     return paginated(
         [schemas.FamilyMemberRead.model_validate(r) for r in rows], total=total, params=params
     )
@@ -104,11 +106,11 @@ def list_family(
     status_code=status.HTTP_201_CREATED,
     dependencies=[CREATE],
 )
-def create_occupancy(
+async def create_occupancy(
     payload: schemas.OccupancyCreate, svc: ResidentService = Depends(resident_service)
 ) -> dict:
     return ok(
-        schemas.OccupancyRead.model_validate(svc.create_occupancy(payload)),
+        schemas.OccupancyRead.model_validate(await svc.create_occupancy(payload)),
         message="Occupancy created",
     )
 
@@ -118,13 +120,13 @@ def create_occupancy(
     response_model=Envelope[schemas.OccupancyRead],
     dependencies=[UPDATE],
 )
-def end_occupancy(
+async def end_occupancy(
     occupancy_id: uuid.UUID,
     payload: schemas.OccupancyEnd,
     svc: ResidentService = Depends(resident_service),
 ) -> dict:
     return ok(
-        schemas.OccupancyRead.model_validate(svc.end_occupancy(occupancy_id, payload)),
+        schemas.OccupancyRead.model_validate(await svc.end_occupancy(occupancy_id, payload)),
         message="Occupancy ended",
     )
 
@@ -136,11 +138,11 @@ def end_occupancy(
     status_code=status.HTTP_201_CREATED,
     dependencies=[CREATE],
 )
-def create_family(
+async def create_family(
     payload: schemas.FamilyMemberCreate, svc: ResidentService = Depends(resident_service)
 ) -> dict:
     return ok(
-        schemas.FamilyMemberRead.model_validate(svc.create_family(payload)),
+        schemas.FamilyMemberRead.model_validate(await svc.create_family(payload)),
         message="Family member added",
     )
 
@@ -152,10 +154,10 @@ def create_family(
     response_class=Response,
     dependencies=[DELETE],
 )
-def delete_contact(
+async def delete_contact(
     contact_id: uuid.UUID, svc: ResidentService = Depends(resident_service)
 ) -> Response:
-    svc.delete_contact(contact_id)
+    await svc.delete_contact(contact_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -163,13 +165,13 @@ def delete_contact(
 @router.get(
     "/move-records", response_model=Envelope[list[schemas.MoveRecordRead]], dependencies=[VIEW]
 )
-def list_moves(
+async def list_moves(
     community_id: uuid.UUID | None = None,
     move_status: str | None = None,
     params: PageParams = Depends(page_params),
     svc: ResidentService = Depends(resident_service),
 ) -> dict:
-    rows, total = svc.list_moves(
+    rows, total = await svc.list_moves(
         community_id=community_id, status=move_status, offset=params.offset, limit=params.page_size
     )
     return paginated(
@@ -183,11 +185,11 @@ def list_moves(
     status_code=status.HTTP_201_CREATED,
     dependencies=[CREATE],
 )
-def create_move(
+async def create_move(
     payload: schemas.MoveRecordCreate, svc: ResidentService = Depends(resident_service)
 ) -> dict:
     return ok(
-        schemas.MoveRecordRead.model_validate(svc.create_move(payload)),
+        schemas.MoveRecordRead.model_validate(await svc.create_move(payload)),
         message="Move record created",
     )
 
@@ -195,8 +197,8 @@ def create_move(
 @router.get(
     "/move-records/{move_id}", response_model=Envelope[schemas.MoveRecordRead], dependencies=[VIEW]
 )
-def get_move(move_id: uuid.UUID, svc: ResidentService = Depends(resident_service)) -> dict:
-    return ok(schemas.MoveRecordRead.model_validate(svc.get_move(move_id)))
+async def get_move(move_id: uuid.UUID, svc: ResidentService = Depends(resident_service)) -> dict:
+    return ok(schemas.MoveRecordRead.model_validate(await svc.get_move(move_id)))
 
 
 @router.patch(
@@ -204,13 +206,13 @@ def get_move(move_id: uuid.UUID, svc: ResidentService = Depends(resident_service
     response_model=Envelope[schemas.MoveRecordRead],
     dependencies=[UPDATE],
 )
-def transition_move(
+async def transition_move(
     move_id: uuid.UUID,
     payload: schemas.MoveRecordTransition,
     svc: ResidentService = Depends(resident_service),
 ) -> dict:
     return ok(
-        schemas.MoveRecordRead.model_validate(svc.transition_move(move_id, payload)),
+        schemas.MoveRecordRead.model_validate(await svc.transition_move(move_id, payload)),
         message="Updated",
     )
 
@@ -219,20 +221,22 @@ def transition_move(
 @router.get(
     "/{profile_id}", response_model=Envelope[schemas.ResidentProfileRead], dependencies=[VIEW]
 )
-def get_profile(profile_id: uuid.UUID, svc: ResidentService = Depends(resident_service)) -> dict:
-    return ok(schemas.ResidentProfileRead.model_validate(svc.get_profile(profile_id)))
+async def get_profile(
+    profile_id: uuid.UUID, svc: ResidentService = Depends(resident_service)
+) -> dict:
+    return ok(schemas.ResidentProfileRead.model_validate(await svc.get_profile(profile_id)))
 
 
 @router.patch(
     "/{profile_id}", response_model=Envelope[schemas.ResidentProfileRead], dependencies=[UPDATE]
 )
-def update_profile(
+async def update_profile(
     profile_id: uuid.UUID,
     payload: schemas.ResidentProfileUpdate,
     svc: ResidentService = Depends(resident_service),
 ) -> dict:
     return ok(
-        schemas.ResidentProfileRead.model_validate(svc.update_profile(profile_id, payload)),
+        schemas.ResidentProfileRead.model_validate(await svc.update_profile(profile_id, payload)),
         message="Updated",
     )
 
@@ -242,12 +246,12 @@ def update_profile(
     response_model=Envelope[list[schemas.EmergencyContactRead]],
     dependencies=[VIEW],
 )
-def list_contacts(
+async def list_contacts(
     profile_id: uuid.UUID,
     params: PageParams = Depends(page_params),
     svc: ResidentService = Depends(resident_service),
 ) -> dict:
-    rows, total = svc.list_contacts(
+    rows, total = await svc.list_contacts(
         profile_id=profile_id, offset=params.offset, limit=params.page_size
     )
     return paginated(
@@ -261,12 +265,12 @@ def list_contacts(
     status_code=status.HTTP_201_CREATED,
     dependencies=[CREATE],
 )
-def create_contact(
+async def create_contact(
     profile_id: uuid.UUID,
     payload: schemas.EmergencyContactCreate,
     svc: ResidentService = Depends(resident_service),
 ) -> dict:
     return ok(
-        schemas.EmergencyContactRead.model_validate(svc.create_contact(profile_id, payload)),
+        schemas.EmergencyContactRead.model_validate(await svc.create_contact(profile_id, payload)),
         message="Contact added",
     )

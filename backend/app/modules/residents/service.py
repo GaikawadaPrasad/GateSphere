@@ -1,4 +1,4 @@
-"""Business logic for Residents (FR-03).
+"""Business logic for Residents (FR-03). Async stack (ADR-010).
 
 Rules:
   * All entities live in the caller's active community (from `TenantScope.require()`).
@@ -18,12 +18,12 @@ from datetime import UTC, datetime
 
 from fastapi import Request
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import BusinessRuleError, ConflictError, NotFoundError
 from app.core.state_machine import ensure_transition
 from app.core.tenancy import TenantScope
-from app.modules.audit.service import record_audit
+from app.modules.audit.service import record_audit_async
 from app.modules.communities.models import Unit
 from app.modules.residents import schemas
 from app.modules.residents.models import (
@@ -81,7 +81,7 @@ def _apply(obj: object, patch: dict) -> None:
 
 class ResidentService:
     def __init__(
-        self, db: Session, scope: TenantScope, actor: User, request: Request | None = None
+        self, db: AsyncSession, scope: TenantScope, actor: User, request: Request | None = None
     ):
         self.db = db
         self.scope = scope
@@ -93,10 +93,10 @@ class ResidentService:
         self.contacts = EmergencyContactRepository(db, scope)
         self.moves = MoveRecordRepository(db, scope)
 
-    def _audit(
+    async def _audit(
         self, action: str, community_id: uuid.UUID, entity_type: str, entity_id, **kw
     ) -> None:
-        record_audit(
+        await record_audit_async(
             self.db,
             module="residents",
             action=action,
@@ -108,22 +108,21 @@ class ResidentService:
             **kw,
         )
 
-    def _unit_in_scope(self, unit_id: uuid.UUID) -> Unit:
+    async def _unit_in_scope(self, unit_id: uuid.UUID) -> Unit:
         stmt = select(Unit).where(Unit.id == unit_id)
         if not self.scope.is_global:
             stmt = stmt.where(Unit.community_id.in_(self.scope.community_ids))
-        unit = self.db.scalar(stmt)
+        unit = await self.db.scalar(stmt)
         if unit is None:
             raise NotFoundError("Unit not found")
         return unit
 
-    def _user_exists(self, user_id: uuid.UUID) -> User:
-        user = self.db.get(User, user_id)
+    async def _user_exists(self, user_id: uuid.UUID) -> User:
+        user = await self.db.get(User, user_id)
         if user is None:
             raise NotFoundError("User not found")
         return user
 
-    # -- resident profiles --------------------------------------------- #
     def _active_community(self, community_id: uuid.UUID | None) -> uuid.UUID:
         if community_id is not None:
             return self.scope.require(community_id)
@@ -133,88 +132,90 @@ class ResidentService:
             "Specify a community", code="COMMUNITY_REQUIRED", fields={"community_id": "required"}
         )
 
-    def list_profiles(self, *, community_id: uuid.UUID | None, offset: int, limit: int):
+    # -- resident profiles --------------------------------------------- #
+    async def list_profiles(self, *, community_id: uuid.UUID | None, offset: int, limit: int):
         stmt = select(ResidentProfile)
         if community_id is not None:
             self.scope.require(community_id)
             stmt = stmt.where(ResidentProfile.community_id == community_id)
         stmt = stmt.order_by(ResidentProfile.created_at.desc())
-        return self.profiles.list(offset=offset, limit=limit, extra=stmt), self.profiles.count(
-            extra=stmt
+        return (
+            await self.profiles.list(offset=offset, limit=limit, extra=stmt),
+            await self.profiles.count(extra=stmt),
         )
 
-    def get_profile(self, profile_id: uuid.UUID) -> ResidentProfile:
-        obj = self.profiles.get(profile_id)
+    async def get_profile(self, profile_id: uuid.UUID) -> ResidentProfile:
+        obj = await self.profiles.get(profile_id)
         if obj is None:
             raise NotFoundError("Resident profile not found")
         return obj
 
-    def create_profile(
+    async def create_profile(
         self, payload: schemas.ResidentProfileCreate, *, community_id: uuid.UUID | None
     ):
         cid = self._active_community(community_id)
         _enum("profile_status", payload.profile_status)
         _enum("kyc_status", payload.kyc_status)
-        self._user_exists(payload.user_id)
-        if self.profiles.by_user(cid, payload.user_id):
+        await self._user_exists(payload.user_id)
+        if await self.profiles.by_user(cid, payload.user_id):
             raise ConflictError(
                 "This user already has a profile in this community",
                 code="PROFILE_EXISTS",
                 fields={"user_id": "already has a profile"},
             )
         obj = ResidentProfile(community_id=cid, **payload.model_dump())
-        self.profiles.add(obj)
-        self._audit("profile.create", cid, "resident_profile", obj.id, new=payload.model_dump())
+        await self.profiles.add(obj)
+        await self._audit(
+            "profile.create", cid, "resident_profile", obj.id, new=payload.model_dump()
+        )
         return obj
 
-    def update_profile(self, profile_id: uuid.UUID, payload: schemas.ResidentProfileUpdate):
-        obj = self.get_profile(profile_id)
+    async def update_profile(self, profile_id: uuid.UUID, payload: schemas.ResidentProfileUpdate):
+        obj = await self.get_profile(profile_id)
         patch = payload.model_dump(exclude_unset=True)
         _enum("profile_status", patch.get("profile_status"))
         _enum("kyc_status", patch.get("kyc_status"))
         if "profile_status" in patch and patch["profile_status"] != obj.profile_status:
             ensure_transition(
-                obj.profile_status,
-                patch["profile_status"],
-                _PROFILE_TRANSITIONS,
-                entity="profile",
+                obj.profile_status, patch["profile_status"], _PROFILE_TRANSITIONS, entity="profile"
             )
         if "kyc_status" in patch and patch["kyc_status"] != obj.kyc_status:
             ensure_transition(obj.kyc_status, patch["kyc_status"], _KYC_TRANSITIONS, entity="KYC")
         before = {k: getattr(obj, k, None) for k in patch}
         _apply(obj, patch)
-        self.db.flush()
-        self._audit(
+        await self.db.flush()
+        await self._audit(
             "profile.update", obj.community_id, "resident_profile", obj.id, old=before, new=patch
         )
         return obj
 
     # -- occupancies ------------------------------------------------ #
-    def list_occupancies(self, *, unit_id: uuid.UUID, offset: int, limit: int):
-        self._unit_in_scope(unit_id)
+    async def list_occupancies(self, *, unit_id: uuid.UUID, offset: int, limit: int):
+        await self._unit_in_scope(unit_id)
         stmt = (
             select(UnitOccupancy)
             .where(UnitOccupancy.unit_id == unit_id)
             .order_by(UnitOccupancy.is_active.desc(), UnitOccupancy.start_date.desc())
         )
-        return self.occupancies.list(
-            offset=offset, limit=limit, extra=stmt
-        ), self.occupancies.count(extra=stmt)
+        return (
+            await self.occupancies.list(offset=offset, limit=limit, extra=stmt),
+            await self.occupancies.count(extra=stmt),
+        )
 
-    def create_occupancy(self, payload: schemas.OccupancyCreate) -> UnitOccupancy:
-        unit = self._unit_in_scope(payload.unit_id)
+    async def create_occupancy(self, payload: schemas.OccupancyCreate) -> UnitOccupancy:
+        unit = await self._unit_in_scope(payload.unit_id)
         _enum("occupancy_role", payload.occupancy_role)
-        profile = self.profiles.get(payload.resident_profile_id)
+        profile = await self.profiles.get(payload.resident_profile_id)
         if profile is None or profile.community_id != unit.community_id:
             raise NotFoundError("Resident profile not found")
-        if self.occupancies.active_for_pair(unit.id, profile.id):
+        if await self.occupancies.active_for_pair(unit.id, profile.id):
             raise ConflictError(
                 "That resident already has an active occupancy on this unit",
                 code="OCCUPANCY_EXISTS",
             )
         if payload.is_primary:
             existing_primary = [
-                o for o in self.occupancies.active_for_unit(unit.id) if o.is_primary
+                o for o in await self.occupancies.active_for_unit(unit.id) if o.is_primary
             ]
             if existing_primary:
                 raise ConflictError(
@@ -230,8 +231,8 @@ class ResidentService:
         )
         if payload.start_date is not None:
             obj.start_date = payload.start_date
-        self.occupancies.add(obj)
-        self._audit(
+        await self.occupancies.add(obj)
+        await self._audit(
             "occupancy.create",
             unit.community_id,
             "unit_occupancy",
@@ -240,10 +241,10 @@ class ResidentService:
         )
         return obj
 
-    def end_occupancy(
+    async def end_occupancy(
         self, occupancy_id: uuid.UUID, payload: schemas.OccupancyEnd
     ) -> UnitOccupancy:
-        obj = self.occupancies.get(occupancy_id)
+        obj = await self.occupancies.get(occupancy_id)
         if obj is None:
             raise NotFoundError("Occupancy not found")
         if payload.end_date <= obj.start_date:
@@ -254,8 +255,8 @@ class ResidentService:
             )
         obj.end_date = payload.end_date
         obj.is_active = payload.is_active
-        self.db.flush()
-        self._audit(
+        await self.db.flush()
+        await self._audit(
             "occupancy.end",
             obj.community_id,
             "unit_occupancy",
@@ -265,25 +266,26 @@ class ResidentService:
         return obj
 
     # -- family members ------------------------------------------ #
-    def list_family(self, *, unit_id: uuid.UUID, offset: int, limit: int):
-        self._unit_in_scope(unit_id)
+    async def list_family(self, *, unit_id: uuid.UUID, offset: int, limit: int):
+        await self._unit_in_scope(unit_id)
         stmt = (
             select(FamilyMember)
             .where(FamilyMember.unit_id == unit_id)
             .order_by(FamilyMember.full_name)
         )
-        return self.family.list(offset=offset, limit=limit, extra=stmt), self.family.count(
-            extra=stmt
+        return (
+            await self.family.list(offset=offset, limit=limit, extra=stmt),
+            await self.family.count(extra=stmt),
         )
 
-    def create_family(self, payload: schemas.FamilyMemberCreate) -> FamilyMember:
-        unit = self._unit_in_scope(payload.unit_id)
+    async def create_family(self, payload: schemas.FamilyMemberCreate) -> FamilyMember:
+        unit = await self._unit_in_scope(payload.unit_id)
         _enum("relationship_type", payload.relationship_type)
-        profile = self.profiles.get(payload.primary_resident_profile_id)
+        profile = await self.profiles.get(payload.primary_resident_profile_id)
         if profile is None or profile.community_id != unit.community_id:
             raise NotFoundError("Primary resident profile not found")
         if payload.user_id is not None:
-            self._user_exists(payload.user_id)
+            await self._user_exists(payload.user_id)
         obj = FamilyMember(
             community_id=unit.community_id,
             unit_id=unit.id,
@@ -294,8 +296,8 @@ class ResidentService:
             date_of_birth=payload.date_of_birth,
             phone=payload.phone,
         )
-        self.family.add(obj)
-        self._audit(
+        await self.family.add(obj)
+        await self._audit(
             "family.create",
             unit.community_id,
             "family_member",
@@ -305,19 +307,20 @@ class ResidentService:
         return obj
 
     # -- emergency contacts ------------------------------------ #
-    def list_contacts(self, *, profile_id: uuid.UUID, offset: int, limit: int):
-        self.get_profile(profile_id)
+    async def list_contacts(self, *, profile_id: uuid.UUID, offset: int, limit: int):
+        await self.get_profile(profile_id)
         stmt = (
             select(EmergencyContact)
             .where(EmergencyContact.resident_profile_id == profile_id)
             .order_by(EmergencyContact.priority)
         )
-        return self.contacts.list(offset=offset, limit=limit, extra=stmt), self.contacts.count(
-            extra=stmt
+        return (
+            await self.contacts.list(offset=offset, limit=limit, extra=stmt),
+            await self.contacts.count(extra=stmt),
         )
 
-    def create_contact(self, profile_id: uuid.UUID, payload: schemas.EmergencyContactCreate):
-        profile = self.get_profile(profile_id)
+    async def create_contact(self, profile_id: uuid.UUID, payload: schemas.EmergencyContactCreate):
+        profile = await self.get_profile(profile_id)
         obj = EmergencyContact(
             community_id=profile.community_id,
             resident_profile_id=profile.id,
@@ -327,21 +330,21 @@ class ResidentService:
             alternate_phone=payload.alternate_phone,
             priority=payload.priority,
         )
-        self.contacts.add(obj)
-        self._audit("contact.create", profile.community_id, "emergency_contact", obj.id)
+        await self.contacts.add(obj)
+        await self._audit("contact.create", profile.community_id, "emergency_contact", obj.id)
         return obj
 
-    def delete_contact(self, contact_id: uuid.UUID) -> None:
-        obj = self.contacts.get(contact_id)
+    async def delete_contact(self, contact_id: uuid.UUID) -> None:
+        obj = await self.contacts.get(contact_id)
         if obj is None:
             raise NotFoundError("Emergency contact not found")
         cid = obj.community_id
-        self.db.delete(obj)
-        self.db.flush()
-        self._audit("contact.delete", cid, "emergency_contact", contact_id)
+        await self.db.delete(obj)
+        await self.db.flush()
+        await self._audit("contact.delete", cid, "emergency_contact", contact_id)
 
     # -- move records ------------------------------------- #
-    def list_moves(
+    async def list_moves(
         self, *, community_id: uuid.UUID | None, status: str | None, offset: int, limit: int
     ):
         _enum("move_status", status)
@@ -352,18 +355,21 @@ class ResidentService:
         if status is not None:
             stmt = stmt.where(MoveRecord.status == status)
         stmt = stmt.order_by(MoveRecord.requested_at.desc())
-        return self.moves.list(offset=offset, limit=limit, extra=stmt), self.moves.count(extra=stmt)
+        return (
+            await self.moves.list(offset=offset, limit=limit, extra=stmt),
+            await self.moves.count(extra=stmt),
+        )
 
-    def get_move(self, move_id: uuid.UUID) -> MoveRecord:
-        obj = self.moves.get(move_id)
+    async def get_move(self, move_id: uuid.UUID) -> MoveRecord:
+        obj = await self.moves.get(move_id)
         if obj is None:
             raise NotFoundError("Move record not found")
         return obj
 
-    def create_move(self, payload: schemas.MoveRecordCreate) -> MoveRecord:
-        unit = self._unit_in_scope(payload.unit_id)
+    async def create_move(self, payload: schemas.MoveRecordCreate) -> MoveRecord:
+        unit = await self._unit_in_scope(payload.unit_id)
         _enum("move_type", payload.move_type)
-        profile = self.profiles.get(payload.resident_profile_id)
+        profile = await self.profiles.get(payload.resident_profile_id)
         if profile is None or profile.community_id != unit.community_id:
             raise NotFoundError("Resident profile not found")
         obj = MoveRecord(
@@ -375,16 +381,16 @@ class ResidentService:
             clearance_notes=payload.clearance_notes,
             status="scheduled" if payload.scheduled_at else "requested",
         )
-        self.moves.add(obj)
-        self._audit(
+        await self.moves.add(obj)
+        await self._audit(
             "move.create", unit.community_id, "move_record", obj.id, new=payload.model_dump()
         )
         return obj
 
-    def transition_move(
+    async def transition_move(
         self, move_id: uuid.UUID, payload: schemas.MoveRecordTransition
     ) -> MoveRecord:
-        obj = self.get_move(move_id)
+        obj = await self.get_move(move_id)
         _enum("move_status", payload.status)
         ensure_transition(obj.status, payload.status, _MOVE_TRANSITIONS, entity="move record")
         before = obj.status
@@ -397,11 +403,11 @@ class ResidentService:
             obj.approved_by_user_id = self.actor.id
             obj.approved_at = datetime.now(UTC)
         if payload.status == "completed" and obj.move_type == "move_out":
-            for occ in self.occupancies.active_for_unit(obj.unit_id):
+            for occ in await self.occupancies.active_for_unit(obj.unit_id):
                 if occ.resident_profile_id == obj.resident_profile_id:
                     occ.is_active = False
-        self.db.flush()
-        self._audit(
+        await self.db.flush()
+        await self._audit(
             "move.transition",
             obj.community_id,
             "move_record",
