@@ -41,6 +41,7 @@ from app.modules.complaints.repository import (
     active_assignment,
 )
 from app.modules.complaints.schemas import ALLOWED
+from app.modules.notifications import events as notif_events
 from app.modules.users.models import User
 
 # Full lifecycle (docs/backend/state-machines.md). `closed` / `reopened` are reachable ONLY
@@ -325,6 +326,23 @@ class ComplaintService:
             self._mark_first_response(ticket)
         self.db.flush()
         self._audit(f"ticket.{target}", ticket.community_id, "service_ticket", ticket.id)
+        final = ticket.status  # may be resident_confirmation after a 'resolved' request
+        notif_events.emit(
+            self.db,
+            self.scope,
+            self.actor,
+            self.request,
+            recipient_user_id=ticket.raised_by_user_id,
+            community_id=ticket.community_id,
+            notification_type=f"ticket.{final}",
+            title=f"Ticket {ticket.ticket_number}: {final.replace('_', ' ')}",
+            message=(
+                f"Your ticket '{ticket.subject}' is now '{final.replace('_', ' ')}'."
+                + (" Please confirm the fix." if final == "resident_confirmation" else "")
+            ),
+            reference_type="service_ticket",
+            reference_id=ticket.id,
+        )
         return ticket
 
     def confirm_ticket(self, ticket_id: uuid.UUID, payload: schemas.TicketConfirm) -> ServiceTicket:

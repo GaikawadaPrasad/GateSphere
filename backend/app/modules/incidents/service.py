@@ -33,6 +33,7 @@ from app.modules.incidents.repository import (
     assignment_for,
 )
 from app.modules.incidents.schemas import ALLOWED
+from app.modules.notifications import events as notif_events
 from app.modules.users.models import User
 
 _TRANSITIONS: dict[str, set[str]] = {
@@ -208,6 +209,19 @@ class IncidentService:
         self._history(inc, old, target, payload.reason)
         self.db.flush()
         self._audit(f"incident.{target}", inc.community_id, "security_incident", inc.id)
+        notif_events.emit(
+            self.db,
+            self.scope,
+            self.actor,
+            self.request,
+            recipient_user_id=inc.reporter_user_id,
+            community_id=inc.community_id,
+            notification_type=f"incident.{target}",
+            title=f"Incident {inc.incident_number}: {target}",
+            message=f"Incident {inc.incident_number} ({inc.incident_type}) is now '{target}'.",
+            reference_type="security_incident",
+            reference_id=inc.id,
+        )
         return inc
 
     # -- assignments ------------------------------------ #

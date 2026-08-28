@@ -18,6 +18,30 @@ Format per entry:
 
 ---
 
+## 2026-08-28 — Notification wiring (domain events → inbox)
+
+**By:** post-module integration/polish — the last "still open" item
+**Branch / commit:** `main`
+**What changed:**
+- **`app/modules/notifications/events.py::emit(...)`** — a best-effort helper other services
+  call inside their own transaction. Runs the dispatch inside a **SAVEPOINT** (`begin_nested`)
+  so a notification failure rolls back only the notification, logs a warning, and never
+  breaks the domain op. Skips when there is no recipient or the recipient is the actor.
+- Wired:
+  - visitors — `decide_request` → notify the requester (`visitor.approved/rejected`);
+    `create_request` (approval required) → notify the host (`visitor.approval_needed`).
+  - billing — `post_invoice` → notify the billed resident (`billing.invoice_posted`).
+  - complaints — `transition_ticket` → notify the raiser of the new state (incl. the
+    "please confirm" nudge at `resident_confirmation`).
+  - incidents — `transition_incident` → notify the reporter.
+  - `in_app` only for now; other channels stay simulated.
+**Verified:** `ruff` + `black` clean; `pytest -q` → **205 passed** (+1: billing invoice-posted
+→ resident inbox). No schema change.
+**Open / next:** panic-alert → guards, SLA-breach sweep, Celery channel delivery — see
+`AGENTS.md §23`.
+
+---
+
 ## 2026-08-28 — Workflow state-machine audit + hardening
 
 **By:** post-module integration/polish — the full state-transition audit ask

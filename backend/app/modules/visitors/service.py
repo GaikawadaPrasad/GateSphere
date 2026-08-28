@@ -20,6 +20,7 @@ from app.core.hashing import digest, digest_opt
 from app.core.tenancy import TenantScope
 from app.modules.audit.service import record_audit
 from app.modules.communities.models import Gate, Unit
+from app.modules.notifications import events as notif_events
 from app.modules.residents.models import UnitOccupancy
 from app.modules.users.models import User
 from app.modules.visitors import schemas
@@ -278,6 +279,20 @@ class VisitorService:
             obj.id,
             new={"visitor_type": payload.visitor_type, "status": obj.status},
         )
+        if approval_required and obj.host_user_id:
+            notif_events.emit(
+                self.db,
+                self.scope,
+                self.actor,
+                self.request,
+                recipient_user_id=obj.host_user_id,
+                community_id=unit.community_id,
+                notification_type="visitor.approval_needed",
+                title="Visitor approval needed",
+                message=f"{visitor.full_name} is requesting to visit your unit.",
+                reference_type="visitor_request",
+                reference_id=obj.id,
+            )
         return obj
 
     def _primary_host(self, unit_id: uuid.UUID) -> uuid.UUID | None:
@@ -324,6 +339,21 @@ class VisitorService:
             "visitor_request",
             req.id,
             new={"decision": payload.decision},
+        )
+        visitor = self.db.get(Visitor, req.visitor_id)
+        notif_events.emit(
+            self.db,
+            self.scope,
+            self.actor,
+            self.request,
+            recipient_user_id=req.created_by_user_id,
+            community_id=req.community_id,
+            notification_type=f"visitor.{req.status}",
+            title=f"Visitor request {req.status}",
+            message=f"Your visitor request for "
+            f"{visitor.full_name if visitor else 'a guest'} was {req.status}.",
+            reference_type="visitor_request",
+            reference_id=req.id,
         )
         return req
 

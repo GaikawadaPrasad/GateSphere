@@ -42,6 +42,7 @@ from app.modules.billing.repository import (
 )
 from app.modules.billing.schemas import ALLOWED
 from app.modules.communities.models import Unit
+from app.modules.notifications import events as notif_events
 from app.modules.residents.models import ResidentProfile, UnitOccupancy
 from app.modules.users.models import User
 
@@ -306,6 +307,20 @@ class BillingService:
         )
         self.db.flush()
         self._audit("invoice.post", inv.community_id, "invoice", inv.id)
+        notif_events.emit(
+            self.db,
+            self.scope,
+            self.actor,
+            self.request,
+            recipient_user_id=inv.billed_to_user_id,
+            community_id=inv.community_id,
+            notification_type="billing.invoice_posted",
+            title=f"Invoice {inv.invoice_number}",
+            message=f"A maintenance invoice of {inv.total_amount} is due"
+            + (f" by {inv.due_date}." if inv.due_date else "."),
+            reference_type="invoice",
+            reference_id=inv.id,
+        )
         return inv
 
     def cancel_invoice(self, invoice_id: uuid.UUID) -> MaintenanceInvoice:

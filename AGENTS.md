@@ -1025,9 +1025,11 @@ tenant tables to a new RLS migration) → extend `seed.py` → `tests/test_<m>_{
 3. **Frontend design system** — Tailwind + shadcn/ui + Recharts + TanStack Table + the shared
    component library. Plain CSS with the design tokens is the placeholder.
 4. **Permission caching** (`permission_version` bump) — evaluation is live per request today.
-5. **Notification wiring** — the domain modules currently emit audit-only events; route the
-   user-facing ones (visitor approved, dues reminder, incident/panic alert, complaint SLA
-   breach) through `NotificationService.dispatch()` + the Celery `tasks.py` hooks.
+5. **More notification hooks + Celery** — `app/modules/notifications/events.py::emit` now
+   fans visitor-decision / visitor-approval-needed / invoice-posted / ticket-status /
+   incident-status events to the recipient's inbox. Still to add: panic-alert → on-duty
+   guards, SLA-breach sweeps, and moving delivery to `email`/`sms` channels via the Celery
+   `tasks.py` hooks (all channels except `in_app` are still simulated).
 
 Done since first cut: **user/role management** (FR-02), **audit read API** (FR-16),
 **deferred child tables** (`ticket_attachments`, `incident_attachments`, `resident_groups`),
