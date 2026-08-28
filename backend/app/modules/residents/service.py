@@ -21,6 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import BusinessRuleError, ConflictError, NotFoundError
+from app.core.state_machine import ensure_transition
 from app.core.tenancy import TenantScope
 from app.modules.audit.service import record_audit
 from app.modules.communities.models import Unit
@@ -49,6 +50,18 @@ _MOVE_TRANSITIONS: dict[str, set[str]] = {
     "completed": set(),
     "rejected": set(),
     "cancelled": set(),
+}
+_PROFILE_TRANSITIONS: dict[str, set[str]] = {
+    "pending": {"active", "suspended"},
+    "active": {"suspended", "moved_out"},
+    "suspended": {"active", "moved_out"},
+    "moved_out": {"active"},  # a returning resident
+}
+_KYC_TRANSITIONS: dict[str, set[str]] = {
+    "not_started": {"submitted"},
+    "submitted": {"verified", "rejected"},
+    "rejected": {"submitted"},
+    "verified": {"submitted"},  # re-KYC on document expiry
 }
 
 
@@ -159,6 +172,15 @@ class ResidentService:
         patch = payload.model_dump(exclude_unset=True)
         _enum("profile_status", patch.get("profile_status"))
         _enum("kyc_status", patch.get("kyc_status"))
+        if "profile_status" in patch and patch["profile_status"] != obj.profile_status:
+            ensure_transition(
+                obj.profile_status,
+                patch["profile_status"],
+                _PROFILE_TRANSITIONS,
+                entity="profile",
+            )
+        if "kyc_status" in patch and patch["kyc_status"] != obj.kyc_status:
+            ensure_transition(obj.kyc_status, patch["kyc_status"], _KYC_TRANSITIONS, entity="KYC")
         before = {k: getattr(obj, k, None) for k in patch}
         _apply(obj, patch)
         self.db.flush()
@@ -364,13 +386,7 @@ class ResidentService:
     ) -> MoveRecord:
         obj = self.get_move(move_id)
         _enum("move_status", payload.status)
-        allowed = _MOVE_TRANSITIONS.get(obj.status, set())
-        if payload.status not in allowed:
-            raise BusinessRuleError(
-                f"Cannot move a '{obj.status}' record to '{payload.status}'",
-                code="INVALID_TRANSITION",
-                fields={"status": f"allowed: {sorted(allowed) or 'none'}"},
-            )
+        ensure_transition(obj.status, payload.status, _MOVE_TRANSITIONS, entity="move record")
         before = obj.status
         obj.status = payload.status
         if payload.scheduled_at is not None:

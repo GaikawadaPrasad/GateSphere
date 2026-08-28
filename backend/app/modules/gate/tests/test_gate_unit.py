@@ -44,10 +44,13 @@ def test_roster_status_machine(db, scope_for, community, superadmin, make_user):
     svc = _svc(db, scope_for(community.id), superadmin)
     roster = _roster(svc, community, make_user())
     assert roster.status == "planned"
-    svc.update_roster(roster.id, schemas.RosterUpdate(status="active"))
+    svc.transition_roster(roster.id, "active")
     with pytest.raises(BusinessRuleError) as exc:
-        svc.update_roster(roster.id, schemas.RosterUpdate(status="planned"))
+        svc.transition_roster(roster.id, "planned")
     assert exc.value.code == "INVALID_TRANSITION"
+    svc.transition_roster(roster.id, "completed")
+    with pytest.raises(BusinessRuleError):  # completed is terminal
+        svc.transition_roster(roster.id, "active")
 
 
 def test_duplicate_roster_conflicts(db, scope_for, community, superadmin, make_user):

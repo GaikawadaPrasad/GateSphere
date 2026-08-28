@@ -144,3 +144,21 @@ def test_occupancy_start_before_end_when_ended(
         occ.id, schemas.OccupancyEnd(end_date=date.today() + timedelta(days=30))
     )
     assert ended.is_active is False and ended.end_date > ended.start_date
+
+
+def test_profile_and_kyc_status_are_guarded(db, scope_for, community, superadmin, make_user):
+    svc = _svc(db, scope_for(community.id), superadmin)
+    p = _profile(svc, community.id, make_user())
+    assert p.profile_status == "pending" and p.kyc_status == "not_started"
+
+    # forward is fine
+    svc.update_profile(p.id, schemas.ResidentProfileUpdate(profile_status="active"))
+    svc.update_profile(p.id, schemas.ResidentProfileUpdate(kyc_status="submitted"))
+    svc.update_profile(p.id, schemas.ResidentProfileUpdate(kyc_status="verified"))
+
+    # illegal jumps rejected
+    with pytest.raises(BusinessRuleError) as exc:
+        svc.update_profile(p.id, schemas.ResidentProfileUpdate(profile_status="pending"))
+    assert exc.value.code == "INVALID_TRANSITION"
+    with pytest.raises(BusinessRuleError):
+        svc.update_profile(p.id, schemas.ResidentProfileUpdate(kyc_status="not_started"))

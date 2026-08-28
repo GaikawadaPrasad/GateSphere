@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import BusinessRuleError, ConflictError, NotFoundError
+from app.core.state_machine import ensure_transition
 from app.core.tenancy import TenantScope
 from app.modules.audit.service import record_audit
 from app.modules.communities.models import Gate, Tower, Unit
@@ -194,10 +195,7 @@ class IncidentService:
         inc = self.get_incident(incident_id)
         _enum("status", payload.status)
         target = payload.status
-        if target not in _TRANSITIONS.get(inc.status, set()):
-            raise BusinessRuleError(
-                f"Cannot move a '{inc.status}' incident to '{target}'", code="INVALID_TRANSITION"
-            )
+        ensure_transition(inc.status, target, _TRANSITIONS, entity="incident")
         if target == "resolved":
             if not (payload.resolution_summary or inc.resolution_summary):
                 raise BusinessRuleError(

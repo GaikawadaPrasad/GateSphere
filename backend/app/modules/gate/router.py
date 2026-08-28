@@ -112,6 +112,24 @@ def update_roster(
     )
 
 
+@router.post(
+    "/rosters/{roster_id}/status",
+    response_model=Envelope[schemas.RosterRead],
+    dependencies=[UPDATE],
+)
+def transition_roster(
+    roster_id: uuid.UUID,
+    payload: schemas.RosterTransition,
+    svc: GateService = Depends(gate_service),
+) -> dict:
+    return ok(
+        schemas.RosterRead.model_validate(
+            svc.transition_roster(roster_id, payload.status, payload.reason)
+        ),
+        message="Updated",
+    )
+
+
 # --- gate assignments --------------------------------------------- #
 @router.get(
     "/assignments", response_model=Envelope[list[schemas.AssignmentRead]], dependencies=[VIEW]

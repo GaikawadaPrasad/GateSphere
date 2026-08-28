@@ -16,6 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import BusinessRuleError, ConflictError, ForbiddenError, NotFoundError
+from app.core.state_machine import ensure_transition
 from app.core.tenancy import TenantScope
 from app.modules.audit.service import record_audit
 from app.modules.communities.models import Gate
@@ -208,20 +209,31 @@ class GateService:
         return obj
 
     def update_roster(self, roster_id: uuid.UUID, payload) -> GuardRoster:
+        """Edit roster **details** only. Status is a guarded transition — see
+        `transition_roster` / `POST /gate/rosters/{id}/status`."""
         obj = self._get_roster(roster_id)
         patch = payload.model_dump(exclude_unset=True)
-        new_status = patch.get("status")
-        if new_status is not None and new_status != obj.status:
-            _enum("roster_status", new_status)
-            if new_status not in _ROSTER_TRANSITIONS[obj.status]:
-                raise BusinessRuleError(
-                    f"Cannot move a '{obj.status}' roster to '{new_status}'",
-                    code="INVALID_TRANSITION",
-                )
         for k, v in patch.items():
             setattr(obj, k, v)
         self.db.flush()
         self._audit("roster.update", obj.community_id, "guard_roster", obj.id, new=patch)
+        return obj
+
+    def transition_roster(self, roster_id: uuid.UUID, new_status: str, reason=None) -> GuardRoster:
+        obj = self._get_roster(roster_id)
+        _enum("roster_status", new_status)
+        ensure_transition(obj.status, new_status, _ROSTER_TRANSITIONS, entity="roster")
+        old = obj.status
+        obj.status = new_status
+        self.db.flush()
+        self._audit(
+            f"roster.{new_status}",
+            obj.community_id,
+            "guard_roster",
+            obj.id,
+            old={"status": old},
+            new={"status": new_status, "reason": reason},
+        )
         return obj
 
     # -- gate assignments ----------------------------------- #

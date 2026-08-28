@@ -18,6 +18,32 @@ Format per entry:
 
 ---
 
+## 2026-08-28 — Workflow state-machine audit + hardening
+
+**By:** post-module integration/polish — the full state-transition audit ask
+**Branch / commit:** `main`
+**What changed:**
+- **`app/core/state_machine.py`** — `ensure_transition(current, target, MAP)` (rejects unknown
+  transition / terminal-state move / no-op), `can_transition`, `is_terminal`.
+- **`docs/backend/state-machines.md`** — the full report: every enum classified
+  (static / event / lifecycle), and for each lifecycle enum its states, forward vs
+  reversible vs terminal transitions, endpoint, role, required data, history + notify.
+- Adopted `ensure_transition` in complaints (`transition_ticket` — `_TICKET_ACTIONS` subset;
+  `closed`/`reopened` remain **confirm-only**), incidents (`transition_incident`), residents
+  (`transition_move` + **new** `profile_status` / `kyc_status` guards on `update_profile`),
+  domestic_staff (**new** `police_verification_status` guard on `update_staff`).
+- **gate roster** — `status` removed from `RosterUpdate`; new `RosterTransition` schema +
+  `transition_roster` service method + `POST /gate/rosters/{id}/status` endpoint. `update_roster`
+  is details-only now. (`gate.md` updated.)
+- Bypass audit: no `.status =` writes outside services; `tasks.py` are empty (no background
+  status writes); only non-workflow `status`-ish field left on a generic Update body is
+  `CommunityUpdate.state` (postal state).
+**Verified:** `ruff` + `black` clean; `pytest -q` → **204 passed** (+4 state-machine tests).
+No schema change → no migration.
+**Open / next:** notification wiring into the domain modules (the last "still open" item).
+
+---
+
 ## 2026-08-28 — Upload pipeline + ManagedFileUrl guard
 
 **By:** post-module integration/polish — the "one upload pipeline with fixed formats" ask

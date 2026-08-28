@@ -70,9 +70,13 @@ class RosterCreate(_Write):
 
 
 class RosterUpdate(_Write):
-    status: str | None = None
     supervisor_user_id: uuid.UUID | None = None
     notes: str | None = Field(default=None, max_length=2000)
+
+
+class RosterTransition(_Write):
+    status: str  # planned -> active -> completed, or -> cancelled
+    reason: str | None = Field(default=None, max_length=2000)
 
 
 class RosterRead(_Read):

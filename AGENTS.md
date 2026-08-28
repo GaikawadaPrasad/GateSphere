@@ -1043,4 +1043,15 @@ file fields as **`app.core.files.ManagedFileUrl`**, which rejects any URL that i
 object in our bucket. Never accept a raw client URL into a stored column — add a kind to the
 catalogue and use `ManagedFileUrl`.
 
+### Workflow state machines
+Every lifecycle `status`/`*_status` enum has an explicit transition map in its service and a
+**dedicated action endpoint** — never a plain `PATCH …/{id}` carrying the status. The one gate
+is `app/core/state_machine.py::ensure_transition(current, target, MAP)`. Full inventory (states,
+allowed/reversible/terminal transitions, roles, required data, history + notify) is in
+[`docs/backend/state-machines.md`](docs/backend/state-machines.md). When you add a status
+field: (1) classify it (static / event / lifecycle), (2) if lifecycle, write the `_TRANSITIONS`
+map + call `ensure_transition`, (3) expose a `POST …/{id}/<action>` or `…/status` endpoint,
+(4) keep it **out** of the generic `*Update` schema, (5) write the history + audit row in the
+same transaction, (6) update `docs/backend/state-machines.md`.
+
 Record any deliberate deviation as an ADR in `docs/decisions/`.

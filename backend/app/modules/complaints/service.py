@@ -19,6 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import BusinessRuleError, ConflictError, NotFoundError
+from app.core.state_machine import ensure_transition
 from app.core.tenancy import TenantScope
 from app.modules.audit.service import record_audit
 from app.modules.communities.models import Unit
@@ -42,6 +43,8 @@ from app.modules.complaints.repository import (
 from app.modules.complaints.schemas import ALLOWED
 from app.modules.users.models import User
 
+# Full lifecycle (docs/backend/state-machines.md). `closed` / `reopened` are reachable ONLY
+# via confirm_ticket (resident confirmation) — never through the generic transition endpoint.
 _TRANSITIONS: dict[str, set[str]] = {
     "created": {"assigned", "cancelled"},
     "assigned": {"acknowledged", "in_progress", "cancelled"},
@@ -50,6 +53,18 @@ _TRANSITIONS: dict[str, set[str]] = {
     "resolved": {"resident_confirmation"},
     "resident_confirmation": {"closed", "reopened"},
     "reopened": {"assigned", "in_progress", "cancelled"},
+    "closed": set(),
+    "cancelled": set(),
+}
+# The subset the `/transition` endpoint may drive (created..resolved + cancel).
+_TICKET_ACTIONS: dict[str, set[str]] = {
+    "created": {"assigned", "cancelled"},
+    "assigned": {"acknowledged", "in_progress", "cancelled"},
+    "acknowledged": {"in_progress", "cancelled"},
+    "in_progress": {"resolved", "cancelled"},
+    "reopened": {"assigned", "in_progress", "cancelled"},
+    "resolved": set(),
+    "resident_confirmation": set(),
     "closed": set(),
     "cancelled": set(),
 }
@@ -289,9 +304,9 @@ class ComplaintService:
                 "Use the resident-confirmation endpoint to close or reopen a ticket",
                 code="INVALID_TRANSITION",
             )
-        allowed = _TRANSITIONS.get(ticket.status, set())
-        # 'resolved' is requested but the ticket moves to resident_confirmation
-        if target == "resolved" and "resolved" in allowed:
+        # the transition endpoint drives created..resolved only
+        ensure_transition(ticket.status, target, _TICKET_ACTIONS, entity="ticket")
+        if target == "resolved":
             now = datetime.now(UTC)
             ticket.resolved_at = now
             if ticket.resolution_due_at and now > ticket.resolution_due_at:
@@ -300,17 +315,12 @@ class ComplaintService:
             ticket.resident_confirmation_status = "pending"
             self._record_history(ticket, "in_progress", "resolved", payload.remarks)
             self._record_history(ticket, "resolved", "resident_confirmation")
-        elif target in allowed:
+        else:
             from_status = ticket.status
             ticket.status = target
             if target == "cancelled":
                 ticket.closed_at = datetime.now(UTC)
             self._record_history(ticket, from_status, target, payload.remarks)
-        else:
-            raise BusinessRuleError(
-                f"Cannot move a '{ticket.status}' ticket to '{target}'",
-                code="INVALID_TRANSITION",
-            )
         if target in ("acknowledged", "in_progress"):
             self._mark_first_response(ticket)
         self.db.flush()

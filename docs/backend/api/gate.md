@@ -13,7 +13,8 @@ global caller on the collection routes.
 | `POST /gate/events` | `gate:create` | `EventCreate` | `201` single | append-only; `422 INVALID_ENUM`; `404` if gate outside scope |
 | `GET /gate/rosters` | `gate:view` | – | `200` list | `?guard_user_id=`, `?roster_status=` |
 | `POST /gate/rosters` | `gate:create` | `RosterCreate` | `201` single | `422 INVALID_TIME_RANGE`; `409 ROSTER_EXISTS` |
-| `PATCH /gate/rosters/{roster_id}` | `gate:update` | `RosterUpdate` | `200` single | `422 INVALID_TRANSITION` on bad status move |
+| `PATCH /gate/rosters/{roster_id}` | `gate:update` | `RosterUpdate` | `200` single | details only (supervisor / notes) |
+| `POST /gate/rosters/{roster_id}/status` | `gate:update` | `RosterTransition` | `200` single | `planned→active→completed` / `→cancelled`; `422 INVALID_TRANSITION` |
 | `GET /gate/assignments` | `gate:view` | – | `200` list | `?gate_id=`, `?active_only=true` |
 | `POST /gate/assignments` | `gate:create` | `AssignmentCreate` | `201` single | `409 ASSIGNMENT_ACTIVE`; `404` gate/roster outside scope |
 | `POST /gate/assignments/{assignment_id}/end` | `gate:update` | – | `200` single | `422 ALREADY_ENDED` |
@@ -27,7 +28,8 @@ global caller on the collection routes.
 
 - **EventCreate**: `gate_id?`, `event_type`, `reference_type?`, `reference_id?`, `occurred_at?`, `metadata?` (object).
 - **RosterCreate**: `guard_user_id`, `supervisor_user_id?`, `shift_date`, `shift_start`, `shift_end`, `notes?`.
-- **RosterUpdate**: `status?`, `supervisor_user_id?`, `notes?`.
+- **RosterUpdate**: `supervisor_user_id?`, `notes?`.
+- **RosterTransition**: `status`, `reason?`.
 - **AssignmentCreate**: `guard_user_id`, `gate_id`, `roster_id?`, `assigned_from?`, `assigned_to?`.
 - **AlertCreate**: `alert_type="other"`, `severity="high"`, `gate_id?`, `message?`, `community_id?` (global caller only).
 - **AlertResolve**: `resolution_summary?`.

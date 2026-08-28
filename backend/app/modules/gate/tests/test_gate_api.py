@@ -103,3 +103,35 @@ def _guard_user_id() -> str:
     with SessionLocal() as db:
         u = db.scalar(select(User).where(User.email == "security_guard@gatesphere.com"))
         return str(u.id)
+
+
+def test_roster_status_endpoint_is_separate_from_update(as_role, seed_ids):
+    sup = as_role("security_supervisor")
+    guard = _guard_user_id()
+    import secrets
+
+    start = f"05:{secrets.randbelow(60):02d}:00"
+    rid = sup.post(
+        f"{P}/rosters",
+        json={
+            "guard_user_id": guard,
+            "shift_date": "2026-10-01",
+            "shift_start": start,
+            "shift_end": "17:00:00",
+        },
+    ).json()["data"]["id"]
+    # status is NOT accepted on the plain update
+    assert sup.patch(f"{P}/rosters/{rid}", json={"status": "active"}).status_code == 422
+    # dedicated transition works, and enforces the machine
+    assert sup.post(f"{P}/rosters/{rid}/status", json={"status": "active"}).status_code == 200
+    bad = sup.post(f"{P}/rosters/{rid}/status", json={"status": "planned"})
+    assert bad.status_code == 422 and bad.json()["error"]["code"] == "INVALID_TRANSITION"
+    with __import__("contextlib").suppress(Exception):
+        from app.db.session import SessionLocal
+        from app.modules.gate.models import GuardRoster
+
+        with SessionLocal() as db:
+            obj = db.get(GuardRoster, rid)
+            if obj:
+                db.delete(obj)
+                db.commit()

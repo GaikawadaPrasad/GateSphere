@@ -78,3 +78,14 @@ def test_rating_is_upserted_per_resident(db, scope_for, community, unit, superad
     r1 = svc.rate_staff(schemas.RatingCreate(staff_id=staff.id, unit_id=unit.id, rating=3))
     r2 = svc.rate_staff(schemas.RatingCreate(staff_id=staff.id, unit_id=unit.id, rating=5))
     assert r1.id == r2.id and r2.rating == 5
+
+
+def test_verification_status_is_guarded(db, scope_for, community, superadmin):
+    svc = _svc(db, scope_for(community.id), superadmin)
+    staff = _staff(svc, community)
+    assert staff.police_verification_status == "not_started"
+    svc.update_staff(staff.id, schemas.StaffUpdate(police_verification_status="pending"))
+    svc.update_staff(staff.id, schemas.StaffUpdate(police_verification_status="verified"))
+    with pytest.raises(BusinessRuleError) as exc:
+        svc.update_staff(staff.id, schemas.StaffUpdate(police_verification_status="not_started"))
+    assert exc.value.code == "INVALID_TRANSITION"
