@@ -39,6 +39,7 @@ _TENANT_TABLES = [
     "security_incidents",
     "notifications",
     "resident_groups",
+    "managed_files",
 ]
 
 

@@ -6,6 +6,8 @@ Contract: docs/backend/api/uploads.md.
 
 from __future__ import annotations
 
+import uuid
+
 from fastapi import APIRouter, Depends, Request
 
 from app.core.responses import Response as Envelope
@@ -50,6 +52,11 @@ def list_kinds() -> dict:
 @router.post("", response_model=Envelope[schemas.PresignResponse])
 def presign(payload: schemas.PresignRequest, svc: UploadService = Depends(upload_service)) -> dict:
     return ok(svc.presign(payload), message="Upload authorised")
+
+
+@router.post("/{file_id}/confirm", response_model=Envelope[schemas.ConfirmResponse])
+def confirm(file_id: uuid.UUID, svc: UploadService = Depends(upload_service)) -> dict:
+    return ok(svc.confirm(file_id), message="Upload confirmed")
 
 
 @router.get("/download", response_model=Envelope[schemas.DownloadResponse])

@@ -7,6 +7,8 @@ see docs/security/file-upload-security.md.
 
 from __future__ import annotations
 
+import contextlib
+
 import boto3
 from botocore.client import Config
 
@@ -56,6 +58,21 @@ def object_head(key: str) -> dict | None:
     except _s3.exceptions.ClientError:
         return None
     return {"content_length": r.get("ContentLength"), "content_type": r.get("ContentType")}
+
+
+def object_bytes(key: str, length: int) -> bytes | None:
+    """First `length` bytes of the object (for magic-number sniffing), or None."""
+    rng = f"bytes=0-{max(length - 1, 0)}"
+    try:
+        r = _s3.get_object(Bucket=settings.S3_BUCKET, Key=key, Range=rng)
+        return r["Body"].read()
+    except _s3.exceptions.ClientError:
+        return None
+
+
+def delete_object(key: str) -> None:
+    with contextlib.suppress(_s3.exceptions.ClientError):
+        _s3.delete_object(Bucket=settings.S3_BUCKET, Key=key)
 
 
 def public_url(key: str) -> str:

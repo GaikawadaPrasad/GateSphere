@@ -32,6 +32,52 @@ def test_presign_happy_path(as_role, seed_ids):
     assert d["file_url"].startswith("http://localhost:9000/gatesphere-local/")
     assert d["upload_url"].startswith("http")
     assert d["required_headers"]["Content-Type"] == "image/jpeg"
+    assert d["file_id"] and d["confirm_url"].endswith(f"/uploads/{d['file_id']}/confirm")
+
+
+def _presign(client, seed_ids, *, kind="visitor_photo", content_type="image/jpeg"):
+    return client.post(
+        P,
+        json={
+            "kind": kind,
+            "filename": "f.bin",
+            "content_type": content_type,
+            "size_bytes": 64,
+            "community_id": seed_ids["community_id"],
+        },
+    ).json()["data"]
+
+
+def test_confirm_accepts_a_real_image(as_role, seed_ids):
+    from app.services import storage
+
+    guard = as_role("security_guard")
+    d = _presign(guard, seed_ids)
+    storage.put_object(d["key"], b"\xff\xd8\xff\xe0\x00\x10JFIF\x00" + b"x" * 40, "image/jpeg")
+    c = guard.post(f"{P}/{d['file_id']}/confirm")
+    assert c.status_code == 200, c.text
+    assert c.json()["data"]["status"] == "confirmed"
+    assert c.json()["data"]["detected_content_type"] == "image/jpeg"
+
+
+def test_confirm_rejects_disguised_payload(as_role, seed_ids):
+    from app.services import storage
+
+    guard = as_role("security_guard")
+    d = _presign(guard, seed_ids, content_type="image/png")
+    # a script uploaded with an image content-type
+    storage.put_object(d["key"], b"<?php system($_GET[0]); ?>\n", "image/png")
+    c = guard.post(f"{P}/{d['file_id']}/confirm")
+    assert c.status_code == 422
+    assert c.json()["error"]["code"] == "UPLOAD_REJECTED"
+
+
+def test_confirm_without_upload_fails(as_role, seed_ids):
+    guard = as_role("security_guard")
+    d = _presign(guard, seed_ids)
+    c = guard.post(f"{P}/{d['file_id']}/confirm")
+    assert c.status_code == 422
+    assert c.json()["error"]["code"] == "NO_OBJECT"
 
 
 def test_rejects_wrong_content_type(as_role, seed_ids):

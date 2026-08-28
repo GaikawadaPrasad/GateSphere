@@ -42,6 +42,7 @@ from app.modules.complaints.repository import (
 )
 from app.modules.complaints.schemas import ALLOWED
 from app.modules.notifications import events as notif_events
+from app.modules.uploads.guard import ensure_confirmed
 from app.modules.users.models import User
 
 # Full lifecycle (docs/backend/state-machines.md). `closed` / `reopened` are reachable ONLY
@@ -429,6 +430,7 @@ class ComplaintService:
 
     def add_attachment(self, ticket_id: uuid.UUID, payload) -> TicketAttachment:
         ticket = self.get_ticket(ticket_id)
+        ensure_confirmed(self.db, payload.file_url)
         if payload.message_id is not None:
             msg = self.db.get(TicketMessage, payload.message_id)
             if msg is None or msg.ticket_id != ticket.id:

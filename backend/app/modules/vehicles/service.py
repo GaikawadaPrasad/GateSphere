@@ -20,6 +20,7 @@ from app.core.errors import BusinessRuleError, ConflictError, NotFoundError
 from app.core.tenancy import TenantScope
 from app.modules.audit.service import record_audit
 from app.modules.communities.models import Gate
+from app.modules.uploads.guard import ensure_confirmed
 from app.modules.users.models import User
 from app.modules.vehicles import schemas
 from app.modules.vehicles.models import (
@@ -345,6 +346,7 @@ class VehicleService:
     def report_violation(self, payload: schemas.ViolationCreate, *, community_id: uuid.UUID | None):
         cid = self._one_community(community_id)
         _enum("violation_type", payload.violation_type)
+        ensure_confirmed(self.db, payload.evidence_url)
         obj = ParkingViolation(
             community_id=cid,
             vehicle_id=payload.vehicle_id,

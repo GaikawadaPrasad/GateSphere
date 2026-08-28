@@ -100,3 +100,43 @@ def seed_ids() -> dict:
 @pytest.fixture()
 def unique_code() -> str:
     return "t" + uuid.uuid4().hex[:10]
+
+
+@pytest.fixture()
+def confirmed_upload():
+    """Factory: `confirmed_upload("ticket_attachment", community_id)` -> a managed file URL
+    whose `managed_files` row is already `confirmed` (skips the real S3 round-trip so
+    attachment/photo tests don't need to PUT bytes to MinIO).
+    """
+    from app.modules.uploads.catalogue import KINDS
+    from app.modules.uploads.models import ManagedFile
+    from app.services import storage
+
+    created: list[uuid.UUID] = []
+
+    def _make(kind_slug: str, community_id=None, content_type: str = "image/jpeg") -> str:
+        kind = KINDS[kind_slug]
+        key = f"{kind.prefix}/{community_id or 'x'}/{uuid.uuid4().hex}-test.jpg"
+        with SessionLocal() as db:
+            mf = ManagedFile(
+                community_id=uuid.UUID(str(community_id)) if community_id else None,
+                object_key=key,
+                kind=kind_slug,
+                declared_content_type=content_type,
+                declared_size_bytes=1024,
+                status="confirmed",
+                detected_content_type=content_type,
+                size_bytes=1024,
+            )
+            db.add(mf)
+            db.commit()
+            created.append(mf.id)
+        return storage.public_url(key)
+
+    yield _make
+    with SessionLocal() as db:
+        for fid in created:
+            obj = db.get(ManagedFile, fid)
+            if obj:
+                db.delete(obj)
+        db.commit()

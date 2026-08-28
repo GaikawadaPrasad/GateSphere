@@ -18,6 +18,7 @@ class PresignRequest(BaseModel):
 
 
 class PresignResponse(BaseModel):
+    file_id: uuid.UUID
     kind: str
     key: str
     upload_url: str
@@ -26,6 +27,16 @@ class PresignResponse(BaseModel):
     file_url: str
     max_bytes: int
     expires_in: int
+    confirm_url: str
+
+
+class ConfirmResponse(BaseModel):
+    file_id: uuid.UUID
+    status: str
+    file_url: str | None = None
+    detected_content_type: str | None = None
+    size_bytes: int | None = None
+    reject_reason: str | None = None
 
 
 class DownloadResponse(BaseModel):

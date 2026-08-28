@@ -1052,10 +1052,15 @@ All are idempotent by stamping — a row is only touched (and only notified) whe
 ### File uploads
 Every file URL the API stores goes through **`POST /api/v1/uploads`** first — it returns a
 presigned S3 PUT URL for one of the fixed **kinds** in `app/modules/uploads/catalogue.py`
-(kind → key-prefix + allowed MIME types + hard size cap). Domain write schemas type their
-file fields as **`app.core.files.ManagedFileUrl`**, which rejects any URL that is not an
-object in our bucket. Never accept a raw client URL into a stored column — add a kind to the
-catalogue and use `ManagedFileUrl`.
+(kind → key-prefix + allowed MIME types + hard size cap) and creates a `managed_files` row
+(`status="pending"`). After the client PUTs the bytes it calls **`POST
+/uploads/{file_id}/confirm`**, which HEADs the object, checks the real size and **sniffs the
+magic number** (`app/modules/uploads/sniff.py`) against the kind — pass → `confirmed`, fail
+→ object deleted + `rejected` (NFR-SEC-07). Two enforcement points on a stored URL:
+`app.core.files.ManagedFileUrl` (pydantic — must be our bucket) **and**
+`app.modules.uploads.guard.ensure_confirmed(db, url)` called in the service before persisting
+(must be `confirmed`). Never accept a raw client URL into a stored column — add a kind to the
+catalogue, type the field `ManagedFileUrl`, and call `ensure_confirmed` in the service.
 
 ### Workflow state machines
 Every lifecycle `status`/`*_status` enum has an explicit transition map in its service and a

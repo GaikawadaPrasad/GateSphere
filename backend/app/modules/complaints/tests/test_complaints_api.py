@@ -74,14 +74,25 @@ def test_cross_community_unit_is_404(as_role, seed_ids):
     assert r.status_code == 404
 
 
-def test_attachments(as_role, seed_ids):
+def test_attachments(as_role, seed_ids, confirmed_upload):
     cid = seed_ids["community_id"]
     resident = as_role("resident")
     tid = resident.post(
         f"{P}/tickets",
         json={"unit_id": _unit_in(cid), "category_id": _category_in(cid), "subject": "Photo"},
     ).json()["data"]["id"]
-    _u = "http://localhost:9000/gatesphere-local/complaints/attachments/x/a.jpg"
+
+    # an unconfirmed upload is refused (NFR-SEC-07)
+    bad = resident.post(
+        f"{P}/tickets/{tid}/attachments",
+        json={
+            "file_url": "http://localhost:9000/gatesphere-local/complaints/attachments/x/a.jpg",
+            "file_name": "a.jpg",
+        },
+    )
+    assert bad.status_code == 422 and bad.json()["error"]["code"] == "FILE_NOT_CONFIRMED"
+
+    _u = confirmed_upload("ticket_attachment", cid)
     r = resident.post(
         f"{P}/tickets/{tid}/attachments",
         json={"file_url": _u, "file_name": "a.jpg", "mime_type": "image/jpeg"},

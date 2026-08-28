@@ -34,6 +34,7 @@ from app.modules.incidents.repository import (
 )
 from app.modules.incidents.schemas import ALLOWED
 from app.modules.notifications import events as notif_events
+from app.modules.uploads.guard import ensure_confirmed
 from app.modules.users.models import User
 
 _TRANSITIONS: dict[str, set[str]] = {
@@ -294,6 +295,7 @@ class IncidentService:
 
     def add_attachment(self, incident_id: uuid.UUID, payload) -> IncidentAttachment:
         inc = self.get_incident(incident_id)
+        ensure_confirmed(self.db, payload.file_url)
         obj = IncidentAttachment(
             incident_id=inc.id,
             uploaded_by_user_id=self.actor.id,

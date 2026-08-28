@@ -35,6 +35,7 @@ from app.modules.domestic_staff.repository import (
     StaffRepository,
 )
 from app.modules.domestic_staff.schemas import ALLOWED
+from app.modules.uploads.guard import ensure_confirmed
 from app.modules.users.models import User
 
 _VERIFICATION_TRANSITIONS: dict[str, set[str]] = {
@@ -122,6 +123,7 @@ class DomesticStaffService:
         _enum("police_verification_status", payload.police_verification_status)
         if self.staff.by_phone(cid, payload.phone):
             raise ConflictError("A staff member with that phone exists", code="STAFF_EXISTS")
+        ensure_confirmed(self.db, payload.photo_url)
         obj = DomesticStaff(
             community_id=cid,
             user_id=payload.user_id,
@@ -165,6 +167,8 @@ class DomesticStaffService:
                 _VERIFICATION_TRANSITIONS,
                 entity="verification",
             )
+        if "photo_url" in patch:
+            ensure_confirmed(self.db, patch["photo_url"])
         for k, v in patch.items():
             setattr(obj, k, v)
         self.db.flush()

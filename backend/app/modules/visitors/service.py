@@ -22,6 +22,7 @@ from app.modules.audit.service import record_audit
 from app.modules.communities.models import Gate, Unit
 from app.modules.notifications import events as notif_events
 from app.modules.residents.models import UnitOccupancy
+from app.modules.uploads.guard import ensure_confirmed
 from app.modules.users.models import User
 from app.modules.visitors import schemas
 from app.modules.visitors.models import (
@@ -135,6 +136,7 @@ class VisitorService:
         existing = self.visitors.by_phone(community_id, data.phone)
         if existing:
             return existing
+        ensure_confirmed(self.db, data.photo_url)
         obj = Visitor(
             community_id=community_id,
             full_name=data.full_name,
@@ -500,6 +502,7 @@ class VisitorService:
 
     # -- gate entries -------------------------------------- #
     def record_entry(self, payload: schemas.EntryCreate) -> VisitorEntry:
+        ensure_confirmed(self.db, payload.entry_photo_url)
         req: VisitorRequest | None = None
         if payload.pass_token:
             vpass = pass_by_hash(self.db, digest(payload.pass_token))

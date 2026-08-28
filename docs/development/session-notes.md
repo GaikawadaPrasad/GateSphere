@@ -18,6 +18,36 @@ Format per entry:
 
 ---
 
+## 2026-08-28 — NFR-SEC-07 upload confirm + magic-byte validation (gap fix 7/7)
+
+**By:** QA/acceptance gap remediation — final functional gap
+**Branch / commit:** `main`
+**What changed:**
+- **Migration `0022_managed_files`** — `managed_files` (object_key unique, kind, community_id?,
+  created_by, declared vs detected content-type/size, status pending|confirmed|rejected,
+  reject_reason, confirmed_at; RLS). Model `ManagedFile` + registered in `app/db/base.py`.
+- **`app/modules/uploads/sniff.py`** — `detect(head)` → candidate MIME set from magic bytes
+  (jpeg/png/webp/pdf/mp4/mov/OOXML-zip/OLE).
+- **`UploadService.presign`** now inserts a `pending` row and returns `file_id` + `confirm_url`.
+- **`UploadService.confirm` + `POST /uploads/{file_id}/confirm`** — HEADs the object, checks
+  real size vs the kind cap, sniffs the first 32 bytes; mismatch → `storage.delete_object`
+  + `rejected` + `422 UPLOAD_REJECTED`; else `confirmed`. `storage.object_bytes` /
+  `delete_object` added.
+- **`app/modules/uploads/guard.py::ensure_confirmed(db, url)`** — fail-closed check wired
+  into every service that persists a file URL: visitors (`upsert_visitor`, `record_entry`),
+  complaints/incidents (`add_attachment`), domestic_staff (`create_staff`/`update_staff`),
+  vehicles (`report_violation`).
+- Tests: `confirmed_upload` fixture in root `conftest.py`; new confirm/reject/no-object
+  tests; complaints + incidents attachment tests updated to go through a confirmed upload
+  and assert `FILE_NOT_CONFIRMED` on the raw path. RLS suite `_TENANT_TABLES` += `managed_files`.
+- Docs: `docs/backend/api/uploads.md`, AGENTS "File uploads".
+**Why:** gap 7 — the pipeline trusted the declared content-type/size; a script could be
+stored behind an `image/png` header, and nothing forced a post-upload check.
+**Verified:** `alembic upgrade head`; `ruff/black`; `pytest -q` → 219 passed (real PUT to
+MinIO in the confirm tests).
+**Open / next:** all 7 functional gaps done. Remaining: FastAPI/SQLAlchemy **async
+migration** (large epic, session-cookie auth stays).
+
 ## 2026-08-28 — FR-09 payment receipts (gap fix 6/7)
 
 **By:** QA/acceptance gap remediation
