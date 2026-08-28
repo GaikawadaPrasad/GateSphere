@@ -18,6 +18,24 @@ Format per entry:
 
 ---
 
+## 2026-08-28 — RLS enforcement test suite
+
+**By:** post-module integration/polish — closes the "RLS blind spot" (AGENTS.md §12)
+**Branch / commit:** `main`
+**What changed:**
+- **`backend/tests/test_tenant_isolation.py`** — module fixture creates a `gs_rls_test` role
+  (`NOSUPERUSER NOBYPASSRLS`, granted CRUD on `public`), connects as it, and:
+  - asserts `rolsuper`/`rolbypassrls` are both false;
+  - with `set_config('app.community_ids', <A>)`, sweeps every tenant table
+    (`gates … resident_groups`) and asserts **no row from another community is visible**;
+  - asserts the scope actually switches the visible set (sees A's units, 0 of B's);
+  - asserts an `INSERT` into `resident_groups` for community B while scoped to A is
+    rejected (`InsufficientPrivilege` — the policy's `USING` doubles as `WITH CHECK`).
+**Verified:** `ruff` + `black` clean; `pytest -q` → **209 passed** (+4 RLS). No schema change
+(the test role is created by the test fixture, not a migration — Supabase manages its own roles).
+
+---
+
 ## 2026-08-28 — Notification wiring (domain events → inbox)
 
 **By:** post-module integration/polish — the last "still open" item

@@ -712,11 +712,12 @@ Observability, Testability, Maintainability over cleverness.
   cross‑tenant isolation suite exists; **any new tenant‑owned table or repository method needs a
   case added there.** Treat CI's actual pass count as authoritative — never propagate a stale
   count from a doc.
-- **RLS blind spot** — the ordinary backend suite connects as a privileged DB user and may build
-  its schema without the RLS policies, so **a green backend suite is not evidence that tenant
-  isolation works at the DB layer.** RLS assertions belong in a separate suite that connects as
-  the restricted application role against the migrated database. `alembic check` does not close
-  this gap (autogenerate can't see policies).
+- **RLS blind spot** — the ordinary backend suite connects as a privileged DB user (superuser
+  → bypasses RLS), so **a green backend suite is not evidence that tenant isolation works at
+  the DB layer.** `backend/tests/test_tenant_isolation.py` closes this: it creates a
+  `gs_rls_test` role (`NOSUPERUSER NOBYPASSRLS`), connects as it, and asserts the
+  `tenant_isolation` policy filters reads and blocks cross-scope writes across every tenant
+  table. `alembic check` does not close this gap (autogenerate can't see policies).
 - **Frontend**: Vitest/Jest + Testing Library for units; Playwright for E2E (login, visitor
   approval, gate entry, amenity booking conflict, invoice payment, complaint lifecycle, tenant
   isolation, responsive, slow‑network).
@@ -1019,13 +1020,11 @@ tenant tables to a new RLS migration) → extend `seed.py` → `tests/test_<m>_{
 
 ### Still open (feature work)
 
-1. **RLS enforcement test suite** — `tests/test_tenant_isolation.py` must connect as a
-   **restricted** DB role against the migrated DB (local Postgres superuser bypasses RLS, §12).
-2. **OTP login, community switcher UI, SSE/WebSocket gate feed** (FR‑04/05).
-3. **Frontend design system** — Tailwind + shadcn/ui + Recharts + TanStack Table + the shared
+1. **OTP login, community switcher UI, SSE/WebSocket gate feed** (FR‑04/05).
+2. **Frontend design system** — Tailwind + shadcn/ui + Recharts + TanStack Table + the shared
    component library. Plain CSS with the design tokens is the placeholder.
-4. **Permission caching** (`permission_version` bump) — evaluation is live per request today.
-5. **More notification hooks + Celery** — `app/modules/notifications/events.py::emit` now
+3. **Permission caching** (`permission_version` bump) — evaluation is live per request today.
+4. **More notification hooks + Celery** — `app/modules/notifications/events.py::emit` now
    fans visitor-decision / visitor-approval-needed / invoice-posted / ticket-status /
    incident-status events to the recipient's inbox. Still to add: panic-alert → on-duty
    guards, SLA-breach sweeps, and moving delivery to `email`/`sms` channels via the Celery
