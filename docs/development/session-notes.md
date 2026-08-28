@@ -18,6 +18,32 @@ Format per entry:
 
 ---
 
+## 2026-08-28 — FR-17 operational seed data (gap fix 1/7)
+
+**By:** QA/acceptance gap remediation — gap 1 of 7 from the PRD/SRS/TRD review
+**Branch / commit:** `main`
+**What changed:**
+- **`backend/app/scripts/seed.py`** — new `seed_operations(db, communities)`, wired into
+  `main()` after `seed_notifications`. Creates realistic *operational* rows per community
+  via direct ORM writes: 3 maintenance invoices (paid / partially_paid / posted) + line
+  items + payments + allocations; 3 service tickets across the lifecycle + status history;
+  2 confirmed amenity bookings; 3 deliveries (expected / at_gate / delivered); 2 visitor
+  requests + entries (one inside, one completed); 1 active parking allocation + 2 vehicle
+  entries; 2 staff-attendance rows (one open, one closed); 1 resolved panic alert.
+- Rows attach to seeded resident units so `resident@gatesphere.com` gets a populated
+  dashboard (outstanding invoice, open ticket, upcoming booking, in-flight delivery).
+- Idempotency keyed on the `INV-<cc>-2026-%` invoice-number prefix — re-running fills
+  gaps without duplicating.
+- **`docs/database/seed-data.md`** — rewritten from the TBD stub: documents both the
+  config/directory layer and the new operational layer.
+**Why:** the seed loaded config + directory rows only; every transactional module
+rendered an empty screen. SRS: "empty screens are strictly prohibited."
+**Verified:** `ruff check . && black --check . && pytest -q` → 209 passed;
+`python -m app.scripts.seed` run twice (idempotent); row counts checked per community.
+**Open / next:** gaps 2–7 (SLA escalation sweep, Celery `tasks.py`, panic→notification
++ recurring dues reminder, OTP/PIN pass + visitor groups, payment receipts, upload
+magic-byte validation + confirm step), then the FastAPI/SQLAlchemy async migration.
+
 ## 2026-08-28 — RLS enforcement test suite
 
 **By:** post-module integration/polish — closes the "RLS blind spot" (AGENTS.md §12)

@@ -540,6 +540,372 @@ def seed_notifications(db: Session, communities: list[Community]) -> None:
             )
 
 
+def seed_operations(db: Session, communities: list[Community]) -> None:
+    """FR-17: realistic *operational* rows for every module so no screen renders empty.
+
+    Idempotent — skips a community once it already has maintenance invoices.
+    Rows are written directly (not through the service layer) to keep the seed
+    deterministic and free of request/notification side effects.
+    """
+    from datetime import UTC, date, datetime, timedelta
+    from decimal import Decimal
+
+    from app.modules.amenities.models import Amenity, AmenityBooking
+    from app.modules.billing.models import (
+        ChargeHead,
+        InvoiceItem,
+        MaintenanceInvoice,
+        Payment,
+        PaymentAllocation,
+    )
+    from app.modules.communities.models import Gate
+    from app.modules.complaints.models import (
+        ServiceCategory,
+        ServiceTicket,
+        SlaPolicy,
+        TicketStatusHistory,
+    )
+    from app.modules.deliveries.models import Delivery, DeliveryProtocol
+    from app.modules.domestic_staff.models import DomesticStaff, StaffAttendance
+    from app.modules.gate.models import PanicAlert
+    from app.modules.residents.models import ResidentProfile, UnitOccupancy
+    from app.modules.vehicles.models import ParkingAllocation, ParkingSlot, Vehicle, VehicleEntry
+    from app.modules.visitors.models import Visitor, VisitorEntry, VisitorRequest
+
+    now = datetime.now(UTC)
+    guard = db.scalar(select(User).where(User.email == f"security_guard@{DEMO_DOMAIN}"))
+    manager = db.scalar(select(User).where(User.email == f"facility_manager@{DEMO_DOMAIN}"))
+
+    for c in communities:
+        sfx = c.code[-2:]
+        # Idempotency: keyed on this seed's own invoice-number prefix so a partially
+        # populated dev DB still gets its operational rows filled in.
+        if db.scalar(
+            select(MaintenanceInvoice).where(
+                MaintenanceInvoice.community_id == c.id,
+                MaintenanceInvoice.invoice_number.like(f"INV-{sfx}-2026-%"),
+            )
+        ):
+            continue
+
+        occupancies = db.scalars(
+            select(UnitOccupancy)
+            .join(ResidentProfile, ResidentProfile.id == UnitOccupancy.resident_profile_id)
+            .where(UnitOccupancy.community_id == c.id, UnitOccupancy.is_active.is_(True))
+            .order_by(UnitOccupancy.created_at)
+        ).all()
+        if not occupancies:
+            continue
+        profiles = {
+            p.id: p
+            for p in db.scalars(
+                select(ResidentProfile).where(ResidentProfile.community_id == c.id)
+            ).all()
+        }
+        gate = db.scalar(select(Gate).where(Gate.community_id == c.id).order_by(Gate.code))
+
+        def _resident_user(occ, _profiles=profiles):
+            prof = _profiles.get(occ.resident_profile_id)
+            return prof.user_id if prof else None
+
+        # -- Billing: 3 invoices (paid / partially paid / posted-unpaid) + payments --------
+        maint = db.scalar(
+            select(ChargeHead).where(ChargeHead.community_id == c.id, ChargeHead.code == "MAINT")
+        )
+        water = db.scalar(
+            select(ChargeHead).where(ChargeHead.community_id == c.id, ChargeHead.code == "WATER")
+        )
+        plans = [
+            ("paid", Decimal("1")),
+            ("partially_paid", Decimal("0.4")),
+            ("posted", Decimal("0")),
+        ]
+        for idx, (target_status, paid_ratio) in enumerate(plans):
+            occ = occupancies[idx % len(occupancies)]
+            base = Decimal("2875.00")
+            water_amt = Decimal("300.00")
+            tax = ((base + water_amt) * Decimal("0.18")).quantize(Decimal("0.01"))
+            total = base + water_amt + tax
+            paid = (total * paid_ratio).quantize(Decimal("0.01"))
+            inv = MaintenanceInvoice(
+                community_id=c.id,
+                unit_id=occ.unit_id,
+                billed_to_user_id=_resident_user(occ),
+                invoice_number=f"INV-{sfx}-2026-{idx + 1:04d}",
+                billing_period_start=date(2026, 8, 1),
+                billing_period_end=date(2026, 8, 31),
+                issue_date=date(2026, 8, 1),
+                due_date=date(2026, 8, 15),
+                subtotal=base + water_amt,
+                tax=tax,
+                total_amount=total,
+                amount_paid=paid,
+                balance_due=total - paid,
+                status=target_status,
+            )
+            inv.items = [
+                InvoiceItem(
+                    charge_head_id=maint.id if maint else None,
+                    description="Monthly Maintenance",
+                    quantity=Decimal("1150"),
+                    unit_rate=Decimal("2.50"),
+                    amount=base,
+                    taxable=True,
+                ),
+                InvoiceItem(
+                    charge_head_id=water.id if water else None,
+                    description="Water Charges",
+                    quantity=Decimal("1"),
+                    unit_rate=water_amt,
+                    amount=water_amt,
+                    taxable=True,
+                ),
+            ]
+            db.add(inv)
+            db.flush()
+            if paid > 0:
+                pay = Payment(
+                    community_id=c.id,
+                    payer_user_id=_resident_user(occ),
+                    payment_reference=f"PAY-{sfx}-2026-{idx + 1:04d}",
+                    amount=paid,
+                    payment_method="upi",
+                    payment_status="success",
+                    gateway_name="razorpay",
+                    gateway_transaction_id=f"rzp_{sfx}{idx + 1:06d}",
+                )
+                pay.allocations = [PaymentAllocation(invoice_id=inv.id, allocated_amount=paid)]
+                db.add(pay)
+
+        # -- Complaints: 3 tickets across the lifecycle -----------------------------------
+        cats = db.scalars(
+            select(ServiceCategory)
+            .where(ServiceCategory.community_id == c.id)
+            .order_by(ServiceCategory.code)
+        ).all()
+        slas = {
+            s.category_id: s
+            for s in db.scalars(select(SlaPolicy).where(SlaPolicy.community_id == c.id)).all()
+        }
+        ticket_plan = [
+            ("created", "Kitchen tap leaking", None),
+            ("in_progress", "Bedroom power socket sparking", None),
+            ("resolved", "Corridor light not working", now - timedelta(hours=6)),
+        ]
+        for idx, (status, subject, resolved_at) in enumerate(ticket_plan):
+            occ = occupancies[idx % len(occupancies)]
+            cat = cats[idx % len(cats)] if cats else None
+            sla = slas.get(cat.id) if cat else None
+            t = ServiceTicket(
+                community_id=c.id,
+                unit_id=occ.unit_id,
+                ticket_number=f"TKT-{sfx}-2026-{idx + 1:04d}",
+                raised_by_user_id=_resident_user(occ),
+                category_id=cat.id if cat else None,
+                sla_policy_id=sla.id if sla else None,
+                subject=subject,
+                description=f"{subject}. Reported by resident; please attend.",
+                priority=cat.default_priority if cat else "medium",
+                status=status,
+                first_response_due_at=now + timedelta(minutes=60),
+                resolution_due_at=now + timedelta(hours=24),
+                escalation_due_at=now + timedelta(hours=4),
+                resolved_at=resolved_at,
+            )
+            db.add(t)
+            db.flush()
+            chain = {
+                "created": ["created"],
+                "in_progress": ["created", "assigned", "in_progress"],
+                "resolved": ["created", "assigned", "in_progress", "resolved"],
+            }[status]
+            prev = None
+            for st in chain:
+                db.add(
+                    TicketStatusHistory(
+                        ticket_id=t.id, from_status=prev, to_status=st, remarks="seed"
+                    )
+                )
+                prev = st
+
+        # -- Amenities: 2 upcoming confirmed bookings -------------------------------------
+        for idx, amen in enumerate(
+            db.scalars(
+                select(Amenity).where(Amenity.community_id == c.id).order_by(Amenity.code)
+            ).all()
+        ):
+            occ = occupancies[idx % len(occupancies)]
+            day = (now + timedelta(days=idx + 1)).date()
+            start = datetime.combine(day, datetime.min.time(), tzinfo=UTC).replace(hour=18)
+            db.add(
+                AmenityBooking(
+                    community_id=c.id,
+                    amenity_id=amen.id,
+                    unit_id=occ.unit_id,
+                    resident_user_id=_resident_user(occ),
+                    booking_date=day,
+                    start_at=start,
+                    end_at=start + timedelta(hours=1),
+                    participant_count=4,
+                    status="confirmed",
+                )
+            )
+
+        # -- Deliveries: expected / at_gate / delivered --------------------------------
+        protos = {
+            p.delivery_type: p
+            for p in db.scalars(
+                select(DeliveryProtocol).where(DeliveryProtocol.community_id == c.id)
+            ).all()
+        }
+        deliv_plan = [
+            ("food", "Swiggy", "expected", "pending"),
+            ("ecommerce", "Amazon", "at_gate", "approved"),
+            ("courier", "Blue Dart", "delivered", "approved"),
+        ]
+        for idx, (dtype, provider, status, approval) in enumerate(deliv_plan):
+            occ = occupancies[idx % len(occupancies)]
+            proto = protos.get(dtype)
+            db.add(
+                Delivery(
+                    community_id=c.id,
+                    unit_id=occ.unit_id,
+                    resident_user_id=_resident_user(occ),
+                    protocol_id=proto.id if proto else None,
+                    delivery_type=dtype,
+                    provider_name=provider,
+                    executive_name=f"{provider} Rider",
+                    executive_phone=f"+9199{sfx}00{idx + 1:04d}",
+                    tracking_reference=f"{provider[:3].upper()}{sfx}{idx + 1:08d}",
+                    approval_status=approval,
+                    approved_by_user_id=guard.id if approval == "approved" and guard else None,
+                    expected_at=now + timedelta(hours=1),
+                    arrived_at=now - timedelta(minutes=20) if status != "expected" else None,
+                    status=status,
+                )
+            )
+
+        # -- Visitors: one guest inside, one completed visit ----------------------------
+        visitors = db.scalars(
+            select(Visitor).where(Visitor.community_id == c.id).order_by(Visitor.phone)
+        ).all()
+        for idx, vstatus in enumerate(("entered", "completed")):
+            if idx >= len(visitors):
+                break
+            occ = occupancies[idx % len(occupancies)]
+            v = visitors[idx]
+            req = VisitorRequest(
+                community_id=c.id,
+                visitor_id=v.id,
+                unit_id=occ.unit_id,
+                host_user_id=_resident_user(occ),
+                created_by_user_id=_resident_user(occ),
+                visitor_type="guest",
+                purpose="Family visit",
+                expected_at=now - timedelta(hours=2),
+                valid_until=now + timedelta(hours=6),
+                status=vstatus,
+                approval_required=True,
+                party_size=1,
+            )
+            db.add(req)
+            db.flush()
+            db.add(
+                VisitorEntry(
+                    community_id=c.id,
+                    request_id=req.id,
+                    visitor_id=v.id,
+                    gate_id=gate.id if gate else None,
+                    entry_guard_user_id=guard.id if guard else None,
+                    exit_guard_user_id=guard.id if (guard and vstatus == "completed") else None,
+                    entry_at=now - timedelta(hours=2),
+                    exit_at=now - timedelta(minutes=30) if vstatus == "completed" else None,
+                    status="inside" if vstatus == "entered" else "exited",
+                )
+            )
+
+        # -- Vehicles: active allocation + gate movements ------------------------------
+        veh = db.scalar(select(Vehicle).where(Vehicle.community_id == c.id))
+        slot = db.scalar(
+            select(ParkingSlot)
+            .where(ParkingSlot.community_id == c.id)
+            .order_by(ParkingSlot.slot_code)
+        )
+        if veh and slot:
+            db.add(
+                ParkingAllocation(
+                    community_id=c.id,
+                    slot_id=slot.id,
+                    vehicle_id=veh.id,
+                    unit_id=occupancies[0].unit_id,
+                    status="active",
+                    allocated_by_user_id=manager.id if manager else None,
+                )
+            )
+            db.add(
+                VehicleEntry(
+                    community_id=c.id,
+                    vehicle_id=veh.id,
+                    registration_number=veh.registration_number,
+                    gate_id=gate.id if gate else None,
+                    entry_guard_user_id=guard.id if guard else None,
+                    source_type="resident",
+                    status="inside",
+                )
+            )
+        db.add(
+            VehicleEntry(
+                community_id=c.id,
+                registration_number=f"KA{sfx}XY{sfx}99",
+                gate_id=gate.id if gate else None,
+                entry_guard_user_id=guard.id if guard else None,
+                exit_guard_user_id=guard.id if guard else None,
+                entry_at=now - timedelta(hours=3),
+                exit_at=now - timedelta(hours=1),
+                source_type="visitor",
+                status="exited",
+            )
+        )
+
+        # -- Domestic staff: one on-site, one checked-out ------------------------------
+        staff = db.scalars(
+            select(DomesticStaff)
+            .where(DomesticStaff.community_id == c.id)
+            .order_by(DomesticStaff.phone)
+        ).all()
+        for idx, s in enumerate(staff[:2]):
+            db.add(
+                StaffAttendance(
+                    community_id=c.id,
+                    staff_id=s.id,
+                    gate_id=gate.id if gate else None,
+                    check_in_at=now - timedelta(hours=4 + idx),
+                    check_out_at=None if idx == 0 else now - timedelta(hours=1),
+                    check_in_by_user_id=guard.id if guard else None,
+                    check_out_by_user_id=guard.id if (guard and idx == 1) else None,
+                    attendance_status="inside" if idx == 0 else "left",
+                )
+            )
+
+        # -- Gate: a resolved panic alert -------------------------------------------------
+        db.add(
+            PanicAlert(
+                community_id=c.id,
+                triggered_by_user_id=_resident_user(occupancies[0]),
+                gate_id=gate.id if gate else None,
+                alert_type="medical",
+                severity="high",
+                message="Resident reported a medical emergency in the lobby.",
+                status="resolved",
+                triggered_at=now - timedelta(days=1),
+                acknowledged_by_user_id=guard.id if guard else None,
+                acknowledged_at=now - timedelta(days=1) + timedelta(minutes=2),
+                resolved_at=now - timedelta(days=1) + timedelta(minutes=40),
+                resolution_summary="Ambulance called; resident stabilised and taken to hospital.",
+            )
+        )
+
+
 def main() -> None:
     with SessionLocal() as db:
         seed_rbac(db)
@@ -557,6 +923,7 @@ def main() -> None:
         seed_communication(db, communities)
         seed_incidents(db, communities)
         seed_notifications(db, communities)
+        seed_operations(db, communities)
         db.commit()
     log.info("seed.done")
     print(f"Seed complete. Demo users: <role>@{DEMO_DOMAIN} / <role>{DEMO_PASSWORD_SUFFIX}")
