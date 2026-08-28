@@ -12,16 +12,16 @@ from fastapi import APIRouter, Depends, Response, status
 
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
-from app.core.security import require_permission
+from app.core.security import require_permission_async
 from app.modules.users import schemas
 from app.modules.users.deps import user_service
 from app.modules.users.service import UserService
 
 router = APIRouter(prefix="/users", tags=["Users & RBAC"])
 
-VIEW = Depends(require_permission("users:view"))
-CREATE = Depends(require_permission("users:create"))
-UPDATE = Depends(require_permission("users:update"))
+VIEW = Depends(require_permission_async("users:view"))
+CREATE = Depends(require_permission_async("users:create"))
+UPDATE = Depends(require_permission_async("users:update"))
 Svc = UserService
 
 
@@ -31,12 +31,12 @@ async def module_health() -> dict:
 
 
 @router.get("/roles", response_model=Envelope[list[schemas.RoleRead]], dependencies=[VIEW])
-def list_roles(svc: Svc = Depends(user_service)) -> dict:
-    return ok(svc.list_roles())
+async def list_roles(svc: Svc = Depends(user_service)) -> dict:
+    return ok(await svc.list_roles())
 
 
 @router.get("", response_model=Envelope[list[schemas.UserRead]], dependencies=[VIEW])
-def list_users(
+async def list_users(
     q: str | None = None,
     role_slug: str | None = None,
     community_id: uuid.UUID | None = None,
@@ -44,7 +44,7 @@ def list_users(
     params: PageParams = Depends(page_params),
     svc: Svc = Depends(user_service),
 ) -> dict:
-    rows, total = svc.list_users(
+    rows, total = await svc.list_users(
         q=q,
         role_slug=role_slug,
         community_id=community_id,
@@ -61,20 +61,20 @@ def list_users(
     status_code=status.HTTP_201_CREATED,
     dependencies=[CREATE],
 )
-def create_user(payload: schemas.UserCreate, svc: Svc = Depends(user_service)) -> dict:
-    return ok(svc.to_read(svc.create_user(payload)), message="User created")
+async def create_user(payload: schemas.UserCreate, svc: Svc = Depends(user_service)) -> dict:
+    return ok(svc.to_read(await svc.create_user(payload)), message="User created")
 
 
 @router.get("/{user_id}", response_model=Envelope[schemas.UserRead], dependencies=[VIEW])
-def get_user(user_id: uuid.UUID, svc: Svc = Depends(user_service)) -> dict:
-    return ok(svc.to_read(svc.get_user(user_id)))
+async def get_user(user_id: uuid.UUID, svc: Svc = Depends(user_service)) -> dict:
+    return ok(svc.to_read(await svc.get_user(user_id)))
 
 
 @router.patch("/{user_id}", response_model=Envelope[schemas.UserRead], dependencies=[UPDATE])
-def update_user(
+async def update_user(
     user_id: uuid.UUID, payload: schemas.UserUpdate, svc: Svc = Depends(user_service)
 ) -> dict:
-    return ok(svc.to_read(svc.update_user(user_id, payload)), message="Updated")
+    return ok(svc.to_read(await svc.update_user(user_id, payload)), message="Updated")
 
 
 @router.post(
@@ -83,10 +83,10 @@ def update_user(
     status_code=status.HTTP_201_CREATED,
     dependencies=[UPDATE],
 )
-def grant_role(
+async def grant_role(
     user_id: uuid.UUID, payload: schemas.RoleGrantIn, svc: Svc = Depends(user_service)
 ) -> dict:
-    ur = svc.grant_role(user_id, payload)
+    ur = await svc.grant_role(user_id, payload)
     return ok(svc._role_grant(ur), message="Role granted")
 
 
@@ -96,8 +96,8 @@ def grant_role(
     response_class=Response,
     dependencies=[UPDATE],
 )
-def revoke_role(
+async def revoke_role(
     user_id: uuid.UUID, grant_id: uuid.UUID, svc: Svc = Depends(user_service)
 ) -> Response:
-    svc.revoke_role(user_id, grant_id)
+    await svc.revoke_role(user_id, grant_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

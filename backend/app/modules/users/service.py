@@ -1,4 +1,4 @@
-"""Business logic for User & Role management (FR-02).
+"""Business logic for User & Role management (FR-02). Async stack (ADR-010).
 
 A global caller (Super Admin) manages every user. A community-scoped caller (Community Admin)
 manages users **within their community** — a user with no roles, or one whose only roles are in
@@ -11,29 +11,32 @@ from __future__ import annotations
 import uuid
 
 from fastapi import Request
-from sqlalchemy import or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy import func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.errors import BusinessRuleError, ConflictError, ForbiddenError, NotFoundError
 from app.core.rbac import ROLE_PERMISSIONS
-from app.core.security import hash_password, revoke_all_user_sessions
+from app.core.security import hash_password, revoke_all_user_sessions_async
 from app.core.tenancy import TenantScope
-from app.modules.audit.service import record_audit
+from app.modules.audit.service import record_audit_async
 from app.modules.users import schemas
 from app.modules.users.models import Permission, Role, RolePermission, User, UserRole
+
+_WITH_ROLES = (selectinload(User.roles).selectinload(UserRole.role),)
 
 
 class UserService:
     def __init__(
-        self, db: Session, scope: TenantScope, actor: User, request: Request | None = None
+        self, db: AsyncSession, scope: TenantScope, actor: User, request: Request | None = None
     ):
         self.db = db
         self.scope = scope
         self.actor = actor
         self.request = request
 
-    def _audit(self, action, entity_id, *, community_id=None, **kw):
-        record_audit(
+    async def _audit(self, action, entity_id, *, community_id=None, **kw) -> None:
+        await record_audit_async(
             self.db,
             module="users",
             action=action,
@@ -63,8 +66,13 @@ class UserService:
             return True  # unaffiliated user — claimable by any admin
         return bool(grant_cids & self.scope.community_ids)
 
-    def _get_visible(self, user_id: uuid.UUID) -> User:
-        user = self.db.get(User, user_id)
+    async def _get_visible(self, user_id: uuid.UUID) -> User:
+        user = await self.db.scalar(
+            select(User)
+            .options(*_WITH_ROLES)
+            .where(User.id == user_id)
+            .execution_options(populate_existing=True)
+        )
         if user is None or not self._visible(user):
             raise NotFoundError("User not found")
         return user
@@ -95,7 +103,7 @@ class UserService:
             roles=[self._role_grant(ur) for ur in user.roles],
         )
 
-    def list_users(
+    async def list_users(
         self,
         *,
         q: str | None,
@@ -105,7 +113,7 @@ class UserService:
         offset: int,
         limit: int,
     ):
-        stmt = select(User)
+        stmt = select(User).options(*_WITH_ROLES)
         if q:
             stmt = stmt.where(or_(User.email.ilike(f"%{q}%"), User.full_name.ilike(f"%{q}%")))
         if active is not None:
@@ -125,19 +133,18 @@ class UserService:
                     )
                 )
         stmt = stmt.distinct().order_by(User.email)
-        from sqlalchemy import func
-
         total = int(
-            self.db.scalar(select(func.count()).select_from(stmt.order_by(None).subquery())) or 0
+            await self.db.scalar(select(func.count()).select_from(stmt.order_by(None).subquery()))
+            or 0
         )
-        rows = list(self.db.scalars(stmt.offset(offset).limit(limit)).all())
+        rows = list((await self.db.scalars(stmt.offset(offset).limit(limit))).all())
         return rows, total
 
-    def get_user(self, user_id: uuid.UUID) -> User:
-        return self._get_visible(user_id)
+    async def get_user(self, user_id: uuid.UUID) -> User:
+        return await self._get_visible(user_id)
 
-    def list_roles(self) -> list[schemas.RoleRead]:
-        roles = list(self.db.scalars(select(Role).order_by(Role.slug)).all())
+    async def list_roles(self) -> list[schemas.RoleRead]:
+        roles = list((await self.db.scalars(select(Role).order_by(Role.slug))).all())
         out = []
         for r in roles:
             granted = ROLE_PERMISSIONS.get(r.slug, [])
@@ -145,10 +152,12 @@ class UserService:
                 codes = ["*"]
             else:
                 codes = sorted(
-                    self.db.scalars(
-                        select(Permission.code)
-                        .join(RolePermission, RolePermission.permission_id == Permission.id)
-                        .where(RolePermission.role_id == r.id)
+                    (
+                        await self.db.scalars(
+                            select(Permission.code)
+                            .join(RolePermission, RolePermission.permission_id == Permission.id)
+                            .where(RolePermission.role_id == r.id)
+                        )
                     ).all()
                 )
             out.append(
@@ -159,9 +168,9 @@ class UserService:
         return out
 
     # -- writes -------------------------------------------- #
-    def create_user(self, payload: schemas.UserCreate) -> User:
+    async def create_user(self, payload: schemas.UserCreate) -> User:
         email = payload.email.lower()
-        if self.db.scalar(select(User).where(User.email == email)):
+        if await self.db.scalar(select(User).where(User.email == email)):
             raise ConflictError("Email already registered", code="EMAIL_TAKEN")
         user = User(
             email=email,
@@ -170,31 +179,30 @@ class UserService:
             password_hash=hash_password(payload.password),
         )
         self.db.add(user)
-        self.db.flush()
-        self._audit("user.create", str(user.id))
+        await self.db.flush()
+        await self._audit("user.create", str(user.id))
         if payload.role_slug:
-            self.grant_role(
+            await self.grant_role(
                 user.id,
                 schemas.RoleGrantIn(role_slug=payload.role_slug, community_id=payload.community_id),
             )
-        self.db.refresh(user)
-        return user
+        return await self._get_visible(user.id)
 
-    def update_user(self, user_id: uuid.UUID, payload: schemas.UserUpdate) -> User:
-        user = self._get_visible(user_id)
+    async def update_user(self, user_id: uuid.UUID, payload: schemas.UserUpdate) -> User:
+        user = await self._get_visible(user_id)
         patch = payload.model_dump(exclude_unset=True)
         was_active = user.is_active
         for k, v in patch.items():
             setattr(user, k, v)
-        self.db.flush()
+        await self.db.flush()
         if was_active and user.is_active is False:
-            revoke_all_user_sessions(self.db, user.id)
-        self._audit("user.update", str(user.id), new=patch)
-        return user
+            await revoke_all_user_sessions_async(self.db, user.id)
+        await self._audit("user.update", str(user.id), new=patch)
+        return await self._get_visible(user_id)
 
-    def grant_role(self, user_id: uuid.UUID, payload: schemas.RoleGrantIn) -> UserRole:
-        user = self._get_visible(user_id)
-        role = self.db.scalar(select(Role).where(Role.slug == payload.role_slug))
+    async def grant_role(self, user_id: uuid.UUID, payload: schemas.RoleGrantIn) -> UserRole:
+        user = await self._get_visible(user_id)
+        role = await self.db.scalar(select(Role).where(Role.slug == payload.role_slug))
         if role is None:
             raise NotFoundError("Role not found")
         self._require_community(payload.community_id)
@@ -202,7 +210,7 @@ class UserService:
             raise BusinessRuleError(
                 f"{role.slug} is a platform-global role", code="GLOBAL_ROLE_ONLY"
             )
-        dupe = self.db.scalar(
+        dupe = await self.db.scalar(
             select(UserRole).where(
                 UserRole.user_id == user.id,
                 UserRole.role_id == role.id,
@@ -213,24 +221,25 @@ class UserService:
             raise ConflictError("Grant already exists", code="GRANT_EXISTS")
         ur = UserRole(user_id=user.id, role_id=role.id, community_id=payload.community_id)
         self.db.add(ur)
-        self.db.flush()
-        revoke_all_user_sessions(self.db, user.id)
-        self._audit(
+        await self.db.flush()
+        await revoke_all_user_sessions_async(self.db, user.id)
+        await self._audit(
             "role.grant",
             str(user.id),
             community_id=payload.community_id,
             new={"role": role.slug, "community_id": str(payload.community_id or "global")},
         )
-        self.db.refresh(ur)
-        return ur
+        return await self.db.scalar(
+            select(UserRole).options(selectinload(UserRole.role)).where(UserRole.id == ur.id)
+        )
 
-    def revoke_role(self, user_id: uuid.UUID, grant_id: uuid.UUID) -> None:
-        user = self._get_visible(user_id)
-        ur = self.db.get(UserRole, grant_id)
+    async def revoke_role(self, user_id: uuid.UUID, grant_id: uuid.UUID) -> None:
+        user = await self._get_visible(user_id)
+        ur = await self.db.get(UserRole, grant_id)
         if ur is None or ur.user_id != user.id:
             raise NotFoundError("Grant not found")
         self._require_community(ur.community_id)
-        self.db.delete(ur)
-        self.db.flush()
-        revoke_all_user_sessions(self.db, user.id)
-        self._audit("role.revoke", str(user.id), community_id=ur.community_id)
+        await self.db.delete(ur)
+        await self.db.flush()
+        await revoke_all_user_sessions_async(self.db, user.id)
+        await self._audit("role.revoke", str(user.id), community_id=ur.community_id)

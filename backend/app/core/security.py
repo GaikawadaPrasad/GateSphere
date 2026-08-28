@@ -158,6 +158,21 @@ def revoke_all_user_sessions(db: Session, user_id: uuid.UUID) -> None:
         _cache_drop(row.session_key_hash)
 
 
+async def revoke_all_user_sessions_async(db: AsyncSession, user_id: uuid.UUID) -> None:
+    """Async twin (ADR-010)."""
+    now = datetime.now(UTC)
+    rows = (
+        await db.scalars(
+            select(UserSession).where(
+                UserSession.user_id == user_id, UserSession.revoked_at.is_(None)
+            )
+        )
+    ).all()
+    for row in rows:
+        row.revoked_at = now
+        _cache_drop(row.session_key_hash)
+
+
 def _load_session(db: Session, request: Request) -> dict:
     token = request.cookies.get(settings.SESSION_COOKIE_NAME)
     if not token:
