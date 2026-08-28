@@ -12,8 +12,8 @@ from fastapi import APIRouter, Depends, Request
 
 from app.core.responses import Response as Envelope
 from app.core.responses import ok
-from app.core.security import require_auth
-from app.core.tenancy import TenantContext, tenant_context
+from app.core.security import require_auth_async
+from app.core.tenancy import AsyncTenantContext, async_tenant_context
 from app.modules.uploads import schemas
 from app.modules.uploads.catalogue import KINDS
 from app.modules.uploads.service import UploadService
@@ -24,8 +24,8 @@ router = APIRouter(prefix="/uploads", tags=["Uploads"])
 
 def upload_service(
     request: Request,
-    ctx: TenantContext = Depends(tenant_context),
-    user: User = Depends(require_auth),
+    ctx: AsyncTenantContext = Depends(async_tenant_context),
+    user: User = Depends(require_auth_async),
 ) -> UploadService:
     return UploadService(ctx.db, ctx.scope, user, request)
 
@@ -50,15 +50,17 @@ def list_kinds() -> dict:
 
 
 @router.post("", response_model=Envelope[schemas.PresignResponse])
-def presign(payload: schemas.PresignRequest, svc: UploadService = Depends(upload_service)) -> dict:
-    return ok(svc.presign(payload), message="Upload authorised")
+async def presign(
+    payload: schemas.PresignRequest, svc: UploadService = Depends(upload_service)
+) -> dict:
+    return ok(await svc.presign(payload), message="Upload authorised")
 
 
 @router.post("/{file_id}/confirm", response_model=Envelope[schemas.ConfirmResponse])
-def confirm(file_id: uuid.UUID, svc: UploadService = Depends(upload_service)) -> dict:
-    return ok(svc.confirm(file_id), message="Upload confirmed")
+async def confirm(file_id: uuid.UUID, svc: UploadService = Depends(upload_service)) -> dict:
+    return ok(await svc.confirm(file_id), message="Upload confirmed")
 
 
 @router.get("/download", response_model=Envelope[schemas.DownloadResponse])
-def download(key: str, svc: UploadService = Depends(upload_service)) -> dict:
-    return ok(svc.download(key))
+async def download(key: str, svc: UploadService = Depends(upload_service)) -> dict:
+    return ok(await svc.download(key))

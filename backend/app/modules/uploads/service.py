@@ -1,10 +1,12 @@
-"""Upload pipeline service (FR — file handling).
+"""Upload pipeline service (FR — file handling). Async stack (ADR-010).
 
 Flow: client calls `POST /uploads` with `{kind, filename, content_type, size_bytes}` ->
 we validate against the fixed catalogue and hand back a **presigned PUT URL** + the final
-`file_url`. The client PUTs the bytes straight to S3/MinIO, then passes `file_url` to the
-domain endpoint (attachment / photo / evidence). `ManagedFileUrl` on those endpoints
-guarantees the URL points back into our bucket.
+`file_url`. The client PUTs the bytes straight to S3/MinIO, then `POST /uploads/{id}/confirm`
+runs the size + magic-byte check, then passes `file_url` to the domain endpoint.
+`ManagedFileUrl` + `uploads.guard.ensure_confirmed` are the two gates on a stored URL.
+
+`storage.*` is blocking boto3 — every call is off-loaded to a worker thread.
 """
 
 from __future__ import annotations
@@ -13,11 +15,13 @@ import re
 import uuid
 from datetime import UTC, datetime
 
+from anyio import to_thread
 from fastapi import Request
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import BusinessRuleError, NotFoundError
 from app.core.tenancy import TenantScope
-from app.modules.audit.service import record_audit
+from app.modules.audit.service import record_audit_async
 from app.modules.uploads import schemas
 from app.modules.uploads.catalogue import KINDS, extension_for
 from app.modules.uploads.models import ManagedFile
@@ -35,7 +39,9 @@ def _safe_stem(filename: str) -> str:
 
 
 class UploadService:
-    def __init__(self, db, scope: TenantScope, actor: User, request: Request | None = None):
+    def __init__(
+        self, db: AsyncSession, scope: TenantScope, actor: User, request: Request | None = None
+    ):
         self.db = db
         self.scope = scope
         self.actor = actor
@@ -50,7 +56,7 @@ class UploadService:
             "Specify a community", code="COMMUNITY_REQUIRED", fields={"community_id": "required"}
         )
 
-    def presign(self, payload: schemas.PresignRequest) -> schemas.PresignResponse:
+    async def presign(self, payload: schemas.PresignRequest) -> schemas.PresignResponse:
         kind = KINDS.get(payload.kind)
         if kind is None:
             raise NotFoundError("Unknown upload kind")
@@ -66,13 +72,16 @@ class UploadService:
                 code="FILE_TOO_LARGE",
                 fields={"size_bytes": f"<= {kind.max_bytes}"},
             )
-        if kind.scope == "community":
-            ns = str(self._community(payload.community_id))
-        else:
-            ns = str(self.actor.id)
+        ns = (
+            str(self._community(payload.community_id))
+            if kind.scope == "community"
+            else str(self.actor.id)
+        )
         ext = extension_for(payload.content_type)
         key = f"{kind.prefix}/{ns}/{uuid.uuid4().hex}-{_safe_stem(payload.filename)}{ext}"
-        url = storage.presigned_put(key, payload.content_type, expires=_PRESIGN_TTL)
+        url = await to_thread.run_sync(
+            storage.presigned_put, key, payload.content_type, _PRESIGN_TTL
+        )
         community_id = payload.community_id if kind.scope == "community" else None
         mf = ManagedFile(
             community_id=community_id,
@@ -84,13 +93,13 @@ class UploadService:
             status="pending",
         )
         self.db.add(mf)
-        self.db.flush()
-        record_audit(
+        await self.db.flush()
+        await record_audit_async(
             self.db,
             module="uploads",
             action="upload.presign",
             actor=self.actor,
-            community_id=payload.community_id if kind.scope == "community" else None,
+            community_id=community_id,
             entity_type="object",
             entity_id=uuid.uuid4().hex,
             request=self.request,
@@ -113,8 +122,8 @@ class UploadService:
             confirm_url=f"/api/v1/uploads/{mf.id}/confirm",
         )
 
-    def _managed_file(self, file_id: uuid.UUID) -> ManagedFile:
-        mf = self.db.get(ManagedFile, file_id)
+    async def _managed_file(self, file_id: uuid.UUID) -> ManagedFile:
+        mf = await self.db.get(ManagedFile, file_id)
         if mf is None:
             raise NotFoundError("Upload not found")
         foreign = mf.created_by_user_id != self.actor.id and not self.scope.is_global
@@ -122,8 +131,8 @@ class UploadService:
             raise NotFoundError("Upload not found")
         return mf
 
-    def confirm(self, file_id: uuid.UUID) -> schemas.ConfirmResponse:
-        mf = self._managed_file(file_id)
+    async def confirm(self, file_id: uuid.UUID) -> schemas.ConfirmResponse:
+        mf = await self._managed_file(file_id)
         if mf.status == "confirmed":
             return schemas.ConfirmResponse(
                 file_id=mf.id,
@@ -137,37 +146,40 @@ class UploadService:
                 f"Upload was rejected: {mf.reject_reason}", code="UPLOAD_REJECTED"
             )
         kind = KINDS[mf.kind]
-        head = storage.object_head(mf.object_key)
+        head = await to_thread.run_sync(storage.object_head, mf.object_key)
         if head is None:
             raise BusinessRuleError("No object was uploaded to the presigned URL", code="NO_OBJECT")
 
         size = head.get("content_length") or 0
         reason: str | None = None
+        detected: str | None = None
         if size > kind.max_bytes:
             reason = f"file is {size} bytes, over the {kind.max_bytes} cap for {kind.slug}"
         else:
-            candidates = detect(storage.object_bytes(mf.object_key, 32) or b"")
+            head_bytes = await to_thread.run_sync(storage.object_bytes, mf.object_key, 32)
+            candidates = detect(head_bytes or b"")
             if not candidates:
                 reason = "file signature not recognised"
             elif not candidates & set(kind.content_types):
                 reason = f"file contents ({sorted(candidates)}) not allowed for {kind.slug}"
+            else:
+                detected = next(iter(candidates), None)
 
         if reason:
-            storage.delete_object(mf.object_key)
+            await to_thread.run_sync(storage.delete_object, mf.object_key)
             mf.status = "rejected"
             mf.reject_reason = reason[:200]
             mf.size_bytes = size
-            self.db.flush()
-            self._audit_confirm(mf, "upload.reject")
+            await self.db.flush()
+            await self._audit_confirm(mf, "upload.reject")
             raise BusinessRuleError(reason, code="UPLOAD_REJECTED")
 
-        detected = next(iter(detect(storage.object_bytes(mf.object_key, 32) or b"")), None)
         mf.status = "confirmed"
         mf.detected_content_type = detected
         mf.size_bytes = size
         mf.confirmed_at = datetime.now(UTC)
-        self.db.flush()
-        self._audit_confirm(mf, "upload.confirm")
+        await self.db.flush()
+        await self._audit_confirm(mf, "upload.confirm")
         return schemas.ConfirmResponse(
             file_id=mf.id,
             status="confirmed",
@@ -176,8 +188,8 @@ class UploadService:
             size_bytes=size,
         )
 
-    def _audit_confirm(self, mf: ManagedFile, action: str) -> None:
-        record_audit(
+    async def _audit_confirm(self, mf: ManagedFile, action: str) -> None:
+        await record_audit_async(
             self.db,
             module="uploads",
             action=action,
@@ -189,9 +201,8 @@ class UploadService:
             new={"key": mf.object_key, "status": mf.status, "reason": mf.reject_reason},
         )
 
-    def download(self, key: str) -> schemas.DownloadResponse:
-        if storage.object_head(key) is None:
+    async def download(self, key: str) -> schemas.DownloadResponse:
+        if await to_thread.run_sync(storage.object_head, key) is None:
             raise NotFoundError("Object not found")
-        return schemas.DownloadResponse(
-            key=key, url=storage.presigned_get(key, expires=3600), expires_in=3600
-        )
+        url = await to_thread.run_sync(storage.presigned_get, key, 3600)
+        return schemas.DownloadResponse(key=key, url=url, expires_in=3600)
