@@ -17,8 +17,8 @@ def _svc(db, scope, actor):
     return AmenityService(db, scope, actor)
 
 
-def _slot_on(db, amenity, target: date) -> AmenitySlot:
-    return db.scalar(
+async def _slot_on(db, amenity, target: date) -> AmenitySlot:
+    return await db.scalar(
         select(AmenitySlot).where(
             AmenitySlot.amenity_id == amenity.id,
             AmenitySlot.day_of_week == target.weekday(),
@@ -26,46 +26,50 @@ def _slot_on(db, amenity, target: date) -> AmenitySlot:
     )
 
 
-def _future(db, amenity, days=1):
+async def _future(db, amenity, days=1):
     d = date.today() + timedelta(days=days)
-    return d, _slot_on(db, amenity, d)
+    return d, await _slot_on(db, amenity, d)
 
 
-def test_booking_computes_window_and_amount(db, scope_for, community, amenity, resident):
+async def test_booking_computes_window_and_amount(db, scope_for, community, amenity, resident):
     svc = _svc(db, scope_for(community.id), resident)
-    bdate, slot = _future(db, amenity)
-    b = svc.book(schemas.BookingCreate(amenity_id=amenity.id, slot_id=slot.id, booking_date=bdate))
+    bdate, slot = await _future(db, amenity)
+    b = await svc.book(
+        schemas.BookingCreate(amenity_id=amenity.id, slot_id=slot.id, booking_date=bdate)
+    )
     assert b.status == "confirmed"
     assert b.start_at.hour == 6 and b.end_at.hour == 8
     assert b.booking_date == bdate
 
 
-def test_weekday_mismatch_rejected(db, scope_for, community, amenity, resident):
+async def test_weekday_mismatch_rejected(db, scope_for, community, amenity, resident):
     svc = _svc(db, scope_for(community.id), resident)
     bdate = date.today() + timedelta(days=1)
-    wrong = db.scalar(
+    wrong = await db.scalar(
         select(AmenitySlot).where(
             AmenitySlot.amenity_id == amenity.id,
             AmenitySlot.day_of_week != bdate.weekday(),
         )
     )
     with pytest.raises(BusinessRuleError) as exc:
-        svc.book(schemas.BookingCreate(amenity_id=amenity.id, slot_id=wrong.id, booking_date=bdate))
+        await svc.book(
+            schemas.BookingCreate(amenity_id=amenity.id, slot_id=wrong.id, booking_date=bdate)
+        )
     assert exc.value.code == "SLOT_WEEKDAY_MISMATCH"
 
 
-def test_capacity_is_enforced_across_overlapping_bookings(
+async def test_capacity_is_enforced_across_overlapping_bookings(
     db, scope_for, community, amenity, resident
 ):
     svc = _svc(db, scope_for(community.id), resident)
-    bdate, slot = _future(db, amenity)
-    svc.book(
+    bdate, slot = await _future(db, amenity)
+    await svc.book(
         schemas.BookingCreate(
             amenity_id=amenity.id, slot_id=slot.id, booking_date=bdate, participant_count=4
         )
     )
     with pytest.raises(ConflictError) as exc:
-        svc.book(
+        await svc.book(
             schemas.BookingCreate(
                 amenity_id=amenity.id, slot_id=slot.id, booking_date=bdate, participant_count=1
             )
@@ -73,12 +77,12 @@ def test_capacity_is_enforced_across_overlapping_bookings(
     assert exc.value.code == "SLOT_FULL"
 
 
-def test_maintenance_block_prevents_booking(
+async def test_maintenance_block_prevents_booking(
     db, scope_for, community, amenity, resident, superadmin
 ):
     admin = _svc(db, scope_for(community.id), superadmin)
-    bdate, slot = _future(db, amenity)
-    admin.create_block(
+    bdate, slot = await _future(db, amenity)
+    await admin.create_block(
         amenity.id,
         schemas.BlockCreate(
             blocked_from=datetime.combine(bdate, time(0, 0), tzinfo=UTC),
@@ -87,34 +91,38 @@ def test_maintenance_block_prevents_booking(
     )
     svc = _svc(db, scope_for(community.id), resident)
     with pytest.raises(ConflictError) as exc:
-        svc.book(schemas.BookingCreate(amenity_id=amenity.id, slot_id=slot.id, booking_date=bdate))
+        await svc.book(
+            schemas.BookingCreate(amenity_id=amenity.id, slot_id=slot.id, booking_date=bdate)
+        )
     assert exc.value.code == "AMENITY_BLOCKED"
 
 
-def test_max_advance_days_rule(db, scope_for, community, amenity, resident, superadmin):
+async def test_max_advance_days_rule(db, scope_for, community, amenity, resident, superadmin):
     admin = _svc(db, scope_for(community.id), superadmin)
-    admin.upsert_rule(
+    await admin.upsert_rule(
         amenity.id, schemas.RuleUpsert(rule_type="max_advance_days", rule_value={"value": 2})
     )
     svc = _svc(db, scope_for(community.id), resident)
     far = date.today() + timedelta(days=10)
-    slot = _slot_on(db, amenity, far)
+    slot = await _slot_on(db, amenity, far)
     with pytest.raises(BusinessRuleError) as exc:
-        svc.book(schemas.BookingCreate(amenity_id=amenity.id, slot_id=slot.id, booking_date=far))
+        await svc.book(
+            schemas.BookingCreate(amenity_id=amenity.id, slot_id=slot.id, booking_date=far)
+        )
     assert exc.value.code == "TOO_FAR_AHEAD"
 
 
-def test_cancel_frees_capacity(db, scope_for, community, amenity, resident):
+async def test_cancel_frees_capacity(db, scope_for, community, amenity, resident):
     svc = _svc(db, scope_for(community.id), resident)
-    bdate, slot = _future(db, amenity)
-    b = svc.book(
+    bdate, slot = await _future(db, amenity)
+    b = await svc.book(
         schemas.BookingCreate(
             amenity_id=amenity.id, slot_id=slot.id, booking_date=bdate, participant_count=4
         )
     )
-    svc.cancel_booking(b.id, schemas.BookingCancel(reason="plans changed"))
+    await svc.cancel_booking(b.id, schemas.BookingCancel(reason="plans changed"))
     assert b.status == "cancelled"
-    svc.book(
+    await svc.book(
         schemas.BookingCreate(
             amenity_id=amenity.id, slot_id=slot.id, booking_date=bdate, participant_count=4
         )

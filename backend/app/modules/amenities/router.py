@@ -12,17 +12,17 @@ from fastapi import APIRouter, Depends, Response, status
 
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
-from app.core.security import require_permission
+from app.core.security import require_permission_async
 from app.modules.amenities import schemas
 from app.modules.amenities.deps import amenity_service
 from app.modules.amenities.service import AmenityService
 
 router = APIRouter(prefix="/amenities", tags=["Amenity Booking"])
 
-VIEW = Depends(require_permission("amenities:view"))
-CREATE = Depends(require_permission("amenities:create"))
-UPDATE = Depends(require_permission("amenities:update"))
-APPROVE = Depends(require_permission("amenities:approve"))
+VIEW = Depends(require_permission_async("amenities:view"))
+CREATE = Depends(require_permission_async("amenities:create"))
+UPDATE = Depends(require_permission_async("amenities:update"))
+APPROVE = Depends(require_permission_async("amenities:approve"))
 
 Svc = AmenityService
 
@@ -34,7 +34,7 @@ async def module_health() -> dict:
 
 # --- bookings ------------------------------------------------------- #
 @router.get("/bookings", response_model=Envelope[list[schemas.BookingRead]], dependencies=[VIEW])
-def list_bookings(
+async def list_bookings(
     community_id: uuid.UUID | None = None,
     amenity_id: uuid.UUID | None = None,
     booking_status: str | None = None,
@@ -42,7 +42,7 @@ def list_bookings(
     params: PageParams = Depends(page_params),
     svc: Svc = Depends(amenity_service),
 ) -> dict:
-    rows, total = svc.list_bookings(
+    rows, total = await svc.list_bookings(
         community_id=community_id,
         amenity_id=amenity_id,
         booking_status=booking_status,
@@ -61,15 +61,15 @@ def list_bookings(
     status_code=status.HTTP_201_CREATED,
     dependencies=[CREATE],
 )
-def book(payload: schemas.BookingCreate, svc: Svc = Depends(amenity_service)) -> dict:
-    return ok(schemas.BookingRead.model_validate(svc.book(payload)), message="Booked")
+async def book(payload: schemas.BookingCreate, svc: Svc = Depends(amenity_service)) -> dict:
+    return ok(schemas.BookingRead.model_validate(await svc.book(payload)), message="Booked")
 
 
 @router.get(
     "/bookings/{booking_id}", response_model=Envelope[schemas.BookingRead], dependencies=[VIEW]
 )
-def get_booking(booking_id: uuid.UUID, svc: Svc = Depends(amenity_service)) -> dict:
-    return ok(schemas.BookingRead.model_validate(svc.get_booking(booking_id)))
+async def get_booking(booking_id: uuid.UUID, svc: Svc = Depends(amenity_service)) -> dict:
+    return ok(schemas.BookingRead.model_validate(await svc.get_booking(booking_id)))
 
 
 @router.post(
@@ -77,13 +77,13 @@ def get_booking(booking_id: uuid.UUID, svc: Svc = Depends(amenity_service)) -> d
     response_model=Envelope[schemas.BookingRead],
     dependencies=[VIEW],
 )
-def cancel_booking(
+async def cancel_booking(
     booking_id: uuid.UUID,
     payload: schemas.BookingCancel,
     svc: Svc = Depends(amenity_service),
 ) -> dict:
     return ok(
-        schemas.BookingRead.model_validate(svc.cancel_booking(booking_id, payload)),
+        schemas.BookingRead.model_validate(await svc.cancel_booking(booking_id, payload)),
         message="Cancelled",
     )
 
@@ -93,24 +93,24 @@ def cancel_booking(
     response_model=Envelope[schemas.BookingRead],
     dependencies=[UPDATE],
 )
-def mark_booking(
+async def mark_booking(
     booking_id: uuid.UUID, new_status: str, svc: Svc = Depends(amenity_service)
 ) -> dict:
     return ok(
-        schemas.BookingRead.model_validate(svc.mark_booking(booking_id, new_status)),
+        schemas.BookingRead.model_validate(await svc.mark_booking(booking_id, new_status)),
         message="Updated",
     )
 
 
 # --- amenities + config -------------------------------------- #
 @router.get("", response_model=Envelope[list[schemas.AmenityRead]], dependencies=[VIEW])
-def list_amenities(
+async def list_amenities(
     community_id: uuid.UUID | None = None, svc: Svc = Depends(amenity_service)
 ) -> dict:
     return ok(
         [
             schemas.AmenityRead.model_validate(a)
-            for a in svc.list_amenities(community_id=community_id)
+            for a in await svc.list_amenities(community_id=community_id)
         ]
     )
 
@@ -121,25 +121,27 @@ def list_amenities(
     status_code=status.HTTP_201_CREATED,
     dependencies=[APPROVE],
 )
-def create_amenity(
+async def create_amenity(
     payload: schemas.AmenityCreate,
     community_id: uuid.UUID | None = None,
     svc: Svc = Depends(amenity_service),
 ) -> dict:
     return ok(
-        schemas.AmenityRead.model_validate(svc.create_amenity(payload, community_id=community_id)),
+        schemas.AmenityRead.model_validate(
+            await svc.create_amenity(payload, community_id=community_id)
+        ),
         message="Created",
     )
 
 
 @router.patch("/{amenity_id}", response_model=Envelope[schemas.AmenityRead], dependencies=[APPROVE])
-def update_amenity(
+async def update_amenity(
     amenity_id: uuid.UUID,
     payload: schemas.AmenityUpdate,
     svc: Svc = Depends(amenity_service),
 ) -> dict:
     return ok(
-        schemas.AmenityRead.model_validate(svc.update_amenity(amenity_id, payload)),
+        schemas.AmenityRead.model_validate(await svc.update_amenity(amenity_id, payload)),
         message="Updated",
     )
 
@@ -147,8 +149,8 @@ def update_amenity(
 @router.get(
     "/{amenity_id}/slots", response_model=Envelope[list[schemas.SlotRead]], dependencies=[VIEW]
 )
-def list_slots(amenity_id: uuid.UUID, svc: Svc = Depends(amenity_service)) -> dict:
-    return ok([schemas.SlotRead.model_validate(s) for s in svc.list_slots(amenity_id)])
+async def list_slots(amenity_id: uuid.UUID, svc: Svc = Depends(amenity_service)) -> dict:
+    return ok([schemas.SlotRead.model_validate(s) for s in await svc.list_slots(amenity_id)])
 
 
 @router.post(
@@ -157,11 +159,12 @@ def list_slots(amenity_id: uuid.UUID, svc: Svc = Depends(amenity_service)) -> di
     status_code=status.HTTP_201_CREATED,
     dependencies=[APPROVE],
 )
-def create_slot(
+async def create_slot(
     amenity_id: uuid.UUID, payload: schemas.SlotCreate, svc: Svc = Depends(amenity_service)
 ) -> dict:
     return ok(
-        schemas.SlotRead.model_validate(svc.create_slot(amenity_id, payload)), message="Created"
+        schemas.SlotRead.model_validate(await svc.create_slot(amenity_id, payload)),
+        message="Created",
     )
 
 
@@ -171,34 +174,34 @@ def create_slot(
     response_class=Response,
     dependencies=[APPROVE],
 )
-def delete_slot(slot_id: uuid.UUID, svc: Svc = Depends(amenity_service)) -> Response:
-    svc.delete_slot(slot_id)
+async def delete_slot(slot_id: uuid.UUID, svc: Svc = Depends(amenity_service)) -> Response:
+    await svc.delete_slot(slot_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(
     "/{amenity_id}/rules", response_model=Envelope[list[schemas.RuleRead]], dependencies=[VIEW]
 )
-def list_rules(amenity_id: uuid.UUID, svc: Svc = Depends(amenity_service)) -> dict:
-    return ok([schemas.RuleRead.model_validate(r) for r in svc.list_rules(amenity_id)])
+async def list_rules(amenity_id: uuid.UUID, svc: Svc = Depends(amenity_service)) -> dict:
+    return ok([schemas.RuleRead.model_validate(r) for r in await svc.list_rules(amenity_id)])
 
 
 @router.put(
     "/{amenity_id}/rules", response_model=Envelope[schemas.RuleRead], dependencies=[APPROVE]
 )
-def upsert_rule(
+async def upsert_rule(
     amenity_id: uuid.UUID, payload: schemas.RuleUpsert, svc: Svc = Depends(amenity_service)
 ) -> dict:
     return ok(
-        schemas.RuleRead.model_validate(svc.upsert_rule(amenity_id, payload)), message="Saved"
+        schemas.RuleRead.model_validate(await svc.upsert_rule(amenity_id, payload)), message="Saved"
     )
 
 
 @router.get(
     "/{amenity_id}/blocks", response_model=Envelope[list[schemas.BlockRead]], dependencies=[VIEW]
 )
-def list_blocks(amenity_id: uuid.UUID, svc: Svc = Depends(amenity_service)) -> dict:
-    return ok([schemas.BlockRead.model_validate(b) for b in svc.list_blocks(amenity_id)])
+async def list_blocks(amenity_id: uuid.UUID, svc: Svc = Depends(amenity_service)) -> dict:
+    return ok([schemas.BlockRead.model_validate(b) for b in await svc.list_blocks(amenity_id)])
 
 
 @router.post(
@@ -207,10 +210,10 @@ def list_blocks(amenity_id: uuid.UUID, svc: Svc = Depends(amenity_service)) -> d
     status_code=status.HTTP_201_CREATED,
     dependencies=[UPDATE],
 )
-def create_block(
+async def create_block(
     amenity_id: uuid.UUID, payload: schemas.BlockCreate, svc: Svc = Depends(amenity_service)
 ) -> dict:
     return ok(
-        schemas.BlockRead.model_validate(svc.create_block(amenity_id, payload)),
+        schemas.BlockRead.model_validate(await svc.create_block(amenity_id, payload)),
         message="Blocked",
     )

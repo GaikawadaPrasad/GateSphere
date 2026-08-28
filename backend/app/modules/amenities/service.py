@@ -15,10 +15,10 @@ from datetime import UTC, date, datetime
 
 from fastapi import Request
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import BusinessRuleError, ConflictError, ForbiddenError, NotFoundError
-from app.core.security import user_permissions
+from app.core.security import user_permissions_async
 from app.core.tenancy import TenantScope
 from app.modules.amenities import schemas
 from app.modules.amenities.models import (
@@ -36,7 +36,7 @@ from app.modules.amenities.repository import (
     SlotRepository,
 )
 from app.modules.amenities.schemas import ALLOWED
-from app.modules.audit.service import record_audit
+from app.modules.audit.service import record_audit_async
 from app.modules.residents.models import ResidentProfile, UnitOccupancy
 from app.modules.users.models import User
 
@@ -52,7 +52,7 @@ def _enum(field: str, value: str | None) -> None:
 
 class AmenityService:
     def __init__(
-        self, db: Session, scope: TenantScope, actor: User, request: Request | None = None
+        self, db: AsyncSession, scope: TenantScope, actor: User, request: Request | None = None
     ):
         self.db = db
         self.scope = scope
@@ -64,8 +64,8 @@ class AmenityService:
         self.blocks = BlockRepository(db, scope)
         self.bookings = BookingRepository(db, scope)
 
-    def _audit(self, action, community_id, entity_type, entity_id, **kw):
-        record_audit(
+    async def _audit(self, action, community_id, entity_type, entity_id, **kw):
+        await record_audit_async(
             self.db,
             module="amenities",
             action=action,
@@ -86,14 +86,14 @@ class AmenityService:
             "Specify a community", code="COMMUNITY_REQUIRED", fields={"community_id": "required"}
         )
 
-    def _amenity_in_scope(self, amenity_id: uuid.UUID) -> Amenity:
-        obj = self.amenities.get(amenity_id)
+    async def _amenity_in_scope(self, amenity_id: uuid.UUID) -> Amenity:
+        obj = await self.amenities.get(amenity_id)
         if obj is None:
             raise NotFoundError("Amenity not found")
         return obj
 
-    def _actor_unit(self) -> uuid.UUID:
-        occ = self.db.scalar(
+    async def _actor_unit(self) -> uuid.UUID:
+        occ = await self.db.scalar(
             select(UnitOccupancy)
             .join(ResidentProfile, ResidentProfile.id == UnitOccupancy.resident_profile_id)
             .where(
@@ -109,44 +109,48 @@ class AmenityService:
         return occ.unit_id
 
     # -- amenities ------------------------------------------- #
-    def list_amenities(self, *, community_id: uuid.UUID | None):
+    async def list_amenities(self, *, community_id: uuid.UUID | None):
         cid = self._one_community(community_id)
         stmt = select(Amenity).where(Amenity.community_id == cid).order_by(Amenity.code)
-        return list(self.db.scalars(stmt).all())
+        return list((await self.db.scalars(stmt)).all())
 
-    def create_amenity(self, payload: schemas.AmenityCreate, *, community_id: uuid.UUID | None):
+    async def create_amenity(
+        self, payload: schemas.AmenityCreate, *, community_id: uuid.UUID | None
+    ):
         cid = self._one_community(community_id)
         _enum("amenity_type", payload.amenity_type)
-        if self.amenities.by_code(cid, payload.code):
+        if await self.amenities.by_code(cid, payload.code):
             raise ConflictError("That code exists", code="AMENITY_EXISTS")
         obj = Amenity(community_id=cid, **payload.model_dump())
-        self.amenities.add(obj)
-        self._audit("amenity.create", cid, "amenity", obj.id)
+        await self.amenities.add(obj)
+        await self._audit("amenity.create", cid, "amenity", obj.id)
         return obj
 
-    def update_amenity(self, amenity_id: uuid.UUID, payload: schemas.AmenityUpdate):
-        obj = self._amenity_in_scope(amenity_id)
+    async def update_amenity(self, amenity_id: uuid.UUID, payload: schemas.AmenityUpdate):
+        obj = await self._amenity_in_scope(amenity_id)
         patch = payload.model_dump(exclude_unset=True)
         _enum("amenity_type", patch.get("amenity_type"))
         for k, v in patch.items():
             setattr(obj, k, v)
-        self.db.flush()
-        self._audit("amenity.update", obj.community_id, "amenity", obj.id, new=patch)
+        await self.db.flush()
+        await self._audit("amenity.update", obj.community_id, "amenity", obj.id, new=patch)
         return obj
 
     # -- slots ------------------------------------------- #
-    def list_slots(self, amenity_id: uuid.UUID):
-        self._amenity_in_scope(amenity_id)
+    async def list_slots(self, amenity_id: uuid.UUID):
+        await self._amenity_in_scope(amenity_id)
         return list(
-            self.db.scalars(
-                select(AmenitySlot)
-                .where(AmenitySlot.amenity_id == amenity_id)
-                .order_by(AmenitySlot.day_of_week, AmenitySlot.start_time)
+            (
+                await self.db.scalars(
+                    select(AmenitySlot)
+                    .where(AmenitySlot.amenity_id == amenity_id)
+                    .order_by(AmenitySlot.day_of_week, AmenitySlot.start_time)
+                )
             ).all()
         )
 
-    def create_slot(self, amenity_id: uuid.UUID, payload: schemas.SlotCreate):
-        amenity = self._amenity_in_scope(amenity_id)
+    async def create_slot(self, amenity_id: uuid.UUID, payload: schemas.SlotCreate):
+        amenity = await self._amenity_in_scope(amenity_id)
         if payload.end_time <= payload.start_time:
             raise BusinessRuleError("end_time must be after start_time", code="INVALID_TIME_RANGE")
         obj = AmenitySlot(
@@ -158,27 +162,27 @@ class AmenityService:
             capacity=payload.capacity,
             fee=payload.fee,
         )
-        self.slots.add(obj)
-        self._audit("slot.create", amenity.community_id, "amenity_slot", obj.id)
+        await self.slots.add(obj)
+        await self._audit("slot.create", amenity.community_id, "amenity_slot", obj.id)
         return obj
 
-    def delete_slot(self, slot_id: uuid.UUID) -> None:
-        obj = self.slots.get(slot_id)
+    async def delete_slot(self, slot_id: uuid.UUID) -> None:
+        obj = await self.slots.get(slot_id)
         if obj is None:
             raise NotFoundError("Slot not found")
         obj.is_active = False
-        self.db.flush()
-        self._audit("slot.disable", obj.community_id, "amenity_slot", obj.id)
+        await self.db.flush()
+        await self._audit("slot.disable", obj.community_id, "amenity_slot", obj.id)
 
     # -- rules ------------------------------------------ #
-    def list_rules(self, amenity_id: uuid.UUID):
-        self._amenity_in_scope(amenity_id)
-        return self.rules.for_amenity(amenity_id)
+    async def list_rules(self, amenity_id: uuid.UUID):
+        await self._amenity_in_scope(amenity_id)
+        return await self.rules.for_amenity(amenity_id)
 
-    def upsert_rule(self, amenity_id: uuid.UUID, payload: schemas.RuleUpsert):
-        amenity = self._amenity_in_scope(amenity_id)
+    async def upsert_rule(self, amenity_id: uuid.UUID, payload: schemas.RuleUpsert):
+        amenity = await self._amenity_in_scope(amenity_id)
         _enum("rule_type", payload.rule_type)
-        obj = self.rules.match(amenity_id, payload.rule_type)
+        obj = await self.rules.match(amenity_id, payload.rule_type)
         if obj is None:
             obj = AmenityRule(
                 community_id=amenity.community_id,
@@ -186,18 +190,20 @@ class AmenityService:
                 rule_type=payload.rule_type,
                 rule_value=payload.rule_value,
             )
-            self.rules.add(obj)
+            await self.rules.add(obj)
             action = "rule.create"
         else:
             obj.rule_value = payload.rule_value
             obj.is_active = True
-            self.db.flush()
+            await self.db.flush()
             action = "rule.update"
-        self._audit(action, amenity.community_id, "amenity_rule", obj.id, new=payload.rule_value)
+        await self._audit(
+            action, amenity.community_id, "amenity_rule", obj.id, new=payload.rule_value
+        )
         return obj
 
-    def _rule_int(self, amenity_id: uuid.UUID, rule_type: str) -> int | None:
-        rule = self.rules.match(amenity_id, rule_type)
+    async def _rule_int(self, amenity_id: uuid.UUID, rule_type: str) -> int | None:
+        rule = await self.rules.match(amenity_id, rule_type)
         if rule is None or not rule.is_active:
             return None
         raw = rule.rule_value.get("value")
@@ -207,18 +213,20 @@ class AmenityService:
             return None
 
     # -- blocks ---------------------------------------- #
-    def list_blocks(self, amenity_id: uuid.UUID):
-        self._amenity_in_scope(amenity_id)
+    async def list_blocks(self, amenity_id: uuid.UUID):
+        await self._amenity_in_scope(amenity_id)
         return list(
-            self.db.scalars(
-                select(AmenityBlock)
-                .where(AmenityBlock.amenity_id == amenity_id)
-                .order_by(AmenityBlock.blocked_from.desc())
+            (
+                await self.db.scalars(
+                    select(AmenityBlock)
+                    .where(AmenityBlock.amenity_id == amenity_id)
+                    .order_by(AmenityBlock.blocked_from.desc())
+                )
             ).all()
         )
 
-    def create_block(self, amenity_id: uuid.UUID, payload: schemas.BlockCreate):
-        amenity = self._amenity_in_scope(amenity_id)
+    async def create_block(self, amenity_id: uuid.UUID, payload: schemas.BlockCreate):
+        amenity = await self._amenity_in_scope(amenity_id)
         if payload.blocked_to <= payload.blocked_from:
             raise BusinessRuleError(
                 "blocked_to must be after blocked_from", code="INVALID_TIME_RANGE"
@@ -231,12 +239,12 @@ class AmenityService:
             reason=payload.reason,
             created_by_user_id=self.actor.id,
         )
-        self.blocks.add(obj)
-        self._audit("block.create", amenity.community_id, "amenity_block", obj.id)
+        await self.blocks.add(obj)
+        await self._audit("block.create", amenity.community_id, "amenity_block", obj.id)
         return obj
 
     # -- bookings ------------------------------------- #
-    def list_bookings(
+    async def list_bookings(
         self,
         *,
         community_id: uuid.UUID | None,
@@ -258,21 +266,21 @@ class AmenityService:
         if mine:
             stmt = stmt.where(AmenityBooking.resident_user_id == self.actor.id)
         stmt = stmt.order_by(AmenityBooking.start_at.desc())
-        return self.bookings.list(offset=offset, limit=limit, extra=stmt), self.bookings.count(
-            extra=stmt
-        )
+        return await self.bookings.list(
+            offset=offset, limit=limit, extra=stmt
+        ), await self.bookings.count(extra=stmt)
 
-    def get_booking(self, booking_id: uuid.UUID) -> AmenityBooking:
-        obj = self.bookings.get(booking_id)
+    async def get_booking(self, booking_id: uuid.UUID) -> AmenityBooking:
+        obj = await self.bookings.get(booking_id)
         if obj is None:
             raise NotFoundError("Booking not found")
         return obj
 
-    def book(self, payload: schemas.BookingCreate) -> AmenityBooking:
-        amenity = self._amenity_in_scope(payload.amenity_id)
+    async def book(self, payload: schemas.BookingCreate) -> AmenityBooking:
+        amenity = await self._amenity_in_scope(payload.amenity_id)
         if not amenity.is_active:
             raise BusinessRuleError("Amenity is not bookable", code="AMENITY_INACTIVE")
-        slot = self.slots.get(payload.slot_id)
+        slot = await self.slots.get(payload.slot_id)
         if slot is None or slot.amenity_id != amenity.id:
             raise NotFoundError("Slot not found")
         if not slot.is_active:
@@ -285,7 +293,7 @@ class AmenityService:
         if payload.booking_date < today:
             raise BusinessRuleError("booking_date is in the past", code="DATE_IN_PAST")
 
-        max_adv = self._rule_int(amenity.id, "max_advance_days")
+        max_adv = await self._rule_int(amenity.id, "max_advance_days")
         if max_adv is not None and (payload.booking_date - today).days > max_adv:
             raise BusinessRuleError(
                 f"Bookings open only {max_adv} days ahead", code="TOO_FAR_AHEAD"
@@ -294,27 +302,27 @@ class AmenityService:
         start_at = datetime.combine(payload.booking_date, slot.start_time, tzinfo=UTC)
         end_at = datetime.combine(payload.booking_date, slot.end_time, tzinfo=UTC)
 
-        max_hours = self._rule_int(amenity.id, "max_hours_per_booking")
+        max_hours = await self._rule_int(amenity.id, "max_hours_per_booking")
         if max_hours is not None and (end_at - start_at).total_seconds() > max_hours * 3600:
             raise BusinessRuleError("Slot exceeds the per-booking limit", code="TOO_LONG")
 
-        unit_id = self._actor_unit()
-        max_active = self._rule_int(amenity.id, "max_active_per_unit")
+        unit_id = await self._actor_unit()
+        max_active = await self._rule_int(amenity.id, "max_active_per_unit")
         if max_active is not None and (
-            self.bookings.active_count_for_unit(amenity.id, unit_id) >= max_active
+            await self.bookings.active_count_for_unit(amenity.id, unit_id) >= max_active
         ):
             raise BusinessRuleError(
                 "Your unit has reached its active-booking limit", code="UNIT_BOOKING_LIMIT"
             )
 
         # atomic conflict check
-        self.amenities.lock(amenity.id)
-        if self.blocks.overlapping(amenity.id, start_at, end_at):
+        await self.amenities.lock(amenity.id)
+        if await self.blocks.overlapping(amenity.id, start_at, end_at):
             raise ConflictError("Amenity is blocked for maintenance", code="AMENITY_BLOCKED")
         cap = slot.capacity or amenity.capacity
         used = sum(
             b.participant_count
-            for b in self.bookings.overlapping_confirmed(amenity.id, start_at, end_at)
+            for b in await self.bookings.overlapping_confirmed(amenity.id, start_at, end_at)
         )
         if used + payload.participant_count > cap:
             raise ConflictError("No capacity left for that slot", code="SLOT_FULL")
@@ -332,8 +340,8 @@ class AmenityService:
             status="confirmed",
             amount=slot.fee,
         )
-        self.bookings.add(obj)
-        self._audit(
+        await self.bookings.add(obj)
+        await self._audit(
             "booking.create",
             amenity.community_id,
             "amenity_booking",
@@ -342,17 +350,17 @@ class AmenityService:
         )
         return obj
 
-    def cancel_booking(self, booking_id: uuid.UUID, payload: schemas.BookingCancel):
-        obj = self.get_booking(booking_id)
+    async def cancel_booking(self, booking_id: uuid.UUID, payload: schemas.BookingCancel):
+        obj = await self.get_booking(booking_id)
         if obj.status != "confirmed":
             raise BusinessRuleError(f"Booking is '{obj.status}'", code="INVALID_TRANSITION")
         is_owner = obj.resident_user_id == self.actor.id
-        pset = user_permissions(self.db, self.actor)
+        pset = await user_permissions_async(self.db, self.actor)
         perms = "*" in pset or "amenities:update" in pset
         if not (is_owner or perms):
             raise ForbiddenError("Not your booking", code="NOT_BOOKING_OWNER")
         if is_owner and not perms:
-            min_hours = self._rule_int(obj.amenity_id, "min_cancel_hours")
+            min_hours = await self._rule_int(obj.amenity_id, "min_cancel_hours")
             if min_hours is not None and (
                 (obj.start_at - datetime.now(UTC)).total_seconds() < min_hours * 3600
             ):
@@ -362,18 +370,18 @@ class AmenityService:
         obj.status = "cancelled"
         obj.cancelled_at = datetime.now(UTC)
         obj.cancellation_reason = payload.reason
-        self.db.flush()
-        self._audit("booking.cancel", obj.community_id, "amenity_booking", obj.id)
+        await self.db.flush()
+        await self._audit("booking.cancel", obj.community_id, "amenity_booking", obj.id)
         return obj
 
-    def mark_booking(self, booking_id: uuid.UUID, new_status: str):
-        obj = self.get_booking(booking_id)
+    async def mark_booking(self, booking_id: uuid.UUID, new_status: str):
+        obj = await self.get_booking(booking_id)
         _enum("booking_status", new_status)
         if new_status not in ("completed", "no_show"):
             raise BusinessRuleError("Only completed / no_show here", code="INVALID_TRANSITION")
         if obj.status != "confirmed":
             raise BusinessRuleError(f"Booking is '{obj.status}'", code="INVALID_TRANSITION")
         obj.status = new_status
-        self.db.flush()
-        self._audit(f"booking.{new_status}", obj.community_id, "amenity_booking", obj.id)
+        await self.db.flush()
+        await self._audit(f"booking.{new_status}", obj.community_id, "amenity_booking", obj.id)
         return obj

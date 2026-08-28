@@ -1,4 +1,4 @@
-"""Data-access for Amenity Booking (FR-11). Queries only."""
+"""Data-access for Amenity Booking (FR-11). Queries only. Async (ADR-010)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from datetime import datetime
 
 from sqlalchemy import select
 
-from app.db.repository import TenantRepository
+from app.db.repository import AsyncTenantRepository
 from app.modules.amenities.models import (
     Amenity,
     AmenityBlock,
@@ -17,49 +17,53 @@ from app.modules.amenities.models import (
 )
 
 
-class AmenityRepository(TenantRepository[Amenity]):
+class AmenityRepository(AsyncTenantRepository[Amenity]):
     model = Amenity
 
-    def by_code(self, community_id: uuid.UUID, code: str) -> Amenity | None:
-        return self.db.scalar(
+    async def by_code(self, community_id: uuid.UUID, code: str) -> Amenity | None:
+        return await self.db.scalar(
             select(Amenity).where(Amenity.community_id == community_id, Amenity.code == code)
         )
 
-    def lock(self, amenity_id: uuid.UUID) -> Amenity | None:
-        return self.db.scalar(select(Amenity).where(Amenity.id == amenity_id).with_for_update())
+    async def lock(self, amenity_id: uuid.UUID) -> Amenity | None:
+        return await self.db.scalar(
+            select(Amenity).where(Amenity.id == amenity_id).with_for_update()
+        )
 
 
-class SlotRepository(TenantRepository[AmenitySlot]):
+class SlotRepository(AsyncTenantRepository[AmenitySlot]):
     model = AmenitySlot
 
 
-class RuleRepository(TenantRepository[AmenityRule]):
+class RuleRepository(AsyncTenantRepository[AmenityRule]):
     model = AmenityRule
 
-    def for_amenity(self, amenity_id: uuid.UUID) -> list[AmenityRule]:
+    async def for_amenity(self, amenity_id: uuid.UUID) -> list[AmenityRule]:
         return list(
-            self.db.scalars(
-                select(AmenityRule).where(
-                    AmenityRule.amenity_id == amenity_id, AmenityRule.is_active.is_(True)
+            (
+                await self.db.scalars(
+                    select(AmenityRule).where(
+                        AmenityRule.amenity_id == amenity_id, AmenityRule.is_active.is_(True)
+                    )
                 )
             ).all()
         )
 
-    def match(self, amenity_id: uuid.UUID, rule_type: str) -> AmenityRule | None:
-        return self.db.scalar(
+    async def match(self, amenity_id: uuid.UUID, rule_type: str) -> AmenityRule | None:
+        return await self.db.scalar(
             select(AmenityRule).where(
                 AmenityRule.amenity_id == amenity_id, AmenityRule.rule_type == rule_type
             )
         )
 
 
-class BlockRepository(TenantRepository[AmenityBlock]):
+class BlockRepository(AsyncTenantRepository[AmenityBlock]):
     model = AmenityBlock
 
-    def overlapping(
+    async def overlapping(
         self, amenity_id: uuid.UUID, start: datetime, end: datetime
     ) -> AmenityBlock | None:
-        return self.db.scalar(
+        return await self.db.scalar(
             select(AmenityBlock).where(
                 AmenityBlock.amenity_id == amenity_id,
                 AmenityBlock.blocked_from < end,
@@ -68,32 +72,34 @@ class BlockRepository(TenantRepository[AmenityBlock]):
         )
 
 
-class BookingRepository(TenantRepository[AmenityBooking]):
+class BookingRepository(AsyncTenantRepository[AmenityBooking]):
     model = AmenityBooking
 
-    def overlapping_confirmed(
+    async def overlapping_confirmed(
         self, amenity_id: uuid.UUID, start: datetime, end: datetime
     ) -> list[AmenityBooking]:
         return list(
-            self.db.scalars(
-                select(AmenityBooking).where(
-                    AmenityBooking.amenity_id == amenity_id,
-                    AmenityBooking.status == "confirmed",
-                    AmenityBooking.start_at < end,
-                    AmenityBooking.end_at > start,
+            (
+                await self.db.scalars(
+                    select(AmenityBooking).where(
+                        AmenityBooking.amenity_id == amenity_id,
+                        AmenityBooking.status == "confirmed",
+                        AmenityBooking.start_at < end,
+                        AmenityBooking.end_at > start,
+                    )
                 )
             ).all()
         )
 
-    def active_count_for_unit(self, amenity_id: uuid.UUID, unit_id: uuid.UUID) -> int:
+    async def active_count_for_unit(self, amenity_id: uuid.UUID, unit_id: uuid.UUID) -> int:
         return len(
-            list(
-                self.db.scalars(
+            (
+                await self.db.scalars(
                     select(AmenityBooking).where(
                         AmenityBooking.amenity_id == amenity_id,
                         AmenityBooking.unit_id == unit_id,
                         AmenityBooking.status == "confirmed",
                     )
-                ).all()
-            )
+                )
+            ).all()
         )
