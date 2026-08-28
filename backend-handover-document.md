@@ -178,7 +178,7 @@ Still open (integration/polish — see `AGENTS.md §23`):
 - **Audit read API** (FR-16), **user/role management endpoints** (FR-02).
 - **Deferred child tables** — `ticket_attachments`, `incident_attachments`, `resident_groups`.
 
-Test count: **209 passing** (`pytest -q`).
+Test count: **215 passing** (`pytest -q`).
 
 ## 7. Key decisions (ADRs — see `docs/decisions/`)
 
