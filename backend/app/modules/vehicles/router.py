@@ -12,17 +12,17 @@ from fastapi import APIRouter, Depends, status
 
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
-from app.core.security import require_permission
+from app.core.security import require_permission_async
 from app.modules.vehicles import schemas
 from app.modules.vehicles.deps import vehicle_service
 from app.modules.vehicles.service import VehicleService
 
 router = APIRouter(prefix="/vehicles", tags=["Vehicle & Parking"])
 
-VIEW = Depends(require_permission("vehicles:view"))
-CREATE = Depends(require_permission("vehicles:create"))
-UPDATE = Depends(require_permission("vehicles:update"))
-APPROVE = Depends(require_permission("vehicles:approve"))
+VIEW = Depends(require_permission_async("vehicles:view"))
+CREATE = Depends(require_permission_async("vehicles:create"))
+UPDATE = Depends(require_permission_async("vehicles:update"))
+APPROVE = Depends(require_permission_async("vehicles:approve"))
 
 Svc = VehicleService
 
@@ -34,31 +34,33 @@ async def module_health() -> dict:
 
 # --- parking rules -------------------------------------------------- #
 @router.get("/parking/rules", response_model=Envelope[schemas.RuleRead], dependencies=[VIEW])
-def get_rule(community_id: uuid.UUID | None = None, svc: Svc = Depends(vehicle_service)) -> dict:
-    return ok(schemas.RuleRead.model_validate(svc.get_rule(community_id=community_id)))
+async def get_rule(
+    community_id: uuid.UUID | None = None, svc: Svc = Depends(vehicle_service)
+) -> dict:
+    return ok(schemas.RuleRead.model_validate(await svc.get_rule(community_id=community_id)))
 
 
 @router.patch("/parking/rules", response_model=Envelope[schemas.RuleRead], dependencies=[APPROVE])
-def update_rule(
+async def update_rule(
     payload: schemas.RuleUpdate,
     community_id: uuid.UUID | None = None,
     svc: Svc = Depends(vehicle_service),
 ) -> dict:
     return ok(
-        schemas.RuleRead.model_validate(svc.update_rule(payload, community_id=community_id)),
+        schemas.RuleRead.model_validate(await svc.update_rule(payload, community_id=community_id)),
         message="Updated",
     )
 
 
 # --- parking slots ------------------------------------------------ #
 @router.get("/parking/slots", response_model=Envelope[list[schemas.SlotRead]], dependencies=[VIEW])
-def list_slots(
+async def list_slots(
     community_id: uuid.UUID | None = None,
     slot_status: str | None = None,
     params: PageParams = Depends(page_params),
     svc: Svc = Depends(vehicle_service),
 ) -> dict:
-    rows, total = svc.list_slots(
+    rows, total = await svc.list_slots(
         community_id=community_id,
         slot_status=slot_status,
         offset=params.offset,
@@ -73,13 +75,13 @@ def list_slots(
     status_code=status.HTTP_201_CREATED,
     dependencies=[APPROVE],
 )
-def create_slot(
+async def create_slot(
     payload: schemas.SlotCreate,
     community_id: uuid.UUID | None = None,
     svc: Svc = Depends(vehicle_service),
 ) -> dict:
     return ok(
-        schemas.SlotRead.model_validate(svc.create_slot(payload, community_id=community_id)),
+        schemas.SlotRead.model_validate(await svc.create_slot(payload, community_id=community_id)),
         message="Slot created",
     )
 
@@ -90,13 +92,13 @@ def create_slot(
     response_model=Envelope[list[schemas.AllocationRead]],
     dependencies=[VIEW],
 )
-def list_allocations(
+async def list_allocations(
     community_id: uuid.UUID | None = None,
     active_only: bool = False,
     params: PageParams = Depends(page_params),
     svc: Svc = Depends(vehicle_service),
 ) -> dict:
-    rows, total = svc.list_allocations(
+    rows, total = await svc.list_allocations(
         community_id=community_id,
         active_only=active_only,
         offset=params.offset,
@@ -113,8 +115,10 @@ def list_allocations(
     status_code=status.HTTP_201_CREATED,
     dependencies=[APPROVE],
 )
-def allocate(payload: schemas.AllocationCreate, svc: Svc = Depends(vehicle_service)) -> dict:
-    return ok(schemas.AllocationRead.model_validate(svc.allocate(payload)), message="Allocated")
+async def allocate(payload: schemas.AllocationCreate, svc: Svc = Depends(vehicle_service)) -> dict:
+    return ok(
+        schemas.AllocationRead.model_validate(await svc.allocate(payload)), message="Allocated"
+    )
 
 
 @router.post(
@@ -122,20 +126,22 @@ def allocate(payload: schemas.AllocationCreate, svc: Svc = Depends(vehicle_servi
     response_model=Envelope[schemas.AllocationRead],
     dependencies=[UPDATE],
 )
-def release(allocation_id: uuid.UUID, svc: Svc = Depends(vehicle_service)) -> dict:
-    return ok(schemas.AllocationRead.model_validate(svc.release(allocation_id)), message="Released")
+async def release(allocation_id: uuid.UUID, svc: Svc = Depends(vehicle_service)) -> dict:
+    return ok(
+        schemas.AllocationRead.model_validate(await svc.release(allocation_id)), message="Released"
+    )
 
 
 # --- gate entries ------------------------------------------- #
 @router.get("/entries", response_model=Envelope[list[schemas.EntryRead]], dependencies=[VIEW])
-def list_entries(
+async def list_entries(
     community_id: uuid.UUID | None = None,
     plate: str | None = None,
     open_only: bool = False,
     params: PageParams = Depends(page_params),
     svc: Svc = Depends(vehicle_service),
 ) -> dict:
-    rows, total = svc.list_entries(
+    rows, total = await svc.list_entries(
         community_id=community_id,
         plate=plate,
         open_only=open_only,
@@ -153,13 +159,15 @@ def list_entries(
     status_code=status.HTTP_201_CREATED,
     dependencies=[CREATE],
 )
-def record_entry(
+async def record_entry(
     payload: schemas.EntryCreate,
     community_id: uuid.UUID | None = None,
     svc: Svc = Depends(vehicle_service),
 ) -> dict:
     return ok(
-        schemas.EntryRead.model_validate(svc.record_entry(payload, community_id=community_id)),
+        schemas.EntryRead.model_validate(
+            await svc.record_entry(payload, community_id=community_id)
+        ),
         message="Entry logged",
     )
 
@@ -167,8 +175,10 @@ def record_entry(
 @router.patch(
     "/entries/{entry_id}/exit", response_model=Envelope[schemas.EntryRead], dependencies=[UPDATE]
 )
-def record_exit(entry_id: uuid.UUID, svc: Svc = Depends(vehicle_service)) -> dict:
-    return ok(schemas.EntryRead.model_validate(svc.record_exit(entry_id)), message="Exit logged")
+async def record_exit(entry_id: uuid.UUID, svc: Svc = Depends(vehicle_service)) -> dict:
+    return ok(
+        schemas.EntryRead.model_validate(await svc.record_exit(entry_id)), message="Exit logged"
+    )
 
 
 # --- violations -------------------------------------------- #
@@ -177,13 +187,13 @@ def record_exit(entry_id: uuid.UUID, svc: Svc = Depends(vehicle_service)) -> dic
     response_model=Envelope[list[schemas.ViolationRead]],
     dependencies=[VIEW],
 )
-def list_violations(
+async def list_violations(
     community_id: uuid.UUID | None = None,
     violation_status: str | None = None,
     params: PageParams = Depends(page_params),
     svc: Svc = Depends(vehicle_service),
 ) -> dict:
-    rows, total = svc.list_violations(
+    rows, total = await svc.list_violations(
         community_id=community_id,
         violation_status=violation_status,
         offset=params.offset,
@@ -200,14 +210,14 @@ def list_violations(
     status_code=status.HTTP_201_CREATED,
     dependencies=[CREATE],
 )
-def report_violation(
+async def report_violation(
     payload: schemas.ViolationCreate,
     community_id: uuid.UUID | None = None,
     svc: Svc = Depends(vehicle_service),
 ) -> dict:
     return ok(
         schemas.ViolationRead.model_validate(
-            svc.report_violation(payload, community_id=community_id)
+            await svc.report_violation(payload, community_id=community_id)
         ),
         message="Reported",
     )
@@ -218,24 +228,26 @@ def report_violation(
     response_model=Envelope[schemas.ViolationRead],
     dependencies=[UPDATE],
 )
-def transition_violation(
+async def transition_violation(
     violation_id: uuid.UUID, new_status: str, svc: Svc = Depends(vehicle_service)
 ) -> dict:
     return ok(
-        schemas.ViolationRead.model_validate(svc.transition_violation(violation_id, new_status)),
+        schemas.ViolationRead.model_validate(
+            await svc.transition_violation(violation_id, new_status)
+        ),
         message="Updated",
     )
 
 
 # --- vehicle registry ------------------------------------- #
 @router.get("", response_model=Envelope[list[schemas.VehicleRead]], dependencies=[VIEW])
-def list_vehicles(
+async def list_vehicles(
     community_id: uuid.UUID | None = None,
     q: str | None = None,
     params: PageParams = Depends(page_params),
     svc: Svc = Depends(vehicle_service),
 ) -> dict:
-    rows, total = svc.list_vehicles(
+    rows, total = await svc.list_vehicles(
         community_id=community_id, q=q, offset=params.offset, limit=params.page_size
     )
     return paginated(
@@ -249,31 +261,31 @@ def list_vehicles(
     status_code=status.HTTP_201_CREATED,
     dependencies=[CREATE],
 )
-def register_vehicle(
+async def register_vehicle(
     payload: schemas.VehicleCreate,
     community_id: uuid.UUID | None = None,
     svc: Svc = Depends(vehicle_service),
 ) -> dict:
     return ok(
         schemas.VehicleRead.model_validate(
-            svc.register_vehicle(payload, community_id=community_id)
+            await svc.register_vehicle(payload, community_id=community_id)
         ),
         message="Vehicle registered",
     )
 
 
 @router.get("/{vehicle_id}", response_model=Envelope[schemas.VehicleRead], dependencies=[VIEW])
-def get_vehicle(vehicle_id: uuid.UUID, svc: Svc = Depends(vehicle_service)) -> dict:
-    return ok(schemas.VehicleRead.model_validate(svc.get_vehicle(vehicle_id)))
+async def get_vehicle(vehicle_id: uuid.UUID, svc: Svc = Depends(vehicle_service)) -> dict:
+    return ok(schemas.VehicleRead.model_validate(await svc.get_vehicle(vehicle_id)))
 
 
 @router.patch("/{vehicle_id}", response_model=Envelope[schemas.VehicleRead], dependencies=[UPDATE])
-def update_vehicle(
+async def update_vehicle(
     vehicle_id: uuid.UUID,
     payload: schemas.VehicleUpdate,
     svc: Svc = Depends(vehicle_service),
 ) -> dict:
     return ok(
-        schemas.VehicleRead.model_validate(svc.update_vehicle(vehicle_id, payload)),
+        schemas.VehicleRead.model_validate(await svc.update_vehicle(vehicle_id, payload)),
         message="Updated",
     )
