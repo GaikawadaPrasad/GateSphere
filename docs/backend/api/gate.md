@@ -47,3 +47,9 @@ global caller on the collection routes.
 `event.log`, `roster.create`, `roster.update`, `assignment.create`, `assignment.end`,
 `alert.raise`, `alert.acknowledge`, `alert.resolve`, `alert.cancel` — written to `audit_logs`
 in the same transaction.
+
+## Notifications
+
+`POST /gate/alerts` (panic) fans a `gate.panic_alert` notification (in-app + sms) to every
+active `security_supervisor`, `security_guard` and `community_admin` in the alert's
+community, best-effort inside a SAVEPOINT (a dispatch failure never blocks the alert).

@@ -51,3 +51,55 @@ def emit(
             NotificationService(db, scope, actor, request).dispatch(payload)
     except Exception:  # notifications must never break the domain op
         log.warning("notification emit failed", extra={"type": notification_type}, exc_info=True)
+
+
+def emit_to_roles(
+    db,
+    scope: TenantScope,
+    actor: User | None,
+    request,
+    *,
+    community_id: uuid.UUID,
+    role_slugs: list[str],
+    notification_type: str,
+    title: str,
+    message: str,
+    reference_type: str | None = None,
+    reference_id: uuid.UUID | None = None,
+    channels: list[str] | None = None,
+) -> int:
+    """Fan a single event out to every active user holding one of `role_slugs` in
+    `community_id` (a global grant counts too). Returns the recipient count.
+    """
+    from sqlalchemy import select
+
+    from app.modules.users.models import Role, UserRole
+
+    rows = db.scalars(
+        select(UserRole.user_id)
+        .join(Role, Role.id == UserRole.role_id)
+        .where(
+            Role.slug.in_(role_slugs),
+            (UserRole.community_id == community_id) | (UserRole.community_id.is_(None)),
+        )
+    ).all()
+    seen: set[uuid.UUID] = set()
+    for uid in rows:
+        if uid in seen:
+            continue
+        seen.add(uid)
+        emit(
+            db,
+            scope,
+            actor,
+            request,
+            recipient_user_id=uid,
+            community_id=community_id,
+            notification_type=notification_type,
+            title=title,
+            message=message,
+            reference_type=reference_type,
+            reference_id=reference_id,
+            channels=channels,
+        )
+    return len(seen)

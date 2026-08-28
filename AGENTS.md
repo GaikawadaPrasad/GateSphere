@@ -1024,17 +1024,30 @@ tenant tables to a new RLS migration) → extend `seed.py` → `tests/test_<m>_{
 2. **Frontend design system** — Tailwind + shadcn/ui + Recharts + TanStack Table + the shared
    component library. Plain CSS with the design tokens is the placeholder.
 3. **Permission caching** (`permission_version` bump) — evaluation is live per request today.
-4. **More notification hooks + Celery** — `app/modules/notifications/events.py::emit` now
-   fans visitor-decision / visitor-approval-needed / invoice-posted / ticket-status /
-   incident-status events to the recipient's inbox. Still to add: panic-alert → on-duty
-   guards, SLA-breach sweeps, and moving delivery to `email`/`sms` channels via the Celery
-   `tasks.py` hooks (all channels except `in_app` are still simulated).
+4. **Remaining notification channels** — all channels except `in_app` are still simulated
+   (marked delivered without a real provider). Wiring real email/SMS providers is deferred.
 
 Done since first cut: **user/role management** (FR-02), **audit read API** (FR-16),
 **deferred child tables** (`ticket_attachments`, `incident_attachments`, `resident_groups`),
 **upload pipeline** (`/uploads` presign + fixed catalogue + `ManagedFileUrl` guard on every
 file field), **RLS enforcement test suite**, **state-machine audit**
-(`docs/backend/state-machines.md` + `app/core/state_machine.py`) — see session-notes.
+(`docs/backend/state-machines.md` + `app/core/state_machine.py`), **FR-17 operational seed
+data** (`seed_operations`), **scheduled jobs** (see §9.4) — see session-notes.
+
+### 9.4 Scheduled jobs (implemented)
+Beat schedule lives in `app/core/celery_app.py`; every task uses `app/core/jobs.py`
+(`job_session` + global `system_scope` + the seeded `system@` audit actor) and applies the
+**same** service-layer transition rules.
+
+| Task | Cadence | Effect |
+|---|---|---|
+| `complaints.tasks.sweep_ticket_sla` | every 5 min | advances `service_tickets.escalation_state` `on_track→at_risk→breached→escalated`, stamps timestamps, audits, notifies resident + `sla_policies.escalation_notify_role` |
+| `billing.tasks.sweep_overdue_invoices` | daily 01:00 | `posted`/`partially_paid` past `due_date` → `overdue` + notify resident |
+| `billing.tasks.send_dues_reminders` | Mon 09:00 | recurring nudge for every invoice with a balance |
+| `visitors.tasks.expire_stale_requests` | every 15 min | `pending`/`approved` past `valid_until` → `expired` |
+| `amenities.tasks.close_past_bookings` | every 15 min | `confirmed` past `end_at` → `completed` |
+
+All are idempotent by stamping — a row is only touched (and only notified) when its state changes.
 
 ### File uploads
 Every file URL the API stores goes through **`POST /api/v1/uploads`** first — it returns a

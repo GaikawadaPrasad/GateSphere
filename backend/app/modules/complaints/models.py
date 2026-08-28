@@ -74,6 +74,10 @@ class SlaPolicy(Base, TimestampMixin, TenantMixin):
     response_minutes: Mapped[int] = mapped_column(Integer, default=120)
     resolution_minutes: Mapped[int] = mapped_column(Integer, default=1440)
     escalation_minutes: Mapped[int] = mapped_column(Integer, default=2880)
+    # FR-10 escalation path: notify this role when the ticket breaches / escalates,
+    # and warn at this fraction of the resolution window elapsed.
+    at_risk_threshold_percent: Mapped[int] = mapped_column(SmallInteger, default=80)
+    escalation_notify_role: Mapped[str] = mapped_column(String(40), default="facility_manager")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
@@ -112,6 +116,11 @@ class ServiceTicket(Base, TimestampMixin, TenantMixin):
     sla_breached_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # FR-10 escalation sweep (see app/modules/complaints/tasks.py)
+    escalation_state: Mapped[str] = mapped_column(String(12), default="on_track", index=True)
+    escalation_level: Mapped[int] = mapped_column(SmallInteger, default=0)
+    escalated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    sla_at_risk_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     history: Mapped[list[TicketStatusHistory]] = relationship(
         back_populates="ticket", cascade="all, delete-orphan"

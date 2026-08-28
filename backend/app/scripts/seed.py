@@ -130,6 +130,19 @@ def seed_users(db: Session, communities: list[Community]) -> None:
         scope = None if slug in ("super_admin", "auditor") else communities[0].id
         _get_or_create(db, UserRole, user_id=user.id, role_id=roles[slug].id, community_id=scope)
 
+    # Non-interactive actor for Celery scheduled jobs (SLA sweeps, dues reminders, …).
+    # No role grants — jobs use a global TenantScope; this row only attributes audit logs.
+    _get_or_create(
+        db,
+        User,
+        email=f"system@{DEMO_DOMAIN}",
+        defaults={
+            "full_name": "System (automation)",
+            "password_hash": hash_password(f"system{DEMO_PASSWORD_SUFFIX}"),
+            "is_active": False,
+        },
+    )
+
 
 def seed_residents(db: Session, communities: list[Community]) -> None:
     from app.modules.communities.models import Unit

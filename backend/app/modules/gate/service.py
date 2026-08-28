@@ -28,6 +28,7 @@ from app.modules.gate.repository import (
     PanicAlertRepository,
 )
 from app.modules.gate.schemas import ALLOWED
+from app.modules.notifications import events as notif_events
 from app.modules.users.models import User
 
 _ROSTER_TRANSITIONS = {
@@ -311,6 +312,21 @@ class GateService:
         )
         self.alerts.add(obj)
         self._audit("alert.raise", cid, "panic_alert", obj.id, new={"type": payload.alert_type})
+        self.db.flush()
+        notif_events.emit_to_roles(
+            self.db,
+            self.scope,
+            self.actor,
+            self.request,
+            community_id=cid,
+            role_slugs=["security_supervisor", "security_guard", "community_admin"],
+            notification_type="gate.panic_alert",
+            title=f"PANIC: {payload.alert_type} ({payload.severity})",
+            message=payload.message or f"A {payload.alert_type} alert was raised. Respond now.",
+            reference_type="panic_alert",
+            reference_id=obj.id,
+            channels=["in_app", "sms"],
+        )
         return obj
 
     def list_alerts(

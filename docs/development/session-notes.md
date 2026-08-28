@@ -18,6 +18,41 @@ Format per entry:
 
 ---
 
+## 2026-08-28 — SLA escalation + Celery scheduled jobs + panic notify (gap fixes 2–4/7)
+
+**By:** QA/acceptance gap remediation
+**Branch / commit:** `main`
+**What changed:**
+- **`backend/app/core/jobs.py`** (new) — `job_session()` (commit/rollback/close ctx mgr),
+  `system_scope()` (global TenantScope), `system_actor(db)` (seeded `system@` user).
+- **`backend/app/scripts/seed.py`** — `seed_users` now also creates an inactive
+  `system@gatesphere.com` account (audit actor for jobs; no role grants).
+- **Migration `0019_sla_escalation`** — `sla_policies.at_risk_threshold_percent` (80),
+  `sla_policies.escalation_notify_role` ("facility_manager");
+  `service_tickets.escalation_state` ("on_track"), `.escalation_level` (0), `.escalated_at`,
+  `.sla_at_risk_at` + index on `escalation_state`. Models updated.
+- **`complaints/tasks.py`** — `sweep_ticket_sla` engine: `on_track→at_risk→breached→escalated`,
+  monotonic + idempotent, audit + resident/role notifications.
+- **`billing/tasks.py`** — `sweep_overdue_invoices` (past-due → `overdue` + notify),
+  `send_dues_reminders` (recurring balance nudge — FR-15).
+- **`visitors/tasks.py`** — `expire_stale_requests` (`pending`/`approved` past `valid_until`
+  → `expired`).
+- **`amenities/tasks.py`** — `close_past_bookings` (`confirmed` past `end_at` → `completed`).
+- **`notifications/events.py`** — new `emit_to_roles(...)` fan-out to every user holding a
+  role in a community.
+- **`gate/service.py::raise_alert`** — now fans a `gate.panic_alert` notification to
+  on-duty `security_supervisor` / `security_guard` / `community_admin` (in-app + sms).
+- **`app/core/celery_app.py`** — real `beat_schedule` for all five tasks; added
+  `amenities.tasks` to `include`.
+- Docs: AGENTS.md §9.4 (new job table) + Still-open list; `state-machines.md` §4;
+  `docs/backend/api/complaints.md` SLA section.
+**Why:** gaps 2 (SLA escalation), 3 (empty `tasks.py` / nothing scheduled) and 4
+(panic→notification, recurring dues reminder) from the acceptance review.
+**Verified:** `alembic upgrade head`; `ruff check . && black --check . && pytest -q` → 210
+passed (new `test_sla_escalation.py` drives breach→escalation→idempotency + notification).
+**Open / next:** gap 5 (OTP/PIN pass verification + `visitor_groups`), gap 6 (payment
+receipts), gap 7 (upload magic-byte + confirm step); then the async migration.
+
 ## 2026-08-28 — FR-17 operational seed data (gap fix 1/7)
 
 **By:** QA/acceptance gap remediation — gap 1 of 7 from the PRD/SRS/TRD review

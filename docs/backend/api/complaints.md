@@ -28,7 +28,20 @@ global caller on the collection routes.
 ## Schemas (write — all `extra="forbid"`)
 
 - **CategoryCreate**: `code`, `name`, `default_priority="medium"`.
-- **SlaCreate**: `category_id`, `priority`, `response_minutes=120`, `resolution_minutes=1440`, `escalation_minutes=2880`.
+- **SlaCreate**: `category_id`, `priority`, `response_minutes=120`, `resolution_minutes=1440`, `escalation_minutes=2880`, `at_risk_threshold_percent=80`, `escalation_notify_role="facility_manager"`.
+
+## SLA escalation (FR-10)
+
+The Celery beat task `complaints.tasks.sweep_ticket_sla` runs every 5 minutes and advances
+each open ticket's `escalation_state`:
+
+| state | trigger | side effects |
+|---|---|---|
+| `at_risk` | `at_risk_threshold_percent` of the resolution window elapsed | stamp `sla_at_risk_at`; notify `escalation_notify_role` (in-app) + resident |
+| `breached` | now past `resolution_due_at` | stamp `sla_breached_at`; notify role + resident (in-app + email) |
+| `escalated` | now past `escalation_due_at` | stamp `escalated_at`, bump `escalation_level`; notify role + `security_supervisor` + resident |
+
+Monotonic and idempotent — a ticket is only updated (and only notified) on a state change.
 - **TicketCreate**: `unit_id`, `category_id`, `subject`, `description?`, `priority?` (defaults to category).
 - **TicketAssign**: exactly one of `assigned_to_user_id` / `vendor_name`, `remarks?`.
 - **TicketTransition**: `status` (`assigned|acknowledged|in_progress|resolved|cancelled`), `remarks?`.

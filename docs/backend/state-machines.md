@@ -183,8 +183,14 @@ Blocked jumps: `used/expired/revoked → active` — impossible (no code path se
 
 ## 4. Bypass-path audit (post-implementation)
 
-- Grep for `.status =` / `status=` writes outside services → **none** (routers thin,
-  repositories read-only filters, `tasks.py` are empty stubs — no background status writes).
+- Grep for `.status =` / `status=` writes outside services → the only ones are in
+  `*/tasks.py` (Celery sweeps). Those are **system-driven forward-only** advances that mirror
+  the service transition maps and write an audit row in the same transaction:
+  - `complaints` — `escalation_state` `on_track→at_risk→breached→escalated` (a monotonic
+    ordering, never reversed; independent of the user-driven `status` lifecycle)
+  - `billing` — `posted`/`partially_paid` → `overdue` (already an allowed status)
+  - `visitors` — `pending`/`approved` → `expired` (terminal, already in `REQUEST_STATUS`)
+  - `amenities` — `confirmed` → `completed` (same target as `mark_booking`)
 - AST scan for `status` in every `*Update` / `*Patch` schema → after this pass the only hits
   are `CommunityUpdate.state` (postal *state*, not a workflow) and the service-guarded
   `profile_status` / `kyc_status` / `police_verification_status` admin fields.

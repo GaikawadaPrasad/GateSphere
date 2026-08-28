@@ -41,5 +41,12 @@ global caller on the collection routes; `PaymentCreate` carries `community_id` i
 ## Audit
 
 `charge_head.create`, `charge_head.update`, `rule.update`, `invoice.create`, `invoice.post`,
-`invoice.cancel`, `payment.record` — written to `audit_logs` in the same transaction. The
-financial trail also lives in `ledger_entries`.
+`invoice.cancel`, `payment.record`, `invoice.overdue` — written to `audit_logs` in the same
+transaction. The financial trail also lives in `ledger_entries`.
+
+## Scheduled jobs
+
+- `billing.tasks.sweep_overdue_invoices` (daily 01:00) — `posted`/`partially_paid` invoices
+  past `due_date` with a balance move to `overdue`; the resident is notified.
+- `billing.tasks.send_dues_reminders` (Mon 09:00) — recurring reminder for every invoice
+  still carrying a balance (not just on post).
