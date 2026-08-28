@@ -12,13 +12,19 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any, ClassVar
 
 from sqlalchemy import DateTime, ForeignKey, Uuid, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class Base(DeclarativeBase):
-    pass
+    # eager_defaults => server-generated columns (created_at, and especially
+    # `updated_at` on UPDATE) are fetched via RETURNING in the same statement.
+    # Without this, an AsyncSession expires `updated_at` after an UPDATE flush and
+    # serializing the returned ORM object triggers a forbidden lazy DB load
+    # (MissingGreenlet). PostgreSQL supports RETURNING for both INSERT and UPDATE.
+    __mapper_args__: ClassVar[dict[str, Any]] = {"eager_defaults": True}
 
 
 def pk() -> Mapped[uuid.UUID]:

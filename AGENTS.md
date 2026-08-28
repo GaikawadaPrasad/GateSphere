@@ -1036,7 +1036,9 @@ tenant tables to a new RLS migration) → extend `seed.py` → `tests/test_<m>_{
    `AsyncSession`); deps use `async_tenant_context` + `require_auth_async`; router handlers
    `async def` + `await svc.*` + `require_permission_async`; unit-test `conftest` `db`
    fixture → `AsyncSessionLocal`, tests `async def` + `await`. Blocking libs (boto3) via
-   `anyio.to_thread.run_sync`.
+   `anyio.to_thread.run_sync`. `Base.__mapper_args__ = {"eager_defaults": True}` makes PG
+   fetch `updated_at` via RETURNING on UPDATE (else it expires post-flush and serializing
+   the object lazy-loads → MissingGreenlet).
 1. **OTP login, community switcher UI, SSE/WebSocket gate feed** (FR‑04/05).
 2. **Frontend design system** — Tailwind + shadcn/ui + Recharts + TanStack Table + the shared
    component library. Plain CSS with the design tokens is the placeholder.
