@@ -1023,10 +1023,20 @@ tenant tables to a new RLS migration) → extend `seed.py` → `tests/test_<m>_{
 0. **Async stack migration** (ADR-010) — in progress, incremental. Landed: async engine +
    `AsyncSessionLocal` + `get_async_db`; shared twins (`AsyncTenantRepository`,
    `require_auth_async` / `require_permission_async`, `async_tenant_context`,
-   `record_audit_async`, `revoke_all_user_sessions_async`). XX   `uploads`, `audit`, `users`. Remaining: everything else —
-   convert `repository → service → router → deps → unit tests` one module at a time, suite
-   green at each step. Then async Alembic env + drop the sync engine at cutover. Auth stays
-   session-cookie (no JWT).
+   `record_audit_async`, `revoke_all_user_sessions_async`). **Converted:** `communities`,
+   `uploads`, `audit`, `users`, `residents`. Remaining: `communication`, `deliveries`,
+   `domestic_staff`, `vehicles`, `amenities`, `dashboards`, then the event cluster
+   (`notifications` + `billing`/`complaints`/`gate`/`incidents`/`visitors` — they share
+   `notifications.events`), then `auth`, then Celery `tasks.py` + async Alembic env + drop
+   the sync engine. Convert `repository → service → router → deps → unit tests` per module,
+   suite green each step. Auth stays session-cookie (no JWT).
+
+   **Pattern:** repo extends `AsyncTenantRepository`; service methods `async def` + `await`,
+   `record_audit_async`, eager-load relationships with `selectinload` (no lazy IO under
+   `AsyncSession`); deps use `async_tenant_context` + `require_auth_async`; router handlers
+   `async def` + `await svc.*` + `require_permission_async`; unit-test `conftest` `db`
+   fixture → `AsyncSessionLocal`, tests `async def` + `await`. Blocking libs (boto3) via
+   `anyio.to_thread.run_sync`.
 1. **OTP login, community switcher UI, SSE/WebSocket gate feed** (FR‑04/05).
 2. **Frontend design system** — Tailwind + shadcn/ui + Recharts + TanStack Table + the shared
    component library. Plain CSS with the design tokens is the placeholder.

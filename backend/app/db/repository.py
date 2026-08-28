@@ -109,7 +109,11 @@ class AsyncTenantRepository(AsyncRepository[M]):
 
     async def get(self, obj_id: uuid.UUID) -> M | None:
         return await self.db.scalar(
-            self._scoped(select(self.model).where(self.model.id == obj_id))  # type: ignore[attr-defined]
+            self._scoped(
+                select(self.model).where(self.model.id == obj_id)
+            ).execution_options(  # type: ignore[attr-defined]
+                populate_existing=True
+            )
         )
 
     async def list(

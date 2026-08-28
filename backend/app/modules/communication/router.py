@@ -12,17 +12,17 @@ from fastapi import APIRouter, Depends, Response, status
 
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
-from app.core.security import require_permission
+from app.core.security import require_permission_async
 from app.modules.communication import schemas
 from app.modules.communication.deps import communication_service
 from app.modules.communication.service import CommunicationService
 
 router = APIRouter(prefix="/communication", tags=["Communication & Broadcasts"])
 
-VIEW = Depends(require_permission("communication:view"))
-CREATE = Depends(require_permission("communication:create"))
-UPDATE = Depends(require_permission("communication:update"))
-APPROVE = Depends(require_permission("communication:approve"))
+VIEW = Depends(require_permission_async("communication:view"))
+CREATE = Depends(require_permission_async("communication:create"))
+UPDATE = Depends(require_permission_async("communication:update"))
+APPROVE = Depends(require_permission_async("communication:approve"))
 
 Svc = CommunicationService
 
@@ -38,13 +38,13 @@ async def module_health() -> dict:
     response_model=Envelope[list[schemas.AnnouncementRead]],
     dependencies=[VIEW],
 )
-def list_announcements(
+async def list_announcements(
     community_id: uuid.UUID | None = None,
     published_only: bool = True,
     params: PageParams = Depends(page_params),
     svc: Svc = Depends(communication_service),
 ) -> dict:
-    rows, total = svc.list_announcements(
+    rows, total = await svc.list_announcements(
         community_id=community_id,
         published_only=published_only,
         offset=params.offset,
@@ -61,14 +61,14 @@ def list_announcements(
     status_code=status.HTTP_201_CREATED,
     dependencies=[CREATE],
 )
-def create_announcement(
+async def create_announcement(
     payload: schemas.AnnouncementCreate,
     community_id: uuid.UUID | None = None,
     svc: Svc = Depends(communication_service),
 ) -> dict:
     return ok(
         schemas.AnnouncementRead.model_validate(
-            svc.create_announcement(payload, community_id=community_id)
+            await svc.create_announcement(payload, community_id=community_id)
         ),
         message="Draft created",
     )
@@ -79,8 +79,10 @@ def create_announcement(
     response_model=Envelope[schemas.AnnouncementRead],
     dependencies=[VIEW],
 )
-def get_announcement(announcement_id: uuid.UUID, svc: Svc = Depends(communication_service)) -> dict:
-    return ok(schemas.AnnouncementRead.model_validate(svc.get_announcement(announcement_id)))
+async def get_announcement(
+    announcement_id: uuid.UUID, svc: Svc = Depends(communication_service)
+) -> dict:
+    return ok(schemas.AnnouncementRead.model_validate(await svc.get_announcement(announcement_id)))
 
 
 @router.patch(
@@ -88,13 +90,15 @@ def get_announcement(announcement_id: uuid.UUID, svc: Svc = Depends(communicatio
     response_model=Envelope[schemas.AnnouncementRead],
     dependencies=[UPDATE],
 )
-def update_announcement(
+async def update_announcement(
     announcement_id: uuid.UUID,
     payload: schemas.AnnouncementUpdate,
     svc: Svc = Depends(communication_service),
 ) -> dict:
     return ok(
-        schemas.AnnouncementRead.model_validate(svc.update_announcement(announcement_id, payload)),
+        schemas.AnnouncementRead.model_validate(
+            await svc.update_announcement(announcement_id, payload)
+        ),
         message="Updated",
     )
 
@@ -104,11 +108,11 @@ def update_announcement(
     response_model=Envelope[schemas.AnnouncementRead],
     dependencies=[APPROVE],
 )
-def publish_announcement(
+async def publish_announcement(
     announcement_id: uuid.UUID, svc: Svc = Depends(communication_service)
 ) -> dict:
     return ok(
-        schemas.AnnouncementRead.model_validate(svc.publish_announcement(announcement_id)),
+        schemas.AnnouncementRead.model_validate(await svc.publish_announcement(announcement_id)),
         message="Published",
     )
 
@@ -118,11 +122,11 @@ def publish_announcement(
     response_model=Envelope[schemas.AnnouncementRead],
     dependencies=[UPDATE],
 )
-def expire_announcement(
+async def expire_announcement(
     announcement_id: uuid.UUID, svc: Svc = Depends(communication_service)
 ) -> dict:
     return ok(
-        schemas.AnnouncementRead.model_validate(svc.expire_announcement(announcement_id)),
+        schemas.AnnouncementRead.model_validate(await svc.expire_announcement(announcement_id)),
         message="Expired",
     )
 
@@ -134,13 +138,17 @@ def expire_announcement(
     status_code=status.HTTP_201_CREATED,
     dependencies=[CREATE],
 )
-def create_poll(payload: schemas.PollCreate, svc: Svc = Depends(communication_service)) -> dict:
-    return ok(schemas.PollRead.model_validate(svc.create_poll(payload)), message="Poll created")
+async def create_poll(
+    payload: schemas.PollCreate, svc: Svc = Depends(communication_service)
+) -> dict:
+    return ok(
+        schemas.PollRead.model_validate(await svc.create_poll(payload)), message="Poll created"
+    )
 
 
 @router.get("/polls/{poll_id}", response_model=Envelope[schemas.PollRead], dependencies=[VIEW])
-def get_poll(poll_id: uuid.UUID, svc: Svc = Depends(communication_service)) -> dict:
-    return ok(schemas.PollRead.model_validate(svc.get_poll(poll_id)))
+async def get_poll(poll_id: uuid.UUID, svc: Svc = Depends(communication_service)) -> dict:
+    return ok(schemas.PollRead.model_validate(await svc.get_poll(poll_id)))
 
 
 @router.post(
@@ -148,11 +156,11 @@ def get_poll(poll_id: uuid.UUID, svc: Svc = Depends(communication_service)) -> d
     response_model=Envelope[schemas.PollRead],
     dependencies=[APPROVE],
 )
-def set_poll_status(
+async def set_poll_status(
     poll_id: uuid.UUID, new_status: str, svc: Svc = Depends(communication_service)
 ) -> dict:
     return ok(
-        schemas.PollRead.model_validate(svc.set_poll_status(poll_id, new_status)),
+        schemas.PollRead.model_validate(await svc.set_poll_status(poll_id, new_status)),
         message="Updated",
     )
 
@@ -163,11 +171,11 @@ def set_poll_status(
     status_code=status.HTTP_201_CREATED,
     dependencies=[VIEW],
 )
-def vote(
+async def vote(
     poll_id: uuid.UUID, payload: schemas.VoteIn, svc: Svc = Depends(communication_service)
 ) -> dict:
-    svc.vote(poll_id, payload)
-    return ok(svc.results(poll_id), message="Vote recorded")
+    await svc.vote(poll_id, payload)
+    return ok(await svc.results(poll_id), message="Vote recorded")
 
 
 @router.get(
@@ -175,8 +183,8 @@ def vote(
     response_model=Envelope[schemas.PollResults],
     dependencies=[VIEW],
 )
-def poll_results(poll_id: uuid.UUID, svc: Svc = Depends(communication_service)) -> dict:
-    return ok(svc.results(poll_id))
+async def poll_results(poll_id: uuid.UUID, svc: Svc = Depends(communication_service)) -> dict:
+    return ok(await svc.results(poll_id))
 
 
 # --- resident groups ------------------------------------------- #
@@ -195,10 +203,10 @@ def _group_read(grp, count: int) -> schemas.GroupRead:
 
 
 @router.get("/groups", response_model=Envelope[list[schemas.GroupRead]], dependencies=[VIEW])
-def list_groups(
+async def list_groups(
     community_id: uuid.UUID | None = None, svc: Svc = Depends(communication_service)
 ) -> dict:
-    return ok([_group_read(g, n) for g, n in svc.list_groups(community_id=community_id)])
+    return ok([_group_read(g, n) for g, n in await svc.list_groups(community_id=community_id)])
 
 
 @router.post(
@@ -207,13 +215,13 @@ def list_groups(
     status_code=status.HTTP_201_CREATED,
     dependencies=[CREATE],
 )
-def create_group(
+async def create_group(
     payload: schemas.GroupCreate,
     community_id: uuid.UUID | None = None,
     svc: Svc = Depends(communication_service),
 ) -> dict:
     return ok(
-        _group_read(svc.create_group(payload, community_id=community_id), 0),
+        _group_read(await svc.create_group(payload, community_id=community_id), 0),
         message="Group created",
     )
 
@@ -221,12 +229,12 @@ def create_group(
 @router.patch(
     "/groups/{group_id}", response_model=Envelope[schemas.GroupRead], dependencies=[UPDATE]
 )
-def update_group(
+async def update_group(
     group_id: uuid.UUID,
     payload: schemas.GroupUpdate,
     svc: Svc = Depends(communication_service),
 ) -> dict:
-    grp = svc.update_group(group_id, payload)
+    grp = await svc.update_group(group_id, payload)
     return ok(_group_read(grp, len(grp.members)), message="Updated")
 
 
@@ -235,8 +243,8 @@ def update_group(
     response_model=Envelope[list[schemas.GroupMemberRead]],
     dependencies=[VIEW],
 )
-def list_members(group_id: uuid.UUID, svc: Svc = Depends(communication_service)) -> dict:
-    return ok([schemas.GroupMemberRead.model_validate(m) for m in svc.list_members(group_id)])
+async def list_members(group_id: uuid.UUID, svc: Svc = Depends(communication_service)) -> dict:
+    return ok([schemas.GroupMemberRead.model_validate(m) for m in await svc.list_members(group_id)])
 
 
 @router.post(
@@ -245,13 +253,13 @@ def list_members(group_id: uuid.UUID, svc: Svc = Depends(communication_service))
     status_code=status.HTTP_201_CREATED,
     dependencies=[UPDATE],
 )
-def add_member(
+async def add_member(
     group_id: uuid.UUID,
     payload: schemas.GroupMemberIn,
     svc: Svc = Depends(communication_service),
 ) -> dict:
     return ok(
-        schemas.GroupMemberRead.model_validate(svc.add_member(group_id, payload)),
+        schemas.GroupMemberRead.model_validate(await svc.add_member(group_id, payload)),
         message="Added",
     )
 
@@ -262,8 +270,8 @@ def add_member(
     response_class=Response,
     dependencies=[UPDATE],
 )
-def remove_member(
+async def remove_member(
     group_id: uuid.UUID, member_id: uuid.UUID, svc: Svc = Depends(communication_service)
 ) -> Response:
-    svc.remove_member(group_id, member_id)
+    await svc.remove_member(group_id, member_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
