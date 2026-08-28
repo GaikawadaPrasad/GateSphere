@@ -7,6 +7,7 @@ from datetime import date, datetime, time
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.files import ManagedFileUrl
 from app.modules.domestic_staff.models import (
     ATTENDANCE_STATUS,
     STAFF_TYPES,
@@ -43,7 +44,7 @@ class StaffCreate(_Write):
     user_id: uuid.UUID | None = None
     id_type: str | None = Field(default=None, max_length=30)
     id_number: str | None = Field(default=None, max_length=40)
-    photo_url: str | None = None
+    photo_url: ManagedFileUrl | None = None
     police_verification_status: str = "not_started"
     verification_expiry: date | None = None
     emergency_address: str | None = Field(default=None, max_length=2000)
@@ -52,7 +53,7 @@ class StaffCreate(_Write):
 class StaffUpdate(_Write):
     full_name: str | None = Field(default=None, max_length=180)
     staff_type: str | None = None
-    photo_url: str | None = None
+    photo_url: ManagedFileUrl | None = None
     police_verification_status: str | None = None
     verification_expiry: date | None = None
     emergency_address: str | None = Field(default=None, max_length=2000)

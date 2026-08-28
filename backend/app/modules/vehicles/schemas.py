@@ -8,6 +8,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.core.files import ManagedFileUrl
 from app.modules.vehicles.models import (
     ALLOCATION_STATUS,
     ENTRY_SOURCE,
@@ -165,7 +166,7 @@ class ViolationCreate(_Write):
     vehicle_id: uuid.UUID | None = None
     parking_slot_id: uuid.UUID | None = None
     description: str | None = Field(default=None, max_length=2000)
-    evidence_url: str | None = None
+    evidence_url: ManagedFileUrl | None = None
     fine_amount: Decimal | None = Field(default=None, ge=0)
 
 

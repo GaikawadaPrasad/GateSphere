@@ -7,6 +7,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.files import ManagedFileUrl
 from app.modules.incidents.models import (
     ACTION_TYPES,
     INCIDENT_STATUS,
@@ -68,7 +69,7 @@ class ActionIn(_Write):
 
 
 class AttachmentIn(_Write):
-    file_url: str = Field(min_length=1, max_length=8000)
+    file_url: ManagedFileUrl
     file_name: str = Field(min_length=1, max_length=255)
     mime_type: str | None = Field(default=None, max_length=120)
     file_size_bytes: int | None = Field(default=None, ge=0)

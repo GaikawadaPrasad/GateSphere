@@ -81,9 +81,10 @@ def test_attachments(as_role, seed_ids):
         f"{P}/tickets",
         json={"unit_id": _unit_in(cid), "category_id": _category_in(cid), "subject": "Photo"},
     ).json()["data"]["id"]
+    _u = "http://localhost:9000/gatesphere-local/complaints/attachments/x/a.jpg"
     r = resident.post(
         f"{P}/tickets/{tid}/attachments",
-        json={"file_url": "s3://bucket/a.jpg", "file_name": "a.jpg", "mime_type": "image/jpeg"},
+        json={"file_url": _u, "file_name": "a.jpg", "mime_type": "image/jpeg"},
     )
     assert r.status_code == 201, r.text
     lst = resident.get(f"{P}/tickets/{tid}/attachments")

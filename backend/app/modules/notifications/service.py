@@ -147,6 +147,13 @@ class NotificationService:
         obj.quiet_hours_start = payload.quiet_hours_start
         obj.quiet_hours_end = payload.quiet_hours_end
         self.db.flush()
+        self._audit(
+            "preference.set",
+            cid,
+            "notification_preference",
+            obj.id,
+            new={"channel": payload.channel, "is_enabled": payload.is_enabled},
+        )
         return obj
 
     # -- dispatch -------------------------------------- #

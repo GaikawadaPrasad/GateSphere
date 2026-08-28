@@ -1031,6 +1031,16 @@ tenant tables to a new RLS migration) → extend `seed.py` → `tests/test_<m>_{
 
 Done since first cut: **user/role management** (FR-02), **audit read API** (FR-16),
 **deferred child tables** (`ticket_attachments`, `incident_attachments`, `resident_groups`),
-**RLS enforcement test suite** — see session-notes.
+**upload pipeline** (`/uploads` presign + fixed catalogue + `ManagedFileUrl` guard on every
+file field), **RLS enforcement test suite**, **state-machine audit**
+(`docs/backend/state-machines.md` + `app/core/state_machine.py`) — see session-notes.
+
+### File uploads
+Every file URL the API stores goes through **`POST /api/v1/uploads`** first — it returns a
+presigned S3 PUT URL for one of the fixed **kinds** in `app/modules/uploads/catalogue.py`
+(kind → key-prefix + allowed MIME types + hard size cap). Domain write schemas type their
+file fields as **`app.core.files.ManagedFileUrl`**, which rejects any URL that is not an
+object in our bucket. Never accept a raw client URL into a stored column — add a kind to the
+catalogue and use `ManagedFileUrl`.
 
 Record any deliberate deviation as an ADR in `docs/decisions/`.

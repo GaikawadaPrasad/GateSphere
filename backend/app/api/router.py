@@ -18,6 +18,7 @@ from app.modules.gate.router import router as gate_router
 from app.modules.incidents.router import router as incidents_router
 from app.modules.notifications.router import router as notifications_router
 from app.modules.residents.router import router as residents_router
+from app.modules.uploads.router import router as uploads_router
 from app.modules.users.router import router as users_router
 from app.modules.vehicles.router import router as vehicles_router
 from app.modules.visitors.router import router as visitors_router
@@ -41,5 +42,6 @@ for r in (
     notifications_router,
     audit_router,
     dashboards_router,
+    uploads_router,
 ):
     api_router.include_router(r)

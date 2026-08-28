@@ -145,6 +145,13 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # group-only targets would violate the narrower CHECK — drop them first.
+    op.execute(
+        "DELETE FROM announcement_targets "
+        "WHERE resident_group_id IS NOT NULL "
+        "AND NOT target_all_community AND tower_id IS NULL "
+        "AND unit_id IS NULL AND role_id IS NULL"
+    )
     op.drop_constraint("ck_announcement_target_valid", "announcement_targets", type_="check")
     op.create_check_constraint(
         "ck_announcement_target_valid",

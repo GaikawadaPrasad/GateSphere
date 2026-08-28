@@ -37,3 +37,38 @@ def presigned_get(key: str, expires: int = 3600) -> str:
     return _s3.generate_presigned_url(
         "get_object", Params={"Bucket": settings.S3_BUCKET, "Key": key}, ExpiresIn=expires
     )
+
+
+def presigned_put(key: str, content_type: str, expires: int = 900) -> str:
+    """A time-limited URL the client PUTs the file to directly (must send the same
+    Content-Type header)."""
+    return _s3.generate_presigned_url(
+        "put_object",
+        Params={"Bucket": settings.S3_BUCKET, "Key": key, "ContentType": content_type},
+        ExpiresIn=expires,
+    )
+
+
+def object_head(key: str) -> dict | None:
+    """`{content_length, content_type}` if the object exists, else None."""
+    try:
+        r = _s3.head_object(Bucket=settings.S3_BUCKET, Key=key)
+    except _s3.exceptions.ClientError:
+        return None
+    return {"content_length": r.get("ContentLength"), "content_type": r.get("ContentType")}
+
+
+def public_url(key: str) -> str:
+    return f"{settings.S3_PUBLIC_URL}/{settings.S3_BUCKET}/{key}"
+
+
+PUBLIC_PREFIX = f"{settings.S3_PUBLIC_URL.rstrip('/')}/{settings.S3_BUCKET}/"
+
+
+def key_from_url(url: str) -> str | None:
+    """Return the object key for a URL that belongs to our managed bucket, else None."""
+    if url.startswith(PUBLIC_PREFIX):
+        return url[len(PUBLIC_PREFIX) :]
+    if url.startswith(f"s3://{settings.S3_BUCKET}/"):
+        return url[len(f"s3://{settings.S3_BUCKET}/") :]
+    return None

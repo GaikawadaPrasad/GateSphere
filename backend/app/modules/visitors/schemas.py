@@ -7,6 +7,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.files import ManagedFileUrl
 from app.modules.visitors.models import (
     DECISIONS,
     PASS_TYPES,
@@ -43,7 +44,7 @@ class VisitorCreate(_Write):
     id_type: str | None = Field(default=None, max_length=30)
     id_number: str | None = Field(default=None, max_length=40)
     vehicle_number: str | None = Field(default=None, max_length=20)
-    photo_url: str | None = None
+    photo_url: ManagedFileUrl | None = None
 
 
 class VisitorRead(_Read):
@@ -133,7 +134,7 @@ class EntryCreate(_Write):
     visitor_id: uuid.UUID | None = None
     gate_id: uuid.UUID | None = None
     vehicle_number: str | None = Field(default=None, max_length=20)
-    entry_photo_url: str | None = None
+    entry_photo_url: ManagedFileUrl | None = None
 
 
 class EntryRead(_Read):

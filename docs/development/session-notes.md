@@ -18,6 +18,30 @@ Format per entry:
 
 ---
 
+## 2026-08-28 — Upload pipeline + ManagedFileUrl guard
+
+**By:** post-module integration/polish — the "one upload pipeline with fixed formats" ask
+**Branch / commit:** `main`
+**What changed:**
+- `app/services/storage.py` — added `presigned_put`, `object_head`, `public_url`,
+  `key_from_url` (+ `PUBLIC_PREFIX`).
+- **`uploads` module** — `app/modules/uploads/catalogue.py` is the single source of allowed
+  file **kinds** (kind → key prefix + allowed MIME types + hard size cap + community/user
+  key scope). `GET /uploads/kinds`, `POST /uploads` (presign — validates content-type + size
+  against the kind, returns `{upload_url, required_headers, file_url, …}`),
+  `GET /uploads/download?key=`. `upload.presign` audited.
+- `app/core/files.py::ManagedFileUrl` — pydantic `AfterValidator` type that rejects any URL
+  not resolving to an object in our bucket. Wired into **every** stored file field:
+  `AttachmentIn.file_url` (complaints, incidents), `VisitorCreate.photo_url` /
+  `EntryCreate.entry_photo_url`, `StaffCreate/Update.photo_url`, `ViolationCreate.evidence_url`.
+- `notifications` — `preference.set` now audited.
+**Verified:** `ruff` + `black` clean; `pytest -q` → **201 passed** (uploads: 7 api new);
+`alembic downgrade base && upgrade head` clean (0018 downgrade now deletes group-only
+announcement targets first); reseed.
+**Open / next:** state-machine audit + report.
+
+---
+
 ## 2026-08-28 — Deferred child tables (attachments + resident groups)
 
 **By:** post-module integration/polish, item 4 of the "still open" list
