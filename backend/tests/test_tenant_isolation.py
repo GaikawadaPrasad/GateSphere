@@ -27,6 +27,7 @@ _TENANT_TABLES = [
     "resident_profiles",
     "visitors",
     "visitor_requests",
+    "visitor_request_members",
     "gate_events",
     "domestic_staff",
     "deliveries",

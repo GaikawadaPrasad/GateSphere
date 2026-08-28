@@ -192,6 +192,37 @@ class VisitorEntry(Base, TimestampMixin, TenantMixin):
     denial_reason: Mapped[str | None] = mapped_column(Text)
 
 
+class VisitorRequestMember(Base, TimestampMixin, TenantMixin):
+    """FR-04 multi-visitor grouping — a distinct visitor covered by one request/approval.
+
+    The request's own `visitor_id` is also mirrored here as the `is_primary` member so the
+    whole party can be listed and admitted from one place.
+    """
+
+    __tablename__ = "visitor_request_members"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["request_id", "community_id"],
+            ["visitor_requests.id", "visitor_requests.community_id"],
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["visitor_id", "community_id"],
+            ["visitors.id", "visitors.community_id"],
+            ondelete="CASCADE",
+        ),
+        UniqueConstraint("request_id", "visitor_id"),
+    )
+
+    id: Mapped[uuid.UUID] = pk()
+    request_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    visitor_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    is_primary: Mapped[bool] = mapped_column(Boolean, default=False)
+    added_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+
+
 class VisitorPolicy(Base, TimestampMixin, TenantMixin):
     __tablename__ = "visitor_policies"
     __table_args__ = (UniqueConstraint("community_id"),)

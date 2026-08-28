@@ -32,6 +32,7 @@ from app.modules.visitors.models import (
     VisitorPass,
     VisitorPolicy,
     VisitorRequest,
+    VisitorRequestMember,
 )
 from app.modules.visitors.repository import (
     BlacklistRepository,
@@ -272,6 +273,21 @@ class VisitorService:
             status="pending" if approval_required else "approved",
         )
         self.requests.add(obj)
+        self.db.flush()
+        # the request's own visitor is always the primary group member
+        self._add_member(obj, visitor.id, is_primary=True)
+        for extra_id in dict.fromkeys(payload.additional_visitor_ids or []):
+            if extra_id == visitor.id:
+                continue
+            mv = self.visitors.get(extra_id)
+            if mv is None or mv.community_id != unit.community_id:
+                raise NotFoundError("Additional visitor not found")
+            hit_m = self._blacklist_hit(unit.community_id, mv.phone, None)
+            if hit_m and policy.blacklist_mode == "block":
+                raise ForbiddenError(
+                    f"Visitor {mv.full_name} is blacklisted", code="VISITOR_BLACKLISTED"
+                )
+            self._add_member(obj, mv.id, is_primary=False)
         self._audit(
             "request.create",
             unit.community_id,
@@ -369,9 +385,72 @@ class VisitorService:
         return req
 
     # -- passes ----------------------------------------------- #
+    # -- group members (FR-04 multi-visitor grouping) ----- #
+    def _add_member(
+        self, req: VisitorRequest, visitor_id: uuid.UUID, *, is_primary: bool
+    ) -> VisitorRequestMember:
+        row = VisitorRequestMember(
+            community_id=req.community_id,
+            request_id=req.id,
+            visitor_id=visitor_id,
+            is_primary=is_primary,
+        )
+        self.db.add(row)
+        self.db.flush()
+        return row
+
+    def list_group_members(self, request_id: uuid.UUID) -> list[VisitorRequestMember]:
+        req = self.get_request(request_id)  # scope check
+        return list(
+            self.db.scalars(
+                select(VisitorRequestMember)
+                .where(VisitorRequestMember.request_id == req.id)
+                .order_by(VisitorRequestMember.is_primary.desc(), VisitorRequestMember.added_at)
+            )
+        )
+
+    def add_group_member(
+        self, request_id: uuid.UUID, payload: schemas.GroupMemberCreate
+    ) -> VisitorRequestMember:
+        req = self.get_request(request_id)
+        if req.status in ("rejected", "cancelled", "expired", "completed"):
+            raise BusinessRuleError(
+                f"Cannot add a visitor to a '{req.status}' request", code="INVALID_STATE"
+            )
+        if payload.visitor_id is not None:
+            visitor = self.visitors.get(payload.visitor_id)
+            if visitor is None or visitor.community_id != req.community_id:
+                raise NotFoundError("Visitor not found")
+        elif payload.visitor is not None:
+            visitor = self.upsert_visitor(req.community_id, payload.visitor)
+        else:
+            raise BusinessRuleError("Provide `visitor` or `visitor_id`", code="VISITOR_REQUIRED")
+        if self.db.scalar(
+            select(VisitorRequestMember).where(
+                VisitorRequestMember.request_id == req.id,
+                VisitorRequestMember.visitor_id == visitor.id,
+            )
+        ):
+            raise ConflictError("Visitor already in this group", code="MEMBER_EXISTS")
+        hit = self._blacklist_hit(req.community_id, visitor.phone, None)
+        policy = self._policy(req.community_id)
+        if hit and policy.blacklist_mode == "block":
+            raise ForbiddenError("Visitor is blacklisted", code="VISITOR_BLACKLISTED")
+        row = self._add_member(req, visitor.id, is_primary=False)
+        req.party_size = max(req.party_size, len(self.list_group_members(req.id)))
+        self.db.flush()
+        self._audit(
+            "request.add_member",
+            req.community_id,
+            "visitor_request",
+            req.id,
+            new={"visitor_id": str(visitor.id)},
+        )
+        return row
+
     def create_pass(
         self, request_id: uuid.UUID, payload: schemas.PassCreate
-    ) -> tuple[VisitorPass, str]:
+    ) -> tuple[VisitorPass, str, str | None]:
         req = self.get_request(request_id)
         _enum("pass_type", payload.pass_type)
         if req.status not in ("approved", "pending"):
@@ -381,10 +460,14 @@ class VisitorService:
         policy = self._policy(req.community_id)
         now = datetime.now(UTC)
         token = secrets.token_urlsafe(18)
+        pin: str | None = None
+        if payload.with_pin or payload.pass_type in ("pin", "otp"):
+            pin = f"{secrets.randbelow(1_000_000):06d}"
         obj = VisitorPass(
             request_id=req.id,
             pass_type=payload.pass_type,
             token_hash=digest(token),
+            pin_hash=digest(pin) if pin else None,
             valid_from=payload.valid_from or now,
             valid_to=payload.valid_to or (now + timedelta(minutes=policy.pass_ttl_minutes)),
             max_entries=payload.max_entries,
@@ -401,9 +484,9 @@ class VisitorService:
             req.community_id,
             "visitor_pass",
             obj.id,
-            new={"pass_type": payload.pass_type},
+            new={"pass_type": payload.pass_type, "with_pin": pin is not None},
         )
-        return obj, token
+        return obj, token, pin
 
     def revoke_pass(self, pass_id: uuid.UUID) -> None:
         obj = self.db.get(VisitorPass, pass_id)
@@ -431,15 +514,55 @@ class VisitorService:
             if vpass.entry_count >= vpass.max_entries:
                 raise BusinessRuleError("Pass has no entries left", code="PASS_EXHAUSTED")
             vpass.entry_count += 1
+        elif payload.pin:
+            now = datetime.now(UTC)
+            candidates = list(
+                self.db.scalars(
+                    select(VisitorPass).where(
+                        VisitorPass.pin_hash == digest(payload.pin),
+                        VisitorPass.is_revoked.is_(False),
+                    )
+                )
+            )
+            if payload.request_id:
+                candidates = [c for c in candidates if c.request_id == payload.request_id]
+            usable = [
+                c
+                for c in candidates
+                if c.valid_from <= now <= c.valid_to and c.entry_count < c.max_entries
+            ]
+            if not usable:
+                raise NotFoundError("No valid pass for that PIN")
+            if len(usable) > 1:
+                raise ConflictError(
+                    "PIN matches several passes — also send request_id", code="PIN_AMBIGUOUS"
+                )
+            vpass = usable[0]
+            vpass.entry_count += 1
+            req = self.get_request(vpass.request_id)
         elif payload.request_id:
             req = self.get_request(payload.request_id)
         else:
-            raise BusinessRuleError("Provide `request_id` or `pass_token`", code="REQUEST_REQUIRED")
+            raise BusinessRuleError(
+                "Provide `request_id`, `pass_token` or `pin`", code="REQUEST_REQUIRED"
+            )
 
         if req.status not in ("approved", "entered"):
             raise BusinessRuleError(f"Request is '{req.status}', not approved", code="NOT_APPROVED")
 
         visitor_id = req.visitor_id
+        if payload.visitor_id and payload.visitor_id != req.visitor_id:
+            in_group = self.db.scalar(
+                select(VisitorRequestMember).where(
+                    VisitorRequestMember.request_id == req.id,
+                    VisitorRequestMember.visitor_id == payload.visitor_id,
+                )
+            )
+            if in_group is None:
+                raise BusinessRuleError(
+                    "Visitor is not part of this request's group", code="NOT_IN_GROUP"
+                )
+            visitor_id = payload.visitor_id
         # blacklist re-check at the gate
         visitor = self.db.get(Visitor, visitor_id)
         policy = self._policy(req.community_id)
@@ -499,7 +622,14 @@ class VisitorService:
         entry.status = "exited"
         if entry.request_id:
             req = self.db.get(VisitorRequest, entry.request_id)
-            if req and req.status == "entered":
+            still_inside = self.db.scalar(
+                select(VisitorEntry.id).where(
+                    VisitorEntry.request_id == entry.request_id,
+                    VisitorEntry.status == "inside",
+                    VisitorEntry.id != entry.id,
+                )
+            )
+            if req and req.status == "entered" and still_inside is None:
                 req.status = "completed"
         self.db.flush()
         self._audit("entry.exit", entry.community_id, "visitor_entry", entry.id)

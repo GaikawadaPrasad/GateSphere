@@ -87,6 +87,20 @@ class RequestCreate(_Write):
     vehicle_number: str | None = Field(default=None, max_length=20)
     group_label: str | None = Field(default=None, max_length=120)
     party_size: int = Field(default=1, ge=1, le=50)
+    # FR-04 multi-visitor grouping — extra known visitors covered by this one approval
+    additional_visitor_ids: list[uuid.UUID] | None = None
+
+
+class GroupMemberCreate(_Write):
+    visitor_id: uuid.UUID | None = None
+    visitor: VisitorCreate | None = None
+
+
+class GroupMemberRead(_Read):
+    request_id: uuid.UUID
+    visitor_id: uuid.UUID
+    is_primary: bool
+    added_at: datetime
 
 
 class RequestDecision(_Write):
@@ -115,6 +129,7 @@ class PassCreate(_Write):
     valid_from: datetime | None = None
     valid_to: datetime | None = None
     max_entries: int = Field(default=1, ge=1, le=50)
+    with_pin: bool = False  # also issue a 6-digit gate PIN (implied for pin/otp pass types)
 
 
 class PassRead(_Read):
@@ -126,11 +141,13 @@ class PassRead(_Read):
     entry_count: int
     is_revoked: bool
     token: str | None = None  # returned once, at creation
+    pin: str | None = None  # returned once, at creation (when with_pin / pin / otp)
 
 
 class EntryCreate(_Write):
     request_id: uuid.UUID | None = None
     pass_token: str | None = None
+    pin: str | None = Field(default=None, min_length=4, max_length=12)
     visitor_id: uuid.UUID | None = None
     gate_id: uuid.UUID | None = None
     vehicle_number: str | None = Field(default=None, max_length=20)

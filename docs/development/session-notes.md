@@ -18,6 +18,31 @@ Format per entry:
 
 ---
 
+## 2026-08-28 — FR-04 PIN pass verification + visitor groups (gap fix 5/7)
+
+**By:** QA/acceptance gap remediation
+**Branch / commit:** `main`
+**What changed:**
+- **Migration `0020_visitor_groups`** — `visitor_request_members` (community_id, request_id,
+  visitor_id, is_primary, added_at; tenant-safe composite FKs; unique(request_id, visitor_id);
+  RLS). Model `VisitorRequestMember`.
+- **PIN pass** — `PassCreate.with_pin` (implied for `pin`/`otp` types); `create_pass` now
+  generates a 6-digit PIN, stores `digest(pin)` in `visitor_passes.pin_hash`, returns the
+  plaintext once (`PassRead.pin`). Return signature is now `(pass, token, pin)`.
+- **`record_entry`** — new `pin` path: matches non-revoked passes by `pin_hash`, narrows by
+  `request_id`, `409 PIN_AMBIGUOUS` on >1. New `visitor_id` handling: admits a specific
+  group member (`422 NOT_IN_GROUP` if the visitor isn't on the request).
+- **Grouping** — `RequestCreate.additional_visitor_ids`; `create_request` writes the primary
+  + extra members (each blacklist-screened). New `GET/POST /visitors/requests/{id}/members`.
+- **`record_exit`** — only completes the request when no other member entry is still `inside`.
+- RLS suite `_TENANT_TABLES` += `visitor_request_members`.
+- Docs: `docs/backend/api/visitors.md`.
+**Why:** gap 5 — `pin_hash` was never set/checked (only QR worked); grouping was a
+`party_size` int with no linkage of distinct visitor records.
+**Verified:** `alembic upgrade head`; `ruff/black`; `pytest -q` → 213 passed (new
+`test_visitors_groups_pin.py`).
+**Open / next:** gap 6 (payment receipts), gap 7 (upload magic-byte + confirm); then async.
+
 ## 2026-08-28 — SLA escalation + Celery scheduled jobs + panic notify (gap fixes 2–4/7)
 
 **By:** QA/acceptance gap remediation

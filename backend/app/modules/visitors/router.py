@@ -197,10 +197,41 @@ def create_pass(
     payload: schemas.PassCreate,
     svc: VisitorService = Depends(visitor_service),
 ) -> dict:
-    obj, token = svc.create_pass(request_id, payload)
+    obj, token, pin = svc.create_pass(request_id, payload)
     read = schemas.PassRead.model_validate(obj)
     read.token = token
-    return ok(read, message="Pass issued — the token is shown once")
+    read.pin = pin
+    return ok(read, message="Pass issued — the token/PIN are shown once")
+
+
+@router.get(
+    "/requests/{request_id}/members",
+    response_model=Envelope[list[schemas.GroupMemberRead]],
+    dependencies=[VIEW],
+)
+def list_group_members(
+    request_id: uuid.UUID, svc: VisitorService = Depends(visitor_service)
+) -> dict:
+    return ok(
+        [schemas.GroupMemberRead.model_validate(m) for m in svc.list_group_members(request_id)]
+    )
+
+
+@router.post(
+    "/requests/{request_id}/members",
+    response_model=Envelope[schemas.GroupMemberRead],
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[CREATE],
+)
+def add_group_member(
+    request_id: uuid.UUID,
+    payload: schemas.GroupMemberCreate,
+    svc: VisitorService = Depends(visitor_service),
+) -> dict:
+    return ok(
+        schemas.GroupMemberRead.model_validate(svc.add_group_member(request_id, payload)),
+        message="Visitor added to the group",
+    )
 
 
 @router.post(

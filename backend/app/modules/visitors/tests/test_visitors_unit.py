@@ -82,7 +82,7 @@ def test_full_entry_exit_cycle(db, scope_for, community, unit, superadmin):
 def test_pass_issue_and_use(db, scope_for, community, unit, superadmin):
     svc = _svc(db, scope_for(community.id), superadmin)
     req = _req(svc, unit)  # pending
-    vpass, token = svc.create_pass(req.id, schemas.PassCreate(max_entries=1))
+    vpass, token, _pin = svc.create_pass(req.id, schemas.PassCreate(max_entries=1))
     db.refresh(req)
     assert req.status == "approved"  # a pass pre-approves
     entry = svc.record_entry(schemas.EntryCreate(pass_token=token))
@@ -98,7 +98,7 @@ def test_pass_issue_and_use(db, scope_for, community, unit, superadmin):
 def test_revoked_pass_rejected(db, scope_for, community, unit, superadmin):
     svc = _svc(db, scope_for(community.id), superadmin)
     req = _req(svc, unit)
-    vpass, token = svc.create_pass(req.id, schemas.PassCreate())
+    vpass, token, _pin = svc.create_pass(req.id, schemas.PassCreate())
     svc.revoke_pass(vpass.id)
     with pytest.raises(BusinessRuleError) as exc:
         svc.record_entry(schemas.EntryCreate(pass_token=token))
