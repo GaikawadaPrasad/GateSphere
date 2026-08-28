@@ -15,11 +15,12 @@ from dataclasses import dataclass
 
 from fastapi import Depends, Header, Request
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 from app.core.errors import ForbiddenError
-from app.core.security import require_auth
-from app.db.session import get_db
+from app.core.security import require_auth, require_auth_async
+from app.db.session import get_async_db, get_db
 from app.modules.users.models import User, UserRole
 
 
@@ -107,3 +108,62 @@ def tenant_context(
     """
     bind_rls_scope(db, scope)
     return TenantContext(db=db, scope=scope)
+
+
+# --------------------------------------------------------------------------- #
+# Async twins (ADR-010).
+# --------------------------------------------------------------------------- #
+async def bind_rls_scope_async(db: AsyncSession, scope: TenantScope) -> None:
+    from sqlalchemy import text
+
+    value = "" if scope.is_global else ",".join(str(c) for c in scope.community_ids)
+    await db.execute(text("SELECT set_config('app.community_ids', :v, true)"), {"v": value})
+
+
+async def get_tenant_scope_async(
+    request: Request,
+    db: AsyncSession = Depends(get_async_db),
+    user: User = Depends(require_auth_async),
+    x_community_id: str | None = Header(default=None, alias="X-Community-Id"),
+) -> TenantScope:
+    if user.is_superadmin:
+        if x_community_id:
+            try:
+                active = frozenset({uuid.UUID(x_community_id)})
+            except ValueError as exc:
+                raise ForbiddenError("Invalid X-Community-Id", code="INVALID_SCOPE") from exc
+            return TenantScope(user.id, is_global=False, community_ids=active)
+        return TenantScope(user.id, is_global=True, community_ids=frozenset())
+
+    rows = (
+        await db.scalars(select(UserRole.community_id).where(UserRole.user_id == user.id))
+    ).all()
+    community_ids = frozenset(cid for cid in rows if cid is not None)
+    is_global = any(cid is None for cid in rows)
+
+    if x_community_id:
+        try:
+            wanted = uuid.UUID(x_community_id)
+        except ValueError as exc:
+            raise ForbiddenError("Invalid X-Community-Id", code="INVALID_SCOPE") from exc
+        if not is_global and wanted not in community_ids:
+            raise ForbiddenError("Not a member of that community", code="INVALID_SCOPE")
+        return TenantScope(user.id, is_global=False, community_ids=frozenset({wanted}))
+
+    scope = TenantScope(user.id, is_global, community_ids)
+    request.state.tenant_scope = scope
+    return scope
+
+
+@dataclass
+class AsyncTenantContext:
+    db: AsyncSession
+    scope: TenantScope
+
+
+async def async_tenant_context(
+    db: AsyncSession = Depends(get_async_db),
+    scope: TenantScope = Depends(get_tenant_scope_async),
+) -> AsyncTenantContext:
+    await bind_rls_scope_async(db, scope)
+    return AsyncTenantContext(db=db, scope=scope)
