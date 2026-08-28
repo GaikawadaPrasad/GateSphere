@@ -21,7 +21,8 @@ global caller on the collection routes; `PaymentCreate` carries `community_id` i
 | `POST /billing/invoices/{invoice_id}/cancel` | `billing:approve` | – | `200` single | `422 INVOICE_HAS_PAYMENTS` / `INVALID_TRANSITION` |
 | `GET /billing/payments` | `billing:view` | – | `200` list | `?community_id=` |
 | `POST /billing/payments` | `billing:create` | `PaymentCreate` | `201` single | simulated; `422 ALLOCATION_MISMATCH` / `OVER_ALLOCATION` / `INVOICE_NOT_PAYABLE` |
-| `GET /billing/payments/{payment_id}` | `billing:view` | – | `200` single | includes `allocations` |
+| `GET /billing/payments/{payment_id}` | `billing:view` | – | `200` single | includes `allocations` + `receipt_number` |
+| `GET /billing/payments/{payment_id}/receipt` | `billing:view` | – | `200` single | `ReceiptRead` — stable per-community `RCP-<yyyy>-<nnnnnn>` number, payer, community, allocation lines with invoice numbers |
 | `GET /billing/units/{unit_id}/ledger` | `billing:view` | – | `200` list | newest first, monotonic `entry_seq` |
 
 ## Schemas (write — all `extra="forbid"`)
@@ -30,7 +31,7 @@ global caller on the collection routes; `PaymentCreate` carries `community_id` i
 - **RuleUpdate**: `due_day?` (1–28), `grace_days?` (0–60), `late_fee_mode?`, `late_fee_value?`, `tax_percent?` (0–100), `allow_advance_payment?`.
 - **InvoiceCreate**: `unit_id`, `billing_period_start?`, `billing_period_end?`, `issue_date?`, `due_date?`, `discount=0`, `items: [InvoiceLineCreate, …]` (≥ 1).
 - **InvoiceLineCreate**: `description`, `charge_head_id?`, `quantity=1` (> 0), `unit_rate=0`, `taxable=false`.
-- **PaymentCreate**: `amount` (> 0), `payment_method="upi"`, `payer_user_id?`, `allocations: [{invoice_id, amount}]` (≥ 1, must sum to `amount`), `remarks?`, `community_id?` (global caller).
+- **PaymentCreate**: `amount` (> 0), `payment_method="upi"`, `payer_user_id?`, `allocations: [{invoice_id, amount}]` (≥ 1, must sum to `amount`), `remarks?`, `community_id?` (global caller). A `receipt_number` is minted on record.
 
 ## Error codes
 

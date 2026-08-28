@@ -18,6 +18,25 @@ Format per entry:
 
 ---
 
+## 2026-08-28 — FR-09 payment receipts (gap fix 6/7)
+
+**By:** QA/acceptance gap remediation
+**Branch / commit:** `main`
+**What changed:**
+- **Migration `0021_payment_receipts`** — `payments.receipt_number` (String 40),
+  `receipt_issued_at`; backfills existing rows `RCP-<yyyy>-<nnnnnn>` per community via a
+  window function; `uq_payment_receipt_number (community_id, receipt_number)`.
+- `record_payment` mints `RCP-<year>-<seq:06d>` (`PaymentRepository.next_receipt_sequence`).
+- New `BillingService.get_receipt` + `GET /billing/payments/{id}/receipt` → `ReceiptRead`
+  (number, payer, community, allocation lines with invoice numbers).
+- `PaymentRead` now exposes `receipt_number` / `receipt_issued_at`; `seed_operations`
+  payments carry a receipt number.
+- Docs: `docs/backend/api/billing.md`.
+**Why:** gap 6 — payments recorded a `payment_reference` but no receipt number/document.
+**Verified:** `alembic upgrade head`; `ruff/black`; `pytest -q` → 214 passed (billing
+lifecycle test extended to assert the receipt).
+**Open / next:** gap 7 (upload magic-byte validation + confirm step); then async migration.
+
 ## 2026-08-28 — FR-04 PIN pass verification + visitor groups (gap fix 5/7)
 
 **By:** QA/acceptance gap remediation

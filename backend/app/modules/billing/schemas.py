@@ -163,12 +163,33 @@ class PaymentRead(_Read):
     community_id: uuid.UUID
     payer_user_id: uuid.UUID | None
     payment_reference: str
+    receipt_number: str | None
+    receipt_issued_at: datetime | None
     amount: Decimal
     payment_method: str
     payment_status: str
     paid_at: datetime
     remarks: str | None
     allocations: list[PaymentAllocationRead] = []
+
+
+class ReceiptLine(BaseModel):
+    invoice_id: uuid.UUID
+    invoice_number: str | None
+    amount: Decimal
+
+
+class ReceiptRead(BaseModel):
+    receipt_number: str | None
+    payment_reference: str
+    community_name: str | None
+    payer_name: str | None
+    amount: Decimal
+    payment_method: str
+    payment_status: str
+    paid_at: datetime
+    issued_at: datetime | None
+    allocations: list[ReceiptLine] = []
 
 
 class LedgerRead(_Read):

@@ -681,6 +681,8 @@ def seed_operations(db: Session, communities: list[Community]) -> None:
                     community_id=c.id,
                     payer_user_id=_resident_user(occ),
                     payment_reference=f"PAY-{sfx}-2026-{idx + 1:04d}",
+                    receipt_number=f"RCP-{sfx}-2026-{idx + 1:06d}",
+                    receipt_issued_at=now,
                     amount=paid,
                     payment_method="upi",
                     payment_status="success",

@@ -135,6 +135,15 @@ def get_payment(payment_id: uuid.UUID, svc: Svc = Depends(billing_service)) -> d
     return ok(schemas.PaymentRead.model_validate(svc.get_payment(payment_id)))
 
 
+@router.get(
+    "/payments/{payment_id}/receipt",
+    response_model=Envelope[schemas.ReceiptRead],
+    dependencies=[VIEW],
+)
+def get_payment_receipt(payment_id: uuid.UUID, svc: Svc = Depends(billing_service)) -> dict:
+    return ok(schemas.ReceiptRead.model_validate(svc.get_receipt(payment_id)))
+
+
 # --- ledger ------------------------------------------------- #
 @router.get(
     "/units/{unit_id}/ledger",

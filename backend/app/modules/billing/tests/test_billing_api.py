@@ -53,8 +53,18 @@ def test_admin_invoice_lifecycle(as_role, seed_ids):
         },
     )
     assert pay.status_code == 201, pay.text
+    pay_data = pay.json()["data"]
+    assert pay_data["receipt_number"] and pay_data["receipt_number"].startswith("RCP-")
     got = admin.get(f"{P}/invoices/{inv['id']}").json()["data"]
     assert got["status"] == "paid" and got["balance_due"] == "0.00"
+
+    # FR-09 receipt document
+    rc = admin.get(f"{P}/payments/{pay_data['id']}/receipt")
+    assert rc.status_code == 200, rc.text
+    receipt = rc.json()["data"]
+    assert receipt["receipt_number"] == pay_data["receipt_number"]
+    assert receipt["amount"] == "1200.00"
+    assert receipt["allocations"][0]["invoice_number"] == inv["invoice_number"]
 
 
 def test_facility_manager_cannot_create_invoice(as_role):

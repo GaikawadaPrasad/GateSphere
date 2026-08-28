@@ -134,6 +134,7 @@ class Payment(Base, TimestampMixin, TenantMixin):
     __tablename__ = "payments"
     __table_args__ = (
         UniqueConstraint("payment_reference"),
+        UniqueConstraint("community_id", "receipt_number", name="uq_payment_receipt_number"),
         CheckConstraint("amount > 0", name="ck_payment_amount_positive"),
     )
 
@@ -142,6 +143,8 @@ class Payment(Base, TimestampMixin, TenantMixin):
         ForeignKey("users.id", ondelete="SET NULL")
     )
     payment_reference: Mapped[str] = mapped_column(String(60))
+    receipt_number: Mapped[str | None] = mapped_column(String(40))
+    receipt_issued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     amount: Mapped[Decimal] = mapped_column(_Money)
     payment_method: Mapped[str] = mapped_column(String(15), default="upi")
     payment_status: Mapped[str] = mapped_column(String(12), default="success", index=True)

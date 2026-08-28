@@ -49,6 +49,12 @@ class InvoiceRepository(TenantRepository[MaintenanceInvoice]):
 class PaymentRepository(TenantRepository[Payment]):
     model = Payment
 
+    def next_receipt_sequence(self, community_id: uuid.UUID) -> int:
+        n = self.db.scalar(
+            select(func.count()).select_from(Payment).where(Payment.community_id == community_id)
+        )
+        return int(n or 0) + 1
+
 
 class LedgerRepository(TenantRepository[LedgerEntry]):
     model = LedgerEntry

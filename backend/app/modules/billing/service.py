@@ -357,14 +357,18 @@ class BillingService:
             raise BusinessRuleError(
                 "Allocations must sum to the payment amount", code="ALLOCATION_MISMATCH"
             )
+        now = datetime.now(UTC)
+        rseq = self.payments.next_receipt_sequence(cid)
         payment = Payment(
             community_id=cid,
             payer_user_id=payload.payer_user_id or self.actor.id,
             payment_reference=f"PAY-{secrets.token_hex(8).upper()}",
+            receipt_number=f"RCP-{now.year}-{rseq:06d}",
+            receipt_issued_at=now,
             amount=_money(payload.amount),
             payment_method=payload.payment_method,
             payment_status="success",
-            paid_at=datetime.now(UTC),
+            paid_at=now,
             gateway_name="simulated",
             remarks=payload.remarks,
         )
@@ -415,6 +419,35 @@ class BillingService:
         if obj is None:
             raise NotFoundError("Payment not found")
         return obj
+
+    def get_receipt(self, payment_id: uuid.UUID) -> dict:
+        from app.modules.communities.models import Community
+
+        pay = self.get_payment(payment_id)
+        community = self.db.get(Community, pay.community_id)
+        payer = self.db.get(User, pay.payer_user_id) if pay.payer_user_id else None
+        lines = []
+        for alloc in pay.allocations:
+            inv = self.db.get(MaintenanceInvoice, alloc.invoice_id)
+            lines.append(
+                {
+                    "invoice_id": alloc.invoice_id,
+                    "invoice_number": inv.invoice_number if inv else None,
+                    "amount": alloc.allocated_amount,
+                }
+            )
+        return {
+            "receipt_number": pay.receipt_number,
+            "payment_reference": pay.payment_reference,
+            "community_name": community.name if community else None,
+            "payer_name": payer.full_name if payer else None,
+            "amount": pay.amount,
+            "payment_method": pay.payment_method,
+            "payment_status": pay.payment_status,
+            "paid_at": pay.paid_at,
+            "issued_at": pay.receipt_issued_at,
+            "allocations": lines,
+        }
 
     def list_payments(self, *, community_id: uuid.UUID | None, offset: int, limit: int):
         stmt = select(Payment)
