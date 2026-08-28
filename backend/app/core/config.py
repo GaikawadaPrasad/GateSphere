@@ -58,6 +58,18 @@ class Settings(BaseSettings):
     def sqlalchemy_url(self) -> str:
         return str(self.DATABASE_URL)
 
+    @property
+    def sqlalchemy_async_url(self) -> str:
+        """Same DSN, async driver. psycopg 3 serves both sync and async, so the
+        `postgresql+psycopg://` scheme already works for `create_async_engine`.
+        A bare `postgresql://` is normalised here."""
+        url = str(self.DATABASE_URL)
+        if url.startswith("postgresql+psycopg://"):
+            return url
+        if url.startswith("postgresql://"):
+            return "postgresql+psycopg://" + url[len("postgresql://") :]
+        return url
+
 
 @lru_cache
 def get_settings() -> Settings:

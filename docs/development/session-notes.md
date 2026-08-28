@@ -18,6 +18,29 @@ Format per entry:
 
 ---
 
+## 2026-08-28 — Async migration: infra step (ADR-010)
+
+**By:** async stack migration — step 1 of N, incremental / infra-first
+**Branch / commit:** `main`
+**What changed:**
+- **`app/db/session.py`** — `async_engine` (`create_async_engine`, psycopg 3),
+  `AsyncSessionLocal` (`async_sessionmaker`, `expire_on_commit=False`), `get_async_db`
+  dependency — **alongside** the untouched sync stack. Same database.
+- **`app/core/config.py`** — `sqlalchemy_async_url` (normalises `postgresql://` →
+  `postgresql+psycopg://`).
+- **`requirements.txt`** — `greenlet==3.1.1`, `pytest-asyncio==0.25.0`.
+- **`pyproject.toml`** — `asyncio_mode = "auto"`.
+- **`tests/test_async_infra.py`** — smoke test: async session reads seed data; RLS GUC
+  round-trips over an async connection.
+- **`docs/decisions/ADR-010-async-stack.md`** (new); AGENTS "Still open" item 0.
+- Rebuilt `backend`/`worker`/`beat` images.
+**Why:** the owner chose FastAPI async + SQLAlchemy 2.0 async (session-cookie auth stays).
+Infra-first so the suite is green at every step (per their instruction).
+**Verified:** `ruff/black`; `pytest -q` → 217 passed (215 + 2 async infra).
+**Open / next:** convert modules one at a time — `repository → service → router → tests`.
+Start with a leaf module (e.g. `communities` or `notifications`). Then async Alembic env,
+then drop the sync engine at cutover.
+
 ## 2026-08-28 — NFR-SEC-07 upload confirm + magic-byte validation (gap fix 7/7)
 
 **By:** QA/acceptance gap remediation — final functional gap

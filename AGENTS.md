@@ -1020,6 +1020,10 @@ tenant tables to a new RLS migration) → extend `seed.py` → `tests/test_<m>_{
 
 ### Still open (feature work)
 
+0. **Async stack migration** (ADR-010) — in progress, incremental. Infra landed: async
+   engine + `AsyncSessionLocal` + `get_async_db` in `app/db/session.py` run alongside the
+   sync stack (both hit the same DB). Next: convert `repository → service → router → tests`
+   one module at a time, suite green at each step. Auth stays session-cookie (no JWT).
 1. **OTP login, community switcher UI, SSE/WebSocket gate feed** (FR‑04/05).
 2. **Frontend design system** — Tailwind + shadcn/ui + Recharts + TanStack Table + the shared
    component library. Plain CSS with the design tokens is the placeholder.
