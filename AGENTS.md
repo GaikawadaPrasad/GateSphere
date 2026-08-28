@@ -1024,12 +1024,14 @@ tenant tables to a new RLS migration) → extend `seed.py` → `tests/test_<m>_{
    `AsyncSessionLocal` + `get_async_db`; shared twins (`AsyncTenantRepository`,
    `require_auth_async` / `require_permission_async`, `async_tenant_context`,
    `record_audit_async`, `revoke_all_user_sessions_async`). **Converted:** `communities`,
-   `uploads`, `audit`, `users`, `residents`. Remaining: `communication`, `deliveries`,
+   `uploads`, `audit`, `users`, `residents`, `communication`, `deliveries`. Remaining:
    `domestic_staff`, `vehicles`, `amenities`, `dashboards`, then the event cluster
    (`notifications` + `billing`/`complaints`/`gate`/`incidents`/`visitors` — they share
-   `notifications.events`), then `auth`, then Celery `tasks.py` + async Alembic env + drop
-   the sync engine. Convert `repository → service → router → deps → unit tests` per module,
-   suite green each step. Auth stays session-cookie (no JWT).
+   `notifications.events`; needs `emit_async` / a dual sync+async `NotificationService`
+   during the cluster, delete the sync side after the last caller flips), then `auth`, then
+   Celery `tasks.py` (own sync engine or async) + async Alembic env + drop the sync engine.
+   Convert `repository → service → router → deps → unit tests` per module, suite green each
+   step. Auth stays session-cookie (no JWT).
 
    **Pattern:** repo extends `AsyncTenantRepository`; service methods `async def` + `await`,
    `record_audit_async`, eager-load relationships with `selectinload` (no lazy IO under

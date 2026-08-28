@@ -18,6 +18,35 @@ Format per entry:
 
 ---
 
+## 2026-08-28 — Async migration: shared deps + 7 modules (ADR-010)
+
+**By:** async stack migration — incremental, one commit per module
+**Branch / commit:** `main`
+**What changed:**
+- **Shared async twins** (commit `d33eabc`): `AsyncRepository` / `AsyncTenantRepository`
+  (`app/db/repository.py`); `require_auth_async`, `require_permission_async`,
+  `user_permissions_async`, `_load_session_async`, `revoke_all_user_sessions_async`
+  (`app/core/security.py`); `bind_rls_scope_async`, `get_tenant_scope_async`,
+  `AsyncTenantContext`, `async_tenant_context` (`app/core/tenancy.py`);
+  `record_audit_async` (`app/modules/audit/service.py`).
+- **`Base.__mapper_args__ = {"eager_defaults": True}`** (commit `5b90858`) — PG fetches
+  `updated_at` via RETURNING on UPDATE so it doesn't expire post-flush and blow up
+  serialization with a lazy load (MissingGreenlet). `AsyncTenantRepository.get` uses
+  `populate_existing=True`.
+- **Converted modules** (repo → service → router → deps → unit tests, one commit each):
+  `communities` (`3126f82`), `uploads` (`0b0191d`, boto3 via `anyio.to_thread`),
+  `audit` (`20e9a73`), `users` (`1ed827f`, `selectinload(User.roles)`),
+  `residents` (`b4704f3`), `communication` (`c73cef6`, `selectinload` for
+  targets/options/members), `deliveries` (`d51aef0`).
+- Per-module unit-test `conftest.py` `db` fixture → `AsyncSessionLocal`; tests `async def`.
+- `pytest-asyncio` (`asyncio_mode=auto`), `greenlet` added; images rebuilt.
+**Why:** owner chose FastAPI async + SQLAlchemy 2.0 async (session-cookie auth unchanged).
+**Verified:** `ruff/black` + `pytest -q` green (217) after every module commit.
+**Open / next:** `domestic_staff`, `vehicles`, `amenities`, `dashboards`; then the event
+cluster (`notifications` + billing/complaints/gate/incidents/visitors — shared
+`notifications.events`); then `auth`, Celery `tasks.py`, async Alembic env, drop the sync
+engine. Pattern + gotchas in AGENTS "Still open" item 0.
+
 ## 2026-08-28 — Async migration: infra step (ADR-010)
 
 **By:** async stack migration — step 1 of N, incremental / infra-first
