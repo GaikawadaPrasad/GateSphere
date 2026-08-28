@@ -12,17 +12,17 @@ from fastapi import APIRouter, Depends, status
 
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
-from app.core.security import require_permission
+from app.core.security import require_permission_async
 from app.modules.deliveries import schemas
 from app.modules.deliveries.deps import delivery_service
 from app.modules.deliveries.service import DeliveryService
 
 router = APIRouter(prefix="/deliveries", tags=["Delivery Management"])
 
-VIEW = Depends(require_permission("deliveries:view"))
-CREATE = Depends(require_permission("deliveries:create"))
-UPDATE = Depends(require_permission("deliveries:update"))
-APPROVE = Depends(require_permission("deliveries:approve"))
+VIEW = Depends(require_permission_async("deliveries:view"))
+CREATE = Depends(require_permission_async("deliveries:create"))
+UPDATE = Depends(require_permission_async("deliveries:update"))
+APPROVE = Depends(require_permission_async("deliveries:approve"))
 
 Svc = DeliveryService
 
@@ -34,22 +34,22 @@ async def module_health() -> dict:
 
 # --- protocols -------------------------------------------------------- #
 @router.get("/protocols", response_model=Envelope[list[schemas.ProtocolRead]], dependencies=[VIEW])
-def list_protocols(
+async def list_protocols(
     community_id: uuid.UUID | None = None, svc: Svc = Depends(delivery_service)
 ) -> dict:
-    rows = svc.list_protocols(community_id=community_id)
+    rows = await svc.list_protocols(community_id=community_id)
     return ok([schemas.ProtocolRead.model_validate(r) for r in rows])
 
 
 @router.put("/protocols", response_model=Envelope[schemas.ProtocolRead], dependencies=[APPROVE])
-def upsert_protocol(
+async def upsert_protocol(
     payload: schemas.ProtocolUpsert,
     community_id: uuid.UUID | None = None,
     svc: Svc = Depends(delivery_service),
 ) -> dict:
     return ok(
         schemas.ProtocolRead.model_validate(
-            svc.upsert_protocol(payload, community_id=community_id)
+            await svc.upsert_protocol(payload, community_id=community_id)
         ),
         message="Saved",
     )
@@ -57,7 +57,7 @@ def upsert_protocol(
 
 # --- deliveries --------------------------------------------------- #
 @router.get("", response_model=Envelope[list[schemas.DeliveryRead]], dependencies=[VIEW])
-def list_deliveries(
+async def list_deliveries(
     community_id: uuid.UUID | None = None,
     unit_id: uuid.UUID | None = None,
     delivery_status: str | None = None,
@@ -65,7 +65,7 @@ def list_deliveries(
     params: PageParams = Depends(page_params),
     svc: Svc = Depends(delivery_service),
 ) -> dict:
-    rows, total = svc.list_deliveries(
+    rows, total = await svc.list_deliveries(
         community_id=community_id,
         unit_id=unit_id,
         status=delivery_status,
@@ -84,16 +84,18 @@ def list_deliveries(
     status_code=status.HTTP_201_CREATED,
     dependencies=[CREATE],
 )
-def create_delivery(payload: schemas.DeliveryCreate, svc: Svc = Depends(delivery_service)) -> dict:
+async def create_delivery(
+    payload: schemas.DeliveryCreate, svc: Svc = Depends(delivery_service)
+) -> dict:
     return ok(
-        schemas.DeliveryRead.model_validate(svc.create_delivery(payload)),
+        schemas.DeliveryRead.model_validate(await svc.create_delivery(payload)),
         message="Delivery logged",
     )
 
 
 @router.get("/{delivery_id}", response_model=Envelope[schemas.DeliveryRead], dependencies=[VIEW])
-def get_delivery(delivery_id: uuid.UUID, svc: Svc = Depends(delivery_service)) -> dict:
-    return ok(schemas.DeliveryRead.model_validate(svc.get_delivery(delivery_id)))
+async def get_delivery(delivery_id: uuid.UUID, svc: Svc = Depends(delivery_service)) -> dict:
+    return ok(schemas.DeliveryRead.model_validate(await svc.get_delivery(delivery_id)))
 
 
 @router.get(
@@ -101,8 +103,8 @@ def get_delivery(delivery_id: uuid.UUID, svc: Svc = Depends(delivery_service)) -
     response_model=Envelope[list[schemas.EventRead]],
     dependencies=[VIEW],
 )
-def list_events(delivery_id: uuid.UUID, svc: Svc = Depends(delivery_service)) -> dict:
-    return ok([schemas.EventRead.model_validate(e) for e in svc.list_events(delivery_id)])
+async def list_events(delivery_id: uuid.UUID, svc: Svc = Depends(delivery_service)) -> dict:
+    return ok([schemas.EventRead.model_validate(e) for e in await svc.list_events(delivery_id)])
 
 
 @router.post(
@@ -110,13 +112,13 @@ def list_events(delivery_id: uuid.UUID, svc: Svc = Depends(delivery_service)) ->
     response_model=Envelope[schemas.DeliveryRead],
     dependencies=[APPROVE],
 )
-def decide_delivery(
+async def decide_delivery(
     delivery_id: uuid.UUID,
     payload: schemas.DeliveryDecision,
     svc: Svc = Depends(delivery_service),
 ) -> dict:
     return ok(
-        schemas.DeliveryRead.model_validate(svc.decide_delivery(delivery_id, payload)),
+        schemas.DeliveryRead.model_validate(await svc.decide_delivery(delivery_id, payload)),
         message="Decision recorded",
     )
 
@@ -126,13 +128,13 @@ def decide_delivery(
     response_model=Envelope[schemas.DeliveryRead],
     dependencies=[UPDATE],
 )
-def record_arrival(
+async def record_arrival(
     delivery_id: uuid.UUID,
     payload: schemas.DeliveryArrival,
     svc: Svc = Depends(delivery_service),
 ) -> dict:
     return ok(
-        schemas.DeliveryRead.model_validate(svc.record_arrival(delivery_id, payload)),
+        schemas.DeliveryRead.model_validate(await svc.record_arrival(delivery_id, payload)),
         message="Arrival recorded",
     )
 
@@ -142,9 +144,9 @@ def record_arrival(
     response_model=Envelope[schemas.DeliveryRead],
     dependencies=[UPDATE],
 )
-def mark_delivered(delivery_id: uuid.UUID, svc: Svc = Depends(delivery_service)) -> dict:
+async def mark_delivered(delivery_id: uuid.UUID, svc: Svc = Depends(delivery_service)) -> dict:
     return ok(
-        schemas.DeliveryRead.model_validate(svc.mark_delivered(delivery_id)),
+        schemas.DeliveryRead.model_validate(await svc.mark_delivered(delivery_id)),
         message="Completed",
     )
 
@@ -154,8 +156,8 @@ def mark_delivered(delivery_id: uuid.UUID, svc: Svc = Depends(delivery_service))
     response_model=Envelope[schemas.DeliveryRead],
     dependencies=[UPDATE],
 )
-def cancel_delivery(delivery_id: uuid.UUID, svc: Svc = Depends(delivery_service)) -> dict:
+async def cancel_delivery(delivery_id: uuid.UUID, svc: Svc = Depends(delivery_service)) -> dict:
     return ok(
-        schemas.DeliveryRead.model_validate(svc.cancel_delivery(delivery_id)),
+        schemas.DeliveryRead.model_validate(await svc.cancel_delivery(delivery_id)),
         message="Cancelled",
     )

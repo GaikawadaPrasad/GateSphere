@@ -13,11 +13,11 @@ from datetime import UTC, datetime
 
 from fastapi import Request
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import BusinessRuleError, NotFoundError
 from app.core.tenancy import TenantScope
-from app.modules.audit.service import record_audit
+from app.modules.audit.service import record_audit_async
 from app.modules.communities.models import Gate, Unit
 from app.modules.deliveries import schemas
 from app.modules.deliveries.models import Delivery, DeliveryEvent, DeliveryProtocol
@@ -50,7 +50,7 @@ def _enum(field: str, value: str | None) -> None:
 
 class DeliveryService:
     def __init__(
-        self, db: Session, scope: TenantScope, actor: User, request: Request | None = None
+        self, db: AsyncSession, scope: TenantScope, actor: User, request: Request | None = None
     ):
         self.db = db
         self.scope = scope
@@ -59,8 +59,8 @@ class DeliveryService:
         self.protocols = ProtocolRepository(db, scope)
         self.deliveries = DeliveryRepository(db, scope)
 
-    def _audit(self, action, community_id, entity_type, entity_id, **kw):
-        record_audit(
+    async def _audit(self, action, community_id, entity_type, entity_id, **kw):
+        await record_audit_async(
             self.db,
             module="deliveries",
             action=action,
@@ -81,28 +81,28 @@ class DeliveryService:
             "Specify a community", code="COMMUNITY_REQUIRED", fields={"community_id": "required"}
         )
 
-    def _unit_in_scope(self, unit_id: uuid.UUID) -> Unit:
+    async def _unit_in_scope(self, unit_id: uuid.UUID) -> Unit:
         stmt = select(Unit).where(Unit.id == unit_id)
         if not self.scope.is_global:
             stmt = stmt.where(Unit.community_id.in_(self.scope.community_ids))
-        unit = self.db.scalar(stmt)
+        unit = await self.db.scalar(stmt)
         if unit is None:
             raise NotFoundError("Unit not found")
         return unit
 
-    def _gate_in_scope(self, gate_id: uuid.UUID | None) -> uuid.UUID | None:
+    async def _gate_in_scope(self, gate_id: uuid.UUID | None) -> uuid.UUID | None:
         if gate_id is None:
             return None
         stmt = select(Gate).where(Gate.id == gate_id)
         if not self.scope.is_global:
             stmt = stmt.where(Gate.community_id.in_(self.scope.community_ids))
-        gate = self.db.scalar(stmt)
+        gate = await self.db.scalar(stmt)
         if gate is None:
             raise NotFoundError("Gate not found")
         return gate.id
 
-    def _primary_resident(self, unit_id: uuid.UUID) -> uuid.UUID | None:
-        occ = self.db.scalar(
+    async def _primary_resident(self, unit_id: uuid.UUID) -> uuid.UUID | None:
+        occ = await self.db.scalar(
             select(UnitOccupancy).where(
                 UnitOccupancy.unit_id == unit_id,
                 UnitOccupancy.is_primary.is_(True),
@@ -111,10 +111,12 @@ class DeliveryService:
         )
         if occ is None:
             return None
-        profile = self.db.get(ResidentProfile, occ.resident_profile_id)
+        profile = await self.db.get(ResidentProfile, occ.resident_profile_id)
         return profile.user_id if profile else None
 
-    def _event(self, delivery: Delivery, event_type: str, *, gate_id=None, remarks=None) -> None:
+    async def _event(
+        self, delivery: Delivery, event_type: str, *, gate_id=None, remarks=None
+    ) -> None:
         self.db.add(
             DeliveryEvent(
                 delivery_id=delivery.id,
@@ -126,52 +128,54 @@ class DeliveryService:
         )
 
     # -- protocols --------------------------------------------- #
-    def list_protocols(self, *, community_id: uuid.UUID | None):
+    async def list_protocols(self, *, community_id: uuid.UUID | None):
         cid = self._one_community(community_id)
         stmt = (
             select(DeliveryProtocol)
             .where(DeliveryProtocol.community_id == cid)
             .order_by(DeliveryProtocol.delivery_type)
         )
-        return list(self.db.scalars(stmt).all())
+        return list((await self.db.scalars(stmt)).all())
 
-    def upsert_protocol(self, payload: schemas.ProtocolUpsert, *, community_id: uuid.UUID | None):
+    async def upsert_protocol(
+        self, payload: schemas.ProtocolUpsert, *, community_id: uuid.UUID | None
+    ):
         cid = self._one_community(community_id)
         _enum("delivery_type", payload.delivery_type)
         _enum("protocol_type", payload.protocol_type)
-        obj = self.protocols.for_type(cid, payload.delivery_type)
+        obj = await self.protocols.for_type(cid, payload.delivery_type)
         data = payload.model_dump()
         if obj is None:
             obj = DeliveryProtocol(community_id=cid, **data)
-            self.protocols.add(obj)
+            await self.protocols.add(obj)
             action = "protocol.create"
         else:
             for k, v in data.items():
                 setattr(obj, k, v)
-            self.db.flush()
+            await self.db.flush()
             action = "protocol.update"
-        self._audit(action, cid, "delivery_protocol", obj.id, new=data)
+        await self._audit(action, cid, "delivery_protocol", obj.id, new=data)
         return obj
 
-    def _protocol_for(self, community_id: uuid.UUID, delivery_type: str) -> DeliveryProtocol:
-        obj = self.protocols.for_type(community_id, delivery_type)
+    async def _protocol_for(self, community_id: uuid.UUID, delivery_type: str) -> DeliveryProtocol:
+        obj = await self.protocols.for_type(community_id, delivery_type)
         if obj is None:
             obj = DeliveryProtocol(
                 community_id=community_id, delivery_type=delivery_type, **_DEFAULT_PROTOCOL
             )
-            self.protocols.add(obj)
+            await self.protocols.add(obj)
         return obj
 
     # -- deliveries ------------------------------------------- #
-    def create_delivery(self, payload: schemas.DeliveryCreate) -> Delivery:
-        unit = self._unit_in_scope(payload.unit_id)
+    async def create_delivery(self, payload: schemas.DeliveryCreate) -> Delivery:
+        unit = await self._unit_in_scope(payload.unit_id)
         _enum("delivery_type", payload.delivery_type)
-        protocol = self._protocol_for(unit.community_id, payload.delivery_type)
+        protocol = await self._protocol_for(unit.community_id, payload.delivery_type)
         auto = protocol.allow_direct_entry and not protocol.requires_otp
         obj = Delivery(
             community_id=unit.community_id,
             unit_id=unit.id,
-            resident_user_id=self._primary_resident(unit.id),
+            resident_user_id=await self._primary_resident(unit.id),
             protocol_id=protocol.id,
             delivery_type=payload.delivery_type,
             provider_name=payload.provider_name,
@@ -184,9 +188,9 @@ class DeliveryService:
             approval_status="auto_approved" if auto else "pending",
             status="expected",
         )
-        self.deliveries.add(obj)
-        self._event(obj, "logged")
-        self._audit(
+        await self.deliveries.add(obj)
+        await self._event(obj, "logged")
+        await self._audit(
             "delivery.create",
             unit.community_id,
             "delivery",
@@ -195,13 +199,13 @@ class DeliveryService:
         )
         return obj
 
-    def get_delivery(self, delivery_id: uuid.UUID) -> Delivery:
-        obj = self.deliveries.get(delivery_id)
+    async def get_delivery(self, delivery_id: uuid.UUID) -> Delivery:
+        obj = await self.deliveries.get(delivery_id)
         if obj is None:
             raise NotFoundError("Delivery not found")
         return obj
 
-    def list_deliveries(
+    async def list_deliveries(
         self,
         *,
         community_id: uuid.UUID | None,
@@ -224,14 +228,14 @@ class DeliveryService:
         if approval_status:
             stmt = stmt.where(Delivery.approval_status == approval_status)
         stmt = stmt.order_by(Delivery.created_at.desc())
-        return self.deliveries.list(offset=offset, limit=limit, extra=stmt), self.deliveries.count(
-            extra=stmt
-        )
+        return await self.deliveries.list(
+            offset=offset, limit=limit, extra=stmt
+        ), await self.deliveries.count(extra=stmt)
 
-    def decide_delivery(
+    async def decide_delivery(
         self, delivery_id: uuid.UUID, payload: schemas.DeliveryDecision
     ) -> Delivery:
-        obj = self.get_delivery(delivery_id)
+        obj = await self.get_delivery(delivery_id)
         if payload.decision not in ("approved", "rejected"):
             raise BusinessRuleError("decision must be approved|rejected", code="INVALID_ENUM")
         if obj.approval_status not in ("pending",):
@@ -242,54 +246,56 @@ class DeliveryService:
         obj.approved_by_user_id = self.actor.id
         if payload.decision == "rejected":
             obj.status = "cancelled"
-        self._event(obj, payload.decision, remarks=payload.remarks)
-        self.db.flush()
-        self._audit(f"delivery.{payload.decision}", obj.community_id, "delivery", obj.id)
+        await self._event(obj, payload.decision, remarks=payload.remarks)
+        await self.db.flush()
+        await self._audit(f"delivery.{payload.decision}", obj.community_id, "delivery", obj.id)
         return obj
 
-    def record_arrival(self, delivery_id: uuid.UUID, payload: schemas.DeliveryArrival) -> Delivery:
-        obj = self.get_delivery(delivery_id)
+    async def record_arrival(
+        self, delivery_id: uuid.UUID, payload: schemas.DeliveryArrival
+    ) -> Delivery:
+        obj = await self.get_delivery(delivery_id)
         if obj.approval_status not in ("approved", "auto_approved"):
             raise BusinessRuleError("Delivery is not approved", code="NOT_APPROVED")
         if obj.status not in ("expected", "at_gate"):
             raise BusinessRuleError(
                 f"Delivery is '{obj.status}', cannot arrive", code="INVALID_TRANSITION"
             )
-        gate_id = self._gate_in_scope(payload.gate_id)
+        gate_id = await self._gate_in_scope(payload.gate_id)
         obj.status = "at_gate"
         obj.arrived_at = obj.arrived_at or datetime.now(UTC)
         if payload.executive_name:
             obj.executive_name = payload.executive_name
         if payload.executive_phone:
             obj.executive_phone = payload.executive_phone
-        self._event(obj, "arrived", gate_id=gate_id)
-        self.db.flush()
-        self._audit("delivery.arrived", obj.community_id, "delivery", obj.id)
+        await self._event(obj, "arrived", gate_id=gate_id)
+        await self.db.flush()
+        await self._audit("delivery.arrived", obj.community_id, "delivery", obj.id)
         return obj
 
-    def mark_delivered(self, delivery_id: uuid.UUID) -> Delivery:
-        obj = self.get_delivery(delivery_id)
+    async def mark_delivered(self, delivery_id: uuid.UUID) -> Delivery:
+        obj = await self.get_delivery(delivery_id)
         if obj.status not in ("at_gate", "in_transit"):
             raise BusinessRuleError(
                 f"Delivery is '{obj.status}', cannot complete", code="INVALID_TRANSITION"
             )
-        protocol = self.db.get(DeliveryProtocol, obj.protocol_id) if obj.protocol_id else None
+        protocol = await self.db.get(DeliveryProtocol, obj.protocol_id) if obj.protocol_id else None
         obj.status = "delivered" if (protocol and not protocol.leave_at_gate) else "collected"
-        self._event(obj, "delivered")
-        self.db.flush()
-        self._audit("delivery.delivered", obj.community_id, "delivery", obj.id)
+        await self._event(obj, "delivered")
+        await self.db.flush()
+        await self._audit("delivery.delivered", obj.community_id, "delivery", obj.id)
         return obj
 
-    def cancel_delivery(self, delivery_id: uuid.UUID) -> Delivery:
-        obj = self.get_delivery(delivery_id)
+    async def cancel_delivery(self, delivery_id: uuid.UUID) -> Delivery:
+        obj = await self.get_delivery(delivery_id)
         if obj.status in ("delivered", "collected", "returned", "cancelled"):
             raise BusinessRuleError(f"Delivery is '{obj.status}'", code="INVALID_TRANSITION")
         obj.status = "cancelled"
-        self._event(obj, "rejected", remarks="cancelled")
-        self.db.flush()
-        self._audit("delivery.cancel", obj.community_id, "delivery", obj.id)
+        await self._event(obj, "rejected", remarks="cancelled")
+        await self.db.flush()
+        await self._audit("delivery.cancel", obj.community_id, "delivery", obj.id)
         return obj
 
-    def list_events(self, delivery_id: uuid.UUID) -> list[DeliveryEvent]:
-        self.get_delivery(delivery_id)  # scope check
-        return delivery_events(self.db, delivery_id)
+    async def list_events(self, delivery_id: uuid.UUID) -> list[DeliveryEvent]:
+        await self.get_delivery(delivery_id)  # scope check
+        return await delivery_events(self.db, delivery_id)
