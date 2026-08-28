@@ -12,6 +12,7 @@ from decimal import Decimal
 from typing import Any
 
 from fastapi import Request
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 from app.modules.audit.models import AuditLog
@@ -30,6 +31,34 @@ def _jsonable(value: Any) -> Any:
     return value
 
 
+def _build_audit_row(
+    *,
+    module: str,
+    action: str,
+    actor: User | None,
+    community_id: uuid.UUID | None,
+    entity_type: str | None,
+    entity_id: uuid.UUID | str | None,
+    old: dict | None,
+    new: dict | None,
+    request: Request | None,
+) -> AuditLog:
+    session_id = getattr(request.state, "session_id", None) if request else None
+    return AuditLog(
+        community_id=community_id,
+        user_id=actor.id if actor else None,
+        session_id=uuid.UUID(session_id) if isinstance(session_id, str) else session_id,
+        module=module,
+        action=action,
+        entity_type=entity_type,
+        entity_id=str(entity_id) if entity_id is not None else None,
+        old_values=_jsonable(old) if old else None,
+        new_values=_jsonable(new) if new else None,
+        ip_address=_client_ip(request),
+        user_agent=(request.headers.get("user-agent") if request else None) or None,
+    )
+
+
 def record_audit(
     db: Session,
     *,
@@ -43,22 +72,49 @@ def record_audit(
     new: dict | None = None,
     request: Request | None = None,
 ) -> AuditLog:
-    session_id = getattr(request.state, "session_id", None) if request else None
-    row = AuditLog(
-        community_id=community_id,
-        user_id=actor.id if actor else None,
-        session_id=uuid.UUID(session_id) if isinstance(session_id, str) else session_id,
+    row = _build_audit_row(
         module=module,
         action=action,
+        actor=actor,
+        community_id=community_id,
         entity_type=entity_type,
-        entity_id=str(entity_id) if entity_id is not None else None,
-        old_values=_jsonable(old) if old else None,
-        new_values=_jsonable(new) if new else None,
-        ip_address=_client_ip(request),
-        user_agent=(request.headers.get("user-agent") if request else None) or None,
+        entity_id=entity_id,
+        old=old,
+        new=new,
+        request=request,
     )
     db.add(row)
     db.flush()
+    return row
+
+
+async def record_audit_async(
+    db: AsyncSession,
+    *,
+    module: str,
+    action: str,
+    actor: User | None = None,
+    community_id: uuid.UUID | None = None,
+    entity_type: str | None = None,
+    entity_id: uuid.UUID | str | None = None,
+    old: dict | None = None,
+    new: dict | None = None,
+    request: Request | None = None,
+) -> AuditLog:
+    """Async twin of `record_audit` (ADR-010)."""
+    row = _build_audit_row(
+        module=module,
+        action=action,
+        actor=actor,
+        community_id=community_id,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        old=old,
+        new=new,
+        request=request,
+    )
+    db.add(row)
+    await db.flush()
     return row
 
 

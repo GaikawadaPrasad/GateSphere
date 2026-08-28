@@ -8,6 +8,8 @@ Rules:
     references are never distinguished from "not found").
   * `is_active=False` is a soft disable; hard delete cascades and is Super-Admin only.
   * Every write emits an audit row in the same transaction.
+
+Async stack (ADR-010).
 """
 
 from __future__ import annotations
@@ -15,11 +17,12 @@ from __future__ import annotations
 import uuid
 
 from fastapi import Request
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import BusinessRuleError, ConflictError, ForbiddenError, NotFoundError
 from app.core.tenancy import TenantScope
-from app.modules.audit.service import record_audit
+from app.modules.audit.service import record_audit_async
 from app.modules.communities import schemas
 from app.modules.communities.models import Community, Floor, Gate, Tower, Unit
 from app.modules.communities.repository import (
@@ -47,9 +50,13 @@ def _apply(obj: object, patch: dict) -> None:
         setattr(obj, key, value)
 
 
+def _snapshot(obj: object, keys: dict) -> dict:
+    return {k: getattr(obj, k, None) for k in keys}
+
+
 class CommunityService:
     def __init__(
-        self, db: Session, scope: TenantScope, actor: User, request: Request | None = None
+        self, db: AsyncSession, scope: TenantScope, actor: User, request: Request | None = None
     ) -> None:
         self.db = db
         self.scope = scope
@@ -61,199 +68,150 @@ class CommunityService:
         self.floors = FloorRepository(db, scope)
         self.units = UnitRepository(db, scope)
 
+    async def _audit(self, action: str, community_id, entity_type, entity_id, **kw) -> None:
+        await record_audit_async(
+            self.db,
+            module="communities",
+            action=action,
+            actor=self.actor,
+            community_id=community_id,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            request=self.request,
+            **kw,
+        )
+
     # -- communities ------------------------------------------------------ #
-    def list_communities(
+    async def list_communities(
         self, *, offset: int, limit: int, active: bool | None
     ) -> tuple[list[Community], int]:
         return (
-            self.communities.list(offset=offset, limit=limit, active=active),
-            self.communities.count(active=active),
+            await self.communities.list(offset=offset, limit=limit, active=active),
+            await self.communities.count(active=active),
         )
 
-    def get_community(self, community_id: uuid.UUID) -> Community:
-        obj = self.communities.get(community_id)
+    async def get_community(self, community_id: uuid.UUID) -> Community:
+        obj = await self.communities.get(community_id)
         if obj is None:
             raise NotFoundError("Community not found")
         return obj
 
-    def create_community(self, payload: schemas.CommunityCreate) -> Community:
+    async def create_community(self, payload: schemas.CommunityCreate) -> Community:
         if not self.scope.is_global:
             raise ForbiddenError("Only a platform admin can create a community", code="GLOBAL_ONLY")
         code = payload.code.lower()
-        if self.communities.get_by_code(code):
+        if await self.communities.get_by_code(code):
             raise ConflictError(
                 "Community code already in use",
                 code="COMMUNITY_CODE_TAKEN",
                 fields={"code": "taken"},
             )
         obj = Community(**payload.model_dump(exclude={"code"}), code=code)
-        self.communities.add(obj)
-        record_audit(
-            self.db,
-            module="communities",
-            action="community.create",
-            actor=self.actor,
-            community_id=obj.id,
-            entity_type="community",
-            entity_id=obj.id,
-            new=payload.model_dump(),
-            request=self.request,
-        )
+        await self.communities.add(obj)
+        await self._audit("community.create", obj.id, "community", obj.id, new=payload.model_dump())
         return obj
 
-    def update_community(
+    async def update_community(
         self, community_id: uuid.UUID, payload: schemas.CommunityUpdate
     ) -> Community:
-        obj = self.get_community(community_id)
+        obj = await self.get_community(community_id)
         patch = payload.model_dump(exclude_unset=True)
         before = _snapshot(obj, patch)
         _apply(obj, patch)
-        self.db.flush()
-        record_audit(
-            self.db,
-            module="communities",
-            action="community.update",
-            actor=self.actor,
-            community_id=obj.id,
-            entity_type="community",
-            entity_id=obj.id,
-            old=before,
-            new=patch,
-            request=self.request,
-        )
+        await self.db.flush()
+        await self._audit("community.update", obj.id, "community", obj.id, old=before, new=patch)
         return obj
 
-    def delete_community(self, community_id: uuid.UUID) -> None:
+    async def delete_community(self, community_id: uuid.UUID) -> None:
         if not self.scope.is_global:
             raise ForbiddenError("Only a platform admin can delete a community", code="GLOBAL_ONLY")
-        obj = self.get_community(community_id)
-        self.db.delete(obj)
-        self.db.flush()
-        record_audit(
-            self.db,
-            module="communities",
-            action="community.delete",
-            actor=self.actor,
-            community_id=community_id,
-            entity_type="community",
-            entity_id=community_id,
-            request=self.request,
-        )
+        obj = await self.get_community(community_id)
+        await self.db.delete(obj)
+        await self.db.flush()
+        await self._audit("community.delete", community_id, "community", community_id)
 
     # -- gates ---------------------------------------------------------- #
-    def list_gates(
+    async def list_gates(
         self, *, community_id: uuid.UUID, offset: int, limit: int
     ) -> tuple[list[Gate], int]:
         cid = self.scope.require(community_id)
-        from sqlalchemy import select
-
         stmt = select(Gate).where(Gate.community_id == cid).order_by(Gate.code)
-        return self.gates.list(offset=offset, limit=limit, extra=stmt), self.gates.count(extra=stmt)
+        return (
+            await self.gates.list(offset=offset, limit=limit, extra=stmt),
+            await self.gates.count(extra=stmt),
+        )
 
-    def create_gate(self, *, community_id: uuid.UUID, payload: schemas.GateCreate) -> Gate:
+    async def create_gate(self, *, community_id: uuid.UUID, payload: schemas.GateCreate) -> Gate:
         cid = self.scope.require(community_id)
         _check_enum("gate_type", payload.gate_type)
-        if self.gates.by_code(cid, payload.code):
+        if await self.gates.by_code(cid, payload.code):
             raise ConflictError(
                 "Gate code already in use", code="GATE_CODE_TAKEN", fields={"code": "taken"}
             )
         obj = Gate(community_id=cid, **payload.model_dump())
-        self.gates.add(obj)
-        record_audit(
-            self.db,
-            module="communities",
-            action="gate.create",
-            actor=self.actor,
-            community_id=cid,
-            entity_type="gate",
-            entity_id=obj.id,
-            new=payload.model_dump(),
-            request=self.request,
-        )
+        await self.gates.add(obj)
+        await self._audit("gate.create", cid, "gate", obj.id, new=payload.model_dump())
         return obj
 
     # -- towers ------------------------------------------------------- #
-    def list_towers(
+    async def list_towers(
         self, *, community_id: uuid.UUID, offset: int, limit: int
     ) -> tuple[list[Tower], int]:
         cid = self.scope.require(community_id)
-        from sqlalchemy import select
-
         stmt = select(Tower).where(Tower.community_id == cid).order_by(Tower.name)
-        return self.towers.list(offset=offset, limit=limit, extra=stmt), self.towers.count(
-            extra=stmt
+        return (
+            await self.towers.list(offset=offset, limit=limit, extra=stmt),
+            await self.towers.count(extra=stmt),
         )
 
-    def get_tower(self, tower_id: uuid.UUID) -> Tower:
-        obj = self.towers.get(tower_id)
+    async def get_tower(self, tower_id: uuid.UUID) -> Tower:
+        obj = await self.towers.get(tower_id)
         if obj is None:
             raise NotFoundError("Tower not found")
         return obj
 
-    def create_tower(self, *, community_id: uuid.UUID, payload: schemas.TowerCreate) -> Tower:
+    async def create_tower(self, *, community_id: uuid.UUID, payload: schemas.TowerCreate) -> Tower:
         cid = self.scope.require(community_id)
         _check_enum("structure_type", payload.structure_type)
-        if self.towers.by_name(cid, payload.name):
+        if await self.towers.by_name(cid, payload.name):
             raise ConflictError(
                 "Tower name already in use", code="TOWER_NAME_TAKEN", fields={"name": "taken"}
             )
         obj = Tower(community_id=cid, **payload.model_dump())
-        self.towers.add(obj)
-        record_audit(
-            self.db,
-            module="communities",
-            action="tower.create",
-            actor=self.actor,
-            community_id=cid,
-            entity_type="tower",
-            entity_id=obj.id,
-            new=payload.model_dump(),
-            request=self.request,
-        )
+        await self.towers.add(obj)
+        await self._audit("tower.create", cid, "tower", obj.id, new=payload.model_dump())
         return obj
 
-    def update_tower(self, tower_id: uuid.UUID, payload: schemas.TowerUpdate) -> Tower:
-        obj = self.get_tower(tower_id)
+    async def update_tower(self, tower_id: uuid.UUID, payload: schemas.TowerUpdate) -> Tower:
+        obj = await self.get_tower(tower_id)
         patch = payload.model_dump(exclude_unset=True)
         _check_enum("structure_type", patch.get("structure_type"))
         before = _snapshot(obj, patch)
         _apply(obj, patch)
-        self.db.flush()
-        record_audit(
-            self.db,
-            module="communities",
-            action="tower.update",
-            actor=self.actor,
-            community_id=obj.community_id,
-            entity_type="tower",
-            entity_id=obj.id,
-            old=before,
-            new=patch,
-            request=self.request,
-        )
+        await self.db.flush()
+        await self._audit("tower.update", obj.community_id, "tower", obj.id, old=before, new=patch)
         return obj
 
     # -- floors ---------------------------------------------------- #
-    def list_floors(
+    async def list_floors(
         self, *, tower_id: uuid.UUID, offset: int, limit: int
     ) -> tuple[list[Floor], int]:
-        tower = self.get_tower(tower_id)
-        from sqlalchemy import select
-
+        tower = await self.get_tower(tower_id)
         stmt = select(Floor).where(Floor.tower_id == tower.id).order_by(Floor.floor_number)
-        return self.floors.list(offset=offset, limit=limit, extra=stmt), self.floors.count(
-            extra=stmt
+        return (
+            await self.floors.list(offset=offset, limit=limit, extra=stmt),
+            await self.floors.count(extra=stmt),
         )
 
-    def get_floor(self, floor_id: uuid.UUID) -> Floor:
-        obj = self.floors.get(floor_id)
+    async def get_floor(self, floor_id: uuid.UUID) -> Floor:
+        obj = await self.floors.get(floor_id)
         if obj is None:
             raise NotFoundError("Floor not found")
         return obj
 
-    def create_floor(self, payload: schemas.FloorCreate) -> Floor:
-        tower = self.get_tower(payload.tower_id)  # 404 if tower outside scope
-        if self.floors.by_number(
+    async def create_floor(self, payload: schemas.FloorCreate) -> Floor:
+        tower = await self.get_tower(payload.tower_id)  # 404 if tower outside scope
+        if await self.floors.by_number(
             community_id=tower.community_id, tower_id=tower.id, number=payload.floor_number
         ):
             raise ConflictError(
@@ -267,40 +225,35 @@ class CommunityService:
             floor_number=payload.floor_number,
             label=payload.label,
         )
-        self.floors.add(obj)
+        await self.floors.add(obj)
         tower.total_floors = max(tower.total_floors, payload.floor_number)
-        self.db.flush()
-        record_audit(
-            self.db,
-            module="communities",
-            action="floor.create",
-            actor=self.actor,
-            community_id=tower.community_id,
-            entity_type="floor",
-            entity_id=obj.id,
-            new=payload.model_dump(),
-            request=self.request,
+        await self.db.flush()
+        await self._audit(
+            "floor.create", tower.community_id, "floor", obj.id, new=payload.model_dump()
         )
         return obj
 
     # -- units --------------------------------------------------- #
-    def list_units(self, *, floor_id: uuid.UUID, offset: int, limit: int) -> tuple[list[Unit], int]:
-        floor = self.get_floor(floor_id)
-        from sqlalchemy import select
-
+    async def list_units(
+        self, *, floor_id: uuid.UUID, offset: int, limit: int
+    ) -> tuple[list[Unit], int]:
+        floor = await self.get_floor(floor_id)
         stmt = select(Unit).where(Unit.floor_id == floor.id).order_by(Unit.unit_number)
-        return self.units.list(offset=offset, limit=limit, extra=stmt), self.units.count(extra=stmt)
+        return (
+            await self.units.list(offset=offset, limit=limit, extra=stmt),
+            await self.units.count(extra=stmt),
+        )
 
-    def get_unit(self, unit_id: uuid.UUID) -> Unit:
-        obj = self.units.get(unit_id)
+    async def get_unit(self, unit_id: uuid.UUID) -> Unit:
+        obj = await self.units.get(unit_id)
         if obj is None:
             raise NotFoundError("Unit not found")
         return obj
 
-    def create_unit(self, payload: schemas.UnitCreate) -> Unit:
-        floor = self.get_floor(payload.floor_id)  # 404 if floor outside scope
+    async def create_unit(self, payload: schemas.UnitCreate) -> Unit:
+        floor = await self.get_floor(payload.floor_id)  # 404 if floor outside scope
         _check_enum("unit_type", payload.unit_type)
-        if self.units.by_number(
+        if await self.units.by_number(
             community_id=floor.community_id,
             tower_id=floor.tower_id,
             floor_id=floor.id,
@@ -320,41 +273,18 @@ class CommunityService:
             bedrooms=payload.bedrooms,
             area_sqft=payload.area_sqft,
         )
-        self.units.add(obj)
-        record_audit(
-            self.db,
-            module="communities",
-            action="unit.create",
-            actor=self.actor,
-            community_id=floor.community_id,
-            entity_type="unit",
-            entity_id=obj.id,
-            new=payload.model_dump(),
-            request=self.request,
+        await self.units.add(obj)
+        await self._audit(
+            "unit.create", floor.community_id, "unit", obj.id, new=payload.model_dump()
         )
         return obj
 
-    def update_unit(self, unit_id: uuid.UUID, payload: schemas.UnitUpdate) -> Unit:
-        obj = self.get_unit(unit_id)
+    async def update_unit(self, unit_id: uuid.UUID, payload: schemas.UnitUpdate) -> Unit:
+        obj = await self.get_unit(unit_id)
         patch = payload.model_dump(exclude_unset=True)
         _check_enum("unit_type", patch.get("unit_type"))
         before = _snapshot(obj, patch)
         _apply(obj, patch)
-        self.db.flush()
-        record_audit(
-            self.db,
-            module="communities",
-            action="unit.update",
-            actor=self.actor,
-            community_id=obj.community_id,
-            entity_type="unit",
-            entity_id=obj.id,
-            old=before,
-            new=patch,
-            request=self.request,
-        )
+        await self.db.flush()
+        await self._audit("unit.update", obj.community_id, "unit", obj.id, old=before, new=patch)
         return obj
-
-
-def _snapshot(obj: object, keys: dict) -> dict:
-    return {k: getattr(obj, k, None) for k in keys}
