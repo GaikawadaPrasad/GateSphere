@@ -5,6 +5,7 @@ from __future__ import annotations
 from celery import Celery
 from celery.schedules import crontab
 
+import app.db.base  # noqa: F401 — register every ORM model so mappers configure in the worker
 from app.core.config import settings
 
 celery = Celery(
