@@ -920,3 +920,24 @@ scoped parent, and `UnitScopedAccess` now adds the own-unit layer for residents.
 - `visitors.record_entry` PIN lookup is now scoped to the guard's community (a 6-digit PIN can
   collide across communities; only the request's community should match).
 **Verified:** `ruff`/`black` clean; `pytest` 239 passed (new cross-community `download` IDOR test).
+
+## 2026-08-30 — Backend architecture Mermaid documentation
+
+**By:** documentation build (code-derived)
+**What changed:** new `docs/architecture/backend/`:
+- `backend-architecture.mmd` — one end-to-end system diagram (client → CORS/correlation-id/
+  rate-limit/exception middleware → CSRF/session auth → tenant scope + RBAC + RLS bind →
+  20 route groups → domain services → `record_audit_async` → `AsyncTenantRepository` → Postgres;
+  plus the notification event bus, S3/MinIO, Redis, Celery beat/worker, permission propagation).
+- `modules/*.mmd` — one flowchart per module (20 files) with every route, permission gate,
+  business conditionals (state machines, own-unit checks, atomic amenity lock, blacklist screen,
+  `user_in_community`, upload IDOR guard), service methods + file refs, repos/models written,
+  events emitted, jobs triggered.
+- `route-inventory.md` — all ~230 API routes: method · path · auth · permission · scope ·
+  mutation · side effects; + the 5 Celery beat tasks. Cross-checked against live `openapi.json`
+  (256 registered routes).
+- `README.md` — purpose, source-of-truth policy, route→diagram map, update rules.
+- AGENTS.md §18 gains the mandatory "keep diagrams in sync with code" rule.
+**Verified:** derived by tracing `main.py` → `api/router.py` → each `router/deps/service/
+repository/models/tasks.py`; `subgraph`/`end` balance + quote balance + header checks pass;
+one perm fix applied (`/notifications/templates` GET is `notifications:create`, not `:view`).

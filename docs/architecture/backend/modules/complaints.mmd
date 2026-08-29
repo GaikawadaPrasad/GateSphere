@@ -1,0 +1,88 @@
+%% Module: complaints — Service Desk, SLA-driven (FR-10)
+%% Files: app/modules/complaints/{router,deps,service,repository,models,schemas,tasks}.py
+%% Models: ServiceCategory, SlaPolicy (config-as-data), ServiceTicket (state machine),
+%%         TicketStatusHistory (append-only), TicketAssignment (executor XOR vendor),
+%%         TicketMessage, TicketFeedback (one/ticket), TicketAttachment
+%% Scope: TenantScope + UnitScopedAccess
+
+flowchart TD
+    C["Client (session)"] --> DEP["deps.complaint_service — async_tenant_context + require_auth_async"]
+    DEP --> G{"require_permission_async<br/>complaints:view / :create / :update / :approve"}
+    G -->|deny| E403["403 PERMISSION_DENIED"]
+
+    G --> CONFIG & T_L & T_C & T_D & T_ASSIGN & T_TRANS & T_CONFIRM & T_MSG & T_FB & T_ATT
+
+    subgraph CONFIG["Config (complaints:approve for writes)"]
+        CAT["GET/POST/PATCH /complaints/categories → 409 CATEGORY_EXISTS; service_categories upsert"]
+        SLA["GET/PUT /complaints/sla → list_slas / upsert_sla (per category+priority);<br/>sla_policies (response/resolution/escalation minutes, at_risk_threshold, escalation_notify_role)"]
+    end
+
+    T_L["GET /complaints/tickets → list_tickets  [complaints:view]<br/>_scope_unit_column(unit_id, OR raised_by_user_id==actor)"]
+
+    subgraph T_C["POST /complaints/tickets → create_ticket  [complaints:create]"]
+        direction TB
+        TC1["_unit_in_scope(unit_id) + _assert_unit_visible; category same community 404"]
+        TC1 --> TC2["priority = payload.priority | category.default_priority; slas.match(cat, priority)"]
+        TC2 --> TC3["INSERT service_tickets (status=created, TKT-number,<br/>first_response_due_at / resolution_due_at / escalation_due_at from SLA)"]
+        TC3 --> TC4["_record_history(None→created); audit ticket.create"]
+    end
+
+    T_D["GET /complaints/tickets/{id} → get_ticket → _assert_unit_visible → 404<br/>(gate for messages/history/attachments/confirm/feedback too)"]
+
+    subgraph T_ASSIGN["POST /complaints/tickets/{id}/assign → assign_ticket  [complaints:update]"]
+        direction TB
+        AS0{"ticket ∈ closed|cancelled?"} -->|yes| AS_E1["422 INVALID_TRANSITION"]
+        AS0 -->|no| AS1{"assigned_to_user_id set?"}
+        AS1 -->|yes| AS2{"user_in_community(user, ticket.community)?"} -->|no| AS_E2["404 Assignee not found"]
+        AS2 -->|yes| AS3
+        AS1 -->|"vendor_name (XOR)"| AS3["deactivate prev active_assignment; INSERT ticket_assignments"]
+        AS3 --> AS4["if status ∈ created|reopened → status=assigned + history; _mark_first_response; audit ticket.assign"]
+    end
+
+    subgraph T_TRANS["POST /complaints/tickets/{id}/transition → transition_ticket  [complaints:update]"]
+        direction TB
+        TT0{"target ∈ closed|reopened?"} -->|yes| TT_E1["422 — use /confirm endpoint"]
+        TT0 -->|no| TT1["ensure_transition(current, target, _TICKET_ACTIONS)"]
+        TT1 -->|invalid| TT_E2["422 INVALID_TRANSITION"]
+        TT1 -->|"target == resolved"| TT2["resolved_at; SLA breach stamp;<br/>status → resident_confirmation; resident_confirmation_status=pending; history ×2"]
+        TT1 -->|"cancelled / acknowledged / in_progress"| TT3["status = target; cancelled → closed_at; history"]
+        TT2 & TT3 --> TT4["audit ticket.&lt;target&gt; → emit ticket.&lt;final&gt; → raised_by_user_id"]
+    end
+
+    subgraph T_CONFIRM["POST /complaints/tickets/{id}/confirm → confirm_ticket  [complaints:view]"]
+        direction TB
+        CF0{"status == resident_confirmation?"} -->|no| CF_E["422 INVALID_TRANSITION"]
+        CF0 -->|"confirmed"| CF1["status=closed, closed_at; history"]
+        CF0 -->|"disputed"| CF2["status=reopened; history"]
+        CF1 & CF2 --> CF3["audit ticket.confirm"]
+    end
+
+    subgraph T_MSG["GET/POST /complaints/tickets/{id}/messages  [complaints:view]"]
+        direction TB
+        MG_L["list_messages — is_unit_restricted → exclude is_internal (staff notes hidden from residents)"]
+        MG_C{"POST add_message: payload.is_internal & is_unit_restricted?"} -->|yes| MG_E["403 INTERNAL_NOTE_FORBIDDEN"]
+        MG_C -->|no| MG_A["INSERT ticket_messages; _mark_first_response if external staff reply; audit"]
+    end
+
+    subgraph T_FB["POST /complaints/tickets/{id}/feedback  [complaints:view]"]
+        FB0{"status == closed?"} -->|no| FB_E1["422 TICKET_NOT_CLOSED"]
+        FB0 -->|yes| FB1{"feedback exists?"} -->|yes| FB_E2["409 FEEDBACK_EXISTS"]
+        FB1 -->|no| FB2["INSERT ticket_feedback; audit"]
+    end
+
+    T_ATT["GET/POST /complaints/tickets/{id}/attachments  [complaints:view]<br/>ensure_confirmed_async(file_url); message_id (if set) must belong to ticket; INSERT ticket_attachments"]
+    T_HIST["GET /complaints/tickets/{id}/history → list_history"]
+    G --> T_HIST
+
+    subgraph TASK["Celery: complaints.tasks.sweep_ticket_sla (5 min)"]
+        direction TB
+        SW["walk open tickets; _target_state(t, sla, now):<br/>escalation_due_at → escalated ; resolution_due_at → breached ; at_risk_threshold% → at_risk"]
+        SW --> SW1["if target &gt; current escalation_state → advance, stamp (sla_at_risk_at / sla_breached_at / escalated_at + level++)"]
+        SW1 --> SW2["audit ticket.sla_&lt;state&gt;<br/>emit_to_roles complaints.ticket_&lt;state&gt; → escalation_notify_role (+ security_supervisor for escalated)<br/>emit → raised_by_user_id"]
+    end
+
+    CONFIG & T_L & T_C & T_D & T_ASSIGN & T_TRANS & T_CONFIRM & T_MSG & T_FB & T_ATT --> REPO["Category/Sla/Ticket Repository (AsyncTenantRepository)"]
+    T_ATT --> UP["uploads.guard.ensure_confirmed_async (ticket_attachment)"]
+    REPO --> DB[("PostgreSQL: service_categories, sla_policies, service_tickets, ticket_status_history,<br/>ticket_assignments, ticket_messages, ticket_feedback, ticket_attachments, audit_logs")]
+    TT4 & SW2 --> EVT["notifications/events.emit* → NotificationService.dispatch"]
+    TASK --> DB

@@ -1,0 +1,57 @@
+%% Module: notifications (FR-15)
+%% Files: app/modules/notifications/{router,deps,service,events,models,schemas,tasks}.py
+%% Models: NotificationTemplate, Notification, NotificationDelivery (append-only), UserNotificationPreference
+
+flowchart TD
+    C["Client (session)"] --> DEP["deps.notification_service"]
+
+    subgraph INBOX["Inbox — self-scoped (recipient_user_id == actor.id)"]
+        direction TB
+        I1["GET /notifications → list_mine (?unread_only)"]
+        I2["GET /notifications/{id} → _mine → 404 if not recipient"]
+        I3["POST /notifications/{id}/read → mark_read"]
+        I4["POST /notifications/read-all → mark_all_read (bulk, returns count)"]
+    end
+    DEP -->|notifications:view| INBOX
+
+    subgraph PREF["Preferences — self"]
+        P1["GET/PUT /notifications/me/preferences → my_preferences / set_preference<br/>upsert user_notification_preferences (channel, is_enabled, quiet_hours)"]
+    end
+    DEP -->|notifications:view| PREF
+
+    subgraph TPL["Templates — tenant-scoped (both GET and PUT gated notifications:create)"]
+        T1["GET/PUT /notifications/templates → list_templates / upsert_template<br/>upsert notification_templates per (community, code, channel)"]
+    end
+    DEP -->|"notifications:create"| TPL
+
+    subgraph DISPATCH["POST /notifications/dispatch → dispatch(DispatchIn)  (notifications:create)"]
+        direction TB
+        D0["_one_community(payload.community_id) → scope.require"]
+        D1{"recipient User exists?"} -->|no| D_E1["404 Recipient not found"]
+        D1 -->|yes| D2{"template_code given?"}
+        D2 -->|yes| D3["templates.match(cid, code, in_app) or fallback by code<br/>→ 404 Template not found; _render(title/body, context)"]
+        D2 -->|no| D4["use payload.title/message"]
+        D3 --> D5
+        D4 --> D5{"title & message present?"} -->|no| D_E2["422 CONTENT_REQUIRED"]
+        D5 -->|yes| D6["INSERT notifications"]
+        D6 --> D7["per channel: _channel_allowed(user, cid, channel)"]
+        D7 --> D8{"decision"}
+        D8 -->|"in_app → deliver"| D9["INSERT notification_delivery status=delivered provider=in_app"]
+        D8 -->|"other channel, pref enabled, not quiet → deliver"| D10["INSERT notification_delivery status=delivered provider=simulated (sim-id)"]
+        D8 -->|"disabled | quiet"| D11["INSERT notification_delivery status=skipped failure_reason=channel &lt;x&gt;"]
+        D9 & D10 & D11 --> D12["audit notifications/notification.dispatch"]
+    end
+    DEP -->|notifications:create| DISPATCH
+
+    subgraph BUS["Event bus (events.py) — NOT a route"]
+        direction TB
+        E1["emit(...) / emit_to_roles(...)<br/>called by visitors, billing, complaints, gate, incidents, onboarding + Celery tasks"]
+        E2["async with db.begin_nested()  (SAVEPOINT)<br/>NotificationService(db, scope, actor).dispatch(payload)"]
+        E3["except Exception → log.warning, rollback ONLY the notification"]
+    end
+    E1 --> E2 --> DISPATCH
+    E2 -.->|failure| E3
+
+    INBOX & PREF & TPL --> REPO["NotificationRepository / TemplateRepository (AsyncTenantRepository)"]
+    DISPATCH --> REPO
+    REPO --> PG[("PostgreSQL: notifications, notification_deliveries,<br/>notification_templates, user_notification_preferences, audit_logs")]

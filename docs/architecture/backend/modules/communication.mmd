@@ -1,0 +1,58 @@
+%% Module: communication — Broadcast Engine (FR-12)
+%% Files: app/modules/communication/{router,deps,service,repository,models,schemas}.py
+%% Models: Announcement (notice|emergency|poll|event|survey; publish-freeze) + AnnouncementTarget,
+%%         ResidentGroup + ResidentGroupMember, Poll + PollOption + PollResponse + PollResponseOption
+
+flowchart TD
+    C["Client (session)"] --> DEP["deps.communication_service — async_tenant_context + require_auth_async"]
+    DEP --> G{"require_permission_async<br/>communication:view / :create / :update / :approve"}
+    G -->|deny| E403["403 PERMISSION_DENIED"]
+
+    G --> ANN & GRP & POLL
+
+    subgraph ANN["Announcements"]
+        direction TB
+        AN_L["GET /communication/announcements → list_announcements (?published_only)"]
+        AN_C["POST /communication/announcements → create_announcement  [communication:create]<br/>_validate_targets (tower/unit/role/group must be in community);<br/>INSERT announcements + announcement_targets; audit"]
+        AN_G["GET /communication/announcements/{id} → get_announcement (repo _scoped)"]
+        AN_U{"PATCH /communication/announcements/{id} → update_announcement  [communication:update]<br/>is_published?"}
+        AN_U -->|yes| AN_UE["409 ALREADY_PUBLISHED (published = immutable)"]
+        AN_U -->|no| AN_UU["apply patch; re-validate targets; audit"]
+        AN_P["POST /communication/announcements/{id}/publish  [communication:approve]<br/>is_published=true, publish_at; freezes"]
+        AN_E["POST /communication/announcements/{id}/expire  [communication:approve]"]
+    end
+
+    subgraph GRP["Resident groups"]
+        direction TB
+        GR_L["GET /communication/groups → list_groups (+ member counts)"]
+        GR_C["POST /communication/groups → create_group  [communication:create]  409 GROUP_EXISTS"]
+        GR_U["PATCH /communication/groups/{id} → update_group  [communication:update]"]
+        GR_ML["GET /communication/groups/{id}/members → list_members (_get_group scope gate)"]
+        GR_MA{"POST /communication/groups/{id}/members → add_member  [communication:update]<br/>user_in_community(user_id, group.community)?"}
+        GR_MA -->|no| GR_MAE["404 User not found"]
+        GR_MA -->|yes| GR_MA2{"already a member?"} -->|yes| GR_MAE2["409 MEMBER_EXISTS"]
+        GR_MA2 -->|no| GR_MA3["INSERT resident_group_members; audit"]
+        GR_MD["DELETE /communication/groups/{id}/members/{member_id} → remove_member<br/>member.group_id == group.id else 404; DELETE row; audit"]
+    end
+
+    subgraph POLL["Polls & surveys (state machine draft→open→closed)"]
+        direction TB
+        PO_C["POST /communication/polls → create_poll  [communication:create]<br/>announcement type ∈ poll|survey; 409 POLL_EXISTS; INSERT polls + poll_options"]
+        PO_G["GET /communication/polls/{id} · /{id}/results → get_poll / results (live tally)"]
+        PO_S{"POST /communication/polls/{id}/status → set_poll_status  [communication:update]"}
+        PO_S -->|"invalid transition"| PO_SE["422 INVALID_TRANSITION"]
+        PO_S -->|"→ open"| PO_S1{"announcement.is_published?"} -->|no| PO_SE2["422 ANNOUNCEMENT_DRAFT"]
+        PO_S1 -->|yes| PO_S2["opens_at; status=open"]
+        PO_S -->|"→ closed"| PO_S3["closes_at; status=closed"]
+        PO_V["POST /communication/polls/{id}/vote → vote  [communication:view]"]
+        PO_V --> PO_V1{"status == open & not past closes_at?"} -->|no| PO_VE1["422 POLL_NOT_OPEN / POLL_CLOSED"]
+        PO_V1 -->|yes| PO_V2{"option_ids ⊆ poll.options?"} -->|no| PO_VE2["422 INVALID_OPTION"]
+        PO_V2 -->|yes| PO_V3{"allow_multiple OR exactly 1?"} -->|no| PO_VE3["422 SINGLE_CHOICE_ONLY"]
+        PO_V3 -->|yes| PO_V4{"response_for(poll, actor) exists?"} -->|yes| PO_VE4["409 ALREADY_VOTED"]
+        PO_V4 -->|no| PO_V5["INSERT poll_responses + poll_response_options; audit poll.vote"]
+    end
+
+    ANN & GRP & POLL --> REPO["AnnouncementRepository / PollRepository (AsyncTenantRepository)<br/>+ _get_group (explicit community check)"]
+    REPO --> DB[("PostgreSQL: announcements, announcement_targets, resident_groups, resident_group_members,<br/>polls, poll_options, poll_responses, poll_response_options, audit_logs")]
+
+    NOTE["list_announcements returns all published announcements in the community<br/>ordered by created_at desc, paginated — audience targeting is stored but not applied to this list."]

@@ -1,0 +1,65 @@
+%% Module: incidents — Emergency & Security Incident Management (FR-13)
+%% Files: app/modules/incidents/{router,deps,service,repository,models,schemas}.py
+%% Models: SecurityIncident (state machine), IncidentStatusHistory (append-only),
+%%         IncidentAssignment, IncidentAction (append-only), IncidentAttachment
+
+flowchart TD
+    C["Client (session)"] --> DEP["deps.incident_service — async_tenant_context + require_auth_async"]
+    DEP --> G{"require_permission_async<br/>incidents:view / :create / :update"}
+    G -->|deny| E403["403 PERMISSION_DENIED"]
+
+    G --> I_L & I_C & I_D & I_U & I_TRANS & I_ASSIGN & I_RELEASE & I_ACT & I_ATT & I_HIST
+
+    I_L["GET /incidents → list_incidents (?incident_status, ?severity)"]
+
+    subgraph I_C["POST /incidents → create_incident  [incidents:create]"]
+        direction TB
+        C1["_one_community(payload.community_id); _enum(type, severity)"]
+        C1 --> C2["_belongs(Tower/Unit/Gate/PanicAlert, community_id) — cross-tenant ref → 404"]
+        C2 --> C3["INSERT security_incidents (status=reported, INC-number, reporter_user_id=actor)"]
+        C3 --> C4["_history(None→reported); audit incident.create"]
+    end
+
+    I_D["GET /incidents/{id} → get_incident (IncidentRepository _scoped) → 404"]
+
+    subgraph I_U["PATCH /incidents/{id} → update_incident  [incidents:update]"]
+        U1{"status ∈ closed|false_alarm?"} -->|yes| U_E["422 INVALID_TRANSITION"]
+        U1 -->|no| U2["apply patch; audit incident.update"]
+    end
+
+    subgraph I_TRANS["POST /incidents/{id}/transition → transition_incident  [incidents:update]"]
+        direction TB
+        T1["ensure_transition(current, target, _TRANSITIONS  reported→acknowledged→responding→contained→resolved→closed ; false_alarm)"]
+        T1 -->|invalid| T_E["422 INVALID_TRANSITION"]
+        T1 -->|"target == resolved"| T2{"resolution_summary present?"} -->|no| T_E2["422 SUMMARY_REQUIRED"]
+        T2 -->|yes| T3["resolution_summary, resolved_at"]
+        T1 -->|other| T3
+        T3 --> T4["status=target; _history(old→target); audit incident.&lt;target&gt;"]
+        T4 --> T5["emit incident.&lt;target&gt; → reporter_user_id (SAVEPOINT)"]
+    end
+
+    subgraph I_ASSIGN["POST /incidents/{id}/assignments → assign  [incidents:update]"]
+        direction TB
+        AS1{"incident ∈ closed|false_alarm?"} -->|yes| AS_E1["422 INVALID_TRANSITION"]
+        AS1 -->|no| AS2{"user_in_community(assigned_user_id, incident.community)?"} -->|no| AS_E2["404 Responder not found"]
+        AS2 -->|yes| AS3{"already assigned?"} -->|yes| AS_E3["409 ALREADY_ASSIGNED"]
+        AS3 -->|no| AS4["INSERT incident_assignments; audit incident.assign"]
+    end
+
+    subgraph I_RELEASE["POST /incidents/assignments/{assignment_id}/release → release  [incidents:update]"]
+        direction TB
+        RL1["db.get(IncidentAssignment) → get_incident(obj.incident_id) as scope gate"]
+        RL1 --> RL2{"is_active?"} -->|no| RL_E["422 ALREADY_RELEASED"]
+        RL2 -->|yes| RL3["is_active=false, released_at; audit incident.release"]
+    end
+
+    I_ACT["GET/POST /incidents/{id}/actions → list_actions / add_action  [:view/:update]<br/>INSERT incident_actions (append-only); audit"]
+    I_ATT["GET/POST /incidents/{id}/attachments → list/add_attachment  [:view/:update]<br/>ensure_confirmed_async(file_url); INSERT incident_attachments; audit"]
+    I_HIST["GET /incidents/{id}/history → list_history  [incidents:view]"]
+
+    I_L & I_C & I_D & I_U & I_TRANS & I_ASSIGN & I_RELEASE & I_ACT & I_ATT & I_HIST --> REPO["IncidentRepository (AsyncTenantRepository) + _belongs / get_incident gates"]
+    I_ATT --> UP["uploads.guard.ensure_confirmed_async (incident_evidence)"]
+    REPO --> DB[("PostgreSQL: security_incidents, incident_status_history,<br/>incident_assignments, incident_actions, incident_attachments, audit_logs")]
+    T5 --> EVT["notifications/events.emit → NotificationService.dispatch"]
+
+    NOTE["An incident may be created from a PanicAlert (panic_alert_id) — links gate → incident.<br/>transition_incident may trigger an emergency broadcast (via notification event)."]

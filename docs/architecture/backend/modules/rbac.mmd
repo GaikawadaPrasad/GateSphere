@@ -1,0 +1,53 @@
+%% Module: rbac — configurable RBAC (FR-02 extension), migration 0023
+%% Files: app/modules/rbac/{router,deps,service,schemas}.py · models in app/modules/users/models.py
+%% Effective(role, community) = role_permissions ∪ {allow overrides} − {deny overrides}
+
+flowchart TD
+    C["Client (session)"] --> DEP["deps.rbac_service<br/>async_tenant_context + require_auth_async"]
+
+    DEP --> RGATE{"route gate"}
+    RGATE -->|"GET /rbac/permissions, /roles,<br/>/communities/{cid}/overrides, /roles/{slug}/effective"| VIEW["require_permission_async(users:view)"]
+    RGATE -->|"all PUT/POST/DELETE"| ADMIN["require_platform_admin<br/>is_superadmin else 403 PLATFORM_ADMIN_ONLY"]
+
+    VIEW --> READS
+    ADMIN --> GLOBAL
+    ADMIN --> OVERRIDE
+
+    subgraph READS["Reads — RbacService"]
+        direction TB
+        RD1["list_permissions → select(Permission)"]
+        RD2["list_roles → per Role: current codes + _default_codes(slug) + is_wildcard"]
+        RD3["list_community_overrides(cid) → _community() calls scope.require(cid)"]
+        RD4["effective_permissions(cid, slug) → base ∪ allow − deny"]
+    end
+
+    subgraph GLOBAL["Global role edit — _apply_global(slug, codes, action)"]
+        direction TB
+        G0{"_guard_editable: ROLE_PERMISSIONS[slug] == ['*'] ?"} -->|yes| G_E["422 ROLE_NOT_EDITABLE"]
+        G0 -->|no| G1{"unknown codes?"} -->|yes| G_E2["422 UNKNOWN_PERMISSION"]
+        G1 -->|no| G2["diff role_permissions rows → INSERT/DELETE"]
+        G2 --> G3["users_with_role_async(role) → invalidate_user_permissions_async(all)"]
+        G3 --> G4["audit rbac/role.&lt;action&gt;"]
+    end
+    PUT_G["PUT /rbac/roles/{slug}/permissions → set_role_permissions"] --> GLOBAL
+    POST_G["POST .../permissions (add one)"] --> GLOBAL
+    DEL_G["DELETE .../permissions/{code} (remove one)"] --> GLOBAL
+    RST_G["POST .../permissions/reset (→ ROLE_PERMISSIONS seed)"] --> GLOBAL
+
+    subgraph OVERRIDE["Per-community override — set_community_role_overrides(cid, slug, {allow,deny,note})"]
+        direction TB
+        O0["_community(cid) → scope.require(cid); _guard_editable(slug)"]
+        O1{"code in both allow AND deny?"} -->|yes| O_E["422 CONFLICTING_OVERRIDE"]
+        O1 -->|no| O2["upsert community_role_permissions (effect allow|deny)"]
+        O2 --> O3["users_with_role_async(role, cid) → invalidate_user_permissions_async"]
+        O3 --> O4["audit rbac/community_override.set"]
+        O5["DELETE .../{code} → remove_community_override → delete row + invalidate"]
+    end
+
+    READS --> RREAD["select via AsyncSession"]
+    GLOBAL --> WMUT["role_permissions INSERT/DELETE"]
+    OVERRIDE --> OMUT["community_role_permissions upsert/delete"]
+    RREAD & WMUT & OMUT --> DB[("PostgreSQL: role_permissions, community_role_permissions,<br/>users.permission_version, audit_logs")]
+    G3 & O3 --> RC[("Redis: revoke session:* for every holder")]
+
+    ENF["Enforcement: get_tenant_scope_async computes scope.permissions<br/>= effective set for the active community.<br/>require_permission_async(code) → scope.can(code)<br/>→ a deny override 403s the target route for a single-community user."]

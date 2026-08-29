@@ -1,0 +1,60 @@
+%% Module: auth (FR-01) — session-cookie auth, no browser JWT
+%% Files: app/modules/auth/{router,schemas}.py · app/core/security.py · app/modules/auth/models.py (UserSession)
+%% Derived from source. Keep in sync.
+
+flowchart TD
+    C["Client"]
+
+    subgraph LOGIN["POST /auth/login  (public, rate-limited 5/min/IP)"]
+        direction TB
+        L1["router.login<br/>app/modules/auth/router.py"]
+        L2["fetch User by email.lower()<br/>select(User)"]
+        L3{"user & is_active &<br/>verify_password (Argon2)?"}
+        L4["needs_rehash? → re-hash password_hash"]
+        L5["create_session<br/>app/core/security.py"]
+        L6["_serialize → user_permissions_async<br/>CurrentUser{id,email,is_superadmin,<br/>permissions[], community_ids[], permission_version}"]
+        LF["AuthError 401 INVALID_CREDENTIALS<br/>(uniform — no enumeration)"]
+    end
+
+    subgraph SESSION["create_session side effects"]
+        direction TB
+        SE1["INSERT user_sessions<br/>(session_key_hash sha256, csrf_token, ip, ua, expires_at)"]
+        SE2["Redis SETEX session:&lt;hash&gt; = {session_id,user_id,csrf}<br/>TTL = SESSION_TTL_SECONDS (8h) — best-effort"]
+        SE3["Set-Cookie gs_session (HttpOnly, SameSite=Lax)<br/>Set-Cookie gs_csrf (JS-readable)"]
+    end
+
+    subgraph LOGOUT["POST /auth/logout  (session)"]
+        direction TB
+        O1["router.logout — require_auth_async"]
+        O2["destroy_session: user_sessions.revoked_at=now,<br/>Redis DEL session:&lt;hash&gt;, delete_cookie ×2"]
+        O3["record_audit_async auth/logout"]
+    end
+
+    subgraph ME["GET /auth/me  (session)"]
+        M1["router.me → _serialize"]
+        M2["read user_sessions/User + user_permissions_async"]
+    end
+
+    subgraph AUD["Audit"]
+        A_OK["audit auth/login.success (same txn)"]
+        A_BAD["audit auth/login.failed<br/>OWN txn via AsyncSessionLocal() — request txn rolls back on 401"]
+    end
+
+    C -->|email,password| L1 --> L2 --> L3
+    L3 -->|no| LF --> A_BAD --> C
+    L3 -->|yes| L4 --> L5
+    L5 --> SE1 --> SE2 --> SE3
+    L5 --> A_OK
+    L5 --> L6 --> C
+
+    C -->|gs_session + X-CSRF-Token| O1 --> O2 --> O3 --> C
+    C -->|gs_session| M1 --> M2 --> C
+
+    A_OK --> DB[("PostgreSQL: user_sessions, audit_logs")]
+    A_BAD --> DB
+    SE1 --> DB
+    O2 --> DB
+    SE2 --> RC[("Redis")]
+    O2 --> RC
+
+    note["Sessions revoked on: logout · password change · role/permission change<br/>(revoke_all_user_sessions_async / invalidate_user_permissions_async)"]

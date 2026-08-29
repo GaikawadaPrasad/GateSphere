@@ -1,0 +1,59 @@
+%% Module: uploads — file pipeline (NFR-SEC-07)
+%% Files: app/modules/uploads/{router,service,catalogue,sniff,guard,models,schemas}.py · app/services/storage.py (boto3)
+%% Model: ManagedFile (object_key, kind, status pending|confirmed|rejected, community_id, created_by_user_id)
+
+flowchart TD
+    C["Client (session — every route via deps.upload_service → require_auth_async)"]
+
+    C -->|"GET /uploads/kinds"| K["list_kinds → catalogue.KINDS<br/>(kind → prefix, allowed content_types, max_bytes, scope community|user)"]
+
+    subgraph PRESIGN["POST /uploads → presign(PresignRequest)"]
+        direction TB
+        P0{"kind in KINDS?"} -->|no| P_E1["404 Unknown upload kind"]
+        P0 -->|yes| P1{"content_type allowed?"} -->|no| P_E2["422 CONTENT_TYPE_NOT_ALLOWED"]
+        P1 -->|yes| P2{"size_bytes &lt;= max?"} -->|no| P_E3["422 FILE_TOO_LARGE"]
+        P2 -->|yes| P3["ns = community_id (community kind, scope.require) | actor.id (user kind)<br/>key = prefix/ns/&lt;uuid4&gt;-&lt;stem&gt;&lt;ext&gt;"]
+        P3 --> P4["storage.presigned_put(key, content_type, 900s)  [off-thread]"]
+        P4 --> P5["INSERT managed_files status=pending, created_by_user_id=actor.id"]
+        P5 --> P6["audit uploads/upload.presign"]
+        P6 --> P7["→ {file_id, upload_url, file_url, confirm_url}"]
+    end
+    C --> PRESIGN
+    C -.->|"PUT bytes directly to S3/MinIO"| S3[("S3 / MinIO bucket")]
+    P4 --> S3
+
+    subgraph CONFIRM["POST /uploads/{file_id}/confirm → confirm(file_id)"]
+        direction TB
+        F0["_managed_file: db.get(ManagedFile) → _assert_can_access<br/>(is_global OR created_by==actor OR mf.community_id in scope) else 404"]
+        F0 --> F1{"status?"}
+        F1 -->|confirmed| F_OK["return existing"]
+        F1 -->|rejected| F_R["422 UPLOAD_REJECTED (reason)"]
+        F1 -->|pending| F2["storage.object_head(key)"]
+        F2 --> F3{"object present?"} -->|no| F_E["422 NO_OBJECT"]
+        F3 -->|yes| F4{"size &gt; max?"} -->|yes| F5R
+        F4 -->|no| F5["storage.object_bytes(key, 32) → sniff.detect(bytes)"]
+        F5 --> F6{"signature recognised AND ∈ kind.content_types?"}
+        F6 -->|no| F5R["storage.delete_object(key); status=rejected; audit upload.reject; 422 UPLOAD_REJECTED"]
+        F6 -->|yes| F7["status=confirmed, detected_content_type, size_bytes, confirmed_at; audit upload.confirm"]
+    end
+    C --> CONFIRM
+    F2 & F5 & F5R --> S3
+
+    subgraph DOWNLOAD["GET /uploads/download?key= → download(key)  (IDOR-guarded)"]
+        direction TB
+        DL0["select ManagedFile WHERE object_key=key"]
+        DL0 --> DL1{"row present AND status=confirmed?"} -->|no| DL_E1["404 Object not found"]
+        DL1 -->|yes| DL2["_assert_can_access(mf) else 404"]
+        DL2 --> DL3["storage.object_head(key) — 404 if missing"]
+        DL3 --> DL4["storage.presigned_get(key, 3600s) → {key, url, expires_in}"]
+    end
+    C --> DOWNLOAD
+    DL3 & DL4 --> S3
+
+    subgraph GUARD["guard.ensure_confirmed_async(db, url)  — called by domain services before persisting a file_url"]
+        direction TB
+        GU1["app.core.files.ManagedFileUrl (pydantic) — must be our bucket else 422"]
+        GU2["ensure_confirmed_async: managed_files row for url must be status=confirmed<br/>(visitors photo, staff photo/ID, ticket/incident attachments, vehicle evidence, announcement media)"]
+    end
+
+    P5 & F0 & DL0 --> PG[("PostgreSQL: managed_files, audit_logs")]

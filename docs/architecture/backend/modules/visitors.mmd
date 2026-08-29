@@ -1,0 +1,85 @@
+%% Module: visitors (FR-04)
+%% Files: app/modules/visitors/{router,deps,service,repository,models,schemas,tasks}.py
+%% Models: Visitor, VisitorBlacklist, VisitorPolicy, VisitorRequest, VisitorApproval,
+%%         VisitorRequestMember, VisitorPass, VisitorEntry
+%% Scope: TenantScope + UnitScopedAccess (plain resident → own-unit requests/entries only)
+
+flowchart TD
+    C["Client (session)"] --> DEP["deps.visitor_service — async_tenant_context + require_auth_async"]
+    DEP --> G{"require_permission_async<br/>visitors:view / :create / :update / :approve"}
+    G -->|deny| E403["403 PERMISSION_DENIED"]
+
+    G --> POLICY & BL & REQ & PASS & ENTRY
+
+    subgraph POLICY["Policy & directory"]
+        direction TB
+        PC["GET/PATCH /visitors/policy → get_policy / update_policy<br/>upsert visitor_policies (approval_required, photo_required, blacklist_mode, pass_ttl)"]
+        VL["GET /visitors → list_visitors (directory, ?q)"]
+    end
+
+    subgraph BL["Blacklist"]
+        direction TB
+        BLL["GET /visitors/blacklist → list_blacklist"]
+        BLA["POST /visitors/blacklist → add_blacklist  [visitors:approve]<br/>phone_hash = HMAC digest(phone); id_number_hash; INSERT visitor_blacklist"]
+    end
+
+    subgraph REQ["Requests — _assert_unit_visible for plain resident"]
+        direction TB
+        RL["GET /visitors/requests → list_requests<br/>_scope_unit_column(unit_id, OR created_by_user_id==actor)"]
+        RC["POST /visitors/requests → create_request"]
+        RC --> RC1["_unit_in_scope(unit_id) + _assert_unit_visible; _policy(community)"]
+        RC1 --> RC2["visitor from visitor_id (community check) OR upsert_visitor(payload.visitor)"]
+        RC2 --> RC3{"_blacklist_hit & policy.blacklist_mode=='block'?"}
+        RC3 -->|yes| RC_E["audit request.blacklisted → 403 VISITOR_BLACKLISTED"]
+        RC3 -->|no| RC4["approval_required = policy.approval_required & type != recurring<br/>INSERT visitor_requests (status pending|approved), host_user_id=_primary_host(unit)"]
+        RC4 --> RC5["INSERT visitor_request_members (primary + additional_visitor_ids, each blacklist-checked)"]
+        RC5 --> RC6["audit request.create"]
+        RC6 --> RC7{"approval_required & host?"} -->|yes| RC8["emit visitor.approval_needed → host (SAVEPOINT)"]
+
+        RG["GET /visitors/requests/{id} → get_request → _assert_unit_visible → 404"]
+        RD["POST /visitors/requests/{id}/decision → decide_request  [visitors:approve]"]
+        RD --> RD1{"status == pending?"} -->|no| RD_E1["422 INVALID_TRANSITION"]
+        RD1 -->|yes| RD2{"approval_row(request, actor) exists?"} -->|yes| RD_E2["409 ALREADY_DECIDED"]
+        RD2 -->|no| RD3["INSERT visitor_approvals; visitor_requests.status = approved|rejected"]
+        RD3 --> RD4["audit request.&lt;decision&gt; → emit visitor.&lt;status&gt; → creator"]
+
+        RCAN["POST /visitors/requests/{id}/cancel → cancel_request<br/>only from pending|approved → status=cancelled; 422 INVALID_TRANSITION"]
+        RMEM["GET/POST /visitors/requests/{id}/members → list/add_group_member<br/>blacklist check; 409 MEMBER_EXISTS; party_size = max(...)"]
+    end
+
+    subgraph PASS["Passes"]
+        direction TB
+        PCr["POST /visitors/requests/{id}/passes → create_pass  [visitors:create]<br/>request status ∈ approved|pending; token_urlsafe(18) + optional 6-digit PIN (both HMAC digest)<br/>valid_to &gt; valid_from else 422; a valid pass pre-approves a pending request; INSERT visitor_passes"]
+        PRv["POST /visitors/passes/{pass_id}/revoke → revoke_pass<br/>db.get(VisitorPass) then get_request(request_id) as the scope gate; is_revoked=true"]
+    end
+
+    subgraph ENTRY["Gate entries"]
+        direction TB
+        EL["GET /visitors/entries → list_entries<br/>plain resident → entries whose request.unit_id ∈ own units"]
+        ER["POST /visitors/entries → record_entry  [visitors:create]"]
+        ER --> ER0["ensure_confirmed_async(entry_photo_url)"]
+        ER0 --> ER1{"identify by"}
+        ER1 -->|pass_token| ERt["pass_by_hash; check is_revoked / valid window / entries left; entry_count++"]
+        ER1 -->|pin| ERp["select VisitorPass JOIN VisitorRequest WHERE pin_hash & community ∈ scope;<br/>filter usable; &gt;1 → 409 PIN_AMBIGUOUS; entry_count++"]
+        ER1 -->|request_id| ERr["get_request(request_id)"]
+        ERt & ERp & ERr --> ER2{"request.status ∈ approved|entered?"} -->|no| ER_E1["422 NOT_APPROVED"]
+        ER2 -->|yes| ER3{"payload.visitor_id in request group?"} -->|no (and set)| ER_E2["422 NOT_IN_GROUP"]
+        ER3 -->|yes/default| ER4{"blacklist re-check hit?"}
+        ER4 -->|yes| ER5["INSERT visitor_entries status=denied reason=blacklisted; audit entry.denied; 403 VISITOR_BLACKLISTED"]
+        ER4 -->|no| ER6{"open entry for visitor?"} -->|yes| ER_E3["409 ALREADY_INSIDE"]
+        ER6 -->|no| ER7["INSERT visitor_entries status=inside; visitor_requests.status=entered;<br/>visitors.visit_count++, last_visit_at, frequent_visitor_flag = visit_count &gt;= 5"]
+        ER7 --> ER8["audit entry.create"]
+
+        EX["PATCH /visitors/entries/{entry_id}/exit → record_exit<br/>status inside else 422 NOT_INSIDE; status=exited, exit_at;<br/>if no other 'inside' for request → request.status=completed"]
+    end
+
+    subgraph TASK["Celery: visitors.tasks.expire_stale_requests (15 min)"]
+        direction TB
+        TK["pending|approved past valid_until → status=expired; audit; emit visitors.request_expired → creator"]
+    end
+
+    POLICY & BL & REQ & PASS & ENTRY --> REPO["Visitor/Blacklist/Request/Entry/Policy Repository (AsyncTenantRepository)"]
+    REPO --> DB[("PostgreSQL: visitors, visitor_blacklist, visitor_policies, visitor_requests,<br/>visitor_approvals, visitor_request_members, visitor_passes, visitor_entries, audit_logs")]
+    ER0 --> UP["uploads.guard.ensure_confirmed_async"]
+    RC8 & RD4 & TK --> EVT["notifications/events.emit → NotificationService"]
+    TASK --> DB

@@ -1,0 +1,63 @@
+%% Module: deliveries (FR-07)
+%% Files: app/modules/deliveries/{router,deps,service,repository,models,schemas,tasks}.py
+%% Models: DeliveryProtocol (config-as-data, per delivery_type), Delivery (workflow), DeliveryEvent (append-only)
+%% Scope: TenantScope + UnitScopedAccess (plain resident → own-unit deliveries)
+
+flowchart TD
+    C["Client (session)"] --> DEP["deps.delivery_service — async_tenant_context + require_auth_async"]
+    DEP --> G{"require_permission_async<br/>deliveries:view / :create / :update / :approve"}
+    G -->|deny| E403["403 PERMISSION_DENIED"]
+
+    G --> PROTO & LIST & CREATE & DETAIL & DECIDE & ARRIVE & DELIVERED & CANCEL
+
+    subgraph PROTO["Protocols (config-as-data)"]
+        direction TB
+        PL["GET /deliveries/protocols → list_protocols  [deliveries:view]"]
+        PU["PUT /deliveries/protocols → upsert_protocol  [deliveries:approve]<br/>_enum(delivery_type, protocol_type); upsert delivery_protocols<br/>(collect_at_gate | leave_at_gate | call_resident | reject; requires_otp; allow_direct_entry)"]
+    end
+
+    LIST["GET /deliveries → list_deliveries  [deliveries:view]<br/>_scope_unit_column(unit_id) for plain resident"]
+
+    subgraph CREATE["POST /deliveries → create_delivery  [deliveries:create]"]
+        direction TB
+        CR1["_unit_in_scope(unit_id) + _assert_unit_visible"]
+        CR1 --> CR2["_protocol_for(community, delivery_type)  (default row if missing)"]
+        CR2 --> CR3["auto = protocol.allow_direct_entry AND NOT protocol.requires_otp<br/>approval_status = auto_approved | pending"]
+        CR3 --> CR4["INSERT deliveries (resident_user_id = _primary_resident(unit))<br/>+ INSERT delivery_events (logged)"]
+        CR4 --> CR5["audit delivery.create"]
+    end
+
+    DETAIL["GET /deliveries/{id} → get_delivery → _assert_unit_visible → 404"]
+
+    subgraph DECIDE["POST /deliveries/{id}/decision → decide_delivery  [deliveries:approve]"]
+        direction TB
+        D1{"decision ∈ approved|rejected?"} -->|no| D_E1["422 INVALID_ENUM"]
+        D1 -->|yes| D2{"approval_status == pending?"} -->|no| D_E2["422 INVALID_TRANSITION"]
+        D2 -->|yes| D3["deliveries.approval_status = decision; approved_by_user_id = actor<br/>rejected → status=cancelled; INSERT delivery_events; audit delivery.&lt;decision&gt;"]
+    end
+
+    subgraph ARRIVE["POST /deliveries/{id}/arrival → record_arrival  [deliveries:update]"]
+        direction TB
+        A1{"approval_status ∈ approved|auto_approved?"} -->|no| A_E1["422 NOT_APPROVED"]
+        A1 -->|yes| A2{"status ∈ expected|at_gate?"} -->|no| A_E2["422 INVALID_TRANSITION"]
+        A2 -->|yes| A3["_gate_in_scope(gate_id); status=at_gate, arrived_at; INSERT delivery_events (arrived); audit"]
+    end
+
+    subgraph DELIVERED["POST /deliveries/{id}/delivered → mark_delivered  [deliveries:update]"]
+        direction TB
+        M1{"status ∈ at_gate|in_transit?"} -->|no| M_E["422 INVALID_TRANSITION"]
+        M1 -->|yes| M2["protocol.leave_at_gate ? status=collected : status=delivered<br/>INSERT delivery_events (delivered); audit"]
+    end
+
+    CANCEL["POST /deliveries/{id}/cancel → cancel_delivery  [deliveries:update]<br/>not terminal → status=cancelled; INSERT delivery_events; audit"]
+
+    EVT["GET /deliveries/{id}/events → list_events (via get_delivery scope gate)"]
+    G --> EVT
+
+    PROTO & LIST & CREATE & DETAIL & DECIDE & ARRIVE & DELIVERED & CANCEL --> REPO["ProtocolRepository / DeliveryRepository (AsyncTenantRepository) + delivery_events()"]
+    CR1 --> UP["uploads.guard? (no file field on delivery — n/a)"]
+    REPO --> DB[("PostgreSQL: delivery_protocols, deliveries, delivery_events, audit_logs")]
+
+    subgraph TASK["Celery: deliveries has NO scheduled task"]
+        T0["(none)"]
+    end

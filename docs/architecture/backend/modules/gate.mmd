@@ -1,0 +1,60 @@
+%% Module: gate — Security Gate Operations (FR-05)
+%% Files: app/modules/gate/{router,deps,service,repository,models,schemas}.py
+%% Models: GateEvent (append-only), GuardRoster (state machine), GateAssignment, PanicAlert (state machine)
+
+flowchart TD
+    C["Client (session)"] --> DEP["deps.gate_service — async_tenant_context + require_auth_async"]
+    DEP --> G{"require_permission_async<br/>gate:view / :create / :update / :approve"}
+    G -->|deny| E403["403 PERMISSION_DENIED"]
+
+    G --> EVENTS & OVERRIDE & ROSTER & ASSIGN
+    C -->|"session only (any role may raise)"| ALERTRAISE
+
+    subgraph EVENTS["Gate events (append-only)"]
+        direction TB
+        EL["GET /gate/events → list_events (?gate_id, ?event_type)"]
+        EC["POST /gate/events → log_event  [gate:create]<br/>_enum(event_type); community from gate OR single-in-scope;<br/>INSERT gate_events; audit event.log"]
+    end
+
+    subgraph OVERRIDE["POST /gate/checkpoint-override → override_checkpoint  [gate:approve]"]
+        direction TB
+        O1["reason 3-500 chars (schema)"]
+        O1 --> O2["INSERT gate_events event_type=checkpoint_override, metadata={reason}"]
+        O2 --> O3["audit gate/checkpoint.override"]
+        O3 --> O4["emit_to_roles gate.checkpoint_override → security_supervisor + community_admin"]
+    end
+
+    subgraph ROSTER["Guard rosters (state machine planned→active→completed | →cancelled)"]
+        direction TB
+        RL["GET /gate/rosters → list_rosters"]
+        RC["POST /gate/rosters → create_roster  [gate:create]<br/>shift_end &gt; shift_start else 422 INVALID_TIME_RANGE;<br/>duplicate shift → 409 ROSTER_EXISTS; INSERT guard_rosters"]
+        RU["PATCH /gate/rosters/{id} → update_roster  [gate:update]  — details only (no status)"]
+        RT["POST /gate/rosters/{id}/status → transition_roster  [gate:update]"]
+        RT --> RT1{"ensure_transition(current, target, _ROSTER_TRANSITIONS)"}
+        RT1 -->|invalid| RT_E["422 INVALID_TRANSITION"]
+        RT1 -->|valid| RT2["guard_rosters.status = target; audit roster.&lt;status&gt;"]
+    end
+
+    subgraph ASSIGN["Gate assignments (one active per guard)"]
+        direction TB
+        AL["GET /gate/assignments → list_assignments (?gate_id, ?active_only)"]
+        AC["POST /gate/assignments → create_assignment  [gate:create]<br/>gate community resolved; roster (optional) same community;<br/>active_for_guard → 409 ASSIGNMENT_ACTIVE; INSERT gate_assignments"]
+        AE["POST /gate/assignments/{id}/end → end_assignment  [gate:update]<br/>status active else 422 ALREADY_ENDED → status=ended"]
+    end
+
+    subgraph ALERT["Panic / SOS alerts (state machine active→acknowledged→resolved | →cancelled)"]
+        direction TB
+        ALL["GET /gate/alerts → list_alerts  [gate:view]"]
+        ALERTRAISE["POST /gate/alerts → raise_alert"]
+        ALERTRAISE --> AR1["community from gate OR payload.community_id (scope.require)<br/>INSERT panic_alerts status=active"]
+        AR1 --> AR2["audit alert.raise"]
+        AR2 --> AR3["emit_to_roles gate.panic_alert (channels in_app + sms)<br/>→ security_supervisor + security_guard + community_admin"]
+        ALA["POST /gate/alerts/{id}/acknowledge  [gate:update] — status active else 422 → acknowledged, actor, ts"]
+        ALR["POST /gate/alerts/{id}/resolve  [gate:update] — from active|acknowledged → resolved + summary"]
+        ALC["POST /gate/alerts/{id}/cancel — triggered_by_user_id == actor else 403 NOT_ALERT_OWNER → cancelled"]
+    end
+    G --> ALL & ALA & ALR & ALC
+
+    EVENTS & OVERRIDE & ROSTER & ASSIGN & ALERT --> REPO["GateEvent/GuardRoster/GateAssignment/PanicAlert Repository (AsyncTenantRepository)"]
+    REPO --> DB[("PostgreSQL: gate_events, guard_rosters, gate_assignments, panic_alerts, audit_logs")]
+    O4 & AR3 --> EVT["notifications/events.emit_to_roles → NotificationService.dispatch"]

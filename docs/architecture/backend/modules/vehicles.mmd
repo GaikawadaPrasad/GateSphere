@@ -1,0 +1,59 @@
+%% Module: vehicles & parking (FR-08)
+%% Files: app/modules/vehicles/{router,deps,service,repository,models,schemas}.py
+%% Models: Vehicle (owner resident XOR visitor CHECK), ParkingRule (config-as-data), ParkingSlot,
+%%         ParkingAllocation (one active/slot, one active/vehicle), VehicleEntry, ParkingViolation (state machine)
+
+flowchart TD
+    C["Client (session)"] --> DEP["deps.vehicle_service — async_tenant_context + require_auth_async"]
+    DEP --> G{"require_permission_async<br/>vehicles:view / :create / :update"}
+    G -->|deny| E403["403 PERMISSION_DENIED"]
+
+    G --> RULES & VEH & SLOTS & ALLOC & ENTRY & VIOL
+
+    subgraph RULES["Parking rules (config-as-data)"]
+        R1["GET/PATCH /vehicles/parking/rules → get_rule / update_rule<br/>upsert parking_rules (allow_multi_slot_vehicle, allow_guest_parking, max_active_slots_per_unit, violation_grace_minutes)"]
+    end
+
+    subgraph VEH["Vehicles"]
+        direction TB
+        V_L["GET /vehicles → list_vehicles (?q by plate)"]
+        V_C["POST /vehicles → register_vehicle<br/>plate.upper(); by_plate → 409 VEHICLE_EXISTS; INSERT vehicles (resident XOR visitor)"]
+        V_GU["GET/PATCH /vehicles/{vehicle_id} → get_vehicle / update_vehicle"]
+    end
+
+    subgraph SLOTS["Parking slots"]
+        S_L["GET /vehicles/parking/slots → list_slots (?slot_status)"]
+        S_C["POST /vehicles/parking/slots → create_slot<br/>by_code → 409 SLOT_EXISTS; INSERT parking_slots"]
+    end
+
+    subgraph ALLOC["Allocations"]
+        direction TB
+        AL_L["GET /vehicles/parking/allocations → list_allocations (?active_only)"]
+        AL_C["POST /vehicles/parking/allocations → allocate"]
+        AL_C --> AL1["slots.get(slot_id) 404; vehicles.get(vehicle_id) same community 404; _rule(community)"]
+        AL1 --> AL2{"active_for_slot(slot)?"} -->|yes| AL_E1["409 SLOT_TAKEN"]
+        AL2 -->|no| AL3{"NOT allow_multi_slot AND active_for_vehicle?"} -->|yes| AL_E2["409 VEHICLE_HAS_SLOT"]
+        AL3 -->|no| AL4{"active_count_for_unit &gt;= max_active_slots_per_unit?"} -->|yes| AL_E3["422 UNIT_SLOT_LIMIT"]
+        AL4 -->|no| AL5["INSERT parking_allocations; parking_slots.status = allocated; audit allocation.create"]
+        AL_R["POST /vehicles/parking/allocations/{id}/release → release<br/>status active else 422 ALREADY_RELEASED → status=released; slot.status=available; audit"]
+    end
+
+    subgraph ENTRY["Gate entries (plate-based)"]
+        direction TB
+        E_L["GET /vehicles/entries → list_entries (?plate, ?open_only)"]
+        E_C["POST /vehicles/entries → record_entry  [vehicles:create]<br/>plate.upper(); open_for_plate → 409 ALREADY_INSIDE;<br/>vehicle by_plate (may be None); _gate_in_scope;<br/>INSERT vehicle_entries status=inside, is_flagged = (vehicle is None); audit entry.create"]
+        E_X["PATCH /vehicles/entries/{id}/exit → record_exit<br/>status inside else 422 NOT_INSIDE → status=exited, exit_at, exit_guard; audit"]
+    end
+
+    subgraph VIOL["Violations (state machine open→acknowledged→resolved | waived)"]
+        direction TB
+        VI_L["GET /vehicles/parking/violations → list_violations (?violation_status)"]
+        VI_C["POST /vehicles/parking/violations → report_violation<br/>ensure_confirmed_async(evidence_url); INSERT parking_violations; audit violation.report"]
+        VI_T["POST /vehicles/parking/violations/{id}/status → transition_violation"]
+        VI_T --> VI_T1{"target ∈ _VIOLATION_TRANSITIONS[current]?"} -->|no| VI_E["422 INVALID_TRANSITION"]
+        VI_T1 -->|yes| VI_T2["status = target; resolved/waived → resolved_at; audit violation.&lt;status&gt;"]
+    end
+
+    RULES & VEH & SLOTS & ALLOC & ENTRY & VIOL --> REPO["Vehicle/Slot/Allocation/Entry/Rule/Violation Repository (AsyncTenantRepository)"]
+    VI_C --> UP["uploads.guard.ensure_confirmed_async (vehicle_evidence)"]
+    REPO --> DB[("PostgreSQL: vehicles, parking_rules, parking_slots, parking_allocations,<br/>vehicle_entries, parking_violations, audit_logs")]

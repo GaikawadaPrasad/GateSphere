@@ -1,0 +1,58 @@
+%% Module: onboarding (FR-03) — URL tenant invitations + direct add/remove of tenants
+%% Files: app/modules/onboarding/{router,deps,service,models,schemas}.py · migration 0023
+%% Model: CommunityInvitation (token_hash, status pending|accepted|revoked|expired, unit_id, role_slug, occupancy_role)
+
+flowchart TD
+    subgraph OWNER["Owner / admin routes (session · residents:* perm · TenantScope)"]
+        direction TB
+        DEP["deps.onboarding_service — async_tenant_context + require_auth_async"]
+
+        CRE["POST /communities/{cid}/invitations → create_invitation  [residents:create]"]
+        CRE --> CRE1["_require_scope(cid); _community(cid); _unit_ctx(unit_id, cid); _role(role_slug)"]
+        CRE1 --> CRE2{"is_primary & primary occupant exists?"} -->|yes| CRE_E1["409 PRIMARY_OCCUPANT_EXISTS"]
+        CRE2 -->|no| CRE3{"pending invite for email+unit?"} -->|yes| CRE_E2["409 INVITATION_EXISTS"]
+        CRE3 -->|no| CRE4["token = token_urlsafe(32); INSERT community_invitations (token_hash sha256, expires_at)"]
+        CRE4 --> CRE5["audit onboarding/invitation.create → {token, accept_url = FRONTEND_ORIGIN/invite/&lt;token&gt;}"]
+
+        LST["GET /communities/{cid}/invitations → list_invitations  [residents:view] (?invite_status)"]
+        RVK["POST /communities/{cid}/invitations/{id}/revoke → revoke_invitation  [residents:create]"]
+        RVK --> RVK1{"status == pending?"} -->|no| RVK_E["422 INVITATION_NOT_PENDING"]
+        RVK1 -->|yes| RVK2["community_invitations.status = revoked; audit"]
+    end
+
+    subgraph PUBLIC["Public token routes (deps.public_onboarding_service — NO scope; optional_user for accept)"]
+        direction TB
+        VIEW["GET /invitations/{token} → public_view(token)"]
+        VIEW --> VIEW1["_load_token: select by token_hash; if pending & expired → status=expired (lazy write)"]
+        VIEW1 --> VIEW2["→ community_name, unit_label 'Tower / Floor / Unit', invited_by,<br/>account_exists (User by invited_email)"]
+
+        ACC["POST /invitations/{token}/accept → accept(token, payload, current_user, response)"]
+        ACC --> ACC0["_load_token(token, for_update=True)  — SELECT ... FOR UPDATE (serialise concurrent accepts)"]
+        ACC0 --> ACC1{"status == pending?"} -->|no| ACC_E1["422 INVITATION_NOT_PENDING"]
+        ACC1 -->|yes| ACC2{"who is the user?"}
+        ACC2 -->|"current_user.email == invited_email"| USE_CUR["use current_user"]
+        ACC2 -->|"account exists, not signed in as them"| CHK{"valid password in payload?"}
+        CHK -->|yes| LOGIN_EX["verify_password → create_session (logged_in)"]
+        CHK -->|no| ACC_E2["403 LOGIN_REQUIRED"]
+        ACC2 -->|"no account"| NEW{"password given?"}
+        NEW -->|no| ACC_E3["422 PASSWORD_REQUIRED"]
+        NEW -->|yes| NEWU["_assert_phone_free(phone) → 409 PHONE_TAKEN;<br/>INSERT users (Argon2); create_session (account_created, logged_in)"]
+
+        USE_CUR & LOGIN_EX & NEWU --> ACC3{"is_primary & primary occupant exists?"} -->|yes| ACC_E4["409 PRIMARY_OCCUPANT_EXISTS"]
+        ACC3 -->|no| ACC4["_get_or_create_profile (resident_profiles, status=active)<br/>+ INSERT unit_occupancies<br/>+ INSERT emergency_contacts (payload, ≤5)"]
+        ACC4 --> ACC5["_grant_resident_role(user, cid, role_slug):<br/>INSERT user_roles if absent → invalidate_user_permissions_async([user])"]
+        ACC5 --> ACC6["community_invitations: status=accepted, accepted_user_id, resident_profile_id"]
+        ACC6 --> ACC7["audit onboarding/invitation.accept"]
+        ACC7 --> ACC8{"inviter set?"} -->|yes| ACC9["emit onboarding.invitation_accepted → inviter (SAVEPOINT)"]
+    end
+
+    subgraph DIRECT["Direct tenant management (session · TenantScope)"]
+        direction TB
+        ADD["POST /communities/{cid}/tenants → add_tenant  [residents:create]<br/>_assert_phone_free; INSERT users if new; profile + occupancy;<br/>409 OCCUPANCY_EXISTS / PRIMARY_OCCUPANT_EXISTS; grant resident role → invalidate"]
+        RMV["DELETE /communities/{cid}/tenants/{profile_id} → remove_tenant  [residents:delete]<br/>_profile_in(cid, profile_id); bulk UPDATE unit_occupancies is_active=false;<br/>resident_profiles.status=moved_out; DELETE user_roles (resident@cid);<br/>invalidate_user_permissions_async([user])"]
+        RMO["DELETE /communities/{cid}/units/{unit_id}/occupants/{occupancy_id} → remove_occupancy [residents:delete]<br/>end that occupancy; if no active occupancy left in cid →<br/>profile moved_out + grant delete + invalidate"]
+    end
+
+    CRE5 & RVK2 & VIEW1 & ACC6 & ADD & RMV & RMO --> PG[("PostgreSQL: community_invitations, users, user_sessions,<br/>resident_profiles, unit_occupancies, emergency_contacts,<br/>user_roles, users.permission_version, audit_logs")]
+    ACC5 & ADD & RMV & RMO --> RC[("Redis: revoke session:* for affected users")]
+    ACC9 --> NOT["NotificationService.dispatch → notifications"]

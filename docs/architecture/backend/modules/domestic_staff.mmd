@@ -1,0 +1,51 @@
+%% Module: domestic_staff — Domestic Staff & Multi-Apartment Assignment (FR-06)
+%% Files: app/modules/domestic_staff/{router,deps,service,repository,models,schemas}.py
+%% Models: DomesticStaff (police_verification state machine; id# HMAC), StaffUnitAssignment (many-to-many, one active/pair),
+%%         StaffAttendance (one open row), StaffRating (one per staff+unit+resident, upsert)
+
+flowchart TD
+    C["Client (session)"] --> DEP["deps.domestic_staff_service — async_tenant_context + require_auth_async"]
+    DEP --> G{"require_permission_async<br/>domestic_staff:view / :create / :update / :approve"}
+    G -->|deny| E403["403 PERMISSION_DENIED"]
+
+    G --> STAFF & ASSIGN & ATT & RATE
+
+    subgraph STAFF["Staff directory"]
+        direction TB
+        ST_L["GET /domestic-staff → list_staff (?q)"]
+        ST_C["POST /domestic-staff → create_staff  [domestic_staff:create]<br/>by_phone → 409 STAFF_EXISTS (one per phone/community);<br/>ensure_confirmed_async(photo_url); id_number_hash = HMAC digest; INSERT domestic_staff"]
+        ST_G["GET /domestic-staff/{staff_id} → get_staff (repo _scoped) → 404"]
+        ST_U["PATCH /domestic-staff/{staff_id} → update_staff  [domestic_staff:update]"]
+        ST_U --> ST_U1{"police_verification_status change?"}
+        ST_U1 -->|yes| ST_U2["ensure_transition(current, new, _VERIFICATION_TRANSITIONS<br/>not_started→pending→verified/rejected ; expired) → 422 INVALID_TRANSITION"]
+        ST_U1 -->|no| ST_U3["apply patch; photo_url change → ensure_confirmed_async; audit staff.update"]
+        ST_U2 --> ST_U3
+    end
+
+    subgraph ASSIGN["Unit assignments (multi-apartment)"]
+        direction TB
+        AS_L["GET /domestic-staff/assignments → list_assignments (?staff_id, ?unit_id, ?active_only)"]
+        AS_C["POST /domestic-staff/assignments → assign_unit  [domestic_staff:approve]"]
+        AS_C --> AS1["_staff_in_scope(staff_id); _unit_in_scope(unit_id, staff.community)"]
+        AS1 --> AS2{"start_date &gt; end_date?"} -->|yes| AS_E1["422 INVALID_DATE_RANGE"]
+        AS2 -->|no| AS3{"active_for_pair(staff, unit)?"} -->|yes| AS_E2["409 ASSIGNMENT_EXISTS"]
+        AS3 -->|no| AS4["INSERT staff_unit_assignments (approved_by_user_id=actor); audit assignment.create"]
+        AS_E["POST /domestic-staff/assignments/{id}/end → end_assignment  [domestic_staff:update]<br/>is_active else 422 ALREADY_ENDED → is_active=false, end_date; audit"]
+    end
+
+    subgraph ATT["Attendance (gate check-in/out)"]
+        direction TB
+        AT_L["GET /domestic-staff/attendance → list_attendance (?staff_id, ?open_only)"]
+        AT_I["POST /domestic-staff/attendance/check-in → check_in  [domestic_staff:create]<br/>open_for_staff → 409 ALREADY_INSIDE; _gate_in_scope; INSERT staff_attendance status=inside; audit"]
+        AT_O["PATCH /domestic-staff/attendance/{id}/check-out → check_out  [domestic_staff:update]<br/>check_out_at set → 422 NOT_INSIDE; else check_out_at, status=left, check_out_by; audit"]
+    end
+
+    subgraph RATE["Ratings (resident feedback)"]
+        direction TB
+        RA_C["POST /domestic-staff/ratings → rate_staff  [domestic_staff:create]<br/>_staff_in_scope; unit (optional) same community;<br/>existing rating for (staff, unit, actor) → UPDATE in place ; else INSERT staff_ratings; audit"]
+        RA_L["GET /domestic-staff/{staff_id}/ratings → list_ratings"]
+    end
+
+    STAFF & ASSIGN & ATT & RATE --> REPO["Staff/Assignment/Attendance/Rating Repository (AsyncTenantRepository)"]
+    ST_C --> UP["uploads.guard.ensure_confirmed_async (staff_photo / id_document)"]
+    REPO --> DB[("PostgreSQL: domestic_staff, staff_unit_assignments, staff_attendance, staff_ratings, audit_logs")]

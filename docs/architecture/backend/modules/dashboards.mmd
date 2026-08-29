@@ -1,0 +1,21 @@
+%% Module: dashboards (FR-14) — read-only role-specific aggregates, NO tables
+%% Files: app/modules/dashboards/{router,deps,service,schemas}.py
+
+flowchart TD
+    C["Client (session)"] --> DEP["deps.dashboard_service<br/>async_tenant_context + require_auth_async"]
+    DEP --> G["require_permission_async(dashboards:view)"]
+    G --> CID["_community(community_id):<br/>?community_id= (global caller) OR single community in scope OR 422 COMMUNITY_REQUIRED"]
+
+    CID --> R{route}
+    R -->|"GET /dashboards/overview"| OV["DashboardService.overview(cid)"]
+    R -->|"GET /dashboards/security"| SEC["security(cid)"]
+    R -->|"GET /dashboards/financial"| FIN["financial(cid)"]
+    R -->|"GET /dashboards/resident"| RES["resident(cid)  — actor-scoped"]
+
+    OV --> OVQ["_count over VisitorRequest, Delivery, ServiceTicket,<br/>PanicAlert, SecurityIncident, ResidentProfile, Unit ... WHERE community_id=cid"]
+    SEC --> SECQ["visitors_inside (VisitorEntry.status='inside'),<br/>vehicles_inside, staff_inside (StaffAttendance open),<br/>pending_visitor_approvals,<br/>expected_visitors (VisitorRequest approved & (valid_until NULL | &gt;= now) & not entered),<br/>active_panic_alerts, open_incidents, guards_on_active_roster"]
+    FIN --> FINQ["MaintenanceInvoice group-by status;<br/>_outstanding = SUM(balance_due) where status in posted/partially_paid/overdue"]
+    RES --> RESQ["find actor's active UnitOccupancy (join ResidentProfile.user_id=actor.id);<br/>my_open_tickets / my_pending_visitor_requests / my_upcoming_bookings by actor.id;<br/>my_outstanding_balance for that unit; published_announcements count"]
+
+    OVQ & SECQ & FINQ & RESQ --> PG[("PostgreSQL — SELECT COUNT / SUM only, no writes, no audit")]
+    PG --> C

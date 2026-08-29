@@ -1,0 +1,198 @@
+%% GateSphere Backend — end-to-end architecture (code-derived)
+%% Source: app/main.py, app/api/router.py, app/core/*, app/modules/*/{router,deps,service,repository,models,tasks}.py
+%% Keep synchronized with the implementation. See docs/architecture/backend/README.md.
+
+flowchart TD
+    Client["Client<br/>Next.js web app / Swagger"]
+
+    %% ---------------------------------------------------------------- request pipeline
+    subgraph PIPE["Request pipeline (app/main.py)"]
+        direction TB
+        CORS["CORSMiddleware<br/>allow_origins = settings.cors_allow_origins<br/>allow_credentials=true"]
+        CID["CorrelationIdMiddleware<br/>app/core/logging.py — X-Request-ID"]
+        RL["slowapi rate limiter<br/>app/modules/auth/router.py::limiter<br/>5/min/IP on POST /auth/login"]
+        EXC["Exception handlers<br/>app/core/errors.py<br/>AppError→{401,403,404,409,422}, SQLAlchemyError→500,<br/>RequestValidationError→422, catch-all→500<br/>every response = {success,message,data,meta}(+error)"]
+    end
+
+    subgraph AUTHN["Authentication (app/core/security.py)"]
+        direction TB
+        CSRF["verify_csrf<br/>X-CSRF-Token == gs_csrf cookie on POST/PUT/PATCH/DELETE"]
+        SESS["_load_session_async<br/>Redis session:&lt;hash&gt; → fallback user_sessions row<br/>checks revoked_at / expires_at"]
+        REQAUTH["require_auth_async → User<br/>sets request.state.user / session_id"]
+    end
+
+    subgraph AUTHZ["Authorization (app/core/tenancy.py + security.py)"]
+        direction TB
+        SCOPE["get_tenant_scope_async → TenantScope<br/>community_ids from user_roles (never payload)<br/>active_cid + effective permissions =<br/>role defaults ± community_role_permissions overrides"]
+        PERM["require_permission_async(code)<br/>scope.can(code) else 403 PERMISSION_DENIED"]
+        PADMIN["require_platform_admin<br/>is_superadmin else 403 PLATFORM_ADMIN_ONLY"]
+        RLSBIND["bind_rls_scope_async<br/>SET LOCAL app.community_ids = &lt;csv&gt;"]
+        UNITACC["UnitScopedAccess (residents/access.py)<br/>plain resident → own-unit rows only<br/>user_in_community() for payload user ids"]
+    end
+
+    %% ---------------------------------------------------------------- routers
+    subgraph ROUTES["API routers  /api/v1  (app/api/router.py)"]
+        direction LR
+        R_AUTH["/auth"]:::pub
+        R_USERS["/users"]
+        R_RBAC["/rbac"]
+        R_AUDIT["/audit"]
+        R_COMM["/communities"]
+        R_ONB["/communities/../invitations,tenants<br/>/invitations/{token}"]:::pub
+        R_RES["/residents"]
+        R_VIS["/visitors"]
+        R_GATE["/gate"]
+        R_DS["/domestic-staff"]
+        R_DEL["/deliveries"]
+        R_VEH["/vehicles"]
+        R_BILL["/billing"]
+        R_CMP["/complaints"]
+        R_AMN["/amenities"]
+        R_CMN["/communication"]
+        R_INC["/incidents"]
+        R_DASH["/dashboards"]
+        R_NOT["/notifications"]
+        R_UP["/uploads"]
+    end
+
+    %% ---------------------------------------------------------------- domain services
+    subgraph SVC["Domain services (app/modules/*/service.py)  — async def, ALL business rules"]
+        direction LR
+        S_USERS["UserService"]
+        S_RBAC["RbacService"]
+        S_AUDITQ["AuditQueryService"]
+        S_COMM["CommunityService"]
+        S_ONB["OnboardingService"]
+        S_RES["ResidentService"]
+        S_VIS["VisitorService"]
+        S_GATE["GateService"]
+        S_DS["DomesticStaffService"]
+        S_DEL["DeliveryService"]
+        S_VEH["VehicleService"]
+        S_BILL["BillingService"]
+        S_CMP["ComplaintService"]
+        S_AMN["AmenityService"]
+        S_CMN["CommunicationService"]
+        S_INC["IncidentService"]
+        S_DASH["DashboardService"]
+        S_NOT["NotificationService"]
+        S_UP["UploadService"]
+    end
+
+    AUDIT_HELP["record_audit_async()<br/>app/modules/audit/service.py<br/>append-only audit_logs, same txn"]
+
+    %% ---------------------------------------------------------------- persistence
+    subgraph DATA["Data access (app/db/repository.py)"]
+        direction TB
+        REPO["AsyncTenantRepository&lt;Model&gt;<br/>_scoped(): WHERE community_id IN scope.community_ids<br/>applied before execution — cross-tenant = 404"]
+        MODELS["ORM models (app/modules/*/models.py)<br/>UUID v4 PKs, composite tenant-safe FKs,<br/>eager_defaults, CHECK/UNIQUE constraints"]
+    end
+    PG[("PostgreSQL 15<br/>single DB · logical multi-tenancy<br/>Row-Level Security: tenant_isolation policy<br/>per migration 0003+ (GUC app.community_ids)")]
+    REDIS[("Redis<br/>session cache · slowapi counters")]
+
+    %% ---------------------------------------------------------------- side effects
+    subgraph SIDE["Cross-cutting side effects"]
+        direction TB
+        EVT["Notification event bus<br/>notifications/events.py::emit / emit_to_roles<br/>SAVEPOINT-isolated, best-effort<br/>→ NotificationService.dispatch"]
+        NOTIF["notifications + notification_deliveries<br/>in_app real · sms/whatsapp/email/push SIMULATED"]
+        S3[("S3 / MinIO<br/>app/services/storage.py (boto3, off-thread)<br/>presigned PUT/GET · HEAD · magic-byte sniff")]
+    end
+
+    subgraph JOBS["Background jobs (NOT called by routes)"]
+        direction TB
+        BEAT["Celery beat<br/>app/core/celery_app.py"]
+        WORKER["Celery worker → app/core/jobs.py<br/>job_session + system_scope + system@ actor"]
+        T1["complaints.sweep_ticket_sla · 5m"]
+        T2["billing.sweep_overdue_invoices · 01:00"]
+        T3["billing.send_dues_reminders · Mon 09:00"]
+        T4["visitors.expire_stale_requests · 15m"]
+        T5["amenities.close_past_bookings · 15m"]
+    end
+
+    OPS["ops routes (app/main.py)<br/>GET / · /healthz · /readyz · /docs · /redoc"]
+
+    %% ================================================================ edges
+    Client -->|HTTPS| CORS --> CID --> RL --> EXC
+    Client -.-> OPS
+    EXC --> CSRF --> SESS --> REQAUTH
+    REQAUTH --> SCOPE
+    SCOPE --> PERM
+    SCOPE --> PADMIN
+    SCOPE --> RLSBIND
+    SCOPE --> UNITACC
+    PERM --> ROUTES
+    PADMIN --> R_RBAC
+    RLSBIND --> PG
+
+    %% public token routes bypass auth
+    Client -->|"GET /invitations/{token}<br/>POST /invitations/{token}/accept"| R_ONB
+    Client -->|"POST /auth/login"| R_AUTH
+
+    R_AUTH --> S_USERS
+    R_USERS --> S_USERS
+    R_RBAC --> S_RBAC
+    R_AUDIT --> S_AUDITQ
+    R_COMM --> S_COMM
+    R_ONB --> S_ONB
+    R_RES --> S_RES
+    R_VIS --> S_VIS
+    R_GATE --> S_GATE
+    R_DS --> S_DS
+    R_DEL --> S_DEL
+    R_VEH --> S_VEH
+    R_BILL --> S_BILL
+    R_CMP --> S_CMP
+    R_AMN --> S_AMN
+    R_CMN --> S_CMN
+    R_INC --> S_INC
+    R_DASH --> S_DASH
+    R_NOT --> S_NOT
+    R_UP --> S_UP
+
+    S_USERS & S_RBAC & S_AUDITQ & S_COMM & S_ONB & S_RES & S_VIS & S_GATE & S_DS & S_DEL & S_VEH & S_BILL & S_CMP & S_AMN & S_CMN & S_INC & S_NOT --> AUDIT_HELP
+    S_DASH -.->|read-only aggregates| REPO
+
+    S_USERS & S_RBAC & S_COMM & S_ONB & S_RES & S_VIS & S_GATE & S_DS & S_DEL & S_VEH & S_BILL & S_CMP & S_AMN & S_CMN & S_INC & S_NOT & S_UP --> REPO
+    S_ONB & S_RES --> UNITACC
+    S_VIS & S_BILL & S_CMP & S_DEL & S_AMN --> UNITACC
+
+    AUDIT_HELP --> REPO
+    REPO --> MODELS --> PG
+    SESS --> REDIS
+    RL --> REDIS
+    S_AUDITQ -->|"list/get/CSV, _scoped"| PG
+
+    %% events
+    S_VIS -->|"visitor.approval_needed<br/>visitor.approved / rejected"| EVT
+    S_BILL -->|"billing.invoice_posted"| EVT
+    S_CMP -->|"ticket.&lt;status&gt;"| EVT
+    S_GATE -->|"gate.panic_alert (in_app+sms)<br/>gate.checkpoint_override"| EVT
+    S_INC -->|"incident.&lt;status&gt;"| EVT
+    S_ONB -->|"onboarding.invitation_accepted"| EVT
+    EVT --> S_NOT --> NOTIF --> PG
+
+    %% uploads integration
+    S_UP -->|"presigned PUT/GET · HEAD · bytes · delete"| S3
+    S_VIS & S_DS & S_CMP & S_INC & S_VEH & S_CMN -->|"ensure_confirmed_async(url)"| S_UP
+
+    %% permission propagation
+    S_USERS -->|"grant/revoke → invalidate_user_permissions_async"| REDIS
+    S_RBAC -->|"override change → bump permission_version + revoke sessions"| REDIS
+    S_ONB -->|"tenant add/remove → invalidate_user_permissions_async"| REDIS
+
+    %% jobs
+    BEAT --> WORKER
+    WORKER --> T1 & T2 & T3 & T4 & T5
+    T1 --> S_CMP
+    T2 --> S_BILL
+    T3 --> S_BILL
+    T4 --> S_VIS
+    T5 --> S_AMN
+    T1 & T2 & T3 & T4 -->|"emit_to_roles / emit"| EVT
+    WORKER --> PG
+
+    %% response
+    ROUTES -->|"Envelope[T] · never raw ORM"| Client
+
+    classDef pub fill:#fff3cd,stroke:#b8860b;
+    class R_AUTH,R_ONB pub;

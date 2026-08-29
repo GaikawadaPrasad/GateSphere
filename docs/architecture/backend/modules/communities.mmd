@@ -1,0 +1,46 @@
+%% Module: communities (FR-03) — Community → Tower → Floor → Unit + Gate
+%% Files: app/modules/communities/{router,deps,service,repository,models,schemas}.py
+%% communities is the tenant ROOT (not itself tenant-scoped); children use composite tenant-safe FKs
+
+flowchart TD
+    C["Client (session)"] --> DEP["deps.community_service<br/>async_tenant_context + require_auth_async"]
+    DEP --> G{"require_permission_async<br/>communities:view / :create / :update / :delete"}
+    G -->|deny| E403["403 PERMISSION_DENIED"]
+
+    G --> COMM
+    G --> CHILD
+
+    subgraph COMM["Community CRUD"]
+        direction TB
+        L["GET /communities → communities.list (?active)"]
+        GET["GET /communities/{cid} → get_community (repo _scoped) → 404"]
+        CR{"POST /communities — scope.is_global?"}
+        CR -->|no| CR_E["403 GLOBAL_ONLY"]
+        CR -->|yes| CR2{"code taken?"} -->|yes| CR_E2["409 COMMUNITY_CODE_TAKEN"]
+        CR2 -->|no| CR3["INSERT communities"]
+        UP["PATCH /communities/{cid} → update_community (old/new snapshot)"]
+        DEL{"DELETE /communities/{cid} — scope.is_global?"}
+        DEL -->|no| DEL_E["403 GLOBAL_ONLY"]
+        DEL -->|yes| DEL2["db.delete(community) — cascades all child tables"]
+    end
+
+    subgraph CHILD["Property hierarchy — active community from scope.require(), NEVER payload"]
+        direction TB
+        GT["POST /communities/{cid}/gates → create_gate<br/>scope.require(cid); 409 GATE_CODE_TAKEN → INSERT gates"]
+        TW["POST /communities/{cid}/towers → create_tower<br/>409 TOWER_NAME_TAKEN → INSERT towers"]
+        TWU["PATCH /communities/towers/{tower_id} → update_tower (get_tower repo _scoped)"]
+        FL["POST /communities/floors → create_floor<br/>get_tower(payload.tower_id) 404 if outside scope;<br/>409 FLOOR_NUMBER_TAKEN → INSERT floors + towers.total_floors=max()"]
+        UN["POST /communities/units → create_unit<br/>get_floor(payload.floor_id) 404 if outside scope;<br/>409 UNIT_NUMBER_TAKEN → INSERT units"]
+        UNU["PATCH /communities/units/{unit_id} → update_unit"]
+        LISTS["GET /communities/{cid}/gates|towers · /towers/{id}/floors · /floors/{id}/units<br/>each: parent scope-checked, then child list"]
+    end
+
+    COMM --> AUD["_audit communities/&lt;entity&gt;.&lt;action&gt; (same txn)"]
+    CHILD --> AUD
+
+    COMM --> REPO["CommunityRepository (special) · Gate/Tower/Floor/UnitRepository (AsyncTenantRepository)"]
+    CHILD --> REPO
+    AUD --> REPO
+    REPO --> DB[("PostgreSQL: communities, gates, towers, floors, units, audit_logs")]
+
+    NOTE["Tenant-safe FKs: (floor_id, community_id, tower_id) → floors ; (unit_id, community_id) → units.<br/>A child row can never reference a parent in another community."]

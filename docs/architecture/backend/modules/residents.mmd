@@ -1,0 +1,59 @@
+%% Module: residents (FR-03)
+%% Files: app/modules/residents/{router,deps,service,repository,models,schemas}.py
+%% Models: ResidentProfile, UnitOccupancy (partial-unique 1 primary active per unit),
+%%         FamilyMember, EmergencyContact, MoveRecord (state machine)
+
+flowchart TD
+    C["Client (session)"] --> DEP["deps.resident_service — async_tenant_context + require_auth_async"]
+    DEP --> G{"require_permission_async residents:view / :create / :update / :delete"}
+    G -->|deny| E403["403 PERMISSION_DENIED"]
+
+    G --> PROF
+    G --> OCC
+    G --> CONTACT
+    G --> FAM
+    G --> MOVE
+
+    subgraph PROF["Resident profiles"]
+        direction TB
+        P_L["GET /residents → list_profiles (?community_id)"]
+        P_C["POST /residents → create_profile<br/>UniqueConstraint(community_id,user_id) → 409 PROFILE_EXISTS; INSERT resident_profiles"]
+        P_G["GET /residents/{profile_id} → get_profile (repo _scoped) → 404"]
+        P_U["PATCH /residents/{profile_id} → update_profile"]
+    end
+
+    subgraph OCC["Occupancies"]
+        direction TB
+        O_L["GET /residents/units/{unit_id}/occupancies → list_occupancies"]
+        O_C["POST /residents/occupancies → create_occupancy<br/>_active_community; profile.community == unit.community;<br/>if is_primary & active primary exists → 409 PRIMARY_OCCUPANT_EXISTS<br/>INSERT unit_occupancies"]
+        O_E["PATCH /residents/occupancies/{id}/end → end_occupancy<br/>422 INVALID_DATE_RANGE; set is_active/end_date"]
+    end
+
+    subgraph CONTACT["Emergency contacts"]
+        direction TB
+        E_L["GET /residents/{profile_id}/emergency-contacts → list_contacts (order priority)"]
+        E_C["POST /residents/{profile_id}/emergency-contacts → create_contact → INSERT emergency_contacts"]
+        E_D["DELETE /residents/emergency-contacts/{contact_id} → delete_contact (repo _scoped) → 204"]
+    end
+
+    subgraph FAM["Family members"]
+        F_C["POST /residents/family-members → create_family → INSERT family_members"]
+        F_L["GET /residents/units/{unit_id}/family-members → list_family"]
+    end
+
+    subgraph MOVE["Move records (state machine)"]
+        direction TB
+        M_L["GET /residents/move-records → list_moves (?community_id, ?move_status)"]
+        M_C["POST /residents/move-records → create_move<br/>status = scheduled if scheduled_at else requested; INSERT move_records"]
+        M_G["GET /residents/move-records/{move_id} → get_move"]
+        M_T["PATCH /residents/move-records/{move_id}/status → transition_move"]
+        M_T --> M_T1{"ensure_transition(current, target, MOVE_MAP)"}
+        M_T1 -->|invalid| M_E["422 INVALID_TRANSITION"]
+        M_T1 -->|approved| M_T2["stamp approved_by_user_id / approved_at"]
+        M_T1 -->|completed move_out| M_T3["deactivate the UnitOccupancy"]
+    end
+
+    PROF & OCC & CONTACT & FAM & MOVE --> AUD["record_audit_async residents/&lt;entity&gt;.&lt;action&gt; (same txn)"]
+    PROF & OCC & CONTACT & FAM & MOVE --> REPO["ResidentProfile/Occupancy/FamilyMember/EmergencyContact/MoveRecord Repository<br/>(AsyncTenantRepository — _scoped by community_id)"]
+    AUD --> REPO
+    REPO --> DB[("PostgreSQL: resident_profiles, unit_occupancies, family_members,<br/>emergency_contacts, move_records, audit_logs")]

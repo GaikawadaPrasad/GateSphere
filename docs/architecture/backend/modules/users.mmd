@@ -1,0 +1,52 @@
+%% Module: users / RBAC core (FR-02)
+%% Files: app/modules/users/{router,deps,service,models,schemas}.py
+%% Model: User — UserRole (community_id NULL = global) — Role — RolePermission — Permission
+
+flowchart TD
+    C["Client (session)"] --> DEP["deps.user_service<br/>async_tenant_context + require_auth_async"]
+
+    DEP --> GATE{"require_permission_async<br/>users:view / users:create / users:update"}
+    GATE -->|deny| E403["403 PERMISSION_DENIED"]
+
+    GATE -->|users:view| RD
+    GATE -->|users:create| WR_CREATE
+    GATE -->|users:update| WR_UPD
+
+    subgraph RD["Reads — UserService (service.py)"]
+        direction TB
+        L1["GET /users → list_users<br/>join UserRole; community caller sees users in scope.community_ids OR unaffiliated"]
+        L2["GET /users/{id} → get_user → _get_visible<br/>_visible(): global OR grant_cids ∩ scope.community_ids OR no roles → else 404"]
+        L3["GET /users/roles → list_roles<br/>Role + effective codes (ROLE_PERMISSIONS / role_permissions)"]
+    end
+
+    subgraph WR_CREATE["POST /users → create_user"]
+        direction TB
+        CR1{"email exists?"} -->|yes| CR_E["409 EMAIL_TAKEN"]
+        CR1 -->|no| CR2["INSERT users (Argon2 password_hash)"]
+        CR2 --> CR3["audit users/user.create"]
+        CR3 --> CR4{"payload.role_slug?"}
+        CR4 -->|yes| GR
+    end
+
+    subgraph WR_UPD["Writes — grant / revoke / update"]
+        direction TB
+        U1["PATCH /users/{id} → update_user<br/>setattr(patch); if deactivated → revoke_all_user_sessions_async"]
+        GR["POST /users/{id}/roles → grant_role<br/>_get_visible + _require_community(payload.community_id)<br/>super_admin/auditor must be global (else 422 GLOBAL_ROLE_ONLY)"]
+        GR2{"duplicate grant?"} -->|yes| GR_E["409 GRANT_EXISTS"]
+        GR --> GR2
+        GR2 -->|no| GR3["INSERT user_roles"]
+        RV["DELETE /users/{id}/roles/{grant_id} → revoke_role<br/>_get_visible + grant.user_id check + _require_community(ur.community_id)"]
+        RV --> RV1["DELETE user_roles row"]
+    end
+
+    U1 --> A1["audit users/user.update"]
+    GR3 --> A2["audit users/role.grant"] --> INV
+    RV1 --> A3["audit users/role.revoke"] --> INV
+
+    INV["invalidate_user_permissions_async([user.id])<br/>app/core/security.py<br/>UPDATE users.permission_version += 1<br/>revoke_all_user_sessions_async per id"]
+
+    L1 & L2 & L3 --> REPO["select(...) via AsyncSession (User not tenant-scoped;<br/>visibility enforced in _get_visible)"]
+    CR2 & GR3 & RV1 & U1 --> REPO
+    REPO --> DB[("PostgreSQL: users, user_roles, audit_logs")]
+    INV --> DB
+    INV --> RC[("Redis: drop session:* for affected users")]

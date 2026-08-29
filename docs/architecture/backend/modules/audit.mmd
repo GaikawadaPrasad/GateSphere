@@ -1,0 +1,32 @@
+%% Module: audit (FR-16) — immutable audit trail + read-only query API
+%% Files: app/modules/audit/{router,deps,service,query_service,models,schemas}.py
+%% audit_logs: community_id, user_id, session_id, module, action, entity_type, entity_id,
+%%             old_values, new_values, ip_address, user_agent, created_at  — INSERT ONLY
+
+flowchart TD
+    subgraph WRITE["Write path — record_audit_async() (called by every mutating service, same txn)"]
+        direction TB
+        W1["record_audit_async(db, module=, action=, actor=, community_id=,<br/>entity_type=, entity_id=, old=, new=, request=)"]
+        W2["_build_audit_row: user_id=actor.id|None, session_id from request.state,<br/>ip/ua from request, _jsonable(old/new) — UUID/Decimal/datetime/date"]
+        W3["db.add(AuditLog)  — no update/delete anywhere in app code"]
+    end
+    W1 --> W2 --> W3 --> PG[("PostgreSQL: audit_logs<br/>+ RLS tenant_isolation (permissive when community_id NULL)")]
+
+    subgraph READ["Read path — AuditQueryService (query_service.py)"]
+        direction TB
+        C["Client (session)"] --> DEP["deps.audit_query_service"]
+        DEP --> G{"require_permission_async"}
+        G -->|"GET /audit/logs, /audit/logs/{id}"| GV["audit:view"]
+        G -->|"GET /audit/logs.csv"| GX["audit:export"]
+
+        GV --> SC["_scoped(stmt): global caller → all rows;<br/>else WHERE community_id IN scope.community_ids"]
+        GX --> SC
+
+        SC --> Q1["list_logs — filters: module, action, entity_type, entity_id,<br/>user_id, since, until · page/page_size"]
+        SC --> Q2["get_log(log_id) — _scoped(select where id) → 404 if outside scope"]
+        SC --> Q3["export_logs → StreamingResponse text/csv"]
+    end
+
+    Q1 & Q2 & Q3 --> PG
+
+    NOTE["Auditor role = GET-only across audit + financial + incidents (NFR-COMP-02).<br/>No write route accepts the auditor role."]

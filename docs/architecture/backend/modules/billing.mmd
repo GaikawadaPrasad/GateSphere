@@ -1,0 +1,72 @@
+%% Module: billing — Accounting-oriented Maintenance & Billing (FR-09)
+%% Files: app/modules/billing/{router,deps,service,repository,models,schemas,tasks}.py
+%% Models: ChargeHead, BillingRule (config-as-data), MaintenanceInvoice + InvoiceItem,
+%%         Payment + PaymentAllocation (simulated gateway), LedgerEntry (append-only, Identity seq)
+%% Scope: TenantScope + UnitScopedAccess
+
+flowchart TD
+    C["Client (session)"] --> DEP["deps.billing_service — async_tenant_context + require_auth_async"]
+    DEP --> G{"require_permission_async<br/>billing:view / :create / :approve"}
+    G -->|deny| E403["403 PERMISSION_DENIED"]
+
+    G --> CONFIG & INV_L & INV_C & INV_D & INV_POST & INV_CANCEL & PAY_L & PAY_C & PAY_D & LEDGER
+
+    subgraph CONFIG["Config (billing:approve for writes)"]
+        direction TB
+        CH["GET/POST/PATCH /billing/charge-heads → 409 CHARGE_HEAD_EXISTS; charge_heads upsert"]
+        RU["GET/PATCH /billing/rules → get_rule / update_rule; billing_rules upsert (due_day, grace, late fee, tax%)"]
+    end
+
+    INV_L["GET /billing/invoices → list_invoices  [billing:view]<br/>_scope_unit_column(MaintenanceInvoice.unit_id) — resident sees own units only"]
+
+    subgraph INV_C["POST /billing/invoices → create_invoice  [billing:create]"]
+        direction TB
+        IC0{"is_unit_restricted (plain resident)?"} -->|yes| IC_E["403 STAFF_ONLY"]
+        IC0 -->|no| IC1["_unit_in_scope(unit_id); _rule(community); next_sequence"]
+        IC1 --> IC2["per item: amount = qty*rate; subtotal, taxable_base<br/>tax = taxable_base * rule.tax_percent/100; total = subtotal - discount + tax"]
+        IC2 --> IC3["INSERT maintenance_invoices (status=draft) + invoice_items;<br/>billed_to_user_id = _primary_billed_user(unit); audit invoice.create"]
+    end
+
+    INV_D["GET /billing/invoices/{id} → get_invoice → _assert_unit_visible → 404"]
+
+    subgraph INV_POST["POST /billing/invoices/{id}/post  [billing:approve]"]
+        direction TB
+        IP1{"status == draft?"} -->|no| IP_E["422 INVALID_TRANSITION"]
+        IP1 -->|yes| IP2["status=posted; _ledger(debit, total) → INSERT ledger_entries (balance_after recomputed per unit)"]
+        IP2 --> IP3["audit invoice.post → emit billing.invoice_posted → billed user"]
+    end
+
+    subgraph INV_CANCEL["POST /billing/invoices/{id}/cancel  [billing:approve]"]
+        direction TB
+        IX1{"amount_paid &gt; 0?"} -->|yes| IX_E1["422 INVOICE_HAS_PAYMENTS"]
+        IX1 -->|no| IX2{"status ∈ draft|posted|overdue?"} -->|no| IX_E2["422 INVALID_TRANSITION"]
+        IX2 -->|yes| IX3["posted/overdue → _ledger(credit, total); status=cancelled; balance_due=0; audit"]
+    end
+
+    PAY_L["GET /billing/payments → list_payments  [billing:view]<br/>_scope_owned(Payment.payer_user_id) — resident sees own payments"]
+
+    subgraph PAY_C["POST /billing/payments → record_payment  [billing:create]"]
+        direction TB
+        PC1{"Σ allocations == amount?"} -->|no| PC_E1["422 ALLOCATION_MISMATCH"]
+        PC1 -->|yes| PC2["payer_id = actor.id if is_unit_restricted else payload.payer_user_id|actor.id<br/>INSERT payments (payment_reference, receipt_number, gateway=simulated)"]
+        PC2 --> PC3["per allocation: invoices.get(id) same community; _assert_unit_visible(inv.unit_id)"]
+        PC3 --> PC4{"invoice status ∈ posted|partially_paid|overdue?"} -->|no| PC_E2["422 INVOICE_NOT_PAYABLE"]
+        PC4 -->|yes| PC5{"amt &gt; balance_due?"} -->|yes| PC_E3["422 OVER_ALLOCATION"]
+        PC5 -->|no| PC6["INSERT payment_allocations; invoice.amount_paid+=, balance_due=, status paid|partially_paid;<br/>_ledger(credit, amt) → INSERT ledger_entries"]
+        PC6 --> PC7["audit payment.record"]
+    end
+
+    PAY_D["GET /billing/payments/{id} · /{id}/receipt → get_payment / get_receipt<br/>is_unit_restricted & payer != actor → 404"]
+
+    LEDGER["GET /billing/units/{unit_id}/ledger → unit_ledger<br/>_unit_in_scope + _assert_unit_visible → 404"]
+
+    subgraph TASK["Celery (app/modules/billing/tasks.py)"]
+        direction TB
+        T2["sweep_overdue_invoices · daily 01:00 → posted/partially_paid past due_date → overdue;<br/>emit billing.invoice_overdue → billed user"]
+        T3["send_dues_reminders · Mon 09:00 → every invoice with balance;<br/>emit billing.dues_reminder → billed user"]
+    end
+
+    CONFIG & INV_L & INV_C & INV_D & INV_POST & INV_CANCEL & PAY_L & PAY_C & PAY_D & LEDGER --> REPO["ChargeHead/Rule/Invoice/Payment/Ledger Repository (AsyncTenantRepository)"]
+    REPO --> DB[("PostgreSQL: charge_heads, billing_rules, maintenance_invoices, invoice_items,<br/>payments, payment_allocations, ledger_entries, audit_logs")]
+    IP3 & T2 & T3 --> EVT["notifications/events.emit → NotificationService.dispatch"]
+    TASK --> DB

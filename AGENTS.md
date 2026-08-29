@@ -903,6 +903,26 @@ A feature is production‑ready — and may be called done — only when:
   `git log` before continuing. Do not assume previous session work is complete, and do not discard
   a previous architectural decision without reviewing why it was made.
 
+### Backend architecture Mermaid diagrams — mandatory, code-derived
+
+Two levels of Mermaid documentation live under **`docs/architecture/backend/`**:
+`backend-architecture.mmd` (one end-to-end system diagram — request pipeline → auth → RBAC →
+routes → services → repositories → DB → events/workers/integrations → response), and one
+`modules/<module>.mmd` per backend module (every route, its permission gate, its business
+conditionals, service methods with file refs, repos/models written, events emitted, jobs
+triggered, external calls). A route-by-route table is in `route-inventory.md`; the policy is in
+`docs/architecture/backend/README.md`.
+
+**These diagrams are derived from the source, never from assumptions.** Whenever a backend change
+touches a route (path/method), authn/authz, a permission code, input validation, a business
+condition, a state transition, a service/repository/model, a DB mutation, an orchestrator/task/
+queue, an event, an external integration, a generated file, a notification, or an error path,
+the author MUST: (1) update the affected `modules/<module>.mmd`; (2) update
+`backend-architecture.mmd` if module-to-module wiring changed; (3) update `route-inventory.md`;
+(4) re-verify both diagrams against the implementation and validate Mermaid syntax
+(`subgraph`/`end` balance, quoted labels, no stale route/file refs). If code and a diagram
+disagree, fix the diagram to match the verified code.
+
 ---
 
 ## 19. Forbidden patterns

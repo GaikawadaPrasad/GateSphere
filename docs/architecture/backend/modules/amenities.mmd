@@ -1,0 +1,68 @@
+%% Module: amenities — Amenity Booking & Conflict Resolution (FR-11)
+%% Files: app/modules/amenities/{router,deps,service,repository,models,schemas,tasks}.py
+%% Models: Amenity, AmenitySlot (weekly), AmenityRule (config-as-data), AmenityBlock (maintenance),
+%%         AmenityBooking (atomic conflict check; partial-unique elsewhere)
+%% Scope: TenantScope; bookings additionally self-scoped for a plain resident
+
+flowchart TD
+    C["Client (session)"] --> DEP["deps.amenity_service — async_tenant_context + require_auth_async"]
+    DEP --> G{"require_permission_async<br/>amenities:view / :create / :update / :delete / :approve"}
+    G -->|deny| E403["403 PERMISSION_DENIED"]
+
+    G --> AMN & SLOT & RULE & BLOCK & BK_L & BOOK & BK_D & BK_CANCEL & BK_STATUS
+
+    subgraph AMN["Amenities (community-wide — residents must see them to book)"]
+        A_L["GET /amenities → list_amenities"]
+        A_C["POST /amenities → create_amenity  [amenities:approve]  409 AMENITY_EXISTS"]
+        A_U["PATCH /amenities/{id} → update_amenity  [amenities:update]"]
+    end
+
+    subgraph SLOT["Slots"]
+        S_L["GET /amenities/{id}/slots → list_slots"]
+        S_C["POST /amenities/{id}/slots → create_slot  [amenities:create]<br/>end_time &gt; start_time else 422 INVALID_TIME_RANGE; INSERT amenity_slots"]
+        S_D["DELETE /amenities/slots/{slot_id} → delete_slot  [amenities:delete]  soft (is_active=false)"]
+    end
+
+    RULE["GET/PUT /amenities/{id}/rules → list_rules / upsert_rule  [amenities:view/:update]<br/>amenity_rules: max_advance_days, max_active_per_unit, min_cancel_hours, max_hours_per_booking"]
+    BLOCK["GET/POST /amenities/{id}/blocks → list_blocks / create_block  [amenities:view/:create]<br/>blocked_to &gt; blocked_from else 422; INSERT amenity_blocks"]
+
+    BK_L["GET /amenities/bookings → list_bookings  [amenities:view]<br/>_scope_owned(AmenityBooking.resident_user_id) — plain resident → own bookings; ?mine"]
+
+    subgraph BOOK["POST /amenities/bookings → book(BookingCreate)  [amenities:create]"]
+        direction TB
+        B1["_amenity_in_scope; amenity.is_active else 422 AMENITY_INACTIVE"]
+        B1 --> B2["slots.get(slot_id) belongs to amenity 404; slot.is_active else 422 SLOT_INACTIVE"]
+        B2 --> B3{"booking_date.weekday() == slot.day_of_week?"} -->|no| B_E1["422 SLOT_WEEKDAY_MISMATCH"]
+        B3 -->|yes| B4{"booking_date &lt; today?"} -->|yes| B_E2["422 DATE_IN_PAST"]
+        B4 -->|no| B5{"(date-today).days &gt; max_advance_days?"} -->|yes| B_E3["422 TOO_FAR_AHEAD"]
+        B5 -->|no| B6["start_at/end_at from slot times"]
+        B6 --> B7{"duration &gt; max_hours_per_booking?"} -->|yes| B_E4["422 TOO_LONG"]
+        B7 -->|no| B8["_actor_unit() → 422 NO_UNIT if none"]
+        B8 --> B9{"active_count_for_unit &gt;= max_active_per_unit?"} -->|yes| B_E5["422 UNIT_BOOKING_LIMIT"]
+        B9 -->|no| B10["ATOMIC: amenities.lock(amenity.id)  — SELECT ... FOR UPDATE"]
+        B10 --> B11{"blocks.overlapping(amenity, start, end)?"} -->|yes| B_E6["409 AMENITY_BLOCKED"]
+        B11 -->|no| B12{"Σ overlapping_confirmed.participant_count + payload &gt; capacity?"} -->|yes| B_E7["409 SLOT_FULL"]
+        B12 -->|no| B13["INSERT amenity_bookings status=confirmed; audit booking.create"]
+    end
+
+    BK_D["GET /amenities/bookings/{id} → get_booking<br/>is_unit_restricted & resident_user_id != actor → 404"]
+
+    subgraph BK_CANCEL["POST /amenities/bookings/{id}/cancel → cancel_booking  [amenities:view]"]
+        direction TB
+        CN0{"status == confirmed?"} -->|no| CN_E1["422 INVALID_TRANSITION"]
+        CN0 -->|yes| CN1["is_owner = resident_user_id == actor ; perms = '*' or amenities:update"]
+        CN1 --> CN2{"is_owner OR perms?"} -->|no| CN_E2["403 NOT_BOOKING_OWNER"]
+        CN2 -->|"owner, no perms"| CN3{"start_at - now &lt; min_cancel_hours?"} -->|yes| CN_E3["422 TOO_LATE_TO_CANCEL"]
+        CN3 -->|no| CN4
+        CN2 -->|"has perms"| CN4["status=cancelled, cancelled_at, reason; audit booking.cancel"]
+    end
+
+    BK_STATUS["POST /amenities/bookings/{id}/status → mark_booking  [amenities:update]<br/>completed | no_show only; status must be confirmed; audit booking.&lt;status&gt;"]
+
+    subgraph TASK["Celery: amenities.tasks.close_past_bookings (15 min)"]
+        T5["confirmed past end_at → status=completed; audit"]
+    end
+
+    AMN & SLOT & RULE & BLOCK & BK_L & BOOK & BK_D & BK_CANCEL & BK_STATUS --> REPO["Amenity/Slot/Rule/Block/Booking Repository (AsyncTenantRepository)"]
+    REPO --> DB[("PostgreSQL: amenities, amenity_slots, amenity_rules, amenity_blocks, amenity_bookings, audit_logs")]
+    TASK --> DB
