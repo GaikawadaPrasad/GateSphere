@@ -63,8 +63,9 @@ flowchart TD
         ER1 -->|pin| ERp["select VisitorPass JOIN VisitorRequest WHERE pin_hash & community ∈ scope;<br/>filter usable; &gt;1 → 409 PIN_AMBIGUOUS; entry_count++"]
         ER1 -->|request_id| ERr["get_request(request_id)"]
         ERt & ERp & ERr --> ER2{"request.status ∈ approved|entered?"} -->|no| ER_E1["422 NOT_APPROVED"]
-        ER2 -->|yes| ER3{"payload.visitor_id in request group?"} -->|no (and set)| ER_E2["422 NOT_IN_GROUP"]
-        ER3 -->|yes/default| ER4{"blacklist re-check hit?"}
+        ER2 -->|yes| ER3{"payload.visitor_id set and not in request group?"}
+        ER3 -->|yes| ER_E2["422 NOT_IN_GROUP"]
+        ER3 -->|no| ER4{"blacklist re-check hit?"}
         ER4 -->|yes| ER5["INSERT visitor_entries status=denied reason=blacklisted; audit entry.denied; 403 VISITOR_BLACKLISTED"]
         ER4 -->|no| ER6{"open entry for visitor?"} -->|yes| ER_E3["409 ALREADY_INSIDE"]
         ER6 -->|no| ER7["INSERT visitor_entries status=inside; visitor_requests.status=entered;<br/>visitors.visit_count++, last_visit_at, frequent_visitor_flag = visit_count &gt;= 5"]
