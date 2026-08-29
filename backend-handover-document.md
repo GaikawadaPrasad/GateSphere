@@ -1,6 +1,6 @@
 # GateSphere — Backend Handover Document
 
-_Last updated: 2026-08-28 · Branch: `main` (not yet pushed — foundation work, per the owner's instruction)_
+_Last updated: 2026-08-29 · Branch: `main` (not yet pushed — foundation work, per the owner's instruction)_
 
 This document is the single entry point for anyone (human or agent) picking up the GateSphere
 backend. Read this, then [`AGENTS.md`](AGENTS.md) (project standards) and
@@ -120,7 +120,7 @@ transaction**. `audit_logs` is append-only. `_jsonable` handles UUID / Decimal /
 
 ### Migrations
 
-**Hand-written**, sequential ids `0001` … `0012`. Autogenerate is NOT used — it is polluted by
+**Hand-written**, sequential ids `0001` … `0022`. Autogenerate is NOT used — it is polluted by
 model (`default=`) vs migration (`server_default=`) drift. Each module's migration:
 1. creates its tables with `server_default`s matching the model defaults,
 2. adds any composite-FK `UniqueConstraint((id, community_id))` needed by children,
@@ -149,36 +149,56 @@ models.py → schemas.py → repository.py → service.py → deps.py → router
 → one commit: feat(<m>): FR-NN <Name> module   (NO Co-Authored-By trailer)
 ```
 
+Every module is **fully async** (ADR-010): `AsyncTenantRepository` → `async def` service +
+`record_audit_async` → `async_tenant_context` deps → `async def` router.
+
 | FR | Module | Status | Migration |
 |----|--------|--------|-----------|
-| 01 | auth / sessions | ✅ implemented | 0001–0003 |
-| 02 | users / RBAC | ✅ implemented | 0003 |
-| 16 | audit | ✅ `audit_logs` + `record_audit()` | 0005 |
+| 01 | auth / sessions | ✅ implemented (async login/logout/me) | 0001–0003 |
+| 02 | users / RBAC | ✅ implemented — user + role-grant read/write API (`GET/POST /users`, `PATCH /users/{id}`, `GET /users/roles`, `POST/DELETE /users/{id}/roles`) | 0003 |
+| 16 | audit | ✅ `audit_logs` + `record_audit_async()` + **query API** (`GET /audit/logs` w/ filters, `GET /audit/logs/{id}`, `GET /audit/logs.csv`) | 0005 |
 | 03 | communities & property | ✅ implemented (reference module) | 0004 |
 | 03 | residents | ✅ implemented | 0006 |
-| 04 | visitors | ✅ implemented | 0007 |
-| 05 | gate / security ops | ✅ implemented | 0008 |
+| 04 | visitors | ✅ implemented — QR **and PIN** pass verification, `visitor_request_members` grouping | 0007, 0020 |
+| 05 | gate / security ops | ✅ implemented — panic alert fans a notification to on-duty guards/supervisors | 0008 |
 | 06 | domestic_staff | ✅ implemented | 0009 |
 | 07 | deliveries | ✅ implemented | 0010 |
 | 08 | vehicles & parking | ✅ implemented | 0011 |
-| 09 | billing | ✅ implemented | 0012 |
-| 10 | complaints | ✅ implemented | 0013 |
+| 09 | billing | ✅ implemented — payment **receipts** (`RCP-…` + `GET /billing/payments/{id}/receipt`) | 0012, 0021 |
+| 10 | complaints | ✅ implemented — SLA **escalation sweep** (`on_track→at_risk→breached→escalated`) | 0013, 0019 |
 | 11 | amenities | ✅ implemented | 0014 |
-| 12 | communication | ✅ implemented | 0015 |
-| 13 | incidents | ✅ implemented | 0016 |
+| 12 | communication | ✅ implemented — `resident_groups` + members, group-targeted announcements | 0015, 0018 |
+| 13 | incidents | ✅ implemented — `incident_attachments` | 0016, 0018 |
 | 14 | dashboards | ✅ implemented (no tables) | — |
-| 15 | notifications | ✅ implemented | 0017 |
+| 15 | notifications | ✅ implemented — domain events wired to the inbox via `notifications.events.emit` / `emit_to_roles` | 0017 |
+| — | uploads pipeline | ✅ `/uploads` presign + fixed catalogue + `POST /uploads/{id}/confirm` (magic-byte check) + `managed_files` | 0022 |
 
-**All 15 FR modules + the auth/RBAC/audit foundation are implemented.** Migrations `0001`–`0017`.
+**All FR modules + the auth/RBAC/audit foundation are implemented.** Migrations `0001`–`0022`.
+The 2026-08-28 QA/acceptance gap sweep (7 items) and the async migration are done — see
+`docs/development/session-notes.md` and `docs/decisions/ADR-010-async-stack.md`.
 
-Still open (integration/polish — see `AGENTS.md §23`):
-- **RLS enforcement test suite** — connect as a restricted DB role (superuser bypasses RLS).
-- **Notification wiring** — domain modules emit audit-only events today; route the user-facing
-  ones through `NotificationService.dispatch()` + the Celery `tasks.py` hooks.
-- **Audit read API** (FR-16), **user/role management endpoints** (FR-02).
-- **Deferred child tables** — `ticket_attachments`, `incident_attachments`, `resident_groups`.
+### Background jobs (Celery beat — `app/core/celery_app.py`)
 
-Test count: **217 passing** (`pytest -q`). Backend is fully async (ADR-010).
+Every task uses `app/core/jobs.py` (`job_session` async ctx mgr + global `system_scope` +
+seeded `system@` audit actor) and applies the same service-layer transition rules.
+
+| Task | Cadence | Effect |
+|---|---|---|
+| `complaints.tasks.sweep_ticket_sla` | 5 min | advance `service_tickets.escalation_state`, notify resident + escalation role |
+| `billing.tasks.sweep_overdue_invoices` | daily 01:00 | past-due `posted`/`partially_paid` → `overdue` + notify |
+| `billing.tasks.send_dues_reminders` | Mon 09:00 | recurring nudge for every invoice with a balance |
+| `visitors.tasks.expire_stale_requests` | 15 min | `pending`/`approved` past `valid_until` → `expired` |
+| `amenities.tasks.close_past_bookings` | 15 min | `confirmed` past `end_at` → `completed` |
+
+### Still open (feature work — see `AGENTS.md` "Still open")
+
+- **OTP login, community switcher UI, SSE/WebSocket gate feed** (FR-04/05).
+- **Frontend design system** — Tailwind + shadcn/ui + Recharts + TanStack Table.
+- **Permission caching** (`permission_version` bump) — evaluation is live per request today.
+- **Real email/SMS providers** — every notification channel except `in_app` is simulated.
+
+Test count: **217 passing** (`pytest -q`). RLS enforcement is covered by
+`backend/tests/test_tenant_isolation.py` (connects as a restricted non-superuser DB role).
 
 ## 7. Key decisions (ADRs — see `docs/decisions/`)
 
@@ -213,7 +233,7 @@ backend/
     modules/<m>/   models, schemas, repository, service, deps, router, tasks, tests/
     api/router.py  aggregate router — one include per module
     scripts/seed.py  idempotent synthetic data (extend per module)
-  alembic/versions/  0001 … 0012
+  alembic/versions/  0001 … 0022
   conftest.py      shared fixtures: client, auth_client, as_role, seed_ids, unique_code
 docs/
   backend/modules/<m>/README.md   canonical module spec
