@@ -4,6 +4,12 @@ Canonical envelope. All endpoints require a session; permission noted per row. C
 callers only see/act within their own community (else `404`). `?community_id=` is required for a
 global caller on the collection routes.
 
+**Row-level scope:** a plain resident only sees tickets for the **units they occupy** (plus any
+they raised); another unit's ticket — including `confirm` / `messages` / `feedback` — returns
+`404`. Internal messages (`is_internal=true`) are **hidden from residents** even on their own
+tickets, and a resident cannot post one (`403 INTERNAL_NOTE_FORBIDDEN`). Facility managers /
+admins are unrestricted.
+
 ## Endpoints
 
 | Method & path | Permission | Body | Success | Notes |
@@ -53,7 +59,7 @@ Monotonic and idempotent — a ticket is only updated (and only notified) on a s
 
 `NOT_AUTHENTICATED` · `PERMISSION_DENIED` · `NOT_FOUND` · `VALIDATION_ERROR` · `INVALID_ENUM` ·
 `COMMUNITY_REQUIRED` · `CATEGORY_EXISTS` · `INVALID_TRANSITION` · `TICKET_NOT_CLOSED` ·
-`FEEDBACK_EXISTS` · `CSRF_INVALID`.
+`FEEDBACK_EXISTS` · `INTERNAL_NOTE_FORBIDDEN` · `CSRF_INVALID`.
 
 ## Audit
 

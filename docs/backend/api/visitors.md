@@ -4,6 +4,11 @@ Canonical envelope. All endpoints require a session; permission noted per row. C
 callers only see/act within their own community (else `404`). `?community_id=` is required for a
 global caller on the collection routes.
 
+**Row-level scope:** a plain resident (no management/security role) only sees and acts on visitor
+requests / entries for the **units they occupy** — `GET /requests` and `/entries` are filtered to
+their units, and a request/decision/pass for another unit returns `404` (AGENTS.md §3
+"Row-level access"). Guards, supervisors and admins are unrestricted.
+
 ## Endpoints
 
 | Method & path | Permission | Body | Success | Notes |

@@ -4,6 +4,11 @@ Canonical envelope. All endpoints require a session; permission noted per row. C
 callers only see/act within their own community (else `404`). `?community_id=` is required for a
 global caller on the collection routes; `PaymentCreate` carries `community_id` in the body.
 
+**Row-level scope:** a plain resident only sees their **own units'** invoices / ledger and their
+**own** payments / receipts (lists filtered; another unit's invoice or ledger → `404`). Residents
+**cannot raise invoices** (`403 STAFF_ONLY`) — `POST /invoices` is a staff action; residents use
+`POST /payments` against invoices for their units. Admins / association committee are unrestricted.
+
 ## Endpoints
 
 | Method & path | Permission | Body | Success | Notes |
@@ -37,7 +42,7 @@ global caller on the collection routes; `PaymentCreate` carries `community_id` i
 
 `NOT_AUTHENTICATED` · `PERMISSION_DENIED` · `NOT_FOUND` · `VALIDATION_ERROR` · `INVALID_ENUM` ·
 `COMMUNITY_REQUIRED` · `CHARGE_HEAD_EXISTS` · `INVALID_TRANSITION` · `INVOICE_HAS_PAYMENTS` ·
-`ALLOCATION_MISMATCH` · `INVOICE_NOT_PAYABLE` · `OVER_ALLOCATION` · `CSRF_INVALID`.
+`ALLOCATION_MISMATCH` · `INVOICE_NOT_PAYABLE` · `OVER_ALLOCATION` · `STAFF_ONLY` · `CSRF_INVALID`.
 
 ## Audit
 

@@ -84,3 +84,32 @@ def test_cross_community_invoice_is_404(as_role, seed_ids):
         json={"unit_id": other_unit, "items": [{"description": "x", "unit_rate": "1"}]},
     )
     assert r.status_code == 404
+
+
+def test_resident_billing_is_own_unit_only(as_role, seed_ids, resident_unit_id):
+    admin = as_role("community_admin")
+    other_unit = _unit_in(seed_ids["community_id"])
+    assert other_unit != resident_unit_id
+    inv = admin.post(
+        f"{P}/invoices",
+        json={
+            "unit_id": other_unit,
+            "items": [{"description": "M", "quantity": "1", "unit_rate": "500.00"}],
+        },
+    ).json()["data"]
+    admin.post(f"{P}/invoices/{inv['id']}/post")
+
+    resident = as_role("resident")
+    assert resident.get(f"{P}/invoices/{inv['id']}").status_code == 404
+    assert resident.get(f"{P}/units/{other_unit}/ledger").status_code == 404
+    assert all(i["id"] != inv["id"] for i in resident.get(f"{P}/invoices").json()["data"])
+
+    denied = resident.post(
+        f"{P}/invoices",
+        json={
+            "unit_id": resident_unit_id,
+            "items": [{"description": "x", "quantity": "1", "unit_rate": "1.00"}],
+        },
+    )
+    assert denied.status_code == 403 and denied.json()["error"]["code"] == "STAFF_ONLY"
+    assert admin.get(f"{P}/invoices/{inv['id']}").status_code == 200

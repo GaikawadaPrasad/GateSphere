@@ -37,12 +37,16 @@ def test_tickets_need_auth(client):
     assert client.get(f"{P}/tickets").status_code == 401
 
 
-def test_resident_raises_fm_resolves_resident_confirms(as_role, seed_ids):
+def test_resident_raises_fm_resolves_resident_confirms(as_role, seed_ids, resident_unit_id):
     cid = seed_ids["community_id"]
     resident = as_role("resident")
     r = resident.post(
         f"{P}/tickets",
-        json={"unit_id": _unit_in(cid), "category_id": _category_in(cid), "subject": "No water"},
+        json={
+            "unit_id": resident_unit_id,
+            "category_id": _category_in(cid),
+            "subject": "No water",
+        },
     )
     assert r.status_code == 201, r.text
     tid = r.json()["data"]["id"]
@@ -74,12 +78,16 @@ def test_cross_community_unit_is_404(as_role, seed_ids):
     assert r.status_code == 404
 
 
-def test_attachments(as_role, seed_ids, confirmed_upload):
+def test_attachments(as_role, seed_ids, confirmed_upload, resident_unit_id):
     cid = seed_ids["community_id"]
     resident = as_role("resident")
     tid = resident.post(
         f"{P}/tickets",
-        json={"unit_id": _unit_in(cid), "category_id": _category_in(cid), "subject": "Photo"},
+        json={
+            "unit_id": resident_unit_id,
+            "category_id": _category_in(cid),
+            "subject": "Photo",
+        },
     ).json()["data"]["id"]
 
     # an unconfirmed upload is refused (NFR-SEC-07)
@@ -100,3 +108,46 @@ def test_attachments(as_role, seed_ids, confirmed_upload):
     assert r.status_code == 201, r.text
     lst = resident.get(f"{P}/tickets/{tid}/attachments")
     assert lst.status_code == 200 and lst.json()["data"][0]["file_name"] == "a.jpg"
+
+
+def test_resident_ticket_access_is_own_unit_and_hides_internal_notes(
+    as_role, seed_ids, resident_unit_id
+):
+    cid = seed_ids["community_id"]
+    admin = as_role("community_admin")
+    other_unit = _unit_in(cid)
+    assert other_unit != resident_unit_id
+    cat = _category_in(cid)
+
+    theirs = admin.post(
+        f"{P}/tickets", json={"unit_id": other_unit, "category_id": cat, "subject": "theirs"}
+    ).json()["data"]
+
+    resident = as_role("resident")
+    assert resident.get(f"{P}/tickets/{theirs['id']}").status_code == 404
+    assert (
+        resident.post(
+            f"{P}/tickets/{theirs['id']}/confirm", json={"confirmation_status": "confirmed"}
+        ).status_code
+        == 404
+    )
+    assert all(t["id"] != theirs["id"] for t in resident.get(f"{P}/tickets").json()["data"])
+
+    mine = resident.post(
+        f"{P}/tickets", json={"unit_id": resident_unit_id, "category_id": cat, "subject": "mine"}
+    ).json()["data"]
+    admin.post(
+        f"{P}/tickets/{mine['id']}/messages",
+        json={"message": "internal staff note", "is_internal": True},
+    )
+    resident.post(f"{P}/tickets/{mine['id']}/messages", json={"message": "thank you"})
+
+    msgs = resident.get(f"{P}/tickets/{mine['id']}/messages").json()["data"]
+    assert msgs and all(not m["is_internal"] for m in msgs)
+    assert any(m["message"] == "thank you" for m in msgs)
+
+    bad = resident.post(
+        f"{P}/tickets/{mine['id']}/messages", json={"message": "sneaky", "is_internal": True}
+    )
+    assert bad.status_code == 403
+    assert bad.json()["error"]["code"] == "INTERNAL_NOTE_FORBIDDEN"

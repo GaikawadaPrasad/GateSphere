@@ -12,7 +12,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 from fastapi import Request
-from sqlalchemy import select
+from sqlalchemy import false, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import BusinessRuleError, ConflictError, ForbiddenError, NotFoundError
@@ -21,6 +21,7 @@ from app.core.tenancy import TenantScope
 from app.modules.audit.service import record_audit_async
 from app.modules.communities.models import Gate, Unit
 from app.modules.notifications import events as notif_events
+from app.modules.residents.access import UnitScopedAccess
 from app.modules.residents.models import UnitOccupancy
 from app.modules.uploads.guard import ensure_confirmed_async
 from app.modules.users.models import User
@@ -64,7 +65,7 @@ def _enum(field: str, value: str | None) -> None:
         )
 
 
-class VisitorService:
+class VisitorService(UnitScopedAccess):
     def __init__(
         self, db: AsyncSession, scope: TenantScope, actor: User, request: Request | None = None
     ):
@@ -219,6 +220,12 @@ class VisitorService:
         if unit_id:
             stmt = stmt.where(VisitorRequest.unit_id == unit_id)
         stmt = stmt.order_by(VisitorRequest.created_at.desc())
+        # a plain resident sees only their own units' requests (+ any they created)
+        stmt = await self._scope_unit_column(
+            stmt,
+            VisitorRequest.unit_id,
+            or_owned=VisitorRequest.created_by_user_id == self.actor.id,
+        )
         return await self.requests.list(
             offset=offset, limit=limit, extra=stmt
         ), await self.requests.count(extra=stmt)
@@ -227,10 +234,12 @@ class VisitorService:
         obj = await self.requests.get(request_id)
         if obj is None:
             raise NotFoundError("Visitor request not found")
+        await self._assert_unit_visible(obj.unit_id)
         return obj
 
     async def create_request(self, payload: schemas.RequestCreate) -> VisitorRequest:
         unit = await self._unit_in_scope(payload.unit_id)
+        await self._assert_unit_visible(unit.id)  # a resident invites guests to their own unit
         _enum("visitor_type", payload.visitor_type)
         policy = await self._policy(unit.community_id)
 
@@ -654,6 +663,17 @@ class VisitorService:
         if status:
             stmt = stmt.where(VisitorEntry.status == status)
         stmt = stmt.order_by(VisitorEntry.entry_at.desc().nulls_last())
+        units = await self._unit_scope()
+        if units is not None:
+            stmt = (
+                stmt.where(
+                    VisitorEntry.request_id.in_(
+                        select(VisitorRequest.id).where(VisitorRequest.unit_id.in_(units))
+                    )
+                )
+                if units
+                else stmt.where(false())
+            )
         return await self.entries.list(
             offset=offset, limit=limit, extra=stmt
         ), await self.entries.count(extra=stmt)

@@ -124,19 +124,16 @@ def test_unknown_kind_is_404(as_role, seed_ids):
     assert r.status_code == 404
 
 
-def test_domain_endpoint_rejects_external_url(as_role, seed_ids):
+def test_domain_endpoint_rejects_external_url(as_role, seed_ids, resident_unit_id):
     # a ticket attachment must point at our bucket
     from sqlalchemy import select
 
     from app.db.session import SessionLocal
-    from app.modules.communities.models import Unit
     from app.modules.complaints.models import ServiceCategory
 
     cid = seed_ids["community_id"]
+    unit = resident_unit_id  # a resident may only raise tickets for their own unit
     with SessionLocal() as db:
-        unit = str(
-            db.scalar(select(Unit).where(Unit.community_id == cid).order_by(Unit.unit_number)).id
-        )
         cat = str(
             db.scalar(
                 select(ServiceCategory)

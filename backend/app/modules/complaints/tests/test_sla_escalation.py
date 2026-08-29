@@ -12,13 +12,11 @@ from app.modules.complaints.tasks import sweep_ticket_sla
 from app.modules.notifications.models import Notification
 
 
-def _raise_ticket(as_role, seed_ids) -> str:
-    from app.modules.communities.models import Unit
+def _raise_ticket(as_role, seed_ids, unit_id) -> str:
     from app.modules.complaints.models import ServiceCategory
 
     cid = seed_ids["community_id"]
     with SessionLocal() as db:
-        unit = db.scalar(select(Unit).where(Unit.community_id == cid).order_by(Unit.unit_number))
         cat = db.scalar(
             select(ServiceCategory)
             .where(ServiceCategory.community_id == cid)
@@ -26,7 +24,7 @@ def _raise_ticket(as_role, seed_ids) -> str:
         )
     r = as_role("resident").post(
         "/api/v1/complaints/tickets",
-        json={"unit_id": str(unit.id), "category_id": str(cat.id), "subject": "SLA probe"},
+        json={"unit_id": unit_id, "category_id": str(cat.id), "subject": "SLA probe"},
     )
     assert r.status_code == 201, r.text
     return r.json()["data"]["id"]
@@ -40,8 +38,8 @@ def _backdate(ticket_id: str, **cols) -> None:
         db.commit()
 
 
-def test_sweep_marks_breach_then_escalation_and_notifies(as_role, seed_ids):
-    tid = _raise_ticket(as_role, seed_ids)
+def test_sweep_marks_breach_then_escalation_and_notifies(as_role, seed_ids, resident_unit_id):
+    tid = _raise_ticket(as_role, seed_ids, resident_unit_id)
     now = datetime.now(UTC)
     # resolution window already elapsed, escalation not yet due -> breached
     _backdate(

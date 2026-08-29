@@ -18,7 +18,7 @@ from fastapi import Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.errors import BusinessRuleError, ConflictError, NotFoundError
+from app.core.errors import BusinessRuleError, ConflictError, ForbiddenError, NotFoundError
 from app.core.state_machine import ensure_transition
 from app.core.tenancy import TenantScope
 from app.modules.audit.service import record_audit_async
@@ -42,6 +42,7 @@ from app.modules.complaints.repository import (
 )
 from app.modules.complaints.schemas import ALLOWED
 from app.modules.notifications import events as notif_events
+from app.modules.residents.access import UnitScopedAccess
 from app.modules.uploads.guard import ensure_confirmed_async
 from app.modules.users.models import User
 
@@ -81,7 +82,7 @@ def _enum(field: str, value: str | None) -> None:
         )
 
 
-class ComplaintService:
+class ComplaintService(UnitScopedAccess):
     def __init__(
         self, db: AsyncSession, scope: TenantScope, actor: User, request: Request | None = None
     ):
@@ -202,6 +203,7 @@ class ComplaintService:
 
     async def create_ticket(self, payload: schemas.TicketCreate) -> ServiceTicket:
         unit = await self._unit_in_scope(payload.unit_id)
+        await self._assert_unit_visible(unit.id)  # a resident raises tickets for their own unit
         cat = await self.categories.get(payload.category_id)
         if cat is None or cat.community_id != unit.community_id:
             raise NotFoundError("Category not found")
@@ -240,6 +242,7 @@ class ComplaintService:
         obj = await self.tickets.get(ticket_id)
         if obj is None:
             raise NotFoundError("Ticket not found")
+        await self._assert_unit_visible(obj.unit_id)
         return obj
 
     async def list_tickets(
@@ -261,6 +264,11 @@ class ComplaintService:
         if ticket_status:
             stmt = stmt.where(ServiceTicket.status == ticket_status)
         stmt = stmt.order_by(ServiceTicket.created_at.desc())
+        stmt = await self._scope_unit_column(
+            stmt,
+            ServiceTicket.unit_id,
+            or_owned=ServiceTicket.raised_by_user_id == self.actor.id,
+        )
         return await self.tickets.list(
             offset=offset, limit=limit, extra=stmt
         ), await self.tickets.count(extra=stmt)
@@ -387,6 +395,10 @@ class ComplaintService:
         self, ticket_id: uuid.UUID, payload: schemas.MessageCreate
     ) -> TicketMessage:
         ticket = await self.get_ticket(ticket_id)
+        if payload.is_internal and await self.is_unit_restricted():
+            raise ForbiddenError(
+                "Residents cannot post internal notes", code="INTERNAL_NOTE_FORBIDDEN"
+            )
         msg = TicketMessage(
             ticket_id=ticket.id,
             sender_user_id=self.actor.id,
@@ -402,15 +414,10 @@ class ComplaintService:
 
     async def list_messages(self, ticket_id: uuid.UUID) -> list[TicketMessage]:
         await self.get_ticket(ticket_id)
-        return list(
-            (
-                await self.db.scalars(
-                    select(TicketMessage)
-                    .where(TicketMessage.ticket_id == ticket_id)
-                    .order_by(TicketMessage.created_at)
-                )
-            ).all()
-        )
+        stmt = select(TicketMessage).where(TicketMessage.ticket_id == ticket_id)
+        if await self.is_unit_restricted():
+            stmt = stmt.where(TicketMessage.is_internal.is_(False))  # hide staff-only notes
+        return list((await self.db.scalars(stmt.order_by(TicketMessage.created_at))).all())
 
     async def list_history(self, ticket_id: uuid.UUID) -> list[TicketStatusHistory]:
         await self.get_ticket(ticket_id)

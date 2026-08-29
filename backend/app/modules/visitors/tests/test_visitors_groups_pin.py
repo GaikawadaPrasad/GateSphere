@@ -54,9 +54,9 @@ def test_pin_pass_admits_visitor(as_role, seed_ids):
     assert again.status_code == 404
 
 
-def test_group_members_share_one_approval(as_role, seed_ids):
+def test_group_members_share_one_approval(as_role, seed_ids, resident_unit_id):
     admin = as_role("community_admin")
-    unit_id = _unit_in(seed_ids["community_id"])
+    unit_id = resident_unit_id  # so the resident below may approve it
     req = admin.post(
         f"{P}/requests",
         json={
@@ -79,7 +79,8 @@ def test_group_members_share_one_approval(as_role, seed_ids):
     assert sum(1 for x in members if x["is_primary"]) == 1
 
     resident = as_role("resident")
-    resident.post(f"{P}/requests/{req['id']}/decision", json={"decision": "approved"})
+    dec = resident.post(f"{P}/requests/{req['id']}/decision", json={"decision": "approved"})
+    assert dec.status_code == 200, dec.text
 
     guard = as_role("security_guard")
     # the added group member can enter on the same request

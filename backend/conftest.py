@@ -103,6 +103,31 @@ def unique_code() -> str:
 
 
 @pytest.fixture()
+def resident_unit_id() -> str:
+    """The unit the seeded `resident@` user actually occupies.
+
+    Row-level (own-unit) access scoping means a plain resident may only act on records for
+    units they occupy — tests that log in as `resident` must target this unit, not an
+    arbitrary one.
+    """
+    from app.modules.residents.models import ResidentProfile, UnitOccupancy
+
+    with SessionLocal() as db:
+        return str(
+            db.scalar(
+                select(UnitOccupancy.unit_id)
+                .join(ResidentProfile, ResidentProfile.id == UnitOccupancy.resident_profile_id)
+                .join(User, User.id == ResidentProfile.user_id)
+                .where(
+                    User.email == f"resident@{DEMO_DOMAIN}",
+                    UnitOccupancy.is_active.is_(True),
+                )
+                .order_by(UnitOccupancy.is_primary.desc())
+            )
+        )
+
+
+@pytest.fixture()
 def confirmed_upload():
     """Factory: `confirmed_upload("ticket_attachment", community_id)` -> a managed file URL
     whose `managed_files` row is already `confirmed` (skips the real S3 round-trip so

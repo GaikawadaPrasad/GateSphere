@@ -21,7 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.errors import BusinessRuleError, ConflictError, NotFoundError
+from app.core.errors import BusinessRuleError, ConflictError, ForbiddenError, NotFoundError
 from app.core.tenancy import TenantScope
 from app.modules.audit.service import record_audit_async
 from app.modules.billing import schemas
@@ -44,6 +44,7 @@ from app.modules.billing.repository import (
 from app.modules.billing.schemas import ALLOWED
 from app.modules.communities.models import Unit
 from app.modules.notifications import events as notif_events
+from app.modules.residents.access import UnitScopedAccess
 from app.modules.residents.models import ResidentProfile, UnitOccupancy
 from app.modules.users.models import User
 
@@ -71,7 +72,7 @@ def _enum(field: str, value: str | None) -> None:
         )
 
 
-class BillingService:
+class BillingService(UnitScopedAccess):
     def __init__(
         self, db: AsyncSession, scope: TenantScope, actor: User, request: Request | None = None
     ):
@@ -214,6 +215,8 @@ class BillingService:
 
     # -- invoices ------------------------------------------ #
     async def create_invoice(self, payload: schemas.InvoiceCreate) -> MaintenanceInvoice:
+        if await self.is_unit_restricted():
+            raise ForbiddenError("Only community staff can raise invoices", code="STAFF_ONLY")
         unit = await self._unit_in_scope(payload.unit_id)
         rule = await self._rule(unit.community_id)
         seq = await self.invoices.next_sequence(unit.community_id)
@@ -266,6 +269,7 @@ class BillingService:
         obj = await self.invoices.get(invoice_id)
         if obj is None:
             raise NotFoundError("Invoice not found")
+        await self._assert_unit_visible(obj.unit_id)
         return obj
 
     async def list_invoices(
@@ -287,6 +291,7 @@ class BillingService:
         if invoice_status:
             stmt = stmt.where(MaintenanceInvoice.status == invoice_status)
         stmt = stmt.order_by(MaintenanceInvoice.created_at.desc())
+        stmt = await self._scope_unit_column(stmt, MaintenanceInvoice.unit_id)
         return await self.invoices.list(
             offset=offset, limit=limit, extra=stmt
         ), await self.invoices.count(extra=stmt)
@@ -381,6 +386,7 @@ class BillingService:
             inv = await self.invoices.get(line.invoice_id)
             if inv is None or inv.community_id != cid:
                 raise NotFoundError("Invoice not found")
+            await self._assert_unit_visible(inv.unit_id)
             if inv.status not in ("posted", "partially_paid", "overdue"):
                 raise BusinessRuleError(
                     f"Invoice {inv.invoice_number} is '{inv.status}'", code="INVOICE_NOT_PAYABLE"
@@ -421,6 +427,8 @@ class BillingService:
         obj = await self.payments.get(payment_id)
         if obj is None:
             raise NotFoundError("Payment not found")
+        if (await self.is_unit_restricted()) and obj.payer_user_id != self.actor.id:
+            raise NotFoundError("Payment not found")
         return obj
 
     async def get_receipt(self, payment_id: uuid.UUID) -> dict:
@@ -458,6 +466,7 @@ class BillingService:
             self.scope.require(community_id)
             stmt = stmt.where(Payment.community_id == community_id)
         stmt = stmt.order_by(Payment.paid_at.desc())
+        stmt = await self._scope_owned(stmt, Payment.payer_user_id)
         return await self.payments.list(
             offset=offset, limit=limit, extra=stmt
         ), await self.payments.count(extra=stmt)
@@ -465,6 +474,7 @@ class BillingService:
     # -- ledger --------------------------------------- #
     async def unit_ledger(self, unit_id: uuid.UUID, *, offset: int, limit: int):
         await self._unit_in_scope(unit_id)
+        await self._assert_unit_visible(unit_id)
         stmt = (
             select(LedgerEntry)
             .where(LedgerEntry.unit_id == unit_id)

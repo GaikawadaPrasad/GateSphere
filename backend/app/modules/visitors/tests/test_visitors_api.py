@@ -32,9 +32,9 @@ def test_requests_list_needs_auth(client):
     assert client.get(f"{P}/requests").status_code == 401
 
 
-def test_guard_creates_request_resident_approves(as_role, seed_ids, unique_code):
+def test_guard_creates_request_resident_approves(as_role, seed_ids, unique_code, resident_unit_id):
     guard = as_role("security_guard")
-    unit_id = _unit_in(seed_ids["community_id"])
+    unit_id = resident_unit_id  # the resident may only approve for a unit they occupy
     r = guard.post(
         f"{P}/requests",
         json={
@@ -107,3 +107,29 @@ def test_cross_community_unit_is_404(as_role, seed_ids):
         },
     )
     assert r.status_code == 404
+
+
+def test_resident_cannot_act_on_other_units_request(as_role, seed_ids, resident_unit_id):
+    admin = as_role("community_admin")
+    other_unit = _unit_in(seed_ids["community_id"])
+    assert other_unit != resident_unit_id
+    req = admin.post(
+        f"{P}/requests",
+        json={
+            "unit_id": other_unit,
+            "visitor": {"full_name": "Nosy Neighbour", "phone": _phone()},
+            "visitor_type": "personal_guest",
+        },
+    ).json()["data"]
+
+    resident = as_role("resident")
+    assert resident.get(f"{P}/requests/{req['id']}").status_code == 404
+    assert (
+        resident.post(
+            f"{P}/requests/{req['id']}/decision", json={"decision": "approved"}
+        ).status_code
+        == 404
+    )
+    assert all(x["id"] != req["id"] for x in resident.get(f"{P}/requests").json()["data"])
+    # a community admin is unrestricted
+    assert admin.get(f"{P}/requests/{req['id']}").status_code == 200
