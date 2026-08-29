@@ -24,7 +24,11 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "GateSphere"
 
     # --- CORS / cookies ---
+    # FRONTEND_ORIGIN is the canonical UI origin (used to build invitation links).
+    # CORS_ORIGINS optionally widens the allow-list (comma-separated) for extra
+    # deploy previews / localhost ports during frontend integration.
     FRONTEND_ORIGIN: str = "http://localhost:3000"
+    CORS_ORIGINS: str = ""
     SESSION_COOKIE_NAME: str = "gs_session"
     CSRF_COOKIE_NAME: str = "gs_csrf"
     SESSION_TTL_SECONDS: int = 60 * 60 * 8
@@ -53,6 +57,11 @@ class Settings(BaseSettings):
 
     # --- rate limiting ---
     RATE_LIMIT_LOGIN: str = "5/minute"
+
+    @property
+    def cors_allow_origins(self) -> list[str]:
+        extra = [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+        return list(dict.fromkeys([self.FRONTEND_ORIGIN, *extra]))
 
     @property
     def sqlalchemy_url(self) -> str:

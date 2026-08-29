@@ -17,6 +17,8 @@ from app.modules.domestic_staff.router import router as domestic_staff_router
 from app.modules.gate.router import router as gate_router
 from app.modules.incidents.router import router as incidents_router
 from app.modules.notifications.router import router as notifications_router
+from app.modules.onboarding.router import router as onboarding_router
+from app.modules.rbac.router import router as rbac_router
 from app.modules.residents.router import router as residents_router
 from app.modules.uploads.router import router as uploads_router
 from app.modules.users.router import router as users_router
@@ -43,5 +45,7 @@ for r in (
     audit_router,
     dashboards_router,
     uploads_router,
+    rbac_router,
+    onboarding_router,
 ):
     api_router.include_router(r)

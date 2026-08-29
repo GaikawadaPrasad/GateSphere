@@ -8,10 +8,17 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import Boolean, ForeignKey, String, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base_class import Base, TimestampMixin, uuid_pk
+from app.db.base_class import Base, TenantMixin, TimestampMixin, uuid_pk
 
 
 class User(Base, TimestampMixin):
@@ -24,6 +31,10 @@ class User(Base, TimestampMixin):
     password_hash: Mapped[str] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_superadmin: Mapped[bool] = mapped_column(Boolean, default=False)
+    # bumped whenever this user's effective permissions could have changed
+    # (role grant/revoke, a global role's permission set, or a per-community override
+    # for a role they hold). The frontend re-fetches `/auth/me` when it changes.
+    permission_version: Mapped[int] = mapped_column(Integer, default=0)
 
     roles: Mapped[list[UserRole]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
@@ -80,3 +91,33 @@ class UserRole(Base, TimestampMixin):
 
     user: Mapped[User] = relationship(back_populates="roles")
     role: Mapped[Role] = relationship()
+
+
+class CommunityRolePermission(Base, TimestampMixin, TenantMixin):
+    """Per-community override of a role's default permission set (configurable RBAC).
+
+    Effective permissions for a role **in a given community** =
+        (global `role_permissions` for the role)  +  {allow overrides}  -  {deny overrides}
+
+    Only a platform admin (`super_admin`) manages these rows.
+    """
+
+    __tablename__ = "community_role_permissions"
+    __table_args__ = (
+        CheckConstraint("effect IN ('allow', 'deny')", name="ck_crp_effect"),
+        UniqueConstraint("community_id", "role_id", "permission_id"),
+    )
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    role_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("roles.id", ondelete="CASCADE"))
+    permission_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("permissions.id", ondelete="CASCADE")
+    )
+    effect: Mapped[str] = mapped_column(String(5))  # "allow" | "deny"
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    note: Mapped[str | None] = mapped_column(String(255))
+
+    role: Mapped[Role] = relationship()
+    permission: Mapped[Permission] = relationship()

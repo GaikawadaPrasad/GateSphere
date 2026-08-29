@@ -17,7 +17,11 @@ from sqlalchemy.orm import selectinload
 
 from app.core.errors import BusinessRuleError, ConflictError, ForbiddenError, NotFoundError
 from app.core.rbac import ROLE_PERMISSIONS
-from app.core.security import hash_password, revoke_all_user_sessions_async
+from app.core.security import (
+    hash_password,
+    invalidate_user_permissions_async,
+    revoke_all_user_sessions_async,
+)
 from app.core.tenancy import TenantScope
 from app.modules.audit.service import record_audit_async
 from app.modules.users import schemas
@@ -222,7 +226,7 @@ class UserService:
         ur = UserRole(user_id=user.id, role_id=role.id, community_id=payload.community_id)
         self.db.add(ur)
         await self.db.flush()
-        await revoke_all_user_sessions_async(self.db, user.id)
+        await invalidate_user_permissions_async(self.db, [user.id])
         await self._audit(
             "role.grant",
             str(user.id),
@@ -241,5 +245,5 @@ class UserService:
         self._require_community(ur.community_id)
         await self.db.delete(ur)
         await self.db.flush()
-        await revoke_all_user_sessions_async(self.db, user.id)
+        await invalidate_user_permissions_async(self.db, [user.id])
         await self._audit("role.revoke", str(user.id), community_id=ur.community_id)

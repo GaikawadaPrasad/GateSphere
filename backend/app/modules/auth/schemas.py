@@ -19,3 +19,6 @@ class CurrentUser(BaseModel):
     is_superadmin: bool
     permissions: list[str]
     community_ids: list[str]
+    # bumps when the caller's effective permissions may have changed; the frontend
+    # polls `/auth/me` and refreshes its permission cache when this value moves.
+    permission_version: int = 0

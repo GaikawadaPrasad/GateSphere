@@ -120,7 +120,7 @@ transaction**. `audit_logs` is append-only. `_jsonable` handles UUID / Decimal /
 
 ### Migrations
 
-**Hand-written**, sequential ids `0001` … `0022`. Autogenerate is NOT used — it is polluted by
+**Hand-written**, sequential ids `0001` … `0023`. Autogenerate is NOT used — it is polluted by
 model (`default=`) vs migration (`server_default=`) drift. Each module's migration:
 1. creates its tables with `server_default`s matching the model defaults,
 2. adds any composite-FK `UniqueConstraint((id, community_id))` needed by children,
@@ -172,8 +172,10 @@ Every module is **fully async** (ADR-010): `AsyncTenantRepository` → `async de
 | 14 | dashboards | ✅ implemented (no tables) | — |
 | 15 | notifications | ✅ implemented — domain events wired to the inbox via `notifications.events.emit` / `emit_to_roles` | 0017 |
 | — | uploads pipeline | ✅ `/uploads` presign + fixed catalogue + `POST /uploads/{id}/confirm` (magic-byte check) + `managed_files` | 0022 |
+| — | rbac config | ✅ `/rbac` — platform-admin edits a role's global permission set + per-community `allow`/`deny` overrides (`community_role_permissions`); every change bumps `users.permission_version` + revokes sessions | 0023 |
+| — | onboarding | ✅ `/communities/{id}/invitations` URL invites + public `GET`/`POST /invitations/{token}[/accept]`; direct `POST /communities/{id}/tenants`, `DELETE …/tenants/{profile_id}`, `DELETE …/units/{unit_id}/occupants/{occupancy_id}` | 0023 |
 
-**All FR modules + the auth/RBAC/audit foundation are implemented.** Migrations `0001`–`0022`.
+**All FR modules + the auth/RBAC/audit foundation are implemented.** Migrations `0001`–`0023`.
 The 2026-08-28 QA/acceptance gap sweep (7 items) and the async migration are done — see
 `docs/development/session-notes.md` and `docs/decisions/ADR-010-async-stack.md`.
 
@@ -194,10 +196,16 @@ seeded `system@` audit actor) and applies the same service-layer transition rule
 
 - **OTP login, community switcher UI, SSE/WebSocket gate feed** (FR-04/05).
 - **Frontend design system** — Tailwind + shadcn/ui + Recharts + TanStack Table.
-- **Permission caching** (`permission_version` bump) — evaluation is live per request today.
 - **Real email/SMS providers** — every notification channel except `in_app` is simulated.
+- Invitation emails are not sent — `accept_url` is returned in the create response for the
+  frontend/owner to deliver.
 
-Test count: **217 passing** (`pytest -q`). RLS enforcement is covered by
+Permission propagation is done: `user_permissions_async(db, user, community_id=)` applies
+per-community overrides; role grant/revoke and every RBAC edit call
+`invalidate_user_permissions_async` (bump `permission_version` + revoke sessions); `/auth/me`
+returns `permission_version` for the frontend to poll.
+
+Test count: **236 passing** (`pytest -q`). RLS enforcement is covered by
 `backend/tests/test_tenant_isolation.py` (connects as a restricted non-superuser DB role).
 
 ## 7. Key decisions (ADRs — see `docs/decisions/`)
@@ -233,7 +241,7 @@ backend/
     modules/<m>/   models, schemas, repository, service, deps, router, tasks, tests/
     api/router.py  aggregate router — one include per module
     scripts/seed.py  idempotent synthetic data (extend per module)
-  alembic/versions/  0001 … 0022
+  alembic/versions/  0001 … 0023
   conftest.py      shared fixtures: client, auth_client, as_role, seed_ids, unique_code
 docs/
   backend/modules/<m>/README.md   canonical module spec

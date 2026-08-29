@@ -1,24 +1,29 @@
 """Multi-tenant scope resolution (AGENTS.md §3).
 
-`get_tenant_scope` resolves the set of community ids the caller may touch, from their
+`get_tenant_scope_async` resolves the set of community ids the caller may touch, from their
 role grants — **never** from a client-supplied value. Community-scoped modules inject it
 and pass it to every repository call; the repository applies it before query execution.
 
 Super Admin / Auditor resolve to ALL communities; a `X-Community-Id` header lets Super
 Admin narrow the active community for a request.
+
+The scope also carries the caller's **effective permissions for the active community**
+(role defaults ± that community's `community_role_permissions` overrides) so a service can
+do `scope.require_permission("billing:approve")` for community-specific gating. The
+route-level `require_permission_async` gate stays coarse (union across all the user's roles).
 """
 
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from fastapi import Depends, Header, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import ForbiddenError
-from app.core.security import require_auth_async
+from app.core.security import require_auth_async, user_permissions_async
 from app.db.session import get_async_db
 from app.modules.users.models import User, UserRole
 
@@ -28,6 +33,7 @@ class TenantScope:
     user_id: uuid.UUID
     is_global: bool
     community_ids: frozenset[uuid.UUID]  # empty + is_global => all communities
+    permissions: frozenset[str] = field(default_factory=frozenset)
 
     def allows(self, community_id: uuid.UUID | None) -> bool:
         if self.is_global:
@@ -41,6 +47,13 @@ class TenantScope:
 
             raise NotFoundError("Resource not found")
         return community_id
+
+    def can(self, code: str) -> bool:
+        return "*" in self.permissions or code in self.permissions
+
+    def require_permission(self, code: str) -> None:
+        if not self.can(code):
+            raise ForbiddenError(f"Missing permission: {code}", code="PERMISSION_DENIED")
 
 
 async def bind_rls_scope_async(db: AsyncSession, scope: TenantScope) -> None:
@@ -66,8 +79,15 @@ async def get_tenant_scope_async(
                 active = frozenset({uuid.UUID(x_community_id)})
             except ValueError as exc:
                 raise ForbiddenError("Invalid X-Community-Id", code="INVALID_SCOPE") from exc
-            return TenantScope(user.id, is_global=False, community_ids=active)
-        return TenantScope(user.id, is_global=True, community_ids=frozenset())
+            scope = TenantScope(
+                user.id, is_global=False, community_ids=active, permissions=frozenset({"*"})
+            )
+        else:
+            scope = TenantScope(
+                user.id, is_global=True, community_ids=frozenset(), permissions=frozenset({"*"})
+            )
+        request.state.tenant_scope = scope
+        return scope
 
     rows = (
         await db.scalars(select(UserRole.community_id).where(UserRole.user_id == user.id))
@@ -75,6 +95,7 @@ async def get_tenant_scope_async(
     community_ids = frozenset(cid for cid in rows if cid is not None)
     is_global = any(cid is None for cid in rows)
 
+    active_cid: uuid.UUID | None = None
     if x_community_id:
         try:
             wanted = uuid.UUID(x_community_id)
@@ -82,9 +103,12 @@ async def get_tenant_scope_async(
             raise ForbiddenError("Invalid X-Community-Id", code="INVALID_SCOPE") from exc
         if not is_global and wanted not in community_ids:
             raise ForbiddenError("Not a member of that community", code="INVALID_SCOPE")
-        return TenantScope(user.id, is_global=False, community_ids=frozenset({wanted}))
+        community_ids, is_global, active_cid = frozenset({wanted}), False, wanted
+    elif len(community_ids) == 1 and not is_global:
+        active_cid = next(iter(community_ids))
 
-    scope = TenantScope(user.id, is_global, community_ids)
+    perms = frozenset(await user_permissions_async(db, user, community_id=active_cid))
+    scope = TenantScope(user.id, is_global, community_ids, permissions=perms)
     request.state.tenant_scope = scope
     return scope
 

@@ -58,4 +58,9 @@ def system_scope(actor: User | None = None) -> TenantScope:
     from uuid import UUID
 
     uid = actor.id if actor else UUID(int=0)
-    return TenantScope(user_id=uid, is_global=True, community_ids=frozenset())
+    return TenantScope(
+        user_id=uid,
+        is_global=True,
+        community_ids=frozenset(),
+        permissions=frozenset({"*"}),
+    )

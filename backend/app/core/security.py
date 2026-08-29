@@ -21,14 +21,14 @@ import ipaddress
 import json
 import secrets
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from datetime import UTC, datetime, timedelta
 
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from fastapi import Depends, Request, Response
 from redis.exceptions import RedisError
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -36,7 +36,13 @@ from app.core.errors import AuthError, ForbiddenError
 from app.core.redis import redis_client
 from app.db.session import get_async_db
 from app.modules.auth.models import UserSession
-from app.modules.users.models import Permission, RolePermission, User, UserRole
+from app.modules.users.models import (
+    CommunityRolePermission,
+    Permission,
+    RolePermission,
+    User,
+    UserRole,
+)
 
 _ph = PasswordHasher()
 _SESSION_PREFIX = "session:"
@@ -163,6 +169,37 @@ async def revoke_all_user_sessions_async(db: AsyncSession, user_id: uuid.UUID) -
         _cache_drop(row.session_key_hash)
 
 
+async def invalidate_user_permissions_async(db: AsyncSession, user_ids: Iterable[uuid.UUID]) -> int:
+    """Bump `permission_version` and revoke live sessions for the given users.
+
+    Called after any change to a role's permission set (global or per-community) or a
+    role grant/revoke, so affected users re-authenticate and pick up the new permissions.
+    Returns the number of users touched.
+    """
+    ids = [uid for uid in dict.fromkeys(user_ids) if uid is not None]
+    if not ids:
+        return 0
+    await db.execute(
+        update(User).where(User.id.in_(ids)).values(permission_version=User.permission_version + 1)
+    )
+    for uid in ids:
+        await revoke_all_user_sessions_async(db, uid)
+    return len(ids)
+
+
+async def users_with_role_async(
+    db: AsyncSession, role_id: uuid.UUID, community_id: uuid.UUID | None = None
+) -> list[uuid.UUID]:
+    """User ids holding `role_id` — globally, or (when `community_id` is given) either in
+    that community or via a platform-global grant."""
+    stmt = select(UserRole.user_id).where(UserRole.role_id == role_id)
+    if community_id is not None:
+        stmt = stmt.where(
+            (UserRole.community_id == community_id) | (UserRole.community_id.is_(None))
+        )
+    return list((await db.scalars(stmt)).all())
+
+
 def verify_csrf(request: Request) -> None:
     if request.method in ("GET", "HEAD", "OPTIONS"):
         return
@@ -215,18 +252,60 @@ async def require_auth_async(
     return user
 
 
-async def user_permissions_async(db: AsyncSession, user: User) -> set[str]:
+async def user_permissions_async(
+    db: AsyncSession, user: User, community_id: uuid.UUID | None = None
+) -> set[str]:
+    """Effective permission codes for `user`.
+
+    `community_id=None` → the coarse union across every role the user holds (the route-level
+    gate). `community_id` given → only the roles that apply in that community (community-
+    scoped grants for it + platform-global grants), with that community's
+    `community_role_permissions` overrides applied:
+        effective = role_defaults + {allow overrides} - {deny overrides}
+    """
     if user.is_superadmin:
         return {"*"}
-    rows = (
+
+    grants = (
         await db.execute(
-            select(Permission.code)
-            .join(RolePermission, RolePermission.permission_id == Permission.id)
-            .join(UserRole, UserRole.role_id == RolePermission.role_id)
-            .where(UserRole.user_id == user.id)
+            select(UserRole.role_id, UserRole.community_id).where(UserRole.user_id == user.id)
         )
     ).all()
-    return {code for (code,) in rows}
+    if community_id is None:
+        role_ids = {rid for (rid, _c) in grants}
+    else:
+        role_ids = {rid for (rid, c) in grants if c is None or c == community_id}
+    if not role_ids:
+        return set()
+
+    perms: set[str] = set(
+        (
+            await db.scalars(
+                select(Permission.code)
+                .join(RolePermission, RolePermission.permission_id == Permission.id)
+                .where(RolePermission.role_id.in_(role_ids))
+            )
+        ).all()
+    )
+    if community_id is None:
+        return perms
+
+    overrides = (
+        await db.execute(
+            select(Permission.code, CommunityRolePermission.effect)
+            .join(
+                CommunityRolePermission,
+                CommunityRolePermission.permission_id == Permission.id,
+            )
+            .where(
+                CommunityRolePermission.community_id == community_id,
+                CommunityRolePermission.role_id.in_(role_ids),
+            )
+        )
+    ).all()
+    for code, effect in overrides:
+        perms.add(code) if effect == "allow" else perms.discard(code)
+    return perms
 
 
 def require_permission_async(code: str) -> Callable[..., User]:
@@ -240,3 +319,10 @@ def require_permission_async(code: str) -> Callable[..., User]:
         raise ForbiddenError(f"Missing permission: {code}", code="PERMISSION_DENIED")
 
     return dep
+
+
+async def require_platform_admin(user: User = Depends(require_auth_async)) -> User:
+    """Only `super_admin` (`is_superadmin`) — the platform operator, not a community admin."""
+    if not user.is_superadmin:
+        raise ForbiddenError("Platform admin only", code="PLATFORM_ADMIN_ONLY")
+    return user

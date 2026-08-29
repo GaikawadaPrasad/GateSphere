@@ -78,4 +78,5 @@ async def _serialize(db: AsyncSession, user: User) -> CurrentUser:
         is_superadmin=user.is_superadmin,
         permissions=sorted(await user_permissions_async(db, user)),
         community_ids=sorted({str(c) for c in community_ids if c is not None}),
+        permission_version=user.permission_version or 0,
     )
