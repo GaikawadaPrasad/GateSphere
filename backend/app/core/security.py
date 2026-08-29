@@ -98,7 +98,9 @@ def _client_ip(request: Request) -> str | None:
         return None
 
 
-def create_session(db: Session, response: Response, user: User, request: Request) -> UserSession:
+async def create_session(
+    db: AsyncSession, response: Response, user: User, request: Request
+) -> UserSession:
     token = secrets.token_urlsafe(32)
     csrf = secrets.token_urlsafe(24)
     token_hash = _hash_token(token)
@@ -115,7 +117,7 @@ def create_session(db: Session, response: Response, user: User, request: Request
         expires_at=expires_at,
     )
     db.add(session)
-    db.flush()
+    await db.flush()
 
     _cache_put(
         token_hash,
@@ -135,12 +137,12 @@ def create_session(db: Session, response: Response, user: User, request: Request
     return session
 
 
-def destroy_session(db: Session, request: Request, response: Response) -> None:
+async def destroy_session(db: AsyncSession, request: Request, response: Response) -> None:
     token = request.cookies.get(settings.SESSION_COOKIE_NAME)
     if token:
         token_hash = _hash_token(token)
         _cache_drop(token_hash)
-        row = db.scalar(select(UserSession).where(UserSession.session_key_hash == token_hash))
+        row = await db.scalar(select(UserSession).where(UserSession.session_key_hash == token_hash))
         if row and row.revoked_at is None:
             row.revoked_at = datetime.now(UTC)
     response.delete_cookie(settings.SESSION_COOKIE_NAME, path="/")
