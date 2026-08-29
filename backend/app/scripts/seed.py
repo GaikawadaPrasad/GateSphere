@@ -1,6 +1,13 @@
-"""Idempotent synthetic seed data.
+"""Synthetic seed data.
 
-Run: `python -m app.scripts.seed`  (or `make seed`).
+Run:
+  `python -m app.scripts.seed`            — idempotent top-up (safe to re-run).
+  `python -m app.scripts.seed --reset`    — TRUNCATE every data table first, then seed.
+
+Idempotency note: a plain re-run is idempotent **against a consistently-populated DB**
+(each block skips work it already did). It is *not* robust to a DB that has been
+**partially** wiped (e.g. `TRUNCATE maintenance_invoices` but not the rows that depend
+on it) — use `--reset` for that, or `alembic downgrade base && alembic upgrade head`.
 
 Per the PRD: empty screens are prohibited. This seeds RBAC + 2 communities, 4 towers,
 8 floors, 50+ units, plus a demo user per role. Extend module-by-module as models land.
@@ -8,8 +15,10 @@ Per the PRD: empty screens are prohibited. This seeds RBAC + 2 communities, 4 to
 
 from __future__ import annotations
 
+import sys
+
 import structlog
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.core.rbac import PERMISSIONS, ROLE_PERMISSIONS, ROLES
@@ -921,8 +930,25 @@ def seed_operations(db: Session, communities: list[Community]) -> None:
         )
 
 
-def main() -> None:
+def reset_data(db: Session) -> None:
+    """TRUNCATE every data table (schema + `alembic_version` kept) so `main()` re-seeds
+    from a guaranteed-clean state. `CASCADE` handles FK order; `RESTART IDENTITY` resets
+    the few `Identity` sequences (e.g. `ledger_entries.entry_seq`)."""
+    import app.db.base  # noqa: F401 — register every model on Base.metadata
+    from app.db.base_class import Base
+
+    names = [t.name for t in Base.metadata.sorted_tables if t.name != "alembic_version"]
+    if names:
+        cols = ", ".join(f'"{n}"' for n in names)
+        db.execute(text(f"TRUNCATE {cols} RESTART IDENTITY CASCADE"))
+        db.commit()
+    log.info("seed.reset", tables=len(names))
+
+
+def main(*, reset: bool = False) -> None:
     with SessionLocal() as db:
+        if reset:
+            reset_data(db)
         seed_rbac(db)
         communities = seed_property(db)
         seed_users(db, communities)
@@ -946,4 +972,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main(reset="--reset" in sys.argv[1:])

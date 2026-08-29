@@ -876,3 +876,26 @@ lifecycle, four-section done report, session continuity). Added
 `backend/AGENTS.md` and `frontend/AGENTS.md` updated to match.
 **Verified:** documentation only — no code change.
 **Open / next:** as above (§23).
+
+## 2026-08-30 — Row-level (own-unit) access + seed reset
+
+**By:** review + hardening pass
+**What changed:**
+- `app/modules/residents/access.py` — `actor_unit_scope()` + `UnitScopedAccess` mixin. A plain
+  resident (no management/security/audit/vendor role) is scoped to the units they occupy.
+  Wired into `visitors`, `billing`, `complaints`, `deliveries`, `amenities` (bookings only).
+  A resident can no longer view/act on another unit's visitor request, delivery, invoice,
+  ledger, ticket, or booking; cannot raise invoices (`STAFF_ONLY`) or post internal ticket
+  notes; internal notes hidden from residents.
+- `require_permission_async` moved to `app/core/tenancy.py` (re-exported from `security.py`) so
+  it resolves the `TenantScope` and enforces per-community RBAC overrides at the route gate —
+  the `community_role_permissions` allow/deny rows were previously inert.
+- Auth audit (login success/failure + logout → `audit_logs`), gate `checkpoint-override`
+  endpoint (`gate:approve`, Security Supervisor), security dashboard `expected_visitors`.
+- onboarding: `remove_tenant` stale-read fix, phone-collision → `409 PHONE_TAKEN`, `accept`
+  serialised `FOR UPDATE`.
+- `seed.py --reset` (`make seed-reset`) — TRUNCATE every data table then reseed. The plain
+  seed is an idempotent top-up but not robust to a *partially* wiped DB.
+**Verified:** `ruff` + `black` clean; `pytest` 238 passed; live smoke tests (resident vs admin
+visibility, `--reset` idempotent ×2 + top-up).
+**Commits:** `010dbae`, `5b36c64`, `d9287ec`, `312da40`, + this.

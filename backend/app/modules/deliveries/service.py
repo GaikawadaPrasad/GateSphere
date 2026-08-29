@@ -27,6 +27,7 @@ from app.modules.deliveries.repository import (
     delivery_events,
 )
 from app.modules.deliveries.schemas import ALLOWED
+from app.modules.residents.access import UnitScopedAccess
 from app.modules.residents.models import ResidentProfile, UnitOccupancy
 from app.modules.users.models import User
 
@@ -48,7 +49,7 @@ def _enum(field: str, value: str | None) -> None:
         )
 
 
-class DeliveryService:
+class DeliveryService(UnitScopedAccess):
     def __init__(
         self, db: AsyncSession, scope: TenantScope, actor: User, request: Request | None = None
     ):
@@ -169,6 +170,7 @@ class DeliveryService:
     # -- deliveries ------------------------------------------- #
     async def create_delivery(self, payload: schemas.DeliveryCreate) -> Delivery:
         unit = await self._unit_in_scope(payload.unit_id)
+        await self._assert_unit_visible(unit.id)  # a resident logs deliveries for their own unit
         _enum("delivery_type", payload.delivery_type)
         protocol = await self._protocol_for(unit.community_id, payload.delivery_type)
         auto = protocol.allow_direct_entry and not protocol.requires_otp
@@ -203,6 +205,7 @@ class DeliveryService:
         obj = await self.deliveries.get(delivery_id)
         if obj is None:
             raise NotFoundError("Delivery not found")
+        await self._assert_unit_visible(obj.unit_id)
         return obj
 
     async def list_deliveries(
@@ -228,6 +231,7 @@ class DeliveryService:
         if approval_status:
             stmt = stmt.where(Delivery.approval_status == approval_status)
         stmt = stmt.order_by(Delivery.created_at.desc())
+        stmt = await self._scope_unit_column(stmt, Delivery.unit_id)
         return await self.deliveries.list(
             offset=offset, limit=limit, extra=stmt
         ), await self.deliveries.count(extra=stmt)

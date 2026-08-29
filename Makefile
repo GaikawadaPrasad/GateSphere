@@ -1,7 +1,7 @@
 # GateSphere local dev shortcuts. Requires Docker Desktop.
 COMPOSE = docker compose
 
-.PHONY: help init up down logs ps restart build seed migrate revision \
+.PHONY: help init up down logs ps restart build seed seed-reset migrate revision \
         backend-sh psql redis-cli test lint format fmt-check clean
 
 help: ## Show this help
@@ -43,8 +43,11 @@ migrate: ## Apply DB migrations
 revision: ## Autogenerate a migration:  make revision m="add visitors table"
 	$(COMPOSE) run --rm backend alembic revision --autogenerate -m "$(m)"
 
-seed: ## (Re)load synthetic seed data
+seed: ## (Re)load synthetic seed data (idempotent top-up)
 	$(COMPOSE) run --rm backend seed
+
+seed-reset: ## Wipe every data table, then reseed from clean (safe DB reset)
+	$(COMPOSE) run --rm backend seed --reset
 
 test: ## Run backend tests
 	$(COMPOSE) run --rm backend pytest

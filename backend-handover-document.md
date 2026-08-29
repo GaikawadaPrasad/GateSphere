@@ -38,6 +38,12 @@ docker compose exec backend alembic upgrade head
 docker compose exec backend python -m app.scripts.seed
 ```
 
+Seed re-runs: `python -m app.scripts.seed` is an idempotent top-up against a
+**consistently**-populated DB. To reset a dev DB to clean, use
+`python -m app.scripts.seed --reset` (`make seed-reset`) — it TRUNCATEs every data
+table first. Do **not** hand-`TRUNCATE` a subset of tables and re-seed: the seed's
+per-block idempotency keys off downstream rows and will fail on a partial DB.
+
 Ports on the dev machine (others were taken): API `8001`, web `13000`, Postgres `55432`,
 Redis `56379`, MinIO `59000/59001`.
 
@@ -247,7 +253,7 @@ backend/
     db/            base_class (pk/fk/mixins), base (model registry), repository, session
     modules/<m>/   models, schemas, repository, service, deps, router, tasks, tests/
     api/router.py  aggregate router — one include per module
-    scripts/seed.py  idempotent synthetic data (extend per module)
+    scripts/seed.py  synthetic data; --reset wipes+reseeds (make seed-reset)
   alembic/versions/  0001 … 0023
   conftest.py      shared fixtures: client, auth_client, as_role, seed_ids, unique_code
 docs/

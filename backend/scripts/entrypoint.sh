@@ -39,7 +39,8 @@ case "${1:-api}" in
     exec alembic upgrade head
     ;;
   seed)
-    exec python -m app.scripts.seed
+    shift
+    exec python -m app.scripts.seed "$@"
     ;;
   *)
     exec "$@"

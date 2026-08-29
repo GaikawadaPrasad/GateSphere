@@ -4,6 +4,10 @@ Canonical envelope. All endpoints require a session; permission noted per row. C
 callers only see/act within their own community (else `404`). `?community_id=` is required for a
 global caller on the collection routes.
 
+**Row-level scope:** amenities / slots / rules / blocks are community-wide (residents must see
+them to book). **Bookings** are per-resident: a plain resident's `GET /bookings` returns only
+their own, and another resident's booking detail → `404`. Facility managers / admins see all.
+
 ## Endpoints
 
 | Method & path | Permission | Body | Success | Notes |

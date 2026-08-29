@@ -70,3 +70,14 @@ def test_cross_community_amenity_is_404(as_role, seed_ids):
         json={"amenity_id": am_id, "slot_id": slot_id, "booking_date": bdate},
     )
     assert r.status_code == 404
+
+
+def test_resident_amenity_bookings_are_own_only(as_role):
+    resident = as_role("resident")
+    me = resident.get("/api/v1/auth/me").json()["data"]["id"]
+    listed = resident.get(f"{P}/bookings").json()["data"]
+    assert all(b["resident_user_id"] == me for b in listed)
+
+    fm_listed = as_role("facility_manager").get(f"{P}/bookings").json()["data"]
+    # a facility manager (unrestricted) sees bookings that are not the resident's
+    assert any(b["resident_user_id"] != me for b in fm_listed)

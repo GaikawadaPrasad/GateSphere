@@ -37,6 +37,7 @@ from app.modules.amenities.repository import (
 )
 from app.modules.amenities.schemas import ALLOWED
 from app.modules.audit.service import record_audit_async
+from app.modules.residents.access import UnitScopedAccess
 from app.modules.residents.models import ResidentProfile, UnitOccupancy
 from app.modules.users.models import User
 
@@ -50,7 +51,7 @@ def _enum(field: str, value: str | None) -> None:
         )
 
 
-class AmenityService:
+class AmenityService(UnitScopedAccess):
     def __init__(
         self, db: AsyncSession, scope: TenantScope, actor: User, request: Request | None = None
     ):
@@ -266,6 +267,8 @@ class AmenityService:
         if mine:
             stmt = stmt.where(AmenityBooking.resident_user_id == self.actor.id)
         stmt = stmt.order_by(AmenityBooking.start_at.desc())
+        # a plain resident only sees their own bookings (amenities themselves stay community-wide)
+        stmt = await self._scope_owned(stmt, AmenityBooking.resident_user_id)
         return await self.bookings.list(
             offset=offset, limit=limit, extra=stmt
         ), await self.bookings.count(extra=stmt)
@@ -273,6 +276,8 @@ class AmenityService:
     async def get_booking(self, booking_id: uuid.UUID) -> AmenityBooking:
         obj = await self.bookings.get(booking_id)
         if obj is None:
+            raise NotFoundError("Booking not found")
+        if (await self.is_unit_restricted()) and obj.resident_user_id != self.actor.id:
             raise NotFoundError("Booking not found")
         return obj
 

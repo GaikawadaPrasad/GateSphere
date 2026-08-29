@@ -214,12 +214,12 @@ they occupy (PRD/SRS "Owner / Tenant — Residential unit control"). `app/module
   auditor / vendor_technician) **or** `frozenset[unit_id]` the actor actively occupies.
 - Services mix in `UnitScopedAccess`: `_assert_unit_visible(unit_id)` on every detail/mutation
   path (→ `404`, same shape as a real not‑found), `_scope_unit_column` / `_scope_owned` on list
-  queries (applied **before** execution). Wired into `visitors`, `billing`, `complaints`.
-- Consequences: a resident sees only their unit's visitor requests / invoices / ledger / tickets;
-  cannot raise invoices (`STAFF_ONLY`) or post internal ticket notes; internal notes are hidden
-  from residents even on their own tickets.
-- `deliveries` / `amenities` (`cancel_booking` already checks `resident_user_id`) can adopt the
-  same mixin when those flows are hardened.
+  queries (applied **before** execution). Wired into `visitors`, `billing`, `complaints`,
+  `deliveries`, `amenities` (bookings only — amenities/slots/rules stay community‑wide).
+- Consequences: a resident sees only their unit's visitor requests / deliveries / invoices /
+  ledger / tickets and their own amenity bookings; cannot raise invoices (`STAFF_ONLY`), decide
+  another unit's delivery, or post internal ticket notes; internal notes are hidden from
+  residents even on their own tickets.
 
 ---
 
