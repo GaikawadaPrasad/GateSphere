@@ -135,3 +135,30 @@ def test_roster_status_endpoint_is_separate_from_update(as_role, seed_ids):
             if obj:
                 db.delete(obj)
                 db.commit()
+
+
+def test_supervisor_can_override_checkpoint_guard_cannot(as_role, seed_ids):
+    gate_id = _gate_in(seed_ids["community_id"])
+    body = {"gate_id": gate_id, "reason": "VIP escort — manual admit, approved by front office"}
+
+    guard = as_role("security_guard")
+    assert guard.post(f"{P}/checkpoint-override", json=body).status_code == 403
+
+    sup = as_role("security_supervisor")
+    r = sup.post(f"{P}/checkpoint-override", json=body)
+    assert r.status_code == 201, r.text
+    assert r.json()["data"]["event_type"] == "checkpoint_override"
+
+    # it lands in the append-only gate-event feed
+    feed = sup.get(f"{P}/events", params={"gate_id": gate_id, "event_type": "checkpoint_override"})
+    assert feed.status_code == 200
+    assert any(e["event_type"] == "checkpoint_override" for e in feed.json()["data"])
+
+
+def test_checkpoint_override_requires_reason(as_role, seed_ids):
+    sup = as_role("security_supervisor")
+    gate_id = _gate_in(seed_ids["community_id"])
+    assert (
+        sup.post(f"{P}/checkpoint-override", json={"gate_id": gate_id, "reason": "x"}).status_code
+        == 422
+    )

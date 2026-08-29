@@ -26,7 +26,13 @@ def test_admin_overview_is_scoped(as_role, seed_ids):
 def test_security_dashboard(as_role):
     r = as_role("security_supervisor").get(f"{P}/security")
     assert r.status_code == 200
-    for k in ("visitors_inside", "vehicles_inside", "staff_inside", "active_panic_alerts"):
+    for k in (
+        "visitors_inside",
+        "vehicles_inside",
+        "staff_inside",
+        "active_panic_alerts",
+        "expected_visitors",  # FR-14: security dashboard shows expected visitors
+    ):
         assert isinstance(r.json()["data"][k], int)
 
 

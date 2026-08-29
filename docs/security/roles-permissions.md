@@ -35,7 +35,7 @@ See `ROLE_PERMISSIONS` in `rbac.py`. Summary:
 | community_admin | everything in its community except `audit:*` |
 | association_committee | `billing:view/export`, `incidents:view`, `dashboards:view`, `audit:view` |
 | facility_manager | amenities CRUD, complaints view/update, dashboards |
-| security_supervisor | visitors view/approve, gate view/update, incidents view/create |
+| security_supervisor | visitors view/approve, gate view/update/**approve** (checkpoint override), incidents view/create |
 | security_guard | visitors view/create, gate view/create/update, deliveries view/create |
 | resident | visitors view/create/approve, billing view, complaints view/create, amenities view/create, vehicles view/create |
 | domestic_staff | gate view |

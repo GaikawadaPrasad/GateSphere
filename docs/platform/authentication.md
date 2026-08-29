@@ -33,10 +33,14 @@ delete the Redis key). Presenting a `revoked_at` key is a compromise signal — 
 POST /api/v1/auth/login {email, password}
   -> rate limited (5/min/IP)
   -> fetch user by email; verify Argon2 hash; check is_active
-  -> on success: create Redis session, set gs_session + gs_csrf cookies
-  -> return CurrentUser { id, email, full_name, is_superadmin, permissions[] }
-Failure: uniform 401 "Invalid email or password" (no user enumeration)
+  -> on success: create Redis session, set gs_session + gs_csrf cookies, audit `auth/login.success`
+  -> return CurrentUser { id, email, full_name, is_superadmin, permissions[], permission_version }
+Failure: uniform 401 "Invalid email or password" (no user enumeration); audit `auth/login.failed`
 ```
+
+`login.failed` is written in its own transaction (the request session rolls back on the 401);
+`logout` writes `auth/logout`. All three land in `audit_logs` (FR-01, TRD §5.2) and are
+queryable via `GET /api/v1/audit/logs?module=auth`.
 
 ### CSRF
 

@@ -127,6 +127,47 @@ class GateService:
         )
         return obj
 
+    async def override_checkpoint(self, payload) -> GateEvent:
+        """Supervisor manually overrides a gate checkpoint (FR-05) — append-only event
+        + audit + notification to supervisors and the community admin."""
+        if payload.gate_id is not None:
+            community_id = await self._gate_community(payload.gate_id)
+        else:
+            community_id = self._one_community(payload.community_id)
+        obj = GateEvent(
+            community_id=community_id,
+            gate_id=payload.gate_id,
+            actor_user_id=self.actor.id,
+            event_type="checkpoint_override",
+            reference_type=payload.reference_type,
+            reference_id=payload.reference_id,
+            occurred_at=datetime.now(UTC),
+            event_metadata={"reason": payload.reason},
+        )
+        await self.events.add(obj)
+        await self._audit(
+            "checkpoint.override",
+            community_id,
+            "gate_event",
+            obj.id,
+            new={"reason": payload.reason, "gate_id": str(payload.gate_id or "")},
+        )
+        await self.db.flush()
+        await notif_events.emit_to_roles(
+            self.db,
+            self.scope,
+            self.actor,
+            self.request,
+            community_id=community_id,
+            role_slugs=["security_supervisor", "community_admin"],
+            notification_type="gate.checkpoint_override",
+            title="Gate checkpoint overridden",
+            message=f"{self.actor.full_name} overrode a gate checkpoint: {payload.reason}",
+            reference_type="gate_event",
+            reference_id=obj.id,
+        )
+        return obj
+
     async def list_events(
         self,
         *,

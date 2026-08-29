@@ -23,6 +23,7 @@ router = APIRouter(prefix="/gate", tags=["Gate Operations"])
 VIEW = Depends(require_permission_async("gate:view"))
 CREATE = Depends(require_permission_async("gate:create"))
 UPDATE = Depends(require_permission_async("gate:update"))
+APPROVE = Depends(require_permission_async("gate:approve"))  # Security Supervisor / Community Admin
 
 
 @router.get("/health", summary="Gate Operations module liveness")
@@ -60,6 +61,21 @@ async def list_events(
 async def log_event(payload: schemas.EventCreate, svc: GateService = Depends(gate_service)) -> dict:
     return ok(
         schemas.EventRead.model_validate(await svc.log_event(payload)), message="Event logged"
+    )
+
+
+@router.post(
+    "/checkpoint-override",
+    response_model=Envelope[schemas.EventRead],
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[APPROVE],
+)
+async def override_checkpoint(
+    payload: schemas.CheckpointOverride, svc: GateService = Depends(gate_service)
+) -> dict:
+    return ok(
+        schemas.EventRead.model_validate(await svc.override_checkpoint(payload)),
+        message="Checkpoint overridden",
     )
 
 

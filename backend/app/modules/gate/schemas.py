@@ -48,6 +48,20 @@ class EventCreate(_Write):
     metadata: dict | None = None
 
 
+class CheckpointOverride(_Write):
+    """Security Supervisor manually overrides a gate checkpoint (FR-05).
+
+    Records an append-only `checkpoint_override` gate event with the mandatory reason;
+    notifies supervisors + community admin.
+    """
+
+    gate_id: uuid.UUID | None = None
+    reason: str = Field(min_length=3, max_length=500)
+    reference_type: str | None = Field(default=None, max_length=40)
+    reference_id: uuid.UUID | None = None
+    community_id: uuid.UUID | None = None  # required only for a global caller w/o gate_id
+
+
 class EventRead(_Read):
     community_id: uuid.UUID
     gate_id: uuid.UUID | None

@@ -23,7 +23,8 @@ from app.core.security import (
     user_permissions_async,
     verify_password,
 )
-from app.db.session import get_async_db
+from app.db.session import AsyncSessionLocal, get_async_db
+from app.modules.audit.service import record_audit_async
 from app.modules.auth.schemas import CurrentUser, LoginRequest
 from app.modules.users.models import User, UserRole
 
@@ -41,11 +42,34 @@ async def login(
 ) -> dict:
     user = await db.scalar(select(User).where(User.email == payload.email.lower()))
     if not user or not user.is_active or not verify_password(payload.password, user.password_hash):
+        # Failed logins are audited (FR-01, TRD §5.2). The request session is rolled back
+        # when the AuthError propagates, so write the record in its own transaction.
+        async with AsyncSessionLocal() as audit_db:
+            await record_audit_async(
+                audit_db,
+                module="auth",
+                action="login.failed",
+                actor=user if user else None,
+                entity_type="user",
+                entity_id=str(user.id) if user else None,
+                new={"email": payload.email.lower(), "reason": "invalid_credentials"},
+                request=request,
+            )
+            await audit_db.commit()
         # Uniform error — never reveal which check failed.
         raise AuthError("Invalid email or password", code="INVALID_CREDENTIALS")
     if needs_rehash(user.password_hash):
         user.password_hash = hash_password(payload.password)
     await create_session(db, response, user, request)
+    await record_audit_async(
+        db,
+        module="auth",
+        action="login.success",
+        actor=user,
+        entity_type="user",
+        entity_id=str(user.id),
+        request=request,
+    )
     return ok(await _serialize(db, user), message="Signed in")
 
 
@@ -53,10 +77,19 @@ async def login(
 async def logout(
     request: Request,
     db: AsyncSession = Depends(get_async_db),
-    _: User = Depends(require_auth_async),
+    user: User = Depends(require_auth_async),
 ) -> Response:
     resp = Response(status_code=status.HTTP_204_NO_CONTENT)
     await destroy_session(db, request, resp)
+    await record_audit_async(
+        db,
+        module="auth",
+        action="logout",
+        actor=user,
+        entity_type="user",
+        entity_id=str(user.id),
+        request=request,
+    )
     return resp
 
 

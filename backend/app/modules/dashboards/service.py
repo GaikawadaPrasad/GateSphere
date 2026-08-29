@@ -131,6 +131,13 @@ class DashboardService:
                 VisitorRequest.community_id == cid,
                 VisitorRequest.status == "pending",
             ),
+            expected_visitors=await self._count(
+                VisitorRequest,
+                VisitorRequest.community_id == cid,
+                VisitorRequest.status == "approved",
+                (VisitorRequest.valid_until.is_(None))
+                | (VisitorRequest.valid_until >= datetime.now(UTC)),
+            ),
             active_panic_alerts=await self._count(
                 PanicAlert, PanicAlert.community_id == cid, PanicAlert.status == "active"
             ),

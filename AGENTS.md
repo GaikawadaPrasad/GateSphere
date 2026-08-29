@@ -1022,14 +1022,20 @@ tenant tables to a new RLS migration) → extend `seed.py` → `tests/test_<m>_{
 
 ### Still open (feature work)
 
-1. **OTP login, community switcher UI, SSE/WebSocket gate feed** (FR‑04/05).
-2. **Frontend design system** — Tailwind + shadcn/ui + Recharts + TanStack Table + the shared
-   component library. Plain CSS with the design tokens is the placeholder.
-3. **Permission caching** (`permission_version` bump) — evaluation is live per request today.
-4. **Remaining notification channels** — all channels except `in_app` are still simulated
-   (marked delivered without a real provider). Wiring real email/SMS providers is deferred.
+1. **Frontend** — design system (Tailwind + shadcn/ui + Recharts + TanStack Table), community
+   switcher UI, and the live Security Gate dashboard's refresh (backend supports **short
+   polling** of `GET /gate/events` + `GET /gate/alerts` + `GET /dashboards/security`, per
+   TRD §3.1 — no SSE/WebSocket endpoint is built; add one only if polling proves insufficient).
+2. **Remaining notification channels** — all channels except `in_app` are still simulated
+   (marked delivered without a real provider). Wiring real email/SMS providers is deferred
+   (SMS/WhatsApp provider is explicitly out of PRD/SRS scope).
 
-Done since first cut: **user/role management** (FR-02), **audit read API** (FR-16),
+Done since first cut: **user/role management** (FR-02), **configurable RBAC + per-community
+overrides** (FR-02 ext, migration 0023), **tenant URL invitations + add/remove tenant** (FR-03,
+`onboarding` module), **permission propagation** (`permission_version` bump + session revoke on
+every RBAC change), **auth audit** (login success/failure + logout → `audit_logs`, FR-01),
+**gate checkpoint override** (`POST /gate/checkpoint-override`, `gate:approve`, FR-05),
+**security dashboard `expected_visitors`** (FR-14), **audit read API** (FR-16),
 **deferred child tables** (`ticket_attachments`, `incident_attachments`, `resident_groups`),
 **upload pipeline** (`/uploads` presign + fixed catalogue + `ManagedFileUrl` guard on every
 file field), **RLS enforcement test suite**, **state-machine audit**

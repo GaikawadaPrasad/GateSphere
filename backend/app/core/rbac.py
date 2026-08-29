@@ -77,6 +77,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "gate:view",
         "gate:create",
         "gate:update",
+        "gate:approve",
         "domestic_staff:view",
         "domestic_staff:create",
         "domestic_staff:update",

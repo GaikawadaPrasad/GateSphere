@@ -11,6 +11,7 @@ global caller on the collection routes.
 | `GET /gate/health` | – (session) | – | `200` | liveness |
 | `GET /gate/events` | `gate:view` | – | `200` list | `?gate_id=`, `?event_type=`, `?community_id=` |
 | `POST /gate/events` | `gate:create` | `EventCreate` | `201` single | append-only; `422 INVALID_ENUM`; `404` if gate outside scope |
+| `POST /gate/checkpoint-override` | `gate:approve` | `CheckpointOverride` | `201` `EventRead` | Security Supervisor / Community Admin only — logs an append-only `checkpoint_override` gate event + notifies supervisors + admin; `reason` mandatory (`422` if too short) |
 | `GET /gate/rosters` | `gate:view` | – | `200` list | `?guard_user_id=`, `?roster_status=` |
 | `POST /gate/rosters` | `gate:create` | `RosterCreate` | `201` single | `422 INVALID_TIME_RANGE`; `409 ROSTER_EXISTS` |
 | `PATCH /gate/rosters/{roster_id}` | `gate:update` | `RosterUpdate` | `200` single | details only (supervisor / notes) |
@@ -27,6 +28,7 @@ global caller on the collection routes.
 ## Schemas (write — all `extra="forbid"`)
 
 - **EventCreate**: `gate_id?`, `event_type`, `reference_type?`, `reference_id?`, `occurred_at?`, `metadata?` (object).
+- **CheckpointOverride**: `gate_id?`, `reason` (3–500 chars, required), `reference_type?`, `reference_id?`, `community_id?` (global caller without `gate_id`).
 - **RosterCreate**: `guard_user_id`, `supervisor_user_id?`, `shift_date`, `shift_start`, `shift_end`, `notes?`.
 - **RosterUpdate**: `supervisor_user_id?`, `notes?`.
 - **RosterTransition**: `status`, `reason?`.
@@ -44,9 +46,9 @@ global caller on the collection routes.
 
 ## Audit
 
-`event.log`, `roster.create`, `roster.update`, `assignment.create`, `assignment.end`,
-`alert.raise`, `alert.acknowledge`, `alert.resolve`, `alert.cancel` — written to `audit_logs`
-in the same transaction.
+`event.log`, `checkpoint.override`, `roster.create`, `roster.update`, `assignment.create`,
+`assignment.end`, `alert.raise`, `alert.acknowledge`, `alert.resolve`, `alert.cancel` —
+written to `audit_logs` in the same transaction.
 
 ## Notifications
 

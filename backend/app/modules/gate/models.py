@@ -39,6 +39,7 @@ EVENT_TYPES = (
     "manual_note",
     "gate_open",
     "gate_close",
+    "checkpoint_override",  # supervisor manually overrides a gate checkpoint (FR-05)
 )
 ROSTER_STATUS = ("planned", "active", "completed", "cancelled")
 ASSIGNMENT_STATUS = ("active", "ended")

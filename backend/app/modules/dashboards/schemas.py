@@ -27,6 +27,7 @@ class SecurityStats(BaseModel):
     vehicles_inside: int
     staff_inside: int
     pending_visitor_approvals: int
+    expected_visitors: int  # approved, still valid, not yet entered (FR-14)
     active_panic_alerts: int
     open_incidents: int
     guards_on_active_roster: int

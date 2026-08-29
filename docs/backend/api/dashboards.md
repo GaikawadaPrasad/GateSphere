@@ -19,7 +19,7 @@ All accept an optional `?community_id=` (required for a global caller).
 ## Response shapes
 
 - **OverviewStats**: `community_id`, `residents`, `units`, `pending_visitor_requests`, `visitors_inside`, `pending_deliveries`, `open_tickets`, `open_incidents`, `active_panic_alerts`, `outstanding_balance` (decimal string).
-- **SecurityStats**: `community_id`, `visitors_inside`, `vehicles_inside`, `staff_inside`, `pending_visitor_approvals`, `active_panic_alerts`, `open_incidents`, `guards_on_active_roster`.
+- **SecurityStats**: `community_id`, `visitors_inside`, `vehicles_inside`, `staff_inside`, `pending_visitor_approvals`, `expected_visitors` (approved, still valid, not yet entered — FR-14), `active_panic_alerts`, `open_incidents`, `guards_on_active_roster`.
 - **FinancialStats**: `community_id`, `invoices_by_status` (`{status: count}`), `total_billed`, `total_collected`, `outstanding_balance` (all decimal strings).
 - **ResidentStats**: `community_id`, `unit_id` (nullable), `my_open_tickets`, `my_pending_visitor_requests`, `my_upcoming_bookings`, `my_outstanding_balance`, `published_announcements`.
 

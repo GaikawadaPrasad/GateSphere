@@ -194,9 +194,11 @@ seeded `system@` audit actor) and applies the same service-layer transition rule
 
 ### Still open (feature work — see `AGENTS.md` "Still open")
 
-- **OTP login, community switcher UI, SSE/WebSocket gate feed** (FR-04/05).
-- **Frontend design system** — Tailwind + shadcn/ui + Recharts + TanStack Table.
-- **Real email/SMS providers** — every notification channel except `in_app` is simulated.
+- **Frontend** — design system, community switcher UI, and the live Security Gate dashboard
+  refresh (backend supports **short polling** of `/gate/events` + `/gate/alerts` +
+  `/dashboards/security`; no SSE/WebSocket endpoint, per TRD §3.1).
+- **Real email/SMS providers** — every notification channel except `in_app` is simulated
+  (SMS/WhatsApp provider is out of PRD/SRS scope).
 - Invitation emails are not sent — `accept_url` is returned in the create response for the
   frontend/owner to deliver.
 
@@ -205,7 +207,12 @@ per-community overrides; role grant/revoke and every RBAC edit call
 `invalidate_user_permissions_async` (bump `permission_version` + revoke sessions); `/auth/me`
 returns `permission_version` for the frontend to poll.
 
-Test count: **236 passing** (`pytest -q`). RLS enforcement is covered by
+PRD/TRD/SRS gap sweep (2026-08-30): **auth audit** (login success/failure + logout →
+`audit_logs`, FR-01 / TRD §5.2), **gate checkpoint override** (`POST /gate/checkpoint-override`,
+`gate:approve` — Security Supervisor / Community Admin, FR-05), **security dashboard
+`expected_visitors`** (FR-14). All other FR-01…FR-19 requirements verified present.
+
+Test count: **243 passing** (`pytest -q`). RLS enforcement is covered by
 `backend/tests/test_tenant_isolation.py` (connects as a restricted non-superuser DB role).
 
 ## 7. Key decisions (ADRs — see `docs/decisions/`)
