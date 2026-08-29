@@ -18,6 +18,35 @@ Format per entry:
 
 ---
 
+## 2026-08-28 — Async migration COMPLETE (ADR-010)
+
+**By:** async stack migration — finished
+**Branch / commit:** `main`
+**What changed (continuing from the 7-module note below):**
+- **Converted the rest**: `domestic_staff` (`4b15b6d`), `vehicles` (`9466300`),
+  `amenities` (`38897d4`), `dashboards` (`c6f58da`), then the **event cluster** in one
+  commit (`782155c`) — `notifications` + `billing` / `complaints` / `gate` / `incidents` /
+  `visitors` (they share `notifications.events`, so `emit` / `emit_to_roles` became async
+  coroutines and all six callers flipped together), then `auth` (`677c061`).
+- **Celery tasks** (`complaints` / `billing` / `visitors` / `amenities` `tasks.py`) → async
+  job bodies (`async def _x()` run via `app.core.jobs.run` = `asyncio.run`); `jobs.job_session`
+  is now an `AsyncSession` context manager; `create_session` / `destroy_session` async.
+- **Cutover cleanup** (`b8e08c9`) — removed the dead sync request-path code: sync
+  `require_auth` / `require_permission` / `user_permissions` / `_load_session` /
+  `revoke_all_user_sessions`, `bind_rls_scope` / `get_tenant_scope` / `TenantContext` /
+  `tenant_context`, sync `Repository` / `TenantRepository`, sync `record_audit`. The sync
+  `engine` + `SessionLocal` are kept **for the seed script + test scaffolding only**;
+  Alembic keeps its sync psycopg engine (standard for migrations).
+- Docs: ADR-010 → complete (with the implementation-gotchas list); AGENTS reference-module
+  skeleton + tenancy infra lines; communities README.
+**Why:** owner chose FastAPI async + SQLAlchemy 2.0 async (session-cookie auth unchanged).
+**Verified:** `ruff check . && black --check . && pytest -q` → **217 passed** at every
+module commit and after cutover.
+**Open / next:** nothing on the async migration. (Dev-DB test pollution: the
+`communication` API test that asserts the seeded "Welcome to GateSphere" is on page 1 can
+fail after many local test runs accumulate announcements — `TRUNCATE announcements
+RESTART IDENTITY CASCADE` + `make seed` fixes it; not a code bug.)
+
 ## 2026-08-28 — Async migration: shared deps + 7 modules (ADR-010)
 
 **By:** async stack migration — incremental, one commit per module

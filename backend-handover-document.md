@@ -18,7 +18,7 @@ dashboards, notifications. Multi-tenant — one deployment serves many **communi
 
 | Concern | Local | Staging target |
 |---|---|---|
-| API | FastAPI + SQLAlchemy 2.0 + Alembic | Render |
+| API | FastAPI (async) + SQLAlchemy 2.0 async (AsyncSession, psycopg 3) + Alembic | Render |
 | DB | PostgreSQL 15 | Supabase |
 | Object store | MinIO (S3 API) | Supabase S3 |
 | Cache / sessions | Redis | Upstash |
@@ -63,8 +63,8 @@ for now, by owner's instruction.
 
 ```
 router  → HTTP boundary only: permission dep, parse body, call service, wrap in envelope
-service → ALL business rules, state machines, record_audit(), transaction orchestration
-repository → queries only; TenantRepository filters every query by community_id
+service → ALL business rules (async def), state machines, record_audit_async(), txn orchestration
+repository → queries only; AsyncTenantRepository filters every query by community_id
 model   → SQLAlchemy ORM + DB constraints
 ```
 
@@ -89,14 +89,14 @@ Helpers in `app/core/responses.py` (`ok()`, `paginated()`); central exception ha
   so a row can never reference a parent in another community.
 - Cross-tenant access is a **404, never a 403**.
 - RLS: each migration enables `tenant_isolation` policy on its new tenant tables, driven by the
-  `app.community_ids` GUC set per-request via `bind_rls_scope`. **RLS is a defense-in-depth
+  `app.community_ids` GUC set per-request via `bind_rls_scope_async`. **RLS is a defense-in-depth
   layer and is not exercised by the local test DB** (Postgres superuser bypasses RLS) — tenant
-  isolation is actually verified by `TenantRepository._scoped()` + cross-tenant-404 integration
+  isolation is actually verified by `AsyncTenantRepository._scoped()` + cross-tenant-404 integration
   tests. See AGENTS.md §12.
 
 ### RBAC
 
-`require_permission("<module>:<action>")` dependency. Permission catalogue and per-role grants
+`require_permission_async("<module>:<action>")` dependency. Permission catalogue and per-role grants
 live in `app/core/rbac.py` (`ROLES`, `PERMISSIONS`, `ROLE_PERMISSIONS`). `super_admin` → `{"*"}`.
 Re-run `python -m app.scripts.seed` after changing grants (it upserts `role_permissions`).
 
@@ -108,8 +108,8 @@ model directly — always `SomeRead.model_validate(obj)`.
 
 ### Audit
 
-`app/modules/audit/service.py::record_audit(db, module=, action=, actor=, community_id=,
-entity_type=, entity_id=, old=, new=, request=)` — called **inside the operation's
+`app/modules/audit/service.py::record_audit_async(db, module=, action=, actor=, community_id=,
+entity_type=, entity_id=, old=, new=, request=)` — awaited **inside the operation's
 transaction**. `audit_logs` is append-only. `_jsonable` handles UUID / Decimal / datetime / date.
 
 ### Hashing
@@ -178,7 +178,7 @@ Still open (integration/polish — see `AGENTS.md §23`):
 - **Audit read API** (FR-16), **user/role management endpoints** (FR-02).
 - **Deferred child tables** — `ticket_attachments`, `incident_attachments`, `resident_groups`.
 
-Test count: **215 passing** (`pytest -q`).
+Test count: **217 passing** (`pytest -q`). Backend is fully async (ADR-010).
 
 ## 7. Key decisions (ADRs — see `docs/decisions/`)
 

@@ -1,8 +1,31 @@
 # ADR-010: Migrate to FastAPI async + SQLAlchemy 2.0 async
 
-- **Status:** Accepted — in progress (incremental)
+- **Status:** Accepted — **complete** (2026-08-28)
 - **Date:** 2026-08-28
 - **Relates to:** ADR-001 (backend framework), ADR-003 (authentication — unchanged)
+
+## Outcome
+
+Every FastAPI route and every Celery job runs on the async stack (`create_async_engine` +
+`AsyncSession`, psycopg 3). All 17 modules + `auth` were converted incrementally, one
+commit each, with the test suite green (217) at every step. The dead sync request-path
+code (`require_auth`, `tenant_context`, `Repository`/`TenantRepository`, `record_audit`, …)
+was removed at cutover. The **sync engine + `SessionLocal` are retained** for the seed
+script and test scaffolding only; **Alembic keeps its sync psycopg engine** (the
+recommended setup for migrations even in an async app). Auth is unchanged — opaque
+DB-backed session cookies, no JWT.
+
+Key implementation notes for future work on this codebase:
+- `Base.__mapper_args__ = {"eager_defaults": True}` — PG fetches `updated_at` via RETURNING
+  on UPDATE, else `AsyncSession` expires it post-flush and serialization lazy-loads →
+  `MissingGreenlet`.
+- `AsyncTenantRepository.get` uses `execution_options(populate_existing=True)` so a
+  re-fetch after an in-session mutation returns fresh column values.
+- Relationships must be eager-loaded (`selectinload`) — no lazy IO under `AsyncSession`.
+  Repos that back a nested read schema override `.get()` with the needed `selectinload`.
+- Blocking libraries (boto3) are off-loaded via `anyio.to_thread.run_sync`.
+- Celery task bodies are `async def _x()` invoked by `app.core.jobs.run(...)`
+  (`asyncio.run`); `jobs.job_session()` is an `AsyncSession` context manager.
 
 ## Context
 

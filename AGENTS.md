@@ -188,7 +188,7 @@ complaints, bookings, notices, incidents, audit logs, settings, or financial dat
   different communities.
 - Permission string: **`"<module>:<action>"`** (`visitors:approve`, `billing:export`). Actions:
   `view` `create` `update` `delete` `approve` `export` (+ module‑specific).
-- **Route‑level gate**: `Depends(require_permission("<module>:<action>"))` — 403 before any
+- **Route‑level gate**: `Depends(require_permission_async("<module>:<action>"))` — 403 before any
   handler logic. This is a **coarse** check; anything row‑specific ("can this user see *this*
   unit's ledger") is a **service‑layer** check.
 - Evaluation is `(role permissions ∪ allow overrides) − deny overrides` — **deny always wins**.
@@ -979,8 +979,9 @@ Silence on an area is not the same as "checked and fine" — say which one it is
   caches. Revoked on logout / password change / role change.
 - ✅ **Response envelope** — `{success, message, data, meta}` + `{error}` via `app/core/responses.py`
   and `app/core/errors.py` (central handlers); `frontend/lib/api.ts` unwraps it.
-- ✅ **Tenancy infra** — `app/core/tenancy.py` (`get_tenant_scope`, `TenantScope`, `tenant_context`,
-  `bind_rls_scope`) + `app/db/repository.py` (`TenantRepository`). Module routers use these.
+- ✅ **Tenancy infra** — `app/core/tenancy.py` (`get_tenant_scope_async`, `TenantScope`,
+  `async_tenant_context`, `bind_rls_scope_async`) + `app/db/repository.py`
+  (`AsyncTenantRepository`). Module routers use these (ADR-010 — async stack).
 - ✅ **RLS** — migration `0003` enables Row‑Level Security + a GUC‑based policy on the tenant
   tables that exist today; `bind_rls_scope` sets `app.community_ids` per request.
 - ✅ **Frontend structure** — `(public)` / `(protected)` route groups + `/unauthorized`,
@@ -1013,34 +1014,14 @@ Silence on an area is not the same as "checked and fine" — say which one it is
 
 **Reference module = `communities`.** Every new module follows its shape: `models.py`
 (TenantMixin + DB constraints) → `schemas.py` (`extra="forbid"`, `*Create/*Update/*Read`) →
-`repository.py` (`TenantRepository`) → `service.py` (rules + `record_audit`) → `deps.py`
-(`tenant_context`) → `router.py` (thin, envelope, `require_permission`) → migration (+ add its
+`repository.py` (`AsyncTenantRepository`) → `service.py` (`async def` rules +
+`record_audit_async`) → `deps.py` (`async_tenant_context` + `require_auth_async`) →
+`router.py` (thin `async def`, envelope, `require_permission_async`) → migration (+ add its
 tenant tables to a new RLS migration) → extend `seed.py` → `tests/test_<m>_{unit,api}.py` (incl.
 401/403 and cross-tenant 404) → module README + API doc → this table + session-notes.
 
 ### Still open (feature work)
 
-0. **Async stack migration** (ADR-010) — in progress, incremental. Landed: async engine +
-   `AsyncSessionLocal` + `get_async_db`; shared twins (`AsyncTenantRepository`,
-   `require_auth_async` / `require_permission_async`, `async_tenant_context`,
-   `record_audit_async`, `revoke_all_user_sessions_async`). **Converted:** `communities`,
-   `uploads`, `audit`, `users`, `residents`, `communication`, `deliveries`. Remaining:
-   `domestic_staff`, `vehicles`, `amenities`, `dashboards`, then the event cluster
-   (`notifications` + `billing`/`complaints`/`gate`/`incidents`/`visitors` — they share
-   `notifications.events`; needs `emit_async` / a dual sync+async `NotificationService`
-   during the cluster, delete the sync side after the last caller flips), then `auth`, then
-   Celery `tasks.py` (own sync engine or async) + async Alembic env + drop the sync engine.
-   Convert `repository → service → router → deps → unit tests` per module, suite green each
-   step. Auth stays session-cookie (no JWT).
-
-   **Pattern:** repo extends `AsyncTenantRepository`; service methods `async def` + `await`,
-   `record_audit_async`, eager-load relationships with `selectinload` (no lazy IO under
-   `AsyncSession`); deps use `async_tenant_context` + `require_auth_async`; router handlers
-   `async def` + `await svc.*` + `require_permission_async`; unit-test `conftest` `db`
-   fixture → `AsyncSessionLocal`, tests `async def` + `await`. Blocking libs (boto3) via
-   `anyio.to_thread.run_sync`. `Base.__mapper_args__ = {"eager_defaults": True}` makes PG
-   fetch `updated_at` via RETURNING on UPDATE (else it expires post-flush and serializing
-   the object lazy-loads → MissingGreenlet).
 1. **OTP login, community switcher UI, SSE/WebSocket gate feed** (FR‑04/05).
 2. **Frontend design system** — Tailwind + shadcn/ui + Recharts + TanStack Table + the shared
    component library. Plain CSS with the design tokens is the placeholder.
@@ -1053,7 +1034,9 @@ Done since first cut: **user/role management** (FR-02), **audit read API** (FR-1
 **upload pipeline** (`/uploads` presign + fixed catalogue + `ManagedFileUrl` guard on every
 file field), **RLS enforcement test suite**, **state-machine audit**
 (`docs/backend/state-machines.md` + `app/core/state_machine.py`), **FR-17 operational seed
-data** (`seed_operations`), **scheduled jobs** (see §9.4) — see session-notes.
+data** (`seed_operations`), **scheduled jobs** (see §9.4), **async stack migration**
+(ADR-010 — every route + job on `AsyncSession`; sync engine kept for seed/tests only) —
+see session-notes.
 
 ### 9.4 Scheduled jobs (implemented)
 Beat schedule lives in `app/core/celery_app.py`; every task uses `app/core/jobs.py`

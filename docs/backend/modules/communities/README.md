@@ -71,8 +71,8 @@ Base path `/api/v1/communities`. Full contract: [`docs/backend/api/communities.m
 
 ## Dependencies
 
-`users` (RBAC), `audit` (`record_audit`), `app.core.tenancy` (`TenantScope`, `tenant_context`),
-`app.db.repository` (`TenantRepository`).
+`users` (RBAC), `audit` (`record_audit_async`), `app.core.tenancy` (`TenantScope`,
+`async_tenant_context`), `app.db.repository` (`AsyncTenantRepository`). Async stack (ADR-010).
 
 ## Failure scenarios
 
