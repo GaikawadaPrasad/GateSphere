@@ -77,6 +77,19 @@ def test_resident_groups_and_group_target(as_role, seed_ids):
     assert m.status_code == 201, m.text
     assert len(admin.get(f"{P}/groups/{gid}/members").json()["data"]) == 1
 
+    # a user who is not a member of this community cannot be added
+    with SessionLocal() as db:
+        from app.modules.residents.models import ResidentProfile
+
+        other = db.scalar(
+            select(ResidentProfile.user_id).where(
+                ResidentProfile.community_id == _u.UUID(seed_ids["other_community_id"])
+            )
+        )
+    assert other is not None
+    bad = admin.post(f"{P}/groups/{gid}/members", json={"user_id": str(other)})
+    assert bad.status_code == 404, bad.text
+
     a = admin.post(
         f"{P}/announcements",
         json={

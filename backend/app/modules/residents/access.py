@@ -12,6 +12,10 @@ in the community.
 
 Services mix in `UnitScopedAccess` and call `_assert_unit_visible(...)` on the state-changing
 paths and `_scope_unit_column(...)` / `_scope_owned(...)` on the list queries.
+
+`user_in_community(db, user_id, community_id)` is the related check for a user id that arrives
+in a **payload** (incident responder, ticket assignee, resident-group member) — one community
+must not be able to reference another community's users.
 """
 
 from __future__ import annotations
@@ -41,6 +45,30 @@ CROSS_UNIT_ROLES = frozenset(
 )
 
 _MISSING = object()
+
+
+async def user_in_community(db: AsyncSession, user_id: uuid.UUID, community_id: uuid.UUID) -> bool:
+    """True if `user_id` is a member of `community_id` — holds a community-scoped role grant
+    there, or has a resident profile there. A platform-global grant (super_admin / auditor)
+    does **not** count as membership. Use to validate a user id that arrives in a payload
+    (incident responder, ticket assignee, group member) so one community can't reference
+    another's users."""
+    if await db.scalar(
+        select(UserRole.id)
+        .where(UserRole.user_id == user_id, UserRole.community_id == community_id)
+        .limit(1)
+    ):
+        return True
+    return bool(
+        await db.scalar(
+            select(ResidentProfile.id)
+            .where(
+                ResidentProfile.user_id == user_id,
+                ResidentProfile.community_id == community_id,
+            )
+            .limit(1)
+        )
+    )
 
 
 async def actor_unit_scope(db: AsyncSession, actor: User) -> frozenset[uuid.UUID] | None:

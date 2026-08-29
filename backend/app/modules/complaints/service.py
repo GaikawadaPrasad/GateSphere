@@ -42,7 +42,7 @@ from app.modules.complaints.repository import (
 )
 from app.modules.complaints.schemas import ALLOWED
 from app.modules.notifications import events as notif_events
-from app.modules.residents.access import UnitScopedAccess
+from app.modules.residents.access import UnitScopedAccess, user_in_community
 from app.modules.uploads.guard import ensure_confirmed_async
 from app.modules.users.models import User
 
@@ -286,10 +286,10 @@ class ComplaintService(UnitScopedAccess):
         ticket = await self.get_ticket(ticket_id)
         if ticket.status in ("closed", "cancelled"):
             raise BusinessRuleError(f"Ticket is '{ticket.status}'", code="INVALID_TRANSITION")
-        if payload.assigned_to_user_id is not None:
-            executor = await self.db.get(User, payload.assigned_to_user_id)
-            if executor is None:
-                raise NotFoundError("Assignee not found")
+        if payload.assigned_to_user_id is not None and not await user_in_community(
+            self.db, payload.assigned_to_user_id, ticket.community_id
+        ):
+            raise NotFoundError("Assignee not found")
         prev = await active_assignment(self.db, ticket.id)
         if prev is not None:
             prev.is_active = False

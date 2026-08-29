@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.core.errors import BusinessRuleError, ConflictError
+from app.core.errors import BusinessRuleError, ConflictError, NotFoundError
 from app.modules.incidents import schemas
 from app.modules.incidents.service import IncidentService
 
@@ -61,10 +61,14 @@ async def test_bad_transition_rejected(db, scope_for, community, superadmin):
 async def test_assign_and_release(db, scope_for, community, superadmin, make_user):
     svc = _svc(db, scope_for(community.id), superadmin)
     inc = await _incident(svc, community)
-    responder = await make_user()
+    responder = await make_user(community)
     a = await svc.assign(inc.id, schemas.AssignIn(assigned_user_id=responder.id))
     with pytest.raises(ConflictError):
         await svc.assign(inc.id, schemas.AssignIn(assigned_user_id=responder.id))
+    # a user outside the community cannot be assigned as a responder
+    outsider = await make_user()
+    with pytest.raises(NotFoundError):
+        await svc.assign(inc.id, schemas.AssignIn(assigned_user_id=outsider.id))
     released = await svc.release(a.id)
     assert released.is_active is False and released.released_at is not None
 

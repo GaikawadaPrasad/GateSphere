@@ -10,7 +10,7 @@ from app.core.security import hash_password
 from app.core.tenancy import TenantScope
 from app.db.session import AsyncSessionLocal
 from app.modules.communities.models import Community
-from app.modules.users.models import User
+from app.modules.users.models import Role, User, UserRole
 
 
 @pytest_asyncio.fixture()
@@ -38,7 +38,7 @@ async def community(db) -> Community:
 
 @pytest_asyncio.fixture()
 async def make_user(db):
-    async def _make() -> User:
+    async def _make(community: Community | None = None) -> User:
         u = User(
             email=f"in-{uuid.uuid4().hex[:10]}@example.test",
             full_name="Responder",
@@ -46,6 +46,10 @@ async def make_user(db):
         )
         db.add(u)
         await db.flush()
+        if community is not None:  # make them a member (community-scoped role grant)
+            role = await db.scalar(select(Role).where(Role.slug == "security_guard"))
+            db.add(UserRole(user_id=u.id, role_id=role.id, community_id=community.id))
+            await db.flush()
         return u
 
     return _make

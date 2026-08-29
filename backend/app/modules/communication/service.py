@@ -40,6 +40,7 @@ from app.modules.communication.repository import (
 )
 from app.modules.communication.schemas import ALLOWED
 from app.modules.communities.models import Tower, Unit
+from app.modules.residents.access import user_in_community
 from app.modules.users.models import Role, User
 
 
@@ -187,7 +188,7 @@ class CommunicationService:
 
     async def add_member(self, group_id: uuid.UUID, payload: schemas.GroupMemberIn):
         grp = await self._get_group(group_id)
-        if await self.db.get(User, payload.user_id) is None:
+        if not await user_in_community(self.db, payload.user_id, grp.community_id):
             raise NotFoundError("User not found")
         if await self.db.scalar(
             select(ResidentGroupMember).where(

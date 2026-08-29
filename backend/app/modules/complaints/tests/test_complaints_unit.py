@@ -36,7 +36,9 @@ async def test_full_lifecycle_to_closed_needs_confirmation(
 ):
     svc = _svc(db, scope_for(community.id), superadmin)
     t = await _ticket(svc, unit, category)
-    await svc.assign_ticket(t.id, schemas.TicketAssign(assigned_to_user_id=(await make_user()).id))
+    await svc.assign_ticket(
+        t.id, schemas.TicketAssign(assigned_to_user_id=(await make_user(community)).id)
+    )
     assert t.status == "assigned"
     await svc.transition_ticket(t.id, schemas.TicketTransition(status="acknowledged"))
     await svc.transition_ticket(t.id, schemas.TicketTransition(status="in_progress"))

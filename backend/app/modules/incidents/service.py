@@ -34,6 +34,7 @@ from app.modules.incidents.repository import (
 )
 from app.modules.incidents.schemas import ALLOWED
 from app.modules.notifications import events as notif_events
+from app.modules.residents.access import user_in_community
 from app.modules.uploads.guard import ensure_confirmed_async
 from app.modules.users.models import User
 
@@ -232,7 +233,7 @@ class IncidentService:
         inc = await self.get_incident(incident_id)
         if inc.status in ("closed", "false_alarm"):
             raise BusinessRuleError(f"Incident is '{inc.status}'", code="INVALID_TRANSITION")
-        if await self.db.get(User, payload.assigned_user_id) is None:
+        if not await user_in_community(self.db, payload.assigned_user_id, inc.community_id):
             raise NotFoundError("Responder not found")
         if await assignment_for(self.db, inc.id, payload.assigned_user_id) is not None:
             raise ConflictError("Already assigned", code="ALREADY_ASSIGNED")
