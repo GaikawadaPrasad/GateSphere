@@ -13,11 +13,11 @@ def _svc(db, scope, actor):
     return NotificationService(db, scope, actor)
 
 
-def test_dispatch_from_template_renders_and_delivers(
+async def test_dispatch_from_template_renders_and_delivers(
     db, scope_for, community, superadmin, make_user
 ):
     admin = _svc(db, scope_for(community.id), superadmin)
-    admin.upsert_template(
+    await admin.upsert_template(
         schemas.TemplateUpsert(
             code="welcome",
             channel="in_app",
@@ -26,8 +26,8 @@ def test_dispatch_from_template_renders_and_delivers(
         ),
         community_id=community.id,
     )
-    rcpt = make_user()
-    note = admin.dispatch(
+    rcpt = await make_user()
+    note = await admin.dispatch(
         schemas.DispatchIn(
             recipient_user_id=rcpt.id,
             notification_type="onboarding",
@@ -42,14 +42,14 @@ def test_dispatch_from_template_renders_and_delivers(
     assert statuses == {"in_app": "delivered", "email": "delivered"}
 
 
-def test_dispatch_without_content_or_template_fails(
+async def test_dispatch_without_content_or_template_fails(
     db, scope_for, community, superadmin, make_user
 ):
     admin = _svc(db, scope_for(community.id), superadmin)
     with pytest.raises(BusinessRuleError) as exc:
-        admin.dispatch(
+        await admin.dispatch(
             schemas.DispatchIn(
-                recipient_user_id=make_user().id,
+                recipient_user_id=(await make_user()).id,
                 notification_type="x",
                 community_id=community.id,
             )
@@ -57,14 +57,14 @@ def test_dispatch_without_content_or_template_fails(
     assert exc.value.code == "CONTENT_REQUIRED"
 
 
-def test_disabled_channel_is_skipped(db, scope_for, community, superadmin, make_user):
-    rcpt = make_user()
+async def test_disabled_channel_is_skipped(db, scope_for, community, superadmin, make_user):
+    rcpt = await make_user()
     user_svc = _svc(db, scope_for(community.id), rcpt)
-    user_svc.set_preference(
+    await user_svc.set_preference(
         schemas.PreferenceUpsert(channel="email", is_enabled=False, community_id=community.id)
     )
     admin = _svc(db, scope_for(community.id), superadmin)
-    note = admin.dispatch(
+    note = await admin.dispatch(
         schemas.DispatchIn(
             recipient_user_id=rcpt.id,
             notification_type="alert",
@@ -78,11 +78,11 @@ def test_disabled_channel_is_skipped(db, scope_for, community, superadmin, make_
     assert statuses["email"] == "skipped" and statuses["in_app"] == "delivered"
 
 
-def test_inbox_read_flow(db, scope_for, community, superadmin, make_user):
-    rcpt = make_user()
+async def test_inbox_read_flow(db, scope_for, community, superadmin, make_user):
+    rcpt = await make_user()
     admin = _svc(db, scope_for(community.id), superadmin)
     for i in range(3):
-        admin.dispatch(
+        await admin.dispatch(
             schemas.DispatchIn(
                 recipient_user_id=rcpt.id,
                 notification_type="n",
@@ -92,20 +92,20 @@ def test_inbox_read_flow(db, scope_for, community, superadmin, make_user):
             )
         )
     user_svc = _svc(db, scope_for(community.id), rcpt)
-    rows, total = user_svc.list_mine(unread_only=True, offset=0, limit=10)
+    rows, total = await user_svc.list_mine(unread_only=True, offset=0, limit=10)
     assert total == 3
-    user_svc.mark_read(rows[0].id)
-    assert user_svc.list_mine(unread_only=True, offset=0, limit=10)[1] == 2
-    assert user_svc.mark_all_read() == 2
-    assert user_svc.list_mine(unread_only=True, offset=0, limit=10)[1] == 0
+    await user_svc.mark_read(rows[0].id)
+    assert (await user_svc.list_mine(unread_only=True, offset=0, limit=10))[1] == 2
+    assert await user_svc.mark_all_read() == 2
+    assert (await user_svc.list_mine(unread_only=True, offset=0, limit=10))[1] == 0
 
 
-def test_unknown_template_and_recipient(db, scope_for, community, superadmin, make_user):
+async def test_unknown_template_and_recipient(db, scope_for, community, superadmin, make_user):
     admin = _svc(db, scope_for(community.id), superadmin)
     with pytest.raises(NotFoundError):
-        admin.dispatch(
+        await admin.dispatch(
             schemas.DispatchIn(
-                recipient_user_id=make_user().id,
+                recipient_user_id=(await make_user()).id,
                 notification_type="x",
                 template_code="nope",
                 community_id=community.id,

@@ -1,4 +1,4 @@
-"""Celery tasks for Complaint & Service Desk (FR-10).
+"""Celery tasks for Complaint & Service Desk (FR-10). Async job bodies (ADR-010).
 
 `sweep_ticket_sla` is the escalation engine: it walks every open ticket, and when
 an SLA milestone passes it advances the ticket's `escalation_state`
@@ -15,8 +15,8 @@ import structlog
 from sqlalchemy import select
 
 from app.core.celery_app import celery
-from app.core.jobs import job_session, system_actor, system_scope
-from app.modules.audit.service import record_audit
+from app.core.jobs import job_session, run, system_actor, system_scope
+from app.modules.audit.service import record_audit_async
 from app.modules.complaints.models import ServiceTicket, SlaPolicy
 from app.modules.notifications import events as notif_events
 
@@ -41,16 +41,15 @@ def _target_state(t: ServiceTicket, sla: SlaPolicy | None, now: datetime) -> str
     return state
 
 
-@celery.task(name="app.modules.complaints.tasks.sweep_ticket_sla")
-def sweep_ticket_sla() -> dict:
+async def _sweep_ticket_sla() -> dict:
     now = datetime.now(UTC)
     changed = 0
-    with job_session() as db:
-        actor = system_actor(db)
+    async with job_session() as db:
+        actor = await system_actor(db)
         scope = system_scope(actor)
-        slas = {s.id: s for s in db.scalars(select(SlaPolicy)).all()}
-        tickets = db.scalars(
-            select(ServiceTicket).where(ServiceTicket.status.in_(_OPEN_STATES))
+        slas = {s.id: s for s in (await db.scalars(select(SlaPolicy))).all()}
+        tickets = (
+            await db.scalars(select(ServiceTicket).where(ServiceTicket.status.in_(_OPEN_STATES)))
         ).all()
         for t in tickets:
             sla = slas.get(t.sla_policy_id) if t.sla_policy_id else None
@@ -66,9 +65,9 @@ def sweep_ticket_sla() -> dict:
             elif target == "escalated":
                 t.escalated_at = now
                 t.escalation_level = (t.escalation_level or 0) + 1
-            db.flush()
+            await db.flush()
 
-            record_audit(
+            await record_audit_async(
                 db,
                 module="complaints",
                 action=f"ticket.sla_{target}",
@@ -84,7 +83,7 @@ def sweep_ticket_sla() -> dict:
                 "breached": "has BREACHED its SLA",
                 "escalated": "has been ESCALATED",
             }[target]
-            notif_events.emit_to_roles(
+            await notif_events.emit_to_roles(
                 db,
                 scope,
                 actor,
@@ -99,7 +98,7 @@ def sweep_ticket_sla() -> dict:
                 channels=["in_app", "email"] if target != "at_risk" else ["in_app"],
             )
             if t.raised_by_user_id:
-                notif_events.emit(
+                await notif_events.emit(
                     db,
                     scope,
                     actor,
@@ -115,3 +114,8 @@ def sweep_ticket_sla() -> dict:
             changed += 1
     log.info("sla.sweep", tickets_changed=changed)
     return {"tickets_changed": changed}
+
+
+@celery.task(name="app.modules.complaints.tasks.sweep_ticket_sla")
+def sweep_ticket_sla() -> dict:
+    return run(_sweep_ticket_sla())

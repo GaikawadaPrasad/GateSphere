@@ -1,4 +1,4 @@
-"""Business logic for Notifications (FR-15).
+"""Business logic for Notifications (FR-15). Async stack (ADR-010).
 
 - `dispatch` renders a notification for a recipient (from a template `code` or an explicit
   title/message), then fans out one `notification_delivery` per resolved channel. `in_app`
@@ -15,11 +15,12 @@ from datetime import UTC, datetime
 
 from fastapi import Request
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.errors import BusinessRuleError, NotFoundError
 from app.core.tenancy import TenantScope
-from app.modules.audit.service import record_audit
+from app.modules.audit.service import record_audit_async
 from app.modules.notifications import schemas
 from app.modules.notifications.models import (
     Notification,
@@ -56,7 +57,7 @@ def _render(tpl: str, context: dict[str, str]) -> str:
 
 class NotificationService:
     def __init__(
-        self, db: Session, scope: TenantScope, actor: User, request: Request | None = None
+        self, db: AsyncSession, scope: TenantScope, actor: User, request: Request | None = None
     ):
         self.db = db
         self.scope = scope
@@ -65,8 +66,8 @@ class NotificationService:
         self.templates = TemplateRepository(db, scope)
         self.notifications = NotificationRepository(db, scope)
 
-    def _audit(self, action, community_id, entity_type, entity_id, **kw):
-        record_audit(
+    async def _audit(self, action, community_id, entity_type, entity_id, **kw) -> None:
+        await record_audit_async(
             self.db,
             module="notifications",
             action=action,
@@ -88,48 +89,52 @@ class NotificationService:
         )
 
     # -- templates --------------------------------------- #
-    def list_templates(self, *, community_id: uuid.UUID | None):
+    async def list_templates(self, *, community_id: uuid.UUID | None):
         cid = self._one_community(community_id)
         stmt = (
             select(NotificationTemplate)
             .where(NotificationTemplate.community_id == cid)
             .order_by(NotificationTemplate.code, NotificationTemplate.channel)
         )
-        return list(self.db.scalars(stmt).all())
+        return list((await self.db.scalars(stmt)).all())
 
-    def upsert_template(self, payload: schemas.TemplateUpsert, *, community_id: uuid.UUID | None):
+    async def upsert_template(
+        self, payload: schemas.TemplateUpsert, *, community_id: uuid.UUID | None
+    ):
         cid = self._one_community(community_id)
         _enum("channel", payload.channel)
-        obj = self.templates.match(cid, payload.code, payload.channel)
+        obj = await self.templates.match(cid, payload.code, payload.channel)
         data = payload.model_dump()
         if obj is None:
             obj = NotificationTemplate(community_id=cid, **data)
-            self.templates.add(obj)
+            await self.templates.add(obj)
             action = "template.create"
         else:
             for k, v in data.items():
                 setattr(obj, k, v)
-            self.db.flush()
+            await self.db.flush()
             action = "template.update"
-        self._audit(action, cid, "notification_template", obj.id)
+        await self._audit(action, cid, "notification_template", obj.id)
         return obj
 
     # -- preferences ------------------------------------ #
-    def my_preferences(self):
+    async def my_preferences(self):
         return list(
-            self.db.scalars(
-                select(UserNotificationPreference).where(
-                    UserNotificationPreference.user_id == self.actor.id
+            (
+                await self.db.scalars(
+                    select(UserNotificationPreference).where(
+                        UserNotificationPreference.user_id == self.actor.id
+                    )
                 )
             ).all()
         )
 
-    def set_preference(self, payload: schemas.PreferenceUpsert):
+    async def set_preference(self, payload: schemas.PreferenceUpsert):
         _enum("channel", payload.channel)
         cid = payload.community_id
         if cid is not None:
             self.scope.require(cid)
-        obj = self.db.scalar(
+        obj = await self.db.scalar(
             select(UserNotificationPreference).where(
                 UserNotificationPreference.user_id == self.actor.id,
                 UserNotificationPreference.community_id == cid,
@@ -138,16 +143,14 @@ class NotificationService:
         )
         if obj is None:
             obj = UserNotificationPreference(
-                user_id=self.actor.id,
-                community_id=cid,
-                channel=payload.channel,
+                user_id=self.actor.id, community_id=cid, channel=payload.channel
             )
             self.db.add(obj)
         obj.is_enabled = payload.is_enabled
         obj.quiet_hours_start = payload.quiet_hours_start
         obj.quiet_hours_end = payload.quiet_hours_end
-        self.db.flush()
-        self._audit(
+        await self.db.flush()
+        await self._audit(
             "preference.set",
             cid,
             "notification_preference",
@@ -157,10 +160,10 @@ class NotificationService:
         return obj
 
     # -- dispatch -------------------------------------- #
-    def _channel_allowed(self, user_id: uuid.UUID, cid: uuid.UUID, channel: str) -> str:
+    async def _channel_allowed(self, user_id: uuid.UUID, cid: uuid.UUID, channel: str) -> str:
         if channel == "in_app":
             return "deliver"
-        pref = preference(self.db, user_id, cid, channel)
+        pref = await preference(self.db, user_id, cid, channel)
         if pref is not None and not pref.is_enabled:
             return "disabled"
         if pref is not None and pref.quiet_hours_start and pref.quiet_hours_end:
@@ -171,9 +174,9 @@ class NotificationService:
                 return "quiet"
         return "deliver"
 
-    def dispatch(self, payload: schemas.DispatchIn) -> Notification:
+    async def dispatch(self, payload: schemas.DispatchIn) -> Notification:
         cid = self._one_community(payload.community_id)
-        if self.db.get(User, payload.recipient_user_id) is None:
+        if await self.db.get(User, payload.recipient_user_id) is None:
             raise NotFoundError("Recipient not found")
         channels = payload.channels or list(_DEFAULT_CHANNELS)
         for ch in channels:
@@ -181,10 +184,12 @@ class NotificationService:
 
         title, message, template_id = payload.title, payload.message, None
         if payload.template_code:
-            tpl = self.templates.match(cid, payload.template_code, "in_app") or self.db.scalar(
-                select(NotificationTemplate).where(
-                    NotificationTemplate.community_id == cid,
-                    NotificationTemplate.code == payload.template_code,
+            tpl = await self.templates.match(cid, payload.template_code, "in_app") or (
+                await self.db.scalar(
+                    select(NotificationTemplate).where(
+                        NotificationTemplate.community_id == cid,
+                        NotificationTemplate.code == payload.template_code,
+                    )
                 )
             )
             if tpl is None:
@@ -207,11 +212,11 @@ class NotificationService:
             reference_type=payload.reference_type,
             reference_id=payload.reference_id,
         )
-        self.notifications.add(note)
+        await self.notifications.add(note)
 
         now = datetime.now(UTC)
         for ch in channels:
-            decision = self._channel_allowed(payload.recipient_user_id, cid, ch)
+            decision = await self._channel_allowed(payload.recipient_user_id, cid, ch)
             if decision == "deliver":
                 self.db.add(
                     NotificationDelivery(
@@ -235,49 +240,56 @@ class NotificationService:
                         failure_reason=f"channel {decision}",
                     )
                 )
-        self.db.flush()
-        self._audit(
+        await self.db.flush()
+        await self._audit(
             "notification.dispatch",
             cid,
             "notification",
             note.id,
             new={"type": payload.notification_type, "channels": channels},
         )
-        return note
+        return await self.notifications.get(note.id)
 
     # -- inbox ---------------------------------------- #
-    def list_mine(self, *, unread_only: bool, offset: int, limit: int):
-        stmt = select(Notification).where(Notification.recipient_user_id == self.actor.id)
+    async def list_mine(self, *, unread_only: bool, offset: int, limit: int):
+        stmt = (
+            select(Notification)
+            .options(selectinload(Notification.deliveries))
+            .where(Notification.recipient_user_id == self.actor.id)
+        )
         if unread_only:
             stmt = stmt.where(Notification.is_read.is_(False))
         stmt = stmt.order_by(Notification.created_at.desc())
-        return self.notifications.list(
-            offset=offset, limit=limit, extra=stmt
-        ), self.notifications.count(extra=stmt)
+        return (
+            await self.notifications.list(offset=offset, limit=limit, extra=stmt),
+            await self.notifications.count(extra=stmt),
+        )
 
-    def _mine(self, notification_id: uuid.UUID) -> Notification:
-        obj = self.notifications.get(notification_id)
+    async def _mine(self, notification_id: uuid.UUID) -> Notification:
+        obj = await self.notifications.get(notification_id)
         if obj is None or obj.recipient_user_id != self.actor.id:
             raise NotFoundError("Notification not found")
         return obj
 
-    def get_mine(self, notification_id: uuid.UUID) -> Notification:
-        return self._mine(notification_id)
+    async def get_mine(self, notification_id: uuid.UUID) -> Notification:
+        return await self._mine(notification_id)
 
-    def mark_read(self, notification_id: uuid.UUID) -> Notification:
-        obj = self._mine(notification_id)
+    async def mark_read(self, notification_id: uuid.UUID) -> Notification:
+        obj = await self._mine(notification_id)
         if not obj.is_read:
             obj.is_read = True
             obj.read_at = datetime.now(UTC)
-            self.db.flush()
-        return obj
+            await self.db.flush()
+        return await self.notifications.get(notification_id)
 
-    def mark_all_read(self) -> int:
+    async def mark_all_read(self) -> int:
         rows = list(
-            self.db.scalars(
-                select(Notification).where(
-                    Notification.recipient_user_id == self.actor.id,
-                    Notification.is_read.is_(False),
+            (
+                await self.db.scalars(
+                    select(Notification).where(
+                        Notification.recipient_user_id == self.actor.id,
+                        Notification.is_read.is_(False),
+                    )
                 )
             ).all()
         )
@@ -285,5 +297,5 @@ class NotificationService:
         for r in rows:
             r.is_read = True
             r.read_at = now
-        self.db.flush()
+        await self.db.flush()
         return len(rows)

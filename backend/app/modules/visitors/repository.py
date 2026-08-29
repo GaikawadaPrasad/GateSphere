@@ -6,7 +6,7 @@ import uuid
 
 from sqlalchemy import select
 
-from app.db.repository import TenantRepository
+from app.db.repository import AsyncTenantRepository
 from app.modules.visitors.models import (
     Visitor,
     VisitorApproval,
@@ -18,25 +18,25 @@ from app.modules.visitors.models import (
 )
 
 
-class VisitorRepository(TenantRepository[Visitor]):
+class VisitorRepository(AsyncTenantRepository[Visitor]):
     model = Visitor
 
-    def by_phone(self, community_id: uuid.UUID, phone: str) -> Visitor | None:
-        return self.db.scalar(
+    async def by_phone(self, community_id: uuid.UUID, phone: str) -> Visitor | None:
+        return await self.db.scalar(
             select(Visitor).where(Visitor.community_id == community_id, Visitor.phone == phone)
         )
 
 
-class BlacklistRepository(TenantRepository[VisitorBlacklist]):
+class BlacklistRepository(AsyncTenantRepository[VisitorBlacklist]):
     model = VisitorBlacklist
 
-    def match(
+    async def match(
         self, community_id: uuid.UUID, phone_hash: str, id_hash: str | None
     ) -> VisitorBlacklist | None:
         clause = VisitorBlacklist.phone_hash == phone_hash
         if id_hash:
             clause = clause | (VisitorBlacklist.id_number_hash == id_hash)
-        return self.db.scalar(
+        return await self.db.scalar(
             select(VisitorBlacklist).where(
                 VisitorBlacklist.community_id == community_id,
                 VisitorBlacklist.is_active.is_(True),
@@ -45,17 +45,17 @@ class BlacklistRepository(TenantRepository[VisitorBlacklist]):
         )
 
 
-class RequestRepository(TenantRepository[VisitorRequest]):
+class RequestRepository(AsyncTenantRepository[VisitorRequest]):
     model = VisitorRequest
 
 
-class EntryRepository(TenantRepository[VisitorEntry]):
+class EntryRepository(AsyncTenantRepository[VisitorEntry]):
     model = VisitorEntry
 
-    def open_for_visitor(
+    async def open_for_visitor(
         self, community_id: uuid.UUID, visitor_id: uuid.UUID
     ) -> VisitorEntry | None:
-        return self.db.scalar(
+        return await self.db.scalar(
             select(VisitorEntry).where(
                 VisitorEntry.community_id == community_id,
                 VisitorEntry.visitor_id == visitor_id,
@@ -64,17 +64,17 @@ class EntryRepository(TenantRepository[VisitorEntry]):
         )
 
 
-class PolicyRepository(TenantRepository[VisitorPolicy]):
+class PolicyRepository(AsyncTenantRepository[VisitorPolicy]):
     model = VisitorPolicy
 
-    def for_community(self, community_id: uuid.UUID) -> VisitorPolicy | None:
-        return self.db.scalar(
+    async def for_community(self, community_id: uuid.UUID) -> VisitorPolicy | None:
+        return await self.db.scalar(
             select(VisitorPolicy).where(VisitorPolicy.community_id == community_id)
         )
 
 
-def approval_row(db, request_id: uuid.UUID, approver_id: uuid.UUID) -> VisitorApproval | None:
-    return db.scalar(
+async def approval_row(db, request_id: uuid.UUID, approver_id: uuid.UUID) -> VisitorApproval | None:
+    return await db.scalar(
         select(VisitorApproval).where(
             VisitorApproval.request_id == request_id,
             VisitorApproval.approver_user_id == approver_id,
@@ -82,5 +82,5 @@ def approval_row(db, request_id: uuid.UUID, approver_id: uuid.UUID) -> VisitorAp
     )
 
 
-def pass_by_hash(db, token_hash: str) -> VisitorPass | None:
-    return db.scalar(select(VisitorPass).where(VisitorPass.token_hash == token_hash))
+async def pass_by_hash(db, token_hash: str) -> VisitorPass | None:
+    return await db.scalar(select(VisitorPass).where(VisitorPass.token_hash == token_hash))

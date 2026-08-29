@@ -1,49 +1,57 @@
-"""Shared plumbing for Celery scheduled jobs.
+"""Shared plumbing for Celery scheduled jobs (async — ADR-010).
 
 Background sweeps run outside any HTTP request, so they have no `TenantScope`
 from middleware and no authenticated actor. They use:
 
-- `job_session()` — a plain `Session` context manager that commits on success,
-  rolls back on error, always closes.
+- `job_session()` — an async `AsyncSession` context manager that commits on
+  success, rolls back on error, always closes.
 - `system_scope()` — a global `TenantScope` (sees every community).
 - `system_actor(db)` — the seeded `system@` user, used as the audit actor so
   every automated change is still attributable.
 
-Jobs must apply the **same** state-transition rules as the API (AGENTS.md §
-"Workflow state machines"): import the service-layer transition maps, never
-hand-roll status changes.
+A Celery task body is `async def _foo(): ...` invoked via `run(_foo())`.
+Jobs must apply the **same** state-transition rules as the API.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterator
-from contextlib import contextmanager
+import asyncio
+from collections.abc import AsyncIterator, Coroutine
+from contextlib import asynccontextmanager
+from typing import Any, TypeVar
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.tenancy import TenantScope
-from app.db.session import SessionLocal
+from app.db.session import AsyncSessionLocal
 from app.modules.users.models import User
 
 SYSTEM_ACTOR_EMAIL = "system@gatesphere.com"
 
+_T = TypeVar("_T")
 
-@contextmanager
-def job_session() -> Iterator[Session]:
-    db = SessionLocal()
+
+def run(coro: Coroutine[Any, Any, _T]) -> _T:
+    """Run an async task body from a sync Celery task."""
+    return asyncio.run(coro)
+
+
+@asynccontextmanager
+async def job_session() -> AsyncIterator[AsyncSession]:
+    db = AsyncSessionLocal()
     try:
         yield db
-        db.commit()
+        await db.commit()
     except Exception:
-        db.rollback()
+        await db.rollback()
         raise
     finally:
-        db.close()
+        await db.close()
 
 
-def system_actor(db: Session) -> User | None:
-    return db.scalar(select(User).where(User.email == SYSTEM_ACTOR_EMAIL))
+async def system_actor(db: AsyncSession) -> User | None:
+    return await db.scalar(select(User).where(User.email == SYSTEM_ACTOR_EMAIL))
 
 
 def system_scope(actor: User | None = None) -> TenantScope:

@@ -13,15 +13,15 @@ from fastapi import APIRouter, Depends, status
 
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
-from app.core.security import require_permission
+from app.core.security import require_permission_async
 from app.modules.notifications import schemas
 from app.modules.notifications.deps import notification_service
 from app.modules.notifications.service import NotificationService
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
 
-VIEW = Depends(require_permission("notifications:view"))
-CREATE = Depends(require_permission("notifications:create"))
+VIEW = Depends(require_permission_async("notifications:view"))
+CREATE = Depends(require_permission_async("notifications:create"))
 Svc = NotificationService
 
 
@@ -36,41 +36,43 @@ async def module_health() -> dict:
     response_model=Envelope[list[schemas.PreferenceRead]],
     dependencies=[VIEW],
 )
-def my_preferences(svc: Svc = Depends(notification_service)) -> dict:
-    return ok([schemas.PreferenceRead.model_validate(p) for p in svc.my_preferences()])
+async def my_preferences(svc: Svc = Depends(notification_service)) -> dict:
+    return ok([schemas.PreferenceRead.model_validate(p) for p in await svc.my_preferences()])
 
 
 @router.put("/me/preferences", response_model=Envelope[schemas.PreferenceRead], dependencies=[VIEW])
-def set_preference(
+async def set_preference(
     payload: schemas.PreferenceUpsert, svc: Svc = Depends(notification_service)
 ) -> dict:
-    return ok(schemas.PreferenceRead.model_validate(svc.set_preference(payload)), message="Saved")
+    return ok(
+        schemas.PreferenceRead.model_validate(await svc.set_preference(payload)), message="Saved"
+    )
 
 
 # --- templates + dispatch (admin) ------------------------------- #
 @router.get(
     "/templates", response_model=Envelope[list[schemas.TemplateRead]], dependencies=[CREATE]
 )
-def list_templates(
+async def list_templates(
     community_id: uuid.UUID | None = None, svc: Svc = Depends(notification_service)
 ) -> dict:
     return ok(
         [
             schemas.TemplateRead.model_validate(t)
-            for t in svc.list_templates(community_id=community_id)
+            for t in await svc.list_templates(community_id=community_id)
         ]
     )
 
 
 @router.put("/templates", response_model=Envelope[schemas.TemplateRead], dependencies=[CREATE])
-def upsert_template(
+async def upsert_template(
     payload: schemas.TemplateUpsert,
     community_id: uuid.UUID | None = None,
     svc: Svc = Depends(notification_service),
 ) -> dict:
     return ok(
         schemas.TemplateRead.model_validate(
-            svc.upsert_template(payload, community_id=community_id)
+            await svc.upsert_template(payload, community_id=community_id)
         ),
         message="Saved",
     )
@@ -82,18 +84,20 @@ def upsert_template(
     status_code=status.HTTP_201_CREATED,
     dependencies=[CREATE],
 )
-def dispatch(payload: schemas.DispatchIn, svc: Svc = Depends(notification_service)) -> dict:
-    return ok(schemas.NotificationRead.model_validate(svc.dispatch(payload)), message="Dispatched")
+async def dispatch(payload: schemas.DispatchIn, svc: Svc = Depends(notification_service)) -> dict:
+    return ok(
+        schemas.NotificationRead.model_validate(await svc.dispatch(payload)), message="Dispatched"
+    )
 
 
 # --- my inbox ------------------------------------------------------ #
 @router.get("", response_model=Envelope[list[schemas.NotificationRead]], dependencies=[VIEW])
-def list_mine(
+async def list_mine(
     unread_only: bool = False,
     params: PageParams = Depends(page_params),
     svc: Svc = Depends(notification_service),
 ) -> dict:
-    rows, total = svc.list_mine(
+    rows, total = await svc.list_mine(
         unread_only=unread_only, offset=params.offset, limit=params.page_size
     )
     return paginated(
@@ -102,15 +106,15 @@ def list_mine(
 
 
 @router.post("/read-all", dependencies=[VIEW])
-def mark_all_read(svc: Svc = Depends(notification_service)) -> dict:
-    return ok({"marked": svc.mark_all_read()}, message="Marked")
+async def mark_all_read(svc: Svc = Depends(notification_service)) -> dict:
+    return ok({"marked": await svc.mark_all_read()}, message="Marked")
 
 
 @router.get(
     "/{notification_id}", response_model=Envelope[schemas.NotificationRead], dependencies=[VIEW]
 )
-def get_mine(notification_id: uuid.UUID, svc: Svc = Depends(notification_service)) -> dict:
-    return ok(schemas.NotificationRead.model_validate(svc.get_mine(notification_id)))
+async def get_mine(notification_id: uuid.UUID, svc: Svc = Depends(notification_service)) -> dict:
+    return ok(schemas.NotificationRead.model_validate(await svc.get_mine(notification_id)))
 
 
 @router.post(
@@ -118,7 +122,8 @@ def get_mine(notification_id: uuid.UUID, svc: Svc = Depends(notification_service
     response_model=Envelope[schemas.NotificationRead],
     dependencies=[VIEW],
 )
-def mark_read(notification_id: uuid.UUID, svc: Svc = Depends(notification_service)) -> dict:
+async def mark_read(notification_id: uuid.UUID, svc: Svc = Depends(notification_service)) -> dict:
     return ok(
-        schemas.NotificationRead.model_validate(svc.mark_read(notification_id)), message="Read"
+        schemas.NotificationRead.model_validate(await svc.mark_read(notification_id)),
+        message="Read",
     )

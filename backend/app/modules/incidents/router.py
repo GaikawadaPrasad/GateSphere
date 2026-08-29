@@ -12,16 +12,16 @@ from fastapi import APIRouter, Depends, status
 
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
-from app.core.security import require_permission
+from app.core.security import require_permission_async
 from app.modules.incidents import schemas
 from app.modules.incidents.deps import incident_service
 from app.modules.incidents.service import IncidentService
 
 router = APIRouter(prefix="/incidents", tags=["Emergency & Incident Management"])
 
-VIEW = Depends(require_permission("incidents:view"))
-CREATE = Depends(require_permission("incidents:create"))
-UPDATE = Depends(require_permission("incidents:update"))
+VIEW = Depends(require_permission_async("incidents:view"))
+CREATE = Depends(require_permission_async("incidents:create"))
+UPDATE = Depends(require_permission_async("incidents:update"))
 
 Svc = IncidentService
 
@@ -32,14 +32,14 @@ async def module_health() -> dict:
 
 
 @router.get("", response_model=Envelope[list[schemas.IncidentRead]], dependencies=[VIEW])
-def list_incidents(
+async def list_incidents(
     community_id: uuid.UUID | None = None,
     incident_status: str | None = None,
     severity: str | None = None,
     params: PageParams = Depends(page_params),
     svc: Svc = Depends(incident_service),
 ) -> dict:
-    rows, total = svc.list_incidents(
+    rows, total = await svc.list_incidents(
         community_id=community_id,
         incident_status=incident_status,
         severity=severity,
@@ -57,28 +57,30 @@ def list_incidents(
     status_code=status.HTTP_201_CREATED,
     dependencies=[CREATE],
 )
-def create_incident(payload: schemas.IncidentCreate, svc: Svc = Depends(incident_service)) -> dict:
+async def create_incident(
+    payload: schemas.IncidentCreate, svc: Svc = Depends(incident_service)
+) -> dict:
     return ok(
-        schemas.IncidentRead.model_validate(svc.create_incident(payload)),
+        schemas.IncidentRead.model_validate(await svc.create_incident(payload)),
         message="Incident logged",
     )
 
 
 @router.get("/{incident_id}", response_model=Envelope[schemas.IncidentRead], dependencies=[VIEW])
-def get_incident(incident_id: uuid.UUID, svc: Svc = Depends(incident_service)) -> dict:
-    return ok(schemas.IncidentRead.model_validate(svc.get_incident(incident_id)))
+async def get_incident(incident_id: uuid.UUID, svc: Svc = Depends(incident_service)) -> dict:
+    return ok(schemas.IncidentRead.model_validate(await svc.get_incident(incident_id)))
 
 
 @router.patch(
     "/{incident_id}", response_model=Envelope[schemas.IncidentRead], dependencies=[UPDATE]
 )
-def update_incident(
+async def update_incident(
     incident_id: uuid.UUID,
     payload: schemas.IncidentUpdate,
     svc: Svc = Depends(incident_service),
 ) -> dict:
     return ok(
-        schemas.IncidentRead.model_validate(svc.update_incident(incident_id, payload)),
+        schemas.IncidentRead.model_validate(await svc.update_incident(incident_id, payload)),
         message="Updated",
     )
 
@@ -88,13 +90,13 @@ def update_incident(
     response_model=Envelope[schemas.IncidentRead],
     dependencies=[UPDATE],
 )
-def transition_incident(
+async def transition_incident(
     incident_id: uuid.UUID,
     payload: schemas.IncidentTransition,
     svc: Svc = Depends(incident_service),
 ) -> dict:
     return ok(
-        schemas.IncidentRead.model_validate(svc.transition_incident(incident_id, payload)),
+        schemas.IncidentRead.model_validate(await svc.transition_incident(incident_id, payload)),
         message="Updated",
     )
 
@@ -104,8 +106,8 @@ def transition_incident(
     response_model=Envelope[list[schemas.HistoryRead]],
     dependencies=[VIEW],
 )
-def incident_history(incident_id: uuid.UUID, svc: Svc = Depends(incident_service)) -> dict:
-    return ok([schemas.HistoryRead.model_validate(h) for h in svc.list_history(incident_id)])
+async def incident_history(incident_id: uuid.UUID, svc: Svc = Depends(incident_service)) -> dict:
+    return ok([schemas.HistoryRead.model_validate(h) for h in await svc.list_history(incident_id)])
 
 
 @router.get(
@@ -113,8 +115,12 @@ def incident_history(incident_id: uuid.UUID, svc: Svc = Depends(incident_service
     response_model=Envelope[list[schemas.AssignmentRead]],
     dependencies=[VIEW],
 )
-def incident_assignments(incident_id: uuid.UUID, svc: Svc = Depends(incident_service)) -> dict:
-    return ok([schemas.AssignmentRead.model_validate(a) for a in svc.list_assignments(incident_id)])
+async def incident_assignments(
+    incident_id: uuid.UUID, svc: Svc = Depends(incident_service)
+) -> dict:
+    return ok(
+        [schemas.AssignmentRead.model_validate(a) for a in await svc.list_assignments(incident_id)]
+    )
 
 
 @router.post(
@@ -123,11 +129,11 @@ def incident_assignments(incident_id: uuid.UUID, svc: Svc = Depends(incident_ser
     status_code=status.HTTP_201_CREATED,
     dependencies=[UPDATE],
 )
-def assign(
+async def assign(
     incident_id: uuid.UUID, payload: schemas.AssignIn, svc: Svc = Depends(incident_service)
 ) -> dict:
     return ok(
-        schemas.AssignmentRead.model_validate(svc.assign(incident_id, payload)),
+        schemas.AssignmentRead.model_validate(await svc.assign(incident_id, payload)),
         message="Assigned",
     )
 
@@ -137,8 +143,10 @@ def assign(
     response_model=Envelope[schemas.AssignmentRead],
     dependencies=[UPDATE],
 )
-def release(assignment_id: uuid.UUID, svc: Svc = Depends(incident_service)) -> dict:
-    return ok(schemas.AssignmentRead.model_validate(svc.release(assignment_id)), message="Released")
+async def release(assignment_id: uuid.UUID, svc: Svc = Depends(incident_service)) -> dict:
+    return ok(
+        schemas.AssignmentRead.model_validate(await svc.release(assignment_id)), message="Released"
+    )
 
 
 @router.get(
@@ -146,8 +154,8 @@ def release(assignment_id: uuid.UUID, svc: Svc = Depends(incident_service)) -> d
     response_model=Envelope[list[schemas.ActionRead]],
     dependencies=[VIEW],
 )
-def incident_actions(incident_id: uuid.UUID, svc: Svc = Depends(incident_service)) -> dict:
-    return ok([schemas.ActionRead.model_validate(a) for a in svc.list_actions(incident_id)])
+async def incident_actions(incident_id: uuid.UUID, svc: Svc = Depends(incident_service)) -> dict:
+    return ok([schemas.ActionRead.model_validate(a) for a in await svc.list_actions(incident_id)])
 
 
 @router.post(
@@ -156,11 +164,11 @@ def incident_actions(incident_id: uuid.UUID, svc: Svc = Depends(incident_service
     status_code=status.HTTP_201_CREATED,
     dependencies=[UPDATE],
 )
-def add_action(
+async def add_action(
     incident_id: uuid.UUID, payload: schemas.ActionIn, svc: Svc = Depends(incident_service)
 ) -> dict:
     return ok(
-        schemas.ActionRead.model_validate(svc.add_action(incident_id, payload)),
+        schemas.ActionRead.model_validate(await svc.add_action(incident_id, payload)),
         message="Logged",
     )
 
@@ -170,8 +178,12 @@ def add_action(
     response_model=Envelope[list[schemas.AttachmentRead]],
     dependencies=[VIEW],
 )
-def incident_attachments(incident_id: uuid.UUID, svc: Svc = Depends(incident_service)) -> dict:
-    return ok([schemas.AttachmentRead.model_validate(a) for a in svc.list_attachments(incident_id)])
+async def incident_attachments(
+    incident_id: uuid.UUID, svc: Svc = Depends(incident_service)
+) -> dict:
+    return ok(
+        [schemas.AttachmentRead.model_validate(a) for a in await svc.list_attachments(incident_id)]
+    )
 
 
 @router.post(
@@ -180,12 +192,12 @@ def incident_attachments(incident_id: uuid.UUID, svc: Svc = Depends(incident_ser
     status_code=status.HTTP_201_CREATED,
     dependencies=[UPDATE],
 )
-def add_attachment(
+async def add_attachment(
     incident_id: uuid.UUID,
     payload: schemas.AttachmentIn,
     svc: Svc = Depends(incident_service),
 ) -> dict:
     return ok(
-        schemas.AttachmentRead.model_validate(svc.add_attachment(incident_id, payload)),
+        schemas.AttachmentRead.model_validate(await svc.add_attachment(incident_id, payload)),
         message="Attached",
     )

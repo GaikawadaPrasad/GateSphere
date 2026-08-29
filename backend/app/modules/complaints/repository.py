@@ -6,7 +6,7 @@ import uuid
 
 from sqlalchemy import func, select
 
-from app.db.repository import TenantRepository
+from app.db.repository import AsyncTenantRepository
 from app.modules.complaints.models import (
     ServiceCategory,
     ServiceTicket,
@@ -15,24 +15,24 @@ from app.modules.complaints.models import (
 )
 
 
-class CategoryRepository(TenantRepository[ServiceCategory]):
+class CategoryRepository(AsyncTenantRepository[ServiceCategory]):
     model = ServiceCategory
 
-    def by_code(self, community_id: uuid.UUID, code: str) -> ServiceCategory | None:
-        return self.db.scalar(
+    async def by_code(self, community_id: uuid.UUID, code: str) -> ServiceCategory | None:
+        return await self.db.scalar(
             select(ServiceCategory).where(
                 ServiceCategory.community_id == community_id, ServiceCategory.code == code
             )
         )
 
 
-class SlaRepository(TenantRepository[SlaPolicy]):
+class SlaRepository(AsyncTenantRepository[SlaPolicy]):
     model = SlaPolicy
 
-    def match(
+    async def match(
         self, community_id: uuid.UUID, category_id: uuid.UUID, priority: str
     ) -> SlaPolicy | None:
-        return self.db.scalar(
+        return await self.db.scalar(
             select(SlaPolicy).where(
                 SlaPolicy.community_id == community_id,
                 SlaPolicy.category_id == category_id,
@@ -42,11 +42,11 @@ class SlaRepository(TenantRepository[SlaPolicy]):
         )
 
 
-class TicketRepository(TenantRepository[ServiceTicket]):
+class TicketRepository(AsyncTenantRepository[ServiceTicket]):
     model = ServiceTicket
 
-    def next_sequence(self, community_id: uuid.UUID) -> int:
-        n = self.db.scalar(
+    async def next_sequence(self, community_id: uuid.UUID) -> int:
+        n = await self.db.scalar(
             select(func.count())
             .select_from(ServiceTicket)
             .where(ServiceTicket.community_id == community_id)
@@ -54,8 +54,8 @@ class TicketRepository(TenantRepository[ServiceTicket]):
         return int(n or 0) + 1
 
 
-def active_assignment(db, ticket_id: uuid.UUID) -> TicketAssignment | None:
-    return db.scalar(
+async def active_assignment(db, ticket_id: uuid.UUID) -> TicketAssignment | None:
+    return await db.scalar(
         select(TicketAssignment).where(
             TicketAssignment.ticket_id == ticket_id, TicketAssignment.is_active.is_(True)
         )

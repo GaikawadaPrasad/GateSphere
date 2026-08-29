@@ -12,17 +12,17 @@ from fastapi import APIRouter, Depends, status
 
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
-from app.core.security import require_permission
+from app.core.security import require_permission_async
 from app.modules.complaints import schemas
 from app.modules.complaints.deps import complaint_service
 from app.modules.complaints.service import ComplaintService
 
 router = APIRouter(prefix="/complaints", tags=["Complaint & Service Desk"])
 
-VIEW = Depends(require_permission("complaints:view"))
-CREATE = Depends(require_permission("complaints:create"))
-UPDATE = Depends(require_permission("complaints:update"))
-APPROVE = Depends(require_permission("complaints:approve"))
+VIEW = Depends(require_permission_async("complaints:view"))
+CREATE = Depends(require_permission_async("complaints:create"))
+UPDATE = Depends(require_permission_async("complaints:update"))
+APPROVE = Depends(require_permission_async("complaints:approve"))
 
 Svc = ComplaintService
 
@@ -34,13 +34,13 @@ async def module_health() -> dict:
 
 # --- categories --------------------------------------------------- #
 @router.get("/categories", response_model=Envelope[list[schemas.CategoryRead]], dependencies=[VIEW])
-def list_categories(
+async def list_categories(
     community_id: uuid.UUID | None = None, svc: Svc = Depends(complaint_service)
 ) -> dict:
     return ok(
         [
             schemas.CategoryRead.model_validate(r)
-            for r in svc.list_categories(community_id=community_id)
+            for r in await svc.list_categories(community_id=community_id)
         ]
     )
 
@@ -51,14 +51,14 @@ def list_categories(
     status_code=status.HTTP_201_CREATED,
     dependencies=[APPROVE],
 )
-def create_category(
+async def create_category(
     payload: schemas.CategoryCreate,
     community_id: uuid.UUID | None = None,
     svc: Svc = Depends(complaint_service),
 ) -> dict:
     return ok(
         schemas.CategoryRead.model_validate(
-            svc.create_category(payload, community_id=community_id)
+            await svc.create_category(payload, community_id=community_id)
         ),
         message="Created",
     )
@@ -69,45 +69,49 @@ def create_category(
     response_model=Envelope[schemas.CategoryRead],
     dependencies=[APPROVE],
 )
-def update_category(
+async def update_category(
     category_id: uuid.UUID,
     payload: schemas.CategoryUpdate,
     svc: Svc = Depends(complaint_service),
 ) -> dict:
     return ok(
-        schemas.CategoryRead.model_validate(svc.update_category(category_id, payload)),
+        schemas.CategoryRead.model_validate(await svc.update_category(category_id, payload)),
         message="Updated",
     )
 
 
 # --- SLA policies ----------------------------------------------- #
 @router.get("/sla", response_model=Envelope[list[schemas.SlaRead]], dependencies=[VIEW])
-def list_slas(community_id: uuid.UUID | None = None, svc: Svc = Depends(complaint_service)) -> dict:
-    return ok([schemas.SlaRead.model_validate(r) for r in svc.list_slas(community_id=community_id)])
+async def list_slas(
+    community_id: uuid.UUID | None = None, svc: Svc = Depends(complaint_service)
+) -> dict:
+    return ok(
+        [schemas.SlaRead.model_validate(r) for r in await svc.list_slas(community_id=community_id)]
+    )
 
 
 @router.put("/sla", response_model=Envelope[schemas.SlaRead], dependencies=[APPROVE])
-def upsert_sla(
+async def upsert_sla(
     payload: schemas.SlaCreate,
     community_id: uuid.UUID | None = None,
     svc: Svc = Depends(complaint_service),
 ) -> dict:
     return ok(
-        schemas.SlaRead.model_validate(svc.upsert_sla(payload, community_id=community_id)),
+        schemas.SlaRead.model_validate(await svc.upsert_sla(payload, community_id=community_id)),
         message="Saved",
     )
 
 
 # --- tickets -------------------------------------------------- #
 @router.get("/tickets", response_model=Envelope[list[schemas.TicketRead]], dependencies=[VIEW])
-def list_tickets(
+async def list_tickets(
     community_id: uuid.UUID | None = None,
     unit_id: uuid.UUID | None = None,
     ticket_status: str | None = None,
     params: PageParams = Depends(page_params),
     svc: Svc = Depends(complaint_service),
 ) -> dict:
-    rows, total = svc.list_tickets(
+    rows, total = await svc.list_tickets(
         community_id=community_id,
         unit_id=unit_id,
         ticket_status=ticket_status,
@@ -125,17 +129,20 @@ def list_tickets(
     status_code=status.HTTP_201_CREATED,
     dependencies=[CREATE],
 )
-def create_ticket(payload: schemas.TicketCreate, svc: Svc = Depends(complaint_service)) -> dict:
+async def create_ticket(
+    payload: schemas.TicketCreate, svc: Svc = Depends(complaint_service)
+) -> dict:
     return ok(
-        schemas.TicketRead.model_validate(svc.create_ticket(payload)), message="Ticket created"
+        schemas.TicketRead.model_validate(await svc.create_ticket(payload)),
+        message="Ticket created",
     )
 
 
 @router.get(
     "/tickets/{ticket_id}", response_model=Envelope[schemas.TicketRead], dependencies=[VIEW]
 )
-def get_ticket(ticket_id: uuid.UUID, svc: Svc = Depends(complaint_service)) -> dict:
-    return ok(schemas.TicketRead.model_validate(svc.get_ticket(ticket_id)))
+async def get_ticket(ticket_id: uuid.UUID, svc: Svc = Depends(complaint_service)) -> dict:
+    return ok(schemas.TicketRead.model_validate(await svc.get_ticket(ticket_id)))
 
 
 @router.get(
@@ -143,8 +150,8 @@ def get_ticket(ticket_id: uuid.UUID, svc: Svc = Depends(complaint_service)) -> d
     response_model=Envelope[list[schemas.HistoryRead]],
     dependencies=[VIEW],
 )
-def ticket_history(ticket_id: uuid.UUID, svc: Svc = Depends(complaint_service)) -> dict:
-    return ok([schemas.HistoryRead.model_validate(h) for h in svc.list_history(ticket_id)])
+async def ticket_history(ticket_id: uuid.UUID, svc: Svc = Depends(complaint_service)) -> dict:
+    return ok([schemas.HistoryRead.model_validate(h) for h in await svc.list_history(ticket_id)])
 
 
 @router.get(
@@ -152,8 +159,8 @@ def ticket_history(ticket_id: uuid.UUID, svc: Svc = Depends(complaint_service)) 
     response_model=Envelope[list[schemas.MessageRead]],
     dependencies=[VIEW],
 )
-def ticket_messages(ticket_id: uuid.UUID, svc: Svc = Depends(complaint_service)) -> dict:
-    return ok([schemas.MessageRead.model_validate(m) for m in svc.list_messages(ticket_id)])
+async def ticket_messages(ticket_id: uuid.UUID, svc: Svc = Depends(complaint_service)) -> dict:
+    return ok([schemas.MessageRead.model_validate(m) for m in await svc.list_messages(ticket_id)])
 
 
 @router.post(
@@ -162,13 +169,14 @@ def ticket_messages(ticket_id: uuid.UUID, svc: Svc = Depends(complaint_service))
     status_code=status.HTTP_201_CREATED,
     dependencies=[VIEW],
 )
-def add_message(
+async def add_message(
     ticket_id: uuid.UUID,
     payload: schemas.MessageCreate,
     svc: Svc = Depends(complaint_service),
 ) -> dict:
     return ok(
-        schemas.MessageRead.model_validate(svc.add_message(ticket_id, payload)), message="Sent"
+        schemas.MessageRead.model_validate(await svc.add_message(ticket_id, payload)),
+        message="Sent",
     )
 
 
@@ -177,13 +185,13 @@ def add_message(
     response_model=Envelope[schemas.TicketRead],
     dependencies=[UPDATE],
 )
-def assign_ticket(
+async def assign_ticket(
     ticket_id: uuid.UUID,
     payload: schemas.TicketAssign,
     svc: Svc = Depends(complaint_service),
 ) -> dict:
     return ok(
-        schemas.TicketRead.model_validate(svc.assign_ticket(ticket_id, payload)),
+        schemas.TicketRead.model_validate(await svc.assign_ticket(ticket_id, payload)),
         message="Assigned",
     )
 
@@ -193,13 +201,13 @@ def assign_ticket(
     response_model=Envelope[schemas.TicketRead],
     dependencies=[UPDATE],
 )
-def transition_ticket(
+async def transition_ticket(
     ticket_id: uuid.UUID,
     payload: schemas.TicketTransition,
     svc: Svc = Depends(complaint_service),
 ) -> dict:
     return ok(
-        schemas.TicketRead.model_validate(svc.transition_ticket(ticket_id, payload)),
+        schemas.TicketRead.model_validate(await svc.transition_ticket(ticket_id, payload)),
         message="Updated",
     )
 
@@ -209,13 +217,13 @@ def transition_ticket(
     response_model=Envelope[schemas.TicketRead],
     dependencies=[VIEW],
 )
-def confirm_ticket(
+async def confirm_ticket(
     ticket_id: uuid.UUID,
     payload: schemas.TicketConfirm,
     svc: Svc = Depends(complaint_service),
 ) -> dict:
     return ok(
-        schemas.TicketRead.model_validate(svc.confirm_ticket(ticket_id, payload)),
+        schemas.TicketRead.model_validate(await svc.confirm_ticket(ticket_id, payload)),
         message="Recorded",
     )
 
@@ -226,13 +234,13 @@ def confirm_ticket(
     status_code=status.HTTP_201_CREATED,
     dependencies=[VIEW],
 )
-def add_feedback(
+async def add_feedback(
     ticket_id: uuid.UUID,
     payload: schemas.FeedbackCreate,
     svc: Svc = Depends(complaint_service),
 ) -> dict:
     return ok(
-        schemas.FeedbackRead.model_validate(svc.add_feedback(ticket_id, payload)),
+        schemas.FeedbackRead.model_validate(await svc.add_feedback(ticket_id, payload)),
         message="Thanks",
     )
 
@@ -242,8 +250,10 @@ def add_feedback(
     response_model=Envelope[list[schemas.AttachmentRead]],
     dependencies=[VIEW],
 )
-def list_attachments(ticket_id: uuid.UUID, svc: Svc = Depends(complaint_service)) -> dict:
-    return ok([schemas.AttachmentRead.model_validate(a) for a in svc.list_attachments(ticket_id)])
+async def list_attachments(ticket_id: uuid.UUID, svc: Svc = Depends(complaint_service)) -> dict:
+    return ok(
+        [schemas.AttachmentRead.model_validate(a) for a in await svc.list_attachments(ticket_id)]
+    )
 
 
 @router.post(
@@ -252,12 +262,12 @@ def list_attachments(ticket_id: uuid.UUID, svc: Svc = Depends(complaint_service)
     status_code=status.HTTP_201_CREATED,
     dependencies=[VIEW],
 )
-def add_attachment(
+async def add_attachment(
     ticket_id: uuid.UUID,
     payload: schemas.AttachmentIn,
     svc: Svc = Depends(complaint_service),
 ) -> dict:
     return ok(
-        schemas.AttachmentRead.model_validate(svc.add_attachment(ticket_id, payload)),
+        schemas.AttachmentRead.model_validate(await svc.add_attachment(ticket_id, payload)),
         message="Attached",
     )

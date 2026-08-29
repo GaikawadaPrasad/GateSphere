@@ -12,17 +12,17 @@ from fastapi import APIRouter, Depends, Response, status
 
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
-from app.core.security import require_permission
+from app.core.security import require_permission_async
 from app.modules.visitors import schemas
 from app.modules.visitors.deps import visitor_service
 from app.modules.visitors.service import VisitorService
 
 router = APIRouter(prefix="/visitors", tags=["Visitor Management"])
 
-VIEW = Depends(require_permission("visitors:view"))
-CREATE = Depends(require_permission("visitors:create"))
-APPROVE = Depends(require_permission("visitors:approve"))
-UPDATE = Depends(require_permission("visitors:update"))
+VIEW = Depends(require_permission_async("visitors:view"))
+CREATE = Depends(require_permission_async("visitors:create"))
+APPROVE = Depends(require_permission_async("visitors:approve"))
+UPDATE = Depends(require_permission_async("visitors:update"))
 
 
 @router.get("/health", summary="Visitor Management module liveness")
@@ -32,32 +32,34 @@ async def module_health() -> dict:
 
 # --- policy ------------------------------------------------------------- #
 @router.get("/policy", response_model=Envelope[schemas.PolicyRead], dependencies=[VIEW])
-def get_policy(
+async def get_policy(
     community_id: uuid.UUID | None = None, svc: VisitorService = Depends(visitor_service)
 ) -> dict:
-    return ok(schemas.PolicyRead.model_validate(svc.get_policy(community_id=community_id)))
+    return ok(schemas.PolicyRead.model_validate(await svc.get_policy(community_id=community_id)))
 
 
 @router.patch("/policy", response_model=Envelope[schemas.PolicyRead], dependencies=[UPDATE])
-def update_policy(
+async def update_policy(
     payload: schemas.PolicyUpdate,
     community_id: uuid.UUID | None = None,
     svc: VisitorService = Depends(visitor_service),
 ) -> dict:
     return ok(
-        schemas.PolicyRead.model_validate(svc.update_policy(payload, community_id=community_id)),
+        schemas.PolicyRead.model_validate(
+            await svc.update_policy(payload, community_id=community_id)
+        ),
         message="Updated",
     )
 
 
 # --- blacklist -------------------------------------------------------- #
 @router.get("/blacklist", response_model=Envelope[list[schemas.BlacklistRead]], dependencies=[VIEW])
-def list_blacklist(
+async def list_blacklist(
     community_id: uuid.UUID | None = None,
     params: PageParams = Depends(page_params),
     svc: VisitorService = Depends(visitor_service),
 ) -> dict:
-    rows, total = svc.list_blacklist(
+    rows, total = await svc.list_blacklist(
         community_id=community_id, offset=params.offset, limit=params.page_size
     )
     return paginated(
@@ -71,26 +73,28 @@ def list_blacklist(
     status_code=status.HTTP_201_CREATED,
     dependencies=[UPDATE],
 )
-def add_blacklist(
+async def add_blacklist(
     payload: schemas.BlacklistCreate,
     community_id: uuid.UUID | None = None,
     svc: VisitorService = Depends(visitor_service),
 ) -> dict:
     return ok(
-        schemas.BlacklistRead.model_validate(svc.add_blacklist(payload, community_id=community_id)),
+        schemas.BlacklistRead.model_validate(
+            await svc.add_blacklist(payload, community_id=community_id)
+        ),
         message="Blacklisted",
     )
 
 
 # --- entries -------------------------------------------------------- #
 @router.get("/entries", response_model=Envelope[list[schemas.EntryRead]], dependencies=[VIEW])
-def list_entries(
+async def list_entries(
     community_id: uuid.UUID | None = None,
     entry_status: str | None = None,
     params: PageParams = Depends(page_params),
     svc: VisitorService = Depends(visitor_service),
 ) -> dict:
-    rows, total = svc.list_entries(
+    rows, total = await svc.list_entries(
         community_id=community_id, status=entry_status, offset=params.offset, limit=params.page_size
     )
     return paginated(
@@ -104,29 +108,33 @@ def list_entries(
     status_code=status.HTTP_201_CREATED,
     dependencies=[CREATE],
 )
-def record_entry(
+async def record_entry(
     payload: schemas.EntryCreate, svc: VisitorService = Depends(visitor_service)
 ) -> dict:
-    return ok(schemas.EntryRead.model_validate(svc.record_entry(payload)), message="Entry recorded")
+    return ok(
+        schemas.EntryRead.model_validate(await svc.record_entry(payload)), message="Entry recorded"
+    )
 
 
 @router.patch(
     "/entries/{entry_id}/exit", response_model=Envelope[schemas.EntryRead], dependencies=[UPDATE]
 )
-def record_exit(entry_id: uuid.UUID, svc: VisitorService = Depends(visitor_service)) -> dict:
-    return ok(schemas.EntryRead.model_validate(svc.record_exit(entry_id)), message="Exit recorded")
+async def record_exit(entry_id: uuid.UUID, svc: VisitorService = Depends(visitor_service)) -> dict:
+    return ok(
+        schemas.EntryRead.model_validate(await svc.record_exit(entry_id)), message="Exit recorded"
+    )
 
 
 # --- requests ------------------------------------------------------ #
 @router.get("/requests", response_model=Envelope[list[schemas.RequestRead]], dependencies=[VIEW])
-def list_requests(
+async def list_requests(
     community_id: uuid.UUID | None = None,
     request_status: str | None = None,
     unit_id: uuid.UUID | None = None,
     params: PageParams = Depends(page_params),
     svc: VisitorService = Depends(visitor_service),
 ) -> dict:
-    rows, total = svc.list_requests(
+    rows, total = await svc.list_requests(
         community_id=community_id,
         status=request_status,
         unit_id=unit_id,
@@ -144,19 +152,22 @@ def list_requests(
     status_code=status.HTTP_201_CREATED,
     dependencies=[CREATE],
 )
-def create_request(
+async def create_request(
     payload: schemas.RequestCreate, svc: VisitorService = Depends(visitor_service)
 ) -> dict:
     return ok(
-        schemas.RequestRead.model_validate(svc.create_request(payload)), message="Request created"
+        schemas.RequestRead.model_validate(await svc.create_request(payload)),
+        message="Request created",
     )
 
 
 @router.get(
     "/requests/{request_id}", response_model=Envelope[schemas.RequestRead], dependencies=[VIEW]
 )
-def get_request(request_id: uuid.UUID, svc: VisitorService = Depends(visitor_service)) -> dict:
-    return ok(schemas.RequestRead.model_validate(svc.get_request(request_id)))
+async def get_request(
+    request_id: uuid.UUID, svc: VisitorService = Depends(visitor_service)
+) -> dict:
+    return ok(schemas.RequestRead.model_validate(await svc.get_request(request_id)))
 
 
 @router.post(
@@ -164,13 +175,13 @@ def get_request(request_id: uuid.UUID, svc: VisitorService = Depends(visitor_ser
     response_model=Envelope[schemas.RequestRead],
     dependencies=[APPROVE],
 )
-def decide_request(
+async def decide_request(
     request_id: uuid.UUID,
     payload: schemas.RequestDecision,
     svc: VisitorService = Depends(visitor_service),
 ) -> dict:
     return ok(
-        schemas.RequestRead.model_validate(svc.decide_request(request_id, payload)),
+        schemas.RequestRead.model_validate(await svc.decide_request(request_id, payload)),
         message="Decision recorded",
     )
 
@@ -180,9 +191,12 @@ def decide_request(
     response_model=Envelope[schemas.RequestRead],
     dependencies=[UPDATE],
 )
-def cancel_request(request_id: uuid.UUID, svc: VisitorService = Depends(visitor_service)) -> dict:
+async def cancel_request(
+    request_id: uuid.UUID, svc: VisitorService = Depends(visitor_service)
+) -> dict:
     return ok(
-        schemas.RequestRead.model_validate(svc.cancel_request(request_id)), message="Cancelled"
+        schemas.RequestRead.model_validate(await svc.cancel_request(request_id)),
+        message="Cancelled",
     )
 
 
@@ -192,12 +206,12 @@ def cancel_request(request_id: uuid.UUID, svc: VisitorService = Depends(visitor_
     status_code=status.HTTP_201_CREATED,
     dependencies=[CREATE],
 )
-def create_pass(
+async def create_pass(
     request_id: uuid.UUID,
     payload: schemas.PassCreate,
     svc: VisitorService = Depends(visitor_service),
 ) -> dict:
-    obj, token, pin = svc.create_pass(request_id, payload)
+    obj, token, pin = await svc.create_pass(request_id, payload)
     read = schemas.PassRead.model_validate(obj)
     read.token = token
     read.pin = pin
@@ -209,11 +223,14 @@ def create_pass(
     response_model=Envelope[list[schemas.GroupMemberRead]],
     dependencies=[VIEW],
 )
-def list_group_members(
+async def list_group_members(
     request_id: uuid.UUID, svc: VisitorService = Depends(visitor_service)
 ) -> dict:
     return ok(
-        [schemas.GroupMemberRead.model_validate(m) for m in svc.list_group_members(request_id)]
+        [
+            schemas.GroupMemberRead.model_validate(m)
+            for m in await svc.list_group_members(request_id)
+        ]
     )
 
 
@@ -223,13 +240,13 @@ def list_group_members(
     status_code=status.HTTP_201_CREATED,
     dependencies=[CREATE],
 )
-def add_group_member(
+async def add_group_member(
     request_id: uuid.UUID,
     payload: schemas.GroupMemberCreate,
     svc: VisitorService = Depends(visitor_service),
 ) -> dict:
     return ok(
-        schemas.GroupMemberRead.model_validate(svc.add_group_member(request_id, payload)),
+        schemas.GroupMemberRead.model_validate(await svc.add_group_member(request_id, payload)),
         message="Visitor added to the group",
     )
 
@@ -240,20 +257,22 @@ def add_group_member(
     response_class=Response,
     dependencies=[UPDATE],
 )
-def revoke_pass(pass_id: uuid.UUID, svc: VisitorService = Depends(visitor_service)) -> Response:
-    svc.revoke_pass(pass_id)
+async def revoke_pass(
+    pass_id: uuid.UUID, svc: VisitorService = Depends(visitor_service)
+) -> Response:
+    await svc.revoke_pass(pass_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # --- visitors (directory) ---------------------------------------- #
 @router.get("", response_model=Envelope[list[schemas.VisitorRead]], dependencies=[VIEW])
-def list_visitors(
+async def list_visitors(
     community_id: uuid.UUID | None = None,
     q: str | None = None,
     params: PageParams = Depends(page_params),
     svc: VisitorService = Depends(visitor_service),
 ) -> dict:
-    rows, total = svc.list_visitors(
+    rows, total = await svc.list_visitors(
         community_id=community_id, q=q, offset=params.offset, limit=params.page_size
     )
     return paginated(

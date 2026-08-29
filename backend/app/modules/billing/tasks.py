@@ -1,4 +1,4 @@
-"""Celery tasks for Maintenance & Billing (FR-09).
+"""Celery tasks for Maintenance & Billing (FR-09). Async job bodies (ADR-010).
 
 - `sweep_overdue_invoices` — posted/partially-paid invoices past their due date
   move to `overdue` and the resident is notified.
@@ -14,8 +14,8 @@ import structlog
 from sqlalchemy import select
 
 from app.core.celery_app import celery
-from app.core.jobs import job_session, system_actor, system_scope
-from app.modules.audit.service import record_audit
+from app.core.jobs import job_session, run, system_actor, system_scope
+from app.modules.audit.service import record_audit_async
 from app.modules.billing.models import MaintenanceInvoice
 from app.modules.notifications import events as notif_events
 
@@ -24,25 +24,26 @@ log = structlog.get_logger(__name__)
 _WITH_BALANCE = ("posted", "partially_paid", "overdue")
 
 
-@celery.task(name="app.modules.billing.tasks.sweep_overdue_invoices")
-def sweep_overdue_invoices() -> dict:
+async def _sweep_overdue_invoices() -> dict:
     today = date.today()
     moved = 0
-    with job_session() as db:
-        actor = system_actor(db)
+    async with job_session() as db:
+        actor = await system_actor(db)
         scope = system_scope(actor)
-        rows = db.scalars(
-            select(MaintenanceInvoice).where(
-                MaintenanceInvoice.status.in_(("posted", "partially_paid")),
-                MaintenanceInvoice.due_date.is_not(None),
-                MaintenanceInvoice.due_date < today,
-                MaintenanceInvoice.balance_due > 0,
+        rows = (
+            await db.scalars(
+                select(MaintenanceInvoice).where(
+                    MaintenanceInvoice.status.in_(("posted", "partially_paid")),
+                    MaintenanceInvoice.due_date.is_not(None),
+                    MaintenanceInvoice.due_date < today,
+                    MaintenanceInvoice.balance_due > 0,
+                )
             )
         ).all()
         for inv in rows:
             inv.status = "overdue"
-            db.flush()
-            record_audit(
+            await db.flush()
+            await record_audit_async(
                 db,
                 module="billing",
                 action="invoice.overdue",
@@ -53,7 +54,7 @@ def sweep_overdue_invoices() -> dict:
                 new={"status": "overdue", "balance_due": inv.balance_due},
             )
             if inv.billed_to_user_id:
-                notif_events.emit(
+                await notif_events.emit(
                     db,
                     scope,
                     actor,
@@ -75,22 +76,23 @@ def sweep_overdue_invoices() -> dict:
     return {"invoices_marked": moved}
 
 
-@celery.task(name="app.modules.billing.tasks.send_dues_reminders")
-def send_dues_reminders() -> dict:
+async def _send_dues_reminders() -> dict:
     now = datetime.now(UTC)
     sent = 0
-    with job_session() as db:
-        actor = system_actor(db)
+    async with job_session() as db:
+        actor = await system_actor(db)
         scope = system_scope(actor)
-        rows = db.scalars(
-            select(MaintenanceInvoice).where(
-                MaintenanceInvoice.status.in_(_WITH_BALANCE),
-                MaintenanceInvoice.balance_due > 0,
-                MaintenanceInvoice.billed_to_user_id.is_not(None),
+        rows = (
+            await db.scalars(
+                select(MaintenanceInvoice).where(
+                    MaintenanceInvoice.status.in_(_WITH_BALANCE),
+                    MaintenanceInvoice.balance_due > 0,
+                    MaintenanceInvoice.billed_to_user_id.is_not(None),
+                )
             )
         ).all()
         for inv in rows:
-            notif_events.emit(
+            await notif_events.emit(
                 db,
                 scope,
                 actor,
@@ -110,3 +112,13 @@ def send_dues_reminders() -> dict:
             sent += 1
     log.info("billing.dues_reminders", reminders_sent=sent, at=now.isoformat())
     return {"reminders_sent": sent}
+
+
+@celery.task(name="app.modules.billing.tasks.sweep_overdue_invoices")
+def sweep_overdue_invoices() -> dict:
+    return run(_sweep_overdue_invoices())
+
+
+@celery.task(name="app.modules.billing.tasks.send_dues_reminders")
+def send_dues_reminders() -> dict:
+    return run(_send_dues_reminders())

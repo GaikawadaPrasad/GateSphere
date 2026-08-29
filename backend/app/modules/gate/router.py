@@ -13,16 +13,16 @@ from fastapi import APIRouter, Depends, status
 
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
-from app.core.security import require_permission
+from app.core.security import require_permission_async
 from app.modules.gate import schemas
 from app.modules.gate.deps import gate_service
 from app.modules.gate.service import GateService
 
 router = APIRouter(prefix="/gate", tags=["Gate Operations"])
 
-VIEW = Depends(require_permission("gate:view"))
-CREATE = Depends(require_permission("gate:create"))
-UPDATE = Depends(require_permission("gate:update"))
+VIEW = Depends(require_permission_async("gate:view"))
+CREATE = Depends(require_permission_async("gate:create"))
+UPDATE = Depends(require_permission_async("gate:update"))
 
 
 @router.get("/health", summary="Gate Operations module liveness")
@@ -32,14 +32,14 @@ async def module_health() -> dict:
 
 # --- gate events -------------------------------------------------------- #
 @router.get("/events", response_model=Envelope[list[schemas.EventRead]], dependencies=[VIEW])
-def list_events(
+async def list_events(
     community_id: uuid.UUID | None = None,
     gate_id: uuid.UUID | None = None,
     event_type: str | None = None,
     params: PageParams = Depends(page_params),
     svc: GateService = Depends(gate_service),
 ) -> dict:
-    rows, total = svc.list_events(
+    rows, total = await svc.list_events(
         community_id=community_id,
         gate_id=gate_id,
         event_type=event_type,
@@ -57,20 +57,22 @@ def list_events(
     status_code=status.HTTP_201_CREATED,
     dependencies=[CREATE],
 )
-def log_event(payload: schemas.EventCreate, svc: GateService = Depends(gate_service)) -> dict:
-    return ok(schemas.EventRead.model_validate(svc.log_event(payload)), message="Event logged")
+async def log_event(payload: schemas.EventCreate, svc: GateService = Depends(gate_service)) -> dict:
+    return ok(
+        schemas.EventRead.model_validate(await svc.log_event(payload)), message="Event logged"
+    )
 
 
 # --- guard rosters --------------------------------------------------- #
 @router.get("/rosters", response_model=Envelope[list[schemas.RosterRead]], dependencies=[VIEW])
-def list_rosters(
+async def list_rosters(
     community_id: uuid.UUID | None = None,
     guard_user_id: uuid.UUID | None = None,
     roster_status: str | None = None,
     params: PageParams = Depends(page_params),
     svc: GateService = Depends(gate_service),
 ) -> dict:
-    rows, total = svc.list_rosters(
+    rows, total = await svc.list_rosters(
         community_id=community_id,
         guard_user_id=guard_user_id,
         roster_status=roster_status,
@@ -88,13 +90,15 @@ def list_rosters(
     status_code=status.HTTP_201_CREATED,
     dependencies=[CREATE],
 )
-def create_roster(
+async def create_roster(
     payload: schemas.RosterCreate,
     community_id: uuid.UUID | None = None,
     svc: GateService = Depends(gate_service),
 ) -> dict:
     return ok(
-        schemas.RosterRead.model_validate(svc.create_roster(payload, community_id=community_id)),
+        schemas.RosterRead.model_validate(
+            await svc.create_roster(payload, community_id=community_id)
+        ),
         message="Roster created",
     )
 
@@ -102,13 +106,14 @@ def create_roster(
 @router.patch(
     "/rosters/{roster_id}", response_model=Envelope[schemas.RosterRead], dependencies=[UPDATE]
 )
-def update_roster(
+async def update_roster(
     roster_id: uuid.UUID,
     payload: schemas.RosterUpdate,
     svc: GateService = Depends(gate_service),
 ) -> dict:
     return ok(
-        schemas.RosterRead.model_validate(svc.update_roster(roster_id, payload)), message="Updated"
+        schemas.RosterRead.model_validate(await svc.update_roster(roster_id, payload)),
+        message="Updated",
     )
 
 
@@ -117,14 +122,14 @@ def update_roster(
     response_model=Envelope[schemas.RosterRead],
     dependencies=[UPDATE],
 )
-def transition_roster(
+async def transition_roster(
     roster_id: uuid.UUID,
     payload: schemas.RosterTransition,
     svc: GateService = Depends(gate_service),
 ) -> dict:
     return ok(
         schemas.RosterRead.model_validate(
-            svc.transition_roster(roster_id, payload.status, payload.reason)
+            await svc.transition_roster(roster_id, payload.status, payload.reason)
         ),
         message="Updated",
     )
@@ -134,14 +139,14 @@ def transition_roster(
 @router.get(
     "/assignments", response_model=Envelope[list[schemas.AssignmentRead]], dependencies=[VIEW]
 )
-def list_assignments(
+async def list_assignments(
     community_id: uuid.UUID | None = None,
     gate_id: uuid.UUID | None = None,
     active_only: bool = False,
     params: PageParams = Depends(page_params),
     svc: GateService = Depends(gate_service),
 ) -> dict:
-    rows, total = svc.list_assignments(
+    rows, total = await svc.list_assignments(
         community_id=community_id,
         gate_id=gate_id,
         active_only=active_only,
@@ -159,14 +164,14 @@ def list_assignments(
     status_code=status.HTTP_201_CREATED,
     dependencies=[CREATE],
 )
-def create_assignment(
+async def create_assignment(
     payload: schemas.AssignmentCreate,
     community_id: uuid.UUID | None = None,
     svc: GateService = Depends(gate_service),
 ) -> dict:
     return ok(
         schemas.AssignmentRead.model_validate(
-            svc.create_assignment(payload, community_id=community_id)
+            await svc.create_assignment(payload, community_id=community_id)
         ),
         message="Assigned",
     )
@@ -177,21 +182,24 @@ def create_assignment(
     response_model=Envelope[schemas.AssignmentRead],
     dependencies=[UPDATE],
 )
-def end_assignment(assignment_id: uuid.UUID, svc: GateService = Depends(gate_service)) -> dict:
+async def end_assignment(
+    assignment_id: uuid.UUID, svc: GateService = Depends(gate_service)
+) -> dict:
     return ok(
-        schemas.AssignmentRead.model_validate(svc.end_assignment(assignment_id)), message="Ended"
+        schemas.AssignmentRead.model_validate(await svc.end_assignment(assignment_id)),
+        message="Ended",
     )
 
 
 # --- panic alerts ----------------------------------------------- #
 @router.get("/alerts", response_model=Envelope[list[schemas.AlertRead]], dependencies=[VIEW])
-def list_alerts(
+async def list_alerts(
     community_id: uuid.UUID | None = None,
     alert_status: str | None = None,
     params: PageParams = Depends(page_params),
     svc: GateService = Depends(gate_service),
 ) -> dict:
-    rows, total = svc.list_alerts(
+    rows, total = await svc.list_alerts(
         community_id=community_id,
         alert_status=alert_status,
         offset=params.offset,
@@ -207,8 +215,12 @@ def list_alerts(
     response_model=Envelope[schemas.AlertRead],
     status_code=status.HTTP_201_CREATED,
 )
-def raise_alert(payload: schemas.AlertCreate, svc: GateService = Depends(gate_service)) -> dict:
-    return ok(schemas.AlertRead.model_validate(svc.raise_alert(payload)), message="Alert raised")
+async def raise_alert(
+    payload: schemas.AlertCreate, svc: GateService = Depends(gate_service)
+) -> dict:
+    return ok(
+        schemas.AlertRead.model_validate(await svc.raise_alert(payload)), message="Alert raised"
+    )
 
 
 @router.post(
@@ -216,25 +228,29 @@ def raise_alert(payload: schemas.AlertCreate, svc: GateService = Depends(gate_se
     response_model=Envelope[schemas.AlertRead],
     dependencies=[UPDATE],
 )
-def acknowledge_alert(alert_id: uuid.UUID, svc: GateService = Depends(gate_service)) -> dict:
+async def acknowledge_alert(alert_id: uuid.UUID, svc: GateService = Depends(gate_service)) -> dict:
     return ok(
-        schemas.AlertRead.model_validate(svc.acknowledge_alert(alert_id)), message="Acknowledged"
+        schemas.AlertRead.model_validate(await svc.acknowledge_alert(alert_id)),
+        message="Acknowledged",
     )
 
 
 @router.post(
     "/alerts/{alert_id}/resolve", response_model=Envelope[schemas.AlertRead], dependencies=[UPDATE]
 )
-def resolve_alert(
+async def resolve_alert(
     alert_id: uuid.UUID,
     payload: schemas.AlertResolve,
     svc: GateService = Depends(gate_service),
 ) -> dict:
     return ok(
-        schemas.AlertRead.model_validate(svc.resolve_alert(alert_id, payload)), message="Resolved"
+        schemas.AlertRead.model_validate(await svc.resolve_alert(alert_id, payload)),
+        message="Resolved",
     )
 
 
 @router.post("/alerts/{alert_id}/cancel", response_model=Envelope[schemas.AlertRead])
-def cancel_alert(alert_id: uuid.UUID, svc: GateService = Depends(gate_service)) -> dict:
-    return ok(schemas.AlertRead.model_validate(svc.cancel_alert(alert_id)), message="Cancelled")
+async def cancel_alert(alert_id: uuid.UUID, svc: GateService = Depends(gate_service)) -> dict:
+    return ok(
+        schemas.AlertRead.model_validate(await svc.cancel_alert(alert_id)), message="Cancelled"
+    )

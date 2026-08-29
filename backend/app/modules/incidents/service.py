@@ -12,12 +12,12 @@ from datetime import UTC, datetime
 
 from fastapi import Request
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import BusinessRuleError, ConflictError, NotFoundError
 from app.core.state_machine import ensure_transition
 from app.core.tenancy import TenantScope
-from app.modules.audit.service import record_audit
+from app.modules.audit.service import record_audit_async
 from app.modules.communities.models import Gate, Tower, Unit
 from app.modules.gate.models import PanicAlert
 from app.modules.incidents import schemas
@@ -34,7 +34,7 @@ from app.modules.incidents.repository import (
 )
 from app.modules.incidents.schemas import ALLOWED
 from app.modules.notifications import events as notif_events
-from app.modules.uploads.guard import ensure_confirmed
+from app.modules.uploads.guard import ensure_confirmed_async
 from app.modules.users.models import User
 
 _TRANSITIONS: dict[str, set[str]] = {
@@ -59,7 +59,7 @@ def _enum(field: str, value: str | None) -> None:
 
 class IncidentService:
     def __init__(
-        self, db: Session, scope: TenantScope, actor: User, request: Request | None = None
+        self, db: AsyncSession, scope: TenantScope, actor: User, request: Request | None = None
     ):
         self.db = db
         self.scope = scope
@@ -67,8 +67,8 @@ class IncidentService:
         self.request = request
         self.incidents = IncidentRepository(db, scope)
 
-    def _audit(self, action, community_id, entity_type, entity_id, **kw):
-        record_audit(
+    async def _audit(self, action, community_id, entity_type, entity_id, **kw):
+        await record_audit_async(
             self.db,
             module="incidents",
             action=action,
@@ -89,14 +89,14 @@ class IncidentService:
             "Specify a community", code="COMMUNITY_REQUIRED", fields={"community_id": "required"}
         )
 
-    def _belongs(self, model, obj_id: uuid.UUID | None, community_id: uuid.UUID, label: str):
+    async def _belongs(self, model, obj_id: uuid.UUID | None, community_id: uuid.UUID, label: str):
         if obj_id is None:
             return
-        obj = self.db.get(model, obj_id)
+        obj = await self.db.get(model, obj_id)
         if obj is None or getattr(obj, "community_id", None) != community_id:
             raise NotFoundError(f"{label} not found")
 
-    def _history(self, incident: SecurityIncident, old, new, reason=None) -> None:
+    async def _history(self, incident: SecurityIncident, old, new, reason=None) -> None:
         self.db.add(
             IncidentStatusHistory(
                 community_id=incident.community_id,
@@ -109,19 +109,19 @@ class IncidentService:
         )
 
     # -- incidents --------------------------------------- #
-    def create_incident(self, payload: schemas.IncidentCreate) -> SecurityIncident:
+    async def create_incident(self, payload: schemas.IncidentCreate) -> SecurityIncident:
         cid = self._one_community(payload.community_id)
         _enum("incident_type", payload.incident_type)
         _enum("severity", payload.severity)
-        self._belongs(Tower, payload.tower_id, cid, "Tower")
-        self._belongs(Unit, payload.unit_id, cid, "Unit")
-        self._belongs(Gate, payload.gate_id, cid, "Gate")
+        await self._belongs(Tower, payload.tower_id, cid, "Tower")
+        await self._belongs(Unit, payload.unit_id, cid, "Unit")
+        await self._belongs(Gate, payload.gate_id, cid, "Gate")
         if payload.panic_alert_id is not None:
-            alert = self.db.get(PanicAlert, payload.panic_alert_id)
+            alert = await self.db.get(PanicAlert, payload.panic_alert_id)
             if alert is None or alert.community_id != cid:
                 raise NotFoundError("Panic alert not found")
         now = datetime.now(UTC)
-        seq = self.incidents.next_sequence(cid)
+        seq = await self.incidents.next_sequence(cid)
         inc = SecurityIncident(
             community_id=cid,
             incident_number=f"INC-{now.year}-{seq:05d}",
@@ -136,9 +136,9 @@ class IncidentService:
             reporter_user_id=self.actor.id,
             description=payload.description,
         )
-        self.incidents.add(inc)
-        self._history(inc, None, "reported")
-        self._audit(
+        await self.incidents.add(inc)
+        await self._history(inc, None, "reported")
+        await self._audit(
             "incident.create",
             cid,
             "security_incident",
@@ -147,13 +147,13 @@ class IncidentService:
         )
         return inc
 
-    def get_incident(self, incident_id: uuid.UUID) -> SecurityIncident:
-        obj = self.incidents.get(incident_id)
+    async def get_incident(self, incident_id: uuid.UUID) -> SecurityIncident:
+        obj = await self.incidents.get(incident_id)
         if obj is None:
             raise NotFoundError("Incident not found")
         return obj
 
-    def list_incidents(
+    async def list_incidents(
         self,
         *,
         community_id: uuid.UUID | None,
@@ -173,28 +173,30 @@ class IncidentService:
         if severity:
             stmt = stmt.where(SecurityIncident.severity == severity)
         stmt = stmt.order_by(SecurityIncident.reported_at.desc())
-        return self.incidents.list(offset=offset, limit=limit, extra=stmt), self.incidents.count(
-            extra=stmt
-        )
+        return await self.incidents.list(
+            offset=offset, limit=limit, extra=stmt
+        ), await self.incidents.count(extra=stmt)
 
-    def update_incident(
+    async def update_incident(
         self, incident_id: uuid.UUID, payload: schemas.IncidentUpdate
     ) -> SecurityIncident:
-        inc = self.get_incident(incident_id)
+        inc = await self.get_incident(incident_id)
         if inc.status in ("closed", "false_alarm"):
             raise BusinessRuleError(f"Incident is '{inc.status}'", code="INVALID_TRANSITION")
         patch = payload.model_dump(exclude_unset=True)
         _enum("severity", patch.get("severity"))
         for k, v in patch.items():
             setattr(inc, k, v)
-        self.db.flush()
-        self._audit("incident.update", inc.community_id, "security_incident", inc.id, new=patch)
+        await self.db.flush()
+        await self._audit(
+            "incident.update", inc.community_id, "security_incident", inc.id, new=patch
+        )
         return inc
 
-    def transition_incident(
+    async def transition_incident(
         self, incident_id: uuid.UUID, payload: schemas.IncidentTransition
     ) -> SecurityIncident:
-        inc = self.get_incident(incident_id)
+        inc = await self.get_incident(incident_id)
         _enum("status", payload.status)
         target = payload.status
         ensure_transition(inc.status, target, _TRANSITIONS, entity="incident")
@@ -207,10 +209,10 @@ class IncidentService:
             inc.resolved_at = datetime.now(UTC)
         old = inc.status
         inc.status = target
-        self._history(inc, old, target, payload.reason)
-        self.db.flush()
-        self._audit(f"incident.{target}", inc.community_id, "security_incident", inc.id)
-        notif_events.emit(
+        await self._history(inc, old, target, payload.reason)
+        await self.db.flush()
+        await self._audit(f"incident.{target}", inc.community_id, "security_incident", inc.id)
+        await notif_events.emit(
             self.db,
             self.scope,
             self.actor,
@@ -226,13 +228,13 @@ class IncidentService:
         return inc
 
     # -- assignments ------------------------------------ #
-    def assign(self, incident_id: uuid.UUID, payload: schemas.AssignIn) -> IncidentAssignment:
-        inc = self.get_incident(incident_id)
+    async def assign(self, incident_id: uuid.UUID, payload: schemas.AssignIn) -> IncidentAssignment:
+        inc = await self.get_incident(incident_id)
         if inc.status in ("closed", "false_alarm"):
             raise BusinessRuleError(f"Incident is '{inc.status}'", code="INVALID_TRANSITION")
-        if self.db.get(User, payload.assigned_user_id) is None:
+        if await self.db.get(User, payload.assigned_user_id) is None:
             raise NotFoundError("Responder not found")
-        if assignment_for(self.db, inc.id, payload.assigned_user_id) is not None:
+        if await assignment_for(self.db, inc.id, payload.assigned_user_id) is not None:
             raise ConflictError("Already assigned", code="ALREADY_ASSIGNED")
         obj = IncidentAssignment(
             incident_id=inc.id,
@@ -240,37 +242,39 @@ class IncidentService:
             assigned_by_user_id=self.actor.id,
         )
         self.db.add(obj)
-        self.db.flush()
-        self._audit("incident.assign", inc.community_id, "incident_assignment", obj.id)
+        await self.db.flush()
+        await self._audit("incident.assign", inc.community_id, "incident_assignment", obj.id)
         return obj
 
-    def release(self, assignment_id: uuid.UUID) -> IncidentAssignment:
-        obj = self.db.get(IncidentAssignment, assignment_id)
+    async def release(self, assignment_id: uuid.UUID) -> IncidentAssignment:
+        obj = await self.db.get(IncidentAssignment, assignment_id)
         if obj is None:
             raise NotFoundError("Assignment not found")
-        self.get_incident(obj.incident_id)  # scope check
+        await self.get_incident(obj.incident_id)  # scope check
         if not obj.is_active:
             raise BusinessRuleError("Already released", code="ALREADY_RELEASED")
         obj.is_active = False
         obj.released_at = datetime.now(UTC)
-        self.db.flush()
-        inc = self.db.get(SecurityIncident, obj.incident_id)
-        self._audit("incident.release", inc.community_id, "incident_assignment", obj.id)
+        await self.db.flush()
+        inc = await self.db.get(SecurityIncident, obj.incident_id)
+        await self._audit("incident.release", inc.community_id, "incident_assignment", obj.id)
         return obj
 
-    def list_assignments(self, incident_id: uuid.UUID) -> list[IncidentAssignment]:
-        self.get_incident(incident_id)
+    async def list_assignments(self, incident_id: uuid.UUID) -> list[IncidentAssignment]:
+        await self.get_incident(incident_id)
         return list(
-            self.db.scalars(
-                select(IncidentAssignment)
-                .where(IncidentAssignment.incident_id == incident_id)
-                .order_by(IncidentAssignment.assigned_at)
+            (
+                await self.db.scalars(
+                    select(IncidentAssignment)
+                    .where(IncidentAssignment.incident_id == incident_id)
+                    .order_by(IncidentAssignment.assigned_at)
+                )
             ).all()
         )
 
     # -- actions --------------------------------------- #
-    def add_action(self, incident_id: uuid.UUID, payload: schemas.ActionIn) -> IncidentAction:
-        inc = self.get_incident(incident_id)
+    async def add_action(self, incident_id: uuid.UUID, payload: schemas.ActionIn) -> IncidentAction:
+        inc = await self.get_incident(incident_id)
         _enum("action_type", payload.action_type)
         obj = IncidentAction(
             incident_id=inc.id,
@@ -279,23 +283,25 @@ class IncidentService:
             details=payload.details,
         )
         self.db.add(obj)
-        self.db.flush()
-        self._audit("incident.action", inc.community_id, "incident_action", obj.id)
+        await self.db.flush()
+        await self._audit("incident.action", inc.community_id, "incident_action", obj.id)
         return obj
 
-    def list_actions(self, incident_id: uuid.UUID) -> list[IncidentAction]:
-        self.get_incident(incident_id)
+    async def list_actions(self, incident_id: uuid.UUID) -> list[IncidentAction]:
+        await self.get_incident(incident_id)
         return list(
-            self.db.scalars(
-                select(IncidentAction)
-                .where(IncidentAction.incident_id == incident_id)
-                .order_by(IncidentAction.action_at)
+            (
+                await self.db.scalars(
+                    select(IncidentAction)
+                    .where(IncidentAction.incident_id == incident_id)
+                    .order_by(IncidentAction.action_at)
+                )
             ).all()
         )
 
-    def add_attachment(self, incident_id: uuid.UUID, payload) -> IncidentAttachment:
-        inc = self.get_incident(incident_id)
-        ensure_confirmed(self.db, payload.file_url)
+    async def add_attachment(self, incident_id: uuid.UUID, payload) -> IncidentAttachment:
+        inc = await self.get_incident(incident_id)
+        await ensure_confirmed_async(self.db, payload.file_url)
         obj = IncidentAttachment(
             incident_id=inc.id,
             uploaded_by_user_id=self.actor.id,
@@ -305,26 +311,30 @@ class IncidentService:
             file_size_bytes=payload.file_size_bytes,
         )
         self.db.add(obj)
-        self.db.flush()
-        self._audit("incident.attachment", inc.community_id, "incident_attachment", obj.id)
+        await self.db.flush()
+        await self._audit("incident.attachment", inc.community_id, "incident_attachment", obj.id)
         return obj
 
-    def list_attachments(self, incident_id: uuid.UUID) -> list[IncidentAttachment]:
-        self.get_incident(incident_id)
+    async def list_attachments(self, incident_id: uuid.UUID) -> list[IncidentAttachment]:
+        await self.get_incident(incident_id)
         return list(
-            self.db.scalars(
-                select(IncidentAttachment)
-                .where(IncidentAttachment.incident_id == incident_id)
-                .order_by(IncidentAttachment.created_at)
+            (
+                await self.db.scalars(
+                    select(IncidentAttachment)
+                    .where(IncidentAttachment.incident_id == incident_id)
+                    .order_by(IncidentAttachment.created_at)
+                )
             ).all()
         )
 
-    def list_history(self, incident_id: uuid.UUID) -> list[IncidentStatusHistory]:
-        self.get_incident(incident_id)
+    async def list_history(self, incident_id: uuid.UUID) -> list[IncidentStatusHistory]:
+        await self.get_incident(incident_id)
         return list(
-            self.db.scalars(
-                select(IncidentStatusHistory)
-                .where(IncidentStatusHistory.incident_id == incident_id)
-                .order_by(IncidentStatusHistory.changed_at)
+            (
+                await self.db.scalars(
+                    select(IncidentStatusHistory)
+                    .where(IncidentStatusHistory.incident_id == incident_id)
+                    .order_by(IncidentStatusHistory.changed_at)
+                )
             ).all()
         )

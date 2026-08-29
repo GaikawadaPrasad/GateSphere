@@ -18,11 +18,12 @@ from decimal import Decimal
 
 from fastapi import Request
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.errors import BusinessRuleError, ConflictError, NotFoundError
 from app.core.tenancy import TenantScope
-from app.modules.audit.service import record_audit
+from app.modules.audit.service import record_audit_async
 from app.modules.billing import schemas
 from app.modules.billing.models import (
     BillingRule,
@@ -72,7 +73,7 @@ def _enum(field: str, value: str | None) -> None:
 
 class BillingService:
     def __init__(
-        self, db: Session, scope: TenantScope, actor: User, request: Request | None = None
+        self, db: AsyncSession, scope: TenantScope, actor: User, request: Request | None = None
     ):
         self.db = db
         self.scope = scope
@@ -84,8 +85,8 @@ class BillingService:
         self.payments = PaymentRepository(db, scope)
         self.ledger = LedgerRepository(db, scope)
 
-    def _audit(self, action, community_id, entity_type, entity_id, **kw):
-        record_audit(
+    async def _audit(self, action, community_id, entity_type, entity_id, **kw):
+        await record_audit_async(
             self.db,
             module="billing",
             action=action,
@@ -106,24 +107,24 @@ class BillingService:
             "Specify a community", code="COMMUNITY_REQUIRED", fields={"community_id": "required"}
         )
 
-    def _unit_in_scope(self, unit_id: uuid.UUID) -> Unit:
+    async def _unit_in_scope(self, unit_id: uuid.UUID) -> Unit:
         stmt = select(Unit).where(Unit.id == unit_id)
         if not self.scope.is_global:
             stmt = stmt.where(Unit.community_id.in_(self.scope.community_ids))
-        unit = self.db.scalar(stmt)
+        unit = await self.db.scalar(stmt)
         if unit is None:
             raise NotFoundError("Unit not found")
         return unit
 
-    def _rule(self, community_id: uuid.UUID) -> BillingRule:
-        obj = self.rules.for_community(community_id)
+    async def _rule(self, community_id: uuid.UUID) -> BillingRule:
+        obj = await self.rules.for_community(community_id)
         if obj is None:
             obj = BillingRule(community_id=community_id, **_DEFAULT_RULE)
-            self.rules.add(obj)
+            await self.rules.add(obj)
         return obj
 
-    def _primary_billed_user(self, unit_id: uuid.UUID) -> uuid.UUID | None:
-        occ = self.db.scalar(
+    async def _primary_billed_user(self, unit_id: uuid.UUID) -> uuid.UUID | None:
+        occ = await self.db.scalar(
             select(UnitOccupancy).where(
                 UnitOccupancy.unit_id == unit_id,
                 UnitOccupancy.is_primary.is_(True),
@@ -132,10 +133,10 @@ class BillingService:
         )
         if occ is None:
             return None
-        profile = self.db.get(ResidentProfile, occ.resident_profile_id)
+        profile = await self.db.get(ResidentProfile, occ.resident_profile_id)
         return profile.user_id if profile else None
 
-    def _ledger(
+    async def _ledger(
         self,
         community_id: uuid.UUID,
         unit_id: uuid.UUID | None,
@@ -147,7 +148,7 @@ class BillingService:
         source_id: uuid.UUID,
         narration: str,
     ) -> None:
-        prev = self.ledger.latest_balance(unit_id)
+        prev = await self.ledger.latest_balance(unit_id)
         base = Decimal(prev.balance_after) if prev is not None else Decimal("0")
         delta = amount if entry_type == "debit" else -amount
         self.db.add(
@@ -163,61 +164,63 @@ class BillingService:
                 narration=narration,
             )
         )
-        self.db.flush()
+        await self.db.flush()
 
     # -- charge heads ------------------------------------------ #
-    def list_charge_heads(self, *, community_id: uuid.UUID | None):
+    async def list_charge_heads(self, *, community_id: uuid.UUID | None):
         cid = self._one_community(community_id)
         stmt = select(ChargeHead).where(ChargeHead.community_id == cid).order_by(ChargeHead.code)
-        return list(self.db.scalars(stmt).all())
+        return list((await self.db.scalars(stmt)).all())
 
-    def create_charge_head(
+    async def create_charge_head(
         self, payload: schemas.ChargeHeadCreate, *, community_id: uuid.UUID | None
     ):
         cid = self._one_community(community_id)
         _enum("calculation_type", payload.calculation_type)
-        if self.charge_heads.by_code(cid, payload.code):
+        if await self.charge_heads.by_code(cid, payload.code):
             raise ConflictError("That code exists", code="CHARGE_HEAD_EXISTS")
         obj = ChargeHead(community_id=cid, **payload.model_dump())
-        self.charge_heads.add(obj)
-        self._audit("charge_head.create", cid, "charge_head", obj.id)
+        await self.charge_heads.add(obj)
+        await self._audit("charge_head.create", cid, "charge_head", obj.id)
         return obj
 
-    def update_charge_head(self, charge_head_id: uuid.UUID, payload: schemas.ChargeHeadUpdate):
-        obj = self.charge_heads.get(charge_head_id)
+    async def update_charge_head(
+        self, charge_head_id: uuid.UUID, payload: schemas.ChargeHeadUpdate
+    ):
+        obj = await self.charge_heads.get(charge_head_id)
         if obj is None:
             raise NotFoundError("Charge head not found")
         patch = payload.model_dump(exclude_unset=True)
         _enum("calculation_type", patch.get("calculation_type"))
         for k, v in patch.items():
             setattr(obj, k, v)
-        self.db.flush()
-        self._audit("charge_head.update", obj.community_id, "charge_head", obj.id, new=patch)
+        await self.db.flush()
+        await self._audit("charge_head.update", obj.community_id, "charge_head", obj.id, new=patch)
         return obj
 
     # -- rules ----------------------------------------------- #
-    def get_rule(self, *, community_id: uuid.UUID | None):
-        return self._rule(self._one_community(community_id))
+    async def get_rule(self, *, community_id: uuid.UUID | None):
+        return await self._rule(self._one_community(community_id))
 
-    def update_rule(self, payload: schemas.RuleUpdate, *, community_id: uuid.UUID | None):
-        obj = self._rule(self._one_community(community_id))
+    async def update_rule(self, payload: schemas.RuleUpdate, *, community_id: uuid.UUID | None):
+        obj = await self._rule(self._one_community(community_id))
         patch = payload.model_dump(exclude_unset=True)
         _enum("late_fee_mode", patch.get("late_fee_mode"))
         for k, v in patch.items():
             setattr(obj, k, v)
-        self.db.flush()
-        self._audit("rule.update", obj.community_id, "billing_rule", obj.id, new=patch)
+        await self.db.flush()
+        await self._audit("rule.update", obj.community_id, "billing_rule", obj.id, new=patch)
         return obj
 
     # -- invoices ------------------------------------------ #
-    def create_invoice(self, payload: schemas.InvoiceCreate) -> MaintenanceInvoice:
-        unit = self._unit_in_scope(payload.unit_id)
-        rule = self._rule(unit.community_id)
-        seq = self.invoices.next_sequence(unit.community_id)
+    async def create_invoice(self, payload: schemas.InvoiceCreate) -> MaintenanceInvoice:
+        unit = await self._unit_in_scope(payload.unit_id)
+        rule = await self._rule(unit.community_id)
+        seq = await self.invoices.next_sequence(unit.community_id)
         inv = MaintenanceInvoice(
             community_id=unit.community_id,
             unit_id=unit.id,
-            billed_to_user_id=self._primary_billed_user(unit.id),
+            billed_to_user_id=await self._primary_billed_user(unit.id),
             invoice_number=f"INV-{datetime.now(UTC).year}-{seq:05d}",
             billing_period_start=payload.billing_period_start,
             billing_period_end=payload.billing_period_end,
@@ -249,23 +252,23 @@ class BillingService:
         inv.total_amount = _money(subtotal - inv.discount + tax)
         inv.amount_paid = Decimal("0.00")
         inv.balance_due = inv.total_amount
-        self.invoices.add(inv)
-        self._audit(
+        await self.invoices.add(inv)
+        await self._audit(
             "invoice.create",
             unit.community_id,
             "invoice",
             inv.id,
             new={"invoice_number": inv.invoice_number, "total": str(inv.total_amount)},
         )
-        return inv
+        return await self.get_invoice(inv.id)
 
-    def get_invoice(self, invoice_id: uuid.UUID) -> MaintenanceInvoice:
-        obj = self.invoices.get(invoice_id)
+    async def get_invoice(self, invoice_id: uuid.UUID) -> MaintenanceInvoice:
+        obj = await self.invoices.get(invoice_id)
         if obj is None:
             raise NotFoundError("Invoice not found")
         return obj
 
-    def list_invoices(
+    async def list_invoices(
         self,
         *,
         community_id: uuid.UUID | None,
@@ -275,7 +278,7 @@ class BillingService:
         limit: int,
     ):
         _enum("invoice_status", invoice_status)
-        stmt = select(MaintenanceInvoice)
+        stmt = select(MaintenanceInvoice).options(selectinload(MaintenanceInvoice.items))
         if community_id is not None:
             self.scope.require(community_id)
             stmt = stmt.where(MaintenanceInvoice.community_id == community_id)
@@ -284,18 +287,18 @@ class BillingService:
         if invoice_status:
             stmt = stmt.where(MaintenanceInvoice.status == invoice_status)
         stmt = stmt.order_by(MaintenanceInvoice.created_at.desc())
-        return self.invoices.list(offset=offset, limit=limit, extra=stmt), self.invoices.count(
-            extra=stmt
-        )
+        return await self.invoices.list(
+            offset=offset, limit=limit, extra=stmt
+        ), await self.invoices.count(extra=stmt)
 
-    def post_invoice(self, invoice_id: uuid.UUID) -> MaintenanceInvoice:
-        inv = self.get_invoice(invoice_id)
+    async def post_invoice(self, invoice_id: uuid.UUID) -> MaintenanceInvoice:
+        inv = await self.get_invoice(invoice_id)
         if inv.status != "draft":
             raise BusinessRuleError(
                 f"Invoice is '{inv.status}', not draft", code="INVALID_TRANSITION"
             )
         inv.status = "posted"
-        self._ledger(
+        await self._ledger(
             inv.community_id,
             inv.unit_id,
             inv.billed_to_user_id,
@@ -305,9 +308,9 @@ class BillingService:
             source_id=inv.id,
             narration=f"Invoice {inv.invoice_number} posted",
         )
-        self.db.flush()
-        self._audit("invoice.post", inv.community_id, "invoice", inv.id)
-        notif_events.emit(
+        await self.db.flush()
+        await self._audit("invoice.post", inv.community_id, "invoice", inv.id)
+        await notif_events.emit(
             self.db,
             self.scope,
             self.actor,
@@ -321,10 +324,10 @@ class BillingService:
             reference_type="invoice",
             reference_id=inv.id,
         )
-        return inv
+        return await self.get_invoice(inv.id)
 
-    def cancel_invoice(self, invoice_id: uuid.UUID) -> MaintenanceInvoice:
-        inv = self.get_invoice(invoice_id)
+    async def cancel_invoice(self, invoice_id: uuid.UUID) -> MaintenanceInvoice:
+        inv = await self.get_invoice(invoice_id)
         if inv.amount_paid > 0:
             raise BusinessRuleError("Invoice has payments", code="INVOICE_HAS_PAYMENTS")
         if inv.status not in ("draft", "posted", "overdue"):
@@ -332,7 +335,7 @@ class BillingService:
                 f"Cannot cancel a '{inv.status}' invoice", code="INVALID_TRANSITION"
             )
         if inv.status in ("posted", "overdue"):
-            self._ledger(
+            await self._ledger(
                 inv.community_id,
                 inv.unit_id,
                 inv.billed_to_user_id,
@@ -344,12 +347,12 @@ class BillingService:
             )
         inv.status = "cancelled"
         inv.balance_due = Decimal("0.00")
-        self.db.flush()
-        self._audit("invoice.cancel", inv.community_id, "invoice", inv.id)
-        return inv
+        await self.db.flush()
+        await self._audit("invoice.cancel", inv.community_id, "invoice", inv.id)
+        return await self.get_invoice(inv.id)
 
     # -- payments --------------------------------------- #
-    def record_payment(self, payload: schemas.PaymentCreate) -> Payment:
+    async def record_payment(self, payload: schemas.PaymentCreate) -> Payment:
         cid = self._one_community(payload.community_id)
         _enum("payment_method", payload.payment_method)
         alloc_total = sum((a.amount for a in payload.allocations), Decimal("0"))
@@ -358,7 +361,7 @@ class BillingService:
                 "Allocations must sum to the payment amount", code="ALLOCATION_MISMATCH"
             )
         now = datetime.now(UTC)
-        rseq = self.payments.next_receipt_sequence(cid)
+        rseq = await self.payments.next_receipt_sequence(cid)
         payment = Payment(
             community_id=cid,
             payer_user_id=payload.payer_user_id or self.actor.id,
@@ -372,10 +375,10 @@ class BillingService:
             gateway_name="simulated",
             remarks=payload.remarks,
         )
-        self.payments.add(payment)
+        await self.payments.add(payment)
 
         for line in payload.allocations:
-            inv = self.invoices.get(line.invoice_id)
+            inv = await self.invoices.get(line.invoice_id)
             if inv is None or inv.community_id != cid:
                 raise NotFoundError("Invoice not found")
             if inv.status not in ("posted", "partially_paid", "overdue"):
@@ -394,7 +397,7 @@ class BillingService:
             inv.amount_paid = _money(inv.amount_paid + amt)
             inv.balance_due = _money(inv.total_amount - inv.amount_paid)
             inv.status = "paid" if inv.balance_due <= 0 else "partially_paid"
-            self._ledger(
+            await self._ledger(
                 cid,
                 inv.unit_id,
                 payment.payer_user_id,
@@ -404,31 +407,31 @@ class BillingService:
                 source_id=payment.id,
                 narration=f"Payment {payment.payment_reference} -> {inv.invoice_number}",
             )
-        self.db.flush()
-        self._audit(
+        await self.db.flush()
+        await self._audit(
             "payment.record",
             cid,
             "payment",
             payment.id,
             new={"amount": str(payment.amount), "ref": payment.payment_reference},
         )
-        return payment
+        return await self.get_payment(payment.id)
 
-    def get_payment(self, payment_id: uuid.UUID) -> Payment:
-        obj = self.payments.get(payment_id)
+    async def get_payment(self, payment_id: uuid.UUID) -> Payment:
+        obj = await self.payments.get(payment_id)
         if obj is None:
             raise NotFoundError("Payment not found")
         return obj
 
-    def get_receipt(self, payment_id: uuid.UUID) -> dict:
+    async def get_receipt(self, payment_id: uuid.UUID) -> dict:
         from app.modules.communities.models import Community
 
-        pay = self.get_payment(payment_id)
-        community = self.db.get(Community, pay.community_id)
-        payer = self.db.get(User, pay.payer_user_id) if pay.payer_user_id else None
+        pay = await self.get_payment(payment_id)
+        community = await self.db.get(Community, pay.community_id)
+        payer = await self.db.get(User, pay.payer_user_id) if pay.payer_user_id else None
         lines = []
         for alloc in pay.allocations:
-            inv = self.db.get(MaintenanceInvoice, alloc.invoice_id)
+            inv = await self.db.get(MaintenanceInvoice, alloc.invoice_id)
             lines.append(
                 {
                     "invoice_id": alloc.invoice_id,
@@ -449,24 +452,24 @@ class BillingService:
             "allocations": lines,
         }
 
-    def list_payments(self, *, community_id: uuid.UUID | None, offset: int, limit: int):
-        stmt = select(Payment)
+    async def list_payments(self, *, community_id: uuid.UUID | None, offset: int, limit: int):
+        stmt = select(Payment).options(selectinload(Payment.allocations))
         if community_id is not None:
             self.scope.require(community_id)
             stmt = stmt.where(Payment.community_id == community_id)
         stmt = stmt.order_by(Payment.paid_at.desc())
-        return self.payments.list(offset=offset, limit=limit, extra=stmt), self.payments.count(
-            extra=stmt
-        )
+        return await self.payments.list(
+            offset=offset, limit=limit, extra=stmt
+        ), await self.payments.count(extra=stmt)
 
     # -- ledger --------------------------------------- #
-    def unit_ledger(self, unit_id: uuid.UUID, *, offset: int, limit: int):
-        self._unit_in_scope(unit_id)
+    async def unit_ledger(self, unit_id: uuid.UUID, *, offset: int, limit: int):
+        await self._unit_in_scope(unit_id)
         stmt = (
             select(LedgerEntry)
             .where(LedgerEntry.unit_id == unit_id)
             .order_by(LedgerEntry.entry_seq.desc())
         )
-        return self.ledger.list(offset=offset, limit=limit, extra=stmt), self.ledger.count(
-            extra=stmt
-        )
+        return await self.ledger.list(
+            offset=offset, limit=limit, extra=stmt
+        ), await self.ledger.count(extra=stmt)

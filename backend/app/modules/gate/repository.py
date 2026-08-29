@@ -6,23 +6,23 @@ import uuid
 
 from sqlalchemy import select
 
-from app.db.repository import TenantRepository
+from app.db.repository import AsyncTenantRepository
 from app.modules.gate.models import GateAssignment, GateEvent, GuardRoster, PanicAlert
 
 
-class GateEventRepository(TenantRepository[GateEvent]):
+class GateEventRepository(AsyncTenantRepository[GateEvent]):
     model = GateEvent
 
 
-class GuardRosterRepository(TenantRepository[GuardRoster]):
+class GuardRosterRepository(AsyncTenantRepository[GuardRoster]):
     model = GuardRoster
 
 
-class GateAssignmentRepository(TenantRepository[GateAssignment]):
+class GateAssignmentRepository(AsyncTenantRepository[GateAssignment]):
     model = GateAssignment
 
-    def active_for_guard(self, guard_user_id: uuid.UUID) -> GateAssignment | None:
-        return self.db.scalar(
+    async def active_for_guard(self, guard_user_id: uuid.UUID) -> GateAssignment | None:
+        return await self.db.scalar(
             select(GateAssignment).where(
                 GateAssignment.guard_user_id == guard_user_id,
                 GateAssignment.status == "active",
@@ -30,5 +30,5 @@ class GateAssignmentRepository(TenantRepository[GateAssignment]):
         )
 
 
-class PanicAlertRepository(TenantRepository[PanicAlert]):
+class PanicAlertRepository(AsyncTenantRepository[PanicAlert]):
     model = PanicAlert

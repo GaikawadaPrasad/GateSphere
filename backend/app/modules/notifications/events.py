@@ -1,4 +1,4 @@
-"""Domain-event -> notification fan-out (FR-15 wiring).
+"""Domain-event -> notification fan-out (FR-15 wiring). Async stack (ADR-010).
 
 Other services call `emit(...)` inside their own transaction to turn a business event
 (visitor approved, invoice posted, ticket resolved, ...) into a `Notification` for one
@@ -11,18 +11,20 @@ from __future__ import annotations
 import logging
 import uuid
 
+from sqlalchemy import select
+
 from app.core.tenancy import TenantScope
 from app.modules.notifications import schemas
 from app.modules.notifications.service import NotificationService
-from app.modules.users.models import User
+from app.modules.users.models import Role, User, UserRole
 
 log = logging.getLogger(__name__)
 
 
-def emit(
+async def emit(
     db,
     scope: TenantScope,
-    actor: User,
+    actor: User | None,
     request,
     *,
     recipient_user_id: uuid.UUID | None,
@@ -47,13 +49,13 @@ def emit(
         community_id=community_id,
     )
     try:
-        with db.begin_nested():  # SAVEPOINT — a failure here rolls back only the notification
-            NotificationService(db, scope, actor, request).dispatch(payload)
+        async with db.begin_nested():  # SAVEPOINT — rolls back only the notification
+            await NotificationService(db, scope, actor, request).dispatch(payload)
     except Exception:  # notifications must never break the domain op
         log.warning("notification emit failed", extra={"type": notification_type}, exc_info=True)
 
 
-def emit_to_roles(
+async def emit_to_roles(
     db,
     scope: TenantScope,
     actor: User | None,
@@ -71,16 +73,14 @@ def emit_to_roles(
     """Fan a single event out to every active user holding one of `role_slugs` in
     `community_id` (a global grant counts too). Returns the recipient count.
     """
-    from sqlalchemy import select
-
-    from app.modules.users.models import Role, UserRole
-
-    rows = db.scalars(
-        select(UserRole.user_id)
-        .join(Role, Role.id == UserRole.role_id)
-        .where(
-            Role.slug.in_(role_slugs),
-            (UserRole.community_id == community_id) | (UserRole.community_id.is_(None)),
+    rows = (
+        await db.scalars(
+            select(UserRole.user_id)
+            .join(Role, Role.id == UserRole.role_id)
+            .where(
+                Role.slug.in_(role_slugs),
+                (UserRole.community_id == community_id) | (UserRole.community_id.is_(None)),
+            )
         )
     ).all()
     seen: set[uuid.UUID] = set()
@@ -88,7 +88,7 @@ def emit_to_roles(
         if uid in seen:
             continue
         seen.add(uid)
-        emit(
+        await emit(
             db,
             scope,
             actor,
