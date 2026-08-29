@@ -151,3 +151,58 @@ def test_domain_endpoint_rejects_external_url(as_role, seed_ids, resident_unit_i
         json={"file_url": "http://evil.example/x.jpg", "file_name": "x.jpg"},
     )
     assert r.status_code == 422
+
+
+def test_download_is_authorized_by_managed_file_not_just_key(as_role, seed_ids):
+    """IDOR: /uploads/download must gate on the managed_files row, not merely the key."""
+    import uuid as _uuid
+
+    from sqlalchemy import select
+
+    from app.db.session import SessionLocal
+    from app.modules.uploads.models import ManagedFile
+    from app.services import storage
+
+    guard = as_role("security_guard")
+    d = _presign(guard, seed_ids)
+    storage.put_object(d["key"], b"\xff\xd8\xff\xe0\x00\x10JFIF\x00" + b"x" * 40, "image/jpeg")
+    assert guard.post(f"{P}/{d['file_id']}/confirm").status_code == 200
+
+    # the uploader can get a presigned GET for their own confirmed file
+    good = guard.get(f"{P}/download", params={"key": d["key"]})
+    assert good.status_code == 200 and good.json()["data"]["url"].startswith("http")
+
+    # a confirmed object that belongs to ANOTHER community
+    other_cid = seed_ids["other_community_id"]
+    foreign_key = f"visitors/photos/{other_cid}/{_uuid.uuid4().hex}-x.jpg"
+    storage.put_object(foreign_key, b"\xff\xd8\xff\xe0\x00\x10JFIF\x00" + b"x" * 40, "image/jpeg")
+    with SessionLocal() as db:
+        db.add(
+            ManagedFile(
+                community_id=_uuid.UUID(other_cid),
+                object_key=foreign_key,
+                kind="visitor_photo",
+                declared_content_type="image/jpeg",
+                declared_size_bytes=48,
+                status="confirmed",
+                detected_content_type="image/jpeg",
+                size_bytes=48,
+            )
+        )
+        db.commit()
+    try:
+        # the object exists and the key is known, but it is not in the caller's community
+        r = guard.get(f"{P}/download", params={"key": foreign_key})
+        assert r.status_code == 404, r.text
+    finally:
+        with SessionLocal() as db:
+            row = db.scalar(select(ManagedFile).where(ManagedFile.object_key == foreign_key))
+            if row:
+                db.delete(row)
+                db.commit()
+        storage.delete_object(foreign_key)
+
+    # an unknown key and a pending (unconfirmed) upload are both 404
+    assert guard.get(f"{P}/download", params={"key": "x/y/z.jpg"}).status_code == 404
+    d2 = _presign(guard, seed_ids)
+    assert guard.get(f"{P}/download", params={"key": d2["key"]}).status_code == 404

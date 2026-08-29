@@ -17,6 +17,7 @@ from datetime import UTC, datetime
 
 from anyio import to_thread
 from fastapi import Request
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import BusinessRuleError, NotFoundError
@@ -122,13 +123,21 @@ class UploadService:
             confirm_url=f"/api/v1/uploads/{mf.id}/confirm",
         )
 
+    def _assert_can_access(self, mf: ManagedFile, *, label: str = "Upload") -> None:
+        """A file is reachable by its creator, or by any member of its community
+        (community-scoped kinds). Cross-community / another user's personal file -> 404.
+        A global caller (Super Admin) may reach anything."""
+        if self.scope.is_global or mf.created_by_user_id == self.actor.id:
+            return
+        if mf.community_id is not None and mf.community_id in self.scope.community_ids:
+            return
+        raise NotFoundError(f"{label} not found")
+
     async def _managed_file(self, file_id: uuid.UUID) -> ManagedFile:
         mf = await self.db.get(ManagedFile, file_id)
         if mf is None:
             raise NotFoundError("Upload not found")
-        foreign = mf.created_by_user_id != self.actor.id and not self.scope.is_global
-        if foreign and (mf.community_id is None or mf.community_id not in self.scope.community_ids):
-            raise NotFoundError("Upload not found")
+        self._assert_can_access(mf)
         return mf
 
     async def confirm(self, file_id: uuid.UUID) -> schemas.ConfirmResponse:
@@ -202,6 +211,12 @@ class UploadService:
         )
 
     async def download(self, key: str) -> schemas.DownloadResponse:
+        # Authorize by the `managed_files` row for this key — never hand out a
+        # presigned GET for an arbitrary object key (IDOR).
+        mf = await self.db.scalar(select(ManagedFile).where(ManagedFile.object_key == key))
+        if mf is None or mf.status != "confirmed":
+            raise NotFoundError("Object not found")
+        self._assert_can_access(mf, label="Object")
         if await to_thread.run_sync(storage.object_head, key) is None:
             raise NotFoundError("Object not found")
         url = await to_thread.run_sync(storage.presigned_get, key, 3600)

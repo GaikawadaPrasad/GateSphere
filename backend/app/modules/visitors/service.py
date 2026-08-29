@@ -532,16 +532,19 @@ class VisitorService(UnitScopedAccess):
             vpass.entry_count += 1
         elif payload.pin:
             now = datetime.now(UTC)
-            candidates = list(
-                (
-                    await self.db.scalars(
-                        select(VisitorPass).where(
-                            VisitorPass.pin_hash == digest(payload.pin),
-                            VisitorPass.is_revoked.is_(False),
-                        )
-                    )
-                ).all()
+            # scope the PIN search to the guard's community — a 6-digit PIN can collide
+            # across communities, and only the request's community should ever match.
+            pin_stmt = (
+                select(VisitorPass)
+                .join(VisitorRequest, VisitorRequest.id == VisitorPass.request_id)
+                .where(
+                    VisitorPass.pin_hash == digest(payload.pin),
+                    VisitorPass.is_revoked.is_(False),
+                )
             )
+            if not self.scope.is_global:
+                pin_stmt = pin_stmt.where(VisitorRequest.community_id.in_(self.scope.community_ids))
+            candidates = list((await self.db.scalars(pin_stmt)).all())
             if payload.request_id:
                 candidates = [c for c in candidates if c.request_id == payload.request_id]
             usable = [

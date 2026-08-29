@@ -366,10 +366,17 @@ class BillingService(UnitScopedAccess):
                 "Allocations must sum to the payment amount", code="ALLOCATION_MISMATCH"
             )
         now = datetime.now(UTC)
+        # a unit-restricted caller (plain resident) may only record their own payment —
+        # never attribute one to another user.
+        payer_id = (
+            self.actor.id
+            if await self.is_unit_restricted()
+            else (payload.payer_user_id or self.actor.id)
+        )
         rseq = await self.payments.next_receipt_sequence(cid)
         payment = Payment(
             community_id=cid,
-            payer_user_id=payload.payer_user_id or self.actor.id,
+            payer_user_id=payer_id,
             payment_reference=f"PAY-{secrets.token_hex(8).upper()}",
             receipt_number=f"RCP-{now.year}-{rseq:06d}",
             receipt_issued_at=now,

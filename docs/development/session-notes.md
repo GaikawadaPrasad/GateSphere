@@ -899,3 +899,24 @@ lifecycle, four-section done report, session continuity). Added
 **Verified:** `ruff` + `black` clean; `pytest` 238 passed; live smoke tests (resident vs admin
 visibility, `--reset` idempotent ×2 + top-up).
 **Commits:** `010dbae`, `5b36c64`, `d9287ec`, `312da40`, + this.
+
+## 2026-08-30 — IDOR / BOLA sweep
+
+**By:** security review (object-level authorization)
+**Scope:** every `{id}`-taking endpoint across all 20 modules.
+**Result:** baseline is solid — every repository is `AsyncTenantRepository` (`.get()` applies the
+`community_id` scope filter → cross-tenant = `404`), child sub-tables are all fetched via a
+scoped parent, and `UnitScopedAccess` now adds the own-unit layer for residents.
+**One real finding, fixed:**
+- **`GET /uploads/download?key=…`** handed out a 1-hour presigned GET for *any* object key that
+  existed in the bucket, with no authorization — a cross-community / cross-user BOLA on visitor
+  photos, staff ID documents (PII), ticket/incident attachments, avatars. Keys leak in every
+  `file_url` API response. Fixed: `download` now looks up the `managed_files` row and applies
+  the same creator/community check as `confirm` (`_assert_can_access`); requires `status=confirmed`.
+  `GET /uploads/kinds` now requires auth.
+**Minor hardening in the same pass:**
+- `billing.record_payment` — a unit-restricted caller can no longer set `payer_user_id` to
+  another user (forced to `self.actor.id`).
+- `visitors.record_entry` PIN lookup is now scoped to the guard's community (a 6-digit PIN can
+  collide across communities; only the request's community should match).
+**Verified:** `ruff`/`black` clean; `pytest` 239 passed (new cross-community `download` IDOR test).

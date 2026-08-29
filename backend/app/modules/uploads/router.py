@@ -36,7 +36,7 @@ async def module_health() -> dict:
 
 
 @router.get("/kinds")
-def list_kinds() -> dict:
+def list_kinds(_: User = Depends(require_auth_async)) -> dict:
     return ok(
         {
             k.slug: {

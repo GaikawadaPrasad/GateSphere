@@ -33,10 +33,10 @@ Two gates protect a stored file URL (NFR-SEC-07):
 | Method & path | Body | Success | Notes |
 |---|---|---|---|
 | `GET /uploads/health` | – | `200` | liveness |
-| `GET /uploads/kinds` | – | `200` | the catalogue as JSON |
+| `GET /uploads/kinds` | – | `200` | the catalogue as JSON (auth required) |
 | `POST /uploads` | `PresignRequest` | `200` `PresignResponse` | `404` unknown kind; `422 CONTENT_TYPE_NOT_ALLOWED` / `FILE_TOO_LARGE` / `COMMUNITY_REQUIRED` |
-| `POST /uploads/{file_id}/confirm` | – | `200` `ConfirmResponse` | `422 NO_OBJECT` (nothing PUT) / `UPLOAD_REJECTED` (size or magic-byte check failed — object deleted) |
-| `GET /uploads/download?key=…` | – | `200` `DownloadResponse` | presigned GET for a private object; `404` if missing |
+| `POST /uploads/{file_id}/confirm` | – | `200` `ConfirmResponse` | `404` if the file isn't the caller's (creator, or a member of its community); `422 NO_OBJECT` / `UPLOAD_REJECTED` |
+| `GET /uploads/download?key=…` | – | `200` `DownloadResponse` | presigned GET for a **confirmed** object — **authorized against its `managed_files` row** (creator, or same-community member; global caller sees all). `404` for an unknown key, an unconfirmed file, or one outside the caller's scope — never a blind presign for an arbitrary key. |
 
 **PresignRequest**: `kind`, `filename`, `content_type`, `size_bytes` (≤ 100 MB), `community_id?`.
 **PresignResponse**: `file_id`, `kind`, `key`, `upload_url`, `method="PUT"`, `required_headers`
