@@ -1,7 +1,7 @@
 """Audit write helper (FR-16, NFR-REL-01).
 
-Services call `record_audit(...)` **inside the same transaction** as the operation they are
-auditing. Never update or delete an audit row.
+Services call `record_audit_async(...)` **inside the same transaction** as the operation
+they are auditing. Never update or delete an audit row.
 """
 
 from __future__ import annotations
@@ -13,7 +13,6 @@ from typing import Any
 
 from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Session
 
 from app.modules.audit.models import AuditLog
 from app.modules.users.models import User
@@ -57,35 +56,6 @@ def _build_audit_row(
         ip_address=_client_ip(request),
         user_agent=(request.headers.get("user-agent") if request else None) or None,
     )
-
-
-def record_audit(
-    db: Session,
-    *,
-    module: str,
-    action: str,
-    actor: User | None = None,
-    community_id: uuid.UUID | None = None,
-    entity_type: str | None = None,
-    entity_id: uuid.UUID | str | None = None,
-    old: dict | None = None,
-    new: dict | None = None,
-    request: Request | None = None,
-) -> AuditLog:
-    row = _build_audit_row(
-        module=module,
-        action=action,
-        actor=actor,
-        community_id=community_id,
-        entity_type=entity_type,
-        entity_id=entity_id,
-        old=old,
-        new=new,
-        request=request,
-    )
-    db.add(row)
-    db.flush()
-    return row
 
 
 async def record_audit_async(

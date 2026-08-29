@@ -30,12 +30,11 @@ from fastapi import Depends, Request, Response
 from redis.exceptions import RedisError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.errors import AuthError, ForbiddenError
 from app.core.redis import redis_client
-from app.db.session import get_async_db, get_db
+from app.db.session import get_async_db
 from app.modules.auth.models import UserSession
 from app.modules.users.models import Permission, RolePermission, User, UserRole
 
@@ -149,19 +148,8 @@ async def destroy_session(db: AsyncSession, request: Request, response: Response
     response.delete_cookie(settings.CSRF_COOKIE_NAME, path="/")
 
 
-def revoke_all_user_sessions(db: Session, user_id: uuid.UUID) -> None:
-    """Call on password change and role change (AGENTS.md §7)."""
-    now = datetime.now(UTC)
-    rows = db.scalars(
-        select(UserSession).where(UserSession.user_id == user_id, UserSession.revoked_at.is_(None))
-    ).all()
-    for row in rows:
-        row.revoked_at = now
-        _cache_drop(row.session_key_hash)
-
-
 async def revoke_all_user_sessions_async(db: AsyncSession, user_id: uuid.UUID) -> None:
-    """Async twin (ADR-010)."""
+    """Call on password change and role change (AGENTS.md §7)."""
     now = datetime.now(UTC)
     rows = (
         await db.scalars(
@@ -175,32 +163,6 @@ async def revoke_all_user_sessions_async(db: AsyncSession, user_id: uuid.UUID) -
         _cache_drop(row.session_key_hash)
 
 
-def _load_session(db: Session, request: Request) -> dict:
-    token = request.cookies.get(settings.SESSION_COOKIE_NAME)
-    if not token:
-        raise AuthError("Not authenticated")
-    token_hash = _hash_token(token)
-
-    cached = _cache_get(token_hash)
-    if cached:
-        cached["_token_hash"] = token_hash
-        return cached
-
-    row = db.scalar(select(UserSession).where(UserSession.session_key_hash == token_hash))
-    if row is None:
-        raise AuthError("Session not found")
-    if row.revoked_at is not None:
-        raise AuthError("Session revoked")
-    if row.expires_at <= datetime.now(UTC):
-        raise AuthError("Session expired")
-
-    payload = {"session_id": str(row.id), "user_id": str(row.user_id), "csrf": row.csrf_token}
-    ttl = int((row.expires_at - datetime.now(UTC)).total_seconds())
-    _cache_put(token_hash, payload, max(ttl, 1))
-    payload["_token_hash"] = token_hash
-    return payload
-
-
 def verify_csrf(request: Request) -> None:
     if request.method in ("GET", "HEAD", "OPTIONS"):
         return
@@ -211,52 +173,7 @@ def verify_csrf(request: Request) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# Dependencies
-# --------------------------------------------------------------------------- #
-def require_auth(
-    request: Request,
-    db: Session = Depends(get_db),
-    _: None = Depends(verify_csrf),
-) -> User:
-    session = _load_session(db, request)
-    user = db.get(User, uuid.UUID(session["user_id"]))
-    if not user or not user.is_active:
-        raise AuthError("User inactive")
-    request.state.session_id = session["session_id"]
-    request.state.user = user
-    return user
-
-
-def user_permissions(db: Session, user: User) -> set[str]:
-    if user.is_superadmin:
-        return {"*"}
-    rows = db.execute(
-        select(Permission.code)
-        .join(RolePermission, RolePermission.permission_id == Permission.id)
-        .join(UserRole, UserRole.role_id == RolePermission.role_id)
-        .where(UserRole.user_id == user.id)
-    ).all()
-    return {code for (code,) in rows}
-
-
-# Backwards-compatible private alias.
-_user_permissions = user_permissions
-
-
-def require_permission(code: str) -> Callable[..., User]:
-    """Usage: `user = Depends(require_permission("visitors:approve"))`."""
-
-    def dep(user: User = Depends(require_auth), db: Session = Depends(get_db)) -> User:
-        perms = user_permissions(db, user)
-        if "*" in perms or code in perms:
-            return user
-        raise ForbiddenError(f"Missing permission: {code}", code="PERMISSION_DENIED")
-
-    return dep
-
-
-# --------------------------------------------------------------------------- #
-# Async twins (ADR-010) — identical behaviour over an AsyncSession.
+# Dependencies (async — ADR-010)
 # --------------------------------------------------------------------------- #
 async def _load_session_async(db: AsyncSession, request: Request) -> dict:
     token = request.cookies.get(settings.SESSION_COOKIE_NAME)
