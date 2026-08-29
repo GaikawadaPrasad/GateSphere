@@ -24,7 +24,7 @@ import uuid
 from datetime import UTC, date, datetime, timedelta
 
 from fastapi import Request, Response
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -129,6 +129,21 @@ class OnboardingService:
     async def _user_by_email(self, email: str) -> User | None:
         return await self.db.scalar(select(User).where(User.email == email.lower()))
 
+    async def _assert_phone_free(
+        self, phone: str | None, *, exclude_user_id: uuid.UUID | None = None
+    ) -> None:
+        """`users.phone` is UNIQUE — reject a collision as a clean 409, not a raw IntegrityError."""
+        if not phone:
+            return
+        stmt = select(User.id).where(User.phone == phone)
+        if exclude_user_id is not None:
+            stmt = stmt.where(User.id != exclude_user_id)
+        if await self.db.scalar(stmt) is not None:
+            raise ConflictError(
+                "That phone number is already registered to another account",
+                code="PHONE_TAKEN",
+            )
+
     async def _ensure_primary_free(self, unit_id: uuid.UUID, community_id: uuid.UUID) -> None:
         clash = await self.db.scalar(
             select(UnitOccupancy.id).where(
@@ -191,6 +206,9 @@ class OnboardingService:
                     select(UnitOccupancy)
                     .where(UnitOccupancy.resident_profile_id == profile_id)
                     .order_by(UnitOccupancy.start_date.desc())
+                    # refresh column values — a preceding bulk UPDATE does not sync the
+                    # identity map, so identity-mapped rows would otherwise read stale.
+                    .execution_options(populate_existing=True)
                 )
             ).all()
         )
@@ -287,7 +305,10 @@ class OnboardingService:
         stmt = select(CommunityInvitation).where(CommunityInvitation.community_id == community_id)
         if status:
             stmt = stmt.where(CommunityInvitation.status == status)
-        total = len(list((await self.db.scalars(stmt)).all()))
+        total = int(
+            await self.db.scalar(select(func.count()).select_from(stmt.order_by(None).subquery()))
+            or 0
+        )
         rows = list(
             (
                 await self.db.scalars(
@@ -321,10 +342,11 @@ class OnboardingService:
     # ------------------------------------------------------------------ #
     # invitations — public (token)
     # ------------------------------------------------------------------ #
-    async def _load_token(self, token: str) -> CommunityInvitation:
-        inv = await self.db.scalar(
-            select(CommunityInvitation).where(CommunityInvitation.token_hash == _hash(token))
-        )
+    async def _load_token(self, token: str, *, for_update: bool = False) -> CommunityInvitation:
+        stmt = select(CommunityInvitation).where(CommunityInvitation.token_hash == _hash(token))
+        if for_update:
+            stmt = stmt.with_for_update()  # serialise concurrent accepts of the same token
+        inv = await self.db.scalar(stmt)
         if inv is None:
             raise NotFoundError("Invitation not found")
         if inv.status == "pending" and inv.expires_at <= _now():
@@ -363,7 +385,7 @@ class OnboardingService:
         current_user: User | None,
         response: Response,
     ) -> schemas.TenantOut:
-        inv = await self._load_token(token)
+        inv = await self._load_token(token, for_update=True)
         if inv.status != "pending":
             raise BusinessRuleError(f"Invitation is {inv.status}", code="INVITATION_NOT_PENDING")
 
@@ -390,10 +412,12 @@ class OnboardingService:
                     "A password is required to create your account",
                     code="PASSWORD_REQUIRED",
                 )
+            new_phone = payload.phone or inv.invited_phone
+            await self._assert_phone_free(new_phone)
             user = User(
                 email=inv.invited_email,
                 full_name=payload.full_name or inv.full_name or inv.invited_email,
-                phone=payload.phone or inv.invited_phone,
+                phone=new_phone,
                 password_hash=hash_password(payload.password),
             )
             self.db.add(user)
@@ -405,6 +429,7 @@ class OnboardingService:
         if payload.full_name and user.full_name != payload.full_name:
             user.full_name = payload.full_name
         if payload.phone and not user.phone:
+            await self._assert_phone_free(payload.phone, exclude_user_id=user.id)
             user.phone = payload.phone
 
         if inv.is_primary:
@@ -500,6 +525,7 @@ class OnboardingService:
         user = await self._user_by_email(payload.email)
         account_created = False
         if user is None:
+            await self._assert_phone_free(payload.phone)
             user = User(
                 email=payload.email.lower(),
                 full_name=payload.full_name,

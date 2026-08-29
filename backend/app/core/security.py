@@ -21,7 +21,7 @@ import ipaddress
 import json
 import secrets
 import uuid
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 
 from argon2 import PasswordHasher
@@ -308,21 +308,14 @@ async def user_permissions_async(
     return perms
 
 
-def require_permission_async(code: str) -> Callable[..., User]:
-    async def dep(
-        user: User = Depends(require_auth_async),
-        db: AsyncSession = Depends(get_async_db),
-    ) -> User:
-        perms = await user_permissions_async(db, user)
-        if "*" in perms or code in perms:
-            return user
-        raise ForbiddenError(f"Missing permission: {code}", code="PERMISSION_DENIED")
-
-    return dep
-
-
 async def require_platform_admin(user: User = Depends(require_auth_async)) -> User:
     """Only `super_admin` (`is_superadmin`) — the platform operator, not a community admin."""
     if not user.is_superadmin:
         raise ForbiddenError("Platform admin only", code="PLATFORM_ADMIN_ONLY")
     return user
+
+
+# `require_permission_async` lives in `app.core.tenancy` (it needs the resolved TenantScope so
+# per-community RBAC overrides are enforced), but is re-exported here for the ~20 routers that
+# import it from `app.core.security`. Imported last to avoid a circular import at module load.
+from app.core.tenancy import require_permission_async  # noqa: E402,F401

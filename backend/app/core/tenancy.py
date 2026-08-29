@@ -16,6 +16,7 @@ route-level `require_permission_async` gate stays coarse (union across all the u
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from fastapi import Depends, Header, Request
@@ -111,6 +112,25 @@ async def get_tenant_scope_async(
     scope = TenantScope(user.id, is_global, community_ids, permissions=perms)
     request.state.tenant_scope = scope
     return scope
+
+
+def require_permission_async(code: str) -> Callable[..., TenantScope]:
+    """Route-level RBAC gate. Checks the caller's **effective** permissions.
+
+    `get_tenant_scope_async` resolves `scope.permissions` to the effective set for the
+    caller's *active* community when that is unambiguous (a single community grant, or an
+    `X-Community-Id` header) — i.e. role defaults with that community's
+    `community_role_permissions` overrides (allow/deny) applied. For a global or
+    multi-community caller it is the coarse union across every role they hold. Superadmin
+    resolves to `{"*"}`.
+    """
+
+    async def dep(scope: TenantScope = Depends(get_tenant_scope_async)) -> TenantScope:
+        if scope.can(code):
+            return scope
+        raise ForbiddenError(f"Missing permission: {code}", code="PERMISSION_DENIED")
+
+    return dep
 
 
 @dataclass
