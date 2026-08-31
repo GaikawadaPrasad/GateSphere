@@ -30,7 +30,7 @@ per-module `/api/v1/<module>/health`.
 | Layer | File | Responsibility | Must not |
 |---|---|---|---|
 | Router | `modules/*/router.py` | HTTP I/O: resolve auth+permission deps, validate the Pydantic request, bind tenant scope, call **one** service method, serialize | `db.query`; business logic |
-| Service | `modules/*/service.py` | all business rules: state machines, invariants, SLA timers, booking conflict, invoice generation, transaction orchestration, event emission (audit + notification) | import `fastapi` / `Request` (takes a `RequestContext` from `app/core/context.py` instead; `auth`/`onboarding` are the documented cookie-I/O exceptions). Raw `select()` for reads is tracked debt C-3 |
+| Service | `modules/*/service.py` | all business rules: state machines, invariants, SLA timers, booking conflict, invoice generation, transaction orchestration, event emission (audit + notification) | import `fastapi` / `Request` (takes a `RequestContext` from `app/core/context.py` instead; `auth`/`onboarding` are the documented cookie-I/O exceptions). Raw `select()` for reads is tracked debt C-3 — new queries MUST go in `repository.py` (CI `backend-layering` ratchet; `modules/communities/` is the reference) |
 | Repository | `db/repository.py` + `modules/*/repository.py` | SQLAlchemy queries only; **always** filters tenant tables by `community_id` (`AsyncTenantRepository._scoped()`) | business rules; commit a transaction |
 | Model | `modules/*/models.py` | ORM table def; encodes invariants as DB constraints too (CHECK, UNIQUE, partial-unique, FK ON DELETE) | — |
 
@@ -56,7 +56,7 @@ reaches the client.
 `auth` · `users`/`rbac` · `communities`/`onboarding`/`residents` · `visitors` · `gate` ·
 `domestic_staff` · `deliveries` · `vehicles` · `billing` · `complaints` · `amenities` ·
 `communication` · `incidents` · `dashboards` · `notifications` · `audit` · `uploads`.
-253 routes total (see route-inventory.md); 289-request Postman suite (`docs/postman/`).
+268 routes total (see route-inventory.md); 298-request Postman suite / 397 assertions (`docs/postman/`).
 
 ## Background jobs (Celery beat — `app/core/celery_app.py`)
 

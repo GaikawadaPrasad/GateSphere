@@ -1,11 +1,11 @@
 # Backend Route Inventory
 
-Every registered route, cross-checked against `GET /api/v1/openapi.json` (256 routes total —
-230 API routes + `/`, `/healthz`, `/readyz`, `/docs`, `/redoc`, `/docs/oauth2-redirect`,
-`/api/v1/openapi.json`). Generated from the source tree; keep in sync with code.
+Every registered route, cross-checked against `GET /api/v1/openapi.json` (262 `(method, path)`
+rows total — 259 under `/api/v1/` + `/`, `/healthz`, `/readyz`). The generated appendix below
+is emitted by `docs/architecture/backend/gen_route_inventory.py`; keep in sync with code.
 
 **Legend**
-- **Auth**: `session` = `require_auth_async` (opaque `gs_session` cookie + `X-CSRF-Token` on unsafe methods); `public` = none; `session*` = optional (`optional_user`).
+- **Auth**: `session` = `require_auth_async` (role-bucketed `gatesphere_<bucket>_session` cookie — legacy `gs_session` still read — + `X-CSRF-Token` on unsafe methods; `X-Session-Role` disambiguates when >1 present); `public` = none; `session*` = optional (`optional_user`).
 - **Perm**: the `require_permission_async("<code>")` gate on the route (resolved against the caller's **effective** per-community permission set — role defaults ± `community_role_permissions` overrides). `platform-admin` = `require_platform_admin` (`is_superadmin`). `–` = session only.
 - **Scope**: `T` = tenant-scoped via `TenantScope` (cross-community → 404); `T+U` = also row-level own-unit for a plain resident (`UnitScopedAccess`); `self` = actor's own rows only; `global` = superadmin/global only.
 - **Mutation**: primary ORM model(s) written, via `app/modules/<m>/repository.py` → model → PostgreSQL. All mutating routes also insert `audit_logs` in the same transaction unless noted.
@@ -325,7 +325,7 @@ global `system_scope` + seeded `system@` audit actor).
 
 ## Appendix — complete route table (generated)
 
-Every registered `(method, path)` — 253 rows — emitted from `app.main.app` by `scratchpad/gen_inv.py`. Regenerate on any route change.
+Every registered `(method, path)` — 262 rows (259 under `/api/v1/`) — emitted from `app.main.app` by `docs/architecture/backend/gen_route_inventory.py`. Regenerate on any route change.
 
 | Module | Method | Path | Auth / permission | Handler |
 |---|---|---|---|---|
@@ -359,13 +359,16 @@ Every registered `(method, path)` — 253 rows — emitted from `app.main.app` b
 | billing | GET | `/api/v1/billing/health` | public | `module_health` |
 | billing | GET | `/api/v1/billing/invoices` | `billing:view` | `list_invoices` |
 | billing | POST | `/api/v1/billing/invoices` | `billing:create` | `create_invoice` |
+| billing | GET | `/api/v1/billing/invoices.csv` | `billing:export` | `export_invoices` |
 | billing | GET | `/api/v1/billing/invoices/{invoice_id}` | `billing:view` | `get_invoice` |
 | billing | POST | `/api/v1/billing/invoices/{invoice_id}/cancel` | `billing:approve` | `cancel_invoice` |
 | billing | POST | `/api/v1/billing/invoices/{invoice_id}/post` | `billing:approve` | `post_invoice` |
 | billing | GET | `/api/v1/billing/payments` | `billing:view` | `list_payments` |
 | billing | POST | `/api/v1/billing/payments` | `billing:create` | `record_payment` |
+| billing | GET | `/api/v1/billing/payments.csv` | `billing:export` | `export_payments` |
 | billing | GET | `/api/v1/billing/payments/{payment_id}` | `billing:view` | `get_payment` |
 | billing | GET | `/api/v1/billing/payments/{payment_id}/receipt` | `billing:view` | `get_payment_receipt` |
+| billing | POST | `/api/v1/billing/payments/{payment_id}/refund` | `billing:approve` | `refund_payment` |
 | billing | GET | `/api/v1/billing/rules` | `billing:view` | `get_rule` |
 | billing | PATCH | `/api/v1/billing/rules` | `billing:approve` | `update_rule` |
 | billing | GET | `/api/v1/billing/units/{unit_id}/ledger` | `billing:view` | `unit_ledger` |
@@ -375,6 +378,9 @@ Every registered `(method, path)` — 253 rows — emitted from `app.main.app` b
 | communication | PATCH | `/api/v1/communication/announcements/{announcement_id}` | `communication:update` | `update_announcement` |
 | communication | POST | `/api/v1/communication/announcements/{announcement_id}/expire` | `communication:update` | `expire_announcement` |
 | communication | POST | `/api/v1/communication/announcements/{announcement_id}/publish` | `communication:approve` | `publish_announcement` |
+| communication | POST | `/api/v1/communication/announcements/{announcement_id}/rsvp` | `communication:view` | `rsvp_event` |
+| communication | GET | `/api/v1/communication/announcements/{announcement_id}/rsvps` | `communication:view` | `list_rsvps` |
+| communication | GET | `/api/v1/communication/announcements/{announcement_id}/survey` | `communication:view` | `get_survey` |
 | communication | GET | `/api/v1/communication/groups` | `communication:view` | `list_groups` |
 | communication | POST | `/api/v1/communication/groups` | `communication:create` | `create_group` |
 | communication | PATCH | `/api/v1/communication/groups/{group_id}` | `communication:update` | `update_group` |
@@ -404,8 +410,14 @@ Every registered `(method, path)` — 253 rows — emitted from `app.main.app` b
 | communities | PATCH | `/api/v1/communities/{community_id}` | `communities:update` | `update_community` |
 | communities | GET | `/api/v1/communities/{community_id}/gates` | `communities:view` | `list_gates` |
 | communities | POST | `/api/v1/communities/{community_id}/gates` | `communities:create` | `create_gate` |
+| communities | GET | `/api/v1/communities/{community_id}/invitations` | `residents:view` | `list_invitations` |
+| communities | POST | `/api/v1/communities/{community_id}/invitations` | `residents:create` | `create_invitation` |
+| communities | POST | `/api/v1/communities/{community_id}/invitations/{invitation_id}/revoke` | `residents:create` | `revoke_invitation` |
+| communities | POST | `/api/v1/communities/{community_id}/tenants` | `residents:create` | `add_tenant` |
+| communities | DELETE | `/api/v1/communities/{community_id}/tenants/{profile_id}` | `residents:delete` | `remove_tenant` |
 | communities | GET | `/api/v1/communities/{community_id}/towers` | `communities:view` | `list_towers` |
 | communities | POST | `/api/v1/communities/{community_id}/towers` | `communities:create` | `create_tower` |
+| communities | DELETE | `/api/v1/communities/{community_id}/units/{unit_id}/occupants/{occupancy_id}` | `residents:delete` | `remove_occupant` |
 | complaints | GET | `/api/v1/complaints/categories` | `complaints:view` | `list_categories` |
 | complaints | POST | `/api/v1/complaints/categories` | `complaints:approve` | `create_category` |
 | complaints | PATCH | `/api/v1/complaints/categories/{category_id}` | `complaints:approve` | `update_category` |
@@ -414,6 +426,7 @@ Every registered `(method, path)` — 253 rows — emitted from `app.main.app` b
 | complaints | PUT | `/api/v1/complaints/sla` | `complaints:approve` | `upsert_sla` |
 | complaints | GET | `/api/v1/complaints/tickets` | `complaints:view` | `list_tickets` |
 | complaints | POST | `/api/v1/complaints/tickets` | `complaints:create` | `create_ticket` |
+| complaints | GET | `/api/v1/complaints/tickets.csv` | `complaints:export` | `export_tickets` |
 | complaints | GET | `/api/v1/complaints/tickets/{ticket_id}` | `complaints:view` | `get_ticket` |
 | complaints | POST | `/api/v1/complaints/tickets/{ticket_id}/assign` | `complaints:update` | `assign_ticket` |
 | complaints | GET | `/api/v1/complaints/tickets/{ticket_id}/attachments` | `complaints:view` | `list_attachments` |
@@ -440,23 +453,23 @@ Every registered `(method, path)` — 253 rows — emitted from `app.main.app` b
 | deliveries | POST | `/api/v1/deliveries/{delivery_id}/decision` | `deliveries:approve` | `decide_delivery` |
 | deliveries | POST | `/api/v1/deliveries/{delivery_id}/delivered` | `deliveries:update` | `mark_delivered` |
 | deliveries | GET | `/api/v1/deliveries/{delivery_id}/events` | `deliveries:view` | `list_events` |
-| domestic_staff | GET | `/api/v1/domestic-staff` | `domestic_staff:view` | `list_staff` |
-| domestic_staff | POST | `/api/v1/domestic-staff` | `domestic_staff:create` | `create_staff` |
-| domestic_staff | GET | `/api/v1/domestic-staff/assignments` | `domestic_staff:view` | `list_assignments` |
-| domestic_staff | POST | `/api/v1/domestic-staff/assignments` | `domestic_staff:approve` | `assign_unit` |
-| domestic_staff | POST | `/api/v1/domestic-staff/assignments/{assignment_id}/end` | `domestic_staff:update` | `end_assignment` |
-| domestic_staff | GET | `/api/v1/domestic-staff/attendance` | `domestic_staff:view` | `list_attendance` |
-| domestic_staff | POST | `/api/v1/domestic-staff/attendance/check-in` | `domestic_staff:create` | `check_in` |
-| domestic_staff | PATCH | `/api/v1/domestic-staff/attendance/{attendance_id}/check-out` | `domestic_staff:update` | `check_out` |
-| domestic_staff | GET | `/api/v1/domestic-staff/health` | public | `module_health` |
-| domestic_staff | POST | `/api/v1/domestic-staff/ratings` | `domestic_staff:view` | `rate_staff` |
-| domestic_staff | GET | `/api/v1/domestic-staff/{staff_id}` | `domestic_staff:view` | `get_staff` |
-| domestic_staff | PATCH | `/api/v1/domestic-staff/{staff_id}` | `domestic_staff:update` | `update_staff` |
-| domestic_staff | GET | `/api/v1/domestic-staff/{staff_id}/ratings` | `domestic_staff:view` | `list_ratings` |
+| domestic-staff | GET | `/api/v1/domestic-staff` | `domestic_staff:view` | `list_staff` |
+| domestic-staff | POST | `/api/v1/domestic-staff` | `domestic_staff:create` | `create_staff` |
+| domestic-staff | GET | `/api/v1/domestic-staff/assignments` | `domestic_staff:view` | `list_assignments` |
+| domestic-staff | POST | `/api/v1/domestic-staff/assignments` | `domestic_staff:approve` | `assign_unit` |
+| domestic-staff | POST | `/api/v1/domestic-staff/assignments/{assignment_id}/end` | `domestic_staff:update` | `end_assignment` |
+| domestic-staff | GET | `/api/v1/domestic-staff/attendance` | `domestic_staff:view` | `list_attendance` |
+| domestic-staff | POST | `/api/v1/domestic-staff/attendance/check-in` | `domestic_staff:create` | `check_in` |
+| domestic-staff | PATCH | `/api/v1/domestic-staff/attendance/{attendance_id}/check-out` | `domestic_staff:update` | `check_out` |
+| domestic-staff | GET | `/api/v1/domestic-staff/health` | public | `module_health` |
+| domestic-staff | POST | `/api/v1/domestic-staff/ratings` | `domestic_staff:view` | `rate_staff` |
+| domestic-staff | GET | `/api/v1/domestic-staff/{staff_id}` | `domestic_staff:view` | `get_staff` |
+| domestic-staff | PATCH | `/api/v1/domestic-staff/{staff_id}` | `domestic_staff:update` | `update_staff` |
+| domestic-staff | GET | `/api/v1/domestic-staff/{staff_id}/ratings` | `domestic_staff:view` | `list_ratings` |
 | gate | GET | `/api/v1/gate/alerts` | `gate:view` | `list_alerts` |
-| gate | POST | `/api/v1/gate/alerts` | session | `raise_alert` |
+| gate | POST | `/api/v1/gate/alerts` | public | `raise_alert` |
 | gate | POST | `/api/v1/gate/alerts/{alert_id}/acknowledge` | `gate:update` | `acknowledge_alert` |
-| gate | POST | `/api/v1/gate/alerts/{alert_id}/cancel` | session | `cancel_alert` |
+| gate | POST | `/api/v1/gate/alerts/{alert_id}/cancel` | public | `cancel_alert` |
 | gate | POST | `/api/v1/gate/alerts/{alert_id}/resolve` | `gate:update` | `resolve_alert` |
 | gate | GET | `/api/v1/gate/assignments` | `gate:view` | `list_assignments` |
 | gate | POST | `/api/v1/gate/assignments` | `gate:create` | `create_assignment` |
@@ -464,6 +477,7 @@ Every registered `(method, path)` — 253 rows — emitted from `app.main.app` b
 | gate | POST | `/api/v1/gate/checkpoint-override` | `gate:approve` | `override_checkpoint` |
 | gate | GET | `/api/v1/gate/events` | `gate:view` | `list_events` |
 | gate | POST | `/api/v1/gate/events` | `gate:create` | `log_event` |
+| gate | GET | `/api/v1/gate/events.csv` | `gate:export` | `export_events` |
 | gate | GET | `/api/v1/gate/health` | public | `module_health` |
 | gate | GET | `/api/v1/gate/rosters` | `gate:view` | `list_rosters` |
 | gate | POST | `/api/v1/gate/rosters` | `gate:create` | `create_roster` |
@@ -483,6 +497,8 @@ Every registered `(method, path)` — 253 rows — emitted from `app.main.app` b
 | incidents | POST | `/api/v1/incidents/{incident_id}/attachments` | `incidents:update` | `add_attachment` |
 | incidents | GET | `/api/v1/incidents/{incident_id}/history` | `incidents:view` | `incident_history` |
 | incidents | POST | `/api/v1/incidents/{incident_id}/transition` | `incidents:update` | `transition_incident` |
+| invitations | GET | `/api/v1/invitations/{token}` | public | `view_invitation` |
+| invitations | POST | `/api/v1/invitations/{token}/accept` | session | `accept_invitation` |
 | notifications | GET | `/api/v1/notifications` | `notifications:view` | `list_mine` |
 | notifications | POST | `/api/v1/notifications/dispatch` | `notifications:create` | `dispatch` |
 | notifications | GET | `/api/v1/notifications/health` | public | `module_health` |
@@ -493,14 +509,6 @@ Every registered `(method, path)` — 253 rows — emitted from `app.main.app` b
 | notifications | PUT | `/api/v1/notifications/templates` | `notifications:create` | `upsert_template` |
 | notifications | GET | `/api/v1/notifications/{notification_id}` | `notifications:view` | `get_mine` |
 | notifications | POST | `/api/v1/notifications/{notification_id}/read` | `notifications:view` | `mark_read` |
-| onboarding | GET | `/api/v1/communities/{community_id}/invitations` | `residents:view` | `list_invitations` |
-| onboarding | POST | `/api/v1/communities/{community_id}/invitations` | `residents:create` | `create_invitation` |
-| onboarding | POST | `/api/v1/communities/{community_id}/invitations/{invitation_id}/revoke` | `residents:create` | `revoke_invitation` |
-| onboarding | POST | `/api/v1/communities/{community_id}/tenants` | `residents:create` | `add_tenant` |
-| onboarding | DELETE | `/api/v1/communities/{community_id}/tenants/{profile_id}` | `residents:delete` | `remove_tenant` |
-| onboarding | DELETE | `/api/v1/communities/{community_id}/units/{unit_id}/occupants/{occupancy_id}` | `residents:delete` | `remove_occupant` |
-| onboarding | GET | `/api/v1/invitations/{token}` | public | `view_invitation` |
-| onboarding | POST | `/api/v1/invitations/{token}/accept` | session | `accept_invitation` |
 | onboarding | GET | `/api/v1/onboarding/health` | public | `module_health` |
 | ops | GET | `/` | public | `root` |
 | ops | GET | `/healthz` | public | `healthz` |
@@ -533,11 +541,11 @@ Every registered `(method, path)` — 253 rows — emitted from `app.main.app` b
 | residents | PATCH | `/api/v1/residents/{profile_id}` | `residents:update` | `update_profile` |
 | residents | GET | `/api/v1/residents/{profile_id}/emergency-contacts` | `residents:view` | `list_contacts` |
 | residents | POST | `/api/v1/residents/{profile_id}/emergency-contacts` | `residents:create` | `create_contact` |
-| uploads | POST | `/api/v1/uploads` | session | `presign` |
-| uploads | GET | `/api/v1/uploads/download` | session | `download` |
+| uploads | POST | `/api/v1/uploads` | public | `presign` |
+| uploads | GET | `/api/v1/uploads/download` | public | `download` |
 | uploads | GET | `/api/v1/uploads/health` | public | `module_health` |
 | uploads | GET | `/api/v1/uploads/kinds` | session | `list_kinds` |
-| uploads | POST | `/api/v1/uploads/{file_id}/confirm` | session | `confirm` |
+| uploads | POST | `/api/v1/uploads/{file_id}/confirm` | public | `confirm` |
 | users | GET | `/api/v1/users` | `users:view` | `list_users` |
 | users | POST | `/api/v1/users` | `users:create` | `create_user` |
 | users | GET | `/api/v1/users/health` | public | `module_health` |
@@ -569,6 +577,7 @@ Every registered `(method, path)` — 253 rows — emitted from `app.main.app` b
 | visitors | POST | `/api/v1/visitors/blacklist` | `visitors:update` | `add_blacklist` |
 | visitors | GET | `/api/v1/visitors/entries` | `visitors:view` | `list_entries` |
 | visitors | POST | `/api/v1/visitors/entries` | `visitors:create` | `record_entry` |
+| visitors | GET | `/api/v1/visitors/entries.csv` | `visitors:export` | `export_entries` |
 | visitors | PATCH | `/api/v1/visitors/entries/{entry_id}/exit` | `visitors:update` | `record_exit` |
 | visitors | GET | `/api/v1/visitors/health` | public | `module_health` |
 | visitors | POST | `/api/v1/visitors/passes/{pass_id}/revoke` | `visitors:update` | `revoke_pass` |
