@@ -16,6 +16,7 @@ class AuditLogRead(BaseModel):
     community_id: uuid.UUID | None
     user_id: uuid.UUID | None
     session_id: uuid.UUID | None
+    role_slug: str | None
     module: str
     action: str
     entity_type: str | None

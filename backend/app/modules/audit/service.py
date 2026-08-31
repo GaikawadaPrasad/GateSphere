@@ -41,12 +41,15 @@ def _build_audit_row(
     old: dict | None,
     new: dict | None,
     request: Request | None,
+    role_slug: str | None,
 ) -> AuditLog:
     session_id = getattr(request.state, "session_id", None) if request else None
+    role = role_slug or (getattr(request.state, "session_role", None) if request else None)
     return AuditLog(
         community_id=community_id,
         user_id=actor.id if actor else None,
         session_id=uuid.UUID(session_id) if isinstance(session_id, str) else session_id,
+        role_slug=role,
         module=module,
         action=action,
         entity_type=entity_type,
@@ -70,8 +73,10 @@ async def record_audit_async(
     old: dict | None = None,
     new: dict | None = None,
     request: Request | None = None,
+    role_slug: str | None = None,
 ) -> AuditLog:
-    """Async twin of `record_audit` (ADR-010)."""
+    """Async twin of `record_audit` (ADR-010). `role_slug` overrides the request-state
+    lookup — used by login/logout and system jobs where `request.state` is not populated."""
     row = _build_audit_row(
         module=module,
         action=action,
@@ -82,6 +87,7 @@ async def record_audit_async(
         old=old,
         new=new,
         request=request,
+        role_slug=role_slug,
     )
     db.add(row)
     await db.flush()

@@ -1,7 +1,9 @@
-"""Immutable audit log (FR-16). Append-only: no UPDATE, no DELETE from application code.
+"""Immutable audit log (FR-16). Append-only — enforced by a DB trigger
+(`gs_audit_logs_immutable`, migration 0028) that RAISEs on any UPDATE or DELETE, so the
+guarantee holds even for a superuser / a direct `psql` session, not just the app.
 
-Columns match AGENTS.md §10: community_id, user_id, session_id, action, module, entity_type,
-entity_id, old_values, new_values, ip_address, user_agent, created_at.
+Columns match AGENTS.md §10: community_id, user_id, session_id, role_slug, action, module,
+entity_type, entity_id, old_values, new_values, ip_address, user_agent, created_at.
 """
 
 from __future__ import annotations
@@ -26,6 +28,9 @@ class AuditLog(Base):
     community_id: Mapped[uuid.UUID | None] = mapped_column(index=True)
     user_id: Mapped[uuid.UUID | None] = mapped_column(index=True)
     session_id: Mapped[uuid.UUID | None] = mapped_column()
+    # the role the actor was acting AS at the time (point-in-time; the actor's grants may
+    # change later). None for system jobs and legacy rows.
+    role_slug: Mapped[str | None] = mapped_column(String(48))
     module: Mapped[str] = mapped_column(String(64), index=True)
     action: Mapped[str] = mapped_column(String(64))
     entity_type: Mapped[str | None] = mapped_column(String(64))

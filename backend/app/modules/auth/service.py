@@ -121,6 +121,7 @@ class AuthService:
             entity_id=str(user.id),
             new={"role": role_slug, "bucket": session.cookie_bucket},
             request=request,
+            role_slug=role_slug,
         )
         return await self._serialize(
             user, role_slug=session.role_slug, session_bucket=session.cookie_bucket
@@ -136,6 +137,7 @@ class AuthService:
             entity_type="user",
             entity_id=str(user.id),
             request=request,
+            role_slug=getattr(request.state, "session_role", None),
         )
 
     async def me(self, request: Request, user: User) -> CurrentUser:
