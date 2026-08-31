@@ -24,7 +24,7 @@ flowchart TD
     subgraph AUTHZ["Authorization (app/core/tenancy.py + security.py)"]
         direction TB
         SCOPE["get_tenant_scope_async → TenantScope<br/>community_ids from user_roles (never payload)<br/>active_cid + effective permissions =<br/>role defaults ± community_role_permissions overrides"]
-        PERM["require_permission_async(code)<br/>scope.can(code) else 403 PERMISSION_DENIED"]
+        PERM["require_permission_async(code)<br/>defined in tenancy.py; re-exported from security.py<br/>via module __getattr__ (PEP 562) to break the<br/>security↔tenancy import cycle<br/>scope.can(code) else 403 PERMISSION_DENIED"]
         PADMIN["require_platform_admin<br/>is_superadmin else 403 PLATFORM_ADMIN_ONLY"]
         RLSBIND["bind_rls_scope_async<br/>SET LOCAL app.community_ids = &lt;csv&gt;"]
         UNITACC["UnitScopedAccess (residents/access.py)<br/>plain resident → own-unit rows only<br/>user_in_community() for payload user ids"]
