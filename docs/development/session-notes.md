@@ -941,3 +941,38 @@ scoped parent, and `UnitScopedAccess` now adds the own-unit layer for residents.
 **Verified:** derived by tracing `main.py` → `api/router.py` → each `router/deps/service/
 repository/models/tasks.py`; `subgraph`/`end` balance + quote balance + header checks pass;
 one perm fix applied (`/notifications/templates` GET is `notifications:create`, not `:view`).
+
+---
+
+## 2026-08-31 — Production-readiness audit (Stages 1–10), branch `audit/production-readiness`
+
+Full forensic audit + hardening. Per-stage detail in `docs/backend/audit/STAGE_*.md`.
+
+- **S1 imports:** AST graph of 271 modules — 1 cycle (`security↔tenancy`); runtime break shipped.
+- **S2 routes:** 253 routes enumerated, 0 broken/dupe/dead; authz surface mapped.
+- **S3 RBAC/tenancy:** C-1 fixed (one-way `tenancy→security`, 18 routers repointed). RB-1
+  fixed — `audit_logs.ip_address` (INET) crashed `GET /audit/logs` for any real-IP row.
+  New `tests/test_cross_tenant_idor.py` (29 assertions).
+- **S4 sessions:** role-bucketed cookies `gatesphere_<bucket>_session` (+ legacy `gs_*` read).
+  `user_sessions` += role_slug/cookie_bucket/community_id/last_activity_at (migration 0024).
+  `X-Session-Role` disambiguation; logout revokes only the presented session. New
+  `docs/backend/AUTHENTICATION.md`. Frontend middleware/api.ts updated.
+- **S5 state machines:** migration 0025 — CHECK constraints on 25 status columns. SM-1 fixed
+  (`create_pass` approval bypass). `make test` reseeds + pauses beat (IS-1 mitigation).
+  New `docs/backend/STATE_MACHINES.md`, `docs/backend/TESTING.md`.
+- **S6 DB integrity:** 194 FKs all explicit ON DELETE; models↔tables 1:1. Migrations 0026
+  (indexes + `uq_visitor_entry_open`) + 0027 (canonical index names). `alembic --autogenerate`
+  now emits an EMPTY diff (`env.py` server-default callback).
+- **S7 module gap:** all 50 PRD items present. Added `GET /amenities/{id}`. 4 LOW gaps logged.
+- **S8 config/errors/notify:** prod config guard (refuses unsafe boot), TrustedHost +
+  security headers, `IntegrityError→409/400`, DB pool settings. **NTF-1 fixed** —
+  `publish_announcement` now fans out to residents (`emit_many`). New
+  `docs/backend/PRODUCTION_READINESS.md`.
+- **S9 Postman:** `docs/postman/` generated from the live route table — 289 requests, all
+  253 routes + `_Workflow` + `_Negative`; multi-role cookie jar (no `{{token}}`).
+  `scripts/test-api.sh` + `make test-api`. `make test-api` → 289 req / 0 fail, 388 assert / 0 fail.
+- **S10 docs:** new `API_ARCHITECTURE.md`, `RBAC.md`; `route-inventory.md` gains a
+  generated row-per-path appendix; AGENTS.md §18 gains the Postman-maintenance rule +
+  "no single global auth token". All 21 Mermaid diagrams validate.
+
+`pytest` (Docker, fresh DB): **278 passed**. `ruff` + `black` clean. `frontend tsc` clean.

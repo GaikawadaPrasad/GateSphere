@@ -44,7 +44,10 @@ CODE=$?
 set -e
 
 if [[ "$MANAGE_STACK" == "1" ]]; then
-  ( cd "$ROOT" && docker compose up -d backend >/dev/null 2>&1 )  # restore default rate limit
+  # The _Workflow folder writes real rows to the shared DB — reseed so the next
+  # `make test` (pytest) starts from clean seed data (IS-1), and restore the rate limit.
+  ( cd "$ROOT" && docker compose run --rm backend seed --reset >/dev/null 2>&1 || true )
+  ( cd "$ROOT" && docker compose up -d backend >/dev/null 2>&1 )
 fi
 
 echo ">> report: $PM/newman-report.json"

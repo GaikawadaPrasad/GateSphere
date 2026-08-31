@@ -942,6 +942,19 @@ the author MUST: (1) update the affected `modules/<module>.mmd`; (2) update
 (`subgraph`/`end` balance, quoted labels, no stale route/file refs). If code and a diagram
 disagree, fix the diagram to match the verified code.
 
+### Postman / Newman API suite — mandatory, code-derived
+
+The API test package lives under **`docs/postman/`** and is **generated from the live
+FastAPI route table** by `docs/postman/build_collection.py` (`GateSphere_API.postman_collection.json`,
+`gate_sphere.postman_environment.json`). Whenever an **API route, request schema, response
+schema, authentication behaviour, cookie name, state transition, required parameter, or API
+workflow** changes, regenerate the collection + environment **in the same change** and
+re-run `make test-api`.
+
+**Do not use a single global authentication token/session variable for role-based testing.**
+Each role authenticates into its own `gatesphere_<bucket>_session` cookie (Postman cookie
+jar); requests select the role with the `X-Session-Role` header. There is no `{{token}}`.
+
 ---
 
 ## 19. Forbidden patterns

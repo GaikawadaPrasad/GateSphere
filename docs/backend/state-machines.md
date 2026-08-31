@@ -1,3 +1,5 @@
+> **See [`STATE_MACHINES.md`](STATE_MACHINES.md)** for the current canonical transition tables + enforcement (service `ensure_transition` + DB `CHECK`, migration 0025). This file is the earlier enum-classification report.
+
 # Workflow state machines — audit & implementation report
 
 > Every enum in the codebase, classified. Lifecycle enums have an explicit transition map in
