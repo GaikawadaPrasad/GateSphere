@@ -24,7 +24,7 @@ class ManagedFile(Base, TimestampMixin):
 
     id: Mapped[uuid.UUID] = pk()
     community_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("communities.id", ondelete="CASCADE")
+        ForeignKey("communities.id", ondelete="CASCADE"), index=True
     )
     object_key: Mapped[str] = mapped_column(String(400), unique=True)
     kind: Mapped[str] = mapped_column(String(40))
