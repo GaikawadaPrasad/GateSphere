@@ -9,8 +9,13 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, PostgresDsn, RedisDsn
+from pydantic import Field, PostgresDsn, RedisDsn, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_INSECURE_SECRETS = {
+    "change-me-to-a-random-32+char-string-0000",
+    "local-dev-secret-please-change-0000000000",
+}
 
 
 class Settings(BaseSettings):
@@ -22,6 +27,17 @@ class Settings(BaseSettings):
     SECRET_KEY: str = Field(min_length=32)
     API_V1_PREFIX: str = "/api/v1"
     PROJECT_NAME: str = "GateSphere"
+    # Comma-separated Host header allow-list for TrustedHostMiddleware. "*" (default) is fine
+    # for local; production MUST set explicit hostnames.
+    ALLOWED_HOSTS: str = "*"
+    # Swagger / ReDoc / openapi.json. Defaults on for local + staging, off for production
+    # (AGENTS.md §0) unless explicitly re-enabled.
+    ENABLE_DOCS: bool | None = None
+
+    # --- DB pool ---
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 10
+    DB_POOL_RECYCLE_SECONDS: int = 1800  # recycle before a pooled conn is dropped upstream
 
     # --- CORS / cookies ---
     # FRONTEND_ORIGIN is the canonical UI origin (used to build invitation links).
@@ -63,6 +79,33 @@ class Settings(BaseSettings):
 
     # --- rate limiting ---
     RATE_LIMIT_LOGIN: str = "5/minute"
+
+    @model_validator(mode="after")
+    def _production_safety(self) -> Settings:
+        if self.ENVIRONMENT == "production":
+            problems = []
+            if self.DEBUG:
+                problems.append("DEBUG must be false")
+            if not self.COOKIE_SECURE:
+                problems.append("COOKIE_SECURE must be true")
+            if self.SECRET_KEY in _INSECURE_SECRETS:
+                problems.append("SECRET_KEY is a known dev default")
+            if self.ALLOWED_HOSTS.strip() in ("", "*"):
+                problems.append("ALLOWED_HOSTS must be an explicit host list")
+            if problems:
+                raise ValueError("Unsafe production config: " + "; ".join(problems))
+        return self
+
+    @property
+    def docs_enabled(self) -> bool:
+        if self.ENABLE_DOCS is not None:
+            return self.ENABLE_DOCS
+        return self.ENVIRONMENT != "production"
+
+    @property
+    def allowed_hosts(self) -> list[str]:
+        raw = [h.strip() for h in self.ALLOWED_HOSTS.split(",") if h.strip()]
+        return raw or ["*"]
 
     @property
     def cors_allow_origins(self) -> list[str]:

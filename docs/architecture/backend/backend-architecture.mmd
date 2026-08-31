@@ -8,6 +8,8 @@ flowchart TD
     %% ---------------------------------------------------------------- request pipeline
     subgraph PIPE["Request pipeline (app/main.py)"]
         direction TB
+        SECHDR["SecurityHeadersMiddleware<br/>X-Content-Type-Options, X-Frame-Options DENY,<br/>Referrer-Policy, CSP default-src 'none', HSTS (when COOKIE_SECURE)"]
+        THOST["TrustedHostMiddleware<br/>settings.allowed_hosts (prod: explicit list; enforced by config guard)"]
         CORS["CORSMiddleware<br/>allow_origins = settings.cors_allow_origins<br/>allow_credentials=true"]
         CID["CorrelationIdMiddleware<br/>app/core/logging.py — X-Request-ID"]
         RL["slowapi rate limiter<br/>app/modules/auth/router.py::limiter<br/>5/min/IP on POST /auth/login"]
@@ -110,10 +112,10 @@ flowchart TD
         T5["amenities.close_past_bookings · 15m"]
     end
 
-    OPS["ops routes (app/main.py)<br/>GET / · /healthz · /readyz · /docs · /redoc"]
+    OPS["ops routes (app/main.py)<br/>GET / · /healthz · /readyz · /docs · /redoc<br/>(/docs, /redoc, openapi.json disabled when ENVIRONMENT=production unless ENABLE_DOCS)"]
 
     %% ================================================================ edges
-    Client -->|HTTPS| CORS --> CID --> RL --> EXC
+    Client -->|HTTPS| THOST --> SECHDR --> CORS --> CID --> RL --> EXC
     Client -.-> OPS
     EXC --> SELECT --> CSRF --> SESS --> REQAUTH
     REQAUTH --> SCOPE

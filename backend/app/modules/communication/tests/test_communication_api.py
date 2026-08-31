@@ -35,6 +35,37 @@ def test_resident_cannot_create_announcement(as_role):
     assert r.status_code == 403
 
 
+def test_publishing_a_broadcast_notifies_residents(as_role, seed_ids):
+    """FR-15 / NTF-1: publishing a community-wide notice must create in-app
+    notifications for the residents it targets."""
+    from sqlalchemy import func, select
+
+    from app.db.session import SessionLocal
+    from app.modules.notifications.models import Notification
+
+    admin = as_role("community_admin")
+    r = admin.post(
+        f"{P}/announcements",
+        json={
+            "announcement_type": "notice",
+            "title": "Water shutdown Saturday",
+            "body": "Supply off 10:00-14:00 for tank cleaning.",
+            "targets": [{"target_all_community": True}],
+        },
+    )
+    assert r.status_code == 201, r.text
+    aid = r.json()["data"]["id"]
+    assert admin.post(f"{P}/announcements/{aid}/publish").status_code == 200
+
+    with SessionLocal() as db:
+        n = db.scalar(
+            select(func.count())
+            .select_from(Notification)
+            .where(Notification.reference_id == aid, Notification.reference_type == "announcement")
+        )
+    assert n and n > 0, "publishing a community broadcast created no resident notifications"
+
+
 def test_admin_announcement_and_poll_flow(as_role, seed_ids):
     admin = as_role("community_admin")
     r = admin.post(

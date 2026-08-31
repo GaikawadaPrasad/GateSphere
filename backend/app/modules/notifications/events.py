@@ -55,6 +55,49 @@ async def emit(
         log.warning("notification emit failed", extra={"type": notification_type}, exc_info=True)
 
 
+async def emit_many(
+    db,
+    *,
+    recipient_user_ids: list[uuid.UUID],
+    community_id: uuid.UUID,
+    notification_type: str,
+    title: str,
+    message: str,
+    reference_type: str | None = None,
+    reference_id: uuid.UUID | None = None,
+) -> int:
+    """Bulk in-app notification for a broadcast (community announcement / emergency).
+
+    One `INSERT` for the whole recipient set — no per-recipient SAVEPOINT / preference
+    check / delivery row, so it stays O(1) queries for a community of any size. SMS / email
+    fan-out for very large communities should move to Celery; in-app is the durable record.
+    Best-effort: a failure here never rolls back the publish.
+    """
+    from app.modules.notifications.models import Notification
+
+    ids = list(dict.fromkeys(u for u in recipient_user_ids if u is not None))
+    if not ids:
+        return 0
+    try:
+        async with db.begin_nested():
+            db.add_all(
+                Notification(
+                    community_id=community_id,
+                    recipient_user_id=uid,
+                    notification_type=notification_type,
+                    title=title,
+                    message=message,
+                    reference_type=reference_type,
+                    reference_id=reference_id,
+                )
+                for uid in ids
+            )
+    except Exception:
+        log.warning("broadcast emit failed", extra={"type": notification_type}, exc_info=True)
+        return 0
+    return len(ids)
+
+
 async def emit_to_roles(
     db,
     scope: TenantScope,
