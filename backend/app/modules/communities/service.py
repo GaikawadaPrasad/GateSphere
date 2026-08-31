@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.context import RequestContext
@@ -135,11 +134,7 @@ class CommunityService:
         self, *, community_id: uuid.UUID, offset: int, limit: int
     ) -> tuple[list[Gate], int]:
         cid = self.scope.require(community_id)
-        stmt = select(Gate).where(Gate.community_id == cid).order_by(Gate.code)
-        return (
-            await self.gates.list(offset=offset, limit=limit, extra=stmt),
-            await self.gates.count(extra=stmt),
-        )
+        return await self.gates.list_for_community(cid, offset=offset, limit=limit)
 
     async def create_gate(self, *, community_id: uuid.UUID, payload: schemas.GateCreate) -> Gate:
         cid = self.scope.require(community_id)
@@ -158,11 +153,7 @@ class CommunityService:
         self, *, community_id: uuid.UUID, offset: int, limit: int
     ) -> tuple[list[Tower], int]:
         cid = self.scope.require(community_id)
-        stmt = select(Tower).where(Tower.community_id == cid).order_by(Tower.name)
-        return (
-            await self.towers.list(offset=offset, limit=limit, extra=stmt),
-            await self.towers.count(extra=stmt),
-        )
+        return await self.towers.list_for_community(cid, offset=offset, limit=limit)
 
     async def get_tower(self, tower_id: uuid.UUID) -> Tower:
         obj = await self.towers.get(tower_id)
@@ -197,11 +188,7 @@ class CommunityService:
         self, *, tower_id: uuid.UUID, offset: int, limit: int
     ) -> tuple[list[Floor], int]:
         tower = await self.get_tower(tower_id)
-        stmt = select(Floor).where(Floor.tower_id == tower.id).order_by(Floor.floor_number)
-        return (
-            await self.floors.list(offset=offset, limit=limit, extra=stmt),
-            await self.floors.count(extra=stmt),
-        )
+        return await self.floors.list_for_tower(tower.id, offset=offset, limit=limit)
 
     async def get_floor(self, floor_id: uuid.UUID) -> Floor:
         obj = await self.floors.get(floor_id)
@@ -238,11 +225,7 @@ class CommunityService:
         self, *, floor_id: uuid.UUID, offset: int, limit: int
     ) -> tuple[list[Unit], int]:
         floor = await self.get_floor(floor_id)
-        stmt = select(Unit).where(Unit.floor_id == floor.id).order_by(Unit.unit_number)
-        return (
-            await self.units.list(offset=offset, limit=limit, extra=stmt),
-            await self.units.count(extra=stmt),
-        )
+        return await self.units.list_for_floor(floor.id, offset=offset, limit=limit)
 
     async def get_unit(self, unit_id: uuid.UUID) -> Unit:
         obj = await self.units.get(unit_id)

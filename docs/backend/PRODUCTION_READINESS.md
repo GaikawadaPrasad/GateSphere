@@ -41,6 +41,9 @@ reproducible with `make test` (Docker) unless noted.
 
 - Per-test transactional rollback fixtures not yet implemented (`make test` reseed is the
   workaround for shared-DB flakes — IS-1).
+- Layering debt (C-3): some services still hold read `select()`s. Now ratcheted —
+  `scripts/repo-layering-ratchet.sh` (CI `backend-layering`) fails on growth; new queries
+  must go in `repository.py`. `app/modules/communities/` migrated as the reference.
 - `audit_logs` immutability is path-absence, not a DB trigger (AUD-2).
 - No point-in-time `role` column on `audit_logs` (AUD-1).
 - ~~Broadcast fan-out synchronous~~ → **done**: `publish_announcement` enqueues

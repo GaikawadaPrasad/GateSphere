@@ -62,6 +62,15 @@ class GateRepository(AsyncTenantRepository[Gate]):
             select(Gate).where(Gate.community_id == community_id, Gate.code == code)
         )
 
+    async def list_for_community(
+        self, community_id: uuid.UUID, *, offset: int, limit: int
+    ) -> tuple[list[Gate], int]:
+        stmt = select(Gate).where(Gate.community_id == community_id).order_by(Gate.code)
+        return (
+            await self.list(offset=offset, limit=limit, extra=stmt),
+            await self.count(extra=stmt),
+        )
+
 
 class TowerRepository(AsyncTenantRepository[Tower]):
     model = Tower
@@ -71,9 +80,27 @@ class TowerRepository(AsyncTenantRepository[Tower]):
             select(Tower).where(Tower.community_id == community_id, Tower.name == name)
         )
 
+    async def list_for_community(
+        self, community_id: uuid.UUID, *, offset: int, limit: int
+    ) -> tuple[list[Tower], int]:
+        stmt = select(Tower).where(Tower.community_id == community_id).order_by(Tower.name)
+        return (
+            await self.list(offset=offset, limit=limit, extra=stmt),
+            await self.count(extra=stmt),
+        )
+
 
 class FloorRepository(AsyncTenantRepository[Floor]):
     model = Floor
+
+    async def list_for_tower(
+        self, tower_id: uuid.UUID, *, offset: int, limit: int
+    ) -> tuple[list[Floor], int]:
+        stmt = select(Floor).where(Floor.tower_id == tower_id).order_by(Floor.floor_number)
+        return (
+            await self.list(offset=offset, limit=limit, extra=stmt),
+            await self.count(extra=stmt),
+        )
 
     async def by_number(
         self, *, community_id: uuid.UUID, tower_id: uuid.UUID, number: int
@@ -89,6 +116,15 @@ class FloorRepository(AsyncTenantRepository[Floor]):
 
 class UnitRepository(AsyncTenantRepository[Unit]):
     model = Unit
+
+    async def list_for_floor(
+        self, floor_id: uuid.UUID, *, offset: int, limit: int
+    ) -> tuple[list[Unit], int]:
+        stmt = select(Unit).where(Unit.floor_id == floor_id).order_by(Unit.unit_number)
+        return (
+            await self.list(offset=offset, limit=limit, extra=stmt),
+            await self.count(extra=stmt),
+        )
 
     async def by_number(
         self, *, community_id: uuid.UUID, tower_id: uuid.UUID, floor_id: uuid.UUID, number: str

@@ -118,8 +118,12 @@ FastAPI router  →  service  →  repository  →  SQLAlchemy model  →  Postg
   (`app/core/context.py`) that the router dependency builds with
   `RequestContext.from_request(request)`. The **only** exceptions are `auth` and `onboarding`,
   which set/read session cookies and so take the real `Request`/`Response` — documented in
-  those modules. Services may still hold SQLAlchemy `select()` for read queries (tracked debt
-  C‑3 — new query logic should go in the repository).
+  those modules. Some services still hold SQLAlchemy `select()` for read queries (tracked debt C‑3).
+  **New query logic goes in `<module>/repository.py`, never the service** — enforced by
+  `backend/scripts/repo-layering-ratchet.sh` (CI job `backend-layering`), which fails if the
+  service‑layer `select()` count grows. `app/modules/communities/` is the reference shape:
+  the service resolves scope + rules, the repository owns every query. Lower the baseline
+  with `--update` when you migrate one.
 - **Repository** — SQLAlchemy queries only. Always filters tenant tables by `community_id`.
   `selectinload`/`joinedload` sparingly, only for small bounded results. No business rules.
 - **Model** — ORM table definition. Encodes invariants as DB constraints too.

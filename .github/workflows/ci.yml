@@ -37,6 +37,17 @@ jobs:
       # Ratchet: fails only if the mypy error count grew vs backend/.mypy-baseline (TYP-1).
       - run: bash scripts/mypy-ratchet.sh
 
+  backend-layering:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      # Ratchet: fails only if the service-layer raw-query count grew vs
+      # backend/.repo-layering-baseline (C-3). New queries belong in repository.py.
+      - run: bash scripts/repo-layering-ratchet.sh
+
   frontend-lint:
     runs-on: ubuntu-latest
     defaults:
