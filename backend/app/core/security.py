@@ -315,13 +315,6 @@ async def require_platform_admin(user: User = Depends(require_auth_async)) -> Us
     return user
 
 
-# `require_permission_async` lives in `app.core.tenancy` (it needs the resolved TenantScope so
-# per-community RBAC overrides are enforced), but is re-exported here for the ~20 routers that
-# import it from `app.core.security`. Resolved lazily via module __getattr__ (PEP 562) so that
-# `tenancy` importing `security` first does not trip a circular import at module load.
-def __getattr__(name: str):  # noqa: E402
-    if name == "require_permission_async":
-        from app.core.tenancy import require_permission_async
-
-        return require_permission_async
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+# `require_permission_async` lives in `app.core.tenancy` — it needs the resolved `TenantScope`
+# so per-community RBAC overrides are enforced. Routers import it directly from `app.core.tenancy`
+# (never re-exported here) so the dependency direction stays one-way: tenancy -> security.
