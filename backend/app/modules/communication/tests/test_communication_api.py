@@ -107,6 +107,67 @@ def test_admin_announcement_and_poll_flow(as_role, seed_ids):
     assert v.json()["data"]["total_responses"] == 1
 
 
+def test_multi_question_survey_flow(as_role, seed_ids):
+    """GAP-1: a `survey` announcement carries one Poll per question."""
+    admin = as_role("community_admin")
+    a = admin.post(
+        f"{P}/announcements",
+        json={
+            "announcement_type": "survey",
+            "title": "Amenity priorities 2026",
+            "body": "Two quick questions",
+            "targets": [{"target_all_community": True}],
+        },
+    )
+    assert a.status_code == 201, a.text
+    aid = a.json()["data"]["id"]
+    assert admin.post(f"{P}/announcements/{aid}/publish").status_code == 200
+
+    for q in ("Upgrade the gym?", "Add a co-working room?"):
+        p = admin.post(
+            f"{P}/polls",
+            json={
+                "announcement_id": aid,
+                "question": q,
+                "options": [{"option_text": "Yes"}, {"option_text": "No"}],
+            },
+        )
+        assert p.status_code == 201, p.text
+
+    # duplicate question text is rejected
+    dup = admin.post(
+        f"{P}/polls",
+        json={
+            "announcement_id": aid,
+            "question": "Upgrade the gym?",
+            "options": [{"option_text": "Yes"}, {"option_text": "No"}],
+        },
+    )
+    assert dup.status_code == 409, dup.text
+
+    s = admin.get(f"{P}/announcements/{aid}/survey")
+    assert s.status_code == 200, s.text
+    data = s.json()["data"]
+    assert data["question_count"] == 2
+    assert {q["question"] for q in data["questions"]} == {
+        "Upgrade the gym?",
+        "Add a co-working room?",
+    }
+
+    # survey endpoint rejects a non-survey announcement
+    n = admin.post(
+        f"{P}/announcements",
+        json={
+            "announcement_type": "notice",
+            "title": "x",
+            "body": "y",
+            "targets": [{"target_all_community": True}],
+        },
+    )
+    nid = n.json()["data"]["id"]
+    assert admin.get(f"{P}/announcements/{nid}/survey").status_code == 422
+
+
 def test_resident_groups_and_group_target(as_role, seed_ids):
     admin = as_role("community_admin")
     import uuid as _u

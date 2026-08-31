@@ -46,7 +46,7 @@ reproducible with `make test` (Docker) unless noted.
 - ~~Broadcast fan-out synchronous~~ → **done**: `publish_announcement` enqueues
   `communication.tasks.fan_out_announcement` on the `notifications` Celery queue (idempotent).
 - (CFG-5 done — Redis sliding-window by path class.)
-- Feature-completeness: multi-question survey builder still pending (GAP-1); event RSVP done (GAP-2).
+- Feature-completeness: multi-question surveys done (GAP-1, migration 0031); event RSVP done (GAP-2).
   `?q=` search: visitors, domestic_staff, vehicles, complaints, incidents, deliveries.
   CSV export: audit, invoices, payments, gate events, visitor entries, complaint tickets.
 

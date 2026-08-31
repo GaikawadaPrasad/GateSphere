@@ -178,6 +178,22 @@ class PollResults(BaseModel):
     results: list[PollResultRow]
 
 
+class SurveyQuestionResults(BaseModel):
+    poll_id: uuid.UUID
+    question: str
+    status: str
+    allow_multiple: bool
+    total_responses: int
+    results: list[PollResultRow]
+
+
+class SurveyRead(BaseModel):
+    announcement_id: uuid.UUID
+    title: str
+    question_count: int
+    questions: list[SurveyQuestionResults]
+
+
 class RsvpIn(_Write):
     response: str = Field(pattern="^(going|maybe|not_going)$")
     guests: int = Field(default=0, ge=0, le=20)

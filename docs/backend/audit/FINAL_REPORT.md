@@ -281,7 +281,7 @@ Plus `docs/backend/AUTHENTICATION.md`, `RBAC.md`, `API_ARCHITECTURE.md`,
 | CFG-5 | Rate limiting is login-only. Gate-PIN verify (guard-authenticated) and uploads are unbounded. |
 | R-1 | Invitation token travels in the URL path → reaches access logs (token is hashed at rest, TTL + single-use, not logged in plaintext). |
 | SEED-1 | `audit_logs` empty on fresh seed; a few tables thin. |
-| GAP-1..4 | No multi-question survey builder; events have no RSVP/calendar; `?q=` free-text search only on `visitors` + `domestic_staff`; operational CSV exports only for `audit`. Each defensible vs `AGENTS.md §0`; flagged for Sivion vs the wireframes. |
+| GAP-1..4 | **All FIXED** (Phase 2). GAP-1: multi-question surveys — one `Poll` per question on a `survey` announcement (migration 0031, `GET .../survey`). GAP-2: `event_rsvps` (migration 0030, RLS) + RSVP/summary routes. GAP-3: `?q=` free-text now on visitors, domestic_staff, vehicles, complaints, incidents, deliveries. GAP-4: `.csv` exports on billing (invoices/payments), gate, visitors, complaints (+ existing audit). |
 | NTF-1-note | Broadcast fan-out is synchronous in-app (bulk `INSERT`); move SMS/email to Celery beyond a few thousand residents. |
 
 ---

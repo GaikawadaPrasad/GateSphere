@@ -175,6 +175,15 @@ async def list_rsvps(announcement_id: uuid.UUID, svc: Svc = Depends(communicatio
     return ok(schemas.RsvpSummary.model_validate(await svc.rsvp_summary(announcement_id)))
 
 
+@router.get(
+    "/announcements/{announcement_id}/survey",
+    response_model=Envelope[schemas.SurveyRead],
+    dependencies=[VIEW],
+)
+async def get_survey(announcement_id: uuid.UUID, svc: Svc = Depends(communication_service)) -> dict:
+    return ok(schemas.SurveyRead.model_validate(await svc.survey(announcement_id)))
+
+
 @router.post(
     "/polls/{poll_id}/status",
     response_model=Envelope[schemas.PollRead],

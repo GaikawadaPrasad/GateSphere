@@ -255,8 +255,11 @@ Every registered route, cross-checked against `GET /api/v1/openapi.json` (256 ro
 | PATCH | `/communication/groups/{id}` | session | `communication:update` | T | `resident_groups` (update) | |
 | GET/POST | `/communication/groups/{id}/members` | session | `:view` / `:update` | T | `resident_group_members` (insert) | user must be a community member (`user_in_community`) else `404`; `409 MEMBER_EXISTS` |
 | DELETE | `/communication/groups/{id}/members/{member_id}` | session | `communication:update` | T | `resident_group_members` (delete) | checks `member.group_id == group.id` |
-| POST | `/communication/polls` | session | `communication:create` | T | `polls` + `poll_options` (insert) | announcement must be type `poll`/`survey`; `409 POLL_EXISTS` |
+| POST | `/communication/polls` | session | `communication:create` | T | `polls` + `poll_options` (insert) | `poll` type → one poll (`409 POLL_EXISTS`); `survey` type → one poll per question, distinct question text (`409 QUESTION_EXISTS`) |
 | GET | `/communication/polls/{id}`, `/{id}/results` | session | `communication:view` | T | – | live tally |
+| GET | `/communication/announcements/{id}/survey` | session | `communication:view` | T | – | all questions of a `survey` announcement + per-question tallies (`422 NOT_A_SURVEY`) |
+| POST | `/communication/announcements/{id}/rsvp` | session | `communication:view` | T | `event_rsvps` (upsert) | type `event` & published; `going`/`maybe`/`not_going` + guests; audit `event.rsvp` |
+| GET | `/communication/announcements/{id}/rsvps` | session | `communication:view` | T | – | counts + `total_attendees` (going + guests) + `my_response` |
 | POST | `/communication/polls/{id}/status` | session | `communication:update` | T (machine `draft→open→closed`) | `polls.status` | `open` requires published announcement |
 | POST | `/communication/polls/{id}/vote` | session | `communication:view` | T | `poll_responses` + `poll_response_options` (insert) | `422 POLL_NOT_OPEN`/`INVALID_OPTION`/`SINGLE_CHOICE_ONLY`; `409 ALREADY_VOTED` |
 

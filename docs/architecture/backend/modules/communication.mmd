@@ -1,7 +1,8 @@
 %% Module: communication — Broadcast Engine (FR-12)
 %% Files: app/modules/communication/{router,deps,service,repository,models,schemas}.py
 %% Models: Announcement (notice|emergency|poll|event|survey; publish-freeze) + AnnouncementTarget,
-%%         ResidentGroup + ResidentGroupMember, Poll + PollOption + PollResponse + PollResponseOption
+%%         ResidentGroup + ResidentGroupMember, Poll + PollOption + PollResponse + PollResponseOption,
+%%         EventRSVP (event announcements). survey = one Poll per question (uq announcement_id+question).
 
 flowchart TD
     C["Client (session)"] --> DEP["deps.communication_service — async_tenant_context + require_auth_async"]
@@ -39,8 +40,9 @@ flowchart TD
         direction TB
         RSVP["POST /communication/announcements/{id}/rsvp → rsvp (VIEW)<br/>type=event & is_published; upsert event_rsvps (going|maybe|not_going, guests); audit event.rsvp"]
         RSVP_S["GET /communication/announcements/{id}/rsvps → rsvp_summary<br/>going/maybe/not_going counts + total_attendees (going + guests) + my_response"]
-        PO_C["POST /communication/polls → create_poll  [communication:create]<br/>announcement type ∈ poll|survey; 409 POLL_EXISTS; INSERT polls + poll_options"]
+        PO_C["POST /communication/polls → create_poll  [communication:create]<br/>poll type → 1 poll (409 POLL_EXISTS); survey type → 1 poll per distinct question (409 QUESTION_EXISTS);<br/>INSERT polls + poll_options"]
         PO_G["GET /communication/polls/{id} · /{id}/results → get_poll / results (live tally)"]
+        PO_SV["GET /communication/announcements/{id}/survey → survey (VIEW)<br/>type=survey else 422 NOT_A_SURVEY; all questions + per-question tallies"]
         PO_S{"POST /communication/polls/{id}/status → set_poll_status  [communication:update]"}
         PO_S -->|"invalid transition"| PO_SE["422 INVALID_TRANSITION"]
         PO_S -->|"→ open"| PO_S1{"announcement.is_published?"} -->|no| PO_SE2["422 ANNOUNCEMENT_DRAFT"]
@@ -55,6 +57,6 @@ flowchart TD
     end
 
     ANN & GRP & POLL --> REPO["AnnouncementRepository / PollRepository (AsyncTenantRepository)<br/>+ _get_group (explicit community check)"]
-    REPO --> DB[("PostgreSQL: announcements, announcement_targets, resident_groups, resident_group_members,<br/>polls, poll_options, poll_responses, poll_response_options, audit_logs")]
+    REPO --> DB[("PostgreSQL: announcements, announcement_targets, resident_groups, resident_group_members,<br/>polls, poll_options, poll_responses, poll_response_options, event_rsvps, audit_logs")]
 
     NOTE["list_announcements returns all published announcements in the community<br/>ordered by created_at desc, paginated — audience targeting is stored but not applied to this list."]

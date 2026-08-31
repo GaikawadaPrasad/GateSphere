@@ -48,8 +48,8 @@
 | 37 | Notices | ✅ | `/communication/announcements` `announcement_type=notice` |
 | 38 | Alerts | ✅ | `/gate/alerts` (panic) + `announcement_type=emergency` |
 | 39 | Polls | ✅ | `/communication/polls` (options, vote, results) |
-| 40 | Surveys | ◑ (partial) | `announcement_type=survey` exists; reuses poll mechanics. No multi-question survey builder. **GAP-1 (LOW)** |
-| 41 | Events | ◑ (partial) | `announcement_type=event` exists (broadcast an event). No RSVP / calendar. **GAP-2 (LOW)** — AGENTS.md §0 lists events only as a communication variant. |
+| 40 | Surveys | ✅ | `announcement_type=survey` carries one `Poll` per question (`uq_poll_announcement_question`, migration 0031); `GET /communication/announcements/{id}/survey` returns all questions + per-question tallies. **GAP-1 FIXED** |
+| 41 | Events | ✅ | `announcement_type=event` + `event_rsvps` (migration 0030, RLS) + `POST /communication/announcements/{id}/rsvp` / `GET .../rsvps`. **GAP-2 FIXED** |
 | 42 | Emergency incidents | ✅ | `incidents` |
 | 43 | Incident actions | ✅ | `/incidents/{id}/actions`, `incident_actions` append-only |
 | 44 | Dashboards | ✅ | `/dashboards/{overview,security,financial,resident}` |
@@ -73,7 +73,7 @@ updated.
 
 | ID | Sev | Gap | Recommendation |
 |---|---|---|---|
-| GAP-1 | LOW | No multi-question **survey** builder (only single-question polls; `survey` is just an announcement type) | Only build if the PRD's survey acceptance criteria require multi-question. Otherwise the `poll` + `announcement_type=survey` combo is adequate. |
+| GAP-1 | FIXED | Multi-question **surveys**: a `survey` announcement now carries N `Poll` rows (one per question). Uniqueness key moved `(announcement_id)` → `(announcement_id, question)` (migration 0031); `POST /communication/polls` allows multiple distinct-question polls for `survey` type (`409 QUESTION_EXISTS` on dup); new `GET /communication/announcements/{id}/survey` aggregates all questions + tallies. No new tables — reuses all poll/vote/results machinery. |
 | GAP-2 | FIXED | `event_rsvps` table (migration 0030, RLS) + `POST /communication/announcements/{id}/rsvp` (upsert going/maybe/not_going + guests) + `GET .../rsvps` summary. |
 | GAP-3 | FIXED | `?q=` now on visitors, domestic_staff, vehicles, complaints tickets, incidents, deliveries (ILIKE across number/name/text columns; tenant-scoped). |
 | GAP-4 | FIXED | `.csv` exports (shared `app/core/export.py::csv_response`, `<module>:export` gated): `/billing/invoices.csv`, `/billing/payments.csv`, `/gate/events.csv`, `/visitors/entries.csv`, `/complaints/tickets.csv` (+ existing `/audit/logs.csv`). |
@@ -106,4 +106,4 @@ mermaid-cli validate amenities.mmd      → valid
 | Critical | 0 | — |
 | High | 0 | — |
 | Medium | 1 (FIXED) | AMEN-1 |
-| Low | 4 (documented) | GAP-1..4 |
+| Low | 4 (all FIXED) | GAP-1..4 |

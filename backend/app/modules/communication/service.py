@@ -426,8 +426,16 @@ class CommunicationService:
         ann = await self.get_announcement(payload.announcement_id)
         if ann.announcement_type not in ("poll", "survey"):
             raise BusinessRuleError("Announcement is not a poll/survey", code="NOT_A_POLL")
-        if await self.polls.by_announcement(ann.id) is not None:
-            raise ConflictError("That announcement already has a poll", code="POLL_EXISTS")
+        if ann.announcement_type == "poll":
+            # `poll` type -> exactly one question.
+            if await self.polls.by_announcement(ann.id) is not None:
+                raise ConflictError("That announcement already has a poll", code="POLL_EXISTS")
+        else:
+            # `survey` type -> one Poll per question; questions must be distinct (GAP-1).
+            if await self.polls.question_exists(ann.id, payload.question):
+                raise ConflictError(
+                    "That survey already has a question with this text", code="QUESTION_EXISTS"
+                )
         poll = Poll(
             community_id=ann.community_id,
             announcement_id=ann.id,
@@ -509,4 +517,36 @@ class CommunicationService:
             poll_id=poll.id,
             total_responses=await response_count(self.db, poll.id),
             results=rows,
+        )
+
+    async def survey(self, announcement_id: uuid.UUID) -> schemas.SurveyRead:
+        """All questions of a `survey`-type announcement, with per-question tallies (GAP-1)."""
+        ann = await self.get_announcement(announcement_id)
+        if ann.announcement_type != "survey":
+            raise BusinessRuleError("Announcement is not a survey", code="NOT_A_SURVEY")
+        polls = await self.polls.all_for_announcement(ann.id)
+        questions: list[schemas.SurveyQuestionResults] = []
+        for poll in polls:
+            counts = await tally(self.db, poll.id)
+            rows = [
+                schemas.PollResultRow(
+                    option_id=o.id, option_text=o.option_text, votes=counts.get(o.id, 0)
+                )
+                for o in sorted(poll.options, key=lambda x: x.display_order)
+            ]
+            questions.append(
+                schemas.SurveyQuestionResults(
+                    poll_id=poll.id,
+                    question=poll.question,
+                    status=poll.status,
+                    allow_multiple=poll.allow_multiple,
+                    total_responses=await response_count(self.db, poll.id),
+                    results=rows,
+                )
+            )
+        return schemas.SurveyRead(
+            announcement_id=ann.id,
+            title=ann.title,
+            question_count=len(questions),
+            questions=questions,
         )

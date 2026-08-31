@@ -40,6 +40,23 @@ class PollRepository(AsyncTenantRepository[Poll]):
     async def by_announcement(self, announcement_id: uuid.UUID) -> Poll | None:
         return await self.db.scalar(select(Poll).where(Poll.announcement_id == announcement_id))
 
+    async def all_for_announcement(self, announcement_id: uuid.UUID) -> list[Poll]:
+        rows = await self.db.scalars(
+            select(Poll)
+            .where(Poll.announcement_id == announcement_id)
+            .order_by(Poll.created_at)
+            .options(selectinload(Poll.options), selectinload(Poll.announcement))
+        )
+        return list(rows)
+
+    async def question_exists(self, announcement_id: uuid.UUID, question: str) -> bool:
+        n = await self.db.scalar(
+            select(func.count())
+            .select_from(Poll)
+            .where(Poll.announcement_id == announcement_id, Poll.question == question)
+        )
+        return bool(n)
+
 
 async def response_for(db, poll_id: uuid.UUID, user_id: uuid.UUID) -> PollResponse | None:
     return await db.scalar(

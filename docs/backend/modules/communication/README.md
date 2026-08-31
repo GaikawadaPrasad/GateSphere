@@ -20,17 +20,19 @@ Community announcements with scoped targets (tower / unit / role / all), and pol
 
 ## Data model
 
-Owned tables (`docs/database/schema.md §12`), migration `0015`. `announcements` and `polls`
+Owned tables (`docs/database/schema.md §12`), migrations `0015` (base), `0030` (`event_rsvps`),
+`0031` (survey uniqueness key). `announcements`, `polls`, `resident_groups` and `event_rsvps`
 are tenant-scoped + RLS; the rest are reached only through their parent.
 
 | Table | Notes |
 |-------|-------|
 | `announcements` | UQ `(id, community_id)`. `announcement_type` ∈ notice·emergency·poll·event·survey; `priority` ∈ low·normal·high·urgent. `is_published` — **permanent record once true**. |
-| `announcement_targets` | `CHECK target_all_community OR tower_id OR unit_id OR role_id`. Targets validated against the announcement's community. |
-| `polls` | UQ `announcement_id` — 1:1 with its announcement. `status` ∈ draft·open·closed. `allow_multiple` gates multi-option selection. |
+| `announcement_targets` | `CHECK target_all_community OR tower_id OR unit_id OR role_id OR resident_group_id`. Targets validated against the announcement's community. |
+| `polls` | UQ `(announcement_id, question)` — a `poll` announcement has one poll; a `survey` announcement has one poll **per question**. `status` ∈ draft·open·closed. `allow_multiple` gates multi-option selection. |
 | `poll_options` | `display_order` for stable rendering. |
 | `poll_responses` | UQ `(poll_id, user_id)` — one response per user. |
 | `poll_response_options` | UQ `(response_id, option_id)`. |
+| `event_rsvps` | UQ `(announcement_id, user_id)` — one RSVP per user. `response` ∈ going·maybe·not_going (CHECK); `guests` ≥ 0 (CHECK). |
 
 ## Business rules (service layer)
 
@@ -39,9 +41,16 @@ are tenant-scoped + RLS; the rest are reached only through their parent.
   (`422 ALREADY_PUBLISHED` otherwise). **Publish** requires ≥ 1 target
   (`422 NO_TARGET`), stamps `publish_at`, and freezes the record. `expire` just sets
   `expires_at`.
-- **Poll**: attaches 1:1 to a `poll` / `survey` announcement (`422 NOT_A_POLL`,
-  `409 POLL_EXISTS`); ≥ 2 options. Status machine `draft → open → closed`; **opening requires
-  the announcement to be published** (`422 ANNOUNCEMENT_DRAFT`).
+- **Poll**: attaches to a `poll` / `survey` announcement (`422 NOT_A_POLL`); ≥ 2 options.
+  A `poll` announcement takes exactly one poll (`409 POLL_EXISTS`); a `survey` announcement
+  takes one poll per question, each question text distinct (`409 QUESTION_EXISTS`). Status
+  machine `draft → open → closed`; **opening requires the announcement to be published**
+  (`422 ANNOUNCEMENT_DRAFT`).
+- **Survey**: `GET /communication/announcements/{id}/survey` (`422 NOT_A_SURVEY` for other
+  types) returns every question of the survey with its live per-option tally and response count.
+- **Event RSVP**: `POST /communication/announcements/{id}/rsvp` upserts the caller's response
+  to a published `event` announcement (`422` otherwise); `GET .../rsvps` returns the counts,
+  `total_attendees` (going responders + their guests) and the caller's `my_response`.
 - **Vote**: poll must be `open` (`422 POLL_NOT_OPEN`) and within `closes_at`
   (`422 POLL_CLOSED`); options must belong to the poll (`422 INVALID_OPTION`); exactly one
   option unless `allow_multiple` (`422 SINGLE_CHOICE_ONLY`); one response per user
@@ -56,9 +65,10 @@ Base path `/api/v1/communication`. Full contract:
 ## Events
 
 Audit (`audit_logs`, same transaction): `announcement.create` / `update` / `publish` /
-`expire`, `poll.create`, `poll.open` / `poll.closed`, `poll.vote`. Push / email fan-out to
-targeted residents lands with FR-15. `resident_groups` (schema §12) is deferred — targeting is
-tower / unit / role / all for now.
+`expire`, `poll.create`, `poll.open` / `poll.closed`, `poll.vote`, `event.rsvp`. Publishing an
+announcement enqueues `communication.tasks.fan_out_announcement` (Celery `notifications` queue,
+idempotent) which creates in-app notifications for targeted residents. Targeting supports
+tower / unit / role / resident group / whole community.
 
 ## Seed
 

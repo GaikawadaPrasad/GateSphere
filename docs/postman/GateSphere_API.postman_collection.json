@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "GateSphere API",
-    "description": "Complete GateSphere backend API — every route, generated from the live FastAPI app by `docs/postman/build_collection.py`.\n\n**Multi-role sessions:** each request logs in as its own role via `ensureSession(role)` (collection pre-request script) and sends `X-Session-Role`. Sessions live in Postman's cookie jar — no `{{token}}` variable. Do NOT collapse the roles into one session.\n\nRun order: `00 Health` -> `01 Authentication` -> `_Workflow` (creates + saves ids) -> the module folders -> `_Negative`.",
+    "description": "Complete GateSphere backend API \u2014 every route, generated from the live FastAPI app by `docs/postman/build_collection.py`.\n\n**Multi-role sessions:** each request logs in as its own role via `ensureSession(role)` (collection pre-request script) and sends `X-Session-Role`. Sessions live in Postman's cookie jar \u2014 no `{{token}}` variable. Do NOT collapse the roles into one session.\n\nRun order: `00 Health` -> `01 Authentication` -> `_Workflow` (creates + saves ids) -> the module folders -> `_Negative`.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -5734,6 +5734,71 @@
           ]
         },
         {
+          "name": "GET /visitors/entries.csv",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Session-Role",
+                "value": "community_admin"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/visitors/entries.csv",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "visitors",
+                "entries.csv"
+              ]
+            },
+            "description": "**GET /api/v1/visitors/entries.csv**\n\n- Module: `visitors`\n- Auth: session cookie\n- Required: `visitors:export`\n- Session: `community_admin`\n\nAuto-generated from the live route table by `docs/postman/build_collection.py`. Fill the request body / path variables before running individually; the `_Workflow` folder wires the ids for a full run."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_session_helper'));",
+                  "ensureSession('community_admin');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ok = pm.response.code < 300;",
+                  "pm.test('GET /api/v1/visitors/entries.csv -> 2xx or a documented 4xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200].concat([400,401,403,404,405,409,422]));",
+                  "});",
+                  "if (ok && pm.response.headers.get('content-type') || '' ) {",
+                  "  try {",
+                  "    const b = pm.response.json();",
+                  "    pm.test('canonical envelope', function () {",
+                  "      pm.expect(b).to.have.property('success');",
+                  "    });",
+                  "    const id = b && b.data && (b.data.id || (b.data.data && b.data.data.id));",
+                  "    if (id && pm.response.code === 201) {",
+                  "      pm.collectionVariables.set('_last_GET /api/v1/visitors/entries.csv_id', id);",
+                  "    }",
+                  "  } catch (e) {}",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "PATCH /visitors/entries/{entry_id}/exit",
           "request": {
             "method": "PATCH",
@@ -7517,6 +7582,71 @@
                   "    const id = b && b.data && (b.data.id || (b.data.data && b.data.data.id));",
                   "    if (id && pm.response.code === 201) {",
                   "      pm.collectionVariables.set('_last_POST /api/v1/gate/events_id', id);",
+                  "    }",
+                  "  } catch (e) {}",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /gate/events.csv",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Session-Role",
+                "value": "security_guard"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/gate/events.csv",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gate",
+                "events.csv"
+              ]
+            },
+            "description": "**GET /api/v1/gate/events.csv**\n\n- Module: `gate`\n- Auth: session cookie\n- Required: `gate:export`\n- Session: `security`\n\nAuto-generated from the live route table by `docs/postman/build_collection.py`. Fill the request body / path variables before running individually; the `_Workflow` folder wires the ids for a full run."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_session_helper'));",
+                  "ensureSession('security');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ok = pm.response.code < 300;",
+                  "pm.test('GET /api/v1/gate/events.csv -> 2xx or a documented 4xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200].concat([400,401,403,404,405,409,422]));",
+                  "});",
+                  "if (ok && pm.response.headers.get('content-type') || '' ) {",
+                  "  try {",
+                  "    const b = pm.response.json();",
+                  "    pm.test('canonical envelope', function () {",
+                  "      pm.expect(b).to.have.property('success');",
+                  "    });",
+                  "    const id = b && b.data && (b.data.id || (b.data.data && b.data.data.id));",
+                  "    if (id && pm.response.code === 201) {",
+                  "      pm.collectionVariables.set('_last_GET /api/v1/gate/events.csv_id', id);",
                   "    }",
                   "  } catch (e) {}",
                   "}"
@@ -11331,6 +11461,71 @@
           ]
         },
         {
+          "name": "GET /billing/invoices.csv",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Session-Role",
+                "value": "community_admin"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/invoices.csv",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "invoices.csv"
+              ]
+            },
+            "description": "**GET /api/v1/billing/invoices.csv**\n\n- Module: `billing`\n- Auth: session cookie\n- Required: `billing:export`\n- Session: `community_admin`\n\nAuto-generated from the live route table by `docs/postman/build_collection.py`. Fill the request body / path variables before running individually; the `_Workflow` folder wires the ids for a full run."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_session_helper'));",
+                  "ensureSession('community_admin');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ok = pm.response.code < 300;",
+                  "pm.test('GET /api/v1/billing/invoices.csv -> 2xx or a documented 4xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200].concat([400,401,403,404,405,409,422]));",
+                  "});",
+                  "if (ok && pm.response.headers.get('content-type') || '' ) {",
+                  "  try {",
+                  "    const b = pm.response.json();",
+                  "    pm.test('canonical envelope', function () {",
+                  "      pm.expect(b).to.have.property('success');",
+                  "    });",
+                  "    const id = b && b.data && (b.data.id || (b.data.data && b.data.data.id));",
+                  "    if (id && pm.response.code === 201) {",
+                  "      pm.collectionVariables.set('_last_GET /api/v1/billing/invoices.csv_id', id);",
+                  "    }",
+                  "  } catch (e) {}",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "GET /billing/invoices/{invoice_id}",
           "request": {
             "method": "GET",
@@ -11706,6 +11901,71 @@
           ]
         },
         {
+          "name": "GET /billing/payments.csv",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Session-Role",
+                "value": "community_admin"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/payments.csv",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "payments.csv"
+              ]
+            },
+            "description": "**GET /api/v1/billing/payments.csv**\n\n- Module: `billing`\n- Auth: session cookie\n- Required: `billing:export`\n- Session: `community_admin`\n\nAuto-generated from the live route table by `docs/postman/build_collection.py`. Fill the request body / path variables before running individually; the `_Workflow` folder wires the ids for a full run."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_session_helper'));",
+                  "ensureSession('community_admin');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ok = pm.response.code < 300;",
+                  "pm.test('GET /api/v1/billing/payments.csv -> 2xx or a documented 4xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200].concat([400,401,403,404,405,409,422]));",
+                  "});",
+                  "if (ok && pm.response.headers.get('content-type') || '' ) {",
+                  "  try {",
+                  "    const b = pm.response.json();",
+                  "    pm.test('canonical envelope', function () {",
+                  "      pm.expect(b).to.have.property('success');",
+                  "    });",
+                  "    const id = b && b.data && (b.data.id || (b.data.data && b.data.data.id));",
+                  "    if (id && pm.response.code === 201) {",
+                  "      pm.collectionVariables.set('_last_GET /api/v1/billing/payments.csv_id', id);",
+                  "    }",
+                  "  } catch (e) {}",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "GET /billing/payments/{payment_id}",
           "request": {
             "method": "GET",
@@ -11842,6 +12102,88 @@
                   "    const id = b && b.data && (b.data.id || (b.data.data && b.data.data.id));",
                   "    if (id && pm.response.code === 201) {",
                   "      pm.collectionVariables.set('_last_GET /api/v1/billing/payments/{payment_id}/receipt_id', id);",
+                  "    }",
+                  "  } catch (e) {}",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /billing/payments/{payment_id}/refund",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Session-Role",
+                "value": "community_admin"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/payments/:payment_id/refund",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "payments",
+                ":payment_id",
+                "refund"
+              ],
+              "variable": [
+                {
+                  "key": "payment_id",
+                  "value": "{{payment_id}}"
+                }
+              ]
+            },
+            "description": "**POST /api/v1/billing/payments/{payment_id}/refund**\n\n- Module: `billing`\n- Auth: session cookie\n- Required: `billing:approve`\n- Session: `community_admin`\n\nAuto-generated from the live route table by `docs/postman/build_collection.py`. Fill the request body / path variables before running individually; the `_Workflow` folder wires the ids for a full run.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_session_helper'));",
+                  "ensureSession('community_admin');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ok = pm.response.code < 300;",
+                  "pm.test('POST /api/v1/billing/payments/{payment_id}/refund -> 2xx or a documented 4xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201].concat([400,401,403,404,405,409,422]));",
+                  "});",
+                  "if (ok && pm.response.headers.get('content-type') || '' ) {",
+                  "  try {",
+                  "    const b = pm.response.json();",
+                  "    pm.test('canonical envelope', function () {",
+                  "      pm.expect(b).to.have.property('success');",
+                  "    });",
+                  "    const id = b && b.data && (b.data.id || (b.data.data && b.data.data.id));",
+                  "    if (id && pm.response.code === 201) {",
+                  "      pm.collectionVariables.set('_last_POST /api/v1/billing/payments/{payment_id}/refund_id', id);",
                   "    }",
                   "  } catch (e) {}",
                   "}"
@@ -12610,6 +12952,71 @@
                   "    const id = b && b.data && (b.data.id || (b.data.data && b.data.data.id));",
                   "    if (id && pm.response.code === 201) {",
                   "      pm.collectionVariables.set('_last_POST /api/v1/complaints/tickets_id', id);",
+                  "    }",
+                  "  } catch (e) {}",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /complaints/tickets.csv",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Session-Role",
+                "value": "community_admin"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/complaints/tickets.csv",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "complaints",
+                "tickets.csv"
+              ]
+            },
+            "description": "**GET /api/v1/complaints/tickets.csv**\n\n- Module: `complaints`\n- Auth: session cookie\n- Required: `complaints:export`\n- Session: `community_admin`\n\nAuto-generated from the live route table by `docs/postman/build_collection.py`. Fill the request body / path variables before running individually; the `_Workflow` folder wires the ids for a full run."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_session_helper'));",
+                  "ensureSession('community_admin');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ok = pm.response.code < 300;",
+                  "pm.test('GET /api/v1/complaints/tickets.csv -> 2xx or a documented 4xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200].concat([400,401,403,404,405,409,422]));",
+                  "});",
+                  "if (ok && pm.response.headers.get('content-type') || '' ) {",
+                  "  try {",
+                  "    const b = pm.response.json();",
+                  "    pm.test('canonical envelope', function () {",
+                  "      pm.expect(b).to.have.property('success');",
+                  "    });",
+                  "    const id = b && b.data && (b.data.id || (b.data.data && b.data.data.id));",
+                  "    if (id && pm.response.code === 201) {",
+                  "      pm.collectionVariables.set('_last_GET /api/v1/complaints/tickets.csv_id', id);",
                   "    }",
                   "  } catch (e) {}",
                   "}"
@@ -15106,6 +15513,234 @@
                   "    const id = b && b.data && (b.data.id || (b.data.data && b.data.data.id));",
                   "    if (id && pm.response.code === 201) {",
                   "      pm.collectionVariables.set('_last_POST /api/v1/communication/announcements/{announcement_id}/publish_id', id);",
+                  "    }",
+                  "  } catch (e) {}",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /communication/announcements/{announcement_id}/rsvp",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Session-Role",
+                "value": "community_admin"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/communication/announcements/:announcement_id/rsvp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "communication",
+                "announcements",
+                ":announcement_id",
+                "rsvp"
+              ],
+              "variable": [
+                {
+                  "key": "announcement_id",
+                  "value": "{{notice_id}}"
+                }
+              ]
+            },
+            "description": "**POST /api/v1/communication/announcements/{announcement_id}/rsvp**\n\n- Module: `communication`\n- Auth: session cookie\n- Required: `communication:view`\n- Session: `community_admin`\n\nAuto-generated from the live route table by `docs/postman/build_collection.py`. Fill the request body / path variables before running individually; the `_Workflow` folder wires the ids for a full run.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_session_helper'));",
+                  "ensureSession('community_admin');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ok = pm.response.code < 300;",
+                  "pm.test('POST /api/v1/communication/announcements/{announcement_id}/rsvp -> 2xx or a documented 4xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201].concat([400,401,403,404,405,409,422]));",
+                  "});",
+                  "if (ok && pm.response.headers.get('content-type') || '' ) {",
+                  "  try {",
+                  "    const b = pm.response.json();",
+                  "    pm.test('canonical envelope', function () {",
+                  "      pm.expect(b).to.have.property('success');",
+                  "    });",
+                  "    const id = b && b.data && (b.data.id || (b.data.data && b.data.data.id));",
+                  "    if (id && pm.response.code === 201) {",
+                  "      pm.collectionVariables.set('_last_POST /api/v1/communication/announcements/{announcement_id}/rsvp_id', id);",
+                  "    }",
+                  "  } catch (e) {}",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /communication/announcements/{announcement_id}/rsvps",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Session-Role",
+                "value": "community_admin"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/communication/announcements/:announcement_id/rsvps",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "communication",
+                "announcements",
+                ":announcement_id",
+                "rsvps"
+              ],
+              "variable": [
+                {
+                  "key": "announcement_id",
+                  "value": "{{notice_id}}"
+                }
+              ]
+            },
+            "description": "**GET /api/v1/communication/announcements/{announcement_id}/rsvps**\n\n- Module: `communication`\n- Auth: session cookie\n- Required: `communication:view`\n- Session: `community_admin`\n\nAuto-generated from the live route table by `docs/postman/build_collection.py`. Fill the request body / path variables before running individually; the `_Workflow` folder wires the ids for a full run."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_session_helper'));",
+                  "ensureSession('community_admin');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ok = pm.response.code < 300;",
+                  "pm.test('GET /api/v1/communication/announcements/{announcement_id}/rsvps -> 2xx or a documented 4xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200].concat([400,401,403,404,405,409,422]));",
+                  "});",
+                  "if (ok && pm.response.headers.get('content-type') || '' ) {",
+                  "  try {",
+                  "    const b = pm.response.json();",
+                  "    pm.test('canonical envelope', function () {",
+                  "      pm.expect(b).to.have.property('success');",
+                  "    });",
+                  "    const id = b && b.data && (b.data.id || (b.data.data && b.data.data.id));",
+                  "    if (id && pm.response.code === 201) {",
+                  "      pm.collectionVariables.set('_last_GET /api/v1/communication/announcements/{announcement_id}/rsvps_id', id);",
+                  "    }",
+                  "  } catch (e) {}",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /communication/announcements/{announcement_id}/survey",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Session-Role",
+                "value": "community_admin"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/communication/announcements/:announcement_id/survey",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "communication",
+                "announcements",
+                ":announcement_id",
+                "survey"
+              ],
+              "variable": [
+                {
+                  "key": "announcement_id",
+                  "value": "{{notice_id}}"
+                }
+              ]
+            },
+            "description": "**GET /api/v1/communication/announcements/{announcement_id}/survey**\n\n- Module: `communication`\n- Auth: session cookie\n- Required: `communication:view`\n- Session: `community_admin`\n\nAuto-generated from the live route table by `docs/postman/build_collection.py`. Fill the request body / path variables before running individually; the `_Workflow` folder wires the ids for a full run."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_session_helper'));",
+                  "ensureSession('community_admin');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ok = pm.response.code < 300;",
+                  "pm.test('GET /api/v1/communication/announcements/{announcement_id}/survey -> 2xx or a documented 4xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200].concat([400,401,403,404,405,409,422]));",
+                  "});",
+                  "if (ok && pm.response.headers.get('content-type') || '' ) {",
+                  "  try {",
+                  "    const b = pm.response.json();",
+                  "    pm.test('canonical envelope', function () {",
+                  "      pm.expect(b).to.have.property('success');",
+                  "    });",
+                  "    const id = b && b.data && (b.data.id || (b.data.data && b.data.data.id));",
+                  "    if (id && pm.response.code === 201) {",
+                  "      pm.collectionVariables.set('_last_GET /api/v1/communication/announcements/{announcement_id}/survey_id', id);",
                   "    }",
                   "  } catch (e) {}",
                   "}"
@@ -20427,7 +21062,7 @@
         "exec": [
           "// keep the shared helper source available to every request sandbox",
           "if (!pm.collectionVariables.get('_session_helper')) {",
-          "  console.log('session helper missing — re-import the collection');",
+          "  console.log('session helper missing \u2014 re-import the collection');",
           "}"
         ]
       }

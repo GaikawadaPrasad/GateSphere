@@ -157,10 +157,11 @@ must update this page in the same PR.
 | `announcement_targets` | `announcement_id`, `tower_id`, `unit_id`, `resident_group_id`, `role_id`, `target_all_community` | `CHECK` a valid target combination; target must belong to the announcement's community. Validate the initiator is authorized for the scope **before** publish. |
 | `resident_groups` | `community_id`, `name`, `description`, `created_by_user_id`, `is_active` | |
 | `resident_group_members` | `group_id`, `user_id`, `added_at` | |
-| `polls` | `community_id`, `announcement_id`, `created_by_user_id`, `question`, `allow_multiple`, `opens_at`, `closes_at`, `status` | |
+| `polls` | `community_id`, `announcement_id`, `created_by_user_id`, `question`, `allow_multiple`, `opens_at`, `closes_at`, `status` | UQ `(announcement_id, question)` — `poll` announcement → 1 poll; `survey` announcement → 1 poll per question (migration 0031). |
 | `poll_options` | `poll_id`, `option_text`, `display_order` | |
 | `poll_responses` | `poll_id`, `user_id`, `responded_at` | UQ `(poll_id, user_id)` unless repeat voting explicitly enabled. |
 | `poll_response_options` | `response_id`, `option_id` | UQ `(response_id, option_id)`. |
+| `event_rsvps` | `community_id`, `announcement_id`, `user_id`, `response`, `guests`, `note` | UQ `(announcement_id, user_id)`. `CHECK response IN (going, maybe, not_going)`, `CHECK guests >= 0`. RLS tenant-scoped (migration 0030). |
 
 ## 13 · Emergency & Incident Management
 

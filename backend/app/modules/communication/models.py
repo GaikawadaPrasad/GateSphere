@@ -53,8 +53,9 @@ class Announcement(Base, TimestampMixin, TenantMixin):
     targets: Mapped[list[AnnouncementTarget]] = relationship(
         back_populates="announcement", cascade="all, delete-orphan"
     )
-    poll: Mapped[Poll | None] = relationship(
-        back_populates="announcement", cascade="all, delete-orphan", uselist=False
+    # `poll` type -> exactly one; `survey` type -> one Poll per question (GAP-1).
+    polls: Mapped[list[Poll]] = relationship(
+        back_populates="announcement", cascade="all, delete-orphan", order_by="Poll.created_at"
     )
 
 
@@ -121,7 +122,9 @@ class ResidentGroupMember(Base, TimestampMixin):
 
 class Poll(Base, TimestampMixin, TenantMixin):
     __tablename__ = "polls"
-    __table_args__ = (UniqueConstraint("announcement_id"),)
+    __table_args__ = (
+        UniqueConstraint("announcement_id", "question", name="uq_poll_announcement_question"),
+    )
 
     id: Mapped[uuid.UUID] = pk()
     announcement_id: Mapped[uuid.UUID] = mapped_column(
@@ -136,7 +139,7 @@ class Poll(Base, TimestampMixin, TenantMixin):
     closes_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(String(10), default="draft", index=True)
 
-    announcement: Mapped[Announcement] = relationship(back_populates="poll")
+    announcement: Mapped[Announcement] = relationship(back_populates="polls")
     options: Mapped[list[PollOption]] = relationship(
         back_populates="poll", cascade="all, delete-orphan"
     )

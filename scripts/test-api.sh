@@ -23,8 +23,11 @@ if ! $NEWMAN --version >/dev/null 2>&1; then
 fi
 
 if [[ "$MANAGE_STACK" == "1" ]]; then
-  echo ">> bringing up the stack with a relaxed login rate limit"
-  ( cd "$ROOT" && RATE_LIMIT_LOGIN="1000/minute" docker compose up -d db redis minio backend worker beat )
+  # The Newman sweep fires ~300 requests from one IP in seconds — that is exactly what the
+  # sliding-window limiter is built to throttle, so it must be off for the suite to be
+  # meaningful. Rate limiting has its own dedicated tests (tests/test_ratelimit.py).
+  echo ">> bringing up the stack with rate limiting disabled for the sweep"
+  ( cd "$ROOT" && RATE_LIMIT_ENABLED="false" docker compose up -d db redis minio backend worker beat )
 fi
 
 echo ">> waiting for $BASE_URL/healthz"
