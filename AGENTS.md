@@ -671,6 +671,13 @@ error — availability over strictness. A reverse proxy adds a second, independe
 
 ## 10. Module business rules & state machines (enforce in the service layer)
 
+> Every workflow's transition table, enforcement point and audit/notification side-effects
+> is documented in [`docs/backend/STATE_MACHINES.md`](docs/backend/STATE_MACHINES.md) — keep
+> it updated with any transition-graph change (same PR). The transition **graph** is enforced
+> in the service (`app/core/state_machine.py::ensure_transition` or an explicit guard); the
+> value **set** is additionally pinned by a DB `CHECK` constraint (migration `0025`) — when
+> you add a status value, extend both the service map and the `CHECK` (a follow-up migration).
+
 | Module | Non‑negotiable rules |
 |--------|----------------------|
 | **visitors** (FR‑04) | Categories: personal guest, relative, cab/taxi, delivery exec, service tech, vendor, interviewee, event guest, recurring. Flow: guard logs → **blacklist check first** → pre‑approved? (QR/OTP → direct entry) else resident approval prompt → approve/reject (reason logged) → entry timestamp → exit timestamp → permanent audit. Multi‑visitor grouping under one approval. Mandatory photo + vehicle number where applicable. Approval prompt: secondary notification at 2 min, guard timeout status at 5 min. Pass states `ISSUED→ACTIVE→USED→EXPIRED|REVOKED|CANCELLED`; rejected/expired/revoked cannot produce an entry. |
