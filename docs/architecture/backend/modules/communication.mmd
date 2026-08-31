@@ -37,6 +37,8 @@ flowchart TD
 
     subgraph POLL["Polls & surveys (state machine draft→open→closed)"]
         direction TB
+        RSVP["POST /communication/announcements/{id}/rsvp → rsvp (VIEW)<br/>type=event & is_published; upsert event_rsvps (going|maybe|not_going, guests); audit event.rsvp"]
+        RSVP_S["GET /communication/announcements/{id}/rsvps → rsvp_summary<br/>going/maybe/not_going counts + total_attendees (going + guests) + my_response"]
         PO_C["POST /communication/polls → create_poll  [communication:create]<br/>announcement type ∈ poll|survey; 409 POLL_EXISTS; INSERT polls + poll_options"]
         PO_G["GET /communication/polls/{id} · /{id}/results → get_poll / results (live tally)"]
         PO_S{"POST /communication/polls/{id}/status → set_poll_status  [communication:update]"}

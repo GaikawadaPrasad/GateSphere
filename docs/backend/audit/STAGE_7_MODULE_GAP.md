@@ -74,7 +74,7 @@ updated.
 | ID | Sev | Gap | Recommendation |
 |---|---|---|---|
 | GAP-1 | LOW | No multi-question **survey** builder (only single-question polls; `survey` is just an announcement type) | Only build if the PRD's survey acceptance criteria require multi-question. Otherwise the `poll` + `announcement_type=survey` combo is adequate. |
-| GAP-2 | LOW | **Events** have no RSVP / attendee list / calendar view | AGENTS.md §0 scopes events as a communication broadcast variant. Add RSVP only if wireframes show it. |
+| GAP-2 | FIXED | `event_rsvps` table (migration 0030, RLS) + `POST /communication/announcements/{id}/rsvp` (upsert going/maybe/not_going + guests) + `GET .../rsvps` summary. |
 | GAP-3 | FIXED | `?q=` now on visitors, domestic_staff, vehicles, complaints tickets, incidents, deliveries (ILIKE across number/name/text columns; tenant-scoped). |
 | GAP-4 | FIXED | `.csv` exports (shared `app/core/export.py::csv_response`, `<module>:export` gated): `/billing/invoices.csv`, `/billing/payments.csv`, `/gate/events.csv`, `/visitors/entries.csv`, `/complaints/tickets.csv` (+ existing `/audit/logs.csv`). |
 

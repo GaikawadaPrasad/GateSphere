@@ -176,3 +176,27 @@ class PollResults(BaseModel):
     poll_id: uuid.UUID
     total_responses: int
     results: list[PollResultRow]
+
+
+class RsvpIn(_Write):
+    response: str = Field(pattern="^(going|maybe|not_going)$")
+    guests: int = Field(default=0, ge=0, le=20)
+    note: str | None = Field(default=None, max_length=500)
+
+
+class RsvpRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    user_id: uuid.UUID
+    response: str
+    guests: int
+    note: str | None
+
+
+class RsvpSummary(BaseModel):
+    going: int
+    maybe: int
+    not_going: int
+    total_attendees: int
+    my_response: str | None
+    responses: list[RsvpRead]

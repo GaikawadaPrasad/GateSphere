@@ -29,6 +29,7 @@ from app.db.base_class import Base, TenantMixin, TimestampMixin, pk
 ANNOUNCEMENT_TYPES = ("notice", "emergency", "poll", "event", "survey")
 PRIORITIES = ("low", "normal", "high", "urgent")
 POLL_STATUS = ("draft", "open", "closed")
+RSVP_RESPONSES = ("going", "maybe", "not_going")
 
 
 class Announcement(Base, TimestampMixin, TenantMixin):
@@ -181,3 +182,19 @@ class PollResponseOption(Base, TimestampMixin):
     option_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("poll_options.id", ondelete="CASCADE"), index=True
     )
+
+
+class EventRSVP(Base, TimestampMixin, TenantMixin):
+    """FR-12: a resident's response to an `event` announcement (GAP-2). One per user."""
+
+    __tablename__ = "event_rsvps"
+    __table_args__ = (UniqueConstraint("announcement_id", "user_id"),)
+
+    id: Mapped[uuid.UUID] = pk()
+    announcement_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("announcements.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    response: Mapped[str] = mapped_column(String(10), index=True)  # going | maybe | not_going
+    guests: Mapped[int] = mapped_column(Integer, default=0)
+    note: Mapped[str | None] = mapped_column(String(500))

@@ -25,6 +25,7 @@ from app.modules.communication import schemas
 from app.modules.communication.models import (
     Announcement,
     AnnouncementTarget,
+    EventRSVP,
     Poll,
     PollOption,
     PollResponse,
@@ -257,6 +258,65 @@ class CommunicationService:
         if obj is None:
             raise NotFoundError("Announcement not found")
         return obj
+
+    # -- event RSVP (GAP-2) --------------------------------- #
+    async def rsvp(self, announcement_id: uuid.UUID, payload: schemas.RsvpIn) -> EventRSVP:
+        ann = await self.get_announcement(announcement_id)
+        if ann.announcement_type != "event":
+            raise BusinessRuleError("Not an event announcement", code="NOT_AN_EVENT")
+        if not ann.is_published:
+            raise BusinessRuleError("Event is not published yet", code="ANNOUNCEMENT_DRAFT")
+        row = await self.db.scalar(
+            select(EventRSVP).where(
+                EventRSVP.announcement_id == ann.id, EventRSVP.user_id == self.actor.id
+            )
+        )
+        if row is None:
+            row = EventRSVP(
+                community_id=ann.community_id, announcement_id=ann.id, user_id=self.actor.id
+            )
+            self.db.add(row)
+        row.response = payload.response
+        row.guests = payload.guests
+        row.note = payload.note
+        await self.db.flush()
+        await self._audit(
+            "event.rsvp",
+            ann.community_id,
+            "announcement",
+            ann.id,
+            new={"response": payload.response},
+        )
+        return row
+
+    async def rsvp_summary(self, announcement_id: uuid.UUID) -> dict:
+        ann = await self.get_announcement(announcement_id)
+        rows = list(
+            (
+                await self.db.scalars(
+                    select(EventRSVP)
+                    .where(EventRSVP.announcement_id == ann.id)
+                    .order_by(EventRSVP.created_at)
+                )
+            ).all()
+        )
+        by = {"going": 0, "maybe": 0, "not_going": 0}
+        attendees = 0
+        mine = None
+        for r in rows:
+            by[r.response] = by.get(r.response, 0) + 1
+            if r.response == "going":
+                attendees += 1 + r.guests
+            if r.user_id == self.actor.id:
+                mine = r.response
+        return {
+            "going": by["going"],
+            "maybe": by["maybe"],
+            "not_going": by["not_going"],
+            "total_attendees": attendees,
+            "my_response": mine,
+            "responses": rows,
+        }
 
     async def update_announcement(
         self, announcement_id: uuid.UUID, payload: schemas.AnnouncementUpdate

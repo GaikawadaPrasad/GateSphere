@@ -151,6 +151,30 @@ async def get_poll(poll_id: uuid.UUID, svc: Svc = Depends(communication_service)
     return ok(schemas.PollRead.model_validate(await svc.get_poll(poll_id)))
 
 
+# -- event RSVP (GAP-2) ------------------------------------- #
+@router.post(
+    "/announcements/{announcement_id}/rsvp",
+    response_model=Envelope[schemas.RsvpRead],
+    dependencies=[VIEW],
+)
+async def rsvp_event(
+    announcement_id: uuid.UUID,
+    payload: schemas.RsvpIn,
+    svc: Svc = Depends(communication_service),
+) -> dict:
+    row = await svc.rsvp(announcement_id, payload)
+    return ok(schemas.RsvpRead.model_validate(row), message="RSVP recorded")
+
+
+@router.get(
+    "/announcements/{announcement_id}/rsvps",
+    response_model=Envelope[schemas.RsvpSummary],
+    dependencies=[VIEW],
+)
+async def list_rsvps(announcement_id: uuid.UUID, svc: Svc = Depends(communication_service)) -> dict:
+    return ok(schemas.RsvpSummary.model_validate(await svc.rsvp_summary(announcement_id)))
+
+
 @router.post(
     "/polls/{poll_id}/status",
     response_model=Envelope[schemas.PollRead],

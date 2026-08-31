@@ -149,3 +149,54 @@ def test_resident_groups_and_group_target(as_role, seed_ids):
     )
     assert a.status_code == 201, a.text
     assert a.json()["data"]["targets"][0]["resident_group_id"] == gid
+
+
+def test_event_rsvp_flow(as_role, seed_ids):
+    """GAP-2: RSVP to a published event announcement + summary."""
+    admin = as_role("community_admin")
+    cid = seed_ids["community_id"]
+    a = admin.post(
+        f"{P}/announcements?community_id={cid}",
+        json={
+            "announcement_type": "event",
+            "title": "AGM 2026",
+            "body": "Clubhouse, 6pm",
+            "event_start_at": "2026-03-01T18:00:00Z",
+            "targets": [{"target_all_community": True}],
+        },
+    )
+    assert a.status_code == 201, a.text
+    aid = a.json()["data"]["id"]
+    # cannot RSVP before publish
+    assert (
+        admin.post(f"{P}/announcements/{aid}/rsvp", json={"response": "going"}).status_code == 422
+    )
+    assert admin.post(f"{P}/announcements/{aid}/publish").status_code == 200
+
+    resident = as_role("resident")
+    r = resident.post(f"{P}/announcements/{aid}/rsvp", json={"response": "going", "guests": 2})
+    assert r.status_code == 200, r.text
+    # update (upsert, not duplicate)
+    resident.post(f"{P}/announcements/{aid}/rsvp", json={"response": "maybe"})
+    admin.post(f"{P}/announcements/{aid}/rsvp", json={"response": "going"})
+
+    s = admin.get(f"{P}/announcements/{aid}/rsvps").json()["data"]
+    assert s["going"] == 1 and s["maybe"] == 1
+    assert s["total_attendees"] == 1  # only admin 'going', 0 guests
+    assert s["my_response"] == "going"
+
+    # RSVP on a non-event announcement is rejected
+    n = admin.post(
+        f"{P}/announcements?community_id={cid}",
+        json={
+            "announcement_type": "notice",
+            "title": "x",
+            "body": "y",
+            "targets": [{"target_all_community": True}],
+        },
+    )
+    nid = n.json()["data"]["id"]
+    admin.post(f"{P}/announcements/{nid}/publish")
+    assert (
+        admin.post(f"{P}/announcements/{nid}/rsvp", json={"response": "going"}).status_code == 422
+    )
