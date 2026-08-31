@@ -14,9 +14,20 @@ def test_announcements_need_auth(client):
 
 
 def test_resident_sees_published_announcement(as_role):
-    r = as_role("resident").get(f"{P}/announcements")
-    assert r.status_code == 200
-    assert any(a["title"] == "Welcome to GateSphere" for a in r.json()["data"])
+    # The shared integration DB accumulates announcements across runs, so the seeded
+    # "Welcome to GateSphere" row may be past page 1 — page through until found.
+    resident = as_role("resident")
+    seen = False
+    for page in range(1, 25):
+        r = resident.get(f"{P}/announcements", params={"page": page, "page_size": 50})
+        assert r.status_code == 200
+        rows = r.json()["data"]
+        if any(a["title"] == "Welcome to GateSphere" for a in rows):
+            seen = True
+            break
+        if not rows:
+            break
+    assert seen, "resident cannot see the seeded published 'Welcome to GateSphere' announcement"
 
 
 def test_resident_cannot_create_announcement(as_role):

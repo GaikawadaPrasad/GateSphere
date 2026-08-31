@@ -62,7 +62,9 @@ def test_admin_creates_user_grants_and_revokes_role(auth_client, seed_ids):
         c = TestClient(app)
         lr = c.post("/api/v1/auth/login", json={"email": email, "password": "Sup3rSecret!!"})
         assert lr.status_code == 200
-        c.headers.update({"X-CSRF-Token": c.cookies.get("gs_csrf")})
+        from conftest import csrf_cookie_value
+
+        c.headers.update({"X-CSRF-Token": csrf_cookie_value(c)})
         assert c.get("/api/v1/gate/events").status_code == 200
         c.close()
 

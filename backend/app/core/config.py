@@ -29,11 +29,17 @@ class Settings(BaseSettings):
     # deploy previews / localhost ports during frontend integration.
     FRONTEND_ORIGIN: str = "http://localhost:3000"
     CORS_ORIGINS: str = ""
+    # Legacy single-session cookie names — still honoured on READ (frontend, older clients).
+    # New sessions are written to a role-bucketed cookie: `<SESSION_COOKIE_PREFIX>_<bucket>_session`
+    # (+ `_csrf`). See `app/core/security.py` bucket helpers and docs/backend/AUTHENTICATION.md.
     SESSION_COOKIE_NAME: str = "gs_session"
     CSRF_COOKIE_NAME: str = "gs_csrf"
+    SESSION_COOKIE_PREFIX: str = "gatesphere"
     SESSION_TTL_SECONDS: int = 60 * 60 * 8
+    SESSION_ACTIVITY_REFRESH_SECONDS: int = 60  # min gap between last_activity_at writes
     COOKIE_SECURE: bool = False
     COOKIE_DOMAIN: str | None = None
+    COOKIE_SAMESITE: Literal["lax", "strict", "none"] = "lax"
 
     # --- datastores ---
     DATABASE_URL: PostgresDsn

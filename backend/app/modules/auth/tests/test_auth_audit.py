@@ -35,7 +35,9 @@ def test_login_and_logout_are_audited(auth_client):
         json={"email": "security_guard@gatesphere.com", "password": "security_guard@Gate2026!"},
     )
     assert r.status_code == 200
-    c.headers.update({"X-CSRF-Token": c.cookies.get("gs_csrf")})
+    from conftest import csrf_cookie_value
+
+    c.headers.update({"X-CSRF-Token": csrf_cookie_value(c)})
     assert c.post("/api/v1/auth/logout").status_code == 204
 
     assert _auth_actions(auth_client, "login.success") >= before_in + 1

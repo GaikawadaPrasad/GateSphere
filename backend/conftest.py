@@ -44,10 +44,24 @@ def client() -> TestClient:
     return TestClient(app)
 
 
-def _login(client: TestClient, email: str, password: str) -> TestClient:
-    r = client.post("/api/v1/auth/login", json={"email": email, "password": password})
+def csrf_cookie_value(client: TestClient) -> str | None:
+    """The value of whichever CSRF cookie the session set — `gs_csrf` (legacy) or
+    `gatesphere_<bucket>_csrf` (role-bucketed)."""
+    for name, value in client.cookies.items():
+        if name == "gs_csrf" or (name.startswith("gatesphere_") and name.endswith("_csrf")):
+            return value
+    return None
+
+
+def _login(client: TestClient, email: str, password: str, role: str | None = None) -> TestClient:
+    body: dict = {"email": email, "password": password}
+    if role is not None:
+        body["role"] = role
+    r = client.post("/api/v1/auth/login", json=body)
     assert r.status_code == 200, r.text
-    client.headers.update({"X-CSRF-Token": client.cookies.get("gs_csrf")})
+    token = csrf_cookie_value(client)
+    assert token, "login did not set a CSRF cookie"
+    client.headers.update({"X-CSRF-Token": token})
     return client
 
 

@@ -26,8 +26,15 @@ class UserSession(Base):
     )
     session_key_hash: Mapped[str] = mapped_column(String(128), unique=True, index=True)
     csrf_token: Mapped[str] = mapped_column(String(64))
+    # The role this session was opened for, and the cookie bucket it lives in
+    # (`gatesphere_<bucket>_session`). One browser / cookie jar can hold several
+    # independent sessions — one per bucket — without one login overwriting another.
+    role_slug: Mapped[str | None] = mapped_column(String(48), index=True)
+    cookie_bucket: Mapped[str | None] = mapped_column(String(48))
+    community_id: Mapped[uuid.UUID | None] = mapped_column()
     ip_address: Mapped[str | None] = mapped_column(INET)
     user_agent: Mapped[str | None] = mapped_column(String(512))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    last_activity_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

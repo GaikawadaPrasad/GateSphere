@@ -16,9 +16,10 @@ flowchart TD
 
     subgraph AUTHN["Authentication (app/core/security.py)"]
         direction TB
-        CSRF["verify_csrf<br/>X-CSRF-Token == gs_csrf cookie on POST/PUT/PATCH/DELETE"]
-        SESS["_load_session_async<br/>Redis session:&lt;hash&gt; → fallback user_sessions row<br/>checks revoked_at / expires_at"]
-        REQAUTH["require_auth_async → User<br/>sets request.state.user / session_id"]
+        SELECT["_select_session_token<br/>role-bucketed cookies: gatesphere_&lt;bucket&gt;_session (+ legacy gs_session)<br/>&gt;1 present → X-Session-Role header picks one, else 401 AMBIGUOUS_SESSION"]
+        CSRF["verify_csrf<br/>X-CSRF-Token == gatesphere_&lt;bucket&gt;_csrf on POST/PUT/PATCH/DELETE"]
+        SESS["_load_session_async<br/>Redis session:&lt;hash&gt; → fallback user_sessions row<br/>checks revoked_at / expires_at; _touch_last_activity (≤1/60s)"]
+        REQAUTH["require_auth_async → User<br/>sets request.state.user / session_id / session_bucket / session_role"]
     end
 
     subgraph AUTHZ["Authorization (app/core/tenancy.py + security.py)"]
@@ -114,7 +115,7 @@ flowchart TD
     %% ================================================================ edges
     Client -->|HTTPS| CORS --> CID --> RL --> EXC
     Client -.-> OPS
-    EXC --> CSRF --> SESS --> REQAUTH
+    EXC --> SELECT --> CSRF --> SESS --> REQAUTH
     REQAUTH --> SCOPE
     SCOPE --> PERM
     SCOPE --> PADMIN
