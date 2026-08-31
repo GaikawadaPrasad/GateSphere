@@ -134,6 +134,11 @@ async def create_amenity(
     )
 
 
+@router.get("/{amenity_id}", response_model=Envelope[schemas.AmenityRead], dependencies=[VIEW])
+async def get_amenity(amenity_id: uuid.UUID, svc: Svc = Depends(amenity_service)) -> dict:
+    return ok(schemas.AmenityRead.model_validate(await svc.get_amenity(amenity_id)))
+
+
 @router.patch("/{amenity_id}", response_model=Envelope[schemas.AmenityRead], dependencies=[APPROVE])
 async def update_amenity(
     amenity_id: uuid.UUID,

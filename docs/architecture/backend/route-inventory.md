@@ -230,6 +230,7 @@ Every registered route, cross-checked against `GET /api/v1/openapi.json` (256 ro
 | Method | Path | Auth | Perm | Scope | Mutation | Conditionals |
 |---|---|---|---|---|---|---|
 | GET/POST | `/amenities` | session | `amenities:view` / `:approve` | T | `amenities` (insert) | `409 AMENITY_EXISTS` |
+| GET | `/amenities/{amenity_id}` | session | `amenities:view` | T | – | cross-tenant → `404` |
 | PATCH | `/amenities/{amenity_id}` | session | `amenities:update` | T | `amenities` (update) | |
 | GET/POST | `/amenities/{amenity_id}/slots` | session | `:view` / `:create` | T | `amenity_slots` (insert) | `422 INVALID_TIME_RANGE` |
 | DELETE | `/amenities/slots/{slot_id}` | session | `amenities:delete` | T | `amenity_slots.is_active=false` | soft |
