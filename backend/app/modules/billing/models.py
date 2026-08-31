@@ -149,6 +149,7 @@ class Payment(Base, TimestampMixin, TenantMixin):
     payment_method: Mapped[str] = mapped_column(String(15), default="upi")
     payment_status: Mapped[str] = mapped_column(String(12), default="success", index=True)
     paid_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"))
+    refunded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     gateway_name: Mapped[str | None] = mapped_column(String(40))
     gateway_transaction_id: Mapped[str | None] = mapped_column(String(80))
     remarks: Mapped[str | None] = mapped_column(Text)

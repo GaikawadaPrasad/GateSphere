@@ -113,3 +113,57 @@ def test_resident_billing_is_own_unit_only(as_role, seed_ids, resident_unit_id):
     )
     assert denied.status_code == 403 and denied.json()["error"]["code"] == "STAFF_ONLY"
     assert admin.get(f"{P}/invoices/{inv['id']}").status_code == 200
+
+
+def test_payment_refund_reverses_invoice_and_ledger(as_role, seed_ids):
+    """SM-3: success -> refunded restores the invoice balance and posts a debit."""
+    P = "/api/v1/billing"
+    admin = as_role("community_admin")
+    cid = seed_ids["community_id"]
+    from sqlalchemy import select
+
+    from app.db.session import SessionLocal
+    from app.modules.communities.models import Unit
+
+    with SessionLocal() as db:
+        unit_id = str(
+            db.scalar(select(Unit.id).where(Unit.community_id == cid).order_by(Unit.unit_number))
+        )
+    admin.post(
+        f"{P}/charge-heads",
+        params={"community_id": cid},
+        json={
+            "code": f"RF{__import__('secrets').token_hex(2)}",
+            "name": "Refund test",
+            "calculation_type": "flat",
+            "default_amount": "500.00",
+        },
+    )
+    inv = admin.post(
+        f"{P}/invoices",
+        params={"community_id": cid},
+        json={"unit_id": unit_id, "items": [{"description": "x", "unit_rate": "500.00"}]},
+    )
+    assert inv.status_code == 201, inv.text
+    iid = inv.json()["data"]["id"]
+    assert admin.post(f"{P}/invoices/{iid}/post").status_code == 200
+    pay = admin.post(
+        f"{P}/payments",
+        params={"community_id": cid},
+        json={
+            "amount": "500.00",
+            "payment_method": "upi",
+            "allocations": [{"invoice_id": iid, "amount": "500.00"}],
+        },
+    )
+    assert pay.status_code == 201, pay.text
+    pid = pay.json()["data"]["id"]
+    assert admin.get(f"{P}/invoices/{iid}").json()["data"]["status"] == "paid"
+
+    r = admin.post(f"{P}/payments/{pid}/refund", json={"reason": "duplicate charge"})
+    assert r.status_code == 200, r.text
+    assert r.json()["data"]["payment_status"] == "refunded"
+    assert r.json()["data"]["refunded_at"] is not None
+    assert admin.get(f"{P}/invoices/{iid}").json()["data"]["status"] in ("posted", "overdue")
+    # a second refund is rejected
+    assert admin.post(f"{P}/payments/{pid}/refund", json={"reason": "again"}).status_code == 422

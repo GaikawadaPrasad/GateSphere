@@ -38,12 +38,12 @@ flowchart TD
 
         RG["GET /visitors/requests/{id} → get_request → _assert_unit_visible → 404"]
         RD["POST /visitors/requests/{id}/decision → decide_request  [visitors:approve]"]
-        RD --> RD1{"status == pending?"} -->|no| RD_E1["422 INVALID_TRANSITION"]
+        RD --> RD1{"ensure_transition(status, approved|rejected, _REQUEST_TRANSITIONS)?"} -->|no| RD_E1["422 INVALID_TRANSITION"]
         RD1 -->|yes| RD2{"approval_row(request, actor) exists?"} -->|yes| RD_E2["409 ALREADY_DECIDED"]
         RD2 -->|no| RD3["INSERT visitor_approvals; visitor_requests.status = approved|rejected"]
         RD3 --> RD4["audit request.&lt;decision&gt; → emit visitor.&lt;status&gt; → creator"]
 
-        RCAN["POST /visitors/requests/{id}/cancel → cancel_request<br/>only from pending|approved → status=cancelled; 422 INVALID_TRANSITION"]
+        RCAN["POST /visitors/requests/{id}/cancel → cancel_request<br/>ensure_transition(status, cancelled, _REQUEST_TRANSITIONS); 422 INVALID_TRANSITION"]
         RMEM["GET/POST /visitors/requests/{id}/members → list/add_group_member<br/>blacklist check; 409 MEMBER_EXISTS; party_size = max(...)"]
     end
 
@@ -56,7 +56,7 @@ flowchart TD
     subgraph ENTRY["Gate entries"]
         direction TB
         EL["GET /visitors/entries → list_entries<br/>plain resident → entries whose request.unit_id ∈ own units"]
-        ER["POST /visitors/entries → record_entry  [visitors:create]"]
+        ER["POST /visitors/entries → record_entry  [visitors:create]<br/>ensure_transition(status→entered, allow_noop, code=NOT_APPROVED)"]
         ER --> ER0["ensure_confirmed_async(entry_photo_url)"]
         ER0 --> ER1{"identify by"}
         ER1 -->|pass_token| ERt["pass_by_hash; check is_revoked / valid window / entries left; entry_count++"]

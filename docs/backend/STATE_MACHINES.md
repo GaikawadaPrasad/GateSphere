@@ -128,8 +128,10 @@ Invoice:
 | `posted`, `partially_paid` | `overdue` | Celery `sweep_overdue_invoices` (01:00) — `due_date` passed |
 | `draft`, `posted`, `overdue` | `cancelled` ▸ | `cancel_invoice` — blocked if `amount_paid > 0` |
 
-Payments are **simulated** (PRD) → `record_payment` always writes `payment_status=success`
-with a per-community `receipt_number`. `failed` / `refunded` are CHECK-allowed but unused.
+Payment (`payments.payment_status`): `record_payment` writes `success`; `refund_payment`
+(`POST /payments/{id}/refund`, `billing:approve`) does `success → refunded` — reverses every
+allocation (`amount_paid`, `balance_due`, invoice status recomputed) and posts a `debit`
+ledger entry, all in one txn. `failed` is CHECK-allowed but unreachable (simulated).
 Ledger: every payment writes a `ledger_entries` row; `unit_ledger` re-derives the running
 balance — invariants covered by `test_billing_api.py` / `test_billing_unit.py`.
 

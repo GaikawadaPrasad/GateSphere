@@ -37,6 +37,7 @@ async def _expire_stale_requests() -> dict:
             )
         ).all()
         for req in rows:
+            was = req.status
             req.status = "expired"
             await db.flush()
             await record_audit_async(
@@ -47,7 +48,7 @@ async def _expire_stale_requests() -> dict:
                 community_id=req.community_id,
                 entity_type="visitor_request",
                 entity_id=req.id,
-                old={"status": "approved"},
+                old={"status": was},
                 new={"status": "expired"},
             )
             if req.host_user_id:

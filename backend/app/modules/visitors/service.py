@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.context import RequestContext
 from app.core.errors import BusinessRuleError, ConflictError, ForbiddenError, NotFoundError
 from app.core.hashing import digest, digest_opt
+from app.core.state_machine import ensure_transition, is_terminal
 from app.core.tenancy import TenantScope
 from app.modules.audit.service import record_audit_async
 from app.modules.communities.models import Gate, Unit
@@ -53,6 +54,18 @@ _DEFAULT_POLICY = {
     "otp_required": False,
     "pass_ttl_minutes": 240,
     "blacklist_mode": "block",
+}
+
+# Visitor request lifecycle (SM-2, docs/backend/STATE_MACHINES.md §1). `expired` is set by
+# the Celery sweep; every other move goes through `ensure_transition`.
+_REQUEST_TRANSITIONS: dict[str, set[str]] = {
+    "pending": {"approved", "rejected", "cancelled", "expired"},
+    "approved": {"entered", "cancelled", "expired"},
+    "entered": {"completed"},
+    "rejected": set(),
+    "cancelled": set(),
+    "expired": set(),
+    "completed": set(),
 }
 
 
@@ -344,12 +357,8 @@ class VisitorService(UnitScopedAccess):
     ) -> VisitorRequest:
         req = await self.get_request(request_id)
         _enum("decision", payload.decision)
-        if req.status != "pending":
-            raise BusinessRuleError(
-                f"Request is already '{req.status}'",
-                code="INVALID_TRANSITION",
-                fields={"status": "must be pending"},
-            )
+        target = "approved" if payload.decision == "approved" else "rejected"
+        ensure_transition(req.status, target, _REQUEST_TRANSITIONS, entity="visitor request")
         if await approval_row(self.db, req.id, self.actor.id):
             raise ConflictError("You have already decided on this request", code="ALREADY_DECIDED")
         self.db.add(
@@ -360,7 +369,7 @@ class VisitorService(UnitScopedAccess):
                 remarks=payload.remarks,
             )
         )
-        req.status = "approved" if payload.decision == "approved" else "rejected"
+        req.status = target
         await self.db.flush()
         await self._audit(
             f"request.{payload.decision}",
@@ -388,10 +397,7 @@ class VisitorService(UnitScopedAccess):
 
     async def cancel_request(self, request_id: uuid.UUID) -> VisitorRequest:
         req = await self.get_request(request_id)
-        if req.status not in ("pending", "approved"):
-            raise BusinessRuleError(
-                f"Cannot cancel a '{req.status}' request", code="INVALID_TRANSITION"
-            )
+        ensure_transition(req.status, "cancelled", _REQUEST_TRANSITIONS, entity="visitor request")
         req.status = "cancelled"
         await self.db.flush()
         await self._audit("request.cancel", req.community_id, "visitor_request", req.id)
@@ -428,7 +434,7 @@ class VisitorService(UnitScopedAccess):
         self, request_id: uuid.UUID, payload: schemas.GroupMemberCreate
     ) -> VisitorRequestMember:
         req = await self.get_request(request_id)
-        if req.status in ("rejected", "cancelled", "expired", "completed"):
+        if is_terminal(req.status, _REQUEST_TRANSITIONS):
             raise BusinessRuleError(
                 f"Cannot add a visitor to a '{req.status}' request", code="INVALID_STATE"
             )
@@ -574,8 +580,16 @@ class VisitorService(UnitScopedAccess):
                 "Provide `request_id`, `pass_token` or `pin`", code="REQUEST_REQUIRED"
             )
 
-        if req.status not in ("approved", "entered"):
-            raise BusinessRuleError(f"Request is '{req.status}', not approved", code="NOT_APPROVED")
+        # approved -> entered on the first admit; entered -> entered is a no-op for a
+        # subsequent group member. `ensure_transition` raises INVALID_TRANSITION otherwise.
+        ensure_transition(
+            req.status,
+            "entered",
+            _REQUEST_TRANSITIONS,
+            entity="visitor request",
+            allow_noop=True,
+            code="NOT_APPROVED",
+        )
 
         visitor_id = req.visitor_id
         if payload.visitor_id and payload.visitor_id != req.visitor_id:
@@ -657,6 +671,10 @@ class VisitorService(UnitScopedAccess):
                 )
             )
             if req and req.status == "entered" and still_inside is None:
+                # last group member out -> the request is done
+                ensure_transition(
+                    req.status, "completed", _REQUEST_TRANSITIONS, entity="visitor request"
+                )
                 req.status = "completed"
         await self.db.flush()
         await self._audit("entry.exit", entry.community_id, "visitor_entry", entry.id)

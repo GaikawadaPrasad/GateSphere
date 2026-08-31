@@ -467,6 +467,58 @@ class BillingService(UnitScopedAccess):
             "allocations": lines,
         }
 
+    async def refund_payment(
+        self, payment_id: uuid.UUID, payload: schemas.PaymentRefund
+    ) -> Payment:
+        """SM-3: `success -> refunded`. Reverses every allocation on the invoices and posts
+        a compensating `debit` ledger entry. Payments are SIMULATED — no gateway call."""
+        pay = await self.get_payment(payment_id)
+        if pay.payment_status != "success":
+            raise BusinessRuleError(
+                f"Only a 'success' payment can be refunded (this is '{pay.payment_status}')",
+                code="INVALID_TRANSITION",
+            )
+        now = datetime.now(UTC)
+        for alloc in pay.allocations:
+            inv = await self.invoices.get(alloc.invoice_id)
+            if inv is None:
+                continue
+            amt = _money(alloc.allocated_amount)
+            inv.amount_paid = _money(inv.amount_paid - amt)
+            inv.balance_due = _money(inv.total_amount - inv.amount_paid)
+            if inv.balance_due <= 0:
+                inv.status = "paid"
+            elif inv.amount_paid > 0:
+                inv.status = "partially_paid"
+            else:
+                inv.status = "overdue" if (inv.due_date and inv.due_date < now.date()) else "posted"
+            await self._ledger(
+                pay.community_id,
+                inv.unit_id,
+                pay.payer_user_id,
+                "debit",
+                amt,
+                source_type="payment_refund",
+                source_id=pay.id,
+                narration=(
+                    f"Refund of {pay.payment_reference} <- "
+                    f"{inv.invoice_number}: {payload.reason}"
+                ),
+            )
+        pay.payment_status = "refunded"
+        pay.refunded_at = now
+        pay.remarks = ((pay.remarks + " | ") if pay.remarks else "") + f"refunded: {payload.reason}"
+        await self.db.flush()
+        await self._audit(
+            "payment.refund",
+            pay.community_id,
+            "payment",
+            pay.id,
+            old={"payment_status": "success"},
+            new={"payment_status": "refunded", "reason": payload.reason},
+        )
+        return pay
+
     async def list_payments(self, *, community_id: uuid.UUID | None, offset: int, limit: int):
         stmt = select(Payment).options(selectinload(Payment.allocations))
         if community_id is not None:

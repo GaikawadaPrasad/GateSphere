@@ -150,6 +150,20 @@ async def get_payment_receipt(payment_id: uuid.UUID, svc: Svc = Depends(billing_
     return ok(schemas.ReceiptRead.model_validate(await svc.get_receipt(payment_id)))
 
 
+@router.post(
+    "/payments/{payment_id}/refund",
+    response_model=Envelope[schemas.PaymentRead],
+    dependencies=[APPROVE],
+)
+async def refund_payment(
+    payment_id: uuid.UUID,
+    payload: schemas.PaymentRefund,
+    svc: Svc = Depends(billing_service),
+) -> dict:
+    pay = await svc.refund_payment(payment_id, payload)
+    return ok(schemas.PaymentRead.model_validate(pay), message="Refunded")
+
+
 # --- ledger ------------------------------------------------- #
 @router.get(
     "/units/{unit_id}/ledger",

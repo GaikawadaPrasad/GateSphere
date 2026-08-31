@@ -57,6 +57,7 @@ flowchart TD
     end
 
     PAY_D["GET /billing/payments/{id} · /{id}/receipt → get_payment / get_receipt<br/>is_unit_restricted & payer != actor → 404"]
+    PAY_R["POST /billing/payments/{id}/refund → refund_payment  [billing:approve]<br/>success→refunded (SM-3); reverse each allocation (amount_paid, balance_due, invoice status),<br/>_ledger(debit) reversal; payments.refunded_at; 2nd refund → 422 INVALID_TRANSITION"]
 
     LEDGER["GET /billing/units/{unit_id}/ledger → unit_ledger<br/>_unit_in_scope + _assert_unit_visible → 404"]
 
@@ -66,7 +67,7 @@ flowchart TD
         T3["send_dues_reminders · Mon 09:00 → every invoice with balance;<br/>emit billing.dues_reminder → billed user"]
     end
 
-    CONFIG & INV_L & INV_C & INV_D & INV_POST & INV_CANCEL & PAY_L & PAY_C & PAY_D & LEDGER --> REPO["ChargeHead/Rule/Invoice/Payment/Ledger Repository (AsyncTenantRepository)"]
+    CONFIG & INV_L & INV_C & INV_D & INV_POST & INV_CANCEL & PAY_L & PAY_C & PAY_D & PAY_R & LEDGER --> REPO["ChargeHead/Rule/Invoice/Payment/Ledger Repository (AsyncTenantRepository)"]
     REPO --> DB[("PostgreSQL: charge_heads, billing_rules, maintenance_invoices, invoice_items,<br/>payments, payment_allocations, ledger_entries, audit_logs")]
     IP3 & T2 & T3 --> EVT["notifications/events.emit → NotificationService.dispatch"]
     TASK --> DB

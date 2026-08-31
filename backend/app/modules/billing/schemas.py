@@ -169,8 +169,13 @@ class PaymentRead(_Read):
     payment_method: str
     payment_status: str
     paid_at: datetime
+    refunded_at: datetime | None = None
     remarks: str | None
     allocations: list[PaymentAllocationRead] = []
+
+
+class PaymentRefund(_Write):
+    reason: str = Field(min_length=1, max_length=2000)
 
 
 class ReceiptLine(BaseModel):
