@@ -75,7 +75,7 @@ CSRF (`verify_csrf`) checks `X-CSRF-Token` against **that bucket's** csrf cookie
   audit `auth/login.success` (`new = {role, bucket}`), return `CurrentUser`
   (`+ active_role, session_bucket`).
 - On failure: uniform `401 INVALID_CREDENTIALS`; `auth/login.failed` audited in its own
-  transaction; rate-limited `5/min/IP`.
+  transaction; rate-limited (`auth` path class, `app/core/ratelimit.py`, default `5/60`).
 
 ## Logout — isolation guarantee
 

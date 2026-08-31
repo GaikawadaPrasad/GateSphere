@@ -30,13 +30,15 @@ DEMO_PASSWORD = demo_password("super_admin")
 
 
 @pytest.fixture(autouse=True, scope="session")
-def _disable_login_rate_limit():
-    """Tests log in many times — the 5/min limiter is not what we're testing here."""
-    from app.modules.auth.router import limiter
+def _disable_rate_limit():
+    """Tests log in many times and hammer write endpoints — the Redis sliding-window
+    limiter (app/core/ratelimit.py) is not what most tests exercise. `test_ratelimit.py`
+    re-enables it locally."""
+    from app.core import ratelimit
 
-    limiter.enabled = False
+    ratelimit.settings.RATE_LIMIT_ENABLED = False
     yield
-    limiter.enabled = True
+    ratelimit.settings.RATE_LIMIT_ENABLED = True
 
 
 @pytest.fixture()

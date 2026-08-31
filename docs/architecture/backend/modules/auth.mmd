@@ -1,5 +1,6 @@
 %% Module: auth (FR-01) — session-cookie auth, no browser JWT
-%% Files: app/modules/auth/{router,schemas,service}.py · app/core/security.py · app/modules/auth/models.py (UserSession)
+%% Files: app/modules/auth/{router,service,repository,schemas}.py · app/core/security.py · app/modules/auth/models.py (UserSession)
+%% Router is thin: validate → AuthService.login/logout/me → serialize. AuthRepository holds the queries.
 %% Derived from source. Keep in sync.
 
 flowchart TD
@@ -7,13 +8,13 @@ flowchart TD
 
     subgraph LOGIN["POST /auth/login  (public, rate-limited 5/min/IP)"]
         direction TB
-        L1["router.login<br/>app/modules/auth/router.py"]
-        L2["fetch User by email.lower()<br/>select(User)"]
+        L1["router.login → AuthService.login<br/>auth/router.py · auth/service.py"]
+        L2["AuthRepository.user_by_email(email.lower())"]
         L3{"user & is_active &<br/>verify_password (Argon2)?"}
         L4["needs_rehash? → re-hash password_hash"]
         L4b["resolve_login_role(db, user, payload.role)<br/>app/modules/auth/service.py<br/>super_admin→(super_admin,None); else the user's grant;<br/>multi-role & no role → 422 ROLE_REQUIRED"]
         L5["create_session(role_slug, community_id)<br/>app/core/security.py"]
-        L6["_serialize → user_permissions_async<br/>CurrentUser{id,email,is_superadmin,permissions[],<br/>community_ids[], active_role, session_bucket, permission_version}"]
+        L6["AuthService._serialize (AuthRepository.community_ids + user_permissions_async)<br/>CurrentUser{id,email,is_superadmin,permissions[],<br/>community_ids[], active_role, session_bucket, permission_version}"]
         LF["AuthError 401 INVALID_CREDENTIALS / ROLE_NOT_GRANTED<br/>(credential errors uniform — no enumeration)"]
     end
 
@@ -44,7 +45,7 @@ flowchart TD
     end
 
     subgraph ME["GET /auth/me  (session)"]
-        M1["router.me → _serialize(active_role, session_bucket from request.state)"]
+        M1["router.me → AuthService.me(request, user)"]
     end
 
     subgraph AUD["Audit"]

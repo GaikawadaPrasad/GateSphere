@@ -12,7 +12,7 @@ flowchart TD
         THOST["TrustedHostMiddleware<br/>settings.allowed_hosts (prod: explicit list; enforced by config guard)"]
         CORS["CORSMiddleware<br/>allow_origins = settings.cors_allow_origins<br/>allow_credentials=true"]
         CID["CorrelationIdMiddleware<br/>app/core/logging.py — X-Request-ID"]
-        RL["slowapi rate limiter<br/>app/modules/auth/router.py::limiter<br/>5/min/IP on POST /auth/login"]
+        RL["RateLimitMiddleware (app/core/ratelimit.py)<br/>Redis sliding-window ZSET log; identity user:&lt;session&gt; else ip:&lt;addr&gt;<br/>path classes: auth 5/60 · search 60/60 · upload 30/60 · export 20/60 · write 120/60 · default 600/60<br/>429 RATE_LIMITED + Retry-After; FAILS OPEN on RedisError"]
         EXC["Exception handlers<br/>app/core/errors.py<br/>AppError→{401,403,404,409,422}, SQLAlchemyError→500,<br/>RequestValidationError→422, catch-all→500<br/>every response = {success,message,data,meta}(+error)"]
     end
 
@@ -61,6 +61,7 @@ flowchart TD
     %% ---------------------------------------------------------------- domain services
     subgraph SVC["Domain services (app/modules/*/service.py)  — async def, ALL business rules"]
         direction LR
+        S_AUTH["AuthService (auth/service.py)<br/>login/logout/me · AuthRepository · create_session"]
         S_USERS["UserService"]
         S_RBAC["RbacService"]
         S_AUDITQ["AuditQueryService"]
@@ -91,7 +92,7 @@ flowchart TD
         MODELS["ORM models (app/modules/*/models.py)<br/>UUID v4 PKs, composite tenant-safe FKs,<br/>eager_defaults, CHECK/UNIQUE constraints"]
     end
     PG[("PostgreSQL 15<br/>single DB · logical multi-tenancy<br/>Row-Level Security: tenant_isolation policy<br/>per migration 0003+ (GUC app.community_ids)")]
-    REDIS[("Redis<br/>session cache · slowapi counters")]
+    REDIS[("Redis<br/>session cache · rate-limit sliding windows (gs:rl:*)")]
 
     %% ---------------------------------------------------------------- side effects
     subgraph SIDE["Cross-cutting side effects"]
@@ -131,7 +132,7 @@ flowchart TD
     Client -->|"GET /invitations/{token}<br/>POST /invitations/{token}/accept"| R_ONB
     Client -->|"POST /auth/login"| R_AUTH
 
-    R_AUTH --> S_USERS
+    R_AUTH --> S_AUTH
     R_USERS --> S_USERS
     R_RBAC --> S_RBAC
     R_AUDIT --> S_AUDITQ
@@ -152,7 +153,7 @@ flowchart TD
     R_NOT --> S_NOT
     R_UP --> S_UP
 
-    S_USERS & S_RBAC & S_AUDITQ & S_COMM & S_ONB & S_RES & S_VIS & S_GATE & S_DS & S_DEL & S_VEH & S_BILL & S_CMP & S_AMN & S_CMN & S_INC & S_NOT --> AUDIT_HELP
+    S_AUTH & S_USERS & S_RBAC & S_AUDITQ & S_COMM & S_ONB & S_RES & S_VIS & S_GATE & S_DS & S_DEL & S_VEH & S_BILL & S_CMP & S_AMN & S_CMN & S_INC & S_NOT --> AUDIT_HELP
     S_DASH -.->|read-only aggregates| REPO
 
     S_USERS & S_RBAC & S_COMM & S_ONB & S_RES & S_VIS & S_GATE & S_DS & S_DEL & S_VEH & S_BILL & S_CMP & S_AMN & S_CMN & S_INC & S_NOT & S_UP --> REPO
@@ -164,6 +165,7 @@ flowchart TD
     SESS --> REDIS
     RL --> REDIS
     S_AUDITQ -->|"list/get/CSV, _scoped"| PG
+    S_AUTH -->|AuthRepository| PG
 
     %% events
     S_VIS -->|"visitor.approval_needed<br/>visitor.approved / rejected"| EVT

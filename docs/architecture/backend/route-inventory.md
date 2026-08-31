@@ -27,7 +27,7 @@ Every registered route, cross-checked against `GET /api/v1/openapi.json` (256 ro
 
 | Method | Path | Auth | Perm | Service call | Mutation | Side effects |
 |---|---|---|---|---|---|---|
-| POST | `/auth/login` | public | – (rate-limited `5/min/IP`) | `security.create_session`, `_serialize` | `user_sessions` (insert); Redis `session:*` setex; sets `gs_session`+`gs_csrf` cookies | audit `auth/login.success`; on failure → audit `auth/login.failed` in its own txn, `401 INVALID_CREDENTIALS` |
+| POST | `/auth/login` | public | – (rate-limited: `auth` class, default `5/60`) | `AuthService.login` (`AuthRepository`, `create_session`) | `user_sessions` (insert); Redis `session:*` setex; sets `gs_session`+`gs_csrf` cookies | audit `auth/login.success`; on failure → audit `auth/login.failed` in its own txn, `401 INVALID_CREDENTIALS` |
 | POST | `/auth/logout` | session | – | `security.destroy_session` | `user_sessions.revoked_at`; Redis key drop; clears cookies | audit `auth/logout` |
 | GET | `/auth/me` | session | – | `_serialize` → `user_permissions_async` | – | returns `CurrentUser {permissions[], permission_version, community_ids[]}` |
 

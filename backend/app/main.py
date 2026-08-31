@@ -6,7 +6,6 @@ import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from slowapi.errors import RateLimitExceeded
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
@@ -14,22 +13,10 @@ from app.api.router import api_router
 from app.core.config import settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import CorrelationIdMiddleware, configure_logging
+from app.core.ratelimit import RateLimitMiddleware
 from app.core.responses import ok
-from app.modules.auth.router import limiter
 
 log = structlog.get_logger(__name__)
-
-
-def _rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
-    return JSONResponse(
-        status_code=429,
-        content={
-            "success": False,
-            "message": "Too many requests — slow down and try again shortly.",
-            "data": None,
-            "error": {"code": "RATE_LIMITED"},
-        },
-    )
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -62,11 +49,12 @@ def create_app() -> FastAPI:
         openapi_url=f"{settings.API_V1_PREFIX}/openapi.json" if docs else None,
     )
 
-    app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
     register_exception_handlers(app)
 
+    # Middleware runs bottom-up on the request: TrustedHost → CORS → CorrelationId →
+    # RateLimit → SecurityHeaders → route.
     app.add_middleware(SecurityHeadersMiddleware)
+    app.add_middleware(RateLimitMiddleware)
     app.add_middleware(CorrelationIdMiddleware)
     app.add_middleware(
         CORSMiddleware,

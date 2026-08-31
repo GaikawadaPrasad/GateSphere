@@ -14,7 +14,7 @@ staging) · Redis (session cache + Celery broker) · Celery + beat (jobs) · S3/
 
 ```
 Client ──HTTPS──▶ TrustedHostMiddleware ──▶ SecurityHeadersMiddleware ──▶ CORSMiddleware
-       ──▶ CorrelationIdMiddleware (X-Request-ID) ──▶ slowapi rate limiter (login)
+       ──▶ CorrelationIdMiddleware (X-Request-ID) ──▶ RateLimitMiddleware (Redis sliding window, path classes)
        ──▶ exception handlers (canonical envelope; no SQL/stack/secret leak)
        ──▶ _select_session_token ──▶ verify_csrf ──▶ _load_session_async ──▶ require_auth_async
        ──▶ get_tenant_scope_async ──▶ require_permission_async / require_platform_admin

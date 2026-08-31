@@ -1,142 +1,57 @@
 """Authentication endpoints: login / logout / me.
 
-HTTP boundary only. Credential checks and the session lifecycle live in app.core.security.
-Responses use the canonical envelope (AGENTS.md §6): {success, message, data, meta}.
+HTTP boundary only — validate the request, call one `AuthService` method, serialize.
+Credential checks, the session lifecycle and audit live in `app.modules.auth.service` /
+`app.core.security`. Responses use the canonical envelope (AGENTS.md §6).
+Login rate limiting is the `auth` path class in `app/core/ratelimit.py`.
 """
 
 from fastapi import APIRouter, Depends, Request, Response, status
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
-from app.core.errors import AuthError
 from app.core.responses import Response as Envelope
 from app.core.responses import ok
-from app.core.security import (
-    create_session,
-    destroy_session,
-    hash_password,
-    needs_rehash,
-    require_auth_async,
-    user_permissions_async,
-    verify_password,
-)
-from app.db.session import AsyncSessionLocal, get_async_db
-from app.modules.audit.service import record_audit_async
+from app.core.security import require_auth_async
+from app.db.session import get_async_db
 from app.modules.auth.schemas import CurrentUser, LoginRequest
-from app.modules.auth.service import resolve_login_role
-from app.modules.users.models import User, UserRole
+from app.modules.auth.service import AuthService
+from app.modules.users.models import User
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
-limiter = Limiter(key_func=get_remote_address)
+
+
+def auth_service(db: AsyncSession = Depends(get_async_db)) -> AuthService:
+    return AuthService(db)
 
 
 @router.post("/login", response_model=Envelope[CurrentUser])
-@limiter.limit(settings.RATE_LIMIT_LOGIN)
 async def login(
     request: Request,
     response: Response,
     payload: LoginRequest,
-    db: AsyncSession = Depends(get_async_db),
+    svc: AuthService = Depends(auth_service),
 ) -> dict:
-    user = await db.scalar(select(User).where(User.email == payload.email.lower()))
-    if not user or not user.is_active or not verify_password(payload.password, user.password_hash):
-        # Failed logins are audited (FR-01, TRD §5.2). The request session is rolled back
-        # when the AuthError propagates, so write the record in its own transaction.
-        async with AsyncSessionLocal() as audit_db:
-            await record_audit_async(
-                audit_db,
-                module="auth",
-                action="login.failed",
-                actor=user if user else None,
-                entity_type="user",
-                entity_id=str(user.id) if user else None,
-                new={"email": payload.email.lower(), "reason": "invalid_credentials"},
-                request=request,
-            )
-            await audit_db.commit()
-        # Uniform error — never reveal which check failed.
-        raise AuthError("Invalid email or password", code="INVALID_CREDENTIALS")
-    if needs_rehash(user.password_hash):
-        user.password_hash = hash_password(payload.password)
-    role_slug, community_id = await resolve_login_role(db, user, payload.role)
-    session = await create_session(
-        db, response, user, request, role_slug=role_slug, community_id=community_id
+    current = await svc.login(
+        request, response, email=payload.email, password=payload.password, role=payload.role
     )
-    await record_audit_async(
-        db,
-        module="auth",
-        action="login.success",
-        actor=user,
-        community_id=community_id,
-        entity_type="user",
-        entity_id=str(user.id),
-        new={"role": role_slug, "bucket": session.cookie_bucket},
-        request=request,
-    )
-    return ok(await _serialize(db, user, session=session), message="Signed in")
+    return ok(current, message="Signed in")
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
 async def logout(
     request: Request,
-    db: AsyncSession = Depends(get_async_db),
+    svc: AuthService = Depends(auth_service),
     user: User = Depends(require_auth_async),
 ) -> Response:
     resp = Response(status_code=status.HTTP_204_NO_CONTENT)
-    await destroy_session(db, request, resp)
-    await record_audit_async(
-        db,
-        module="auth",
-        action="logout",
-        actor=user,
-        entity_type="user",
-        entity_id=str(user.id),
-        request=request,
-    )
+    await svc.logout(request, resp, user)
     return resp
 
 
 @router.get("/me", response_model=Envelope[CurrentUser])
 async def me(
     request: Request,
-    db: AsyncSession = Depends(get_async_db),
+    svc: AuthService = Depends(auth_service),
     user: User = Depends(require_auth_async),
 ) -> dict:
-    return ok(
-        await _serialize(
-            db,
-            user,
-            active_role=getattr(request.state, "session_role", None),
-            session_bucket=getattr(request.state, "session_bucket", None),
-        )
-    )
-
-
-async def _serialize(
-    db: AsyncSession,
-    user: User,
-    *,
-    session: object | None = None,
-    active_role: str | None = None,
-    session_bucket: str | None = None,
-) -> CurrentUser:
-    community_ids = (
-        await db.scalars(select(UserRole.community_id).where(UserRole.user_id == user.id))
-    ).all()
-    if session is not None:
-        active_role = getattr(session, "role_slug", None)
-        session_bucket = getattr(session, "cookie_bucket", None)
-    return CurrentUser(
-        id=str(user.id),
-        email=user.email,
-        full_name=user.full_name,
-        is_superadmin=user.is_superadmin,
-        permissions=sorted(await user_permissions_async(db, user)),
-        community_ids=sorted({str(c) for c in community_ids if c is not None}),
-        active_role=active_role,
-        session_bucket=session_bucket,
-        permission_version=user.permission_version or 0,
-    )
+    return ok(await svc.me(request, user))

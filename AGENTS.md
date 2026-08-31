@@ -518,7 +518,7 @@ Full contract: [`docs/platform/api-contract.md`](docs/platform/api-contract.md).
 ### API‑layer security controls (uniform)
 
 CSRF on cookie‑authenticated state‑changing requests · CORS locked to the known Next.js origin(s)
-per environment · rate limiting (`slowapi`) on `/auth/login`, OTP/PIN verify, payment‑simulation ·
+per environment · Redis sliding-window rate limiting by path class (`auth/search/upload/export/write/default`, `app/core/ratelimit.py`) ·
 server‑side upload validation · role + tenant filter applied **before** query. Every endpoint has
 an accurate OpenAPI `summary` and a `docs/backend/api/<module>.md` entry.
 
@@ -553,7 +553,7 @@ an accurate OpenAPI `summary` and a `docs/backend/api/<module>.md` entry.
   `SESSION_ACTIVITY_REFRESH_SECONDS`. **Logout revokes only the presented session.** Password
   change / role / permission change revoke **all** of a user's sessions
   (`revoke_all_user_sessions_async` / `invalidate_user_permissions_async`).
-- **Rate limiting**: `/auth/login` and OTP/PIN verify per IP/account (default `5/minute`; 5 failed
+- **Rate limiting**: Redis sliding-window (`app/core/ratelimit.py`, AGENTS.md §9.2) — identity `user:<session>` else `ip:<addr>`, per-class budgets from config (`auth` default `5/60`; 5 failed
   attempts → temporary lockout).
 - **OTP (mobile)**: guards + residents may authenticate via OTP to the registered mobile (mock
   delivery — recorded, not sent). Same session issuance on success.

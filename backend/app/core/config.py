@@ -77,8 +77,16 @@ class Settings(BaseSettings):
     EMAIL_FROM: str = "no-reply@gatesphere.com"
     EMAIL_FROM_NAME: str = "GateSphere"
 
-    # --- rate limiting ---
-    RATE_LIMIT_LOGIN: str = "5/minute"
+    # --- rate limiting (sliding window over Redis, AGENTS.md §9.2) ---
+    # `<max requests>/<window seconds>` per path class. Identity = user:<id> when the
+    # session cookie resolves, else ip:<addr>. Fails OPEN on a Redis error.
+    RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_LOGIN: str = "5/60"  # the `auth` class — kept name for back-compat
+    RATE_LIMIT_SEARCH: str = "60/60"
+    RATE_LIMIT_UPLOAD: str = "30/60"
+    RATE_LIMIT_EXPORT: str = "20/60"
+    RATE_LIMIT_WRITE: str = "120/60"
+    RATE_LIMIT_DEFAULT: str = "600/60"
 
     @model_validator(mode="after")
     def _production_safety(self) -> Settings:
