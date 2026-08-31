@@ -9,7 +9,7 @@ Every registered route, cross-checked against `GET /api/v1/openapi.json` (256 ro
 - **Perm**: the `require_permission_async("<code>")` gate on the route (resolved against the caller's **effective** per-community permission set — role defaults ± `community_role_permissions` overrides). `platform-admin` = `require_platform_admin` (`is_superadmin`). `–` = session only.
 - **Scope**: `T` = tenant-scoped via `TenantScope` (cross-community → 404); `T+U` = also row-level own-unit for a plain resident (`UnitScopedAccess`); `self` = actor's own rows only; `global` = superadmin/global only.
 - **Mutation**: primary ORM model(s) written, via `app/modules/<m>/repository.py` → model → PostgreSQL. All mutating routes also insert `audit_logs` in the same transaction unless noted.
-- **Side effects**: notification events (`notifications.events.emit*` → SAVEPOINT-isolated), S3/MinIO calls, session revocation, `permission_version` bumps, Celery is **not** invoked synchronously by any route.
+- **Side effects**: notification events (`notifications.events.emit*` → SAVEPOINT-isolated), S3/MinIO calls, session revocation, `permission_version` bumps, Celery is enqueued by exactly one route — `POST /communication/announcements/{id}/publish` → `communication.tasks.fan_out_announcement` on the `notifications` queue (idempotent, off the request path). No route waits on a task.
 
 ---
 

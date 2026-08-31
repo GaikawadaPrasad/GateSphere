@@ -660,7 +660,10 @@ error — availability over strictness. A reverse proxy adds a second, independe
 ### 9.3 Background jobs (Celery)
 
 - Separate queues (`default`, `email`, `notifications`, `reports`, `maintenance`) so a bulk import
-  producing thousands of notifications cannot delay a password‑reset email.
+  producing thousands of notifications cannot delay a password‑reset email. **Implemented** in
+  `app/core/celery_app.py` (`task_queues` + `task_routes`); the worker consumes all five
+  (`scripts/entrypoint.sh -Q …`). A route may **enqueue** a task (only `publish_announcement` →
+  `communication.tasks.fan_out_announcement`, `notifications` queue, idempotent) but never waits on one.
 - **Idempotency by stamping, not dedup logic** — mark the row once the effect has happened (a
   notification row marked dispatched, an invoice marked generated) so a concurrent or late sweep
   skips it. Make the *effect* checkable; don't rely on the scheduler never firing twice.

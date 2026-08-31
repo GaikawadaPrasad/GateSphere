@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from celery import Celery
 from celery.schedules import crontab
+from kombu import Queue
 
 import app.db.base  # noqa: F401 — register every ORM model so mappers configure in the worker
 from app.core.config import settings
@@ -18,6 +19,7 @@ celery = Celery(
         "app.modules.visitors.tasks",
         "app.modules.complaints.tasks",
         "app.modules.amenities.tasks",
+        "app.modules.communication.tasks",
     ],
 )
 celery.conf.update(
@@ -25,6 +27,25 @@ celery.conf.update(
     task_reject_on_worker_lost=True,
     task_track_started=True,
     timezone="UTC",
+    # Separate queues (AGENTS.md §9.3) so a bulk broadcast fan-out cannot delay a
+    # password-reset email. The worker consumes all of them (`entrypoint.sh -Q ...`).
+    task_default_queue="default",
+    task_queues=(
+        Queue("default"),
+        Queue("email"),
+        Queue("notifications"),
+        Queue("reports"),
+        Queue("maintenance"),
+    ),
+    task_routes={
+        "app.modules.communication.tasks.*": {"queue": "notifications"},
+        "app.modules.notifications.tasks.*": {"queue": "notifications"},
+        "app.modules.billing.tasks.send_dues_reminders": {"queue": "email"},
+        "app.modules.billing.tasks.*": {"queue": "maintenance"},
+        "app.modules.complaints.tasks.*": {"queue": "maintenance"},
+        "app.modules.visitors.tasks.*": {"queue": "maintenance"},
+        "app.modules.amenities.tasks.*": {"queue": "maintenance"},
+    },
     beat_schedule={
         "sweep-ticket-sla": {
             "task": "app.modules.complaints.tasks.sweep_ticket_sla",

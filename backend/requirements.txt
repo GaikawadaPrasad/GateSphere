@@ -11,6 +11,7 @@ psycopg[binary]==3.2.3
 greenlet==3.1.1  # required by SQLAlchemy's async engine
 redis==5.2.1
 celery==5.4.0
+kombu==5.4.2  # celery dep — imported directly for Queue defs
 argon2-cffi==23.1.0
 itsdangerous==2.2.0
 python-multipart==0.0.20

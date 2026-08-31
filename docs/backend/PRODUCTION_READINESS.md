@@ -43,8 +43,8 @@ reproducible with `make test` (Docker) unless noted.
   workaround for shared-DB flakes — IS-1).
 - `audit_logs` immutability is path-absence, not a DB trigger (AUD-2).
 - No point-in-time `role` column on `audit_logs` (AUD-1).
-- Broadcast SMS/email fan-out is synchronous in-app only; move to Celery beyond a few
-  thousand residents (NTF-1 note).
+- ~~Broadcast fan-out synchronous~~ → **done**: `publish_announcement` enqueues
+  `communication.tasks.fan_out_announcement` on the `notifications` Celery queue (idempotent).
 - Rate limiting is login-only (CFG-5).
 - Feature-completeness nits: no multi-question survey builder, no event RSVP, uneven `?q=`
   search coverage, operational CSV exports only for `audit` (GAP-1..4).

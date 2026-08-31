@@ -12,6 +12,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
+import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -40,10 +41,22 @@ from app.modules.communication.repository import (
 )
 from app.modules.communication.schemas import ALLOWED
 from app.modules.communities.models import Tower, Unit
-from app.modules.notifications import events as notif_events
 from app.modules.residents.access import user_in_community
 from app.modules.residents.models import ResidentProfile, UnitOccupancy
 from app.modules.users.models import Role, User, UserRole
+
+_log = structlog.get_logger(__name__)
+
+
+def _enqueue_fan_out(announcement_id: str) -> None:
+    """Best-effort enqueue of the broadcast fan-out. A broker hiccup must not fail the
+    publish — the row is committed; a follow-up publish or an ops replay can re-fan."""
+    try:
+        from app.modules.communication.tasks import fan_out_announcement
+
+        fan_out_announcement.apply_async(args=[announcement_id], countdown=2, queue="notifications")
+    except Exception:
+        _log.warning("fan_out enqueue failed", announcement=announcement_id, exc_info=True)
 
 
 def _enum(field: str, value: str | None) -> None:
@@ -320,34 +333,10 @@ class CommunicationService:
         ann.publish_at = ann.publish_at or datetime.now(UTC)
         await self.db.flush()
         await self._audit("announcement.publish", ann.community_id, "announcement", ann.id)
-        # Broadcast fan-out: a published notice/alert must reach its audience (FR-15).
-        recipients = await self._announcement_recipients(ann)
-        emergency = ann.announcement_type == "emergency"
-        await notif_events.emit_many(
-            self.db,
-            recipient_user_ids=recipients,
-            community_id=ann.community_id,
-            notification_type=f"communication.{ann.announcement_type}",
-            title=ann.title,
-            message=(ann.body or "")[:2000],
-            reference_type="announcement",
-            reference_id=ann.id,
-        )
-        if emergency:
-            await notif_events.emit_to_roles(
-                self.db,
-                self.scope,
-                self.actor,
-                self.ctx,
-                community_id=ann.community_id,
-                role_slugs=["security_supervisor", "security_guard", "facility_manager"],
-                notification_type="communication.emergency",
-                title=f"EMERGENCY: {ann.title}",
-                message=(ann.body or "")[:2000],
-                reference_type="announcement",
-                reference_id=ann.id,
-                channels=["in_app", "sms"],
-            )
+        # Broadcast fan-out (FR-15) runs on the `notifications` Celery queue — off the
+        # request path so a whole-community publish stays sub-second. The task is
+        # idempotent and retries until it sees `is_published` committed.
+        _enqueue_fan_out(str(ann.id))
         return await self.get_announcement(ann.id)
 
     async def expire_announcement(self, announcement_id: uuid.UUID) -> Announcement:

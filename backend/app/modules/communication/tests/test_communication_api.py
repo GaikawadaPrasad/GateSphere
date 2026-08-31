@@ -57,6 +57,11 @@ def test_publishing_a_broadcast_notifies_residents(as_role, seed_ids):
     aid = r.json()["data"]["id"]
     assert admin.post(f"{P}/announcements/{aid}/publish").status_code == 200
 
+    # fan-out runs on the `notifications` Celery queue — invoke the task body directly
+    # (it is idempotent; in production `publish` enqueues it with a short countdown).
+    from app.modules.communication.tasks import fan_out_announcement
+
+    fan_out_announcement.apply(args=[aid]).get()
     with SessionLocal() as db:
         n = db.scalar(
             select(func.count())
@@ -64,6 +69,8 @@ def test_publishing_a_broadcast_notifies_residents(as_role, seed_ids):
             .where(Notification.reference_id == aid, Notification.reference_type == "announcement")
         )
     assert n and n > 0, "publishing a community broadcast created no resident notifications"
+    # a second fan-out is a no-op (idempotent)
+    assert fan_out_announcement.apply(args=[aid]).get()["status"] == "already_sent"
 
 
 def test_admin_announcement_and_poll_flow(as_role, seed_ids):

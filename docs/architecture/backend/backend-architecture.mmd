@@ -102,15 +102,16 @@ flowchart TD
         S3[("S3 / MinIO<br/>app/services/storage.py (boto3, off-thread)<br/>presigned PUT/GET · HEAD · magic-byte sniff")]
     end
 
-    subgraph JOBS["Background jobs (NOT called by routes)"]
+    subgraph JOBS["Background jobs — Celery (queues: default · email · notifications · reports · maintenance)"]
         direction TB
-        BEAT["Celery beat<br/>app/core/celery_app.py"]
-        WORKER["Celery worker → app/core/jobs.py<br/>job_session + system_scope + system@ actor"]
-        T1["complaints.sweep_ticket_sla · 5m"]
-        T2["billing.sweep_overdue_invoices · 01:00"]
-        T3["billing.send_dues_reminders · Mon 09:00"]
-        T4["visitors.expire_stale_requests · 15m"]
-        T5["amenities.close_past_bookings · 15m"]
+        BEAT["Celery beat<br/>app/core/celery_app.py — beat_schedule + task_routes"]
+        WORKER["Celery worker → app/core/jobs.py<br/>-Q default,email,notifications,reports,maintenance<br/>job_session + system_scope + system@ actor"]
+        T1["complaints.sweep_ticket_sla · 5m  (maintenance)"]
+        T2["billing.sweep_overdue_invoices · 01:00  (maintenance)"]
+        T3["billing.send_dues_reminders · Mon 09:00  (email)"]
+        T4["visitors.expire_stale_requests · 15m  (maintenance)"]
+        T5["amenities.close_past_bookings · 15m  (maintenance)"]
+        T6["communication.fan_out_announcement  (notifications)<br/>enqueued by publish_announcement — idempotent, off the request path"]
     end
 
     OPS["ops routes (app/main.py)<br/>GET / · /healthz · /readyz · /docs · /redoc<br/>(/docs, /redoc, openapi.json disabled when ENVIRONMENT=production unless ENABLE_DOCS)"]
@@ -187,7 +188,8 @@ flowchart TD
 
     %% jobs
     BEAT --> WORKER
-    WORKER --> T1 & T2 & T3 & T4 & T5
+    WORKER --> T1 & T2 & T3 & T4 & T5 & T6
+    S_CMN -.->|"publish → enqueue (notifications queue)"| T6
     T1 --> S_CMP
     T2 --> S_BILL
     T3 --> S_BILL

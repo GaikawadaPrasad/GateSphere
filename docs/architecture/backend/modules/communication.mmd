@@ -18,7 +18,7 @@ flowchart TD
         AN_U{"PATCH /communication/announcements/{id} → update_announcement  [communication:update]<br/>is_published?"}
         AN_U -->|yes| AN_UE["409 ALREADY_PUBLISHED (published = immutable)"]
         AN_U -->|no| AN_UU["apply patch; re-validate targets; audit"]
-        AN_P["POST /communication/announcements/{id}/publish  [communication:approve]<br/>is_published=true, publish_at; freezes<br/>_announcement_recipients(targets: all-community / tower / unit / role / group)<br/>→ notif_events.emit_many (bulk in-app Notification INSERT)<br/>emergency type → also emit_to_roles(security+FM, in_app+sms)"]
+        AN_P["POST /communication/announcements/{id}/publish  [communication:approve]<br/>is_published=true, publish_at; freezes; audit<br/>_enqueue_fan_out → Celery communication.tasks.fan_out_announcement (notifications queue, countdown 2s)"]
         AN_E["POST /communication/announcements/{id}/expire  [communication:approve]"]
     end
 

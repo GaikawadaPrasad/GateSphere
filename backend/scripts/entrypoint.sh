@@ -30,7 +30,7 @@ case "${1:-api}" in
     exec gunicorn app.main:app -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --workers "${WEB_CONCURRENCY:-3}"
     ;;
   worker)
-    exec celery -A app.core.celery_app.celery worker --loglevel=INFO
+    exec celery -A app.core.celery_app.celery worker --loglevel=INFO -Q default,email,notifications,reports,maintenance
     ;;
   beat)
     exec celery -A app.core.celery_app.celery beat --loglevel=INFO
