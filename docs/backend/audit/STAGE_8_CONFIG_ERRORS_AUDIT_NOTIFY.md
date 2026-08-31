@@ -38,8 +38,8 @@ auditor endpoints are GET-only (Stage 2). Login rows now also carry `{role, buck
 
 | ID | Sev | Finding |
 |---|---|---|
-| AUD-1 | LOW | No first-class `role` column on `audit_logs` — point-in-time role is not captured (derivable from `user_id` + `community_id` + `user_roles` at query time, but that reflects *current* grants). Acceptable for MVP; note for a future `role_slug` column. |
-| AUD-2 | LOW | `audit_logs` immutability is enforced only by the absence of a write path, not a DB trigger / revoked UPDATE privilege. Add a `BEFORE UPDATE/DELETE … RAISE` trigger for defence-in-depth. |
+| AUD-1 | FIXED | migration 0028 — `audit_logs.role_slug` (point-in-time), captured from the session role or an explicit arg. |
+| AUD-2 | FIXED | migration 0028 — `gs_audit_logs_immutable` trigger RAISEs on UPDATE/DELETE. |
 
 ## Notification engine (§23)
 

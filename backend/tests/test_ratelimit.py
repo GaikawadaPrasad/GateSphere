@@ -63,3 +63,14 @@ def test_fails_open_when_redis_is_down(monkeypatch, _limited):
     for _ in range(10):
         r = c.post("/api/v1/auth/login", json={"email": "x@x.com", "password": "y"})
         assert r.status_code != 429
+
+
+def test_invite_token_is_redacted_in_logs():
+    from app.core.logging import redact_path
+
+    assert redact_path("/api/v1/invitations/abc123secret") == "/api/v1/invitations/<redacted>"
+    assert (
+        redact_path("/api/v1/invitations/abc123secret/accept")
+        == "/api/v1/invitations/<redacted>/accept"
+    )
+    assert redact_path("/api/v1/visitors/requests/xyz") == "/api/v1/visitors/requests/xyz"

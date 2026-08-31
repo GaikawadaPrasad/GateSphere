@@ -45,7 +45,7 @@ reproducible with `make test` (Docker) unless noted.
 - No point-in-time `role` column on `audit_logs` (AUD-1).
 - ~~Broadcast fan-out synchronous~~ → **done**: `publish_announcement` enqueues
   `communication.tasks.fan_out_announcement` on the `notifications` Celery queue (idempotent).
-- Rate limiting is login-only (CFG-5).
+- (CFG-5 done — Redis sliding-window by path class.)
 - Feature-completeness: multi-question survey builder + event RSVP still pending (GAP-1/2).
   `?q=` search: visitors, domestic_staff, vehicles, complaints, incidents, deliveries.
   CSV export: audit, invoices, payments, gate events, visitor entries, complaint tickets.

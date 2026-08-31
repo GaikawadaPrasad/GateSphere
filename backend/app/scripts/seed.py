@@ -930,6 +930,107 @@ def seed_operations(db: Session, communities: list[Community]) -> None:
         )
 
 
+def seed_audit_trail(db: Session, communities: list[Community]) -> None:
+    """FR-17: a populated audit trail so `/audit/logs` is never empty on a fresh demo.
+
+    Written directly (append-only; the immutability trigger blocks later edits). Idempotent —
+    skips once any `login.success` row exists.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import func as _f
+
+    from app.modules.audit.models import AuditLog
+    from app.modules.billing.models import MaintenanceInvoice
+    from app.modules.complaints.models import ServiceTicket
+    from app.modules.users.models import Role, User, UserRole
+    from app.modules.visitors.models import VisitorRequest
+
+    if db.scalar(
+        select(_f.count()).select_from(AuditLog).where(AuditLog.action == "login.success")
+    ):
+        return
+
+    now = datetime.now(UTC)
+    rows: list[AuditLog] = []
+    for c in communities:
+        ca = db.scalar(
+            select(User)
+            .join(UserRole, UserRole.user_id == User.id)
+            .join(Role, Role.id == UserRole.role_id)
+            .where(Role.slug == "community_admin", UserRole.community_id == c.id)
+        ) or db.scalar(select(User).where(User.email == f"community_admin@{DEMO_DOMAIN}"))
+        rows.append(
+            AuditLog(
+                community_id=c.id,
+                user_id=ca.id if ca else None,
+                role_slug="community_admin",
+                module="auth",
+                action="login.success",
+                entity_type="user",
+                entity_id=str(ca.id) if ca else None,
+                new_values={"role": "community_admin"},
+                ip_address="203.0.113.10",
+                created_at=now - timedelta(days=2),
+            )
+        )
+        inv = db.scalar(
+            select(MaintenanceInvoice).where(MaintenanceInvoice.community_id == c.id).limit(1)
+        )
+        if inv:
+            rows.append(
+                AuditLog(
+                    community_id=c.id,
+                    user_id=ca.id if ca else None,
+                    role_slug="community_admin",
+                    module="billing",
+                    action="invoice.post",
+                    entity_type="maintenance_invoice",
+                    entity_id=str(inv.id),
+                    old_values={"status": "draft"},
+                    new_values={"status": "posted"},
+                    ip_address="203.0.113.10",
+                    created_at=now - timedelta(days=1, hours=3),
+                )
+            )
+        tk = db.scalar(select(ServiceTicket).where(ServiceTicket.community_id == c.id).limit(1))
+        if tk:
+            rows.append(
+                AuditLog(
+                    community_id=c.id,
+                    user_id=ca.id if ca else None,
+                    role_slug="facility_manager",
+                    module="complaints",
+                    action="ticket.in_progress",
+                    entity_type="service_ticket",
+                    entity_id=str(tk.id),
+                    old_values={"status": "assigned"},
+                    new_values={"status": "in_progress"},
+                    ip_address="203.0.113.22",
+                    created_at=now - timedelta(hours=20),
+                )
+            )
+        vr = db.scalar(select(VisitorRequest).where(VisitorRequest.community_id == c.id).limit(1))
+        if vr:
+            rows.append(
+                AuditLog(
+                    community_id=c.id,
+                    user_id=ca.id if ca else None,
+                    role_slug="resident",
+                    module="visitors",
+                    action="request.approved",
+                    entity_type="visitor_request",
+                    entity_id=str(vr.id),
+                    new_values={"decision": "approved"},
+                    ip_address="203.0.113.44",
+                    created_at=now - timedelta(hours=6),
+                )
+            )
+    db.add_all(rows)
+    db.flush()
+    log.info("seed.audit_trail", rows=len(rows))
+
+
 def reset_data(db: Session) -> None:
     """TRUNCATE every data table (schema + `alembic_version` kept) so `main()` re-seeds
     from a guaranteed-clean state. `CASCADE` handles FK order; `RESTART IDENTITY` resets
@@ -965,6 +1066,7 @@ def main(*, reset: bool = False) -> None:
         seed_incidents(db, communities)
         seed_notifications(db, communities)
         seed_operations(db, communities)
+        seed_audit_trail(db, communities)
         db.commit()
     log.info("seed.done")
     print(f"Seed complete. Demo users: <role>@{DEMO_DOMAIN} / <role>{DEMO_PASSWORD_SUFFIX}")

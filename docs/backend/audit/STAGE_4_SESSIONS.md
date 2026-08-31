@@ -46,9 +46,8 @@ a cookie (opaque token only; only its SHA-256 is stored).
 - `accepted_at` + `with_for_update()` → **single-use**, concurrent-accept-safe
 - raw token appears only in the invite response body / `accept_url`, **never logged**
 
-Residual: the token is in the URL *path*, so it reaches uvicorn access logs. LOW —
-single-use + short TTL + hashed at rest. **Logged for Stage 8** (access-log redaction) as
-accept-with-caveat.
+Residual FIXED: `app/core/logging.py::redact_path` + a `uvicorn.access` filter rewrite
+`/api/v1/invitations/<token>` → `<redacted>` in every log sink.
 
 ## Changes made
 

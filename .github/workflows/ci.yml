@@ -23,6 +23,20 @@ jobs:
       - run: ruff check .
       - run: black --check .
 
+  backend-types:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      # Ratchet: fails only if the mypy error count grew vs backend/.mypy-baseline (TYP-1).
+      - run: bash scripts/mypy-ratchet.sh
+
   frontend-lint:
     runs-on: ubuntu-latest
     defaults:
