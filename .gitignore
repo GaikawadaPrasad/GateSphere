@@ -248,3 +248,6 @@ zap-report.*
 
 # TS build info
 *.tsbuildinfo
+
+# Newman API test reports (generated)
+docs/postman/newman-report.*

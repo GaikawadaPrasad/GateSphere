@@ -24,6 +24,7 @@ x-backend-env: &backend-env
   BREVO_API_KEY: "${BREVO_API_KEY:-}"
   EMAIL_FROM: "${EMAIL_FROM:-no-reply@gatesphere.com}"
   SEED_ON_START: "${SEED_ON_START:-true}"
+  RATE_LIMIT_LOGIN: "${RATE_LIMIT_LOGIN:-5/minute}"
 
 services:
   db:

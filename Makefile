@@ -58,6 +58,9 @@ test: ## Run backend tests against a freshly reseeded DB (deterministic; see doc
 test-fast: ## Run backend tests without reseeding (fast; may flake on accumulated data — see IS-1)
 	$(COMPOSE) run --rm backend pytest
 
+test-api: ## Run the Postman/Newman API suite (docs/postman/) against the stack
+	bash scripts/test-api.sh
+
 lint: ## Ruff + Black check (backend) and ESLint (frontend)
 	$(COMPOSE) run --rm backend sh -c "ruff check . && black --check ."
 	$(COMPOSE) run --rm frontend npm run lint
