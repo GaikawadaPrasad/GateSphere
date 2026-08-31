@@ -10,6 +10,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, Response, status
 
+from app.core.export import EXPORT_ROW_CAP, csv_response
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
 from app.core.tenancy import require_permission_async
@@ -23,6 +24,7 @@ VIEW = Depends(require_permission_async("visitors:view"))
 CREATE = Depends(require_permission_async("visitors:create"))
 APPROVE = Depends(require_permission_async("visitors:approve"))
 UPDATE = Depends(require_permission_async("visitors:update"))
+EXPORT = Depends(require_permission_async("visitors:export"))
 
 
 @router.get("/health", summary="Visitor Management module liveness")
@@ -99,6 +101,28 @@ async def list_entries(
     )
     return paginated(
         [schemas.EntryRead.model_validate(r) for r in rows], total=total, params=params
+    )
+
+
+@router.get("/entries.csv", dependencies=[EXPORT])
+async def export_entries(
+    community_id: uuid.UUID | None = None,
+    entry_status: str | None = None,
+    svc: VisitorService = Depends(visitor_service),
+):
+    rows, _ = await svc.list_entries(
+        community_id=community_id,
+        status=entry_status,
+        offset=0,
+        limit=EXPORT_ROW_CAP,
+    )
+    return csv_response(
+        "visitor_entries.csv",
+        ["entry_at", "exit_at", "status", "visitor_id", "request_id", "vehicle_number"],
+        (
+            (e.entry_at, e.exit_at, e.status, e.visitor_id, e.request_id, e.vehicle_number)
+            for e in rows
+        ),
     )
 
 

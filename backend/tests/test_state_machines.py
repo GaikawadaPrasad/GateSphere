@@ -126,3 +126,34 @@ def test_create_pass_does_not_auto_approve_for_non_approver(as_role, seed_ids):
         before,
         "pending",
     ), f"request was silently approved by a non-approver ({after})"
+
+
+def test_csv_exports_and_search(as_role, seed_ids):
+    """GAP-3 / GAP-4: operational CSV exports + ?q= free-text search."""
+    admin = as_role("community_admin")
+    cid = seed_ids["community_id"]
+    for path, header0 in [
+        (f"/api/v1/billing/invoices.csv?community_id={cid}", "invoice_number"),
+        (f"/api/v1/billing/payments.csv?community_id={cid}", "payment_reference"),
+        (f"/api/v1/gate/events.csv?community_id={cid}", "occurred_at"),
+        (f"/api/v1/visitors/entries.csv?community_id={cid}", "entry_at"),
+        (f"/api/v1/complaints/tickets.csv?community_id={cid}", "ticket_number"),
+    ]:
+        r = admin.get(path)
+        assert r.status_code == 200, (path, r.text[:200])
+        assert r.headers["content-type"].startswith("text/csv")
+        assert r.text.splitlines()[0].split(",")[0] == header0
+
+    # search hits (empty result is fine — just must not 500 and must be scoped)
+    for path in [
+        f"/api/v1/complaints/tickets?community_id={cid}&q=leak",
+        f"/api/v1/incidents?community_id={cid}&q=gate",
+        f"/api/v1/deliveries?community_id={cid}&q=amazon",
+    ]:
+        assert admin.get(path).status_code == 200
+
+    # auditor can export (has *:export via billing:export) but a plain resident cannot
+    assert (
+        as_role("resident").get(f"/api/v1/billing/invoices.csv?community_id={cid}").status_code
+        == 403
+    )

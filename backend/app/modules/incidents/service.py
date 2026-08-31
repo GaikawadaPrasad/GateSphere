@@ -160,6 +160,7 @@ class IncidentService:
         community_id: uuid.UUID | None,
         incident_status: str | None,
         severity: str | None,
+        q: str | None = None,
         offset: int,
         limit: int,
     ):
@@ -173,6 +174,13 @@ class IncidentService:
             stmt = stmt.where(SecurityIncident.status == incident_status)
         if severity:
             stmt = stmt.where(SecurityIncident.severity == severity)
+        if q:
+            like = f"%{q}%"
+            stmt = stmt.where(
+                SecurityIncident.incident_number.ilike(like)
+                | SecurityIncident.location_text.ilike(like)
+                | SecurityIncident.description.ilike(like)
+            )
         stmt = stmt.order_by(SecurityIncident.reported_at.desc())
         return await self.incidents.list(
             offset=offset, limit=limit, extra=stmt

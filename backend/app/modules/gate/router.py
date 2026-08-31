@@ -11,6 +11,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, status
 
+from app.core.export import EXPORT_ROW_CAP, csv_response
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
 from app.core.tenancy import require_permission_async
@@ -24,6 +25,7 @@ VIEW = Depends(require_permission_async("gate:view"))
 CREATE = Depends(require_permission_async("gate:create"))
 UPDATE = Depends(require_permission_async("gate:update"))
 APPROVE = Depends(require_permission_async("gate:approve"))  # Security Supervisor / Community Admin
+EXPORT = Depends(require_permission_async("gate:export"))
 
 
 @router.get("/health", summary="Gate Operations module liveness")
@@ -49,6 +51,37 @@ async def list_events(
     )
     return paginated(
         [schemas.EventRead.model_validate(r) for r in rows], total=total, params=params
+    )
+
+
+@router.get("/events.csv", dependencies=[EXPORT])
+async def export_events(
+    community_id: uuid.UUID | None = None,
+    gate_id: uuid.UUID | None = None,
+    event_type: str | None = None,
+    svc: GateService = Depends(gate_service),
+):
+    rows, _ = await svc.list_events(
+        community_id=community_id,
+        gate_id=gate_id,
+        event_type=event_type,
+        offset=0,
+        limit=EXPORT_ROW_CAP,
+    )
+    return csv_response(
+        "gate_events.csv",
+        ["occurred_at", "event_type", "gate_id", "actor_user_id", "reference_type", "reference_id"],
+        (
+            (
+                e.occurred_at,
+                e.event_type,
+                e.gate_id,
+                e.actor_user_id,
+                e.reference_type,
+                e.reference_id,
+            )
+            for e in rows
+        ),
     )
 
 

@@ -75,8 +75,8 @@ updated.
 |---|---|---|---|
 | GAP-1 | LOW | No multi-question **survey** builder (only single-question polls; `survey` is just an announcement type) | Only build if the PRD's survey acceptance criteria require multi-question. Otherwise the `poll` + `announcement_type=survey` combo is adequate. |
 | GAP-2 | LOW | **Events** have no RSVP / attendee list / calendar view | AGENTS.md §0 scopes events as a communication broadcast variant. Add RSVP only if wireframes show it. |
-| GAP-3 | LOW | Free-text `?q=` search only on `visitors` + `domestic_staff` | Add `?q=` to the other list endpoints (residents, vehicles, deliveries, tickets) — small, incremental. |
-| GAP-4 | LOW | Only `audit` has a CSV export | Add `.csv` variants to the high-value operational lists (invoices, payments, visitor log, gate events) for FR-16 "reporting". |
+| GAP-3 | FIXED | `?q=` now on visitors, domestic_staff, vehicles, complaints tickets, incidents, deliveries (ILIKE across number/name/text columns; tenant-scoped). |
+| GAP-4 | FIXED | `.csv` exports (shared `app/core/export.py::csv_response`, `<module>:export` gated): `/billing/invoices.csv`, `/billing/payments.csv`, `/gate/events.csv`, `/visitors/entries.csv`, `/complaints/tickets.csv` (+ existing `/audit/logs.csv`). |
 
 **No module is missing.** No fake/placeholder modules. The 4 gaps are feature-completeness
 nits within delivered modules, each defensible against `AGENTS.md §0` "Only build what

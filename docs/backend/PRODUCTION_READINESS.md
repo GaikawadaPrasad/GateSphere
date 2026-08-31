@@ -46,8 +46,9 @@ reproducible with `make test` (Docker) unless noted.
 - ~~Broadcast fan-out synchronous~~ → **done**: `publish_announcement` enqueues
   `communication.tasks.fan_out_announcement` on the `notifications` Celery queue (idempotent).
 - Rate limiting is login-only (CFG-5).
-- Feature-completeness nits: no multi-question survey builder, no event RSVP, uneven `?q=`
-  search coverage, operational CSV exports only for `audit` (GAP-1..4).
+- Feature-completeness: multi-question survey builder + event RSVP still pending (GAP-1/2).
+  `?q=` search: visitors, domestic_staff, vehicles, complaints, incidents, deliveries.
+  CSV export: audit, invoices, payments, gate events, visitor entries, complaint tickets.
 
 ## Runbook
 

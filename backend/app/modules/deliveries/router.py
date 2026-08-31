@@ -62,6 +62,7 @@ async def list_deliveries(
     unit_id: uuid.UUID | None = None,
     delivery_status: str | None = None,
     approval_status: str | None = None,
+    q: str | None = None,
     params: PageParams = Depends(page_params),
     svc: Svc = Depends(delivery_service),
 ) -> dict:
@@ -70,6 +71,7 @@ async def list_deliveries(
         unit_id=unit_id,
         status=delivery_status,
         approval_status=approval_status,
+        q=q,
         offset=params.offset,
         limit=params.page_size,
     )

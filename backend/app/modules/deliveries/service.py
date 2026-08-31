@@ -215,6 +215,7 @@ class DeliveryService(UnitScopedAccess):
         unit_id: uuid.UUID | None,
         status: str | None,
         approval_status: str | None,
+        q: str | None = None,
         offset: int,
         limit: int,
     ):
@@ -230,6 +231,13 @@ class DeliveryService(UnitScopedAccess):
             stmt = stmt.where(Delivery.status == status)
         if approval_status:
             stmt = stmt.where(Delivery.approval_status == approval_status)
+        if q:
+            like = f"%{q}%"
+            stmt = stmt.where(
+                Delivery.provider_name.ilike(like)
+                | Delivery.executive_name.ilike(like)
+                | Delivery.tracking_reference.ilike(like)
+            )
         stmt = stmt.order_by(Delivery.created_at.desc())
         stmt = await self._scope_unit_column(stmt, Delivery.unit_id)
         return await self.deliveries.list(

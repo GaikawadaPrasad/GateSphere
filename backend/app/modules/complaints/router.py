@@ -10,6 +10,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, status
 
+from app.core.export import EXPORT_ROW_CAP, csv_response
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
 from app.core.tenancy import require_permission_async
@@ -23,6 +24,7 @@ VIEW = Depends(require_permission_async("complaints:view"))
 CREATE = Depends(require_permission_async("complaints:create"))
 UPDATE = Depends(require_permission_async("complaints:update"))
 APPROVE = Depends(require_permission_async("complaints:approve"))
+EXPORT = Depends(require_permission_async("complaints:export"))
 
 Svc = ComplaintService
 
@@ -108,6 +110,7 @@ async def list_tickets(
     community_id: uuid.UUID | None = None,
     unit_id: uuid.UUID | None = None,
     ticket_status: str | None = None,
+    q: str | None = None,
     params: PageParams = Depends(page_params),
     svc: Svc = Depends(complaint_service),
 ) -> dict:
@@ -115,11 +118,54 @@ async def list_tickets(
         community_id=community_id,
         unit_id=unit_id,
         ticket_status=ticket_status,
+        q=q,
         offset=params.offset,
         limit=params.page_size,
     )
     return paginated(
         [schemas.TicketRead.model_validate(r) for r in rows], total=total, params=params
+    )
+
+
+@router.get("/tickets.csv", dependencies=[EXPORT])
+async def export_tickets(
+    community_id: uuid.UUID | None = None,
+    unit_id: uuid.UUID | None = None,
+    ticket_status: str | None = None,
+    svc: Svc = Depends(complaint_service),
+):
+    rows, _ = await svc.list_tickets(
+        community_id=community_id,
+        unit_id=unit_id,
+        ticket_status=ticket_status,
+        offset=0,
+        limit=EXPORT_ROW_CAP,
+    )
+    return csv_response(
+        "complaint_tickets.csv",
+        [
+            "ticket_number",
+            "subject",
+            "status",
+            "priority",
+            "escalation_state",
+            "unit_id",
+            "created_at",
+            "resolved_at",
+        ],
+        (
+            (
+                t.ticket_number,
+                t.subject,
+                t.status,
+                t.priority,
+                t.escalation_state,
+                t.unit_id,
+                t.created_at,
+                getattr(t, "resolved_at", ""),
+            )
+            for t in rows
+        ),
     )
 
 

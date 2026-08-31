@@ -251,6 +251,7 @@ class ComplaintService(UnitScopedAccess):
         community_id: uuid.UUID | None,
         unit_id: uuid.UUID | None,
         ticket_status: str | None,
+        q: str | None = None,
         offset: int,
         limit: int,
     ):
@@ -263,7 +264,11 @@ class ComplaintService(UnitScopedAccess):
             stmt = stmt.where(ServiceTicket.unit_id == unit_id)
         if ticket_status:
             stmt = stmt.where(ServiceTicket.status == ticket_status)
-        stmt = stmt.order_by(ServiceTicket.created_at.desc())
+        if q:
+            like = f"%{q}%"
+            stmt = stmt.where(
+                ServiceTicket.ticket_number.ilike(like) | ServiceTicket.subject.ilike(like)
+            )
         stmt = await self._scope_unit_column(
             stmt,
             ServiceTicket.unit_id,

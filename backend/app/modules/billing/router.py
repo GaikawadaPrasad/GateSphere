@@ -10,6 +10,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, status
 
+from app.core.export import EXPORT_ROW_CAP, csv_response
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
 from app.core.tenancy import require_permission_async
@@ -23,6 +24,7 @@ VIEW = Depends(require_permission_async("billing:view"))
 CREATE = Depends(require_permission_async("billing:create"))
 UPDATE = Depends(require_permission_async("billing:update"))
 APPROVE = Depends(require_permission_async("billing:approve"))
+EXPORT = Depends(require_permission_async("billing:export"))
 
 Svc = BillingService
 
@@ -199,6 +201,81 @@ async def list_invoices(
     )
     return paginated(
         [schemas.InvoiceRead.model_validate(r) for r in rows], total=total, params=params
+    )
+
+
+@router.get("/invoices.csv", dependencies=[EXPORT])
+async def export_invoices(
+    community_id: uuid.UUID | None = None,
+    unit_id: uuid.UUID | None = None,
+    invoice_status: str | None = None,
+    svc: Svc = Depends(billing_service),
+):
+    rows, _ = await svc.list_invoices(
+        community_id=community_id,
+        unit_id=unit_id,
+        invoice_status=invoice_status,
+        offset=0,
+        limit=EXPORT_ROW_CAP,
+    )
+    return csv_response(
+        "invoices.csv",
+        [
+            "invoice_number",
+            "unit_id",
+            "status",
+            "total_amount",
+            "amount_paid",
+            "balance_due",
+            "issue_date",
+            "due_date",
+            "created_at",
+        ],
+        (
+            (
+                i.invoice_number,
+                i.unit_id,
+                i.status,
+                i.total_amount,
+                i.amount_paid,
+                i.balance_due,
+                i.issue_date,
+                i.due_date,
+                i.created_at,
+            )
+            for i in rows
+        ),
+    )
+
+
+@router.get("/payments.csv", dependencies=[EXPORT])
+async def export_payments(
+    community_id: uuid.UUID | None = None, svc: Svc = Depends(billing_service)
+):
+    rows, _ = await svc.list_payments(community_id=community_id, offset=0, limit=EXPORT_ROW_CAP)
+    return csv_response(
+        "payments.csv",
+        [
+            "payment_reference",
+            "receipt_number",
+            "amount",
+            "payment_method",
+            "payment_status",
+            "paid_at",
+            "refunded_at",
+        ],
+        (
+            (
+                p.payment_reference,
+                p.receipt_number,
+                p.amount,
+                p.payment_method,
+                p.payment_status,
+                p.paid_at,
+                p.refunded_at,
+            )
+            for p in rows
+        ),
     )
 
 

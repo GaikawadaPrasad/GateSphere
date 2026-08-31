@@ -36,6 +36,7 @@ async def list_incidents(
     community_id: uuid.UUID | None = None,
     incident_status: str | None = None,
     severity: str | None = None,
+    q: str | None = None,
     params: PageParams = Depends(page_params),
     svc: Svc = Depends(incident_service),
 ) -> dict:
@@ -43,6 +44,7 @@ async def list_incidents(
         community_id=community_id,
         incident_status=incident_status,
         severity=severity,
+        q=q,
         offset=params.offset,
         limit=params.page_size,
     )
