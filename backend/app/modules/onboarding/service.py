@@ -28,6 +28,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.context import RequestContext
 from app.core.errors import BusinessRuleError, ConflictError, ForbiddenError, NotFoundError
 from app.core.security import (
     create_session,
@@ -70,7 +71,8 @@ class OnboardingService:
         self.db = db
         self.scope = scope
         self.actor = actor
-        self.request = request
+        self.request = request  # kept for create_session (cookie I/O)
+        self.ctx = RequestContext.from_request(request)
 
     # ------------------------------------------------------------------ #
     # shared helpers
@@ -84,7 +86,7 @@ class OnboardingService:
             community_id=community_id,
             entity_type="resident_profile",
             entity_id=str(entity_id),
-            request=self.request,
+            ctx=self.ctx,
             **kw,
         )
 
@@ -494,7 +496,7 @@ class OnboardingService:
                 self.db,
                 TenantScope(user.id, is_global=False, community_ids=frozenset({inv.community_id})),
                 user,
-                self.request,
+                self.ctx,
                 recipient_user_id=inv.invited_by_user_id,
                 community_id=inv.community_id,
                 notification_type="onboarding.invitation_accepted",

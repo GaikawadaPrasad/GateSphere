@@ -10,6 +10,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, Request
 
+from app.core.context import RequestContext
 from app.core.responses import Response as Envelope
 from app.core.responses import ok
 from app.core.security import require_auth_async
@@ -27,7 +28,7 @@ def upload_service(
     ctx: AsyncTenantContext = Depends(async_tenant_context),
     user: User = Depends(require_auth_async),
 ) -> UploadService:
-    return UploadService(ctx.db, ctx.scope, user, request)
+    return UploadService(ctx.db, ctx.scope, user, RequestContext.from_request(request))
 
 
 @router.get("/health", summary="Upload pipeline liveness")

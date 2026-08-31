@@ -13,10 +13,10 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, date, datetime
 
-from fastapi import Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.context import RequestContext
 from app.core.errors import BusinessRuleError, ConflictError, ForbiddenError, NotFoundError
 from app.core.security import user_permissions_async
 from app.core.tenancy import TenantScope
@@ -53,12 +53,12 @@ def _enum(field: str, value: str | None) -> None:
 
 class AmenityService(UnitScopedAccess):
     def __init__(
-        self, db: AsyncSession, scope: TenantScope, actor: User, request: Request | None = None
+        self, db: AsyncSession, scope: TenantScope, actor: User, ctx: RequestContext | None = None
     ):
         self.db = db
         self.scope = scope
         self.actor = actor
-        self.request = request
+        self.ctx = ctx
         self.amenities = AmenityRepository(db, scope)
         self.slots = SlotRepository(db, scope)
         self.rules = RuleRepository(db, scope)
@@ -74,7 +74,7 @@ class AmenityService(UnitScopedAccess):
             community_id=community_id,
             entity_type=entity_type,
             entity_id=entity_id,
-            request=self.request,
+            ctx=self.ctx,
             **kw,
         )
 

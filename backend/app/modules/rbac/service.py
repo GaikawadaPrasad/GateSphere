@@ -15,10 +15,10 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.context import RequestContext
 from app.core.errors import BusinessRuleError, NotFoundError
 from app.core.rbac import PERMISSIONS, ROLE_PERMISSIONS
 from app.core.security import invalidate_user_permissions_async, users_with_role_async
@@ -37,12 +37,12 @@ from app.modules.users.models import (
 
 class RbacService:
     def __init__(
-        self, db: AsyncSession, scope: TenantScope, actor: User, request: Request | None = None
+        self, db: AsyncSession, scope: TenantScope, actor: User, ctx: RequestContext | None = None
     ):
         self.db = db
         self.scope = scope
         self.actor = actor
-        self.request = request
+        self.ctx = ctx
 
     async def _audit(self, action, entity_id, *, community_id=None, **kw) -> None:
         await record_audit_async(
@@ -53,7 +53,7 @@ class RbacService:
             community_id=community_id,
             entity_type="role_permission",
             entity_id=str(entity_id),
-            request=self.request,
+            ctx=self.ctx,
             **kw,
         )
 

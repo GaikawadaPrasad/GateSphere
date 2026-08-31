@@ -11,10 +11,10 @@ import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from fastapi import Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.context import RequestContext
 from app.core.errors import BusinessRuleError
 from app.core.tenancy import TenantScope
 from app.modules.amenities.models import AmenityBooking
@@ -37,12 +37,12 @@ _OPEN_INCIDENT = ("reported", "acknowledged", "responding", "contained")
 
 class DashboardService:
     def __init__(
-        self, db: AsyncSession, scope: TenantScope, actor: User, request: Request | None = None
+        self, db: AsyncSession, scope: TenantScope, actor: User, ctx: RequestContext | None = None
     ):
         self.db = db
         self.scope = scope
         self.actor = actor
-        self.request = request
+        self.ctx = ctx
 
     def _community(self, community_id: uuid.UUID | None) -> uuid.UUID:
         if community_id is not None:

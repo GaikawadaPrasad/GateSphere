@@ -15,6 +15,7 @@ import uuid
 from fastapi import Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.context import RequestContext
 from app.core.errors import AuthError
 from app.core.security import (
     create_session,
@@ -99,7 +100,7 @@ class AuthService:
                     entity_type="user",
                     entity_id=str(user.id) if user else None,
                     new={"email": email.lower(), "reason": "invalid_credentials"},
-                    request=request,
+                    ctx=RequestContext.from_request(request),
                 )
                 await audit_db.commit()
             raise AuthError("Invalid email or password", code="INVALID_CREDENTIALS")
@@ -120,7 +121,7 @@ class AuthService:
             entity_type="user",
             entity_id=str(user.id),
             new={"role": role_slug, "bucket": session.cookie_bucket},
-            request=request,
+            ctx=RequestContext.from_request(request),
             role_slug=role_slug,
         )
         return await self._serialize(
@@ -136,7 +137,7 @@ class AuthService:
             actor=user,
             entity_type="user",
             entity_id=str(user.id),
-            request=request,
+            ctx=RequestContext.from_request(request),
             role_slug=getattr(request.state, "session_role", None),
         )
 

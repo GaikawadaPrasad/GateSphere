@@ -113,8 +113,13 @@ FastAPI router  →  service  →  repository  →  SQLAlchemy model  →  Postg
   `db.query` in a router. No business logic.
 - **Service** — all business rules: state‑machine transitions, invariants, SLA timers, booking
   conflict resolution, delivery‑protocol routing, invoice generation, transaction orchestration,
-  event emission (audit + notification). Framework‑agnostic; must not import `fastapi`, `Request`,
-  or an ORM class; receives repository interfaces so tests can substitute in‑memory fakes.
+  event emission (audit + notification). **Framework‑agnostic: must not import `fastapi` or
+  `Request`.** For audit / notification context a service takes a `RequestContext`
+  (`app/core/context.py`) that the router dependency builds with
+  `RequestContext.from_request(request)`. The **only** exceptions are `auth` and `onboarding`,
+  which set/read session cookies and so take the real `Request`/`Response` — documented in
+  those modules. Services may still hold SQLAlchemy `select()` for read queries (tracked debt
+  C‑3 — new query logic should go in the repository).
 - **Repository** — SQLAlchemy queries only. Always filters tenant tables by `community_id`.
   `selectinload`/`joinedload` sparingly, only for small bounded results. No business rules.
 - **Model** — ORM table definition. Encodes invariants as DB constraints too.

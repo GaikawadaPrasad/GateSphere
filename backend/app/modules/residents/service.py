@@ -16,10 +16,10 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.context import RequestContext
 from app.core.errors import BusinessRuleError, ConflictError, NotFoundError
 from app.core.state_machine import ensure_transition
 from app.core.tenancy import TenantScope
@@ -81,12 +81,12 @@ def _apply(obj: object, patch: dict) -> None:
 
 class ResidentService:
     def __init__(
-        self, db: AsyncSession, scope: TenantScope, actor: User, request: Request | None = None
+        self, db: AsyncSession, scope: TenantScope, actor: User, ctx: RequestContext | None = None
     ):
         self.db = db
         self.scope = scope
         self.actor = actor
-        self.request = request
+        self.ctx = ctx
         self.profiles = ResidentProfileRepository(db, scope)
         self.occupancies = OccupancyRepository(db, scope)
         self.family = FamilyMemberRepository(db, scope)
@@ -104,7 +104,7 @@ class ResidentService:
             community_id=community_id,
             entity_type=entity_type,
             entity_id=entity_id,
-            request=self.request,
+            ctx=self.ctx,
             **kw,
         )
 

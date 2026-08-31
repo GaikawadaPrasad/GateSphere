@@ -10,11 +10,11 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import Request
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.context import RequestContext
 from app.core.errors import BusinessRuleError, ConflictError, ForbiddenError, NotFoundError
 from app.core.rbac import ROLE_PERMISSIONS
 from app.core.security import (
@@ -32,12 +32,12 @@ _WITH_ROLES = (selectinload(User.roles).selectinload(UserRole.role),)
 
 class UserService:
     def __init__(
-        self, db: AsyncSession, scope: TenantScope, actor: User, request: Request | None = None
+        self, db: AsyncSession, scope: TenantScope, actor: User, ctx: RequestContext | None = None
     ):
         self.db = db
         self.scope = scope
         self.actor = actor
-        self.request = request
+        self.ctx = ctx
 
     async def _audit(self, action, entity_id, *, community_id=None, **kw) -> None:
         await record_audit_async(
@@ -48,7 +48,7 @@ class UserService:
             community_id=community_id,
             entity_type="user",
             entity_id=entity_id,
-            request=self.request,
+            ctx=self.ctx,
             **kw,
         )
 

@@ -16,10 +16,10 @@ import uuid
 from datetime import UTC, datetime
 
 from anyio import to_thread
-from fastapi import Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.context import RequestContext
 from app.core.errors import BusinessRuleError, NotFoundError
 from app.core.tenancy import TenantScope
 from app.modules.audit.service import record_audit_async
@@ -41,12 +41,12 @@ def _safe_stem(filename: str) -> str:
 
 class UploadService:
     def __init__(
-        self, db: AsyncSession, scope: TenantScope, actor: User, request: Request | None = None
+        self, db: AsyncSession, scope: TenantScope, actor: User, ctx: RequestContext | None = None
     ):
         self.db = db
         self.scope = scope
         self.actor = actor
-        self.request = request
+        self.ctx = ctx
 
     def _community(self, community_id: uuid.UUID | None) -> uuid.UUID:
         if community_id is not None:
@@ -103,7 +103,7 @@ class UploadService:
             community_id=community_id,
             entity_type="object",
             entity_id=uuid.uuid4().hex,
-            request=self.request,
+            ctx=self.ctx,
             new={
                 "kind": kind.slug,
                 "key": key,
@@ -206,7 +206,7 @@ class UploadService:
             community_id=mf.community_id,
             entity_type="managed_file",
             entity_id=mf.id,
-            request=self.request,
+            ctx=self.ctx,
             new={"key": mf.object_key, "status": mf.status, "reason": mf.reject_reason},
         )
 

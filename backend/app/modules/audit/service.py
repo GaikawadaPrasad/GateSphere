@@ -1,7 +1,8 @@
 """Audit write helper (FR-16, NFR-REL-01).
 
 Services call `record_audit_async(...)` **inside the same transaction** as the operation
-they are auditing. Never update or delete an audit row.
+they are auditing. Never update or delete an audit row (the DB trigger blocks it anyway —
+migration 0028).
 """
 
 from __future__ import annotations
@@ -11,9 +12,9 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
-from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.context import RequestContext
 from app.modules.audit.models import AuditLog
 from app.modules.users.models import User
 
@@ -40,24 +41,23 @@ def _build_audit_row(
     entity_id: uuid.UUID | str | None,
     old: dict | None,
     new: dict | None,
-    request: Request | None,
+    ctx: RequestContext | None,
     role_slug: str | None,
 ) -> AuditLog:
-    session_id = getattr(request.state, "session_id", None) if request else None
-    role = role_slug or (getattr(request.state, "session_role", None) if request else None)
+    session_id = ctx.session_id if ctx else None
     return AuditLog(
         community_id=community_id,
         user_id=actor.id if actor else None,
         session_id=uuid.UUID(session_id) if isinstance(session_id, str) else session_id,
-        role_slug=role,
+        role_slug=role_slug or (ctx.role_slug if ctx else None),
         module=module,
         action=action,
         entity_type=entity_type,
         entity_id=str(entity_id) if entity_id is not None else None,
         old_values=_jsonable(old) if old else None,
         new_values=_jsonable(new) if new else None,
-        ip_address=_client_ip(request),
-        user_agent=(request.headers.get("user-agent") if request else None) or None,
+        ip_address=ctx.ip if ctx else None,
+        user_agent=(ctx.user_agent if ctx else None) or None,
     )
 
 
@@ -72,11 +72,15 @@ async def record_audit_async(
     entity_id: uuid.UUID | str | None = None,
     old: dict | None = None,
     new: dict | None = None,
-    request: Request | None = None,
+    ctx: RequestContext | None = None,
     role_slug: str | None = None,
 ) -> AuditLog:
-    """Async twin of `record_audit` (ADR-010). `role_slug` overrides the request-state
-    lookup — used by login/logout and system jobs where `request.state` is not populated."""
+    """Append one immutable `audit_logs` row in the caller's transaction.
+
+    `ctx` carries ip / user-agent / session / point-in-time role (framework-agnostic).
+    `role_slug` overrides `ctx.role_slug` — used by login/logout and system jobs where
+    `request.state` is not populated.
+    """
     row = _build_audit_row(
         module=module,
         action=action,
@@ -86,22 +90,9 @@ async def record_audit_async(
         entity_id=entity_id,
         old=old,
         new=new,
-        request=request,
+        ctx=ctx,
         role_slug=role_slug,
     )
     db.add(row)
     await db.flush()
     return row
-
-
-def _client_ip(request: Request | None) -> str | None:
-    if not request or not request.client:
-        return None
-    import ipaddress
-
-    host = request.client.host
-    try:
-        ipaddress.ip_address(host)
-        return host
-    except ValueError:
-        return None

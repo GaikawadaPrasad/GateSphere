@@ -14,10 +14,10 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from fastapi import Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.context import RequestContext
 from app.core.errors import BusinessRuleError, ConflictError, ForbiddenError, NotFoundError
 from app.core.state_machine import ensure_transition
 from app.core.tenancy import TenantScope
@@ -84,12 +84,12 @@ def _enum(field: str, value: str | None) -> None:
 
 class ComplaintService(UnitScopedAccess):
     def __init__(
-        self, db: AsyncSession, scope: TenantScope, actor: User, request: Request | None = None
+        self, db: AsyncSession, scope: TenantScope, actor: User, ctx: RequestContext | None = None
     ):
         self.db = db
         self.scope = scope
         self.actor = actor
-        self.request = request
+        self.ctx = ctx
         self.categories = CategoryRepository(db, scope)
         self.slas = SlaRepository(db, scope)
         self.tickets = TicketRepository(db, scope)
@@ -103,7 +103,7 @@ class ComplaintService(UnitScopedAccess):
             community_id=community_id,
             entity_type=entity_type,
             entity_id=entity_id,
-            request=self.request,
+            ctx=self.ctx,
             **kw,
         )
 
@@ -348,7 +348,7 @@ class ComplaintService(UnitScopedAccess):
             self.db,
             self.scope,
             self.actor,
-            self.request,
+            self.ctx,
             recipient_user_id=ticket.raised_by_user_id,
             community_id=ticket.community_id,
             notification_type=f"ticket.{final}",

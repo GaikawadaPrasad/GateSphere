@@ -11,10 +11,10 @@ import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from fastapi import Request
 from sqlalchemy import false, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.context import RequestContext
 from app.core.errors import BusinessRuleError, ConflictError, ForbiddenError, NotFoundError
 from app.core.hashing import digest, digest_opt
 from app.core.tenancy import TenantScope
@@ -67,12 +67,12 @@ def _enum(field: str, value: str | None) -> None:
 
 class VisitorService(UnitScopedAccess):
     def __init__(
-        self, db: AsyncSession, scope: TenantScope, actor: User, request: Request | None = None
+        self, db: AsyncSession, scope: TenantScope, actor: User, ctx: RequestContext | None = None
     ):
         self.db = db
         self.scope = scope
         self.actor = actor
-        self.request = request
+        self.ctx = ctx
         self.visitors = VisitorRepository(db, scope)
         self.blacklist = BlacklistRepository(db, scope)
         self.requests = RequestRepository(db, scope)
@@ -88,7 +88,7 @@ class VisitorService(UnitScopedAccess):
             community_id=community_id,
             entity_type=entity_type,
             entity_id=entity_id,
-            request=self.request,
+            ctx=self.ctx,
             **kw,
         )
 
@@ -313,7 +313,7 @@ class VisitorService(UnitScopedAccess):
                 self.db,
                 self.scope,
                 self.actor,
-                self.request,
+                self.ctx,
                 recipient_user_id=obj.host_user_id,
                 community_id=unit.community_id,
                 notification_type="visitor.approval_needed",
@@ -374,7 +374,7 @@ class VisitorService(UnitScopedAccess):
             self.db,
             self.scope,
             self.actor,
-            self.request,
+            self.ctx,
             recipient_user_id=req.created_by_user_id,
             community_id=req.community_id,
             notification_type=f"visitor.{req.status}",

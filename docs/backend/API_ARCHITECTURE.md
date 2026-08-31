@@ -30,7 +30,7 @@ per-module `/api/v1/<module>/health`.
 | Layer | File | Responsibility | Must not |
 |---|---|---|---|
 | Router | `modules/*/router.py` | HTTP I/O: resolve auth+permission deps, validate the Pydantic request, bind tenant scope, call **one** service method, serialize | `db.query`; business logic |
-| Service | `modules/*/service.py` | all business rules: state machines, invariants, SLA timers, booking conflict, invoice generation, transaction orchestration, event emission (audit + notification) | *(target)* import `fastapi`/ORM — see tracked debt C-2/C-3 |
+| Service | `modules/*/service.py` | all business rules: state machines, invariants, SLA timers, booking conflict, invoice generation, transaction orchestration, event emission (audit + notification) | import `fastapi` / `Request` (takes a `RequestContext` from `app/core/context.py` instead; `auth`/`onboarding` are the documented cookie-I/O exceptions). Raw `select()` for reads is tracked debt C-3 |
 | Repository | `db/repository.py` + `modules/*/repository.py` | SQLAlchemy queries only; **always** filters tenant tables by `community_id` (`AsyncTenantRepository._scoped()`) | business rules; commit a transaction |
 | Model | `modules/*/models.py` | ORM table def; encodes invariants as DB constraints too (CHECK, UNIQUE, partial-unique, FK ON DELETE) | — |
 

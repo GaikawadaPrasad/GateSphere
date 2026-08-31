@@ -16,11 +16,11 @@ import uuid
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
-from fastapi import Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.context import RequestContext
 from app.core.errors import BusinessRuleError, ConflictError, ForbiddenError, NotFoundError
 from app.core.tenancy import TenantScope
 from app.modules.audit.service import record_audit_async
@@ -74,12 +74,12 @@ def _enum(field: str, value: str | None) -> None:
 
 class BillingService(UnitScopedAccess):
     def __init__(
-        self, db: AsyncSession, scope: TenantScope, actor: User, request: Request | None = None
+        self, db: AsyncSession, scope: TenantScope, actor: User, ctx: RequestContext | None = None
     ):
         self.db = db
         self.scope = scope
         self.actor = actor
-        self.request = request
+        self.ctx = ctx
         self.charge_heads = ChargeHeadRepository(db, scope)
         self.rules = RuleRepository(db, scope)
         self.invoices = InvoiceRepository(db, scope)
@@ -95,7 +95,7 @@ class BillingService(UnitScopedAccess):
             community_id=community_id,
             entity_type=entity_type,
             entity_id=entity_id,
-            request=self.request,
+            ctx=self.ctx,
             **kw,
         )
 
@@ -319,7 +319,7 @@ class BillingService(UnitScopedAccess):
             self.db,
             self.scope,
             self.actor,
-            self.request,
+            self.ctx,
             recipient_user_id=inv.billed_to_user_id,
             community_id=inv.community_id,
             notification_type="billing.invoice_posted",

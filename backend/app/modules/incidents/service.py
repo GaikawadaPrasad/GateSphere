@@ -10,10 +10,10 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.context import RequestContext
 from app.core.errors import BusinessRuleError, ConflictError, NotFoundError
 from app.core.state_machine import ensure_transition
 from app.core.tenancy import TenantScope
@@ -60,12 +60,12 @@ def _enum(field: str, value: str | None) -> None:
 
 class IncidentService:
     def __init__(
-        self, db: AsyncSession, scope: TenantScope, actor: User, request: Request | None = None
+        self, db: AsyncSession, scope: TenantScope, actor: User, ctx: RequestContext | None = None
     ):
         self.db = db
         self.scope = scope
         self.actor = actor
-        self.request = request
+        self.ctx = ctx
         self.incidents = IncidentRepository(db, scope)
 
     async def _audit(self, action, community_id, entity_type, entity_id, **kw):
@@ -77,7 +77,7 @@ class IncidentService:
             community_id=community_id,
             entity_type=entity_type,
             entity_id=entity_id,
-            request=self.request,
+            ctx=self.ctx,
             **kw,
         )
 
@@ -217,7 +217,7 @@ class IncidentService:
             self.db,
             self.scope,
             self.actor,
-            self.request,
+            self.ctx,
             recipient_user_id=inc.reporter_user_id,
             community_id=inc.community_id,
             notification_type=f"incident.{target}",

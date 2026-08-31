@@ -12,10 +12,10 @@ import io
 import uuid
 from datetime import datetime
 
-from fastapi import Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.context import RequestContext
 from app.core.errors import NotFoundError
 from app.core.tenancy import TenantScope
 from app.modules.audit.models import AuditLog
@@ -24,12 +24,12 @@ from app.modules.users.models import User
 
 class AuditQueryService:
     def __init__(
-        self, db: AsyncSession, scope: TenantScope, actor: User, request: Request | None = None
+        self, db: AsyncSession, scope: TenantScope, actor: User, ctx: RequestContext | None = None
     ):
         self.db = db
         self.scope = scope
         self.actor = actor
-        self.request = request
+        self.ctx = ctx
 
     def _scoped(self, stmt):
         if self.scope.is_global:

@@ -25,7 +25,7 @@ async def emit(
     db,
     scope: TenantScope,
     actor: User | None,
-    request,
+    ctx,
     *,
     recipient_user_id: uuid.UUID | None,
     community_id: uuid.UUID,
@@ -50,7 +50,7 @@ async def emit(
     )
     try:
         async with db.begin_nested():  # SAVEPOINT — rolls back only the notification
-            await NotificationService(db, scope, actor, request).dispatch(payload)
+            await NotificationService(db, scope, actor, ctx).dispatch(payload)
     except Exception:  # notifications must never break the domain op
         log.warning("notification emit failed", extra={"type": notification_type}, exc_info=True)
 
@@ -102,7 +102,7 @@ async def emit_to_roles(
     db,
     scope: TenantScope,
     actor: User | None,
-    request,
+    ctx,
     *,
     community_id: uuid.UUID,
     role_slugs: list[str],
@@ -135,7 +135,7 @@ async def emit_to_roles(
             db,
             scope,
             actor,
-            request,
+            ctx,
             recipient_user_id=uid,
             community_id=community_id,
             notification_type=notification_type,

@@ -12,11 +12,11 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.context import RequestContext
 from app.core.errors import BusinessRuleError, ConflictError, NotFoundError
 from app.core.tenancy import TenantScope
 from app.modules.audit.service import record_audit_async
@@ -57,12 +57,12 @@ def _enum(field: str, value: str | None) -> None:
 
 class CommunicationService:
     def __init__(
-        self, db: AsyncSession, scope: TenantScope, actor: User, request: Request | None = None
+        self, db: AsyncSession, scope: TenantScope, actor: User, ctx: RequestContext | None = None
     ):
         self.db = db
         self.scope = scope
         self.actor = actor
-        self.request = request
+        self.ctx = ctx
         self.announcements = AnnouncementRepository(db, scope)
         self.polls = PollRepository(db, scope)
 
@@ -75,7 +75,7 @@ class CommunicationService:
             community_id=community_id,
             entity_type=entity_type,
             entity_id=entity_id,
-            request=self.request,
+            ctx=self.ctx,
             **kw,
         )
 
@@ -338,7 +338,7 @@ class CommunicationService:
                 self.db,
                 self.scope,
                 self.actor,
-                self.request,
+                self.ctx,
                 community_id=ann.community_id,
                 role_slugs=["security_supervisor", "security_guard", "facility_manager"],
                 notification_type="communication.emergency",
