@@ -39,8 +39,10 @@ reproducible with `make test` (Docker) unless noted.
 
 ## Known residual items (non-blocking) — see the A–V report
 
-- Per-test transactional rollback fixtures not yet implemented (`make test` reseed is the
-  workaround for shared-DB flakes — IS-1).
+- Transactional per-test isolation (IS-2): **done for unit-level service tests** — the shared
+  `db` fixture (`backend/conftest.py`) is a savepoint-backed session rolled back at teardown
+  (`tests/test_db_isolation.py`). HTTP `TestClient` tests can't share the connection (separate
+  event loop) and keep the deterministic reseed (`make test` — IS-1).
 - Layering debt (C-3): some services still hold read `select()`s. Now ratcheted —
   `scripts/repo-layering-ratchet.sh` (CI `backend-layering`) fails on growth; new queries
   must go in `repository.py`. `app/modules/communities/` migrated as the reference.

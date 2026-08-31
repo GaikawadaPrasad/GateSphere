@@ -269,7 +269,7 @@ Plus `docs/backend/AUTHENTICATION.md`, `RBAC.md`, `API_ARCHITECTURE.md`,
 | C-3 | 18/20 services build raw `select()` instead of delegating to a repository | **Ratcheted (Phase 2).** `scripts/repo-layering-ratchet.sh` + CI `backend-layering` fail if the service-layer `select()` count grows; AGENTS.md §2 makes repository-first mandatory for new code; `app/modules/communities/` fully migrated as the reference shape. Tenant filter **is** present everywhere — remaining debt is maintainability, not correctness; migrate opportunistically (lower the baseline). |
 | C-4 | `auth/router.py` does direct `db.scalar/select` + `commit` | localized; move into `auth/service.py` + `auth/repository.py`. |
 | TYP-1 | `mypy app` → 514 errors (pre-existing) | not CI-gated. Typing debt; recommend a ratchet (fail-on-new). |
-| IS-2 | No transactional per-test rollback fixtures (~250 API tests) | `make test` / `make test-api` reseed as the workaround. |
+| IS-2 | No transactional per-test rollback fixtures | **Partly fixed (Phase 2).** Unit-level service tests now share one canonical `db` fixture (`backend/conftest.py`): a connection-bound `AsyncSession` with `join_transaction_mode="create_savepoint"` inside an outer transaction that is rolled back at teardown — rows never leak even if the code under test commits (`tests/test_db_isolation.py` proves it). 13 duplicated per-module `db` fixtures deleted. HTTP integration tests (`TestClient`) run in the ASGI portal's own event loop and cannot share that connection; they keep the deterministic reseed (`make test` / `scripts/test-api.sh`, IS-1). New business-logic tests should use the `db` fixture + a directly-constructed service. |
 
 ### LOW
 | ID | Issue |

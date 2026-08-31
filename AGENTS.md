@@ -773,6 +773,11 @@ Observability, Testability, Maintainability over cleverness.
   mutation. A mutating test cleans up its own state in a `try/finally` around the assertion that
   can fail (a cleanup call *after* a failing assertion never runs, and the next run inherits the
   leftover as if it were fixture state).
+- **Unit-level service tests take the `db` fixture** (`backend/conftest.py`) — a savepoint-backed
+  `AsyncSession` rolled back at teardown (writes never persist, even across a `.commit()`; IS-2).
+  Build the service directly with it. HTTP `TestClient` integration tests run in a separate event
+  loop and can't share that connection — they depend on the deterministic reseed that `make test`
+  and `scripts/test-api.sh` run (IS-1), so they must still clean up per the rule above.
 - **No silently skipped critical path** — zero `test.skip`/`.only` on a critical journey; a
   missing expected element is a failure, not a `.count() === 0` conditional bail that asserts
   nothing. A test that can't pass stays red and documented as a known defect, never silenced.

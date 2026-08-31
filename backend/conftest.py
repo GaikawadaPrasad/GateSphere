@@ -13,7 +13,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from app.db.session import SessionLocal
+from app.db.session import AsyncSessionLocal, SessionLocal, async_engine
 from app.main import app
 from app.modules.communities.models import Community
 from app.modules.users.models import Role, User, UserRole
@@ -39,6 +39,29 @@ def _disable_rate_limit():
     ratelimit.settings.RATE_LIMIT_ENABLED = False
     yield
     ratelimit.settings.RATE_LIMIT_ENABLED = True
+
+
+@pytest.fixture()
+async def db():
+    """Transactionally-isolated async session for unit-level (non-HTTP) service tests (IS-2).
+
+    Every write the test makes happens inside one outer transaction that is rolled back at
+    teardown. `join_transaction_mode="create_savepoint"` means service code may even call
+    ``.commit()`` — it becomes a SAVEPOINT release — and the rows still never reach another
+    test or the shared seed data. New business-logic tests should take this fixture and build
+    a service directly, rather than going through `TestClient` (HTTP integration tests run in
+    the ASGI portal's own event loop and cannot share this connection — they rely on the
+    deterministic reseed in `make test` / `scripts/test-api.sh`, IS-1).
+    """
+    conn = await async_engine.connect()
+    trans = await conn.begin()
+    session = AsyncSessionLocal(bind=conn, join_transaction_mode="create_savepoint")
+    try:
+        yield session
+    finally:
+        await session.close()
+        await trans.rollback()
+        await conn.close()
 
 
 @pytest.fixture()

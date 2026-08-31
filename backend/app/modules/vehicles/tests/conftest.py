@@ -7,19 +7,8 @@ import pytest_asyncio
 from sqlalchemy import select
 
 from app.core.tenancy import TenantScope
-from app.db.session import AsyncSessionLocal
 from app.modules.communities.models import Community
 from app.modules.users.models import User
-
-
-@pytest_asyncio.fixture()
-async def db():
-    s = AsyncSessionLocal()
-    try:
-        yield s
-    finally:
-        await s.rollback()
-        await s.close()
 
 
 @pytest_asyncio.fixture()

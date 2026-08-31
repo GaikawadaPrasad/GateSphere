@@ -8,19 +8,8 @@ from sqlalchemy import select
 
 from app.core.security import hash_password
 from app.core.tenancy import TenantScope
-from app.db.session import AsyncSessionLocal
 from app.modules.communities.models import Community, Floor, Tower, Unit
 from app.modules.users.models import User
-
-
-@pytest_asyncio.fixture()
-async def db():
-    session = AsyncSessionLocal()
-    try:
-        yield session
-    finally:
-        await session.rollback()
-        await session.close()
 
 
 @pytest_asyncio.fixture()
