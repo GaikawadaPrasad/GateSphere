@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends
 
 from app.core.responses import Response as Envelope
 from app.core.responses import ok
-from app.core.security import require_permission_async
+from app.core.tenancy import require_permission_async
 from app.modules.dashboards import schemas
 from app.modules.dashboards.deps import dashboard_service
 from app.modules.dashboards.service import DashboardService

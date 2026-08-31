@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, status
 
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
-from app.core.security import require_permission_async
+from app.core.tenancy import require_permission_async
 from app.modules.notifications import schemas
 from app.modules.notifications.deps import notification_service
 from app.modules.notifications.service import NotificationService

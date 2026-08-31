@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, Response, status
 
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
-from app.core.security import require_permission_async
+from app.core.tenancy import require_permission_async
 from app.modules.visitors import schemas
 from app.modules.visitors.deps import visitor_service
 from app.modules.visitors.service import VisitorService

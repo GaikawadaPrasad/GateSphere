@@ -463,7 +463,7 @@ Rejected·Overdue·Absent / Info·AtGate·Assigned / Pre‑approved·Special / C
 ### 5.9 API client / same‑origin proxy
 
 `frontend/lib/api.ts`: same‑origin `/api/v1/*` (Next rewrite → backend), `credentials: "include"`,
-adds `X-CSRF-Token` (= `gs_csrf` cookie) on unsafe methods. One typed client file per module.
+adds `X-CSRF-Token` (= the `gs_csrf` or `gatesphere_<bucket>_csrf` cookie) on unsafe methods. One typed client file per module.
 No `any` — response types mirror the contract in `types/`. Don't add a second way for client code
 to reach the backend.
 
@@ -527,20 +527,32 @@ an accurate OpenAPI `summary` and a `docs/backend/api/<module>.md` entry.
 ## 7. Authentication & session management (FR‑01)
 
 **Model: server‑side session cookies. No JWT in the browser.** Full detail:
-[`docs/platform/authentication.md`](docs/platform/authentication.md).
+[`docs/backend/AUTHENTICATION.md`](docs/backend/AUTHENTICATION.md).
 
 - **Login** `POST /api/v1/auth/login` — verify against the **Argon2** hash, check `is_active`,
-  create a session, set cookies. Uniform `401 "Invalid email or password"` (no user enumeration).
-- **Cookies**: `gs_session` (opaque token, **HttpOnly**, `SameSite=Lax`, `Secure` in
-  staging/prod, `Path=/`) and `gs_csrf` (random, JS‑readable, same flags minus HttpOnly). Every
-  unsafe method must send `X-CSRF-Token` = `gs_csrf` cookie.
+  resolve the session role (`resolve_login_role`), create a session, set cookies. Uniform
+  `401 "Invalid email or password"` (no user enumeration).
+- **Independent named sessions (multi‑role)**: session cookies are **role‑bucketed** —
+  `gatesphere_<bucket>_session` + `gatesphere_<bucket>_csrf`, where `bucket` is the role slug
+  (`security_supervisor` + `security_guard` share `security`). One browser / Postman cookie jar
+  can therefore hold several role sessions at once, and logging one out does **not** touch the
+  others. When a request carries more than one session cookie, the caller disambiguates with the
+  `X-Session-Role` header (role slug or bucket); exactly one present is used implicitly. Legacy
+  `gs_session` / `gs_csrf` are still accepted on **read** (bucket `default`). **Never collapse the
+  role sessions back into a single global cookie / token variable** (applies to Postman too).
+- **Cookie flags**: opaque token, **HttpOnly** (session) / JS‑readable (csrf), `SameSite` from
+  `COOKIE_SAMESITE` (default `lax`), `Secure` in staging/prod (`COOKIE_SECURE`), explicit
+  `Max‑Age` = `SESSION_TTL_SECONDS`, `Path=/`, `Domain` from `COOKIE_DOMAIN`. Every unsafe method
+  must send `X-CSRF-Token` = the selected bucket's csrf cookie.
 - **Durable store**: the **`user_sessions`** table (ERD §01) — `session_key_hash`, `user_id`,
-  `ip_address`, `user_agent`, `created_at`, `expires_at`, `revoked_at`. Redis MAY cache‑accelerate
-  lookups but is **not** the system of record. Presenting a `revoked_at` session key is treated as
-  a compromise signal — reject and log.
-  > Scaffold currently stores sessions in Redis only — add the `user_sessions` table and write through.
-- **Lifecycle**: idle TTL ~8h. **Revoke on**: logout, password change, role change, admin‑forced
-  termination. `switch_community` re‑scopes without ending the session.
+  `csrf_token`, `role_slug`, `cookie_bucket`, `community_id`, `ip_address`, `user_agent`,
+  `created_at`, `expires_at`, `last_activity_at`, `revoked_at`. Redis MAY cache‑accelerate lookups
+  but is **not** the system of record. Presenting a `revoked_at` session key is treated as a
+  compromise signal — reject and log.
+- **Lifecycle**: idle TTL ~8h; `last_activity_at` advances at most once per
+  `SESSION_ACTIVITY_REFRESH_SECONDS`. **Logout revokes only the presented session.** Password
+  change / role / permission change revoke **all** of a user's sessions
+  (`revoke_all_user_sessions_async` / `invalidate_user_permissions_async`).
 - **Rate limiting**: `/auth/login` and OTP/PIN verify per IP/account (default `5/minute`; 5 failed
   attempts → temporary lockout).
 - **OTP (mobile)**: guards + residents may authenticate via OTP to the registered mobile (mock
@@ -658,6 +670,13 @@ error — availability over strictness. A reverse proxy adds a second, independe
 ---
 
 ## 10. Module business rules & state machines (enforce in the service layer)
+
+> Every workflow's transition table, enforcement point and audit/notification side-effects
+> is documented in [`docs/backend/STATE_MACHINES.md`](docs/backend/STATE_MACHINES.md) — keep
+> it updated with any transition-graph change (same PR). The transition **graph** is enforced
+> in the service (`app/core/state_machine.py::ensure_transition` or an explicit guard); the
+> value **set** is additionally pinned by a DB `CHECK` constraint (migration `0025`) — when
+> you add a status value, extend both the service map and the `CHECK` (a follow-up migration).
 
 | Module | Non‑negotiable rules |
 |--------|----------------------|
@@ -922,6 +941,19 @@ the author MUST: (1) update the affected `modules/<module>.mmd`; (2) update
 (4) re-verify both diagrams against the implementation and validate Mermaid syntax
 (`subgraph`/`end` balance, quoted labels, no stale route/file refs). If code and a diagram
 disagree, fix the diagram to match the verified code.
+
+### Postman / Newman API suite — mandatory, code-derived
+
+The API test package lives under **`docs/postman/`** and is **generated from the live
+FastAPI route table** by `docs/postman/build_collection.py` (`GateSphere_API.postman_collection.json`,
+`gate_sphere.postman_environment.json`). Whenever an **API route, request schema, response
+schema, authentication behaviour, cookie name, state transition, required parameter, or API
+workflow** changes, regenerate the collection + environment **in the same change** and
+re-run `make test-api`.
+
+**Do not use a single global authentication token/session variable for role-based testing.**
+Each role authenticates into its own `gatesphere_<bucket>_session` cookie (Postman cookie
+jar); requests select the role with the `X-Session-Role` header. There is no `{{token}}`.
 
 ---
 

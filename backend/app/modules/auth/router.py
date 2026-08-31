@@ -26,6 +26,7 @@ from app.core.security import (
 from app.db.session import AsyncSessionLocal, get_async_db
 from app.modules.audit.service import record_audit_async
 from app.modules.auth.schemas import CurrentUser, LoginRequest
+from app.modules.auth.service import resolve_login_role
 from app.modules.users.models import User, UserRole
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -60,17 +61,22 @@ async def login(
         raise AuthError("Invalid email or password", code="INVALID_CREDENTIALS")
     if needs_rehash(user.password_hash):
         user.password_hash = hash_password(payload.password)
-    await create_session(db, response, user, request)
+    role_slug, community_id = await resolve_login_role(db, user, payload.role)
+    session = await create_session(
+        db, response, user, request, role_slug=role_slug, community_id=community_id
+    )
     await record_audit_async(
         db,
         module="auth",
         action="login.success",
         actor=user,
+        community_id=community_id,
         entity_type="user",
         entity_id=str(user.id),
+        new={"role": role_slug, "bucket": session.cookie_bucket},
         request=request,
     )
-    return ok(await _serialize(db, user), message="Signed in")
+    return ok(await _serialize(db, user, session=session), message="Signed in")
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
@@ -95,15 +101,34 @@ async def logout(
 
 @router.get("/me", response_model=Envelope[CurrentUser])
 async def me(
-    db: AsyncSession = Depends(get_async_db), user: User = Depends(require_auth_async)
+    request: Request,
+    db: AsyncSession = Depends(get_async_db),
+    user: User = Depends(require_auth_async),
 ) -> dict:
-    return ok(await _serialize(db, user))
+    return ok(
+        await _serialize(
+            db,
+            user,
+            active_role=getattr(request.state, "session_role", None),
+            session_bucket=getattr(request.state, "session_bucket", None),
+        )
+    )
 
 
-async def _serialize(db: AsyncSession, user: User) -> CurrentUser:
+async def _serialize(
+    db: AsyncSession,
+    user: User,
+    *,
+    session: object | None = None,
+    active_role: str | None = None,
+    session_bucket: str | None = None,
+) -> CurrentUser:
     community_ids = (
         await db.scalars(select(UserRole.community_id).where(UserRole.user_id == user.id))
     ).all()
+    if session is not None:
+        active_role = getattr(session, "role_slug", None)
+        session_bucket = getattr(session, "cookie_bucket", None)
     return CurrentUser(
         id=str(user.id),
         email=user.email,
@@ -111,5 +136,7 @@ async def _serialize(db: AsyncSession, user: User) -> CurrentUser:
         is_superadmin=user.is_superadmin,
         permissions=sorted(await user_permissions_async(db, user)),
         community_ids=sorted({str(c) for c in community_ids if c is not None}),
+        active_role=active_role,
+        session_bucket=session_bucket,
         permission_version=user.permission_version or 0,
     )

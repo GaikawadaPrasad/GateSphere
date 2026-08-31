@@ -49,8 +49,17 @@ seed: ## (Re)load synthetic seed data (idempotent top-up)
 seed-reset: ## Wipe every data table, then reseed from clean (safe DB reset)
 	$(COMPOSE) run --rm backend seed --reset
 
-test: ## Run backend tests
+test: ## Run backend tests against a freshly reseeded DB (deterministic; see docs/backend/TESTING.md)
+	$(COMPOSE) stop worker beat >/dev/null 2>&1 || true
+	$(COMPOSE) run --rm backend seed --reset
 	$(COMPOSE) run --rm backend pytest
+	$(COMPOSE) start worker beat >/dev/null 2>&1 || true
+
+test-fast: ## Run backend tests without reseeding (fast; may flake on accumulated data — see IS-1)
+	$(COMPOSE) run --rm backend pytest
+
+test-api: ## Run the Postman/Newman API suite (docs/postman/) against the stack
+	bash scripts/test-api.sh
 
 lint: ## Ruff + Black check (backend) and ESLint (frontend)
 	$(COMPOSE) run --rm backend sh -c "ruff check . && black --check ."

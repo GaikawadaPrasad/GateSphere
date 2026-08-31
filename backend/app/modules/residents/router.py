@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, Response, status
 
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
-from app.core.security import require_permission_async
+from app.core.tenancy import require_permission_async
 from app.modules.residents import schemas
 from app.modules.residents.deps import resident_service
 from app.modules.residents.service import ResidentService

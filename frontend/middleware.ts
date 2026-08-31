@@ -38,7 +38,11 @@ export function middleware(req: NextRequest) {
   const needsAuth = PROTECTED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   if (!needsAuth) return NextResponse.next();
 
-  if (!req.cookies.has("gs_session")) {
+  // Accept the legacy `gs_session` cookie or any role-bucketed `gatesphere_<bucket>_session`.
+  const hasSession =
+    req.cookies.has("gs_session") ||
+    req.cookies.getAll().some((c) => /^gatesphere_[a-z0-9_]+_session$/.test(c.name));
+  if (!hasSession) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);

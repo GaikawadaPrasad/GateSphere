@@ -13,6 +13,7 @@ flowchart TD
 
     subgraph AMN["Amenities (community-wide — residents must see them to book)"]
         A_L["GET /amenities → list_amenities"]
+        A_G["GET /amenities/{id} → get_amenity  [amenities:view]  → _amenity_in_scope; 404 cross-tenant"]
         A_C["POST /amenities → create_amenity  [amenities:approve]  409 AMENITY_EXISTS"]
         A_U["PATCH /amenities/{id} → update_amenity  [amenities:update]"]
     end

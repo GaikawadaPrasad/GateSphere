@@ -20,7 +20,13 @@ from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
 
 # --- async (app + jobs) -----------------------------------------------------
-async_engine = create_async_engine(settings.sqlalchemy_async_url, pool_pre_ping=True)
+_POOL_KW = {
+    "pool_pre_ping": True,
+    "pool_size": settings.DB_POOL_SIZE,
+    "max_overflow": settings.DB_MAX_OVERFLOW,
+    "pool_recycle": settings.DB_POOL_RECYCLE_SECONDS,
+}
+async_engine = create_async_engine(settings.sqlalchemy_async_url, **_POOL_KW)
 AsyncSessionLocal = async_sessionmaker(
     bind=async_engine, autocommit=False, autoflush=False, expire_on_commit=False
 )
@@ -38,5 +44,5 @@ async def get_async_db() -> AsyncIterator[AsyncSession]:
 
 
 # --- sync (seed script + tests only) --------------------------------------
-engine = create_engine(settings.sqlalchemy_url, pool_pre_ping=True, future=True)
+engine = create_engine(settings.sqlalchemy_url, future=True, **_POOL_KW)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False, future=True)

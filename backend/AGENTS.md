@@ -54,8 +54,11 @@ import `fastapi`. Cross-cutting concerns are dependencies/middleware, applied un
 - Never hand-edit a deployed schema. FastAPI must not keep a competing migration history.
 
 ## Auth / RBAC / tenancy
-- Session cookies (`gs_session` HttpOnly + `gs_csrf`), Argon2, `user_sessions` table is the
-  durable store (Redis may cache). Revoke on logout / password change / role change.
+- **Role-bucketed** session cookies `gatesphere_<bucket>_session` + `_csrf` (legacy `gs_session`/
+  `gs_csrf` still read). Argon2. `user_sessions` is the durable store (Redis may cache).
+  Independent per-role sessions in one jar; `X-Session-Role` header disambiguates when several
+  are present. Logout revokes only the presented session; password/role/permission change
+  revokes all of a user's sessions. Never use one global token/cookie for role testing.
 - Permission strings in `app/core/rbac.py` — add there + reseed.
 - Never trust a client-supplied `community_id` for authorization — derive from the role grant.
 - Cross-tenant object access → `404`, not `403`.

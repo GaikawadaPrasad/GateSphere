@@ -93,6 +93,9 @@ class AmenityService(UnitScopedAccess):
             raise NotFoundError("Amenity not found")
         return obj
 
+    async def get_amenity(self, amenity_id: uuid.UUID) -> Amenity:
+        return await self._amenity_in_scope(amenity_id)
+
     async def _actor_unit(self) -> uuid.UUID:
         occ = await self.db.scalar(
             select(UnitOccupancy)

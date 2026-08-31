@@ -20,7 +20,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 log = structlog.get_logger(__name__)
@@ -124,6 +124,24 @@ def register_exception_handlers(app: FastAPI) -> None:
         }.get(exc.status_code, "HTTP_ERROR")
         detail = exc.detail if isinstance(exc.detail, str) else "Request failed"
         return JSONResponse(status_code=exc.status_code, content=_envelope(code, detail))
+
+    @app.exception_handler(IntegrityError)
+    async def _integrity(request: Request, exc: IntegrityError) -> JSONResponse:
+        """A DB constraint fired that the service layer did not pre-check (usually a race).
+        Map to a client-correctable status; never leak the SQL / constraint internals."""
+        sqlstate = getattr(getattr(exc, "orig", None), "sqlstate", None)
+        mapping = {
+            "23505": (status.HTTP_409_CONFLICT, "CONFLICT", "That record already exists."),
+            "23503": (status.HTTP_409_CONFLICT, "FK_VIOLATION", "A referenced record is missing."),
+            "23514": (status.HTTP_400_BAD_REQUEST, "CHECK_VIOLATION", "A value is out of range."),
+            "23502": (status.HTTP_400_BAD_REQUEST, "NOT_NULL", "A required value is missing."),
+        }
+        code_status, code, msg = mapping.get(
+            sqlstate or "",
+            (status.HTTP_409_CONFLICT, "CONFLICT", "The change conflicts with an existing record."),
+        )
+        log.warning("db.integrity", sqlstate=sqlstate, request_id=_request_id(request))
+        return JSONResponse(status_code=code_status, content=_envelope(code, msg))
 
     @app.exception_handler(SQLAlchemyError)
     async def _sqlalchemy(request: Request, exc: SQLAlchemyError) -> JSONResponse:

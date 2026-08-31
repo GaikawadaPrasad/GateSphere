@@ -1,5 +1,5 @@
 %% Module: auth (FR-01) — session-cookie auth, no browser JWT
-%% Files: app/modules/auth/{router,schemas}.py · app/core/security.py · app/modules/auth/models.py (UserSession)
+%% Files: app/modules/auth/{router,schemas,service}.py · app/core/security.py · app/modules/auth/models.py (UserSession)
 %% Derived from source. Keep in sync.
 
 flowchart TD
@@ -11,44 +11,62 @@ flowchart TD
         L2["fetch User by email.lower()<br/>select(User)"]
         L3{"user & is_active &<br/>verify_password (Argon2)?"}
         L4["needs_rehash? → re-hash password_hash"]
-        L5["create_session<br/>app/core/security.py"]
-        L6["_serialize → user_permissions_async<br/>CurrentUser{id,email,is_superadmin,<br/>permissions[], community_ids[], permission_version}"]
-        LF["AuthError 401 INVALID_CREDENTIALS<br/>(uniform — no enumeration)"]
+        L4b["resolve_login_role(db, user, payload.role)<br/>app/modules/auth/service.py<br/>super_admin→(super_admin,None); else the user's grant;<br/>multi-role & no role → 422 ROLE_REQUIRED"]
+        L5["create_session(role_slug, community_id)<br/>app/core/security.py"]
+        L6["_serialize → user_permissions_async<br/>CurrentUser{id,email,is_superadmin,permissions[],<br/>community_ids[], active_role, session_bucket, permission_version}"]
+        LF["AuthError 401 INVALID_CREDENTIALS / ROLE_NOT_GRANTED<br/>(credential errors uniform — no enumeration)"]
     end
 
-    subgraph SESSION["create_session side effects"]
+    subgraph SESSION["create_session side effects — cookies are ROLE-BUCKETED"]
         direction TB
-        SE1["INSERT user_sessions<br/>(session_key_hash sha256, csrf_token, ip, ua, expires_at)"]
-        SE2["Redis SETEX session:&lt;hash&gt; = {session_id,user_id,csrf}<br/>TTL = SESSION_TTL_SECONDS (8h) — best-effort"]
-        SE3["Set-Cookie gs_session (HttpOnly, SameSite=Lax)<br/>Set-Cookie gs_csrf (JS-readable)"]
+        SE1["INSERT user_sessions<br/>(session_key_hash sha256, csrf_token, role_slug,<br/>cookie_bucket, community_id, ip, ua,<br/>created_at, expires_at, last_activity_at)"]
+        SE2["Redis SETEX session:&lt;hash&gt; = {session_id,user_id,csrf,bucket,role_slug}<br/>TTL = SESSION_TTL_SECONDS (8h) — best-effort"]
+        SE3["Set-Cookie gatesphere_&lt;bucket&gt;_session (HttpOnly, SameSite)<br/>Set-Cookie gatesphere_&lt;bucket&gt;_csrf (JS-readable)<br/>bucket = superadmin | security | resident | community_admin |<br/>facility_manager | auditor | …  (security_supervisor+guard → security)"]
+    end
+
+    subgraph LOAD["_select_session_token + _load_session_async (every authed request)"]
+        direction TB
+        SL1["collect all gatesphere_*_session + legacy gs_session cookies"]
+        SL2{"how many present?"}
+        SL3["0 → AuthError Not authenticated"]
+        SL4["1 → use it"]
+        SL5["&gt;1 → X-Session-Role header selects bucket<br/>(role slug or bucket); missing → 401 AMBIGUOUS_SESSION"]
+        SL6["verify_csrf: X-CSRF-Token == gatesphere_&lt;bucket&gt;_csrf"]
+        SL7["Redis hit → payload; miss → user_sessions row<br/>check revoked_at / expires_at; re-cache"]
+        SL8["_touch_last_activity (≤ 1 write / 60s)"]
     end
 
     subgraph LOGOUT["POST /auth/logout  (session)"]
         direction TB
         O1["router.logout — require_auth_async"]
-        O2["destroy_session: user_sessions.revoked_at=now,<br/>Redis DEL session:&lt;hash&gt;, delete_cookie ×2"]
-        O3["record_audit_async auth/logout"]
+        O2["destroy_session: revoke ONLY the presented session row,<br/>Redis DEL, delete_cookie for that bucket's 2 cookies only"]
+        O3["record_audit_async auth/logout — other role sessions untouched"]
     end
 
     subgraph ME["GET /auth/me  (session)"]
-        M1["router.me → _serialize"]
-        M2["read user_sessions/User + user_permissions_async"]
+        M1["router.me → _serialize(active_role, session_bucket from request.state)"]
     end
 
     subgraph AUD["Audit"]
-        A_OK["audit auth/login.success (same txn)"]
+        A_OK["audit auth/login.success (same txn) new={role,bucket}"]
         A_BAD["audit auth/login.failed<br/>OWN txn via AsyncSessionLocal() — request txn rolls back on 401"]
     end
 
-    C -->|email,password| L1 --> L2 --> L3
+    C -->|"email,password,role?"| L1 --> L2 --> L3
     L3 -->|no| LF --> A_BAD --> C
-    L3 -->|yes| L4 --> L5
+    L3 -->|yes| L4 --> L4b --> L5
     L5 --> SE1 --> SE2 --> SE3
     L5 --> A_OK
     L5 --> L6 --> C
 
-    C -->|gs_session + X-CSRF-Token| O1 --> O2 --> O3 --> C
-    C -->|gs_session| M1 --> M2 --> C
+    C -->|"gatesphere_*_session (+ X-Session-Role if several) + X-CSRF-Token"| SL1
+    SL1 --> SL2
+    SL2 --> SL3 --> C
+    SL2 --> SL4 --> SL6
+    SL2 --> SL5 --> SL6
+    SL6 --> SL7 --> SL8
+    SL8 --> O1 --> O2 --> O3 --> C
+    SL8 --> M1 --> C
 
     A_OK --> DB[("PostgreSQL: user_sessions, audit_logs")]
     A_BAD --> DB
@@ -57,4 +75,4 @@ flowchart TD
     SE2 --> RC[("Redis")]
     O2 --> RC
 
-    note["Sessions revoked on: logout · password change · role/permission change<br/>(revoke_all_user_sessions_async / invalidate_user_permissions_async)"]
+    note["Independent named sessions: one browser / cookie jar holds several<br/>gatesphere_&lt;bucket&gt;_session cookies at once; logout of one leaves the rest alive.<br/>All of a user's sessions are revoked on: password change · role/permission change<br/>(revoke_all_user_sessions_async / invalidate_user_permissions_async)"]

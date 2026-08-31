@@ -16,6 +16,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
+    Index,
     Integer,
     SmallInteger,
     String,
@@ -169,6 +170,14 @@ class VisitorEntry(Base, TimestampMixin, TenantMixin):
             ["visitor_id", "community_id"],
             ["visitors.id", "visitors.community_id"],
             ondelete="CASCADE",
+        ),
+        # A request cannot have two open (`inside`) entries at once — atomic guard to back
+        # up the service-layer check in `record_entry` (migration 0026).
+        Index(
+            "uq_visitor_entry_open",
+            "request_id",
+            unique=True,
+            postgresql_where=text("status = 'inside'"),
         ),
     )
 

@@ -490,9 +490,15 @@ class VisitorService(UnitScopedAccess):
         if obj.valid_to <= obj.valid_from:
             raise BusinessRuleError("valid_to must be after valid_from", code="INVALID_DATE_RANGE")
         self.db.add(obj)
-        # a valid pass pre-approves the request
+        # A valid pass pre-approves the request — but only when the actor is entitled to
+        # approve it: they hold `visitors:approve`, or they occupy the request's unit
+        # (a resident pre-authorising their own guest). Otherwise the pass is issued but
+        # the request stays `pending` for a proper approver (SM-1).
         if req.approval_required and req.status == "pending":
-            req.status = "approved"
+            unit_scope = await self._unit_scope()
+            actor_owns_unit = unit_scope is not None and req.unit_id in unit_scope
+            if self.actor.is_superadmin or self.scope.can("visitors:approve") or actor_owns_unit:
+                req.status = "approved"
         await self.db.flush()
         await self._audit(
             "pass.create",

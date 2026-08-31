@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, Response, status
 
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
-from app.core.security import require_permission_async
+from app.core.tenancy import require_permission_async
 from app.modules.communication import schemas
 from app.modules.communication.deps import communication_service
 from app.modules.communication.service import CommunicationService

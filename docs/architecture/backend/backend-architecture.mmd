@@ -8,6 +8,8 @@ flowchart TD
     %% ---------------------------------------------------------------- request pipeline
     subgraph PIPE["Request pipeline (app/main.py)"]
         direction TB
+        SECHDR["SecurityHeadersMiddleware<br/>X-Content-Type-Options, X-Frame-Options DENY,<br/>Referrer-Policy, CSP default-src 'none', HSTS (when COOKIE_SECURE)"]
+        THOST["TrustedHostMiddleware<br/>settings.allowed_hosts (prod: explicit list; enforced by config guard)"]
         CORS["CORSMiddleware<br/>allow_origins = settings.cors_allow_origins<br/>allow_credentials=true"]
         CID["CorrelationIdMiddleware<br/>app/core/logging.py — X-Request-ID"]
         RL["slowapi rate limiter<br/>app/modules/auth/router.py::limiter<br/>5/min/IP on POST /auth/login"]
@@ -16,15 +18,16 @@ flowchart TD
 
     subgraph AUTHN["Authentication (app/core/security.py)"]
         direction TB
-        CSRF["verify_csrf<br/>X-CSRF-Token == gs_csrf cookie on POST/PUT/PATCH/DELETE"]
-        SESS["_load_session_async<br/>Redis session:&lt;hash&gt; → fallback user_sessions row<br/>checks revoked_at / expires_at"]
-        REQAUTH["require_auth_async → User<br/>sets request.state.user / session_id"]
+        SELECT["_select_session_token<br/>role-bucketed cookies: gatesphere_&lt;bucket&gt;_session (+ legacy gs_session)<br/>&gt;1 present → X-Session-Role header picks one, else 401 AMBIGUOUS_SESSION"]
+        CSRF["verify_csrf<br/>X-CSRF-Token == gatesphere_&lt;bucket&gt;_csrf on POST/PUT/PATCH/DELETE"]
+        SESS["_load_session_async<br/>Redis session:&lt;hash&gt; → fallback user_sessions row<br/>checks revoked_at / expires_at; _touch_last_activity (≤1/60s)"]
+        REQAUTH["require_auth_async → User<br/>sets request.state.user / session_id / session_bucket / session_role"]
     end
 
     subgraph AUTHZ["Authorization (app/core/tenancy.py + security.py)"]
         direction TB
         SCOPE["get_tenant_scope_async → TenantScope<br/>community_ids from user_roles (never payload)<br/>active_cid + effective permissions =<br/>role defaults ± community_role_permissions overrides"]
-        PERM["require_permission_async(code)<br/>scope.can(code) else 403 PERMISSION_DENIED"]
+        PERM["require_permission_async(code)<br/>defined in app/core/tenancy.py; routers import it from there directly<br/>(dependency direction is one-way: tenancy → security)<br/>scope.can(code) else 403 PERMISSION_DENIED"]
         PADMIN["require_platform_admin<br/>is_superadmin else 403 PLATFORM_ADMIN_ONLY"]
         RLSBIND["bind_rls_scope_async<br/>SET LOCAL app.community_ids = &lt;csv&gt;"]
         UNITACC["UnitScopedAccess (residents/access.py)<br/>plain resident → own-unit rows only<br/>user_in_community() for payload user ids"]
@@ -109,12 +112,12 @@ flowchart TD
         T5["amenities.close_past_bookings · 15m"]
     end
 
-    OPS["ops routes (app/main.py)<br/>GET / · /healthz · /readyz · /docs · /redoc"]
+    OPS["ops routes (app/main.py)<br/>GET / · /healthz · /readyz · /docs · /redoc<br/>(/docs, /redoc, openapi.json disabled when ENVIRONMENT=production unless ENABLE_DOCS)"]
 
     %% ================================================================ edges
-    Client -->|HTTPS| CORS --> CID --> RL --> EXC
+    Client -->|HTTPS| THOST --> SECHDR --> CORS --> CID --> RL --> EXC
     Client -.-> OPS
-    EXC --> CSRF --> SESS --> REQAUTH
+    EXC --> SELECT --> CSRF --> SESS --> REQAUTH
     REQAUTH --> SCOPE
     SCOPE --> PERM
     SCOPE --> PADMIN

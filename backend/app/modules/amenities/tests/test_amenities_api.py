@@ -72,6 +72,17 @@ def test_cross_community_amenity_is_404(as_role, seed_ids):
     assert r.status_code == 404
 
 
+def test_get_one_amenity(as_role, seed_ids):
+    resident = as_role("resident")
+    am_id, _slot, _d = _amenity_and_slot(seed_ids["community_id"])
+    r = resident.get(f"{P}/{am_id}")
+    assert r.status_code == 200
+    assert r.json()["data"]["id"] == am_id
+    # cross-community amenity by id -> 404
+    other, _s, _d2 = _amenity_and_slot(seed_ids["other_community_id"])
+    assert resident.get(f"{P}/{other}").status_code == 404
+
+
 def test_resident_amenity_bookings_are_own_only(as_role):
     resident = as_role("resident")
     me = resident.get("/api/v1/auth/me").json()["data"]["id"]

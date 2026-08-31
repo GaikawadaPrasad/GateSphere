@@ -1,3 +1,5 @@
+> **Superseded by [`docs/backend/AUTHENTICATION.md`](../backend/AUTHENTICATION.md)** for session-cookie / multi-role details (role-bucketed `gatesphere_<bucket>_session` cookies, logout isolation). This page is kept for the wider platform context.
+
 # Platform — Authentication & Session Management
 
 Canonical source. Backend implementation: `backend/app/core/security.py`. Frontend: `frontend/lib/api.ts`, `frontend/middleware.ts`.

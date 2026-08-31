@@ -49,7 +49,7 @@ flowchart TD
 
     subgraph PASS["Passes"]
         direction TB
-        PCr["POST /visitors/requests/{id}/passes → create_pass  [visitors:create]<br/>request status ∈ approved|pending; token_urlsafe(18) + optional 6-digit PIN (both HMAC digest)<br/>valid_to &gt; valid_from else 422; a valid pass pre-approves a pending request; INSERT visitor_passes"]
+        PCr["POST /visitors/requests/{id}/passes → create_pass  [visitors:create]<br/>request status ∈ approved|pending; token_urlsafe(18) + optional 6-digit PIN (both HMAC digest)<br/>valid_to &gt; valid_from else 422; a valid pass pre-approves a pending request ONLY IF the actor<br/>is_superadmin / holds visitors:approve / occupies the request's unit (SM-1); else stays pending; INSERT visitor_passes"]
         PRv["POST /visitors/passes/{pass_id}/revoke → revoke_pass<br/>db.get(VisitorPass) then get_request(request_id) as the scope gate; is_revoked=true"]
     end
 

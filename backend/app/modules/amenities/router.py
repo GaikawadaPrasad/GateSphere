@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, Response, status
 
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
-from app.core.security import require_permission_async
+from app.core.tenancy import require_permission_async
 from app.modules.amenities import schemas
 from app.modules.amenities.deps import amenity_service
 from app.modules.amenities.service import AmenityService
@@ -132,6 +132,11 @@ async def create_amenity(
         ),
         message="Created",
     )
+
+
+@router.get("/{amenity_id}", response_model=Envelope[schemas.AmenityRead], dependencies=[VIEW])
+async def get_amenity(amenity_id: uuid.UUID, svc: Svc = Depends(amenity_service)) -> dict:
+    return ok(schemas.AmenityRead.model_validate(await svc.get_amenity(amenity_id)))
 
 
 @router.patch("/{amenity_id}", response_model=Envelope[schemas.AmenityRead], dependencies=[APPROVE])

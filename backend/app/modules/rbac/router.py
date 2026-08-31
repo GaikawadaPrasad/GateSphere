@@ -15,7 +15,8 @@ from fastapi import APIRouter, Depends
 
 from app.core.responses import Response as Envelope
 from app.core.responses import ok
-from app.core.security import require_permission_async, require_platform_admin
+from app.core.security import require_platform_admin
+from app.core.tenancy import require_permission_async
 from app.modules.rbac import schemas
 from app.modules.rbac.deps import rbac_service
 from app.modules.rbac.service import RbacService

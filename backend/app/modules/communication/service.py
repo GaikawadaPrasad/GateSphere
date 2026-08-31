@@ -40,8 +40,10 @@ from app.modules.communication.repository import (
 )
 from app.modules.communication.schemas import ALLOWED
 from app.modules.communities.models import Tower, Unit
+from app.modules.notifications import events as notif_events
 from app.modules.residents.access import user_in_community
-from app.modules.users.models import Role, User
+from app.modules.residents.models import ResidentProfile, UnitOccupancy
+from app.modules.users.models import Role, User, UserRole
 
 
 def _enum(field: str, value: str | None) -> None:
@@ -266,6 +268,48 @@ class CommunicationService:
         )
         return await self.get_announcement(ann.id)
 
+    async def _announcement_recipients(self, ann: Announcement) -> list[uuid.UUID]:
+        """Resident/user ids the announcement's targets resolve to, within its community."""
+        cid = ann.community_id
+        user_ids: set[uuid.UUID] = set()
+        for t in ann.targets:
+            if t.target_all_community:
+                rows = await self.db.scalars(
+                    select(ResidentProfile.user_id).where(ResidentProfile.community_id == cid)
+                )
+                user_ids.update(r for r in rows if r is not None)
+            elif t.tower_id is not None:
+                rows = await self.db.scalars(
+                    select(ResidentProfile.user_id)
+                    .join(UnitOccupancy, UnitOccupancy.resident_profile_id == ResidentProfile.id)
+                    .join(Unit, Unit.id == UnitOccupancy.unit_id)
+                    .where(Unit.tower_id == t.tower_id, UnitOccupancy.is_active.is_(True))
+                )
+                user_ids.update(r for r in rows if r is not None)
+            elif t.unit_id is not None:
+                rows = await self.db.scalars(
+                    select(ResidentProfile.user_id)
+                    .join(UnitOccupancy, UnitOccupancy.resident_profile_id == ResidentProfile.id)
+                    .where(UnitOccupancy.unit_id == t.unit_id, UnitOccupancy.is_active.is_(True))
+                )
+                user_ids.update(r for r in rows if r is not None)
+            elif t.role_id is not None:
+                rows = await self.db.scalars(
+                    select(UserRole.user_id).where(
+                        UserRole.role_id == t.role_id,
+                        (UserRole.community_id == cid) | (UserRole.community_id.is_(None)),
+                    )
+                )
+                user_ids.update(rows)
+            elif t.resident_group_id is not None:
+                rows = await self.db.scalars(
+                    select(ResidentGroupMember.user_id).where(
+                        ResidentGroupMember.group_id == t.resident_group_id
+                    )
+                )
+                user_ids.update(rows)
+        return sorted(user_ids)
+
     async def publish_announcement(self, announcement_id: uuid.UUID) -> Announcement:
         ann = await self.get_announcement(announcement_id)
         if ann.is_published:
@@ -276,6 +320,34 @@ class CommunicationService:
         ann.publish_at = ann.publish_at or datetime.now(UTC)
         await self.db.flush()
         await self._audit("announcement.publish", ann.community_id, "announcement", ann.id)
+        # Broadcast fan-out: a published notice/alert must reach its audience (FR-15).
+        recipients = await self._announcement_recipients(ann)
+        emergency = ann.announcement_type == "emergency"
+        await notif_events.emit_many(
+            self.db,
+            recipient_user_ids=recipients,
+            community_id=ann.community_id,
+            notification_type=f"communication.{ann.announcement_type}",
+            title=ann.title,
+            message=(ann.body or "")[:2000],
+            reference_type="announcement",
+            reference_id=ann.id,
+        )
+        if emergency:
+            await notif_events.emit_to_roles(
+                self.db,
+                self.scope,
+                self.actor,
+                self.request,
+                community_id=ann.community_id,
+                role_slugs=["security_supervisor", "security_guard", "facility_manager"],
+                notification_type="communication.emergency",
+                title=f"EMERGENCY: {ann.title}",
+                message=(ann.body or "")[:2000],
+                reference_type="announcement",
+                reference_id=ann.id,
+                channels=["in_app", "sms"],
+            )
         return await self.get_announcement(ann.id)
 
     async def expire_announcement(self, announcement_id: uuid.UUID) -> Announcement:
