@@ -58,7 +58,7 @@ export function Header() {
             style={{ height: 34, padding: "0.25rem 0.6rem", fontSize: "0.85rem", width: "auto", minWidth: 200 }}
           >
             <option value="">🌐 All Communities (Global)</option>
-            {communities?.map((comm) => (
+            {communities?.map((comm: any) => (
               <option key={comm.id} value={comm.id}>
                 {comm.name} ({comm.code})
               </option>
@@ -76,12 +76,12 @@ export function Header() {
               width: 36,
               height: 36,
               borderRadius: "50%",
-              background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
+              background: "linear-gradient(135deg, #1D4ED8, #0D9488)",
               color: "white",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontWeight: 600,
+              fontWeight: 700,
               fontSize: "0.85rem",
             }}
           >

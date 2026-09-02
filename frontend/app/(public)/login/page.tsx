@@ -2,19 +2,19 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { ApiError } from "@/lib/api";
 import { useLogin } from "@/hooks/use-auth";
+import { ApiError } from "@/lib/api";
 
 const schema = z.object({
-  email: z.string().email("Enter a valid email"),
+  email: z.string().email("Valid email required"),
   password: z.string().min(1, "Password is required"),
 });
+
 type FormValues = z.infer<typeof schema>;
 
-function LoginForm() {
+export default function LoginPage() {
   const router = useRouter();
   const params = useSearchParams();
   const login = useLogin();
@@ -26,7 +26,7 @@ function LoginForm() {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { email: "super_admin@gatesphere.com", password: "" },
+    defaultValues: { email: "", password: "" },
   });
 
   const onSubmit = handleSubmit(async (values) => {
@@ -34,9 +34,9 @@ function LoginForm() {
       await login.mutateAsync(values);
       router.replace(params.get("next") || "/dashboard");
     } catch (err) {
-      if (err instanceof ApiError && Object.keys(err.fields).length) {
+      if (err instanceof ApiError && err.fields && Object.keys(err.fields).length) {
         for (const [field, message] of Object.entries(err.fields)) {
-          setError(field as keyof FormValues, { message });
+          setError(field as keyof FormValues, { message: Array.isArray(message) ? message[0] : String(message) });
         }
       } else {
         setError("root", {
@@ -48,35 +48,48 @@ function LoginForm() {
 
   return (
     <main className="container">
-      <h1>Sign in</h1>
-      <form className="card" onSubmit={onSubmit} noValidate>
+      <h1>Sign in to GateSphere</h1>
+      <form onSubmit={onSubmit} className="card" noValidate>
+        {errors.root && (
+          <div role="alert" className="error-banner">
+            {errors.root.message}
+          </div>
+        )}
+
         <label htmlFor="email">Email</label>
-        <input id="email" type="email" autoComplete="username" {...register("email")} />
-        {errors.email && <p className="error">{errors.email.message}</p>}
+        <input
+          id="email"
+          type="email"
+          autoComplete="email"
+          aria-invalid={Boolean(errors.email)}
+          aria-describedby={errors.email ? "email-error" : undefined}
+          {...register("email")}
+        />
+        {errors.email && (
+          <span id="email-error" className="error-text">
+            {errors.email.message}
+          </span>
+        )}
 
         <label htmlFor="password">Password</label>
         <input
           id="password"
           type="password"
           autoComplete="current-password"
+          aria-invalid={Boolean(errors.password)}
+          aria-describedby={errors.password ? "password-error" : undefined}
           {...register("password")}
         />
-        {errors.password && <p className="error">{errors.password.message}</p>}
+        {errors.password && (
+          <span id="password-error" className="error-text">
+            {errors.password.message}
+          </span>
+        )}
 
-        {errors.root && <p className="error">{errors.root.message}</p>}
-
-        <button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Signing in…" : "Sign in"}
+        <button type="submit" disabled={isSubmitting || login.isPending}>
+          {isSubmitting || login.isPending ? "Signing in…" : "Sign in"}
         </button>
       </form>
     </main>
-  );
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense>
-      <LoginForm />
-    </Suspense>
   );
 }

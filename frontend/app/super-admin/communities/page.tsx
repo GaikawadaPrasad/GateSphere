@@ -126,7 +126,7 @@ export default function CommunitiesPage() {
 
   const filteredCommunities = useMemo(() => {
     if (!communities) return [];
-    return communities.filter((comm) => {
+    return communities.filter((comm: any) => {
       const matchesSearch =
         searchQuery === "" ||
         comm.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

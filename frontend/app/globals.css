@@ -13,7 +13,7 @@
   --primary: #2563eb;
   --primary-hover: #1d4ed8;
   --primary-light: #eff6ff;
-  
+
   --accent: #8b5cf6;
   --accent-light: #f5f3ff;
 
@@ -98,15 +98,28 @@ a {
 /* TYPOGRAPHY & HEADINGS                                                     */
 /* ========================================================================= */
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   color: var(--fg);
   font-weight: 600;
   line-height: 1.3;
 }
 
-h1 { font-size: 1.5rem; }
-h2 { font-size: 1.25rem; }
-h3 { font-size: 1rem; }
+h1 {
+  font-size: 1.5rem;
+}
+
+h2 {
+  font-size: 1.25rem;
+}
+
+h3 {
+  font-size: 1rem;
+}
 
 p {
   color: var(--fg-secondary);
@@ -167,6 +180,7 @@ p {
   background: var(--primary);
   color: white;
 }
+
 .btn-primary:hover:not(:disabled) {
   background: var(--primary-hover);
 }
@@ -176,6 +190,7 @@ p {
   color: var(--fg-secondary);
   border-color: var(--border);
 }
+
 .btn-secondary:hover:not(:disabled) {
   background: var(--panel-hover);
   color: var(--fg);
@@ -185,6 +200,7 @@ p {
   background: var(--danger);
   color: white;
 }
+
 .btn-danger:hover:not(:disabled) {
   background: #dc2626;
 }
@@ -311,8 +327,15 @@ p {
 /* ========================================================================= */
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.4;
+  }
 }
 
 .skeleton {
@@ -322,8 +345,13 @@ p {
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .spin-animation {

@@ -115,7 +115,7 @@ export default function BillingPage() {
             style={{ width: "auto", height: 36, padding: "0.25rem 0.6rem", fontSize: "0.85rem" }}
           >
             <option value="">All Communities</option>
-            {communities?.map((c) => (
+            {communities?.map((c: any) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>

@@ -1,34 +1,76 @@
 "use client";
 
+import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useUiStore } from "@/store/ui";
+import { useMe } from "@/hooks/use-auth";
+import { AUDITOR_NAV, DOMESTIC_STAFF_NAV, OWNER_TENANT_NAV, NavItem } from "@/config/dashboard-navigation";
 
-const navItems = [
-  { label: "Dashboard", href: "/super-admin/dashboard", icon: "📊" },
-  { label: "Communities", href: "/super-admin/communities", icon: "🏢" },
-  { label: "Residents", href: "/super-admin/residents", icon: "👥" },
-  { label: "Gate Traffic", href: "/super-admin/gate-traffic", icon: "🛡️" },
-  { label: "Complaints", href: "/super-admin/complaints", icon: "🎫" },
-  { label: "Billing & Finance", href: "/super-admin/billing", icon: "💳" },
-  { label: "Reports & Analytics", href: "/super-admin/reports", icon: "📈" },
-  { label: "Audit Logs", href: "/super-admin/audit-logs", icon: "📋" },
-  { label: "System Settings", href: "/super-admin/settings", icon: "⚙️" },
+const SUPER_ADMIN_NAV_ITEMS: NavItem[] = [
+  { id: "dashboard", label: "Dashboard", href: "/super-admin/dashboard", icon: "📊" },
+  { id: "communities", label: "Communities", href: "/super-admin/communities", icon: "🏢" },
+  { id: "residents", label: "Residents", href: "/super-admin/residents", icon: "👥" },
+  { id: "gate-traffic", label: "Gate Traffic", href: "/super-admin/gate-traffic", icon: "🛡️" },
+  { id: "complaints", label: "Complaints", href: "/super-admin/complaints", icon: "🎫" },
+  { id: "billing", label: "Billing & Finance", href: "/super-admin/billing", icon: "💳" },
+  { id: "reports", label: "Reports & Analytics", href: "/super-admin/reports", icon: "📈" },
+  { id: "audit-logs", label: "Audit Logs", href: "/super-admin/audit-logs", icon: "📋" },
+  { id: "settings", label: "System Settings", href: "/super-admin/settings", icon: "⚙️" },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
   const { sidebarOpen, toggleSidebar } = useUiStore();
+  const { data: user } = useMe();
+
+  // Determine current active dashboard
+  let navConfig = {
+    title: "GateSphere",
+    roleLabel: "Resident",
+    accentColor: "#1D4ED8",
+    items: OWNER_TENANT_NAV.navItems,
+  };
+
+  if (pathname.startsWith("/dashboard/auditor")) {
+    navConfig = {
+      title: "GateSphere",
+      roleLabel: "Auditor (Read-Only)",
+      accentColor: "#475569",
+      items: AUDITOR_NAV.navItems,
+    };
+  } else if (pathname.startsWith("/dashboard/domestic-staff")) {
+    navConfig = {
+      title: "GateSphere",
+      roleLabel: "Domestic Staff",
+      accentColor: "#0D9488",
+      items: DOMESTIC_STAFF_NAV.navItems,
+    };
+  } else if (pathname.startsWith("/dashboard/owner-tenant")) {
+    navConfig = {
+      title: "GateSphere",
+      roleLabel: "Owner / Tenant",
+      accentColor: "#1D4ED8",
+      items: OWNER_TENANT_NAV.navItems,
+    };
+  } else if (pathname.startsWith("/super-admin")) {
+    navConfig = {
+      title: "GateSphere",
+      roleLabel: "Super Admin",
+      accentColor: "#3B82F6",
+      items: SUPER_ADMIN_NAV_ITEMS,
+    };
+  }
 
   return (
     <aside
       style={{
-        width: sidebarOpen ? 250 : 72,
+        width: sidebarOpen ? 260 : 72,
         background: "var(--sidebar-bg)",
         borderRight: "1px solid var(--sidebar-border)",
         display: "flex",
         flexDirection: "column",
-        transition: "width 0.2s ease",
+        transition: "width 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
         flexShrink: 0,
         position: "sticky",
         top: 0,
@@ -51,42 +93,43 @@ export function Sidebar() {
           <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
             <div
               style={{
-                width: 32,
-                height: 32,
+                width: 34,
+                height: 34,
                 borderRadius: "var(--radius-sm)",
-                background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+                background: "linear-gradient(135deg, #1D4ED8, #0D9488)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontWeight: 700,
+                fontWeight: 900,
                 color: "white",
-                fontSize: "0.95rem",
+                fontSize: "1rem",
+                boxShadow: "0 2px 10px rgba(29, 78, 216, 0.4)",
               }}
             >
               GS
             </div>
             <div>
-              <div style={{ fontWeight: 700, fontSize: "0.95rem", color: "var(--sidebar-fg)", letterSpacing: "-0.01em" }}>
-                GateSphere
+              <div style={{ fontWeight: 800, fontSize: "1rem", color: "var(--sidebar-fg)", letterSpacing: "-0.01em" }}>
+                {navConfig.title}
               </div>
-              <div style={{ fontSize: "0.65rem", color: "#60a5fa", fontWeight: 600, textTransform: "uppercase" }}>
-                Super Admin
+              <div style={{ fontSize: "0.65rem", color: "#38BDF8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                {navConfig.roleLabel}
               </div>
             </div>
           </div>
         ) : (
           <div
             style={{
-              width: 32,
-              height: 32,
+              width: 34,
+              height: 34,
               borderRadius: "var(--radius-sm)",
-              background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+              background: "linear-gradient(135deg, #1D4ED8, #0D9488)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontWeight: 700,
+              fontWeight: 900,
               color: "white",
-              fontSize: "0.95rem",
+              fontSize: "1rem",
             }}
           >
             GS
@@ -111,11 +154,64 @@ export function Sidebar() {
         </button>
       </div>
 
+      {/* Role Quick Switcher in development */}
+      {sidebarOpen && (
+        <div style={{ padding: "0.5rem 1rem", borderBottom: "1px solid var(--sidebar-border)", background: "rgba(255,255,255,0.02)" }}>
+          <div style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--sidebar-muted)", marginBottom: "0.35rem", fontWeight: 700 }}>
+            Role Views
+          </div>
+          <div style={{ display: "flex", gap: "0.25rem", flexWrap: "wrap" }}>
+            <Link
+              href="/dashboard/auditor"
+              style={{
+                fontSize: "11px",
+                padding: "0.2rem 0.45rem",
+                borderRadius: "4px",
+                background: pathname.startsWith("/dashboard/auditor") ? "#334155" : "transparent",
+                color: pathname.startsWith("/dashboard/auditor") ? "#FFFFFF" : "var(--sidebar-muted)",
+                fontWeight: 600,
+              }}
+            >
+              Auditor
+            </Link>
+            <Link
+              href="/dashboard/domestic-staff"
+              style={{
+                fontSize: "11px",
+                padding: "0.2rem 0.45rem",
+                borderRadius: "4px",
+                background: pathname.startsWith("/dashboard/domestic-staff") ? "#0D9488" : "transparent",
+                color: pathname.startsWith("/dashboard/domestic-staff") ? "#FFFFFF" : "var(--sidebar-muted)",
+                fontWeight: 600,
+              }}
+            >
+              Staff
+            </Link>
+            <Link
+              href="/dashboard/owner-tenant"
+              style={{
+                fontSize: "11px",
+                padding: "0.2rem 0.45rem",
+                borderRadius: "4px",
+                background: pathname.startsWith("/dashboard/owner-tenant") ? "#1D4ED8" : "transparent",
+                color: pathname.startsWith("/dashboard/owner-tenant") ? "#FFFFFF" : "var(--sidebar-muted)",
+                fontWeight: 600,
+              }}
+            >
+              Resident
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Navigation Links */}
-      <nav style={{ padding: "1rem 0.5rem", flex: 1, overflowY: "auto" }}>
+      <nav style={{ padding: "0.75rem 0.5rem", flex: 1, overflowY: "auto" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-          {navItems.map((item) => {
-            const isActive = pathname === item.href || (item.href !== "/super-admin/dashboard" && pathname.startsWith(item.href));
+          {navConfig.items.map((item) => {
+            const isExactActive = pathname === item.href;
+            const isSubActive = item.href !== navConfig.items[0].href && pathname.startsWith(item.href);
+            const isActive = isExactActive || isSubActive;
+
             return (
               <Link
                 key={item.href}
@@ -124,21 +220,39 @@ export function Sidebar() {
                   display: "flex",
                   alignItems: "center",
                   gap: "0.75rem",
-                  padding: sidebarOpen ? "0.65rem 0.85rem" : "0.65rem",
+                  padding: sidebarOpen ? "0.6rem 0.85rem" : "0.6rem",
                   justifyContent: sidebarOpen ? "flex-start" : "center",
                   borderRadius: "var(--radius-sm)",
-                  color: isActive ? "#ffffff" : "var(--sidebar-muted)",
-                  background: isActive ? "var(--sidebar-active)" : "transparent",
-                  fontWeight: isActive ? 600 : 500,
-                  fontSize: "0.85rem",
+                  color: isActive ? "#FFFFFF" : "var(--sidebar-muted)",
+                  background: isActive ? "var(--sidebar-surface)" : "transparent",
+                  fontWeight: isActive ? 700 : 500,
+                  fontSize: "13.5px",
                   textDecoration: "none",
                   transition: "all 0.15s ease",
-                  borderLeft: isActive ? "3px solid var(--primary)" : "3px solid transparent",
+                  borderLeft: isActive ? `3px solid ${item.accentColor || "var(--brand-primary)"}` : "3px solid transparent",
                 }}
                 title={item.label}
               >
-                <span style={{ fontSize: "1.1rem" }}>{item.icon}</span>
-                {sidebarOpen && <span>{item.label}</span>}
+                <span style={{ fontSize: "1.15rem" }}>{item.icon}</span>
+                {sidebarOpen && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+                    <span>{item.label}</span>
+                    {item.badge !== undefined && (
+                      <span
+                        style={{
+                          fontSize: "10px",
+                          fontWeight: 700,
+                          padding: "0.1rem 0.45rem",
+                          borderRadius: "9999px",
+                          background: item.accentColor ? `${item.accentColor}30` : "#3B82F630",
+                          color: item.accentColor || "#60A5FA",
+                        }}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
+                  </div>
+                )}
               </Link>
             );
           })}

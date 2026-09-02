@@ -9,9 +9,10 @@ interface ModalProps {
   children: ReactNode;
   footer?: ReactNode;
   maxWidth?: string | number;
+  size?: "sm" | "md" | "lg" | "xl";
 }
 
-export function Modal({ isOpen, onClose, title, children, footer, maxWidth = 540 }: ModalProps) {
+export function Modal({ isOpen, onClose, title, children, footer, maxWidth, size }: ModalProps) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -27,6 +28,12 @@ export function Modal({ isOpen, onClose, title, children, footer, maxWidth = 540
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
+
+  let resolvedMaxWidth: string | number = maxWidth || 560;
+  if (size === "sm") resolvedMaxWidth = 420;
+  if (size === "md") resolvedMaxWidth = 560;
+  if (size === "lg") resolvedMaxWidth = 720;
+  if (size === "xl") resolvedMaxWidth = 900;
 
   return (
     <div
@@ -46,11 +53,11 @@ export function Modal({ isOpen, onClose, title, children, footer, maxWidth = 540
       <div
         style={{
           background: "white",
-          borderRadius: "var(--radius-lg)",
+          borderRadius: "var(--radius-card)",
           width: "100%",
-          maxWidth,
-          boxShadow: "var(--shadow-lg)",
-          border: "1px solid var(--border)",
+          maxWidth: resolvedMaxWidth,
+          boxShadow: "var(--shadow-elevated)",
+          border: "1px solid var(--border-standard)",
           overflow: "hidden",
           animation: "modalIn 0.2s ease-out",
         }}
@@ -62,10 +69,10 @@ export function Modal({ isOpen, onClose, title, children, footer, maxWidth = 540
             alignItems: "center",
             justifyContent: "space-between",
             padding: "1.25rem 1.5rem",
-            borderBottom: "1px solid var(--border)",
+            borderBottom: "1px solid var(--border-standard)",
           }}
         >
-          <h2 style={{ fontSize: "1.1rem", fontWeight: 600, color: "var(--fg)" }}>{title}</h2>
+          <h2 style={{ fontSize: "1.15rem", fontWeight: 700, color: "var(--brand-heading)" }}>{title}</h2>
           <button
             type="button"
             onClick={onClose}
@@ -73,7 +80,7 @@ export function Modal({ isOpen, onClose, title, children, footer, maxWidth = 540
               background: "transparent",
               border: "none",
               cursor: "pointer",
-              color: "var(--muted)",
+              color: "var(--brand-body)",
               fontSize: "1.25rem",
               padding: "0.25rem",
             }}
@@ -92,7 +99,7 @@ export function Modal({ isOpen, onClose, title, children, footer, maxWidth = 540
               justifyContent: "flex-end",
               gap: "0.75rem",
               padding: "1rem 1.5rem",
-              borderTop: "1px solid var(--border)",
+              borderTop: "1px solid var(--border-standard)",
               background: "#f8fafc",
             }}
           >
