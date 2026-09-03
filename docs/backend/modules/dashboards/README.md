@@ -32,6 +32,8 @@ narrows to the caller's own active occupancy.
 | `security` | `visitors_inside`, `vehicles_inside`, `staff_inside`, `pending_visitor_approvals`, `active_panic_alerts`, `open_incidents`, `guards_on_active_roster` |
 | `financial` | `invoices_by_status` (map), `total_billed` (non-draft), `total_collected` (successful payments), `outstanding_balance` |
 | `resident` | the caller's `unit_id`, `my_open_tickets`, `my_pending_visitor_requests`, `my_upcoming_bookings`, `my_outstanding_balance`, `published_announcements` |
+| `assistant/quick-actions` | role-tailored quick chips and suggestion prompts |
+| `assistant/query` | keyword/intent-matched FAQ response with direct actions and dynamic balance/counts |
 
 "Open ticket" = `{created, assigned, acknowledged, in_progress, resident_confirmation}`.
 "Open incident" = `{reported, acknowledged, responding, contained}`.
@@ -50,4 +52,6 @@ None — read-only, no audit rows.
 
 `app/modules/dashboards/tests/test_dashboards_api.py` (health, auth gate, admin overview is
 community-scoped with real counts + Decimal-as-string, security view types, financial view
-shape, resident view resolves the caller's unit, vendor is `403`).
+shape, resident view resolves the caller's unit, vendor is `403`, assistant quick-actions,
+assistant query intent matching).
+

@@ -54,3 +54,28 @@ async def resident(
     community_id: uuid.UUID | None = None, svc: Svc = Depends(dashboard_service)
 ) -> dict:
     return ok(await svc.resident(community_id))
+
+
+@router.get(
+    "/assistant/quick-actions",
+    response_model=Envelope[schemas.AssistantQuickActionsResponse],
+    dependencies=[VIEW],
+    summary="Get role-specific assistant quick chips and suggestions",
+)
+async def assistant_quick_actions(
+    community_id: uuid.UUID | None = None, svc: Svc = Depends(dashboard_service)
+) -> dict:
+    return ok(await svc.assistant_quick_actions(community_id))
+
+
+@router.post(
+    "/assistant/query",
+    response_model=Envelope[schemas.AssistantResponse],
+    dependencies=[VIEW],
+    summary="Query the dashboard assistant / FAQ helper",
+)
+async def assistant_query(
+    payload: schemas.AssistantQueryRequest, svc: Svc = Depends(dashboard_service)
+) -> dict:
+    return ok(await svc.assistant_query(payload.community_id, payload.query))
+

@@ -13,6 +13,8 @@ community-scoped caller is pinned to their own community; a global caller must p
 | `GET /dashboards/security` | – | `200` `SecurityStats` | live gate / security posture |
 | `GET /dashboards/financial` | – | `200` `FinancialStats` | billing rollups |
 | `GET /dashboards/resident` | – | `200` `ResidentStats` | scoped to the caller's active occupancy |
+| `GET /dashboards/assistant/quick-actions` | – | `200` `AssistantQuickActionsResponse` | role-tailored quick chips and suggestions |
+| `POST /dashboards/assistant/query` | `AssistantQueryRequest` | `200` `AssistantResponse` | rule-based assistant & FAQ query |
 
 All accept an optional `?community_id=` (required for a global caller).
 
@@ -22,6 +24,9 @@ All accept an optional `?community_id=` (required for a global caller).
 - **SecurityStats**: `community_id`, `visitors_inside`, `vehicles_inside`, `staff_inside`, `pending_visitor_approvals`, `expected_visitors` (approved, still valid, not yet entered — FR-14), `active_panic_alerts`, `open_incidents`, `guards_on_active_roster`.
 - **FinancialStats**: `community_id`, `invoices_by_status` (`{status: count}`), `total_billed`, `total_collected`, `outstanding_balance` (all decimal strings).
 - **ResidentStats**: `community_id`, `unit_id` (nullable), `my_open_tickets`, `my_pending_visitor_requests`, `my_upcoming_bookings`, `my_outstanding_balance`, `published_announcements`.
+- **AssistantQuickActionsResponse**: `community_id`, `greeting`, `chips` (`[{id, icon, label, query}]`), `suggested_queries`.
+- **AssistantResponse**: `reply_text`, `category`, `actions` (`[{label, url, action_type}]`), `related_faqs`.
+
 
 ## Error codes
 

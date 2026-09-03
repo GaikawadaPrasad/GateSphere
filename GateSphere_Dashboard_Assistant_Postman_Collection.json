@@ -1,0 +1,1263 @@
+{
+  "info": {
+    "_postman_id": "gatesphere-dashboard-assistant-qa-suite-v1",
+    "name": "GateSphere — Dashboards & Chatbot QA Suite (Comprehensive)",
+    "description": "Enterprise API QA Test Suite for GateSphere Dashboards (FR-14) & Intelligent Assistant Chatbot. Covers Happy-Path, Negative, Input Validation, Malformed Payloads, RBAC/Role Isolation, JSON Schema Validation, and SLA Performance Benchmarks.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Automatically inject valid X-CSRF-Token for state-changing HTTP methods",
+          "// unless explicitly set to a test override (e.g. 'FORGED' or 'NONE')",
+          "if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(pm.request.method)) {",
+          "    const currentHeader = pm.request.headers.get('X-CSRF-Token');",
+          "    if (!currentHeader || currentHeader === '{{csrf_token}}' || currentHeader === '') {",
+          "        const activeRole = pm.request.headers.get('X-Session-Role') || 'resident';",
+          "        let token = pm.cookies.get('gatesphere_' + activeRole + '_csrf')",
+          "                 || pm.cookies.get('gatesphere_resident_csrf')",
+          "                 || pm.environment.get('gatesphere_' + activeRole + '_csrf')",
+          "                 || pm.environment.get('gatesphere_resident_csrf')",
+          "                 || pm.environment.get('csrf_token')",
+          "                 || pm.collectionVariables.get('csrf_token');",
+          "        if (token) {",
+          "            pm.request.headers.upsert({ key: 'X-CSRF-Token', value: token });",
+          "        }",
+          "    }",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "csrf_token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01. Authentication & Session Setup",
+      "item": [
+        {
+          "name": "Login as Resident",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response envelope valid', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.data.email).to.eql('resident@gatesphere.com');",
+                  "});",
+                  "// Capture CSRF from cookie or header",
+                  "let csrf = pm.cookies.get('gatesphere_resident_csrf');",
+                  "if (!csrf) {",
+                  "    const setCookie = pm.response.headers.get('Set-Cookie') || '';",
+                  "    const m = setCookie.match(/gatesphere_resident_csrf=([^;]+)/);",
+                  "    if (m) csrf = m[1];",
+                  "}",
+                  "if (csrf) {",
+                  "    pm.environment.set('gatesphere_resident_csrf', csrf);",
+                  "    pm.environment.set('csrf_token', csrf);",
+                  "    pm.collectionVariables.set('csrf_token', csrf);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"resident@gatesphere.com\",\n  \"password\": \"resident@Gate2026!\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          }
+        },
+        {
+          "name": "Login as Community Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.to.have.status(200));",
+                  "let csrf = pm.cookies.get('gatesphere_community_admin_csrf');",
+                  "if (!csrf) {",
+                  "    const setCookie = pm.response.headers.get('Set-Cookie') || '';",
+                  "    const m = setCookie.match(/gatesphere_community_admin_csrf=([^;]+)/);",
+                  "    if (m) csrf = m[1];",
+                  "}",
+                  "if (csrf) {",
+                  "    pm.environment.set('gatesphere_community_admin_csrf', csrf);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"community_admin@gatesphere.com\",\n  \"password\": \"community_admin@Gate2026!\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          }
+        },
+        {
+          "name": "Login as Security Supervisor",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.to.have.status(200));",
+                  "let csrf = pm.cookies.get('gatesphere_security_csrf');",
+                  "if (!csrf) {",
+                  "    const setCookie = pm.response.headers.get('Set-Cookie') || '';",
+                  "    const m = setCookie.match(/gatesphere_security_csrf=([^;]+)/);",
+                  "    if (m) csrf = m[1];",
+                  "}",
+                  "if (csrf) {",
+                  "    pm.environment.set('gatesphere_security_csrf', csrf);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"security_supervisor@gatesphere.com\",\n  \"password\": \"security_supervisor@Gate2026!\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "02. Happy-Path Core Dashboards (FR-14)",
+      "item": [
+        {
+          "name": "Module Health Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Module status ok', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.data.status).to.eql('ok');",
+                  "    pm.expect(json.data.module).to.eql('dashboards');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/dashboards/health", "host": ["{{baseUrl}}"], "path": ["dashboards", "health"] }
+          }
+        },
+        {
+          "name": "DASH-02: Overview Stats (Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Overview schema validation', () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.community_id).to.be.a('string');",
+                  "    pm.expect(d.residents).to.be.a('number');",
+                  "    pm.expect(d.units).to.be.a('number');",
+                  "    pm.expect(d.open_tickets).to.be.a('number');",
+                  "    pm.expect(d.visitors_inside).to.be.a('number');",
+                  "    pm.expect(d.outstanding_balance).to.exist;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Session-Role", "value": "community_admin" }],
+            "url": { "raw": "{{baseUrl}}/dashboards/overview", "host": ["{{baseUrl}}"], "path": ["dashboards", "overview"] }
+          }
+        },
+        {
+          "name": "DASH-03: Security Live Gate Posture",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Security posture schema validation', () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.visitors_inside).to.be.a('number');",
+                  "    pm.expect(d.vehicles_inside).to.be.a('number');",
+                  "    pm.expect(d.staff_inside).to.be.a('number');",
+                  "    pm.expect(d.active_panic_alerts).to.be.a('number');",
+                  "    pm.expect(d.guards_on_active_roster).to.be.a('number');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Session-Role", "value": "security_supervisor" }],
+            "url": { "raw": "{{baseUrl}}/dashboards/security", "host": ["{{baseUrl}}"], "path": ["dashboards", "security"] }
+          }
+        },
+        {
+          "name": "Financial Rollups & Invoices",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Financial totals schema validation', () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.total_billed).to.exist;",
+                  "    pm.expect(d.total_collected).to.exist;",
+                  "    pm.expect(d.outstanding_balance).to.exist;",
+                  "    pm.expect(d.invoices_by_status).to.be.an('object');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Session-Role", "value": "community_admin" }],
+            "url": { "raw": "{{baseUrl}}/dashboards/financial", "host": ["{{baseUrl}}"], "path": ["dashboards", "financial"] }
+          }
+        },
+        {
+          "name": "DASH-04: Resident Personal Dashboard",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Resident personal schema validation', () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.community_id).to.be.a('string');",
+                  "    pm.expect(d.my_open_tickets).to.be.a('number');",
+                  "    pm.expect(d.my_pending_visitor_requests).to.be.a('number');",
+                  "    pm.expect(d.my_upcoming_bookings).to.be.a('number');",
+                  "    pm.expect(d.my_outstanding_balance).to.exist;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Session-Role", "value": "resident" }],
+            "url": { "raw": "{{baseUrl}}/dashboards/resident", "host": ["{{baseUrl}}"], "path": ["dashboards", "resident"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "03. Chatbot Intent Classification & FAQs",
+      "item": [
+        {
+          "name": "01. Intent: Greeting (hello)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Intent matches greeting', () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.category).to.eql('greeting');",
+                  "    pm.expect(d.reply_text).to.include('Hello');",
+                  "    pm.expect(d.actions.length).to.be.at.least(1);",
+                  "    pm.expect(d.related_faqs.length).to.be.at.least(1);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Session-Role", "value": "resident" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"hello\"\n}" },
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/query", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "query"] }
+          }
+        },
+        {
+          "name": "02. Intent: Billing & Maintenance Dues",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Intent matches billing', () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.category).to.eql('billing');",
+                  "    pm.expect(d.reply_text.toLowerCase()).to.include('maintenance');",
+                  "    pm.expect(d.actions.some(a => a.url === '/billing')).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Session-Role", "value": "resident" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"What are my outstanding maintenance dues?\"\n}" },
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/query", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "query"] }
+          }
+        },
+        {
+          "name": "03. Intent: Visitors & Guest Pass",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Intent matches visitors', () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.category).to.eql('visitors');",
+                  "    pm.expect(d.actions.some(a => a.url === '/visitors/new')).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Session-Role", "value": "resident" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"How do I create a visitor pass for my guest?\"\n}" },
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/query", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "query"] }
+          }
+        },
+        {
+          "name": "04. Intent: Deliveries & Swiggy/Zomato",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Intent matches deliveries', () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.category).to.eql('deliveries');",
+                  "    pm.expect(d.reply_text).to.include('Delivery Management');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Session-Role", "value": "resident" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"swiggy delivery gate desk rules\"\n}" },
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/query", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "query"] }
+          }
+        },
+        {
+          "name": "05. Intent: Vehicles & EV Charging",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Intent matches vehicles', () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.category).to.eql('vehicles');",
+                  "    pm.expect(d.reply_text).to.include('EV Charging');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Session-Role", "value": "resident" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"where is EV charging parking slot\"\n}" },
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/query", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "query"] }
+          }
+        },
+        {
+          "name": "06. Intent: Complaints / Service Desk",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Intent matches complaints', () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.category).to.eql('complaints');",
+                  "    pm.expect(d.actions.some(a => a.url === '/complaints/new')).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Session-Role", "value": "resident" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"water tap is leaking in kitchen plumber issue\"\n}" },
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/query", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "query"] }
+          }
+        },
+        {
+          "name": "07. Intent: Pet Policy & Walking Rules",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Intent matches rules', () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.category).to.eql('rules');",
+                  "    pm.expect(d.reply_text).to.include('Pet Policy');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Session-Role", "value": "resident" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"dog walking rules pet policy\"\n}" },
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/query", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "query"] }
+          }
+        },
+        {
+          "name": "08. Intent: Renovation & Drilling Policy",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Intent matches rules', () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.category).to.eql('rules');",
+                  "    pm.expect(d.reply_text).to.include('Renovation');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Session-Role", "value": "resident" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"carpentry drilling renovation hours\"\n}" },
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/query", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "query"] }
+          }
+        },
+        {
+          "name": "09. Intent: Housekeeping & Waste Segregation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Intent matches housekeeping', () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.category).to.eql('housekeeping');",
+                  "    pm.expect(d.reply_text).to.include('Segregation');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Session-Role", "value": "resident" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"doorstep garbage waste collection schedule\"\n}" },
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/query", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "query"] }
+          }
+        },
+        {
+          "name": "10. Intent: Amenities & Timings",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Intent matches amenities', () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.category).to.eql('amenities');",
+                  "    pm.expect(d.reply_text).to.include('Swimming Pool');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Session-Role", "value": "resident" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"What are the swimming pool and gym timings?\"\n}" },
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/query", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "query"] }
+          }
+        },
+        {
+          "name": "11. Intent: Emergency Security Contacts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Intent matches emergency', () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.category).to.eql('emergency');",
+                  "    pm.expect(d.reply_text).to.include('112');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Session-Role", "value": "resident" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"security emergency phone number\"\n}" },
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/query", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "query"] }
+          }
+        },
+        {
+          "name": "12. Intent: Domestic Staff Attendance",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Intent matches domestic_staff', () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.category).to.eql('domestic_staff');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Session-Role", "value": "resident" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"is my maid cook inside society today attendance\"\n}" },
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/query", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "query"] }
+          }
+        },
+        {
+          "name": "13. Intent: Move-In / Relocation NOC",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Intent matches rules', () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.category).to.eql('rules');",
+                  "    pm.expect(d.reply_text).to.include('Move-In');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Session-Role", "value": "resident" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"what is move-in shifting policy and NOC\"\n}" },
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/query", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "query"] }
+          }
+        },
+        {
+          "name": "14. Intent: Utilities & Internet Fiber",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Intent matches utilities', () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.category).to.eql('utilities');",
+                  "    pm.expect(d.reply_text).to.include('Fiber');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Session-Role", "value": "resident" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"which fiber broadband internet and gas providers\"\n}" },
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/query", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "query"] }
+          }
+        },
+        {
+          "name": "15. Intent: Community Circulars & Notices",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Intent matches communication', () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.category).to.eql('communication');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Session-Role", "value": "resident" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"show recent community circulars and notices\"\n}" },
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/query", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "query"] }
+          }
+        },
+        {
+          "name": "16. Intent: Fallback & General Help",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Intent matches general fallback', () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.category).to.eql('general');",
+                  "    pm.expect(d.reply_text).to.include('assist you with');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Session-Role", "value": "resident" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"completely unknown random text 1234567\"\n}" },
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/query", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "query"] }
+          }
+        },
+        {
+          "name": "17. Intent: Profile & Unit Details",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Intent matches profile', () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.category).to.eql('profile');",
+                  "    pm.expect(d.reply_text).to.include('Profile Details');",
+                  "    pm.expect(d.actions.length).to.be.at.least(1);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Session-Role", "value": "resident" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"get my profile details\"\n}" },
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/query", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "query"] }
+          }
+        },
+        {
+          "name": "18. Intent: Capabilities & Features",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Intent matches capabilities', () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.category).to.eql('capabilities');",
+                  "    pm.expect(d.reply_text).to.include('everything I can do for you');",
+                  "    pm.expect(d.actions.length).to.be.at.least(1);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Session-Role", "value": "resident" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"tell me what i get from u\"\n}" },
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/query", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "query"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "04. Role Isolation & Multi-Persona Verification",
+      "item": [
+        {
+          "name": "Security Persona: Greeting & Gate Actions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Security greeting received', () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.reply_text).to.include('Officer');",
+                  "    pm.expect(d.actions.some(a => a.url === '/gate/live')).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Session-Role", "value": "security_supervisor" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"hello\"\n}" },
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/query", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "query"] }
+          }
+        },
+        {
+          "name": "Admin Persona: Greeting & Management Actions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Admin greeting received', () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.reply_text).to.include('Community Admin');",
+                  "    pm.expect(d.actions.some(a => a.url === '/dashboard')).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Session-Role", "value": "community_admin" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"hello\"\n}" },
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/query", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "query"] }
+          }
+        },
+        {
+          "name": "Security Persona: Quick Action Chips",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns gate security chips', () => {",
+                  "    const chips = pm.response.json().data.chips;",
+                  "    pm.expect(chips.some(c => c.id === 'gate')).to.be.true;",
+                  "    pm.expect(chips.some(c => c.id === 'panic')).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Session-Role", "value": "security_supervisor" }],
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/quick-actions", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "quick-actions"] }
+          }
+        },
+        {
+          "name": "Admin Persona: Quick Action Chips",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns admin management chips', () => {",
+                  "    const chips = pm.response.json().data.chips;",
+                  "    pm.expect(chips.some(c => c.id === 'tickets')).to.be.true;",
+                  "    pm.expect(chips.some(c => c.id === 'financial')).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Session-Role", "value": "community_admin" }],
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/quick-actions", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "quick-actions"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "05. Input Validation & Negative Testing",
+      "item": [
+        {
+          "name": "Negative: Empty Query String (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 422 Unprocessable Entity', () => pm.response.to.have.status(422));",
+                  "pm.test('Error code is VALIDATION_ERROR', () => {",
+                  "    const err = pm.response.json().error;",
+                  "    pm.expect(err.code).to.eql('VALIDATION_ERROR');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Session-Role", "value": "resident" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"\"\n}" },
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/query", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "query"] }
+          }
+        },
+        {
+          "name": "Negative: Whitespace-Only Query (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 422 Unprocessable Entity', () => pm.response.to.have.status(422));",
+                  "pm.test('Whitespace stripped and rejected', () => {",
+                  "    const err = pm.response.json().error;",
+                  "    pm.expect(err.code).to.eql('VALIDATION_ERROR');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Session-Role", "value": "resident" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"     \"\n}" },
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/query", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "query"] }
+          }
+        },
+        {
+          "name": "Negative: Null Query (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 422 Unprocessable Entity', () => pm.response.to.have.status(422));",
+                  "pm.test('Null rejected by Pydantic', () => {",
+                  "    const err = pm.response.json().error;",
+                  "    pm.expect(err.code).to.eql('VALIDATION_ERROR');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Session-Role", "value": "resident" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": null\n}" },
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/query", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "query"] }
+          }
+        },
+        {
+          "name": "Negative: Missing Query Field (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 422 Unprocessable Entity', () => pm.response.to.have.status(422));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Session-Role", "value": "resident" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"community_id\": null\n}" },
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/query", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "query"] }
+          }
+        },
+        {
+          "name": "Negative: Extra Forbidden Fields [extra='forbid'] (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 422 Unprocessable Entity', () => pm.response.to.have.status(422));",
+                  "pm.test('Extra fields forbidden', () => {",
+                  "    const err = pm.response.json().error;",
+                  "    pm.expect(err.code).to.eql('VALIDATION_ERROR');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Session-Role", "value": "resident" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"hello\",\n  \"unauthorized_injected_field\": \"exploit\"\n}" },
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/query", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "query"] }
+          }
+        },
+        {
+          "name": "Negative: Malformed JSON Syntax (422/400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Malformed JSON rejected with 422/400', () => {",
+                  "    pm.expect([400, 422]).to.include(pm.response.code);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Session-Role", "value": "resident" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"broken json payload without closing brace" },
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/query", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "query"] }
+          }
+        },
+        {
+          "name": "Negative: Invalid Community UUID Format (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 422 Unprocessable Entity', () => pm.response.to.have.status(422));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Session-Role", "value": "resident" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"hello\",\n  \"community_id\": \"not-a-valid-uuid-format\"\n}" },
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/query", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "query"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "06. Authorization & CSRF Security Testing",
+      "item": [
+        {
+          "name": "Security: Missing CSRF Header on POST (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 403 Forbidden', () => pm.response.to.have.status(403));",
+                  "pm.test('Code is CSRF_INVALID', () => {",
+                  "    pm.expect(pm.response.json().error.code).to.eql('CSRF_INVALID');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Session-Role", "value": "resident" },
+              { "key": "X-CSRF-Token", "value": "" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"hello\"\n}" },
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/query", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "query"] }
+          }
+        },
+        {
+          "name": "Security: Tampered / Forged CSRF Header (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 403 Forbidden', () => pm.response.to.have.status(403));",
+                  "pm.test('Code is CSRF_INVALID', () => {",
+                  "    pm.expect(pm.response.json().error.code).to.eql('CSRF_INVALID');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Session-Role", "value": "resident" },
+              { "key": "X-CSRF-Token", "value": "forged_malicious_csrf_token_xyz" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"hello\"\n}" },
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/query", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "query"] }
+          }
+        },
+        {
+          "name": "Security: Cross-Tenant Isolation (404, never 403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Cross-tenant isolation returns 404 (AGENTS.md §3)', () => {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Session-Role", "value": "resident" }],
+            "url": {
+              "raw": "{{baseUrl}}/dashboards/overview?community_id=00000000-0000-0000-0000-000000000000",
+              "host": ["{{baseUrl}}"],
+              "path": ["dashboards", "overview"],
+              "query": [{ "key": "community_id", "value": "00000000-0000-0000-0000-000000000000" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "07. Performance & SLA Benchmarks (NFR-PERF-01)",
+      "item": [
+        {
+          "name": "SLA Benchmark: Health Check (< 200ms)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Response time is under 200ms', () => {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(200);",
+                  "});",
+                  "pm.test('X-Request-ID header present for distributed tracing', () => {",
+                  "    pm.expect(pm.response.headers.get('X-Request-ID')).to.exist;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/dashboards/health", "host": ["{{baseUrl}}"], "path": ["dashboards", "health"] }
+          }
+        },
+        {
+          "name": "SLA Benchmark: Security Posture (< 500ms)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Gate endpoint response time is under 500ms (NFR-PERF-01)', () => {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(500);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Session-Role", "value": "security_supervisor" }],
+            "url": { "raw": "{{baseUrl}}/dashboards/security", "host": ["{{baseUrl}}"], "path": ["dashboards", "security"] }
+          }
+        },
+        {
+          "name": "SLA Benchmark: Chatbot Query (< 600ms)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Assistant query latency is under 600ms', () => {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(600);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Session-Role", "value": "resident" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"What are my maintenance dues?\"\n}" },
+            "url": { "raw": "{{baseUrl}}/dashboards/assistant/query", "host": ["{{baseUrl}}"], "path": ["dashboards", "assistant", "query"] }
+          }
+        }
+      ]
+    }
+  ]
+}
