@@ -20,11 +20,49 @@ export function useCommunities(params?: { active?: boolean }) {
   });
 }
 
-export function useCommunity(id: string) {
+export function useCommunity(id?: string) {
   return useQuery({
-    queryKey: communityKeys.detail(id),
-    queryFn: () => communitiesApi.get(id),
+    queryKey: communityKeys.detail(id || ""),
+    queryFn: () => (id ? communitiesApi.get(id) : null),
     enabled: Boolean(id),
+    staleTime: 60_000,
+  });
+}
+
+export const useCommunityDetails = useCommunity;
+
+export function useTowers(communityId?: string) {
+  return useQuery({
+    queryKey: ["towers", communityId],
+    queryFn: () => (communityId ? communitiesApi.towers(communityId) : []),
+    enabled: Boolean(communityId),
+    staleTime: 60_000,
+  });
+}
+
+export function useFloors(towerId?: string) {
+  return useQuery({
+    queryKey: ["floors", towerId],
+    queryFn: () => (towerId ? communitiesApi.floors(towerId) : []),
+    enabled: Boolean(towerId),
+    staleTime: 60_000,
+  });
+}
+
+export function useUnits(floorId?: string) {
+  return useQuery({
+    queryKey: ["units", floorId],
+    queryFn: () => (floorId ? communitiesApi.units(floorId) : []),
+    enabled: Boolean(floorId),
+    staleTime: 60_000,
+  });
+}
+
+export function useGates(communityId?: string) {
+  return useQuery({
+    queryKey: ["gates", communityId],
+    queryFn: () => (communityId ? communitiesApi.gates(communityId) : []),
+    enabled: Boolean(communityId),
     staleTime: 60_000,
   });
 }
@@ -59,6 +97,55 @@ export function useDeleteCommunity() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: communityKeys.all });
       qc.invalidateQueries({ queryKey: ["dashboards"] });
+    },
+  });
+}
+
+export function useCreateTower() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ communityId, data }: { communityId: string; data: { name: string; code: string; structure_type?: string; total_floors?: number } }) =>
+      communitiesApi.createTower(communityId, data),
+    onSuccess: (_, { communityId }) => {
+      qc.invalidateQueries({ queryKey: ["towers", communityId] });
+      qc.invalidateQueries({ queryKey: ["dashboards"] });
+      qc.invalidateQueries({ queryKey: communityKeys.all });
+    },
+  });
+}
+
+export function useCreateFloor() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { tower_id: string; floor_number: number; label?: string }) =>
+      communitiesApi.createFloor(data),
+    onSuccess: (_, { tower_id }) => {
+      qc.invalidateQueries({ queryKey: ["floors", tower_id] });
+      qc.invalidateQueries({ queryKey: ["towers"] });
+    },
+  });
+}
+
+export function useCreateUnit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { floor_id: string; unit_number: string; unit_type?: string; bedrooms?: number; area_sqft?: number }) =>
+      communitiesApi.createUnit(data),
+    onSuccess: (_, { floor_id }) => {
+      qc.invalidateQueries({ queryKey: ["units", floor_id] });
+      qc.invalidateQueries({ queryKey: ["floors"] });
+      qc.invalidateQueries({ queryKey: ["dashboards"] });
+    },
+  });
+}
+
+export function useCreateGate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ communityId, data }: { communityId: string; data: { name: string; code: string; gate_type: string } }) =>
+      communitiesApi.createGate(communityId, data),
+    onSuccess: (_, { communityId }) => {
+      qc.invalidateQueries({ queryKey: ["gates", communityId] });
     },
   });
 }

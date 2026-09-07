@@ -34,6 +34,42 @@ export interface Payment {
   amount: string;
   payment_method: string;
   payment_reference: string;
-  status: "success" | "pending" | "failed";
+  receipt_number?: string | null;
+  payment_status: "success" | "pending" | "failed" | "refunded";
+  status: string;
   paid_at: string;
+  refunded_at?: string | null;
+}
+
+export interface ChargeHead {
+  id: string;
+  community_id: string;
+  name: string;
+  code: string;
+  description?: string | null;
+  charge_type: "fixed" | "per_sqft" | "utility" | "ad_hoc";
+  default_amount: string;
+  is_active: boolean;
+}
+
+export interface BillingRule {
+  id: string;
+  community_id: string;
+  billing_frequency: "monthly" | "quarterly" | "annual";
+  due_days: number;
+  grace_period_days: number;
+  late_fee_type: "fixed" | "percentage";
+  late_fee_amount: string;
+}
+
+export interface UnitLedgerEntry {
+  id: string;
+  created_at: string;
+  unit_id: string;
+  entry_type: "debit" | "credit";
+  amount: string;
+  balance_after: string;
+  reference_type: "invoice" | "payment" | "adjustment" | "refund";
+  reference_id: string;
+  description: string;
 }

@@ -29,9 +29,18 @@ export function useLogin() {
     mutationFn: ({ email, password }: { email: string; password: string }) =>
       authApi.login(email, password),
     onSuccess: (user) => {
-      // Identity changed — drop every cached query before seeding the new user.
-      clearQueryCache(qc);
+      if (typeof window !== "undefined" && user?.active_role) {
+        localStorage.setItem("gatesphere_active_role", user.active_role);
+      }
+      // Seed the auth cache FIRST so navigating components see the user immediately.
+      // Then clear all other stale data from any previous session so cross-tenant
+      // data can never leak (AGENTS.md §5.3).
       qc.setQueryData(authKeys.me, user);
+      // Remove all queries except the auth/me key we just set
+      qc.removeQueries({
+        predicate: (query) =>
+          JSON.stringify(query.queryKey) !== JSON.stringify(authKeys.me),
+      });
     },
   });
 }
@@ -41,6 +50,9 @@ export function useLogout() {
   return useMutation({
     mutationFn: () => authApi.logout(),
     onSettled: () => {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("gatesphere_active_role");
+      }
       clearQueryCache(qc);
       qc.setQueryData(authKeys.me, null);
     },
