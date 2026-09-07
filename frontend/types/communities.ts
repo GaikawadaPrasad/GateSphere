@@ -53,3 +53,24 @@ export interface Gate {
   is_active: boolean;
   created_at: string;
 }
+
+export interface TowerCreate {
+  name: string;
+  code: string;
+  structure_type?: string;
+  total_floors?: number;
+}
+
+export interface FloorCreate {
+  tower_id: string;
+  floor_number: number;
+  label?: string;
+}
+
+export interface UnitCreate {
+  floor_id: string;
+  unit_number: string;
+  unit_type?: string;
+  bedrooms?: number;
+  area_sqft?: number;
+}

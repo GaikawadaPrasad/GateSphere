@@ -51,3 +51,13 @@ export function KpiCardSkeleton() {
     </div>
   );
 }
+
+export function MetricsSkeleton({ count = 4 }: { count?: number }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(220px, 1fr))`, gap: "1rem" }}>
+      {Array.from({ length: count }).map((_, i) => (
+        <KpiCardSkeleton key={i} />
+      ))}
+    </div>
+  );
+}

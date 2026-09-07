@@ -3,22 +3,24 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useUiStore } from "@/store/ui";
+import { useMyNotifications } from "@/hooks/use-notifications";
 
 const navItems = [
-  { label: "Dashboard", href: "/super-admin/dashboard", icon: "📊" },
-  { label: "Communities", href: "/super-admin/communities", icon: "🏢" },
-  { label: "Residents", href: "/super-admin/residents", icon: "👥" },
-  { label: "Gate Traffic", href: "/super-admin/gate-traffic", icon: "🛡️" },
-  { label: "Complaints", href: "/super-admin/complaints", icon: "🎫" },
-  { label: "Billing & Finance", href: "/super-admin/billing", icon: "💳" },
-  { label: "Reports & Analytics", href: "/super-admin/reports", icon: "📈" },
-  { label: "Audit Logs", href: "/super-admin/audit-logs", icon: "📋" },
-  { label: "System Settings", href: "/super-admin/settings", icon: "⚙️" },
+  { label: "Dashboard", href: "/community-admin/dashboard", icon: "📊" },
+  { label: "Property", href: "/community-admin/property", icon: "🏢" },
+  { label: "Residents", href: "/community-admin/residents", icon: "👥" },
+  { label: "Staff", href: "/community-admin/staff", icon: "🛠️" },
+  { label: "Communication", href: "/community-admin/communication", icon: "📢" },
+  { label: "Billing & Finance", href: "/community-admin/billing", icon: "💳" },
+  { label: "Incidents", href: "/community-admin/incidents", icon: "🚨" },
+  { label: "Notifications", href: "/community-admin/notifications", icon: "🔔", badgeKey: "notifications" },
 ];
 
-export function Sidebar() {
+export function CommunityAdminSidebar() {
   const pathname = usePathname();
   const { sidebarOpen, toggleSidebar } = useUiStore();
+  const { data: notifications } = useMyNotifications({ unread_only: true });
+  const unreadCount = notifications?.length || 0;
 
   const handleLinkClick = () => {
     // On small screens, close sidebar after clicking a nav link
@@ -72,7 +74,7 @@ export function Sidebar() {
                   width: 32,
                   height: 32,
                   borderRadius: "var(--radius-sm)",
-                  background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+                  background: "linear-gradient(135deg, #2563eb, #10b981)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -87,8 +89,8 @@ export function Sidebar() {
                 <div style={{ fontWeight: 700, fontSize: "0.95rem", color: "var(--sidebar-fg)", letterSpacing: "-0.01em" }}>
                   GateSphere
                 </div>
-                <div style={{ fontSize: "0.65rem", color: "#60a5fa", fontWeight: 600, textTransform: "uppercase" }}>
-                  Super Admin
+                <div style={{ fontSize: "0.65rem", color: "#10b981", fontWeight: 600, textTransform: "uppercase" }}>
+                  Community Admin
                 </div>
               </div>
             </div>
@@ -98,7 +100,7 @@ export function Sidebar() {
                 width: 32,
                 height: 32,
                 borderRadius: "var(--radius-sm)",
-                background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+                background: "linear-gradient(135deg, #2563eb, #10b981)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -133,7 +135,7 @@ export function Sidebar() {
         <nav style={{ padding: "1rem 0.5rem", flex: 1, overflowY: "auto" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
             {navItems.map((item) => {
-              const isActive = pathname === item.href || (item.href !== "/super-admin/dashboard" && pathname.startsWith(item.href));
+              const isActive = pathname === item.href || (item.href !== "/community-admin/dashboard" && pathname.startsWith(item.href));
               return (
                 <Link
                   key={item.href}
@@ -144,7 +146,7 @@ export function Sidebar() {
                     alignItems: "center",
                     gap: "0.75rem",
                     padding: sidebarOpen ? "0.65rem 0.85rem" : "0.65rem",
-                    justifyContent: sidebarOpen ? "flex-start" : "center",
+                    justifyContent: sidebarOpen ? "space-between" : "center",
                     borderRadius: "var(--radius-sm)",
                     color: isActive ? "#ffffff" : "var(--sidebar-muted)",
                     background: isActive ? "var(--sidebar-active)" : "transparent",
@@ -153,11 +155,32 @@ export function Sidebar() {
                     textDecoration: "none",
                     transition: "all 0.15s ease",
                     borderLeft: isActive ? "3px solid var(--primary)" : "3px solid transparent",
+                    position: "relative",
                   }}
                   title={item.label}
                 >
-                  <span style={{ fontSize: "1.1rem" }}>{item.icon}</span>
-                  {sidebarOpen && <span>{item.label}</span>}
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                    <span style={{ fontSize: "1.1rem" }}>{item.icon}</span>
+                    {sidebarOpen && <span>{item.label}</span>}
+                  </div>
+
+                  {item.badgeKey === "notifications" && unreadCount > 0 && (
+                    <span
+                      style={{
+                        background: "#ef4444",
+                        color: "white",
+                        fontSize: "0.65rem",
+                        fontWeight: 700,
+                        padding: "0.15rem 0.4rem",
+                        borderRadius: "var(--radius-full)",
+                        minWidth: 18,
+                        textAlign: "center",
+                        display: sidebarOpen ? "inline-block" : "none",
+                      }}
+                    >
+                      {unreadCount}
+                    </span>
+                  )}
                 </Link>
               );
             })}

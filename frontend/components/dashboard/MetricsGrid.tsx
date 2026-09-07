@@ -15,9 +15,9 @@ export function MetricsGrid({ metrics, isLoading, onCardClick }: MetricsGridProp
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-          gap: "1.25rem",
-          marginBottom: "2rem",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))",
+          gap: "1rem",
+          marginBottom: "1.5rem",
         }}
       >
         {Array.from({ length: 6 }).map((_, i) => (
@@ -33,7 +33,7 @@ export function MetricsGrid({ metrics, isLoading, onCardClick }: MetricsGridProp
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+        gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))",
         gap: "1.25rem",
         marginBottom: "2rem",
       }}

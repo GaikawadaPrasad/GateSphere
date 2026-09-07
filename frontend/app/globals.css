@@ -48,6 +48,10 @@
   --radius: 10px;
   --radius-lg: 14px;
   --radius-full: 9999px;
+
+  --sidebar-width: 250px;
+  --sidebar-collapsed-width: 72px;
+  --header-height: 64px;
 }
 
 * {
@@ -58,11 +62,12 @@
 
 html,
 body {
-  height: 100%;
+  min-height: 100%;
   background: var(--bg);
   color: var(--fg);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 a {
@@ -77,6 +82,8 @@ a {
 .app-container {
   display: flex;
   min-height: 100vh;
+  position: relative;
+  width: 100%;
 }
 
 .main-content {
@@ -85,6 +92,7 @@ a {
   flex-direction: column;
   min-width: 0;
   background: var(--bg);
+  width: 100%;
 }
 
 .page-body {
@@ -92,6 +100,12 @@ a {
   max-width: 1600px;
   width: 100%;
   margin: 0 auto;
+  flex: 1;
+}
+
+/* Mobile Sidebar Backdrop */
+.sidebar-backdrop {
+  display: none;
 }
 
 /* ========================================================================= */
@@ -125,6 +139,8 @@ p {
   box-shadow: var(--shadow-sm);
   padding: 1.25rem;
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .card:hover {
@@ -136,6 +152,8 @@ p {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .card-title {
@@ -161,6 +179,8 @@ p {
   cursor: pointer;
   transition: all 0.15s ease;
   white-space: nowrap;
+  min-height: 36px;
+  touch-action: manipulation;
 }
 
 .btn-primary {
@@ -208,6 +228,7 @@ p {
   background: white;
   color: var(--fg);
   outline: none;
+  min-height: 38px;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -224,6 +245,7 @@ p {
 .table-container {
   width: 100%;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: white;
@@ -234,6 +256,7 @@ p {
   border-collapse: collapse;
   text-align: left;
   font-size: 0.875rem;
+  min-width: 600px;
 }
 
 .data-table th {
@@ -245,6 +268,7 @@ p {
   text-transform: uppercase;
   font-size: 0.75rem;
   letter-spacing: 0.05em;
+  white-space: nowrap;
 }
 
 .data-table td {
@@ -274,6 +298,7 @@ p {
   font-weight: 600;
   border-radius: var(--radius-full);
   text-transform: capitalize;
+  white-space: nowrap;
 }
 
 .badge-success {
@@ -329,4 +354,98 @@ p {
 .spin-animation {
   display: inline-block;
   animation: spin 0.8s linear infinite;
+}
+
+/* ========================================================================= */
+/* RESPONSIVE LAYOUT & MEDIA QUERIES                                         */
+/* ========================================================================= */
+
+/* Tablet & Mobile Breakpoints (< 1024px) */
+@media (max-width: 1024px) {
+  .page-body {
+    padding: 1.25rem 1.5rem;
+  }
+}
+
+/* Mobile Breakpoint (< 768px) */
+@media (max-width: 768px) {
+  .page-body {
+    padding: 1rem;
+  }
+
+  /* Fixed Mobile Sidebar Navigation Drawer */
+  .app-sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    height: 100vh !important;
+    z-index: 100 !important;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+    transform: translateX(0);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), width 0.25s ease !important;
+  }
+
+  .app-sidebar.collapsed-mobile {
+    transform: translateX(-100%) !important;
+  }
+
+  /* Backdrop Overlay for Mobile Sidebar */
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(2px);
+    z-index: 90;
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  /* Header adjustments on mobile */
+  header {
+    padding: 0 1rem !important;
+  }
+
+  .header-user-email {
+    display: none !important;
+  }
+
+  .header-scope-label {
+    display: none !important;
+  }
+
+  /* Inputs prevent iOS auto-zoom */
+  .input-field,
+  .select-field {
+    font-size: 16px;
+  }
+
+  /* Card padding on mobile */
+  .card {
+    padding: 1rem;
+  }
+
+  h1 { font-size: 1.25rem; }
+  h2 { font-size: 1.1rem; }
+}
+
+/* Extra Small Mobile (< 480px) */
+@media (max-width: 480px) {
+  .page-body {
+    padding: 0.75rem;
+  }
+
+  .card {
+    padding: 0.85rem;
+  }
+
+  .btn {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.8rem;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
