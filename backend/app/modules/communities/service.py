@@ -125,7 +125,7 @@ class CommunityService:
         if not self.scope.is_global:
             raise ForbiddenError("Only a platform admin can delete a community", code="GLOBAL_ONLY")
         obj = await self.get_community(community_id)
-        await self.db.delete(obj)
+        obj.is_active = False
         await self.db.flush()
         await self._audit("community.delete", community_id, "community", community_id)
 
