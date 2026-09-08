@@ -102,6 +102,18 @@ class FamilyMemberCreate(_Write):
     user_id: uuid.UUID | None = None
     date_of_birth: date | None = None
     phone: str | None = _Phone
+    access_enabled: bool = True
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True, populate_by_name=True)
+
+
+class FamilyMemberUpdate(_Write):
+    full_name: str | None = Field(default=None, min_length=1, max_length=180)
+    relationship_type: str | None = Field(default=None, alias="relationship")
+    user_id: uuid.UUID | None = None
+    date_of_birth: date | None = None
+    phone: str | None = _Phone
+    access_enabled: bool | None = None
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True, populate_by_name=True)
 

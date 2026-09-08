@@ -296,6 +296,7 @@ class ResidentService:
             relationship_type=payload.relationship_type,
             date_of_birth=payload.date_of_birth,
             phone=payload.phone,
+            access_enabled=payload.access_enabled,
         )
         await self.family.add(obj)
         await self._audit(
@@ -306,6 +307,45 @@ class ResidentService:
             new=payload.model_dump(by_alias=False),
         )
         return obj
+
+    async def update_family(
+        self, member_id: uuid.UUID, payload: schemas.FamilyMemberUpdate
+    ) -> FamilyMember:
+        obj = await self.family.get(member_id)
+        if obj is None:
+            raise NotFoundError("Family member not found")
+        self.scope.require(obj.community_id)
+        old = {
+            "full_name": obj.full_name,
+            "relationship": obj.relationship_type,
+            "phone": obj.phone,
+            "access_enabled": obj.access_enabled,
+        }
+        data = payload.model_dump(exclude_unset=True, by_alias=False)
+        if "relationship_type" in data and data["relationship_type"]:
+            _enum("relationship_type", data["relationship_type"])
+        for k, v in data.items():
+            setattr(obj, k, v)
+        await self.db.flush()
+        await self._audit(
+            "family.update",
+            obj.community_id,
+            "family_member",
+            obj.id,
+            old=old,
+            new=data,
+        )
+        return obj
+
+    async def delete_family(self, member_id: uuid.UUID) -> None:
+        obj = await self.family.get(member_id)
+        if obj is None:
+            raise NotFoundError("Family member not found")
+        self.scope.require(obj.community_id)
+        cid = obj.community_id
+        await self.db.delete(obj)
+        await self.db.flush()
+        await self._audit("family.delete", cid, "family_member", member_id)
 
     # -- emergency contacts ------------------------------------ #
     async def list_contacts(self, *, profile_id: uuid.UUID, offset: int, limit: int):

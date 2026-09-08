@@ -147,6 +147,35 @@ async def create_family(
     )
 
 
+@router.patch(
+    "/family-members/{member_id}",
+    response_model=Envelope[schemas.FamilyMemberRead],
+    dependencies=[UPDATE],
+)
+async def update_family(
+    member_id: uuid.UUID,
+    payload: schemas.FamilyMemberUpdate,
+    svc: ResidentService = Depends(resident_service),
+) -> dict:
+    return ok(
+        schemas.FamilyMemberRead.model_validate(await svc.update_family(member_id, payload)),
+        message="Family member updated",
+    )
+
+
+@router.delete(
+    "/family-members/{member_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    dependencies=[DELETE],
+)
+async def delete_family(
+    member_id: uuid.UUID, svc: ResidentService = Depends(resident_service)
+) -> Response:
+    await svc.delete_family(member_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 # --- emergency contacts (delete-by-id) --------------------------------- #
 @router.delete(
     "/emergency-contacts/{contact_id}",

@@ -212,56 +212,6 @@ export function Sidebar() {
           </button>
         </div>
 
-        {/* Role Quick Switcher in development */}
-        {sidebarOpen && (
-          <div style={{ padding: "0.5rem 1rem", borderBottom: "1px solid var(--sidebar-border)", background: "rgba(255,255,255,0.02)" }}>
-            <div style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--sidebar-muted)", marginBottom: "0.35rem", fontWeight: 700 }}>
-              Role Views
-            </div>
-            <div style={{ display: "flex", gap: "0.25rem", flexWrap: "wrap" }}>
-              <Link
-                href="/dashboard/auditor"
-                style={{
-                  fontSize: "11px",
-                  padding: "0.2rem 0.45rem",
-                  borderRadius: "4px",
-                  background: (pathname.startsWith("/auditor") || pathname.startsWith("/dashboard/auditor")) ? "#334155" : "transparent",
-                  color: (pathname.startsWith("/auditor") || pathname.startsWith("/dashboard/auditor")) ? "#FFFFFF" : "var(--sidebar-muted)",
-                  fontWeight: 600,
-                }}
-              >
-                Auditor
-              </Link>
-              <Link
-                href="/dashboard/domestic-staff"
-                style={{
-                  fontSize: "11px",
-                  padding: "0.2rem 0.45rem",
-                  borderRadius: "4px",
-                  background: (pathname.startsWith("/domestic-staff") || pathname.startsWith("/dashboard/domestic-staff")) ? "#0D9488" : "transparent",
-                  color: (pathname.startsWith("/domestic-staff") || pathname.startsWith("/dashboard/domestic-staff")) ? "#FFFFFF" : "var(--sidebar-muted)",
-                  fontWeight: 600,
-                }}
-              >
-                Staff
-              </Link>
-              <Link
-                href="/dashboard/owner-tenant"
-                style={{
-                  fontSize: "11px",
-                  padding: "0.2rem 0.45rem",
-                  borderRadius: "4px",
-                  background: (pathname.startsWith("/owner-tenant") || pathname.startsWith("/resident") || pathname.startsWith("/dashboard/owner-tenant")) ? "#1D4ED8" : "transparent",
-                  color: (pathname.startsWith("/owner-tenant") || pathname.startsWith("/resident") || pathname.startsWith("/dashboard/owner-tenant")) ? "#FFFFFF" : "var(--sidebar-muted)",
-                  fontWeight: 600,
-                }}
-              >
-                Resident
-              </Link>
-            </div>
-          </div>
-        )}
-
         {/* Navigation Links */}
         <nav style={{ padding: "0.75rem 0.5rem", flex: 1, overflowY: "auto" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>

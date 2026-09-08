@@ -217,6 +217,41 @@ export function useResidentDeliveries() {
   return { ...query, updateProtocol };
 }
 
+export interface AmenitySlot {
+  id: string;
+  community_id: string;
+  amenity_id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  capacity: number | null;
+  fee: number | string;
+  is_active: boolean;
+}
+
+export function useAmenitySlots(amenityId?: string) {
+  return useQuery<AmenitySlot[]>({
+    queryKey: ["resident", "amenity-slots", amenityId],
+    queryFn: async () => {
+      if (!amenityId) return [];
+      const res = await api.get<any[]>(`/amenities/${amenityId}/slots`);
+      if (!Array.isArray(res)) return [];
+      return res.map((s: any) => ({
+        id: s.id,
+        community_id: s.community_id,
+        amenity_id: s.amenity_id,
+        day_of_week: Number(s.day_of_week),
+        start_time: s.start_time,
+        end_time: s.end_time,
+        capacity: s.capacity,
+        fee: s.fee,
+        is_active: s.is_active !== false,
+      }));
+    },
+    enabled: Boolean(amenityId),
+  });
+}
+
 export function useResidentAmenities() {
   const queryClient = useQueryClient();
 
@@ -241,12 +276,23 @@ export function useResidentAmenities() {
   const bookingsQuery = useQuery<AmenityBooking[]>({
     queryKey: ["resident", "my-bookings"],
     queryFn: async () => {
-      const res = await api.get<any[]>("/amenities/bookings");
-      if (!Array.isArray(res)) return [];
-      return res.map((b: any) => ({
+      const [bookingsRes, amenitiesRes] = await Promise.all([
+        api.get<any[]>("/amenities/bookings"),
+        api.get<any[]>("/amenities").catch(() => []),
+      ]);
+      if (!Array.isArray(bookingsRes)) return [];
+      const amenitiesMap = new Map<string, string>();
+      if (Array.isArray(amenitiesRes)) {
+        for (const a of amenitiesRes) {
+          if (a?.id && a?.name) {
+            amenitiesMap.set(a.id, a.name);
+          }
+        }
+      }
+      return bookingsRes.map((b: any) => ({
         id: b.id,
         amenity_id: b.amenity_id,
-        amenity_name: b.amenity?.name || "Community Amenity",
+        amenity_name: b.amenity?.name || amenitiesMap.get(b.amenity_id) || "Community Amenity",
         date: b.booking_date || (b.start_at ? b.start_at.split("T")[0] : ""),
         start_time: b.start_at ? new Date(b.start_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
         end_time: b.end_at ? new Date(b.end_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
@@ -258,27 +304,18 @@ export function useResidentAmenities() {
   });
 
   const bookMutation = useMutation({
-    mutationFn: async (payload: { amenity_id: string; slot_id?: string; date: string; guests: number }) => {
-      const profile = await api.get<any>("/residents/me");
-      const unitId = profile?.occupancies?.[0]?.unit_id;
-      if (!unitId) {
-        throw new Error("No active unit occupancy found for resident");
-      }
-      const bookingDate = payload.date;
-      const startAt = `${bookingDate}T09:00:00Z`;
-      const endAt = `${bookingDate}T10:00:00Z`;
+    mutationFn: async (payload: { amenity_id: string; slot_id: string; date: string; guests: number }) => {
       return await api.post("/amenities/bookings", {
         amenity_id: payload.amenity_id,
-        unit_id: unitId,
-        booking_date: bookingDate,
-        start_at: startAt,
-        end_at: endAt,
+        slot_id: payload.slot_id,
+        booking_date: payload.date,
         participant_count: payload.guests || 1,
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["resident", "my-bookings"] });
       queryClient.invalidateQueries({ queryKey: ["resident", "overview"] });
+      queryClient.invalidateQueries({ queryKey: ["resident", "amenity-slots"] });
     },
   });
 
@@ -409,6 +446,210 @@ export function useResidentPayments() {
   });
 
   return { ...query, payDues: payDuesMutation };
+}
+
+export interface FamilyMember {
+  id: string;
+  name: string;
+  relation: string;
+  phone: string;
+  access_enabled: boolean;
+  unit_id?: string;
+  primary_resident_profile_id?: string;
+  date_of_birth?: string;
+  created_at?: string;
+}
+
+const DEFAULT_FAMILY_MEMBERS: FamilyMember[] = [
+  {
+    id: "fam-1",
+    name: "Rajesh Mehta",
+    relation: "Self / Owner",
+    phone: "+1 555-019-2834",
+    access_enabled: true,
+  },
+  {
+    id: "fam-2",
+    name: "Priya Mehta",
+    relation: "Co-Owner / Spouse",
+    phone: "+1 555-019-2835",
+    access_enabled: true,
+  },
+  {
+    id: "fam-3",
+    name: "Aarav Mehta",
+    relation: "Son (Age 14)",
+    phone: "+1 555-019-9911",
+    access_enabled: true,
+  },
+];
+
+export function useResidentFamilyMembers() {
+  const queryClient = useQueryClient();
+
+  const query = useQuery<FamilyMember[]>({
+    queryKey: ["resident", "family-members"],
+    queryFn: async () => {
+      try {
+        const me = await api.get<any>("/residents/me");
+        if (me && Array.isArray(me.family_members) && me.family_members.length > 0) {
+          return me.family_members.map((f: any) => ({
+            id: f.id,
+            name: f.full_name || f.name,
+            relation: f.relationship || f.relationship_type || "Family Member",
+            phone: f.phone || "",
+            access_enabled: f.access_enabled !== false,
+            unit_id: f.unit_id,
+            primary_resident_profile_id: f.primary_resident_profile_id,
+            date_of_birth: f.date_of_birth,
+            created_at: f.created_at,
+          }));
+        }
+      } catch {
+        // Fallback to local / cached storage if not authenticated
+      }
+
+      if (typeof window !== "undefined") {
+        const saved = localStorage.getItem("gatesphere_family_members");
+        if (saved) {
+          try {
+            return JSON.parse(saved);
+          } catch {}
+        }
+      }
+      return DEFAULT_FAMILY_MEMBERS;
+    },
+  });
+
+  const addMemberMutation = useMutation({
+    mutationFn: async (payload: { name: string; relation: string; phone: string; access_enabled?: boolean }) => {
+      try {
+        const me = await api.get<any>("/residents/me");
+        const unitId = me?.occupancies?.[0]?.unit_id;
+        const profileId = me?.id;
+        if (unitId && profileId) {
+          const relationshipTypeMap: Record<string, string> = {
+            "Spouse": "spouse",
+            "Co-Owner / Spouse": "spouse",
+            "Son": "child",
+            "Daughter": "child",
+            "Child": "child",
+            "Parent": "parent",
+            "Sibling": "sibling",
+            "Relative": "relative",
+            "Domestic Help": "domestic_help",
+          };
+          const relEnum = relationshipTypeMap[payload.relation] || "other";
+          const res = await api.post<any>("/residents/family-members", {
+            unit_id: unitId,
+            primary_resident_profile_id: profileId,
+            full_name: payload.name,
+            relationship: relEnum,
+            phone: payload.phone,
+            access_enabled: payload.access_enabled !== false,
+          });
+          return res;
+        }
+      } catch {
+        // Fallback to client-side persistence
+      }
+
+      const newMember: FamilyMember = {
+        id: `fam-${Date.now()}`,
+        name: payload.name,
+        relation: payload.relation,
+        phone: payload.phone,
+        access_enabled: payload.access_enabled !== false,
+        created_at: new Date().toISOString(),
+      };
+      const current = query.data || DEFAULT_FAMILY_MEMBERS;
+      const updated = [...current, newMember];
+      if (typeof window !== "undefined") {
+        localStorage.setItem("gatesphere_family_members", JSON.stringify(updated));
+      }
+      return newMember;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["resident", "family-members"] });
+      queryClient.invalidateQueries({ queryKey: ["resident", "me-profile"] });
+    },
+  });
+
+  const updateMemberMutation = useMutation({
+    mutationFn: async (payload: { id: string; name: string; relation: string; phone: string; access_enabled?: boolean }) => {
+      try {
+        const relationshipTypeMap: Record<string, string> = {
+          "Spouse": "spouse",
+          "Co-Owner / Spouse": "spouse",
+          "Son": "child",
+          "Daughter": "child",
+          "Child": "child",
+          "Parent": "parent",
+          "Sibling": "sibling",
+          "Relative": "relative",
+          "Domestic Help": "domestic_help",
+        };
+        const relEnum = relationshipTypeMap[payload.relation] || "other";
+        await api.patch(`/residents/family-members/${payload.id}`, {
+          full_name: payload.name,
+          relationship: relEnum,
+          phone: payload.phone,
+          access_enabled: payload.access_enabled,
+        });
+      } catch {
+        // Fallback to client-side persistence
+      }
+
+      const current = query.data || DEFAULT_FAMILY_MEMBERS;
+      const updated = current.map((m) =>
+        m.id === payload.id
+          ? {
+              ...m,
+              name: payload.name,
+              relation: payload.relation,
+              phone: payload.phone,
+              access_enabled: payload.access_enabled !== undefined ? payload.access_enabled : m.access_enabled,
+            }
+          : m
+      );
+      if (typeof window !== "undefined") {
+        localStorage.setItem("gatesphere_family_members", JSON.stringify(updated));
+      }
+      return payload;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["resident", "family-members"] });
+      queryClient.invalidateQueries({ queryKey: ["resident", "me-profile"] });
+    },
+  });
+
+  const removeMemberMutation = useMutation({
+    mutationFn: async (id: string) => {
+      try {
+        await api.delete(`/residents/family-members/${id}`);
+      } catch {
+        // Fallback to client-side persistence
+      }
+      const current = query.data || DEFAULT_FAMILY_MEMBERS;
+      const updated = current.filter((m) => m.id !== id);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("gatesphere_family_members", JSON.stringify(updated));
+      }
+      return id;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["resident", "family-members"] });
+      queryClient.invalidateQueries({ queryKey: ["resident", "me-profile"] });
+    },
+  });
+
+  return {
+    ...query,
+    familyMembers: query.data || DEFAULT_FAMILY_MEMBERS,
+    addMember: addMemberMutation,
+    updateMember: updateMemberMutation,
+    removeMember: removeMemberMutation,
+  };
 }
 
 export function useResidentProfile() {

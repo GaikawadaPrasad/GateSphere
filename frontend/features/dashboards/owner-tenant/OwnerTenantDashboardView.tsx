@@ -16,8 +16,12 @@ import {
   useResidentVisitors,
   useResidentDeliveries,
   useResidentAmenities,
+  useAmenitySlots,
+  AmenitySlot,
   useResidentComplaints,
   useResidentPayments,
+  useResidentFamilyMembers,
+  FamilyMember,
   useSendResidentPanic,
   VisitorRequest,
   DeliveryItem,
@@ -61,18 +65,25 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
   const [sosModalOpen, setSosModalOpen] = useState(false);
   const [visitorPassModalOpen, setVisitorPassModalOpen] = useState(false);
   const [amenityBookingModalOpen, setAmenityBookingModalOpen] = useState(false);
+  const [bookingToCancel, setBookingToCancel] = useState<AmenityBooking | null>(null);
   const [selectedAmenity, setSelectedAmenity] = useState<Amenity | null>(null);
-  const [bookingDate, setBookingDate] = useState("2026-09-05");
+  const todayDateStr = new Date().toISOString().split("T")[0];
+  const [bookingDate, setBookingDate] = useState(todayDateStr);
+  const [selectedSlotId, setSelectedSlotId] = useState<string>("");
+  const [bookingGuests, setBookingGuests] = useState<number>(1);
   const [ticketModalOpen, setTicketModalOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceItem | null>(null);
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [currentReceiptNumber, setCurrentReceiptNumber] = useState("");
   const [addMemberModalOpen, setAddMemberModalOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState<FamilyMember | null>(null);
+  const [memberToDelete, setMemberToDelete] = useState<FamilyMember | null>(null);
   const [assignStaffModalOpen, setAssignStaffModalOpen] = useState(false);
   const [newMemberName, setNewMemberName] = useState("");
-  const [newMemberRelation, setNewMemberRelation] = useState("Family Member");
+  const [newMemberRelation, setNewMemberRelation] = useState("Spouse");
   const [newMemberPhone, setNewMemberPhone] = useState("");
+  const [newMemberAccess, setNewMemberAccess] = useState(true);
 
   // Visitor Pass form state
   const [passVisitorName, setPassVisitorName] = useState("");
@@ -85,8 +96,15 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
   const [ticketDescription, setTicketDescription] = useState("");
   const [ticketPriority, setTicketPriority] = useState("medium");
 
-  // Countdown timer for live visitor approval (e.g. 120 sec)
+  // Countdown timer & dismissed state for live visitor approval
   const [visitorTimer, setVisitorTimer] = useState(78);
+  const [visitorBannerDismissed, setVisitorBannerDismissed] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && sessionStorage.getItem("gatesphere_gate_alert_dismissed") === "true") {
+      setVisitorBannerDismissed(true);
+    }
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -102,12 +120,15 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
   const amenities = useResidentAmenities();
   const complaints = useResidentComplaints();
   const payments = useResidentPayments();
+  const family = useResidentFamilyMembers();
   const panicMutation = useSendResidentPanic();
 
   const visitorList = visitors.data || [];
   const deliveryList = deliveries.data || [];
   const complaintList = complaints.data || [];
   const invoiceList = payments.data || [];
+
+  const pendingVisitor = visitorList.find((v) => v.status === "pending");
 
   // Table controls
   const visitorControls = useTableControls<VisitorRequest>({
@@ -135,7 +156,22 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
   });
 
   const handleVisitorDecision = async (requestId: string, approved: boolean) => {
-    await visitors.decide.mutateAsync({ requestId, approved });
+    try {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId);
+      if (isUuid) {
+        await visitors.decide.mutateAsync({ requestId, approved });
+      }
+      setVisitorBannerDismissed(true);
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("gatesphere_gate_alert_dismissed", "true");
+      }
+      toast.success(
+        approved ? "Visitor entry approved for Main Gate 1." : "Visitor entry request rejected.",
+        approved ? "Gate Entry Approved" : "Gate Entry Rejected"
+      );
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to record visitor decision.", "Error");
+    }
   };
 
   const handleCreatePass = async (e: React.FormEvent) => {
@@ -172,19 +208,146 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
     }
   };
 
+  const amenitySlots = useAmenitySlots(selectedAmenity?.id);
+
+  // Calculate day of week (Python 0=Mon .. 6=Sun)
+  const getDayOfWeek = (dStr: string) => {
+    if (!dStr) return 0;
+    const d = new Date(`${dStr}T12:00:00`);
+    return (d.getDay() + 6) % 7;
+  };
+
+  const currentDayOfWeek = getDayOfWeek(bookingDate);
+  const availableDaySlots = (amenitySlots.data || []).filter(
+    (s) => s.is_active && s.day_of_week === currentDayOfWeek
+  );
+
+  useEffect(() => {
+    if (availableDaySlots.length > 0) {
+      if (!availableDaySlots.some((s) => s.id === selectedSlotId)) {
+        setSelectedSlotId(availableDaySlots[0].id);
+      }
+    } else {
+      setSelectedSlotId("");
+    }
+  }, [bookingDate, amenitySlots.data, selectedSlotId]);
+
+  const activeSelectedSlot = availableDaySlots.find((s) => s.id === selectedSlotId) || availableDaySlots[0];
+  const slotTotalCapacity = activeSelectedSlot?.capacity || selectedAmenity?.capacity || 20;
+
+  const bookedParticipantCount = (amenities.bookings.data || [])
+    .filter(
+      (b) =>
+        b.amenity_id === selectedAmenity?.id &&
+        b.date === bookingDate &&
+        b.status !== "cancelled"
+    )
+    .reduce((sum, b) => sum + (b.guests_count || 1), 0);
+
+  const remainingSpots = Math.max(0, slotTotalCapacity - bookedParticipantCount);
+
+  const formatSlotTime = (t: string) => {
+    if (!t) return "";
+    const parts = t.split(":");
+    const h = parseInt(parts[0], 10);
+    const m = parts[1] || "00";
+    const ampm = h >= 12 ? "PM" : "AM";
+    const h12 = h % 12 || 12;
+    return `${h12 < 10 ? "0" : ""}${h12}:${m} ${ampm}`;
+  };
+
   const handleBookAmenity = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedAmenity) return;
+    if (!activeSelectedSlot) {
+      toast.error("Please select an available time slot for this date.", "Slot Required");
+      return;
+    }
+    if (bookingGuests > remainingSpots) {
+      toast.error(
+        `Only ${remainingSpots} spot(s) remaining for this slot. Please reduce the number of people.`,
+        "Capacity Exceeded"
+      );
+      return;
+    }
     try {
       await amenities.book.mutateAsync({
         amenity_id: selectedAmenity.id,
+        slot_id: activeSelectedSlot.id,
         date: bookingDate,
-        guests: 2,
+        guests: bookingGuests,
       });
       setAmenityBookingModalOpen(false);
-      toast.success(`Booking confirmed for ${selectedAmenity.name} on ${bookingDate}!`, "Amenity Booked");
-    } catch {
-      toast.error("Failed to confirm amenity booking.", "Error");
+      toast.success(
+        `Booking confirmed for ${selectedAmenity.name} on ${bookingDate} (${bookingGuests} person(s))!`,
+        "Amenity Booked"
+      );
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to confirm amenity booking.", "Booking Error");
+    }
+  };
+
+  const handleCancelBooking = (booking: AmenityBooking) => {
+    if (booking.status !== "confirmed") {
+      toast.info("This booking is already cancelled or completed.", "Booking Status");
+      return;
+    }
+    setBookingToCancel(booking);
+  };
+
+  const handleConfirmCancelBooking = async () => {
+    if (!bookingToCancel) return;
+    try {
+      await amenities.cancelBooking.mutateAsync(bookingToCancel.id);
+      const amenityName = bookingToCancel.amenity_name;
+      setBookingToCancel(null);
+      toast.success(`Reservation for ${amenityName} has been cancelled.`, "Booking Cancelled");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to cancel booking.", "Cancellation Error");
+    }
+  };
+
+  const handleSaveMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMemberName.trim() || !newMemberPhone.trim()) {
+      toast.error("Please enter a valid full name and mobile number.", "Validation Error");
+      return;
+    }
+    try {
+      await family.addMember.mutateAsync({
+        name: newMemberName.trim(),
+        relation: newMemberRelation,
+        phone: newMemberPhone.trim(),
+        access_enabled: newMemberAccess,
+      });
+      setAddMemberModalOpen(false);
+      const addedName = newMemberName;
+      setNewMemberName("");
+      setNewMemberPhone("");
+      setNewMemberRelation("Spouse");
+      setNewMemberAccess(true);
+      toast.success(`${addedName} has been added and pre-approved on the gate whitelist.`, "Family Member Added");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to save family member.", "Error");
+    }
+  };
+
+  const handleUpdateMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMember) return;
+    try {
+      await family.updateMember.mutateAsync({
+        id: editingMember.id,
+        name: editingMember.name,
+        relation: editingMember.relation,
+        phone: editingMember.phone,
+        access_enabled: editingMember.access_enabled,
+      });
+      const updatedName = editingMember.name;
+      setEditingMember(null);
+      toast.success(`${updatedName}'s record and gate pre-approval status updated.`, "Family Member Updated");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update family member.", "Error");
     }
   };
 
@@ -235,78 +398,77 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
         </div>
       }
     >
-      {/* REAL-TIME VISITOR APPROVAL PROMPT (Sticky Banner on Pending Visitor) */}
-      {visitorList.some((v) => v.status === "pending") && (
-        <div
-          className="gs-card card-hover"
-          style={{
-            background: "linear-gradient(135deg, #1E40AF, #1D4ED8)",
-            color: "#FFFFFF",
-            padding: "1.25rem 1.5rem",
-            marginBottom: "1.5rem",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: "1rem",
-            boxShadow: "0 8px 32px rgba(29, 78, 216, 0.35)",
-            border: "none",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-            <div
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: "50%",
-                background: "rgba(255, 255, 255, 0.2)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "1.5rem",
-              }}
-            >
-              🔔
-            </div>
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <span style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", background: "rgba(255,255,255,0.25)", padding: "0.2rem 0.6rem", borderRadius: "9999px" }}>
-                  GATE APPROVAL REQUEST
-                </span>
-                <span style={{ fontSize: "12px", color: "#93C5FD" }}>⏱️ Timeout in {visitorTimer}s</span>
-              </div>
-              <h3 style={{ fontSize: "1.25rem", fontWeight: 800, marginTop: "0.25rem", color: "white" }}>
-                Robert Langdon is at Main Gate 1 for your unit
-              </h3>
-              <p style={{ fontSize: "13px", color: "#DBEAFE" }}>
-                Purpose: Guest / Dinner · Vehicle: CA-9081 · Phone: +1 (555) 234-5678
-              </p>
-            </div>
-          </div>
-
-          <div style={{ display: "flex", gap: "0.75rem" }}>
-            <BrandButton
-              variant="outline"
-              size="sm"
-              style={{ background: "rgba(255,255,255,0.15)", color: "white", borderColor: "rgba(255,255,255,0.3)" }}
-              onClick={() => handleVisitorDecision("vis-live-1", false)}
-            >
-              ✕ Reject Entry
-            </BrandButton>
-            <BrandButton
-              size="sm"
-              style={{ background: "#FFFFFF", color: "#1D4ED8", fontWeight: 800 }}
-              onClick={() => handleVisitorDecision("vis-live-1", true)}
-            >
-              ✓ Approve Entry
-            </BrandButton>
-          </div>
-        </div>
-      )}
-
       {/* TAB 1: OVERVIEW */}
       {activeTab === "overview" && (
         <div>
+          {/* REAL-TIME VISITOR APPROVAL PROMPT (Sticky Banner on Pending Visitor or Live Gate Alert) */}
+          {!visitorBannerDismissed && (pendingVisitor || visitorTimer > 0) && (
+            <div
+              className="gs-card card-hover"
+              style={{
+                background: "linear-gradient(135deg, #1E40AF, #1D4ED8)",
+                color: "#FFFFFF",
+                padding: "1.25rem 1.5rem",
+                marginBottom: "1.5rem",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "1rem",
+                boxShadow: "0 8px 32px rgba(29, 78, 216, 0.35)",
+                border: "none",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                <div
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: "50%",
+                    background: "rgba(255, 255, 255, 0.2)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "1.5rem",
+                  }}
+                >
+                  🔔
+                </div>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <span style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", background: "rgba(255,255,255,0.25)", padding: "0.2rem 0.6rem", borderRadius: "9999px" }}>
+                      GATE APPROVAL REQUEST
+                    </span>
+                    <span style={{ fontSize: "12px", color: "#93C5FD" }}>⏱️ Timeout in {visitorTimer}s</span>
+                  </div>
+                  <h3 style={{ fontSize: "1.25rem", fontWeight: 800, marginTop: "0.25rem", color: "white" }}>
+                    {pendingVisitor ? `${pendingVisitor.visitor_name} is at Main Gate 1 for your unit` : "Robert Langdon is at Main Gate 1 for your unit"}
+                  </h3>
+                  <p style={{ fontSize: "13px", color: "#DBEAFE" }}>
+                    Purpose: {pendingVisitor?.purpose || "Guest / Dinner"} · Vehicle: {pendingVisitor?.vehicle_number || "CA-9081"} · Phone: {pendingVisitor?.phone || "+1 (555) 234-5678"}
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: "0.75rem" }}>
+                <BrandButton
+                  variant="outline"
+                  size="sm"
+                  style={{ background: "rgba(255,255,255,0.15)", color: "white", borderColor: "rgba(255,255,255,0.3)" }}
+                  onClick={() => handleVisitorDecision(pendingVisitor?.id || "sim-live-1", false)}
+                >
+                  ✕ Reject Entry
+                </BrandButton>
+                <BrandButton
+                  size="sm"
+                  style={{ background: "#FFFFFF", color: "#1D4ED8", fontWeight: 800 }}
+                  onClick={() => handleVisitorDecision(pendingVisitor?.id || "sim-live-1", true)}
+                >
+                  ✓ Approve Entry
+                </BrandButton>
+              </div>
+            </div>
+          )}
           {/* KPI Stats */}
           <div
             style={{
@@ -467,25 +629,110 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
             <div>
               <h3 className="card-h3">Family Members (Gate Pre-Approved)</h3>
-              <p style={{ color: "var(--brand-body)", fontSize: "13.5px" }}>Family members listed here bypass manual visitor approval at security gates.</p>
+              <p style={{ color: "var(--brand-body)", fontSize: "13.5px" }}>
+                Family members listed here feed the gate recognition system and automatically bypass manual guard approval upon entry.
+              </p>
             </div>
-            <BrandButton size="sm" onClick={() => setAddMemberModalOpen(true)}>
+            <BrandButton
+              size="sm"
+              onClick={() => {
+                setNewMemberName("");
+                setNewMemberPhone("");
+                setNewMemberRelation("Spouse");
+                setNewMemberAccess(true);
+                setAddMemberModalOpen(true);
+              }}
+            >
               + Add Family Member
             </BrandButton>
           </div>
 
-          <DataTable
+          <DataTable<FamilyMember>
             columns={[
-              { key: "name", header: "Member Name", sortable: true },
-              { key: "relation", header: "Relationship" },
-              { key: "phone", header: "Mobile Number" },
-              { key: "gate_access", header: "Gate Whitelist", render: () => <StatusBadge status="approved" label="✓ Pre-Approved" /> },
+              {
+                key: "name",
+                header: "Member Name",
+                sortable: true,
+                render: (m) => (
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                    <div
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: "50%",
+                        background: "linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)",
+                        color: "#fff",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "13px",
+                        fontWeight: 700,
+                      }}
+                    >
+                      {m.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 600, color: "var(--brand-heading)" }}>{m.name}</div>
+                      <div style={{ fontSize: "11.5px", color: "var(--brand-body)" }}>{m.phone}</div>
+                    </div>
+                  </div>
+                ),
+              },
+              {
+                key: "relation",
+                header: "Relationship",
+                render: (m) => (
+                  <span
+                    style={{
+                      padding: "0.2rem 0.55rem",
+                      borderRadius: "6px",
+                      background: "#F1F5F9",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      color: "#334155",
+                    }}
+                  >
+                    {m.relation}
+                  </span>
+                ),
+              },
+              {
+                key: "access_enabled",
+                header: "Gate Recognition Whitelist",
+                render: (m) =>
+                  m.access_enabled ? (
+                    <StatusBadge status="approved" label="✓ Pre-Approved (Auto-Pass)" />
+                  ) : (
+                    <StatusBadge status="rejected" label="🔒 Manual Approval Required" />
+                  ),
+              },
+              {
+                key: "actions",
+                header: "Actions",
+                render: (m) => (
+                  <div style={{ display: "flex", gap: "0.5rem" }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ padding: "0.25rem 0.6rem", fontSize: "12px" }}
+                      onClick={() => setEditingMember(m)}
+                    >
+                      ✏️ Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ padding: "0.25rem 0.6rem", fontSize: "12px", color: "#DC2626" }}
+                      onClick={() => setMemberToDelete(m)}
+                    >
+                      🗑️ Remove
+                    </button>
+                  </div>
+                ),
+              },
             ]}
-            data={[
-              { name: "Rajesh Mehta", relation: "Self / Owner", phone: "+1 555-019-2834" },
-              { name: "Priya Mehta", relation: "Co-Owner / Spouse", phone: "+1 555-019-2835" },
-              { name: "Aarav Mehta", relation: "Son (Age 14)", phone: "+1 555-019-9911" },
-            ]}
+            data={family.familyMembers}
+            isLoading={family.isLoading}
           />
         </div>
       )}
@@ -583,19 +830,38 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
                 { key: "amenity_name", header: "Facility Name" },
                 { key: "date", header: "Reserved Date" },
                 { key: "start_time", header: "Time Slot", render: (i) => `${i.start_time} – ${i.end_time}` },
+                { key: "guests_count", header: "Guests", render: (i) => `${i.guests_count || 1} Person(s)` },
                 { key: "status", header: "Status", render: (i) => <StatusBadge status={i.status} /> },
                 {
                   key: "actions",
                   header: "Action",
-                  render: (i) => (
-                    <BrandButton
-                      variant="outline"
-                      size="sm"
-                      onClick={() => amenities.cancelBooking.mutate(i.id)}
-                    >
-                      Cancel Booking
-                    </BrandButton>
-                  ),
+                  render: (i) => {
+                    if (i.status === "cancelled") {
+                      return (
+                        <span style={{ fontSize: "12px", color: "var(--brand-muted)", fontStyle: "italic" }}>
+                          Cancelled
+                        </span>
+                      );
+                    }
+                    if (i.status === "completed") {
+                      return (
+                        <span style={{ fontSize: "12px", color: "#059669", fontWeight: 600 }}>
+                          Completed
+                        </span>
+                      );
+                    }
+                    return (
+                      <BrandButton
+                        variant="outline"
+                        size="sm"
+                        style={{ borderColor: "#FECACA", color: "#DC2626" }}
+                        isLoading={amenities.cancelBooking.isPending}
+                        onClick={() => handleCancelBooking(i)}
+                      >
+                        Cancel Booking
+                      </BrandButton>
+                    );
+                  },
                 },
               ]}
               data={amenities.bookings.data || []}
@@ -914,16 +1180,7 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
         onClose={() => setAddMemberModalOpen(false)}
         title="Add Pre-Approved Family Member"
       >
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            setAddMemberModalOpen(false);
-            setNewMemberName("");
-            setNewMemberPhone("");
-            toast.success(`${newMemberName} added to gate pre-approved whitelist.`, "Family Member Added");
-          }}
-          style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
-        >
+        <form onSubmit={handleSaveMember} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
           <div>
             <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "0.35rem" }}>
               Full Name
@@ -950,6 +1207,8 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
               <option value="Daughter">Daughter</option>
               <option value="Parent">Parent</option>
               <option value="Sibling">Sibling</option>
+              <option value="Relative">Relative</option>
+              <option value="Other">Other</option>
             </select>
           </div>
           <div>
@@ -964,15 +1223,189 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
               required
             />
           </div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              background: "#F8FAFC",
+              padding: "0.75rem",
+              borderRadius: "8px",
+              border: "1px solid var(--border-standard)",
+            }}
+          >
+            <div>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)" }}>
+                ⚡ Automated Gate Whitelist
+              </div>
+              <div style={{ fontSize: "12px", color: "var(--brand-body)" }}>
+                Pre-approves entry so family members bypass security guard approvals.
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={newMemberAccess}
+              onChange={(e) => setNewMemberAccess(e.target.checked)}
+              style={{ width: "18px", height: "18px", cursor: "pointer", accentColor: "var(--brand-primary)" }}
+            />
+          </div>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "1rem" }}>
             <BrandButton type="button" variant="outline" onClick={() => setAddMemberModalOpen(false)}>
               Cancel
             </BrandButton>
-            <BrandButton type="submit">
+            <BrandButton type="submit" isLoading={family.addMember.isPending}>
               Save Member
             </BrandButton>
           </div>
         </form>
+      </Modal>
+
+      {/* Edit Family Member Modal */}
+      <Modal
+        isOpen={Boolean(editingMember)}
+        onClose={() => setEditingMember(null)}
+        title="Edit Pre-Approved Family Member"
+      >
+        {editingMember && (
+          <form onSubmit={handleUpdateMember} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <div>
+              <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "0.35rem" }}>
+                Full Name
+              </label>
+              <input
+                className="input-field"
+                value={editingMember.name}
+                onChange={(e) => setEditingMember({ ...editingMember, name: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "0.35rem" }}>
+                Relationship
+              </label>
+              <select
+                className="select-field"
+                value={editingMember.relation}
+                onChange={(e) => setEditingMember({ ...editingMember, relation: e.target.value })}
+              >
+                <option value="Self / Owner">Self / Owner</option>
+                <option value="Spouse">Spouse / Co-Owner</option>
+                <option value="Son">Son</option>
+                <option value="Daughter">Daughter</option>
+                <option value="Parent">Parent</option>
+                <option value="Sibling">Sibling</option>
+                <option value="Relative">Relative</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "0.35rem" }}>
+                Mobile Phone
+              </label>
+              <input
+                className="input-field"
+                value={editingMember.phone}
+                onChange={(e) => setEditingMember({ ...editingMember, phone: e.target.value })}
+                required
+              />
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                background: "#F8FAFC",
+                padding: "0.75rem",
+                borderRadius: "8px",
+                border: "1px solid var(--border-standard)",
+              }}
+            >
+              <div>
+                <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)" }}>
+                  ⚡ Automated Gate Whitelist
+                </div>
+                <div style={{ fontSize: "12px", color: "var(--brand-body)" }}>
+                  Pre-approves entry so family members bypass security guard approvals.
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={editingMember.access_enabled}
+                onChange={(e) => setEditingMember({ ...editingMember, access_enabled: e.target.checked })}
+                style={{ width: "18px", height: "18px", cursor: "pointer", accentColor: "var(--brand-primary)" }}
+              />
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "1rem" }}>
+              <BrandButton type="button" variant="outline" onClick={() => setEditingMember(null)}>
+                Cancel
+              </BrandButton>
+              <BrandButton type="submit" isLoading={family.updateMember.isPending}>
+                Save Changes
+              </BrandButton>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* Remove Family Member Confirmation Modal */}
+      <Modal
+        isOpen={Boolean(memberToDelete)}
+        onClose={() => setMemberToDelete(null)}
+        title="Remove Family Member"
+        size="sm"
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem", padding: "0.25rem 0" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "0.75rem",
+              background: "#FEF2F2",
+              border: "1px solid #FCA5A5",
+              borderRadius: "8px",
+              padding: "0.85rem",
+            }}
+          >
+            <span style={{ fontSize: "1.25rem", lineHeight: 1 }}>⚠️</span>
+            <div>
+              <p style={{ fontSize: "14px", fontWeight: 700, color: "#991B1B", margin: 0 }}>
+                Remove {memberToDelete?.name}?
+              </p>
+              <p style={{ fontSize: "13px", color: "#7F1D1D", margin: "0.35rem 0 0 0", lineHeight: 1.4 }}>
+                Are you sure you want to remove <strong>{memberToDelete?.name}</strong> ({memberToDelete?.relation})?
+              </p>
+            </div>
+          </div>
+          <p style={{ fontSize: "13px", color: "var(--brand-body)", margin: 0, lineHeight: 1.4 }}>
+            Removing this record will immediately revoke automated gate recognition and pre-approval. Future arrivals will require manual resident or guard approval.
+          </p>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
+            <BrandButton
+              variant="outline"
+              onClick={() => setMemberToDelete(null)}
+              disabled={family.removeMember.isPending}
+            >
+              Keep Member
+            </BrandButton>
+            <BrandButton
+              variant="danger"
+              isLoading={family.removeMember.isPending}
+              onClick={async () => {
+                if (!memberToDelete) return;
+                try {
+                  await family.removeMember.mutateAsync(memberToDelete.id);
+                  const removedName = memberToDelete.name;
+                  setMemberToDelete(null);
+                  toast.success(`${removedName} has been removed from the gate whitelist.`, "Family Member Removed");
+                } catch (err: any) {
+                  toast.error(err?.message || "Failed to remove family member.", "Error");
+                }
+              }}
+            >
+              Confirm Removal
+            </BrandButton>
+          </div>
+        </div>
       </Modal>
 
       {/* Assign Staff Modal */}
@@ -1086,42 +1519,263 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
         </form>
       </Modal>
 
-      {/* Amenity Booking Modal */}
+      {/* Amenity Booking Modal with Live Slot Capacity & Guest Tracker */}
       <Modal
         isOpen={amenityBookingModalOpen}
         onClose={() => setAmenityBookingModalOpen(false)}
-        title={`Book ${selectedAmenity?.name ?? "Amenity"}`}
+        title={`Reserve ${selectedAmenity?.name ?? "Amenity"}`}
       >
-        <form onSubmit={handleBookAmenity} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+        <form onSubmit={handleBookAmenity} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+          {/* Amenity Summary Header */}
+          {selectedAmenity && (
+            <div style={{ padding: "0.85rem 1rem", background: "#F1F5F9", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <strong style={{ fontSize: "14px", color: "var(--brand-heading)" }}>{selectedAmenity.name}</strong>
+                <div style={{ fontSize: "12px", color: "var(--brand-body)", marginTop: "0.15rem" }}>
+                  Max Total Capacity: {selectedAmenity.capacity} persons
+                </div>
+              </div>
+              <span className="badge" style={{ background: "#DBEAFE", color: "#1E40AF", fontWeight: 700 }}>
+                {selectedAmenity.price_per_hour > 0 ? `$${selectedAmenity.price_per_hour}/hr` : "Free Access"}
+              </span>
+            </div>
+          )}
+
+          {/* Reservation Date */}
           <div>
-            <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "0.35rem" }}>
-              Reservation Date
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, marginBottom: "0.35rem", color: "var(--brand-heading)" }}>
+              📅 Reservation Date
             </label>
             <input
               type="date"
               className="input-field"
+              min={todayDateStr}
               value={bookingDate}
-              onChange={(e) => setBookingDate(e.target.value)}
+              onChange={(e) => {
+                setBookingDate(e.target.value);
+                setBookingGuests(1);
+              }}
               required
             />
           </div>
+
+          {/* Live Available Time Slots Tracker */}
           <div>
-            <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "0.35rem" }}>
-              Time Slot
-            </label>
-            <select className="select-field">
-              <option>06:00 AM – 08:00 AM (Morning Slot)</option>
-              <option>09:00 AM – 11:00 AM</option>
-              <option>04:00 PM – 06:00 PM (Evening Slot)</option>
-              <option>07:00 PM – 09:00 PM (Prime Slot)</option>
-            </select>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.45rem" }}>
+              <label style={{ fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)" }}>
+                ⏰ Available Time Slots &amp; Capacity
+              </label>
+              <span style={{ fontSize: "11.5px", color: "var(--brand-muted)" }}>
+                {availableDaySlots.length} slot(s) available
+              </span>
+            </div>
+
+            {amenitySlots.isLoading ? (
+              <div style={{ padding: "1rem", textAlign: "center", fontSize: "13px", color: "var(--brand-muted)" }}>
+                Loading available time slots…
+              </div>
+            ) : availableDaySlots.length === 0 ? (
+              <div style={{ padding: "0.85rem", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: "8px", fontSize: "13px", color: "#991B1B" }}>
+                ⚠️ No time slots configured for {new Date(`${bookingDate}T12:00:00`).toLocaleDateString(undefined, { weekday: "long" })}. Please select another date.
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                {availableDaySlots.map((s) => {
+                  const isSelected = activeSelectedSlot?.id === s.id;
+                  const slotCap = s.capacity || selectedAmenity?.capacity || 20;
+                  const bookedForThisSlot = (amenities.bookings.data || [])
+                    .filter(
+                      (b) =>
+                        b.amenity_id === selectedAmenity?.id &&
+                        b.date === bookingDate &&
+                        b.status !== "cancelled"
+                    )
+                    .reduce((sum, b) => sum + (b.guests_count || 1), 0);
+                  const spotsLeft = Math.max(0, slotCap - bookedForThisSlot);
+                  const isFull = spotsLeft <= 0;
+
+                  return (
+                    <div
+                      key={s.id}
+                      onClick={() => {
+                        if (!isFull) {
+                          setSelectedSlotId(s.id);
+                          if (bookingGuests > spotsLeft) {
+                            setBookingGuests(Math.max(1, spotsLeft));
+                          }
+                        }
+                      }}
+                      style={{
+                        padding: "0.75rem 1rem",
+                        borderRadius: "8px",
+                        border: isSelected ? "2px solid #2563EB" : "1px solid var(--border-standard)",
+                        background: isSelected ? "#EFF6FF" : isFull ? "#F8FAFC" : "#FFFFFF",
+                        cursor: isFull ? "not-allowed" : "pointer",
+                        opacity: isFull ? 0.65 : 1,
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                        <input
+                          type="radio"
+                          name="amenity_slot"
+                          checked={isSelected}
+                          disabled={isFull}
+                          onChange={() => setSelectedSlotId(s.id)}
+                        />
+                        <div>
+                          <strong style={{ fontSize: "13.5px", color: isFull ? "var(--brand-muted)" : "var(--brand-heading)" }}>
+                            {formatSlotTime(s.start_time)} – {formatSlotTime(s.end_time)}
+                          </strong>
+                          {s.fee && Number(s.fee) > 0 && (
+                            <span style={{ fontSize: "12px", color: "#2563EB", marginLeft: "0.5rem" }}>
+                              (${s.fee})
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        {isFull ? (
+                          <span style={{ fontSize: "11.5px", fontWeight: 700, padding: "0.2rem 0.5rem", borderRadius: "9999px", background: "#FEE2E2", color: "#991B1B" }}>
+                            🔴 Slot Full (0 Left)
+                          </span>
+                        ) : spotsLeft <= 5 ? (
+                          <span style={{ fontSize: "11.5px", fontWeight: 700, padding: "0.2rem 0.5rem", borderRadius: "9999px", background: "#FEF3C7", color: "#92400E" }}>
+                            🟠 {spotsLeft} of {slotCap} spots left
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: "11.5px", fontWeight: 700, padding: "0.2rem 0.5rem", borderRadius: "9999px", background: "#ECFDF5", color: "#065F46" }}>
+                            🟢 {spotsLeft} of {slotCap} spots left
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "1rem" }}>
+
+          {/* Number of People / Guests to Add */}
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+              <label style={{ fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)" }}>
+                👥 Number of People / Guests
+              </label>
+              <span style={{ fontSize: "12px", color: "#2563EB", fontWeight: 600 }}>
+                Max allowed: {remainingSpots} spot(s)
+              </span>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ width: 38, height: 38, padding: 0, fontSize: "1.2rem", fontWeight: 700 }}
+                onClick={() => setBookingGuests((prev) => Math.max(1, prev - 1))}
+                disabled={bookingGuests <= 1}
+              >
+                –
+              </button>
+              <input
+                type="number"
+                className="input-field"
+                style={{ textAlign: "center", fontWeight: 700, fontSize: "15px", maxWidth: 100 }}
+                min={1}
+                max={Math.max(1, remainingSpots)}
+                value={bookingGuests}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  if (!isNaN(val)) {
+                    setBookingGuests(Math.max(1, Math.min(val, Math.max(1, remainingSpots))));
+                  }
+                }}
+                required
+              />
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ width: 38, height: 38, padding: 0, fontSize: "1.2rem", fontWeight: 700 }}
+                onClick={() => setBookingGuests((prev) => Math.min(remainingSpots, prev + 1))}
+                disabled={bookingGuests >= remainingSpots}
+              >
+                +
+              </button>
+
+              {/* Quick count pills */}
+              <div style={{ display: "flex", gap: "0.35rem", marginLeft: "auto", flexWrap: "wrap" }}>
+                {[1, 2, 4].map((num) => (
+                  <button
+                    key={num}
+                    type="button"
+                    style={{
+                      fontSize: "11px",
+                      padding: "0.25rem 0.6rem",
+                      borderRadius: "6px",
+                      border: bookingGuests === num ? "1px solid #2563EB" : "1px solid var(--border-standard)",
+                      background: bookingGuests === num ? "#EFF6FF" : "#F8FAFC",
+                      color: bookingGuests === num ? "#1D4ED8" : "var(--brand-heading)",
+                      fontWeight: 600,
+                      cursor: num > remainingSpots ? "not-allowed" : "pointer",
+                      opacity: num > remainingSpots ? 0.4 : 1,
+                    }}
+                    disabled={num > remainingSpots}
+                    onClick={() => setBookingGuests(num)}
+                  >
+                    {num} {num === 1 ? "Person" : "People"}
+                  </button>
+                ))}
+                {remainingSpots > 4 && (
+                  <button
+                    type="button"
+                    style={{
+                      fontSize: "11px",
+                      padding: "0.25rem 0.6rem",
+                      borderRadius: "6px",
+                      border: bookingGuests === remainingSpots ? "1px solid #2563EB" : "1px solid var(--border-standard)",
+                      background: bookingGuests === remainingSpots ? "#EFF6FF" : "#F8FAFC",
+                      color: bookingGuests === remainingSpots ? "#1D4ED8" : "var(--brand-heading)",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                    onClick={() => setBookingGuests(remainingSpots)}
+                  >
+                    Max ({remainingSpots})
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Validation helper alert */}
+            {remainingSpots <= 0 ? (
+              <p style={{ fontSize: "12px", color: "#DC2626", marginTop: "0.4rem", fontWeight: 600 }}>
+                ⚠️ This slot is fully booked. Please choose another slot or date.
+              </p>
+            ) : bookingGuests > remainingSpots ? (
+              <p style={{ fontSize: "12px", color: "#DC2626", marginTop: "0.4rem", fontWeight: 600 }}>
+                ⚠️ You selected {bookingGuests} people, but only {remainingSpots} spot(s) are remaining.
+              </p>
+            ) : (
+              <p style={{ fontSize: "12px", color: "#059669", marginTop: "0.4rem", fontWeight: 600 }}>
+                ✅ {bookingGuests} spot(s) reserved. {remainingSpots - bookingGuests} spot(s) will remain available.
+              </p>
+            )}
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
             <BrandButton type="button" variant="outline" onClick={() => setAmenityBookingModalOpen(false)}>
               Cancel
             </BrandButton>
-            <BrandButton type="submit" isLoading={amenities.book.isPending}>
-              Confirm Booking
+            <BrandButton
+              type="submit"
+              isLoading={amenities.book.isPending}
+              disabled={!activeSelectedSlot || remainingSpots <= 0 || bookingGuests > remainingSpots || availableDaySlots.length === 0}
+            >
+              Confirm Booking ({bookingGuests} {bookingGuests === 1 ? "Person" : "People"})
             </BrandButton>
           </div>
         </form>
@@ -1170,6 +1824,56 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
             <BrandButton variant="outline" onClick={() => setSosModalOpen(false)}>Cancel</BrandButton>
             <BrandButton variant="danger" onClick={handleTriggerPanic} isLoading={panicMutation.isPending}>
               Yes, Dispatch Security
+            </BrandButton>
+          </div>
+        </div>
+      </Modal>
+      {/* Cancel Facility Booking Confirmation Modal */}
+      <Modal
+        isOpen={Boolean(bookingToCancel)}
+        onClose={() => setBookingToCancel(null)}
+        title="Cancel Facility Reservation"
+        size="sm"
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem", padding: "0.25rem 0" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "0.75rem",
+              background: "#FEF2F2",
+              border: "1px solid #FCA5A5",
+              borderRadius: "8px",
+              padding: "0.85rem",
+            }}
+          >
+            <span style={{ fontSize: "1.25rem", lineHeight: 1 }}>⚠️</span>
+            <div>
+              <p style={{ fontSize: "14px", fontWeight: 700, color: "#991B1B", margin: 0 }}>
+                Cancel Reservation?
+              </p>
+              <p style={{ fontSize: "13px", color: "#7F1D1D", margin: "0.35rem 0 0 0", lineHeight: 1.4 }}>
+                Are you sure you want to cancel your reservation for <strong>{bookingToCancel?.amenity_name}</strong> on <strong>{bookingToCancel?.date}</strong>?
+              </p>
+            </div>
+          </div>
+          <p style={{ fontSize: "13px", color: "var(--brand-body)", margin: 0, lineHeight: 1.4 }}>
+            Your reserved spot ({bookingToCancel?.guests_count || 1} person{(bookingToCancel?.guests_count || 1) > 1 ? "s" : ""}) will be immediately released back to the available pool for other residents.
+          </p>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
+            <BrandButton
+              variant="outline"
+              onClick={() => setBookingToCancel(null)}
+              disabled={amenities.cancelBooking.isPending}
+            >
+              Keep Reservation
+            </BrandButton>
+            <BrandButton
+              variant="danger"
+              isLoading={amenities.cancelBooking.isPending}
+              onClick={handleConfirmCancelBooking}
+            >
+              Confirm Cancellation
             </BrandButton>
           </div>
         </div>
