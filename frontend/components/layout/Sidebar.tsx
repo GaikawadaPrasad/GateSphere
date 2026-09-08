@@ -58,26 +58,26 @@ export function Sidebar() {
       accentColor: "#3B82F6",
       items: SUPER_ADMIN_NAV_ITEMS,
     };
-  } else if (pathname.startsWith("/dashboard/community-admin")) {
+  } else if (pathname.startsWith("/community-admin") || pathname.startsWith("/dashboard/community-admin")) {
     navConfig = {
       title: "GateSphere",
       roleLabel: "Community Admin",
       accentColor: "#2563EB",
-      items: [{ id: "dashboard", label: "Dashboard", href: "/dashboard/community-admin", icon: "🏢" }],
+      items: [{ id: "dashboard", label: "Dashboard", href: "/community-admin/dashboard", icon: "🏢" }],
     };
-  } else if (pathname.startsWith("/dashboard/security-guard")) {
+  } else if (pathname.startsWith("/security-guard") || pathname.startsWith("/dashboard/security-guard")) {
     navConfig = {
       title: "GateSphere",
       roleLabel: "Security Guard",
       accentColor: "#DC2626",
-      items: [{ id: "dashboard", label: "Dashboard", href: "/dashboard/security-guard", icon: "🛡️" }],
+      items: [{ id: "dashboard", label: "Dashboard", href: "/security-guard/dashboard", icon: "🛡️" }],
     };
-  } else if (pathname.startsWith("/dashboard/security-supervisor")) {
+  } else if (pathname.startsWith("/security-supervisor") || pathname.startsWith("/dashboard/security-supervisor")) {
     navConfig = {
       title: "GateSphere",
       roleLabel: "Security Supervisor",
       accentColor: "#EA580C",
-      items: [{ id: "dashboard", label: "Dashboard", href: "/dashboard/security-supervisor", icon: "👮" }],
+      items: [{ id: "dashboard", label: "Dashboard", href: "/security-guard/dashboard", icon: "👮" }],
     };
   } else if (pathname.startsWith("/dashboard/facility-manager")) {
     navConfig = {

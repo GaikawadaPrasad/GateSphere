@@ -95,17 +95,14 @@ export function getRoleLandingRoute(user: CurrentUser | null | undefined): strin
     case "tenant":
       return "/owner-tenant/dashboard";
     case "community_admin":
-      return "/dashboard/community-admin";
+      return "/community-admin/dashboard";
     case "security_guard":
-      return "/dashboard/security-guard";
     case "security_supervisor":
-      return "/dashboard/security-supervisor";
+      return "/security-guard/dashboard";
     case "facility_manager":
-      return "/dashboard/facility-manager";
     case "association_committee":
-      return "/dashboard/association-committee";
     case "vendor_technician":
-      return "/dashboard/vendor-technician";
+      return "/community-admin/dashboard";
     default:
       return "/dashboard";
   }

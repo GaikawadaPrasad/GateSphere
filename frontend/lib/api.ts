@@ -55,9 +55,9 @@ export function getActiveRole(): string | null {
     if (pathname.startsWith("/owner-tenant") || pathname.startsWith("/resident")) return "resident";
     if (pathname.startsWith("/auditor")) return "auditor";
     if (pathname.startsWith("/domestic-staff")) return "domestic_staff";
-    if (pathname.startsWith("/dashboard/community-admin")) return "community_admin";
-    if (pathname.startsWith("/dashboard/security-guard")) return "security_guard";
-    if (pathname.startsWith("/dashboard/security-supervisor")) return "security_supervisor";
+    if (pathname.startsWith("/community-admin") || pathname.startsWith("/dashboard/community-admin")) return "community_admin";
+    if (pathname.startsWith("/security-guard") || pathname.startsWith("/dashboard/security-guard")) return "security_guard";
+    if (pathname.startsWith("/security-supervisor") || pathname.startsWith("/dashboard/security-supervisor")) return "security_supervisor";
     if (pathname.startsWith("/dashboard/facility-manager")) return "facility_manager";
     if (pathname.startsWith("/dashboard/association-committee")) return "association_committee";
     if (pathname.startsWith("/dashboard/vendor-technician")) return "vendor_technician";
