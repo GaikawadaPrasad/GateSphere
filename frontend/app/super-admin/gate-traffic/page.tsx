@@ -7,7 +7,8 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { formatDateTime } from "@/lib/utils";
 import { useGateEvents, usePanicAlerts, useGuardRosters } from "@/hooks/use-gate";
 import { useCommunities } from "@/hooks/use-communities";
-import type { GateEvent, GuardRoster } from "@/types/gate";
+import type { GateEvent, GuardRoster, PanicAlert } from "@/types/gate";
+import type { Community } from "@/types/communities";
 
 export default function GateTrafficPage() {
   const [communityId, setCommunityId] = useState("");
@@ -23,36 +24,30 @@ export default function GateTrafficPage() {
     page_size: 5,
   });
 
-  const { data: rosters } = useGuardRosters({
+  const { data: rosters, isLoading: isRostersLoading } = useGuardRosters({
     community_id: communityId || undefined,
   });
 
   const eventColumns: Column<GateEvent>[] = [
     {
+      key: "occurred_at",
+      header: "Timestamp",
+      render: (item) => formatDateTime(item.occurred_at),
+    },
+    {
       key: "event_type",
       header: "Event Type",
-      render: (e) => (
-        <span style={{ fontWeight: 600, textTransform: "capitalize", color: "var(--fg)" }}>
-          {e.event_type.replace(/_/g, " ")}
-        </span>
-      ),
+      render: (item) => <StatusBadge status={item.event_type} />,
     },
     {
       key: "entity_name",
-      header: "Visitor / Vehicle / Staff",
-      render: (e) => <span>{e.entity_name || e.entity_id || "–"}</span>,
+      header: "Entity / Subject",
+      render: (item) => item.entity_name || `${item.entity_type} (#${item.entity_id.slice(0, 8)})`,
     },
     {
       key: "gate_id",
       header: "Gate",
-      align: "center",
-      render: (e) => <span>Gate #{e.gate_id?.slice(0, 6) || "Main"}</span>,
-    },
-    {
-      key: "occurred_at",
-      header: "Occurred At",
-      align: "right",
-      render: (e) => <span>{formatDateTime(e.occurred_at)}</span>,
+      render: (item) => `Gate #${item.gate_id.slice(0, 8)}`,
     },
   ];
 
@@ -60,19 +55,21 @@ export default function GateTrafficPage() {
     {
       key: "guard_name",
       header: "Guard Name",
-      render: (r) => <span style={{ fontWeight: 600 }}>{r.guard_name || "Guard"}</span>,
+      render: (item) => item.guard_name || "Assigned Guard",
     },
     {
       key: "shift_name",
       header: "Shift",
-      align: "center",
-      render: (r) => <span>{r.shift_name}</span>,
+    },
+    {
+      key: "time",
+      header: "Shift Timing",
+      render: (item) => `${item.start_time} - ${item.end_time}`,
     },
     {
       key: "status",
       header: "Status",
-      align: "center",
-      render: (r) => <StatusBadge status={r.status} />,
+      render: (item) => <StatusBadge status={item.status} />,
     },
   ];
 
@@ -90,7 +87,7 @@ export default function GateTrafficPage() {
             style={{ width: "auto", height: 36, padding: "0.25rem 0.6rem", fontSize: "0.85rem" }}
           >
             <option value="">All Communities</option>
-            {communities?.map((c) => (
+            {communities?.map((c: Community) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
@@ -114,7 +111,7 @@ export default function GateTrafficPage() {
             🚨 {alerts.length} Active Panic Alerts
           </h3>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            {alerts.map((a) => (
+            {alerts.map((a: PanicAlert) => (
               <div
                 key={a.id}
                 style={{
@@ -142,38 +139,32 @@ export default function GateTrafficPage() {
         </div>
       )}
 
-      {/* Grid: Events & Rosters */}
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "1.5rem" }}>
-        {/* Gate Events */}
-        <div className="card">
-          <div className="card-header">
-            <h3 className="card-title">Live Gate Events</h3>
-            <span className="badge badge-success">● Live</span>
-          </div>
+      {/* Live Guard Rosters */}
+      <div style={{ marginBottom: "2rem" }}>
+        <h2 style={{ fontSize: "1.05rem", fontWeight: 600, marginBottom: "0.75rem" }}>
+          Active Security Roster
+        </h2>
+        <DataTable
+          columns={rosterColumns}
+          data={rosters}
+          isLoading={isRostersLoading}
+          emptyTitle="No guards scheduled"
+          emptyDescription="No guard shift rosters are currently planned or active."
+        />
+      </div>
 
-          <DataTable
-            columns={eventColumns as unknown as Column<Record<string, unknown>>[]}
-            data={events as unknown as Record<string, unknown>[]}
-            isLoading={isEventsLoading}
-            emptyTitle="No gate events"
-            emptyDescription="No vehicle or visitor traffic recorded yet."
-          />
-        </div>
-
-        {/* Guard Rosters */}
-        <div className="card">
-          <div className="card-header">
-            <h3 className="card-title">Guard Rosters</h3>
-            <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Active Shift</span>
-          </div>
-
-          <DataTable
-            columns={rosterColumns as unknown as Column<Record<string, unknown>>[]}
-            data={rosters as unknown as Record<string, unknown>[]}
-            emptyTitle="No guard rosters"
-            emptyDescription="No guard shift records available."
-          />
-        </div>
+      {/* Live Gate Events Feed */}
+      <div>
+        <h2 style={{ fontSize: "1.05rem", fontWeight: 600, marginBottom: "0.75rem" }}>
+          Recent Gate Traffic Log
+        </h2>
+        <DataTable
+          columns={eventColumns}
+          data={events}
+          isLoading={isEventsLoading}
+          emptyTitle="No gate traffic"
+          emptyDescription="No entry or exit events recorded for the selected scope."
+        />
       </div>
     </div>
   );

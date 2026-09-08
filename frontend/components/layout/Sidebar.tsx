@@ -1,24 +1,106 @@
 "use client";
 
+import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useUiStore } from "@/store/ui";
+import { AUDITOR_NAV, DOMESTIC_STAFF_NAV, OWNER_TENANT_NAV, NavItem } from "@/config/dashboard-navigation";
 
-const navItems = [
-  { label: "Dashboard", href: "/super-admin/dashboard", icon: "📊" },
-  { label: "Communities", href: "/super-admin/communities", icon: "🏢" },
-  { label: "Residents", href: "/super-admin/residents", icon: "👥" },
-  { label: "Gate Traffic", href: "/super-admin/gate-traffic", icon: "🛡️" },
-  { label: "Complaints", href: "/super-admin/complaints", icon: "🎫" },
-  { label: "Billing & Finance", href: "/super-admin/billing", icon: "💳" },
-  { label: "Reports & Analytics", href: "/super-admin/reports", icon: "📈" },
-  { label: "Audit Logs", href: "/super-admin/audit-logs", icon: "📋" },
-  { label: "System Settings", href: "/super-admin/settings", icon: "⚙️" },
+const SUPER_ADMIN_NAV_ITEMS: NavItem[] = [
+  { id: "dashboard", label: "Dashboard", href: "/super-admin/dashboard", icon: "📊" },
+  { id: "communities", label: "Communities", href: "/super-admin/communities", icon: "🏢" },
+  { id: "residents", label: "Residents", href: "/super-admin/residents", icon: "👥" },
+  { id: "gate-traffic", label: "Gate Traffic", href: "/super-admin/gate-traffic", icon: "🛡️" },
+  { id: "complaints", label: "Complaints", href: "/super-admin/complaints", icon: "🎫" },
+  { id: "billing", label: "Billing & Finance", href: "/super-admin/billing", icon: "💳" },
+  { id: "reports", label: "Reports & Analytics", href: "/super-admin/reports", icon: "📈" },
+  { id: "audit-logs", label: "Audit Logs", href: "/super-admin/audit-logs", icon: "📋" },
+  { id: "settings", label: "System Settings", href: "/super-admin/settings", icon: "⚙️" },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
   const { sidebarOpen, toggleSidebar } = useUiStore();
+
+  // Determine current active dashboard
+  let navConfig = {
+    title: "GateSphere",
+    roleLabel: "Owner / Tenant",
+    accentColor: "#1D4ED8",
+    items: OWNER_TENANT_NAV.navItems,
+  };
+
+  if (pathname.startsWith("/auditor") || pathname.startsWith("/dashboard/auditor")) {
+    navConfig = {
+      title: "GateSphere",
+      roleLabel: "Auditor (Read-Only)",
+      accentColor: "#64748B",
+      items: AUDITOR_NAV.navItems,
+    };
+  } else if (pathname.startsWith("/domestic-staff") || pathname.startsWith("/dashboard/domestic-staff")) {
+    navConfig = {
+      title: "GateSphere",
+      roleLabel: "Domestic Staff",
+      accentColor: "#0D9488",
+      items: DOMESTIC_STAFF_NAV.navItems,
+    };
+  } else if (pathname.startsWith("/owner-tenant") || pathname.startsWith("/resident") || pathname.startsWith("/dashboard/owner-tenant")) {
+    navConfig = {
+      title: "GateSphere",
+      roleLabel: "Owner / Tenant",
+      accentColor: "#2563EB",
+      items: OWNER_TENANT_NAV.navItems,
+    };
+  } else if (pathname.startsWith("/super-admin") || pathname.startsWith("/dashboard/super-admin")) {
+    navConfig = {
+      title: "GateSphere",
+      roleLabel: "Super Admin",
+      accentColor: "#3B82F6",
+      items: SUPER_ADMIN_NAV_ITEMS,
+    };
+  } else if (pathname.startsWith("/community-admin") || pathname.startsWith("/dashboard/community-admin")) {
+    navConfig = {
+      title: "GateSphere",
+      roleLabel: "Community Admin",
+      accentColor: "#2563EB",
+      items: [{ id: "dashboard", label: "Dashboard", href: "/community-admin/dashboard", icon: "🏢" }],
+    };
+  } else if (pathname.startsWith("/security-guard") || pathname.startsWith("/dashboard/security-guard")) {
+    navConfig = {
+      title: "GateSphere",
+      roleLabel: "Security Guard",
+      accentColor: "#DC2626",
+      items: [{ id: "dashboard", label: "Dashboard", href: "/security-guard/dashboard", icon: "🛡️" }],
+    };
+  } else if (pathname.startsWith("/security-supervisor") || pathname.startsWith("/dashboard/security-supervisor")) {
+    navConfig = {
+      title: "GateSphere",
+      roleLabel: "Security Supervisor",
+      accentColor: "#EA580C",
+      items: [{ id: "dashboard", label: "Dashboard", href: "/security-guard/dashboard", icon: "👮" }],
+    };
+  } else if (pathname.startsWith("/dashboard/facility-manager")) {
+    navConfig = {
+      title: "GateSphere",
+      roleLabel: "Facility Manager",
+      accentColor: "#059669",
+      items: [{ id: "dashboard", label: "Dashboard", href: "/dashboard/facility-manager", icon: "🔧" }],
+    };
+  } else if (pathname.startsWith("/dashboard/association-committee")) {
+    navConfig = {
+      title: "GateSphere",
+      roleLabel: "Association Committee",
+      accentColor: "#7C3AED",
+      items: [{ id: "dashboard", label: "Dashboard", href: "/dashboard/association-committee", icon: "🏛️" }],
+    };
+  } else if (pathname.startsWith("/dashboard/vendor-technician")) {
+    navConfig = {
+      title: "GateSphere",
+      roleLabel: "Vendor Technician",
+      accentColor: "#D97706",
+      items: [{ id: "dashboard", label: "Dashboard", href: "/dashboard/vendor-technician", icon: "🔨" }],
+    };
+  }
 
   const handleLinkClick = () => {
     // On small screens, close sidebar after clicking a nav link
@@ -72,7 +154,7 @@ export function Sidebar() {
                   width: 32,
                   height: 32,
                   borderRadius: "var(--radius-sm)",
-                  background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+                  background: `linear-gradient(135deg, ${navConfig.accentColor}, #8b5cf6)`,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -85,26 +167,27 @@ export function Sidebar() {
               </div>
               <div>
                 <div style={{ fontWeight: 700, fontSize: "0.95rem", color: "var(--sidebar-fg)", letterSpacing: "-0.01em" }}>
-                  GateSphere
+                  {navConfig.title}
                 </div>
-                <div style={{ fontSize: "0.65rem", color: "#60a5fa", fontWeight: 600, textTransform: "uppercase" }}>
-                  Super Admin
+                <div style={{ fontSize: "0.65rem", color: navConfig.accentColor, fontWeight: 700, textTransform: "uppercase" }}>
+                  {navConfig.roleLabel}
                 </div>
               </div>
             </div>
           ) : (
             <div
               style={{
-                width: 32,
-                height: 32,
+                width: 34,
+                height: 34,
                 borderRadius: "var(--radius-sm)",
-                background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+                background: `linear-gradient(135deg, ${navConfig.accentColor}, #0D9488)`,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontWeight: 700,
+                fontWeight: 900,
                 color: "white",
-                fontSize: "0.95rem",
+                fontSize: "1rem",
+                boxShadow: `0 2px 10px ${navConfig.accentColor}66`,
               }}
             >
               GS
@@ -115,8 +198,8 @@ export function Sidebar() {
             type="button"
             onClick={toggleSidebar}
             style={{
-              background: "transparent",
-              border: "none",
+              background: "rgba(255, 255, 255, 0.06)",
+              border: "1px solid rgba(255, 255, 255, 0.1)",
               color: "var(--sidebar-muted)",
               cursor: "pointer",
               padding: "0.35rem",
@@ -130,10 +213,13 @@ export function Sidebar() {
         </div>
 
         {/* Navigation Links */}
-        <nav style={{ padding: "1rem 0.5rem", flex: 1, overflowY: "auto" }}>
+        <nav style={{ padding: "0.75rem 0.5rem", flex: 1, overflowY: "auto" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-            {navItems.map((item) => {
-              const isActive = pathname === item.href || (item.href !== "/super-admin/dashboard" && pathname.startsWith(item.href));
+            {navConfig.items.map((item) => {
+              const isExactActive = pathname === item.href;
+              const isSubActive = item.href !== navConfig.items[0]?.href && pathname.startsWith(item.href);
+              const isActive = isExactActive || isSubActive;
+
               return (
                 <Link
                   key={item.href}
@@ -143,21 +229,39 @@ export function Sidebar() {
                     display: "flex",
                     alignItems: "center",
                     gap: "0.75rem",
-                    padding: sidebarOpen ? "0.65rem 0.85rem" : "0.65rem",
+                    padding: sidebarOpen ? "0.6rem 0.85rem" : "0.6rem",
                     justifyContent: sidebarOpen ? "flex-start" : "center",
                     borderRadius: "var(--radius-sm)",
-                    color: isActive ? "#ffffff" : "var(--sidebar-muted)",
-                    background: isActive ? "var(--sidebar-active)" : "transparent",
-                    fontWeight: isActive ? 600 : 500,
-                    fontSize: "0.85rem",
+                    color: isActive ? "#FFFFFF" : "var(--sidebar-muted)",
+                    background: isActive ? "var(--sidebar-surface)" : "transparent",
+                    fontWeight: isActive ? 700 : 500,
+                    fontSize: "13.5px",
                     textDecoration: "none",
                     transition: "all 0.15s ease",
-                    borderLeft: isActive ? "3px solid var(--primary)" : "3px solid transparent",
+                    borderLeft: isActive ? `3px solid ${item.accentColor || navConfig.accentColor || "var(--brand-primary)"}` : "3px solid transparent",
                   }}
                   title={item.label}
                 >
-                  <span style={{ fontSize: "1.1rem" }}>{item.icon}</span>
-                  {sidebarOpen && <span>{item.label}</span>}
+                  <span style={{ fontSize: "1.15rem" }}>{item.icon}</span>
+                  {sidebarOpen && (
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+                      <span>{item.label}</span>
+                      {item.badge !== undefined && (
+                        <span
+                          style={{
+                            fontSize: "10px",
+                            fontWeight: 700,
+                            padding: "0.1rem 0.45rem",
+                            borderRadius: "9999px",
+                            background: item.accentColor ? `${item.accentColor}30` : `${navConfig.accentColor}30`,
+                            color: item.accentColor || navConfig.accentColor,
+                          }}
+                        >
+                          {item.badge}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </Link>
               );
             })}
@@ -177,6 +281,7 @@ export function Sidebar() {
                 cursor: "pointer",
                 fontSize: "0.9rem",
               }}
+              title="Expand sidebar"
             >
               ▶
             </button>

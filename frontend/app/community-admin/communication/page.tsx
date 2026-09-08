@@ -468,7 +468,7 @@ export default function CommunityAdminCommunicationPage() {
                 onChange={(e) => setForm({ ...form, target_id: e.target.value })}
               >
                 <option value="">-- Choose Group --</option>
-                {groups?.map((g) => (
+                {groups?.map((g: any) => (
                   <option key={g.id} value={g.id}>
                     {g.name}
                   </option>

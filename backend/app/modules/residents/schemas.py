@@ -102,6 +102,18 @@ class FamilyMemberCreate(_Write):
     user_id: uuid.UUID | None = None
     date_of_birth: date | None = None
     phone: str | None = _Phone
+    access_enabled: bool = True
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True, populate_by_name=True)
+
+
+class FamilyMemberUpdate(_Write):
+    full_name: str | None = Field(default=None, min_length=1, max_length=180)
+    relationship_type: str | None = Field(default=None, alias="relationship")
+    user_id: uuid.UUID | None = None
+    date_of_birth: date | None = None
+    phone: str | None = _Phone
+    access_enabled: bool | None = None
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True, populate_by_name=True)
 
@@ -166,3 +178,40 @@ class MoveRecordRead(_Read):
     clearance_notes: str | None
     approved_by_user_id: uuid.UUID | None
     approved_at: datetime | None
+
+
+# --- Resident Me / Self-service --------------------------------- #
+class UnitOccupancyDetailRead(BaseModel):
+    id: uuid.UUID
+    unit_id: uuid.UUID
+    unit_number: str
+    tower_name: str | None = None
+    floor_number: int | None = None
+    occupancy_role: str
+    is_primary: bool
+    start_date: date
+    end_date: date | None = None
+    agreement_reference: str | None = None
+    is_active: bool
+
+
+class ResidentMeRead(_Read):
+    user_id: uuid.UUID
+    full_name: str
+    email: str
+    phone: str | None
+    profile_status: str
+    kyc_status: str
+    move_in_date: date | None
+    move_out_date: date | None
+    emergency_notes: str | None
+    occupancies: list[UnitOccupancyDetailRead] = []
+    family_members: list[FamilyMemberRead] = []
+    emergency_contacts: list[EmergencyContactRead] = []
+
+
+class ResidentMeUpdate(_Write):
+    full_name: str | None = Field(default=None, max_length=180)
+    phone: str | None = _Phone
+    emergency_notes: str | None = Field(default=None, max_length=2000)
+

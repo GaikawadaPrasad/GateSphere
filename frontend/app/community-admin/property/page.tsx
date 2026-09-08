@@ -449,7 +449,7 @@ export default function CommunityAdminPropertyPage() {
                 value={currentFloorId}
                 onChange={(e) => setSelectedFloorId(e.target.value)}
               >
-                {floors?.map((f) => (
+                {floors?.map((f: any) => (
                   <option key={f.id} value={f.id}>
                     Floor {f.floor_number}
                   </option>
@@ -656,7 +656,7 @@ export default function CommunityAdminPropertyPage() {
               value={unitForm.floor_id || currentFloorId}
               onChange={(e) => setUnitForm({ ...unitForm, floor_id: e.target.value })}
             >
-              {floors?.map((f) => (
+              {floors?.map((f: any) => (
                 <option key={f.id} value={f.id}>
                   Floor {f.floor_number}
                 </option>

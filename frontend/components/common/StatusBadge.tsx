@@ -1,23 +1,5 @@
+import React from "react";
 import { cn } from "@/lib/utils";
-
-export type StatusVariant =
-  | "active"
-  | "inactive"
-  | "pending"
-  | "resolved"
-  | "reported"
-  | "acknowledged"
-  | "responding"
-  | "closed"
-  | "posted"
-  | "paid"
-  | "overdue"
-  | "cancelled"
-  | "draft"
-  | "high"
-  | "emergency"
-  | "medium"
-  | "low";
 
 interface StatusBadgeProps {
   status: string | boolean;
@@ -27,7 +9,9 @@ interface StatusBadgeProps {
 
 export function StatusBadge({ status, label, className }: StatusBadgeProps) {
   let text = label || (typeof status === "boolean" ? (status ? "Active" : "Inactive") : String(status));
-  let badgeClass = "badge-neutral";
+  let bg = "#F1F5F9";
+  let color = "#475569";
+  let border = "#E2E8F0";
 
   const s = (typeof status === "boolean" ? (status ? "active" : "inactive") : String(status)).toLowerCase();
 
@@ -37,8 +21,13 @@ export function StatusBadge({ status, label, className }: StatusBadgeProps) {
     case "paid":
     case "approved":
     case "completed":
+    case "checked_in":
+    case "on_track":
+    case "verified":
     case "true":
-      badgeClass = "badge-success";
+      bg = "#F0FDF4";
+      color = "#166534";
+      border = "#BBF7D0";
       break;
 
     case "pending":
@@ -46,36 +35,64 @@ export function StatusBadge({ status, label, className }: StatusBadgeProps) {
     case "responding":
     case "partially_paid":
     case "in_progress":
+    case "at_risk":
+    case "assigned":
+    case "warning":
     case "medium":
-      badgeClass = "badge-warning";
+      bg = "#FFFBEB";
+      color = "#92400E";
+      border = "#FDE68A";
       break;
 
     case "inactive":
     case "reported":
     case "overdue":
     case "cancelled":
-    case "high":
+    case "rejected":
+    case "breached":
+    case "escalated":
     case "emergency":
+    case "sos":
+    case "high":
+    case "critical":
     case "false":
-      badgeClass = "badge-danger";
+      bg = "#FEF2F2";
+      color = "#991B1B";
+      border = "#FECACA";
       break;
 
     case "posted":
-    case "assigned":
     case "created":
     case "open":
-      badgeClass = "badge-primary";
+    case "checked_out":
+    case "info":
+    case "low":
+      bg = "#EFF6FF";
+      color = "#1E40AF";
+      border = "#BFDBFE";
       break;
 
     default:
-      badgeClass = "badge-neutral";
+      bg = "#F8FAFC";
+      color = "#64748B";
+      border = "#E2E8F0";
       break;
   }
 
-  // Format underscore texts like in_progress -> In Progress
   if (!label && typeof text === "string" && text.includes("_")) {
     text = text.replace(/_/g, " ");
   }
 
-  return <span className={cn("badge", badgeClass, className)}>{text}</span>;
+  return (
+    <span
+      className={cn("badge", className)}
+      style={{
+        backgroundColor: bg,
+        color: color,
+        border: `1px solid ${border}`,
+      }}
+    >
+      {text}
+    </span>
+  );
 }

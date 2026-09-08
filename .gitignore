@@ -221,6 +221,7 @@ __marimo__/
 # Node / Next.js
 node_modules/
 .next/
+!frontend/lib/
 next-env.d.ts
 npm-debug.log*
 yarn-error.log*

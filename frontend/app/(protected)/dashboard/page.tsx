@@ -2,7 +2,8 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useMe } from "@/hooks/use-auth";
+import { useMe, useLogout } from "@/hooks/use-auth";
+import { getRoleLandingRoute } from "@/lib/permissions";
 
 /**
  * Smart role-router. Redirects the user to their correct portal based on role.
@@ -11,53 +12,71 @@ import { useMe } from "@/hooks/use-auth";
 export default function DashboardPage() {
   const router = useRouter();
   const { data: user, isLoading } = useMe();
+  const logout = useLogout();
 
   useEffect(() => {
-    if (isLoading || !user) return;
-
-    if (user.is_superadmin || user.active_role === "super_admin") {
-      router.replace("/super-admin/dashboard");
-      return;
+    if (user) {
+      const landing = getRoleLandingRoute(user);
+      if (landing && landing !== "/dashboard") {
+        router.replace(landing);
+      }
     }
+  }, [user, router]);
 
-    const primaryRole = user.active_role || user.roles?.[0]?.role_slug;
-    switch (primaryRole) {
-      case "facility_manager":
-        router.replace("/facility-manager/dashboard");
-        break;
-      case "security_supervisor":
-        router.replace("/security-supervisor/dashboard");
-        break;
-      case "security_guard":
-        router.replace("/security-guard/dashboard");
-        break;
-      case "vendor_technician":
-        router.replace("/vendor-technician/dashboard");
-        break;
-      case "community_admin":
-        router.replace("/community-admin/dashboard");
-        break;
-      case "resident":
-        router.replace("/resident/home");
-        break;
-      default:
-        const hasRole = (slug: string) => user.roles?.some((r) => r.role_slug === slug) ?? false;
-        if (hasRole("facility_manager")) { router.replace("/facility-manager/dashboard"); return; }
-        if (hasRole("security_supervisor")) { router.replace("/security-supervisor/dashboard"); return; }
-        if (hasRole("security_guard")) { router.replace("/security-guard/dashboard"); return; }
-        if (hasRole("vendor_technician")) { router.replace("/vendor-technician/dashboard"); return; }
-        if (hasRole("community_admin")) { router.replace("/community-admin/dashboard"); return; }
-        router.replace("/facility-manager/dashboard");
-        break;
-    }
-  }, [user, isLoading, router]);
+  if (isLoading) {
+    return (
+      <main className="container" aria-busy="true" aria-live="polite">
+        <div className="card" style={{ textAlign: "center", padding: "3rem" }}>
+          <h2>Loading dashboard…</h2>
+        </div>
+      </main>
+    );
+  }
 
-  // Show minimal loading state while routing
+  if (!user) return null;
+
   return (
-    <main style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh" }}>
-      <div style={{ textAlign: "center", color: "var(--muted, #64748b)" }}>
-        <div style={{ fontSize: "2rem", marginBottom: "1rem" }}>🔄</div>
-        <p>Redirecting to your role workspace dashboard…</p>
+    <main className="container">
+      <h1>Dashboard</h1>
+      <div className="card">
+        <p>
+          Signed in as <strong>{user.full_name}</strong> ({user.email})
+        </p>
+        <p>
+          Role: <strong>{user.active_role || (user.is_superadmin ? "Super Admin" : "User")}</strong>
+        </p>
+        <p>
+          Scope:{" "}
+          {user.is_superadmin
+            ? "all communities (Super Admin)"
+            : user.community_ids?.length
+              ? `${user.community_ids.length} community(ies)`
+              : "no community"}
+        </p>
+        <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.5rem" }}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => router.replace(getRoleLandingRoute(user))}
+          >
+            Go to Role Portal
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={logout.isPending}
+            onClick={async () => {
+              try {
+                await logout.mutateAsync();
+              } catch {
+                // Ignore sign out network error and proceed to login
+              }
+              router.replace("/login");
+            }}
+          >
+            {logout.isPending ? "Signing out…" : "Sign out"}
+          </button>
+        </div>
       </div>
     </main>
   );
