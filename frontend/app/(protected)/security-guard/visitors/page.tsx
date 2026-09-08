@@ -49,7 +49,7 @@ export default function SecurityGuardVisitorsPage() {
       <div className="card">
         <div className="card-header" style={{ flexWrap: "wrap", gap: "0.75rem" }}>
           <div>
-            <h3 className="card-title">Today's Visitors</h3>
+            <h3 className="card-title">Today&apos;s Visitors</h3>
             <p style={{ fontSize: "0.775rem", color: "var(--muted)" }}>
               {filteredVisitors.length} visitors
             </p>

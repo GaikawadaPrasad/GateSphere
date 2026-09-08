@@ -27,7 +27,7 @@ export default function SecuritySupervisorGuardManagementPage() {
   const loadData = async () => {
     setIsLoading(true);
     const data = await gateApi.rosters();
-    setRoster(data);
+    setRoster(data as unknown as GuardRosterItem[]);
     setIsLoading(false);
   };
 

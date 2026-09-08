@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SearchInput } from "@/components/forms/SearchInput";
 import { StatusBadge } from "@/components/common/StatusBadge";
-import { complaintsApi, serviceRequestsApi, type ServiceRequest } from "@/lib/api";
+import { complaintsApi, type ServiceRequest } from "@/lib/api";
 
 export default function FacilityManagerComplaintsPage() {
   const [complaints, setComplaints] = useState<ServiceRequest[]>([]);

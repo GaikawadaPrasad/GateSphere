@@ -1,42 +1,21 @@
 "use client";
 
-<<<<<<< HEAD
 import React, { useState, Suspense } from "react";
 import Link from "next/link";
-=======
-import React, { Suspense } from "react";
-import { zodResolver } from "@hookform/resolvers/zod";
->>>>>>> e7481ebae09d00f54b7fa3b0587749f5aec51468
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-<<<<<<< HEAD
 import GateSphereLogo from "@/components/public/GateSphereLogo";
 import { ApiError } from "@/lib/api";
-=======
->>>>>>> e7481ebae09d00f54b7fa3b0587749f5aec51468
 import { useLogin } from "@/hooks/use-auth";
-import { ApiError } from "@/lib/api";
-import { getRoleLandingRoute } from "@/lib/permissions";
 
 const schema = z.object({
-<<<<<<< HEAD
-  email: z.string().email("Enter a valid email address"),
-=======
-  email: z.string().email("Valid email required"),
->>>>>>> e7481ebae09d00f54b7fa3b0587749f5aec51468
+  email: z.string().email("Please enter a valid work email address"),
   password: z.string().min(1, "Password is required"),
 });
 
 type FormValues = z.infer<typeof schema>;
-
-const DEMO_ACCOUNTS = [
-  { role: "Super Admin", email: "super_admin@gatesphere.com", pass: "Admin@123", icon: "👑" },
-  { role: "Community Admin", email: "community_admin@gatesphere.com", pass: "Admin@123", icon: "🏢" },
-  { role: "Security Guard", email: "guard@gatesphere.com", pass: "Guard@123", icon: "🛡️" },
-  { role: "Resident", email: "resident@gatesphere.com", pass: "Resident@123", icon: "🏡" },
-];
 
 function LoginForm() {
   const router = useRouter();
@@ -47,7 +26,6 @@ function LoginForm() {
   const {
     register,
     handleSubmit,
-    setValue,
     setError,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
@@ -58,14 +36,13 @@ function LoginForm() {
   const onSubmit = handleSubmit(async (values) => {
     try {
       const user = await login.mutateAsync(values);
-<<<<<<< HEAD
-      const next = params.get("next");
-      if (next) {
-        router.replace(next);
+      const nextParam = params.get("next");
+      if (nextParam && nextParam !== "/unauthorized") {
+        router.replace(nextParam);
         return;
       }
 
-      // active_role is always returned by /auth/login — use it as the source of truth
+      // Role-based landing redirects according to GSE-2026 PRD
       if (user?.is_superadmin || user?.active_role === "super_admin") {
         router.replace("/super-admin/dashboard");
       } else if (user?.active_role === "community_admin") {
@@ -74,22 +51,24 @@ function LoginForm() {
         user?.active_role === "security_guard" ||
         user?.active_role === "security_supervisor"
       ) {
-        router.replace("/gate/live");
+        router.replace("/security-guard/dashboard");
       } else if (user?.active_role === "resident") {
-        router.replace("/resident/home");
+        router.replace("/owner-tenant/dashboard");
+      } else if (user?.active_role === "facility_manager") {
+        router.replace("/facility-manager/dashboard");
+      } else if (user?.active_role === "vendor_technician") {
+        router.replace("/vendor-technician/dashboard");
+      } else if (user?.active_role === "domestic_staff") {
+        router.replace("/domestic-staff/dashboard");
       } else {
-        // Fallback: go to /dashboard which will re-detect and redirect
         router.replace("/dashboard");
       }
-=======
-      const nextParam = params.get("next");
-      const targetUrl = nextParam && nextParam !== "/unauthorized" ? nextParam : getRoleLandingRoute(user);
-      router.replace(targetUrl);
->>>>>>> e7481ebae09d00f54b7fa3b0587749f5aec51468
     } catch (err) {
       if (err instanceof ApiError && err.fields && Object.keys(err.fields).length) {
         for (const [field, message] of Object.entries(err.fields)) {
-          setError(field as keyof FormValues, { message: Array.isArray(message) ? message[0] : String(message) });
+          setError(field as keyof FormValues, {
+            message: Array.isArray(message) ? message[0] : String(message),
+          });
         }
       } else {
         setError("root", {
@@ -99,23 +78,17 @@ function LoginForm() {
     }
   });
 
-  const handleSelectDemoAccount = (email: string, pass: string) => {
-    setValue("email", email, { shouldValidate: true });
-    setValue("password", pass, { shouldValidate: true });
-  };
-
   return (
-<<<<<<< HEAD
-    <div className="min-h-screen w-full flex flex-col justify-center items-center bg-[#070C18] text-white relative overflow-hidden px-4 py-12 selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen w-full flex flex-col justify-center items-center bg-[#070C18] text-white relative overflow-x-hidden px-4 py-8 sm:py-12 selection:bg-blue-600 selection:text-white">
       {/* Background Aurora Ambient Lights */}
       <div
-        className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[380px] rounded-full blur-[140px] pointer-events-none opacity-40"
+        className="absolute top-0 left-1/2 -translate-x-1/2 w-[340px] sm:w-[600px] lg:w-[700px] h-[300px] sm:h-[380px] rounded-full blur-[100px] sm:blur-[140px] pointer-events-none opacity-40"
         style={{
           background: "radial-gradient(circle, rgba(37, 99, 235, 0.4) 0%, rgba(7, 12, 24, 0) 70%)",
         }}
       />
       <div
-        className="absolute bottom-0 right-1/4 w-[400px] h-[300px] rounded-full blur-[120px] pointer-events-none opacity-20"
+        className="absolute bottom-0 right-1/4 w-[280px] sm:w-[400px] h-[220px] sm:h-[300px] rounded-full blur-[90px] sm:blur-[120px] pointer-events-none opacity-20"
         style={{
           background: "radial-gradient(circle, rgba(13, 148, 136, 0.35) 0%, rgba(7, 12, 24, 0) 70%)",
         }}
@@ -130,15 +103,17 @@ function LoginForm() {
         }}
       />
 
-      <div className="relative z-10 w-full max-w-md">
+      <div className="relative z-10 w-full max-w-md mx-auto">
         {/* Top Branding */}
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-block transition-transform hover:scale-105 mb-4">
+        <div className="text-center mb-6 sm:mb-8">
+          <Link href="/" className="inline-block transition-transform hover:scale-105 mb-3 sm:mb-4">
             <GateSphereLogo className="justify-center" variant="light" size="large" />
           </Link>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-[11px] text-blue-400 font-mono mb-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Enterprise Security Access</span>
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-[11px] text-blue-400 font-mono mb-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Enterprise Security Access</span>
+            </div>
           </div>
           <h1
             className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight"
@@ -146,17 +121,17 @@ function LoginForm() {
           >
             Sign in to GateSphere
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Access your township management &amp; gate terminal
+          <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-sm mx-auto">
+            Access your township management &amp; security gate terminal
           </p>
         </div>
 
         {/* Main Glassmorphic Login Card */}
-        <div className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-[0_20px_60px_rgba(0,0,0,0.5)] backdrop-blur-xl p-7 sm:p-8">
-          <form onSubmit={onSubmit} noValidate className="space-y-4.5">
+        <div className="rounded-2xl sm:rounded-3xl bg-slate-900/80 border border-slate-800 shadow-[0_20px_60px_rgba(0,0,0,0.5)] backdrop-blur-xl p-5 sm:p-8">
+          <form onSubmit={onSubmit} noValidate className="space-y-4">
             {/* Root Error Alert */}
             {errors.root && (
-              <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2 font-medium animate-shake">
+              <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2 font-medium">
                 <svg className="w-4 h-4 shrink-0 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="12" cy="12" r="10" />
                   <line x1="12" y1="8" x2="12" y2="12" />
@@ -178,7 +153,7 @@ function LoginForm() {
                   autoComplete="username"
                   placeholder="name@community.com"
                   {...register("email")}
-                  className={`w-full px-4 py-3 rounded-xl bg-slate-800/80 border text-white text-sm placeholder-slate-500 transition-all outline-none focus:ring-2 focus:ring-blue-500/50 ${
+                  className={`w-full px-4 py-2.5 sm:py-3 rounded-xl bg-slate-800/80 border text-white text-sm placeholder-slate-500 transition-all outline-none focus:ring-2 focus:ring-blue-500/50 ${
                     errors.email ? "border-red-500/80" : "border-slate-700 hover:border-slate-600"
                   }`}
                 />
@@ -195,7 +170,7 @@ function LoginForm() {
                   Password
                 </label>
                 <Link
-                  href="/forgot-password"
+                  href="/demo"
                   className="text-xs text-blue-400 hover:text-blue-300 transition-colors font-medium"
                 >
                   Forgot password?
@@ -208,7 +183,7 @@ function LoginForm() {
                   autoComplete="current-password"
                   placeholder="••••••••••••"
                   {...register("password")}
-                  className={`w-full px-4 py-3 pr-11 rounded-xl bg-slate-800/80 border text-white text-sm placeholder-slate-500 transition-all outline-none focus:ring-2 focus:ring-blue-500/50 ${
+                  className={`w-full px-4 py-2.5 sm:py-3 pr-11 rounded-xl bg-slate-800/80 border text-white text-sm placeholder-slate-500 transition-all outline-none focus:ring-2 focus:ring-blue-500/50 ${
                     errors.password ? "border-red-500/80" : "border-slate-700 hover:border-slate-600"
                   }`}
                 />
@@ -239,13 +214,13 @@ function LoginForm() {
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={isSubmitting}
-              className="w-full py-3.5 px-4 rounded-xl text-sm font-bold text-white transition-all transform hover:-translate-y-0.5 active:translate-y-0 shadow-lg shadow-blue-600/30 cursor-pointer flex items-center justify-center gap-2 mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isSubmitting || login.isPending}
+              className="w-full py-3 sm:py-3.5 px-4 rounded-xl text-sm font-bold text-white transition-all transform hover:-translate-y-0.5 active:translate-y-0 shadow-lg shadow-blue-600/30 cursor-pointer flex items-center justify-center gap-2 mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
                 background: "linear-gradient(135deg, #1D4ED8 0%, #3B82F6 100%)",
               }}
             >
-              {isSubmitting ? (
+              {isSubmitting || login.isPending ? (
                 <>
                   <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -264,24 +239,15 @@ function LoginForm() {
             </button>
           </form>
 
-          {/* Quick Demo Credentials Helper */}
-          <div className="mt-6 pt-5 border-t border-slate-800">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2.5 font-mono text-center">
-              Quick Demo Accounts
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {DEMO_ACCOUNTS.map((acc) => (
-                <button
-                  key={acc.role}
-                  type="button"
-                  onClick={() => handleSelectDemoAccount(acc.email, acc.pass)}
-                  className="px-2.5 py-2 rounded-xl bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 hover:border-slate-600 text-left transition-all text-xs text-slate-300 flex items-center gap-1.5 cursor-pointer"
-                >
-                  <span className="text-sm">{acc.icon}</span>
-                  <span className="font-medium truncate">{acc.role}</span>
-                </button>
-              ))}
-            </div>
+          {/* Demo Walkthrough Link */}
+          <div className="mt-6 pt-5 border-t border-slate-800/80 text-center text-xs text-slate-400">
+            <span>Looking to onboard your township? </span>
+            <Link
+              href="/demo"
+              className="text-blue-400 hover:text-blue-300 font-semibold transition-colors underline-offset-2 hover:underline"
+            >
+              Book a Live Demo →
+            </Link>
           </div>
         </div>
 
@@ -296,55 +262,11 @@ function LoginForm() {
         </div>
       </div>
     </div>
-=======
-    <form onSubmit={onSubmit} className="card" noValidate>
-      {errors.root && (
-        <div role="alert" className="error-banner">
-          {errors.root.message}
-        </div>
-      )}
-
-      <label htmlFor="email">Email</label>
-      <input
-        id="email"
-        type="email"
-        autoComplete="email"
-        aria-invalid={Boolean(errors.email)}
-        aria-describedby={errors.email ? "email-error" : undefined}
-        {...register("email")}
-      />
-      {errors.email && (
-        <span id="email-error" className="error-text">
-          {errors.email.message}
-        </span>
-      )}
-
-      <label htmlFor="password">Password</label>
-      <input
-        id="password"
-        type="password"
-        autoComplete="current-password"
-        aria-invalid={Boolean(errors.password)}
-        aria-describedby={errors.password ? "password-error" : undefined}
-        {...register("password")}
-      />
-      {errors.password && (
-        <span id="password-error" className="error-text">
-          {errors.password.message}
-        </span>
-      )}
-
-      <button type="submit" disabled={isSubmitting || login.isPending}>
-        {isSubmitting || login.isPending ? "Signing in…" : "Sign in"}
-      </button>
-    </form>
->>>>>>> e7481ebae09d00f54b7fa3b0587749f5aec51468
   );
 }
 
 export default function LoginPage() {
   return (
-<<<<<<< HEAD
     <Suspense
       fallback={
         <div className="min-h-screen w-full flex items-center justify-center bg-[#070C18] text-white">
@@ -354,13 +276,5 @@ export default function LoginPage() {
     >
       <LoginForm />
     </Suspense>
-=======
-    <main className="container">
-      <h1>Sign in to GateSphere</h1>
-      <Suspense fallback={<div className="card">Loading…</div>}>
-        <LoginForm />
-      </Suspense>
-    </main>
->>>>>>> e7481ebae09d00f54b7fa3b0587749f5aec51468
   );
 }

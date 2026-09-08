@@ -29,10 +29,12 @@ export default function SecuritySupervisorGateOperationsPage() {
   };
 
   const filteredEvents = events.filter((e) => {
+    const vName = e.visitor_name || e.entity_name || "";
+    const gName = e.guard_name || "";
     const matchSearch =
-      e.visitor_name.toLowerCase().includes(search.toLowerCase()) ||
-      (e.vehicle_number && e.vehicle_number.toLowerCase().includes(search.toLowerCase())) ||
-      e.guard_name.toLowerCase().includes(search.toLowerCase());
+      vName.toLowerCase().includes(search.toLowerCase()) ||
+      Boolean(e.vehicle_number && e.vehicle_number.toLowerCase().includes(search.toLowerCase())) ||
+      gName.toLowerCase().includes(search.toLowerCase());
     const matchGate = gateFilter === "all" || e.gate_name === gateFilter;
     const matchAction = actionFilter === "all" || e.action === actionFilter;
     return matchSearch && matchGate && matchAction;
@@ -123,7 +125,7 @@ export default function SecuritySupervisorGateOperationsPage() {
                     <td>{ev.gate_name}</td>
                     <td>{ev.guard_name}</td>
                     <td>
-                      <StatusBadge status={ev.action} />
+                      <StatusBadge status={ev.action || "Active"} />
                     </td>
                     <td>
                       <button

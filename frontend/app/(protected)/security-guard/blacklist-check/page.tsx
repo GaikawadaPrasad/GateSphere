@@ -110,7 +110,7 @@ export default function SecurityGuardBlacklistCheckPage() {
                 ✅ NO RESTRICTIONS FOUND
               </h3>
               <p style={{ color: "#047857", fontSize: "0.9rem" }}>
-                No blacklist entries or security violations match "{query}". Normal gate verification workflow may proceed.
+                No blacklist entries or security violations match &quot;{query}&quot;. Normal gate verification workflow may proceed.
               </p>
             </div>
           )}
