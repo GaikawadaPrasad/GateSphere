@@ -162,7 +162,8 @@ export function DataTable<T extends object = Record<string, unknown>>({
         </thead>
         <tbody>
           {paginatedData.map((item, index) => {
-            const key = keyExtractor ? keyExtractor(item, index) : ((item as Record<string, unknown>).id as string) || String(index);
+            const itemRecord = item as Record<string, unknown>;
+            const key = keyExtractor ? keyExtractor(item, index) : (itemRecord.id as string) || String(index);
             return (
               <tr
                 key={key}
@@ -176,7 +177,7 @@ export function DataTable<T extends object = Record<string, unknown>>({
                       textAlign: col.align || "left",
                     }}
                   >
-                    {col.render ? col.render(item, index) : String((item as Record<string, unknown>)[col.key] ?? "–")}
+                    {col.render ? col.render(item, index) : String(itemRecord[col.key] ?? "–")}
                   </td>
                 ))}
               </tr>

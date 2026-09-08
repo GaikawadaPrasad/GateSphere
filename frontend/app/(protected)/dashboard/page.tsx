@@ -15,13 +15,12 @@ export default function DashboardPage() {
   const logout = useLogout();
 
   useEffect(() => {
-    if (user) {
-      const landing = getRoleLandingRoute(user);
-      if (landing && landing !== "/dashboard") {
-        router.replace(landing);
-      }
+    if (isLoading || !user) return;
+    const landing = getRoleLandingRoute(user);
+    if (landing && landing !== "/dashboard") {
+      router.replace(landing);
     }
-  }, [user, router]);
+  }, [user, isLoading, router]);
 
   if (isLoading) {
     return (
