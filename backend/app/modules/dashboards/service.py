@@ -240,8 +240,6 @@ class DashboardService:
                 Announcement.is_published.is_(True),
             ),
         )
-<<<<<<< Updated upstream
-=======
 
     async def _resolve_role_category(self) -> str:
         if self.actor.is_superadmin or self.scope.is_global:
@@ -281,6 +279,3 @@ class DashboardService:
         svc = AssistantService(self.db, self.scope, self.actor, self.ctx)
         return await svc.query(community_id, query)
 
-
-
->>>>>>> Stashed changes
