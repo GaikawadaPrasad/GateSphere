@@ -49,3 +49,34 @@ class ResidentStats(BaseModel):
     my_upcoming_bookings: int
     my_outstanding_balance: Decimal
     published_announcements: int
+<<<<<<< Updated upstream
+=======
+
+
+# Re-export assistant schemas for backward compatibility
+from app.modules.assistant.schemas import (
+    AssistantAction,
+    AssistantQuickChip,
+    AssistantQueryRequest,
+    AssistantResponse,
+    AssistantQuickActionsResponse,
+)
+
+__all__ = [
+    "OverviewStats",
+    "AdminStats",
+    "SecurityStats",
+    "FinancialStats",
+    "ResidentStats",
+    "AssistantAction",
+    "AssistantQuickChip",
+    "AssistantQueryRequest",
+    "AssistantResponse",
+    "AssistantQuickActionsResponse",
+]
+
+
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes

@@ -45,8 +45,9 @@ from app.modules.users.models import User
 
 _MOVE_TRANSITIONS: dict[str, set[str]] = {
     "requested": {"scheduled", "rejected", "cancelled"},
-    "scheduled": {"approved", "rejected", "cancelled"},
-    "approved": {"completed", "cancelled"},
+    "scheduled": {"in_progress", "approved", "rejected", "cancelled"},
+    "approved": {"in_progress", "completed", "cancelled"},
+    "in_progress": {"completed", "cancelled"},
     "completed": set(),
     "rejected": set(),
     "cancelled": set(),

@@ -126,14 +126,40 @@ class UnitRepository(AsyncTenantRepository[Unit]):
             await self.count(extra=stmt),
         )
 
+    async def list_for_community(
+        self,
+        community_id: uuid.UUID,
+        *,
+        offset: int,
+        limit: int,
+        tower_id: uuid.UUID | None = None,
+        floor_id: uuid.UUID | None = None,
+        unit_type: str | None = None,
+        active: bool | None = None,
+    ) -> tuple[list[Unit], int]:
+        stmt = select(Unit).where(Unit.community_id == community_id)
+        if tower_id is not None:
+            stmt = stmt.where(Unit.tower_id == tower_id)
+        if floor_id is not None:
+            stmt = stmt.where(Unit.floor_id == floor_id)
+        if unit_type is not None:
+            stmt = stmt.where(Unit.unit_type == unit_type)
+        if active is not None:
+            stmt = stmt.where(Unit.is_active.is_(active))
+        stmt = stmt.order_by(Unit.unit_number)
+        return (
+            await self.list(offset=offset, limit=limit, extra=stmt),
+            await self.count(extra=stmt),
+        )
+
     async def by_number(
-        self, *, community_id: uuid.UUID, tower_id: uuid.UUID, floor_id: uuid.UUID, number: str
+        self, *, community_id: uuid.UUID, tower_id: uuid.UUID, number: str
     ) -> Unit | None:
         return await self.db.scalar(
             select(Unit).where(
                 Unit.community_id == community_id,
                 Unit.tower_id == tower_id,
-                Unit.floor_id == floor_id,
                 Unit.unit_number == number,
             )
         )
+

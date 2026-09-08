@@ -80,7 +80,7 @@ def _envelope(code: str, message: str, fields: dict[str, str] | None = None) -> 
     error: dict = {"code": code}
     if fields:
         error["fields"] = fields
-    return {"success": False, "message": message, "data": None, "error": error}
+    return {"success": False, "message": message, "data": None, "meta": None, "error": error}
 
 
 def _request_id(request: Request) -> str | None:
