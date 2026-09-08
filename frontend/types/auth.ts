@@ -15,11 +15,14 @@ export interface CurrentUser {
   email: string;
   full_name: string;
   phone?: string;
-  is_active: boolean;
+  is_active?: boolean;
   is_superadmin: boolean;
   permissions: string[];
   permission_version: number;
   community_ids: string[];
+  /** The role this session was opened as — returned directly by /auth/login and /auth/me */
+  active_role: RoleSlug | null;
+  session_bucket: string | null;
   roles?: {
     id: string;
     role_slug: RoleSlug;

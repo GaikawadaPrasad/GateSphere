@@ -12,6 +12,8 @@ describe("RBAC Permissions and Role Engine", () => {
     permissions: ["*"],
     permission_version: 1,
     community_ids: [],
+    active_role: "super_admin",
+    session_bucket: "superadmin",
     roles: [{ id: "r-1", role_slug: "super_admin", community_id: null }],
   };
 
@@ -32,6 +34,8 @@ describe("RBAC Permissions and Role Engine", () => {
     ],
     permission_version: 1,
     community_ids: ["comm-1"],
+    active_role: "auditor",
+    session_bucket: "auditor",
     roles: [{ id: "r-2", role_slug: "auditor", community_id: "comm-1" }],
   };
 
@@ -44,6 +48,8 @@ describe("RBAC Permissions and Role Engine", () => {
     permissions: ["visitors:create", "visitors:read", "amenities:book", "complaints:create"],
     permission_version: 1,
     community_ids: ["comm-1"],
+    active_role: "resident",
+    session_bucket: "resident",
     roles: [{ id: "r-3", role_slug: "resident", community_id: "comm-1" }],
   };
 

@@ -34,7 +34,8 @@ export function StatMetric({
 }: StatMetricProps) {
   const numericValue = typeof value === "number" ? value : parseFloat(String(value).replace(/[^0-9.-]+/g, ""));
   const isNumber = !isNaN(numericValue);
-  const animatedValue = isNumber ? useCountUp(numericValue) : value;
+  const countUpValue = useCountUp(isNumber ? numericValue : 0);
+  const animatedValue = isNumber ? countUpValue : value;
 
   return (
     <div

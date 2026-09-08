@@ -13,9 +13,22 @@ interface KpiCardProps {
     variant?: "success" | "warning" | "danger" | "primary" | "neutral";
   };
   onClick?: () => void;
+  isLoading?: boolean;
 }
 
-export function KpiCard({ title, value, subtitle, icon, accent = "primary", badge, onClick }: KpiCardProps) {
+export function KpiCard({ title, value, subtitle, icon, accent = "primary", badge, onClick, isLoading }: KpiCardProps) {
+  if (isLoading) {
+    return (
+      <div className="card" style={{ display: "flex", flexDirection: "column", gap: "0.75rem", minHeight: 140 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div className="skeleton" style={{ width: "40%", height: "0.875rem" }} />
+          <div className="skeleton" style={{ width: "2rem", height: "2rem", borderRadius: "50%" }} />
+        </div>
+        <div className="skeleton" style={{ width: "60%", height: "2rem" }} />
+        <div className="skeleton" style={{ width: "80%", height: "0.75rem" }} />
+      </div>
+    );
+  }
   let iconBg = "#eff6ff";
   let iconColor = "#2563eb";
   let borderTop = "3px solid #3b82f6";

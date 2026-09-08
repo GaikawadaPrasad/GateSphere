@@ -1,5 +1,6 @@
 "use client";
 
+import React, { Suspense } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -14,7 +15,7 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const login = useLogin();
@@ -31,8 +32,26 @@ export default function LoginPage() {
 
   const onSubmit = handleSubmit(async (values) => {
     try {
-      await login.mutateAsync(values);
-      router.replace(params.get("next") || "/dashboard");
+      const user = await login.mutateAsync(values);
+      const next = params.get("next");
+      if (next) {
+        router.replace(next);
+        return;
+      }
+
+      // active_role is always returned by /auth/login — use it as the source of truth
+      if (user?.is_superadmin || user?.active_role === "super_admin") {
+        router.replace("/super-admin/dashboard");
+      } else if (user?.active_role === "community_admin") {
+        router.replace("/community-admin/dashboard");
+      } else if (user?.active_role === "security_guard" || user?.active_role === "security_supervisor") {
+        router.replace("/gate/live");
+      } else if (user?.active_role === "resident") {
+        router.replace("/resident/home");
+      } else {
+        // Fallback: go to /dashboard which will re-detect and redirect
+        router.replace("/dashboard");
+      }
     } catch (err) {
       if (err instanceof ApiError && err.fields && Object.keys(err.fields).length) {
         for (const [field, message] of Object.entries(err.fields)) {
@@ -91,5 +110,13 @@ export default function LoginPage() {
         </button>
       </form>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="container" style={{ padding: "2rem", textAlign: "center" }}>Loading login...</div>}>
+      <LoginForm />
+    </Suspense>
   );
 }

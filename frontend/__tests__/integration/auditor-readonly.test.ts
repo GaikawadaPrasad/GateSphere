@@ -21,6 +21,8 @@ describe("Auditor Role & 11 Modules Read-Only Integrity Test", () => {
     ],
     permission_version: 1,
     community_ids: ["comm-1"],
+    active_role: "auditor",
+    session_bucket: "auditor",
     roles: [{ id: "r-auditor", role_slug: "auditor", community_id: "comm-1" }],
   };
 

@@ -8,11 +8,15 @@ interface BreadcrumbItem {
 interface PageHeaderProps {
   title: string;
   subtitle?: string;
+  description?: string;
   breadcrumbs?: BreadcrumbItem[];
   actions?: ReactNode;
+  action?: ReactNode;
 }
 
-export function PageHeader({ title, subtitle, breadcrumbs, actions }: PageHeaderProps) {
+export function PageHeader({ title, subtitle, description, breadcrumbs, actions, action }: PageHeaderProps) {
+  const sub = subtitle || description;
+  const acts = actions || action;
   return (
     <div style={{ marginBottom: "1.75rem" }}>
       {breadcrumbs && breadcrumbs.length > 0 && (
@@ -54,14 +58,14 @@ export function PageHeader({ title, subtitle, breadcrumbs, actions }: PageHeader
           <h1 style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--fg)", letterSpacing: "-0.02em" }}>
             {title}
           </h1>
-          {subtitle && (
+          {sub && (
             <p style={{ fontSize: "0.875rem", color: "var(--muted)", marginTop: "0.2rem" }}>
-              {subtitle}
+              {sub}
             </p>
           )}
         </div>
 
-        {actions && <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>{actions}</div>}
+        {acts && <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>{acts}</div>}
       </div>
     </div>
   );
