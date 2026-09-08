@@ -1,0 +1,1 @@
+"""Assistant module test package."""

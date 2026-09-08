@@ -101,3 +101,89 @@ def test_auditor_can_view_but_not_create(as_role, seed_ids):
     assert r.status_code == 200
     r = auditor.post(P, json={"code": "auditx", "name": "X"})
     assert r.status_code == 403
+
+
+def test_property_full_crud_and_community_units_list(auth_client, unique_code):
+    # 1. Create community
+    r = auth_client.post(P, json={"code": f"c_{unique_code}", "name": "CRUD Community"})
+    assert r.status_code == 201
+    cid = r.json()["data"]["id"]
+
+    try:
+        # 2. Gate CRUD
+        r = auth_client.post(f"{P}/{cid}/gates", json={"code": "G_MAIN", "name": "Main Gate"})
+        assert r.status_code == 201
+        gid = r.json()["data"]["id"]
+
+        r = auth_client.get(f"{P}/gates/{gid}")
+        assert r.status_code == 200
+        assert r.json()["data"]["name"] == "Main Gate"
+
+        r = auth_client.patch(f"{P}/gates/{gid}", json={"name": "North Main Gate"})
+        assert r.status_code == 200
+        assert r.json()["data"]["name"] == "North Main Gate"
+
+        # 3. Tower CRUD
+        r = auth_client.post(f"{P}/{cid}/towers", json={"code": "T1", "name": "Tower One"})
+        assert r.status_code == 201
+        tid = r.json()["data"]["id"]
+
+        r = auth_client.patch(f"{P}/towers/{tid}", json={"name": "Tower Alpha"})
+        assert r.status_code == 200
+        assert r.json()["data"]["name"] == "Tower Alpha"
+
+        # 4. Floor CRUD
+        r = auth_client.post(f"{P}/floors", json={"tower_id": tid, "floor_number": 2, "label": "2nd Floor"})
+        assert r.status_code == 201
+        fid = r.json()["data"]["id"]
+
+        r = auth_client.get(f"{P}/floors/{fid}")
+        assert r.status_code == 200
+
+        r = auth_client.patch(f"{P}/floors/{fid}", json={"label": "Level 2"})
+        assert r.status_code == 200
+        assert r.json()["data"]["label"] == "Level 2"
+
+        # 5. Unit CRUD & Community-wide listing
+        r = auth_client.post(f"{P}/units", json={"floor_id": fid, "unit_number": "A-201", "bedrooms": 2})
+        assert r.status_code == 201
+        uid = r.json()["data"]["id"]
+
+        r = auth_client.get(f"{P}/units/{uid}")
+        assert r.status_code == 200
+
+        r = auth_client.patch(f"{P}/units/{uid}", json={"bedrooms": 3})
+        assert r.status_code == 200
+        assert r.json()["data"]["bedrooms"] == 3
+
+        # Community-wide units endpoint
+        r = auth_client.get(f"{P}/{cid}/units")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["success"] is True
+        assert body["meta"]["total"] >= 1
+        assert any(u["id"] == uid for u in body["data"])
+
+        # Filtered by tower
+        r = auth_client.get(f"{P}/{cid}/units?tower_id={tid}")
+        assert r.status_code == 200
+        assert r.json()["meta"]["total"] >= 1
+
+        # Delete Unit
+        assert auth_client.delete(f"{P}/units/{uid}").status_code == 204
+        assert auth_client.get(f"{P}/units/{uid}").status_code == 404
+
+        # Delete Floor
+        assert auth_client.delete(f"{P}/floors/{fid}").status_code == 204
+        assert auth_client.get(f"{P}/floors/{fid}").status_code == 404
+
+        # Delete Tower
+        assert auth_client.delete(f"{P}/towers/{tid}").status_code == 204
+        assert auth_client.get(f"{P}/towers/{tid}").status_code == 404
+
+        # Delete Gate
+        assert auth_client.delete(f"{P}/gates/{gid}").status_code == 204
+        assert auth_client.get(f"{P}/gates/{gid}").status_code == 404
+
+    finally:
+        auth_client.delete(f"{P}/{cid}")

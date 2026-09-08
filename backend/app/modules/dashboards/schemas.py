@@ -1,4 +1,4 @@
-"""Pydantic response models for Dashboards (FR-14). Read-only aggregates."""
+"""Dashboards schemas (FR-14)."""
 
 from __future__ import annotations
 
@@ -17,8 +17,17 @@ class OverviewStats(BaseModel):
     pending_deliveries: int
     open_tickets: int
     open_incidents: int
-    active_panic_alerts: int
     outstanding_balance: Decimal
+
+
+class AdminStats(BaseModel):
+    community_id: uuid.UUID
+    open_tickets: int
+    open_incidents: int
+    pending_deliveries: int
+    active_panic_alerts: int
+    units_occupied: int
+    units_vacant: int
 
 
 class SecurityStats(BaseModel):
@@ -26,11 +35,8 @@ class SecurityStats(BaseModel):
     visitors_inside: int
     vehicles_inside: int
     staff_inside: int
-    pending_visitor_approvals: int
-    expected_visitors: int  # approved, still valid, not yet entered (FR-14)
     active_panic_alerts: int
-    open_incidents: int
-    guards_on_active_roster: int
+    expected_visitors: int
 
 
 class FinancialStats(BaseModel):
@@ -49,3 +55,26 @@ class ResidentStats(BaseModel):
     my_upcoming_bookings: int
     my_outstanding_balance: Decimal
     published_announcements: int
+
+
+# Re-export assistant schemas for backward compatibility
+from app.modules.assistant.schemas import (
+    AssistantAction,
+    AssistantQuickChip,
+    AssistantQueryRequest,
+    AssistantResponse,
+    AssistantQuickActionsResponse,
+)
+
+__all__ = [
+    "OverviewStats",
+    "AdminStats",
+    "SecurityStats",
+    "FinancialStats",
+    "ResidentStats",
+    "AssistantAction",
+    "AssistantQuickChip",
+    "AssistantQueryRequest",
+    "AssistantResponse",
+    "AssistantQuickActionsResponse",
+]

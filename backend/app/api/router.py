@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from app.modules.amenities.router import router as amenities_router
+from app.modules.assistant.router import router as assistant_router
 from app.modules.audit.router import router as audit_router
 from app.modules.auth.router import router as auth_router
 from app.modules.billing.router import router as billing_router
@@ -44,8 +45,10 @@ for r in (
     notifications_router,
     audit_router,
     dashboards_router,
+    assistant_router,
     uploads_router,
     rbac_router,
     onboarding_router,
 ):
     api_router.include_router(r)
+

@@ -122,6 +122,36 @@ async def create_gate(
     return ok(schemas.GateRead.model_validate(obj), message="Gate created")
 
 
+@router.get("/gates/{gate_id}", response_model=Envelope[schemas.GateRead], dependencies=[VIEW])
+async def get_gate(gate_id: uuid.UUID, svc: CommunityService = Depends(community_service)) -> dict:
+    return ok(schemas.GateRead.model_validate(await svc.get_gate(gate_id)))
+
+
+@router.patch("/gates/{gate_id}", response_model=Envelope[schemas.GateRead], dependencies=[UPDATE])
+async def update_gate(
+    gate_id: uuid.UUID,
+    payload: schemas.GateUpdate,
+    svc: CommunityService = Depends(community_service),
+) -> dict:
+    return ok(
+        schemas.GateRead.model_validate(await svc.update_gate(gate_id, payload)),
+        message="Updated",
+    )
+
+
+@router.delete(
+    "/gates/{gate_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    dependencies=[DELETE],
+)
+async def delete_gate(
+    gate_id: uuid.UUID, svc: CommunityService = Depends(community_service)
+) -> Response:
+    await svc.delete_gate(gate_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 # --- towers ---------------------------------------------------------- #
 @router.get(
     "/{community_id}/towers", response_model=Envelope[list[schemas.TowerRead]], dependencies=[VIEW]
@@ -175,6 +205,19 @@ async def update_tower(
     )
 
 
+@router.delete(
+    "/towers/{tower_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    dependencies=[DELETE],
+)
+async def delete_tower(
+    tower_id: uuid.UUID, svc: CommunityService = Depends(community_service)
+) -> Response:
+    await svc.delete_tower(tower_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 # --- floors -------------------------------------------------------- #
 @router.get(
     "/towers/{tower_id}/floors",
@@ -215,7 +258,60 @@ async def get_floor(
     return ok(schemas.FloorRead.model_validate(await svc.get_floor(floor_id)))
 
 
+@router.patch(
+    "/floors/{floor_id}", response_model=Envelope[schemas.FloorRead], dependencies=[UPDATE]
+)
+async def update_floor(
+    floor_id: uuid.UUID,
+    payload: schemas.FloorUpdate,
+    svc: CommunityService = Depends(community_service),
+) -> dict:
+    return ok(
+        schemas.FloorRead.model_validate(await svc.update_floor(floor_id, payload)),
+        message="Updated",
+    )
+
+
+@router.delete(
+    "/floors/{floor_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    dependencies=[DELETE],
+)
+async def delete_floor(
+    floor_id: uuid.UUID, svc: CommunityService = Depends(community_service)
+) -> Response:
+    await svc.delete_floor(floor_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 # --- units ------------------------------------------------------- #
+@router.get(
+    "/{community_id}/units",
+    response_model=Envelope[list[schemas.UnitRead]],
+    dependencies=[VIEW],
+)
+async def list_community_units(
+    community_id: uuid.UUID,
+    tower_id: uuid.UUID | None = None,
+    floor_id: uuid.UUID | None = None,
+    unit_type: str | None = None,
+    active: bool | None = None,
+    params: PageParams = Depends(page_params),
+    svc: CommunityService = Depends(community_service),
+) -> dict:
+    rows, total = await svc.list_community_units(
+        community_id=community_id,
+        offset=params.offset,
+        limit=params.page_size,
+        tower_id=tower_id,
+        floor_id=floor_id,
+        unit_type=unit_type,
+        active=active,
+    )
+    return paginated([schemas.UnitRead.model_validate(r) for r in rows], total=total, params=params)
+
+
 @router.get(
     "/floors/{floor_id}/units", response_model=Envelope[list[schemas.UnitRead]], dependencies=[VIEW]
 )
@@ -258,3 +354,16 @@ async def update_unit(
     return ok(
         schemas.UnitRead.model_validate(await svc.update_unit(unit_id, payload)), message="Updated"
     )
+
+
+@router.delete(
+    "/units/{unit_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    dependencies=[DELETE],
+)
+async def delete_unit(
+    unit_id: uuid.UUID, svc: CommunityService = Depends(community_service)
+) -> Response:
+    await svc.delete_unit(unit_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

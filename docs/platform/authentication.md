@@ -8,12 +8,13 @@ Canonical source. Backend implementation: `backend/app/core/security.py`. Fronte
 
 See [ADR-003](../decisions/ADR-003-authentication.md).
 
-### Cookies
+### Cookies (Role-Bucketed Standard)
 
 | Cookie | Flags | Purpose |
 |--------|-------|---------|
-| `gs_session` | `HttpOnly`, `SameSite=Lax`, `Secure` (staging/prod), `Path=/` | Opaque 32-byte token. Key into the Redis session store. |
-| `gs_csrf` | `SameSite=Lax`, `Secure` (staging/prod), readable by JS | Double-submit CSRF token. |
+| `gatesphere_<bucket>_session` | `HttpOnly`, `SameSite=Lax`, `Secure` (staging/prod), `Path=/` | Opaque 32-byte token. Key into Redis cache and `user_sessions` DB table. |
+| `gatesphere_<bucket>_csrf` | `SameSite=Lax`, `Secure` (staging/prod), readable by JS | Double-submit CSRF token matched against `X-CSRF-Token` header. |
+| `gs_session` / `gs_csrf` | (Legacy aliases) | Accepted on read for backward compatibility (bucket `default`). |
 
 ### Session store
 
