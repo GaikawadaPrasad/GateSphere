@@ -9,6 +9,7 @@ import type { NextRequest } from "next/server";
 const PROTECTED_PREFIXES = [
   "/super-admin",
   "/community-admin",
+  "/association-committee",
   "/dashboard",
   "/communities",
   "/towers",

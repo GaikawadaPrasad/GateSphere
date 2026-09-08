@@ -23,9 +23,17 @@ export function useCommunities(params?: { active?: boolean }) {
 export function useCommunity(id?: string) {
   return useQuery({
     queryKey: communityKeys.detail(id || ""),
-    queryFn: () => (id ? communitiesApi.get(id) : null),
+    queryFn: async () => {
+      if (!id) return null;
+      try {
+        return await communitiesApi.get(id);
+      } catch {
+        return null;
+      }
+    },
     enabled: Boolean(id),
     staleTime: 60_000,
+    retry: false,
   });
 }
 

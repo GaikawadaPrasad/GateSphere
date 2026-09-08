@@ -356,13 +356,25 @@ export const billingApi = {
   chargeHeads: (communityId?: string) =>
     apiGet<any[]>("/billing/charge-heads", communityId ? { community_id: communityId } : undefined),
   rules: (communityId?: string) =>
-    apiGet<any[]>("/billing/rules", communityId ? { community_id: communityId } : undefined),
+    apiGet<any>("/billing/rules", communityId ? { community_id: communityId } : undefined),
   unitLedger: (unitId: string, params?: ListQueryParams) =>
     apiGet<any[]>(`/billing/units/${unitId}/ledger`, params as Record<string, unknown>),
-  exportInvoicesCsv: (params?: Record<string, unknown>) =>
-    apiGet<string>("/billing/invoices/export", params),
-  exportPaymentsCsv: (params?: Record<string, unknown>) =>
-    apiGet<string>("/billing/payments/export", params),
+  exportInvoicesCsv: (params?: string | Record<string, unknown> | { community_id?: string; invoice_status?: string }) =>
+    apiGet<string>("/billing/invoices/export", typeof params === "string" ? { community_id: params } : params as Record<string, unknown>),
+  exportPaymentsCsv: (params?: string | Record<string, unknown> | { community_id?: string }) =>
+    apiGet<string>("/billing/payments/export", typeof params === "string" ? { community_id: params } : params as Record<string, unknown>),
+};
+
+export const assessmentsApi = {
+  list: (params?: { community_id?: string; status?: string; page?: number; page_size?: number }) =>
+    apiGet<any[]>("/billing/assessments", params as Record<string, unknown>),
+  get: (id: string) => apiGet<any>(`/billing/assessments/${id}`),
+  create: (payload: any, communityId?: string) =>
+    apiSend<any>("POST", "/billing/assessments", payload, communityId ? { community_id: communityId } : undefined),
+  approve: (id: string, notes?: string) =>
+    apiSend<any>("POST", `/billing/assessments/${id}/approve`, { notes }),
+  reject: (id: string, reason?: string) =>
+    apiSend<any>("POST", `/billing/assessments/${id}/reject`, { reason }),
 };
 
 export const communicationApi = {
