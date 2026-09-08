@@ -99,26 +99,15 @@ export function useResidentOverview(communityId?: string | null) {
   return useQuery({
     queryKey: ["resident", "overview", communityId],
     queryFn: async () => {
-      try {
-        const stats = await api.get<any>(`/dashboards/resident${communityId ? `?community_id=${communityId}` : ""}`);
-        return {
-          pending_dues_amount: stats?.pending_dues_amount ?? 350.0,
-          pending_visitor_count: stats?.pending_visitor_count ?? 1,
-          open_service_tickets: stats?.open_tickets_count ?? 2,
-          staff_on_duty_count: 2,
-          upcoming_amenity_bookings: 1,
-          active_deliveries_count: 1,
-        } as ResidentDashboardStats;
-      } catch {
-        return {
-          pending_dues_amount: 350.0,
-          pending_visitor_count: 1,
-          open_service_tickets: 2,
-          staff_on_duty_count: 2,
-          upcoming_amenity_bookings: 1,
-          active_deliveries_count: 1,
-        } as ResidentDashboardStats;
-      }
+      const stats = await api.get<any>(`/dashboards/resident${communityId ? `?community_id=${communityId}` : ""}`);
+      return {
+        pending_dues_amount: Number(stats?.pending_dues_amount ?? 0),
+        pending_visitor_count: Number(stats?.pending_visitor_count ?? 0),
+        open_service_tickets: Number(stats?.open_tickets_count ?? 0),
+        staff_on_duty_count: Number(stats?.staff_on_duty_count ?? 0),
+        upcoming_amenity_bookings: Number(stats?.upcoming_amenity_bookings ?? 0),
+        active_deliveries_count: Number(stats?.active_deliveries_count ?? 0),
+      } as ResidentDashboardStats;
     },
   });
 }
@@ -129,47 +118,22 @@ export function useResidentVisitors() {
   const query = useQuery<VisitorRequest[]>({
     queryKey: ["resident", "visitors"],
     queryFn: async () => {
-      try {
-        const res = await api.get<VisitorRequest[]>("/visitors/requests");
-        return Array.isArray(res) && res.length > 0
-          ? res
-          : [
-              {
-                id: "vis-live-1",
-                visitor_name: "Robert Langdon",
-                phone: "+1 (555) 234-5678",
-                purpose: "Guest / Dinner",
-                vehicle_number: "CA-9081",
-                status: "pending" as const,
-                created_at: new Date(Date.now() - 1000 * 30).toISOString(),
-                expires_at: new Date(Date.now() + 1000 * 90).toISOString(),
-              },
-              {
-                id: "vis-past-2",
-                visitor_name: "Elena Rostova",
-                phone: "+1 (555) 876-5432",
-                purpose: "Family Visit",
-                status: "approved" as const,
-                pass_code: "OTP-8819",
-                created_at: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
-                entry_time: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-                exit_time: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-              },
-            ];
-      } catch {
-        return [
-          {
-            id: "vis-live-1",
-            visitor_name: "Robert Langdon",
-            phone: "+1 (555) 234-5678",
-            purpose: "Guest / Dinner",
-            vehicle_number: "CA-9081",
-            status: "pending" as const,
-            created_at: new Date(Date.now() - 1000 * 30).toISOString(),
-            expires_at: new Date(Date.now() + 1000 * 90).toISOString(),
-          },
-        ];
-      }
+      const res = await api.get<any[]>("/visitors/requests");
+      if (!Array.isArray(res)) return [];
+      return res.map((r: any) => ({
+        id: r.id,
+        visitor_name: r.visitor?.full_name || r.visitor_name || "Visitor",
+        phone: r.visitor?.phone || r.phone || "",
+        purpose: r.purpose || "Guest visit",
+        vehicle_number: r.vehicle_number,
+        status: r.status,
+        created_at: r.created_at,
+        valid_until: r.valid_until,
+        pass_code: r.passes?.[0]?.pin || (r.passes?.[0]?.token ? `QR-${r.passes[0].token.slice(0, 6)}` : undefined),
+        qr_token: r.passes?.[0]?.token,
+        entry_time: r.entries?.[0]?.entry_at,
+        exit_time: r.entries?.[0]?.exit_at,
+      }));
     },
     refetchInterval: 10000,
   });
@@ -177,28 +141,41 @@ export function useResidentVisitors() {
   const decideMutation = useMutation({
     mutationFn: async ({ requestId, approved, note }: { requestId: string; approved: boolean; note?: string }) => {
       return await api.post(`/visitors/requests/${requestId}/decision`, {
-        approved,
-        notes: note || (approved ? "Approved by resident" : "Rejected by resident"),
+        decision: approved ? "approved" : "rejected",
+        remarks: note || (approved ? "Approved by resident" : "Rejected by resident"),
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["resident", "visitors"] });
+      queryClient.invalidateQueries({ queryKey: ["resident", "overview"] });
     },
   });
 
   const createPassMutation = useMutation({
     mutationFn: async (payload: { visitor_name: string; phone: string; valid_for_hours: number }) => {
+      const profile = await api.get<any>("/residents/me");
+      const unitId = profile?.occupancies?.[0]?.unit_id;
+      if (!unitId) {
+        throw new Error("No active unit occupancy found for resident profile");
+      }
       const req = await api.post<any>("/visitors/requests", {
-        visitor_name: payload.visitor_name,
-        phone: payload.phone,
+        unit_id: unitId,
+        visitor_type: "guest",
+        visitor: {
+          full_name: payload.visitor_name,
+          phone: payload.phone,
+        },
         purpose: "Pre-approved Visitor Pass",
       });
       return await api.post(`/visitors/requests/${req.id}/passes`, {
-        valid_for_hours: payload.valid_for_hours || 24,
+        pass_type: "qr",
+        max_entries: 1,
+        with_pin: true,
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["resident", "visitors"] });
+      queryClient.invalidateQueries({ queryKey: ["resident", "overview"] });
     },
   });
 
@@ -211,47 +188,20 @@ export function useResidentDeliveries() {
   const query = useQuery<DeliveryItem[]>({
     queryKey: ["resident", "deliveries"],
     queryFn: async () => {
-      try {
-        const res = await api.get<DeliveryItem[]>("/deliveries");
-        return Array.isArray(res) && res.length > 0
-          ? res
-          : [
-              {
-                id: "del-101",
-                courier_company: "Amazon Express",
-                package_type: "Electronics & Books",
-                tracking_id: "AMZ-9921-US",
-                protocol: "allow_gate" as const,
-                status: "at_gate" as const,
-                arrived_at: new Date(Date.now() - 1000 * 60 * 10).toISOString(),
-                driver_name: "Marcus Miller",
-                driver_phone: "+1 555-8812",
-              },
-              {
-                id: "del-102",
-                courier_company: "FedEx Priority",
-                package_type: "Documents",
-                tracking_id: "FDX-1029-44",
-                protocol: "leave_at_desk" as const,
-                status: "delivered" as const,
-                delivered_at: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
-              },
-            ];
-      } catch {
-        return [
-          {
-            id: "del-101",
-            courier_company: "Amazon Express",
-            package_type: "Electronics & Books",
-            tracking_id: "AMZ-9921-US",
-            protocol: "allow_gate" as const,
-            status: "at_gate" as const,
-            arrived_at: new Date(Date.now() - 1000 * 60 * 10).toISOString(),
-            driver_name: "Marcus Miller",
-            driver_phone: "+1 555-8812",
-          },
-        ];
-      }
+      const res = await api.get<any[]>("/deliveries");
+      if (!Array.isArray(res)) return [];
+      return res.map((d: any) => ({
+        id: d.id,
+        courier_company: d.provider_name || (d.delivery_type ? d.delivery_type.toUpperCase() : "Courier"),
+        package_type: d.delivery_type ? `${d.delivery_type.toUpperCase()} Package` : "General Package",
+        tracking_id: d.tracking_reference || d.id.slice(0, 8),
+        protocol: d.protocol_id || "allow_gate",
+        status: d.status || "expected",
+        arrived_at: d.arrived_at,
+        delivered_at: d.delivered_at,
+        driver_name: d.executive_name,
+        driver_phone: d.executive_phone,
+      }));
     },
   });
 
@@ -273,103 +223,62 @@ export function useResidentAmenities() {
   const amenitiesQuery = useQuery<Amenity[]>({
     queryKey: ["resident", "amenities-list"],
     queryFn: async () => {
-      try {
-        const res = await api.get<Amenity[]>("/amenities");
-        return Array.isArray(res) && res.length > 0
-          ? res
-          : [
-              {
-                id: "amenity-1",
-                name: "Infinity Swimming Pool",
-                category: "Sports & Recreation",
-                description: "Olympic-grade temperature controlled swimming pool with lounge deck.",
-                capacity: 30,
-                pricing_type: "free",
-                price_per_hour: 0,
-                booking_window_days: 7,
-              },
-              {
-                id: "amenity-2",
-                name: "Clubhouse Banquet Hall",
-                category: "Events",
-                description: "Spacious air-conditioned hall with AV systems and banquet seating.",
-                capacity: 150,
-                pricing_type: "paid",
-                price_per_hour: 50,
-                booking_window_days: 30,
-              },
-              {
-                id: "amenity-3",
-                name: "Tennis & Badminton Court",
-                category: "Sports",
-                description: "Synthetic floodlit courts with equipment rental on-site.",
-                capacity: 8,
-                pricing_type: "free",
-                price_per_hour: 0,
-                booking_window_days: 5,
-              },
-            ];
-      } catch {
-        return [
-          {
-            id: "amenity-1",
-            name: "Infinity Swimming Pool",
-            category: "Sports & Recreation",
-            description: "Olympic-grade temperature controlled swimming pool with lounge deck.",
-            capacity: 30,
-            pricing_type: "free",
-            price_per_hour: 0,
-            booking_window_days: 7,
-          },
-        ];
-      }
+      const res = await api.get<any[]>("/amenities");
+      if (!Array.isArray(res)) return [];
+      return res.map((a: any) => ({
+        id: a.id,
+        name: a.name,
+        category: a.amenity_type ? a.amenity_type.toUpperCase() : "Facility",
+        description: a.description || `Community ${a.name} access. Capacity: ${a.capacity || 20} persons.`,
+        capacity: a.capacity || 20,
+        pricing_type: a.pricing_type || "free",
+        price_per_hour: Number(a.price_per_hour ?? 0),
+        booking_window_days: a.booking_window_days || 14,
+      }));
     },
   });
 
   const bookingsQuery = useQuery<AmenityBooking[]>({
     queryKey: ["resident", "my-bookings"],
     queryFn: async () => {
-      try {
-        const res = await api.get<AmenityBooking[]>("/amenities/bookings?mine=true");
-        return Array.isArray(res) && res.length > 0
-          ? res
-          : [
-              {
-                id: "bk-801",
-                amenity_id: "amenity-1",
-                amenity_name: "Infinity Swimming Pool",
-                date: "2026-09-04",
-                start_time: "07:00 AM",
-                end_time: "08:30 AM",
-                status: "confirmed" as const,
-                guests_count: 2,
-                total_amount: 0,
-              },
-            ];
-      } catch {
-        return [
-          {
-            id: "bk-801",
-            amenity_id: "amenity-1",
-            amenity_name: "Infinity Swimming Pool",
-            date: "2026-09-04",
-            start_time: "07:00 AM",
-            end_time: "08:30 AM",
-            status: "confirmed" as const,
-            guests_count: 2,
-            total_amount: 0,
-          },
-        ];
-      }
+      const res = await api.get<any[]>("/amenities/bookings");
+      if (!Array.isArray(res)) return [];
+      return res.map((b: any) => ({
+        id: b.id,
+        amenity_id: b.amenity_id,
+        amenity_name: b.amenity?.name || "Community Amenity",
+        date: b.booking_date || (b.start_at ? b.start_at.split("T")[0] : ""),
+        start_time: b.start_at ? new Date(b.start_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
+        end_time: b.end_at ? new Date(b.end_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
+        status: b.status || "confirmed",
+        guests_count: b.participant_count || 1,
+        total_amount: Number(b.amount_charged ?? 0),
+      }));
     },
   });
 
   const bookMutation = useMutation({
     mutationFn: async (payload: { amenity_id: string; slot_id?: string; date: string; guests: number }) => {
-      return await api.post("/amenities/bookings", payload);
+      const profile = await api.get<any>("/residents/me");
+      const unitId = profile?.occupancies?.[0]?.unit_id;
+      if (!unitId) {
+        throw new Error("No active unit occupancy found for resident");
+      }
+      const bookingDate = payload.date;
+      const startAt = `${bookingDate}T09:00:00Z`;
+      const endAt = `${bookingDate}T10:00:00Z`;
+      return await api.post("/amenities/bookings", {
+        amenity_id: payload.amenity_id,
+        unit_id: unitId,
+        booking_date: bookingDate,
+        start_at: startAt,
+        end_at: endAt,
+        participant_count: payload.guests || 1,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["resident", "my-bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["resident", "overview"] });
     },
   });
 
@@ -379,6 +288,7 @@ export function useResidentAmenities() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["resident", "my-bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["resident", "overview"] });
     },
   });
 
@@ -396,76 +306,61 @@ export function useResidentComplaints() {
   const query = useQuery<ComplaintTicket[]>({
     queryKey: ["resident", "complaints"],
     queryFn: async () => {
-      try {
-        const res = await api.get<ComplaintTicket[]>("/complaints/tickets");
-        return Array.isArray(res) && res.length > 0
-          ? res
-          : [
-              {
-                id: "tkt-101",
-                ticket_number: "TKT-2026-101",
-                subject: "Water seepage in master bathroom ceiling",
-                category_name: "Plumbing",
-                description: "Noticeable water staining and slight drip near the vent.",
-                priority: "high" as const,
-                status: "in_progress" as const,
-                escalation_state: "on_track" as const,
-                created_at: new Date(Date.now() - 1000 * 60 * 60 * 28).toISOString(),
-                assigned_to: "Apex Plumbing Services (Technician Ravi)",
-                assigned_role: "vendor_technician",
-                messages_count: 4,
-              },
-              {
-                id: "tkt-102",
-                ticket_number: "TKT-2026-102",
-                subject: "Intercom buzzer intermittent disconnect",
-                category_name: "Electrical / Intercom",
-                description: "Gate notifications don't ring on the handset occasionally.",
-                priority: "medium" as const,
-                status: "resolved" as const,
-                escalation_state: "on_track" as const,
-                created_at: new Date(Date.now() - 1000 * 60 * 60 * 72).toISOString(),
-                resolved_at: new Date(Date.now() - 1000 * 60 * 60 * 8).toISOString(),
-                assigned_to: "Facility Maintenance Team",
-                messages_count: 2,
-              },
-            ];
-      } catch {
-        return [
-          {
-            id: "tkt-101",
-            ticket_number: "TKT-2026-101",
-            subject: "Water seepage in master bathroom ceiling",
-            category_name: "Plumbing",
-            description: "Noticeable water staining and slight drip near the vent.",
-            priority: "high" as const,
-            status: "in_progress" as const,
-            escalation_state: "on_track" as const,
-            created_at: new Date(Date.now() - 1000 * 60 * 60 * 28).toISOString(),
-            assigned_to: "Apex Plumbing Services (Technician Ravi)",
-            assigned_role: "vendor_technician",
-            messages_count: 4,
-          },
-        ];
-      }
+      const res = await api.get<any[]>("/complaints/tickets");
+      if (!Array.isArray(res)) return [];
+      return res.map((t: any) => ({
+        id: t.id,
+        ticket_number: t.ticket_number || `TKT-${t.id.slice(0, 6)}`,
+        subject: t.subject,
+        category_name: t.category?.name || "General Maintenance",
+        description: t.description || "",
+        priority: t.priority || "medium",
+        status: t.status || "created",
+        escalation_state: t.escalation_state || "on_track",
+        created_at: t.created_at,
+        assigned_to: t.assigned_vendor?.name || t.assigned_user?.full_name || "Facility Maintenance Team",
+        assigned_role: t.assigned_vendor ? "vendor_technician" : "facility_manager",
+        resolved_at: t.resolved_at,
+        messages_count: t.messages_count || 1,
+      }));
     },
   });
 
   const createTicketMutation = useMutation({
     mutationFn: async (payload: { subject: string; category_id?: string; description: string; priority: string }) => {
-      return await api.post("/complaints/tickets", payload);
+      const profile = await api.get<any>("/residents/me");
+      const unitId = profile?.occupancies?.[0]?.unit_id;
+      if (!unitId) {
+        throw new Error("No active unit occupancy found for resident");
+      }
+      let categoryId = payload.category_id;
+      if (!categoryId) {
+        const categories = await api.get<any[]>("/complaints/categories");
+        if (Array.isArray(categories) && categories.length > 0) {
+          categoryId = categories[0].id;
+        }
+      }
+      return await api.post("/complaints/tickets", {
+        unit_id: unitId,
+        category_id: categoryId,
+        subject: payload.subject,
+        description: payload.description,
+        priority: payload.priority || "medium",
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["resident", "complaints"] });
+      queryClient.invalidateQueries({ queryKey: ["resident", "overview"] });
     },
   });
 
   const confirmTicketMutation = useMutation({
     mutationFn: async ({ ticketId, satisfied, notes }: { ticketId: string; satisfied: boolean; notes?: string }) => {
-      return await api.post(`/complaints/tickets/${ticketId}/confirm`, { satisfied, notes });
+      return await api.post(`/complaints/tickets/${ticketId}/confirm`, { satisfied, notes: notes || "Confirmed by resident" });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["resident", "complaints"] });
+      queryClient.invalidateQueries({ queryKey: ["resident", "overview"] });
     },
   });
 
@@ -478,75 +373,33 @@ export function useResidentPayments() {
   const query = useQuery<InvoiceItem[]>({
     queryKey: ["resident", "invoices"],
     queryFn: async () => {
-      try {
-        const res = await api.get<InvoiceItem[]>("/billing/invoices");
-        return Array.isArray(res) && res.length > 0
-          ? res
-          : [
-              {
-                id: "inv-001",
-                invoice_number: "INV-2026-0901",
-                title: "Monthly Maintenance & Facility Fee - Sep 2026",
-                total_amount: 350.0,
-                amount_paid: 0.0,
-                balance_due: 350.0,
-                status: "posted" as const,
-                issue_date: "2026-09-01",
-                due_date: "2026-09-15",
-                line_items: [
-                  { head: "Common Area Maintenance", amount: 220.0 },
-                  { head: "Security & Gate Operations", amount: 80.0 },
-                  { head: "Sinking Fund Reserve", amount: 50.0 },
-                ],
-              },
-              {
-                id: "inv-002",
-                invoice_number: "INV-2026-0801",
-                title: "Monthly Maintenance & Facility Fee - Aug 2026",
-                total_amount: 350.0,
-                amount_paid: 350.0,
-                balance_due: 0.0,
-                status: "paid" as const,
-                issue_date: "2026-08-01",
-                due_date: "2026-08-15",
-                receipt_number: "RCP-2026-0814",
-                line_items: [
-                  { head: "Common Area Maintenance", amount: 220.0 },
-                  { head: "Security & Gate Operations", amount: 80.0 },
-                  { head: "Sinking Fund Reserve", amount: 50.0 },
-                ],
-              },
-            ];
-      } catch {
-        return [
-          {
-            id: "inv-001",
-            invoice_number: "INV-2026-0901",
-            title: "Monthly Maintenance & Facility Fee - Sep 2026",
-            total_amount: 350.0,
-            amount_paid: 0.0,
-            balance_due: 350.0,
-            status: "posted" as const,
-            issue_date: "2026-09-01",
-            due_date: "2026-09-15",
-            line_items: [
-              { head: "Common Area Maintenance", amount: 220.0 },
-              { head: "Security & Gate Operations", amount: 80.0 },
-              { head: "Sinking Fund Reserve", amount: 50.0 },
-            ],
-          },
-        ];
-      }
+      const res = await api.get<any[]>("/billing/invoices");
+      if (!Array.isArray(res)) return [];
+      return res.map((inv: any) => ({
+        id: inv.id,
+        invoice_number: inv.invoice_number,
+        title: `Maintenance & Operations (${inv.invoice_number})`,
+        total_amount: Number(inv.total_amount ?? 0),
+        amount_paid: Number(inv.amount_paid ?? 0),
+        balance_due: Number(inv.balance_due ?? 0),
+        status: inv.status,
+        issue_date: inv.issue_date || inv.created_at,
+        due_date: inv.due_date || inv.created_at,
+        receipt_number: inv.receipt_number,
+        line_items: Array.isArray(inv.items)
+          ? inv.items.map((i: any) => ({ head: i.description || "Maintenance Charge", amount: Number(i.amount ?? 0) }))
+          : [],
+      }));
     },
   });
 
   const payDuesMutation = useMutation({
-    mutationFn: async ({ invoiceId, amount, method }: { invoiceId: string; amount: number; method: string }) => {
+    mutationFn: async ({ invoiceId, amount, method }: { invoiceId: string; amount: number; method?: string }) => {
       return await api.post("/billing/payments", {
-        invoice_id: invoiceId,
-        amount,
-        payment_method: method || "simulated",
-        reference_id: `SIM-TXN-${Date.now()}`,
+        amount: Number(amount),
+        payment_method: "upi",
+        allocations: [{ invoice_id: invoiceId, amount: Number(amount) }],
+        remarks: `Resident portal simulated payment via ${method || "UPI"}`,
       });
     },
     onSuccess: () => {
@@ -558,13 +411,44 @@ export function useResidentPayments() {
   return { ...query, payDues: payDuesMutation };
 }
 
+export function useResidentProfile() {
+  const queryClient = useQueryClient();
+
+  const query = useQuery({
+    queryKey: ["resident", "me-profile"],
+    queryFn: async () => {
+      return await api.get<any>("/residents/me");
+    },
+  });
+
+  const updateProfile = useMutation({
+    mutationFn: async (data: { full_name?: string; phone?: string; emergency_notes?: string }) => {
+      return await api.patch("/residents/me", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["resident", "me-profile"] });
+    },
+  });
+
+  const addFamilyMember = useMutation({
+    mutationFn: async (data: { unit_id: string; primary_resident_profile_id: string; full_name: string; relationship: string; phone?: string }) => {
+      return await api.post("/residents/family-members", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["resident", "me-profile"] });
+    },
+  });
+
+  return { ...query, updateProfile, addFamilyMember };
+}
+
 export function useSendResidentPanic() {
   return useMutation({
     mutationFn: async (payload: { unit_id?: string; note?: string }) => {
       return await api.post("/gate/alerts", {
-        alert_type: "sos",
-        priority: "high",
-        details: payload.note || "Resident emergency panic triggered from portal",
+        alert_type: "medical",
+        severity: "high",
+        message: payload.note || "Resident emergency panic triggered from portal",
       });
     },
   });

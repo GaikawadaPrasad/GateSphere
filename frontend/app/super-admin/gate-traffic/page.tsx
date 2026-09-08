@@ -8,6 +8,7 @@ import { formatDateTime } from "@/lib/utils";
 import { useGateEvents, usePanicAlerts, useGuardRosters } from "@/hooks/use-gate";
 import { useCommunities } from "@/hooks/use-communities";
 import type { GateEvent, GuardRoster, PanicAlert } from "@/types/gate";
+import type { Community } from "@/types/communities";
 
 export default function GateTrafficPage() {
   const [communityId, setCommunityId] = useState("");
@@ -86,7 +87,7 @@ export default function GateTrafficPage() {
             style={{ width: "auto", height: 36, padding: "0.25rem 0.6rem", fontSize: "0.85rem" }}
           >
             <option value="">All Communities</option>
-            {communities?.map((c: any) => (
+            {communities?.map((c: Community) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>

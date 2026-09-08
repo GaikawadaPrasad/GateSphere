@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import { DashboardShell } from "@/components/layout/DashboardShell";
 import { StatMetric } from "@/components/common/StatMetric";
 import { LiveDot } from "@/components/common/LiveDot";
@@ -13,12 +14,16 @@ import {
   useUpdateStaffProfile,
   useAssignedHomes,
   useStaffAttendance,
+  useStaffVisits,
   useSendStaffPanic,
   AssignedHome,
   AttendanceRecord,
+  StaffVisit,
 } from "@/hooks/use-domestic-staff-data";
 import { useTableControls } from "@/hooks/use-table-controls";
 import { formatDate } from "@/lib/utils";
+
+import { toast } from "@/store/toast";
 
 export type DomesticStaffTab =
   | "overview"
@@ -36,7 +41,8 @@ interface DomesticStaffDashboardViewProps {
 }
 
 export function DomesticStaffDashboardView({ initialTab = "overview" }: DomesticStaffDashboardViewProps) {
-  const [activeTab, setActiveTab] = useState<DomesticStaffTab>(initialTab);
+  const router = useRouter();
+  const activeTab = initialTab;
   const [sosModalOpen, setSosModalOpen] = useState(false);
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [phoneInput, setPhoneInput] = useState("+91 98765 43210");
@@ -45,6 +51,7 @@ export function DomesticStaffDashboardView({ initialTab = "overview" }: Domestic
   const { data: profile, isLoading: profileLoading } = useStaffProfile();
   const { data: homes = [], isLoading: homesLoading } = useAssignedHomes();
   const { data: attendance = [], isLoading: attLoading } = useStaffAttendance();
+  const { data: visits = [], isLoading: visitsLoading } = useStaffVisits();
   const updateProfile = useUpdateStaffProfile();
   const panicMutation = useSendStaffPanic();
 
@@ -60,16 +67,22 @@ export function DomesticStaffDashboardView({ initialTab = "overview" }: Domestic
     initialPageSize: 10,
   });
 
+  const visitControls = useTableControls<StaffVisit>({
+    data: visits,
+    searchKeys: ["unit_number", "tasks_performed", "feedback"],
+    initialPageSize: 10,
+  });
+
   const handleTriggerPanic = async () => {
     try {
       await panicMutation.mutateAsync({
         location: "Unit A-402, Emerald Tower",
         note: "Emergency SOS triggered by domestic staff",
       });
-      alert("🚨 Emergency SOS dispatched! Security Guards & Supervisors have received your alert with your current location.");
+      toast.success("Security Guards & Supervisors have been dispatched to Unit A-402.", "🚨 Emergency SOS Dispatched");
       setSosModalOpen(false);
     } catch {
-      alert("Emergency SOS sent to on-duty security guard.");
+      toast.success("Emergency SOS alert recorded and sent to security console.", "🚨 SOS Alert Sent");
       setSosModalOpen(false);
     }
   };
@@ -77,11 +90,16 @@ export function DomesticStaffDashboardView({ initialTab = "overview" }: Domestic
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
-    await updateProfile.mutateAsync({
-      staffId: profile.id,
-      data: { phone: phoneInput, emergency_contact: emergencyInput },
-    });
-    setEditProfileOpen(false);
+    try {
+      await updateProfile.mutateAsync({
+        staffId: profile.id,
+        data: { phone: phoneInput, emergency_contact: emergencyInput },
+      });
+      toast.success("Your contact and emergency information was updated.", "Profile Saved");
+      setEditProfileOpen(false);
+    } catch {
+      toast.error("Failed to update profile. Please try again.", "Error");
+    }
   };
 
   return (
@@ -103,51 +121,6 @@ export function DomesticStaffDashboardView({ initialTab = "overview" }: Domestic
         </div>
       }
     >
-      {/* Navigation Tabs */}
-      <div
-        style={{
-          display: "flex",
-          gap: "0.5rem",
-          overflowX: "auto",
-          paddingBottom: "0.75rem",
-          marginBottom: "1.5rem",
-          borderBottom: "1px solid var(--border-standard)",
-        }}
-      >
-        {[
-          { id: "overview", label: "🏠 Overview" },
-          { id: "profile", label: "👤 My Profile" },
-          { id: "assigned-homes", label: "🏢 Assigned Homes" },
-          { id: "schedule", label: "📅 Shift Schedule" },
-          { id: "attendance", label: "⏱️ Attendance Log" },
-          { id: "entry-exit", label: "🛡️ Entry / Exit Pass" },
-          { id: "visits", label: "📋 Visits & Ratings" },
-          { id: "notifications", label: "🔔 Notifications" },
-          { id: "emergency", label: "🆘 Emergency SOS" },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setActiveTab(tab.id as DomesticStaffTab)}
-            style={{
-              padding: "0.55rem 1rem",
-              borderRadius: "var(--radius-sm)",
-              border: "1px solid",
-              borderColor: activeTab === tab.id ? "#0D9488" : "transparent",
-              background: activeTab === tab.id ? "#F0FDFA" : "transparent",
-              color: activeTab === tab.id ? "#0D9488" : "var(--brand-body)",
-              fontWeight: activeTab === tab.id ? 700 : 500,
-              fontSize: "13.5px",
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-              transition: "all 0.15s ease",
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
       {/* TAB 1: OVERVIEW */}
       {activeTab === "overview" && (
         <div>
@@ -166,7 +139,7 @@ export function DomesticStaffDashboardView({ initialTab = "overview" }: Domestic
               accentColor="#0D9488"
               icon="🏢"
               description="Units scheduled for service today"
-              onClick={() => setActiveTab("assigned-homes")}
+              onClick={() => router.push("/domestic-staff/assigned-homes")}
             />
             <StatMetric
               label="Current Shift Status"
@@ -174,7 +147,7 @@ export function DomesticStaffDashboardView({ initialTab = "overview" }: Domestic
               accentColor="#16A34A"
               icon="⏱️"
               description="Gate 1 entrance at 08:02 AM"
-              onClick={() => setActiveTab("entry-exit")}
+              onClick={() => router.push("/domestic-staff/entry-exit")}
             />
             <StatMetric
               label="Performance Rating"
@@ -183,7 +156,7 @@ export function DomesticStaffDashboardView({ initialTab = "overview" }: Domestic
               accentColor="#D97706"
               icon="⭐"
               description={`Based on ${profile?.total_ratings ?? 42} resident reviews`}
-              onClick={() => setActiveTab("visits")}
+              onClick={() => router.push("/domestic-staff/visits")}
             />
             <StatMetric
               label="Police Verification"
@@ -191,7 +164,7 @@ export function DomesticStaffDashboardView({ initialTab = "overview" }: Domestic
               accentColor="#1D4ED8"
               icon="🛡️"
               description="ID: POL-VER-2026-8812 (Active)"
-              onClick={() => setActiveTab("profile")}
+              onClick={() => router.push("/domestic-staff/profile")}
             />
           </div>
 
@@ -215,10 +188,10 @@ export function DomesticStaffDashboardView({ initialTab = "overview" }: Domestic
               </div>
 
               <div style={{ display: "flex", gap: "0.75rem" }}>
-                <BrandButton size="sm" onClick={() => setActiveTab("assigned-homes")}>
+                <BrandButton size="sm" onClick={() => router.push("/domestic-staff/assigned-homes")}>
                   View Resident Info
                 </BrandButton>
-                <BrandButton variant="outline" size="sm" onClick={() => setActiveTab("entry-exit")}>
+                <BrandButton variant="outline" size="sm" onClick={() => router.push("/domestic-staff/entry-exit")}>
                   Show Gate QR Pass
                 </BrandButton>
               </div>
@@ -451,18 +424,19 @@ export function DomesticStaffDashboardView({ initialTab = "overview" }: Domestic
           </p>
           <DataTable
             columns={[
-              { key: "unit", header: "Unit" },
+              { key: "unit_number", header: "Unit" },
               { key: "date", header: "Date" },
-              { key: "duration", header: "Hours" },
-              { key: "work", header: "Tasks Done" },
-              { key: "rating", header: "Rating", render: (i) => <span style={{ color: "#D97706", fontWeight: 700 }}>⭐ {i.rating}</span> },
+              { key: "duration_minutes", header: "Duration", render: (i) => i.duration_minutes ? `${Math.floor(i.duration_minutes / 60)}h ${i.duration_minutes % 60}m` : "–" },
+              { key: "tasks_performed", header: "Tasks Done" },
+              { key: "rating", header: "Rating", render: (i) => <span style={{ color: "#D97706", fontWeight: 700 }}>⭐ {i.rating || 5}</span> },
               { key: "feedback", header: "Resident Feedback" },
             ]}
-            data={[
-              { unit: "A-402", date: "2026-09-01", duration: "3h 00m", work: "Deep kitchen cleaning", rating: "5.0", feedback: "Punctual and very thorough!" },
-              { unit: "B-701", date: "2026-08-31", duration: "2h 30m", work: "Floor mopping & dusting", rating: "4.8", feedback: "Great work as always." },
-              { unit: "C-104", date: "2026-08-30", duration: "2h 00m", work: "Evening prep & meal cook", rating: "5.0", feedback: "Delicious dinner prepared on time." },
-            ]}
+            data={visitControls.paginatedData}
+            isLoading={visitsLoading}
+            page={visitControls.page}
+            pageSize={visitControls.pageSize}
+            total={visitControls.total}
+            onPageChange={visitControls.setPage}
           />
         </div>
       )}

@@ -15,6 +15,7 @@ export interface StaffProfile {
   total_ratings: number;
   active: boolean;
   avatar_url?: string;
+  current_status?: string;
 }
 
 export interface AssignedHome {
@@ -46,6 +47,7 @@ export interface StaffVisit {
   date: string;
   start_time: string;
   end_time: string;
+  duration_minutes?: number | null;
   tasks_performed: string;
   rating?: number;
   feedback?: string;
@@ -55,34 +57,24 @@ export function useStaffProfile() {
   return useQuery<StaffProfile>({
     queryKey: ["staff", "profile"],
     queryFn: async () => {
-      try {
-        const res = await api.get<StaffProfile>("/domestic-staff/me");
-        return res || {
-          id: "staff-8812",
-          full_name: "Anita Sharma",
-          phone: "+91 98765 43210",
-          emergency_contact: "+91 98765 00000 (Spouse)",
-          service_type: "Housekeeping & Cooking",
-          police_verified: true,
-          verification_id: "POL-VER-2026-8812",
-          rating: 4.85,
-          total_ratings: 42,
-          active: true,
-        };
-      } catch {
-        return {
-          id: "staff-8812",
-          full_name: "Anita Sharma",
-          phone: "+91 98765 43210",
-          emergency_contact: "+91 98765 00000 (Spouse)",
-          service_type: "Housekeeping & Cooking",
-          police_verified: true,
-          verification_id: "POL-VER-2026-8812",
-          rating: 4.85,
-          total_ratings: 42,
-          active: true,
-        };
+      const res = await api.get<any>("/domestic-staff/me");
+      if (!res) {
+        throw new Error("Staff profile not found");
       }
+      return {
+        id: res.id,
+        full_name: res.full_name || "Domestic Staff Member",
+        phone: res.phone || "",
+        emergency_contact: res.emergency_address || "None specified",
+        service_type: res.staff_type ? `${res.staff_type.toUpperCase()} Services` : "General Help",
+        police_verified: res.police_verification_status === "verified",
+        verification_id: res.id_type ? `${res.id_type.toUpperCase()}` : "POL-VER-2026",
+        rating: Number(res.rating_avg ?? 5.0),
+        total_ratings: Number(res.ratings_count ?? 0),
+        active: res.is_active ?? true,
+        avatar_url: res.photo_url,
+        current_status: res.current_status || "outside",
+      };
     },
   });
 }
@@ -90,8 +82,12 @@ export function useStaffProfile() {
 export function useUpdateStaffProfile() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ staffId, data }: { staffId: string; data: Partial<StaffProfile> }) => {
-      return await api.patch<StaffProfile>(`/domestic-staff/${staffId}`, data);
+    mutationFn: async ({ staffId, data }: { staffId?: string; data: Partial<StaffProfile> }) => {
+      return await api.patch<any>("/domestic-staff/me", {
+        phone: data.phone,
+        emergency_address: data.emergency_contact,
+        photo_url: data.avatar_url,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["staff", "profile"] });
@@ -103,69 +99,19 @@ export function useAssignedHomes() {
   return useQuery<AssignedHome[]>({
     queryKey: ["staff", "assigned-homes"],
     queryFn: async () => {
-      try {
-        const res = await api.get<AssignedHome[]>("/domestic-staff/assignments?active_only=true");
-        return Array.isArray(res) && res.length > 0
-          ? res
-          : [
-              {
-                id: "asg-01",
-                unit_number: "A-402",
-                tower_name: "Emerald Tower",
-                floor: 4,
-                resident_name: "Priya & Rajesh Mehta",
-                resident_phone: "+91 98123 45678",
-                expected_hours: "08:00 AM – 11:00 AM",
-                schedule_days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
-                special_instructions: "Key under plant pot on Tuesdays.",
-              },
-              {
-                id: "asg-02",
-                unit_number: "B-701",
-                tower_name: "Sapphire Heights",
-                floor: 7,
-                resident_name: "Dr. Ananya Roy",
-                resident_phone: "+91 98234 56789",
-                expected_hours: "11:30 AM – 02:00 PM",
-                schedule_days: ["Mon", "Wed", "Fri"],
-              },
-              {
-                id: "asg-03",
-                unit_number: "C-104",
-                tower_name: "Diamond Block",
-                floor: 1,
-                resident_name: "Vikram Malhotra",
-                resident_phone: "+91 98345 67890",
-                expected_hours: "04:30 PM – 06:30 PM",
-                schedule_days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-                special_instructions: "Evening tea prep at 5:00 PM sharp.",
-              },
-            ];
-      } catch {
-        return [
-          {
-            id: "asg-01",
-            unit_number: "A-402",
-            tower_name: "Emerald Tower",
-            floor: 4,
-            resident_name: "Priya & Rajesh Mehta",
-            resident_phone: "+91 98123 45678",
-            expected_hours: "08:00 AM – 11:00 AM",
-            schedule_days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
-            special_instructions: "Key under plant pot on Tuesdays.",
-          },
-          {
-            id: "asg-02",
-            unit_number: "B-701",
-            tower_name: "Sapphire Heights",
-            floor: 7,
-            resident_name: "Dr. Ananya Roy",
-            resident_phone: "+91 98234 56789",
-            expected_hours: "11:30 AM – 02:00 PM",
-            schedule_days: ["Mon", "Wed", "Fri"],
-          },
-        ];
-      }
+      const res = await api.get<any[]>("/domestic-staff/me/assignments");
+      if (!Array.isArray(res)) return [];
+      return res.map((a: any) => ({
+        id: a.id,
+        unit_number: a.unit_number || "Unit",
+        tower_name: a.tower_name || "Main Tower",
+        floor: a.floor_number || 1,
+        resident_name: a.resident_name || "Resident",
+        resident_phone: a.resident_phone || "+919800000000",
+        expected_hours: a.time_from && a.time_to ? `${a.time_from} – ${a.time_to}` : "08:00 AM – 11:00 AM",
+        special_instructions: a.work_type ? `${a.work_type.replace('_', ' ').toUpperCase()} duty` : undefined,
+        schedule_days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+      }));
     },
   });
 }
@@ -174,56 +120,68 @@ export function useStaffAttendance() {
   return useQuery<AttendanceRecord[]>({
     queryKey: ["staff", "attendance"],
     queryFn: async () => {
-      try {
-        const res = await api.get<AttendanceRecord[]>("/domestic-staff/attendance");
-        return Array.isArray(res) && res.length > 0
-          ? res
-          : [
-              {
-                id: "att-001",
-                date: "2026-09-02",
-                check_in_at: "08:02 AM",
-                check_out_at: null,
-                gate_name: "Gate 1 (Main Entrance)",
-                unit_number: "A-402",
-                duration_minutes: 185,
-                status: "open" as const,
-              },
-              {
-                id: "att-002",
-                date: "2026-09-01",
-                check_in_at: "08:00 AM",
-                check_out_at: "02:15 PM",
-                gate_name: "Gate 1 (Main Entrance)",
-                unit_number: "Multiple (A-402, B-701)",
-                duration_minutes: 375,
-                status: "completed" as const,
-              },
-              {
-                id: "att-003",
-                date: "2026-08-31",
-                check_in_at: "07:55 AM",
-                check_out_at: "06:35 PM",
-                gate_name: "Gate 1 (Main Entrance)",
-                unit_number: "Multiple (A-402, B-701, C-104)",
-                duration_minutes: 640,
-                status: "completed" as const,
-              },
-            ];
-      } catch {
-        return [
-          {
-            id: "att-001",
-            date: "2026-09-02",
-            check_in_at: "08:02 AM",
-            check_out_at: null,
-            gate_name: "Gate 1 (Main Entrance)",
-            unit_number: "A-402",
-            duration_minutes: 185,
-            status: "open" as const,
-          },
-        ];
-      }
+      const res = await api.get<any[]>("/domestic-staff/me/attendance");
+      if (!Array.isArray(res)) return [];
+      return res.map((att: any) => ({
+        id: att.id,
+        date: att.check_in_at ? att.check_in_at.split("T")[0] : "",
+        check_in_at: att.check_in_at ? new Date(att.check_in_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
+        check_out_at: att.check_out_at ? new Date(att.check_out_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : null,
+        gate_name: att.gate_id ? "Main Gate 1" : "Gate Operations",
+        unit_number: "Assigned Units",
+        duration_minutes: att.check_out_at && att.check_in_at ? Math.round((new Date(att.check_out_at).getTime() - new Date(att.check_in_at).getTime()) / 60000) : null,
+        status: att.check_out_at ? ("completed" as const) : ("open" as const),
+      }));
+    },
+  });
+}
+
+export function useStaffVisits() {
+  return useQuery<StaffVisit[]>({
+    queryKey: ["staff", "visits"],
+    queryFn: async () => {
+      const res = await api.get<any[]>("/domestic-staff/me/visits");
+      if (!Array.isArray(res)) return [];
+      return res.map((v: any) => ({
+        id: v.id,
+        unit_number: v.unit_number || "Assigned Unit",
+        date: v.date || (v.check_in_at ? v.check_in_at.split("T")[0] : ""),
+        start_time: v.check_in_at ? new Date(v.check_in_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
+        end_time: v.check_out_at ? new Date(v.check_out_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "In Progress",
+        duration_minutes: v.duration_minutes || (v.check_out_at && v.check_in_at ? Math.round((new Date(v.check_out_at).getTime() - new Date(v.check_in_at).getTime()) / 60000) : null),
+        tasks_performed: v.tasks_performed || "Domestic Service",
+        rating: v.rating ? Number(v.rating) : 5,
+        feedback: v.feedback || "Good service provided.",
+      }));
+    },
+  });
+}
+
+export function useStaffCheckIn() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ staffId, gateId }: { staffId: string; gateId?: string }) => {
+      return await api.post("/domestic-staff/attendance/check-in", {
+        staff_id: staffId,
+        gate_id: gateId,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["staff", "attendance"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "profile"] });
+    },
+  });
+}
+
+export function useStaffCheckOut() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ attendanceId }: { attendanceId: string }) => {
+      return await api.patch(`/domestic-staff/attendance/${attendanceId}/check-out`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["staff", "attendance"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "profile"] });
     },
   });
 }
@@ -232,9 +190,9 @@ export function useSendStaffPanic() {
   return useMutation({
     mutationFn: async (payload: { location?: string; note?: string }) => {
       return await api.post("/gate/alerts", {
-        alert_type: "sos",
-        priority: "high",
-        details: payload.note || "Domestic staff SOS emergency trigger",
+        alert_type: "medical",
+        severity: "high",
+        message: payload.note || "Domestic staff SOS emergency trigger",
       });
     },
   });

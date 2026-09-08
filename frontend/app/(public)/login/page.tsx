@@ -7,6 +7,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { useLogin } from "@/hooks/use-auth";
 import { ApiError } from "@/lib/api";
+import { getRoleLandingRoute } from "@/lib/permissions";
 
 const schema = z.object({
   email: z.string().email("Valid email required"),
@@ -33,25 +34,9 @@ function LoginForm() {
   const onSubmit = handleSubmit(async (values) => {
     try {
       const user = await login.mutateAsync(values);
-      const next = params.get("next");
-      if (next) {
-        router.replace(next);
-        return;
-      }
-
-      // active_role is always returned by /auth/login — use it as the source of truth
-      if (user?.is_superadmin || user?.active_role === "super_admin") {
-        router.replace("/super-admin/dashboard");
-      } else if (user?.active_role === "community_admin") {
-        router.replace("/community-admin/dashboard");
-      } else if (user?.active_role === "security_guard" || user?.active_role === "security_supervisor") {
-        router.replace("/gate/live");
-      } else if (user?.active_role === "resident") {
-        router.replace("/resident/home");
-      } else {
-        // Fallback: go to /dashboard which will re-detect and redirect
-        router.replace("/dashboard");
-      }
+      const nextParam = params.get("next");
+      const targetUrl = nextParam && nextParam !== "/unauthorized" ? nextParam : getRoleLandingRoute(user);
+      router.replace(targetUrl);
     } catch (err) {
       if (err instanceof ApiError && err.fields && Object.keys(err.fields).length) {
         for (const [field, message] of Object.entries(err.fields)) {
@@ -66,57 +51,57 @@ function LoginForm() {
   });
 
   return (
-    <main className="container">
-      <h1>Sign in to GateSphere</h1>
-      <form onSubmit={onSubmit} className="card" noValidate>
-        {errors.root && (
-          <div role="alert" className="error-banner">
-            {errors.root.message}
-          </div>
-        )}
+    <form onSubmit={onSubmit} className="card" noValidate>
+      {errors.root && (
+        <div role="alert" className="error-banner">
+          {errors.root.message}
+        </div>
+      )}
 
-        <label htmlFor="email">Email</label>
-        <input
-          id="email"
-          type="email"
-          autoComplete="email"
-          aria-invalid={Boolean(errors.email)}
-          aria-describedby={errors.email ? "email-error" : undefined}
-          {...register("email")}
-        />
-        {errors.email && (
-          <span id="email-error" className="error-text">
-            {errors.email.message}
-          </span>
-        )}
+      <label htmlFor="email">Email</label>
+      <input
+        id="email"
+        type="email"
+        autoComplete="email"
+        aria-invalid={Boolean(errors.email)}
+        aria-describedby={errors.email ? "email-error" : undefined}
+        {...register("email")}
+      />
+      {errors.email && (
+        <span id="email-error" className="error-text">
+          {errors.email.message}
+        </span>
+      )}
 
-        <label htmlFor="password">Password</label>
-        <input
-          id="password"
-          type="password"
-          autoComplete="current-password"
-          aria-invalid={Boolean(errors.password)}
-          aria-describedby={errors.password ? "password-error" : undefined}
-          {...register("password")}
-        />
-        {errors.password && (
-          <span id="password-error" className="error-text">
-            {errors.password.message}
-          </span>
-        )}
+      <label htmlFor="password">Password</label>
+      <input
+        id="password"
+        type="password"
+        autoComplete="current-password"
+        aria-invalid={Boolean(errors.password)}
+        aria-describedby={errors.password ? "password-error" : undefined}
+        {...register("password")}
+      />
+      {errors.password && (
+        <span id="password-error" className="error-text">
+          {errors.password.message}
+        </span>
+      )}
 
-        <button type="submit" disabled={isSubmitting || login.isPending}>
-          {isSubmitting || login.isPending ? "Signing in…" : "Sign in"}
-        </button>
-      </form>
-    </main>
+      <button type="submit" disabled={isSubmitting || login.isPending}>
+        {isSubmitting || login.isPending ? "Signing in…" : "Sign in"}
+      </button>
+    </form>
   );
 }
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="container" style={{ padding: "2rem", textAlign: "center" }}>Loading login...</div>}>
-      <LoginForm />
-    </Suspense>
+    <main className="container">
+      <h1>Sign in to GateSphere</h1>
+      <Suspense fallback={<div className="card">Loading…</div>}>
+        <LoginForm />
+      </Suspense>
+    </main>
   );
 }

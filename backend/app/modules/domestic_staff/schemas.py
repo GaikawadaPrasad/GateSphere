@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, time
+import datetime as dt
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -128,3 +129,58 @@ class RatingRead(_Read):
     resident_user_id: uuid.UUID | None
     rating: int
     feedback: str | None
+
+
+# -- staff me / portal --------------------------------------- #
+class StaffMeUpdate(_Write):
+    phone: str | None = _Phone
+    emergency_address: str | None = Field(default=None, max_length=2000)
+    photo_url: ManagedFileUrl | None = None
+
+
+class StaffMeRead(_Read):
+    community_id: uuid.UUID
+    user_id: uuid.UUID | None
+    full_name: str
+    staff_type: str
+    phone: str
+    photo_url: str | None
+    id_type: str | None
+    police_verification_status: str
+    verification_expiry: date | None
+    emergency_address: str | None
+    is_active: bool
+    rating_avg: float = 5.0
+    ratings_count: int = 0
+    current_status: str = "outside"
+    active_assignment_count: int = 0
+
+
+class AssignmentDetailRead(_Read):
+    community_id: uuid.UUID
+    staff_id: uuid.UUID
+    unit_id: uuid.UUID
+    unit_number: str | None = None
+    tower_name: str | None = None
+    floor_number: int | None = None
+    resident_name: str | None = None
+    resident_phone: str | None = None
+    work_type: str
+    start_date: date | None = None
+    end_date: date | None = None
+    time_from: time | None = None
+    time_to: time | None = None
+    is_active: bool
+
+
+class StaffVisitRead(BaseModel):
+    id: uuid.UUID
+    unit_id: uuid.UUID | None = None
+    unit_number: str | None = None
+    date: dt.date | None = None
+    check_in_at: dt.datetime | None = None
+    check_out_at: dt.datetime | None = None
+    duration_minutes: int | None = None
+    tasks_performed: str | None = None
+    rating: int | None = None
+    feedback: str | None = None

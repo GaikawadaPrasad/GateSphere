@@ -43,13 +43,22 @@ export function StatMetric({
       className={`gs-card card-hover ${onClick ? "clickable" : ""} ${className}`}
       style={{
         cursor: onClick ? "pointer" : "default",
-        borderTop: `3px solid ${accentColor}`,
+        padding: "1.35rem 1.5rem",
         position: "relative",
         overflow: "hidden",
+        borderTop: `3px solid ${accentColor}`,
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.75rem" }}>
-        <span style={{ fontSize: "12px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--brand-body)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem" }}>
+        <span
+          style={{
+            fontSize: "11.5px",
+            fontWeight: 800,
+            textTransform: "uppercase",
+            letterSpacing: "0.06em",
+            color: "var(--muted)",
+          }}
+        >
           {label}
         </span>
         {icon && (
@@ -57,13 +66,14 @@ export function StatMetric({
             style={{
               width: 36,
               height: 36,
-              borderRadius: "8px",
-              background: `${accentColor}15`,
+              borderRadius: "10px",
+              background: `${accentColor}12`,
+              border: `1px solid ${accentColor}25`,
               color: accentColor,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: "1.1rem",
+              fontSize: "1.15rem",
             }}
           >
             {icon}
@@ -71,30 +81,44 @@ export function StatMetric({
         )}
       </div>
 
-      <div style={{ display: "flex", alignItems: "baseline", gap: "0.25rem", margin: "0.25rem 0" }}>
-        {prefix && <span style={{ fontSize: "1.5rem", fontWeight: 800, color: accentColor }}>{prefix}</span>}
-        <span className="stat-number">
+      <div style={{ display: "flex", alignItems: "baseline", gap: "0.2rem", margin: "0.15rem 0" }}>
+        {prefix && (
+          <span style={{ fontSize: "1.4rem", fontWeight: 800, color: accentColor, marginRight: "0.15rem" }}>
+            {prefix}
+          </span>
+        )}
+        <span className="stat-number" style={{ color: "#0F172A" }}>
           {isNumber ? animatedValue.toLocaleString() : value}
         </span>
-        {suffix && <span style={{ fontSize: "1rem", fontWeight: 700, color: "var(--brand-body)", marginLeft: "0.25rem" }}>{suffix}</span>}
+        {suffix && (
+          <span style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--muted)", marginLeft: "0.3rem" }}>
+            {suffix}
+          </span>
+        )}
       </div>
 
       {trend && (
         <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginTop: "0.5rem", fontSize: "12px" }}>
           <span
             style={{
-              color: trend.isPositive ? "#16A34A" : "#DC2626",
+              display: "inline-flex",
+              alignItems: "center",
+              padding: "0.15rem 0.45rem",
+              borderRadius: "9999px",
+              background: trend.isPositive ? "#ECFDF5" : "#FEF2F2",
+              color: trend.isPositive ? "#059669" : "#DC2626",
               fontWeight: 700,
+              fontSize: "11px",
             }}
           >
             {trend.isPositive ? "↑" : "↓"} {trend.value}
           </span>
-          {trend.label && <span style={{ color: "var(--text-muted)" }}>{trend.label}</span>}
+          {trend.label && <span style={{ color: "var(--muted)", fontSize: "11.5px" }}>{trend.label}</span>}
         </div>
       )}
 
       {description && (
-        <p style={{ fontSize: "12px", color: "var(--brand-body)", marginTop: "0.5rem" }}>
+        <p style={{ fontSize: "12px", color: "var(--brand-body)", marginTop: "0.4rem", lineHeight: 1.4 }}>
           {description}
         </p>
       )}

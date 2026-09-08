@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import { DashboardShell } from "@/components/layout/DashboardShell";
 import { StatMetric } from "@/components/common/StatMetric";
 import { LiveDot } from "@/components/common/LiveDot";
@@ -9,10 +10,21 @@ import { DataTable, Column } from "@/components/tables/DataTable";
 import { DebouncedInput } from "@/components/forms/DebouncedInput";
 import { FilterPanel } from "@/components/forms/FilterPanel";
 import { BrandButton } from "@/components/common/BrandButton";
-import { useAuditorOverview, useAuditorLogs, useAuditorGateActivity, useAuditorVisitorRecords, useAuditorFinancialLedger, AuditLogItem } from "@/hooks/use-auditor-data";
+import {
+  useAuditorOverview,
+  useAuditorLogs,
+  useAuditorGateActivity,
+  useAuditorVisitorRecords,
+  useAuditorFinancialLedger,
+  useAuditorComplaints,
+  useAuditorVendors,
+  useAuditorIncidents,
+  AuditLogItem,
+} from "@/hooks/use-auditor-data";
 import { useTableControls } from "@/hooks/use-table-controls";
-import { formatDate, formatCurrency } from "@/lib/utils";
 import { useUiStore } from "@/store/ui";
+import { toast } from "@/store/toast";
+import { formatDate, formatCurrency } from "@/lib/utils";
 
 export type AuditorTab =
   | "overview"
@@ -32,7 +44,8 @@ interface AuditorDashboardViewProps {
 }
 
 export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboardViewProps) {
-  const [activeTab, setActiveTab] = useState<AuditorTab>(initialTab);
+  const router = useRouter();
+  const activeTab = initialTab;
   const { activeCommunityId } = useUiStore();
 
   const { data: stats, isLoading: statsLoading } = useAuditorOverview(activeCommunityId);
@@ -40,6 +53,9 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
   const { data: gateEvents = [], isLoading: gateLoading } = useAuditorGateActivity(activeCommunityId);
   const { data: visitorRecords = [], isLoading: visitorsLoading } = useAuditorVisitorRecords(activeCommunityId);
   const { data: financialRecords = [], isLoading: finLoading } = useAuditorFinancialLedger(activeCommunityId);
+  const { data: complaintRecords = [], isLoading: complaintsLoading } = useAuditorComplaints(activeCommunityId);
+  const { data: vendorRecords = [], isLoading: vendorsLoading } = useAuditorVendors(activeCommunityId);
+  const { data: incidentRecords = [], isLoading: incidentsLoading } = useAuditorIncidents(activeCommunityId);
 
   // Table controls for Audit Logs
   const logControls = useTableControls<AuditLogItem>({
@@ -70,6 +86,27 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
   const financialControls = useTableControls<any>({
     data: financialRecords,
     searchKeys: ["invoice_number", "unit_number", "status", "receipt_number"],
+    initialPageSize: 10,
+  });
+
+  // Table controls for Complaints / Maintenance
+  const complaintControls = useTableControls<any>({
+    data: complaintRecords,
+    searchKeys: ["ticket_number", "subject", "priority", "status", "escalation_state"],
+    initialPageSize: 10,
+  });
+
+  // Table controls for Vendors
+  const vendorControls = useTableControls<any>({
+    data: vendorRecords,
+    searchKeys: ["vendor_name", "contract_scope", "technician", "passes_issued"],
+    initialPageSize: 10,
+  });
+
+  // Table controls for Incidents
+  const incidentControls = useTableControls<any>({
+    data: incidentRecords,
+    searchKeys: ["id", "type", "location", "severity", "status"],
     initialPageSize: 10,
   });
 
@@ -157,53 +194,6 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
         </div>
       }
     >
-      {/* 11 Module Navigation Tabs */}
-      <div
-        style={{
-          display: "flex",
-          gap: "0.5rem",
-          overflowX: "auto",
-          paddingBottom: "0.75rem",
-          marginBottom: "1.5rem",
-          borderBottom: "1px solid var(--border-standard)",
-        }}
-      >
-        {[
-          { id: "overview", label: "📊 Overview" },
-          { id: "audit-logs", label: "📋 Audit Logs" },
-          { id: "user-activity", label: "👥 User Activity" },
-          { id: "gate-activity", label: "🛡️ Gate Activity" },
-          { id: "visitor-records", label: "🚪 Visitor Records" },
-          { id: "maintenance-records", label: "🔧 Maintenance SLA" },
-          { id: "vendor-activity", label: "👷 Vendor Activity" },
-          { id: "incident-records", label: "🚨 Incidents" },
-          { id: "financial-records", label: "💳 Financial Ledger" },
-          { id: "reports", label: "📈 Reports" },
-          { id: "audit-search", label: "🔍 Global Search" },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setActiveTab(tab.id as AuditorTab)}
-            style={{
-              padding: "0.55rem 1rem",
-              borderRadius: "var(--radius-sm)",
-              border: "1px solid",
-              borderColor: activeTab === tab.id ? "var(--brand-primary)" : "transparent",
-              background: activeTab === tab.id ? "#EFF6FF" : "transparent",
-              color: activeTab === tab.id ? "var(--brand-primary)" : "var(--brand-body)",
-              fontWeight: activeTab === tab.id ? 700 : 500,
-              fontSize: "13.5px",
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-              transition: "all 0.15s ease",
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
       {/* TAB 1: OVERVIEW */}
       {activeTab === "overview" && (
         <div>
@@ -222,7 +212,7 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
               accentColor="#1D4ED8"
               icon="📋"
               description="Unresolved verification checkpoints"
-              onClick={() => setActiveTab("audit-logs")}
+              onClick={() => router.push("/auditor/audit-logs")}
             />
             <StatMetric
               label="Actions Logged Today"
@@ -230,7 +220,7 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
               accentColor="#0D9488"
               icon="⚡"
               description="Across all 20 domain modules"
-              onClick={() => setActiveTab("audit-logs")}
+              onClick={() => router.push("/auditor/audit-logs")}
             />
             <StatMetric
               label="Flagged Gate Anomalies"
@@ -238,7 +228,7 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
               accentColor="#DC2626"
               icon="🚨"
               description="Open entries without exit match"
-              onClick={() => setActiveTab("gate-activity")}
+              onClick={() => router.push("/auditor/gate-activity")}
             />
             <StatMetric
               label="Financial Reconciliation"
@@ -247,7 +237,7 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
               accentColor="#D97706"
               icon="💳"
               description="Ledger vs Receipts verified"
-              onClick={() => setActiveTab("financial-records")}
+              onClick={() => router.push("/auditor/financial-records")}
             />
           </div>
 
@@ -257,7 +247,7 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
             <div className="gs-card">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
                 <h3 className="card-h3" style={{ fontSize: "1.1rem" }}>🛡️ Live Gate Activity Stream</h3>
-                <BrandButton variant="outline" size="sm" onClick={() => setActiveTab("gate-activity")}>View All</BrandButton>
+                <BrandButton variant="outline" size="sm" onClick={() => router.push("/auditor/gate-activity")}>View All</BrandButton>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                 {gateEvents.slice(0, 3).map((event: any) => (
@@ -292,7 +282,7 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
             <div className="gs-card">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
                 <h3 className="card-h3" style={{ fontSize: "1.1rem" }}>📋 Recent Immutable Audit Trail</h3>
-                <BrandButton variant="outline" size="sm" onClick={() => setActiveTab("audit-logs")}>View Logs</BrandButton>
+                <BrandButton variant="outline" size="sm" onClick={() => router.push("/auditor/audit-logs")}>View Logs</BrandButton>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                 {rawLogs.slice(0, 3).map((log) => (
@@ -496,24 +486,12 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
               { key: "escalation_state", header: "SLA Tracker", render: (i) => <StatusBadge status={i.escalation_state} /> },
               { key: "created_at", header: "Raised At", render: (i) => formatDate(i.created_at) },
             ]}
-            data={[
-              {
-                ticket_number: "TKT-2026-081",
-                subject: "Water booster pump low pressure",
-                priority: "high",
-                status: "resolved",
-                escalation_state: "on_track",
-                created_at: "2026-08-28T10:00:00Z",
-              },
-              {
-                ticket_number: "TKT-2026-092",
-                subject: "Tower B Elevator emergency intercom test",
-                priority: "emergency",
-                status: "in_progress",
-                escalation_state: "at_risk",
-                created_at: "2026-09-01T14:30:00Z",
-              },
-            ]}
+            data={complaintControls.paginatedData}
+            isLoading={complaintsLoading}
+            page={complaintControls.page}
+            pageSize={complaintControls.pageSize}
+            total={complaintControls.total}
+            onPageChange={complaintControls.setPage}
           />
         </div>
       )}
@@ -529,26 +507,16 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
             columns={[
               { key: "vendor_name", header: "Vendor Name", sortable: true },
               { key: "contract_scope", header: "Work Domain" },
-              { key: "technician", header: "Assigned Tech" },
+              { key: "technician", header: "Assigned Tech / Phone" },
               { key: "passes_issued", header: "Passes Issued" },
               { key: "verification_status", header: "Insurance & KYC", render: (i) => <StatusBadge status={i.verification_status} /> },
             ]}
-            data={[
-              {
-                vendor_name: "Apex Elevator Solutions",
-                contract_scope: "Lifts & Hoists Annual Maintenance",
-                technician: "Ravi Kumar (ID: TC-441)",
-                passes_issued: "VP-9901",
-                verification_status: "verified",
-              },
-              {
-                vendor_name: "GreenThumb Landscaping",
-                contract_scope: "Garden & Lawn Upkeep",
-                technician: "Team of 4",
-                passes_issued: "VP-8812 to 8815",
-                verification_status: "verified",
-              },
-            ]}
+            data={vendorControls.paginatedData}
+            isLoading={vendorsLoading}
+            page={vendorControls.page}
+            pageSize={vendorControls.pageSize}
+            total={vendorControls.total}
+            onPageChange={vendorControls.setPage}
           />
         </div>
       )}
@@ -569,24 +537,12 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
               { key: "status", header: "Status", render: (i) => <StatusBadge status={i.status} /> },
               { key: "created_at", header: "Logged At", render: (i) => formatDate(i.created_at) },
             ]}
-            data={[
-              {
-                id: "INC-2026-009",
-                type: "sos",
-                location: "Tower A, Unit 402",
-                severity: "high",
-                status: "resolved",
-                created_at: "2026-09-01T21:15:00Z",
-              },
-              {
-                id: "INC-2026-010",
-                type: "unauthorized_parking",
-                location: "Basement 2, Slot B-14",
-                severity: "low",
-                status: "in_progress",
-                created_at: "2026-09-02T08:45:00Z",
-              },
-            ]}
+            data={incidentControls.paginatedData}
+            isLoading={incidentsLoading}
+            page={incidentControls.page}
+            pageSize={incidentControls.pageSize}
+            total={incidentControls.total}
+            onPageChange={incidentControls.setPage}
           />
         </div>
       )}
@@ -646,7 +602,7 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
                 <BrandButton
                   size="sm"
                   variant="outline"
-                  onClick={() => alert(`Generating ${rep.title} export... Download started.`)}
+                  onClick={() => toast.success(`Generating ${rep.title} export. File will download shortly.`, "Report Export Initiated")}
                 >
                   Download CSV / PDF
                 </BrandButton>

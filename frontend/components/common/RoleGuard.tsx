@@ -25,11 +25,24 @@ export function RoleGuard({
   const router = useRouter();
   const { data: user, isLoading } = useMe();
 
-  const userRoles = user?.roles?.map((r: any) => (typeof r === "string" ? r : r.role_slug)) || [];
+  const isSuper = Boolean(
+    user?.is_superadmin ||
+    user?.active_role === "super_admin" ||
+    user?.roles?.some((r) => r.role_slug === "super_admin")
+  );
+
+  const userRoles: string[] = [
+    ...(user?.active_role ? [user.active_role] : []),
+    ...(user?.roles?.map((r) => r.role_slug) || []),
+  ];
+  if (isSuper) {
+    userRoles.push("super_admin");
+  }
+
   const hasAllowedRole =
     !allowedRoles ||
     allowedRoles.length === 0 ||
-    user?.is_superadmin ||
+    isSuper ||
     allowedRoles.some((role) => userRoles.includes(role));
 
   useEffect(() => {
@@ -40,7 +53,7 @@ export function RoleGuard({
       return;
     }
 
-    if (requireSuperAdmin && !user.is_superadmin) {
+    if (requireSuperAdmin && !isSuper) {
       router.replace(redirectTo || "/unauthorized");
       return;
     }
@@ -49,7 +62,7 @@ export function RoleGuard({
       router.replace(redirectTo || "/unauthorized");
       return;
     }
-  }, [user, isLoading, requireSuperAdmin, allowedRoles, hasAllowedRole, redirectTo, router]);
+  }, [user, isLoading, requireSuperAdmin, isSuper, allowedRoles, hasAllowedRole, redirectTo, router]);
 
   if (isLoading) {
     return (
@@ -61,7 +74,7 @@ export function RoleGuard({
 
   if (!user) return null;
 
-  if (requireSuperAdmin && !user.is_superadmin) {
+  if (requireSuperAdmin && !isSuper) {
     return fallback;
   }
 
@@ -69,9 +82,10 @@ export function RoleGuard({
     return fallback;
   }
 
-  if (requiredPermission && !user.is_superadmin && !user.permissions?.includes(requiredPermission)) {
+  if (requiredPermission && !isSuper && !user.permissions?.includes(requiredPermission)) {
     return fallback;
   }
 
   return <>{children}</>;
 }
+

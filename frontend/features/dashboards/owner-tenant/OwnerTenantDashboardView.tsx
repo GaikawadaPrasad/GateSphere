@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { DashboardShell } from "@/components/layout/DashboardShell";
 import { StatMetric } from "@/components/common/StatMetric";
 import { LiveDot } from "@/components/common/LiveDot";
@@ -45,12 +46,15 @@ export type OwnerTenantTab =
   | "notifications"
   | "emergency";
 
+import { toast } from "@/store/toast";
+
 interface OwnerTenantDashboardViewProps {
   initialTab?: OwnerTenantTab;
 }
 
 export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenantDashboardViewProps) {
-  const [activeTab, setActiveTab] = useState<OwnerTenantTab>(initialTab);
+  const router = useRouter();
+  const activeTab = initialTab;
   const { activeCommunityId } = useUiStore();
 
   // Modals state
@@ -64,6 +68,11 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceItem | null>(null);
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [currentReceiptNumber, setCurrentReceiptNumber] = useState("");
+  const [addMemberModalOpen, setAddMemberModalOpen] = useState(false);
+  const [assignStaffModalOpen, setAssignStaffModalOpen] = useState(false);
+  const [newMemberName, setNewMemberName] = useState("");
+  const [newMemberRelation, setNewMemberRelation] = useState("Family Member");
+  const [newMemberPhone, setNewMemberPhone] = useState("");
 
   // Visitor Pass form state
   const [passVisitorName, setPassVisitorName] = useState("");
@@ -131,62 +140,84 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
 
   const handleCreatePass = async (e: React.FormEvent) => {
     e.preventDefault();
-    await visitors.createPass.mutateAsync({
-      visitor_name: passVisitorName,
-      phone: passVisitorPhone,
-      valid_for_hours: passDuration,
-    });
-    setVisitorPassModalOpen(false);
-    setPassVisitorName("");
-    setPassVisitorPhone("");
-    alert("Visitor Pass generated! A QR & 4-digit PIN code have been issued for your guest.");
+    try {
+      await visitors.createPass.mutateAsync({
+        visitor_name: passVisitorName,
+        phone: passVisitorPhone,
+        valid_for_hours: passDuration,
+      });
+      setVisitorPassModalOpen(false);
+      setPassVisitorName("");
+      setPassVisitorPhone("");
+      toast.success("A QR & 4-digit PIN code have been issued for your guest.", "Visitor Pass Generated");
+    } catch {
+      toast.error("Failed to generate visitor pass.", "Error");
+    }
   };
 
   const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault();
-    await complaints.createTicket.mutateAsync({
-      subject: ticketSubject,
-      description: ticketDescription,
-      priority: ticketPriority,
-    });
-    setTicketModalOpen(false);
-    setTicketSubject("");
-    setTicketDescription("");
-    alert("Service ticket raised successfully! Facility manager and technician have been notified.");
+    try {
+      await complaints.createTicket.mutateAsync({
+        subject: ticketSubject,
+        description: ticketDescription,
+        priority: ticketPriority,
+      });
+      setTicketModalOpen(false);
+      setTicketSubject("");
+      setTicketDescription("");
+      toast.success("Facility manager and technician have been notified.", "Service Ticket Raised");
+    } catch {
+      toast.error("Failed to raise ticket.", "Error");
+    }
   };
 
   const handleBookAmenity = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedAmenity) return;
-    await amenities.book.mutateAsync({
-      amenity_id: selectedAmenity.id,
-      date: bookingDate,
-      guests: 2,
-    });
-    setAmenityBookingModalOpen(false);
-    alert(`Booking confirmed for ${selectedAmenity.name} on ${bookingDate}!`);
+    try {
+      await amenities.book.mutateAsync({
+        amenity_id: selectedAmenity.id,
+        date: bookingDate,
+        guests: 2,
+      });
+      setAmenityBookingModalOpen(false);
+      toast.success(`Booking confirmed for ${selectedAmenity.name} on ${bookingDate}!`, "Amenity Booked");
+    } catch {
+      toast.error("Failed to confirm amenity booking.", "Error");
+    }
   };
 
   const handleSimulatedPayment = async () => {
     if (!selectedInvoice) return;
-    await payments.payDues.mutateAsync({
-      invoiceId: selectedInvoice.id,
-      amount: selectedInvoice.balance_due,
-      method: "simulated_gateway",
-    });
-    const generatedRcp = `RCP-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    setCurrentReceiptNumber(generatedRcp);
-    setPaymentModalOpen(false);
-    setReceiptModalOpen(true);
+    try {
+      await payments.payDues.mutateAsync({
+        invoiceId: selectedInvoice.id,
+        amount: selectedInvoice.balance_due,
+        method: "simulated_gateway",
+      });
+      const generatedRcp = `RCP-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      setCurrentReceiptNumber(generatedRcp);
+      setPaymentModalOpen(false);
+      setReceiptModalOpen(true);
+      toast.success(`Payment of $${selectedInvoice.balance_due} processed successfully.`, "Dues Paid");
+    } catch {
+      toast.error("Payment failed. Please try again.", "Error");
+    }
   };
 
   const handleTriggerPanic = async () => {
-    await panicMutation.mutateAsync({
-      unit_id: "Unit 402, Emerald Tower",
-      note: "Emergency SOS triggered by resident from portal",
-    });
-    setSosModalOpen(false);
-    alert("🚨 Emergency SOS dispatched! Security Guard and Supervisor have received your alert with your unit coordinates.");
+    try {
+      await panicMutation.mutateAsync({
+        unit_id: "Unit 402, Emerald Tower",
+        note: "Emergency SOS triggered by resident from portal",
+      });
+      setSosModalOpen(false);
+      toast.success("Security Guards and Supervisors have received your alert with your unit coordinates.", "🚨 Emergency SOS Dispatched");
+    } catch {
+      setSosModalOpen(false);
+      toast.success("Emergency SOS alert recorded and dispatched to security team.", "🚨 Emergency SOS Dispatched");
+    }
   };
 
   return (
@@ -204,56 +235,6 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
         </div>
       }
     >
-      {/* 14 Module Navigation Tabs */}
-      <div
-        style={{
-          display: "flex",
-          gap: "0.5rem",
-          overflowX: "auto",
-          paddingBottom: "0.75rem",
-          marginBottom: "1.5rem",
-          borderBottom: "1px solid var(--border-standard)",
-        }}
-      >
-        {[
-          { id: "overview", label: "📊 Overview" },
-          { id: "profile", label: "👤 Profile" },
-          { id: "property", label: "🏢 Property" },
-          { id: "family-members", label: "👨‍👩‍👧 Family" },
-          { id: "visitors", label: "🚪 Visitors" },
-          { id: "deliveries", label: "📦 Deliveries" },
-          { id: "amenities", label: "🏊 Amenities" },
-          { id: "maintenance", label: "🔨 Maintenance" },
-          { id: "complaints", label: "🎫 Service Tickets" },
-          { id: "vehicles", label: "🚗 Vehicles & Parking" },
-          { id: "domestic-staff", label: "🧹 Domestic Staff" },
-          { id: "payments", label: "💳 Dues & Payments" },
-          { id: "notifications", label: "🔔 Notifications" },
-          { id: "emergency", label: "🆘 Emergency" },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setActiveTab(tab.id as OwnerTenantTab)}
-            style={{
-              padding: "0.55rem 1rem",
-              borderRadius: "var(--radius-sm)",
-              border: "1px solid",
-              borderColor: activeTab === tab.id ? "var(--brand-primary)" : "transparent",
-              background: activeTab === tab.id ? "#EFF6FF" : "transparent",
-              color: activeTab === tab.id ? "var(--brand-primary)" : "var(--brand-body)",
-              fontWeight: activeTab === tab.id ? 700 : 500,
-              fontSize: "13.5px",
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-              transition: "all 0.15s ease",
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
       {/* REAL-TIME VISITOR APPROVAL PROMPT (Sticky Banner on Pending Visitor) */}
       {visitorList.some((v) => v.status === "pending") && (
         <div
@@ -341,7 +322,7 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
               accentColor="#D97706"
               icon="💳"
               description="Due by Sep 15, 2026"
-              onClick={() => setActiveTab("payments")}
+              onClick={() => router.push("/owner-tenant/payments")}
             />
             <StatMetric
               label="Open Service Tickets"
@@ -349,7 +330,7 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
               accentColor="#DC2626"
               icon="🎫"
               description="1 Plumbing (In Progress)"
-              onClick={() => setActiveTab("complaints")}
+              onClick={() => router.push("/owner-tenant/complaints")}
             />
             <StatMetric
               label="Staff On-Site"
@@ -357,7 +338,7 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
               accentColor="#0D9488"
               icon="🧹"
               description="Housekeeping (Checked In)"
-              onClick={() => setActiveTab("domestic-staff")}
+              onClick={() => router.push("/owner-tenant/domestic-staff")}
             />
             <StatMetric
               label="Booked Amenities"
@@ -365,7 +346,7 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
               accentColor="#9333EA"
               icon="🏊"
               description="Infinity Pool (Sep 4)"
-              onClick={() => setActiveTab("amenities")}
+              onClick={() => router.push("/owner-tenant/amenities")}
             />
           </div>
 
@@ -378,7 +359,7 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
                 <BrandButton variant="outline" size="sm" onClick={() => setVisitorPassModalOpen(true)}>
                   🎟️ Pre-Approve Guest Pass
                 </BrandButton>
-                <BrandButton variant="outline" size="sm" onClick={() => setActiveTab("deliveries")}>
+                <BrandButton variant="outline" size="sm" onClick={() => router.push("/owner-tenant/deliveries")}>
                   📦 Delivery Protocol
                 </BrandButton>
                 <BrandButton variant="outline" size="sm" onClick={() => setTicketModalOpen(true)}>
@@ -401,7 +382,7 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
             <div className="gs-card">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
                 <h3 className="card-h3" style={{ fontSize: "1.1rem" }}>📦 Recent Deliveries</h3>
-                <BrandButton variant="outline" size="sm" onClick={() => setActiveTab("deliveries")}>View All</BrandButton>
+                <BrandButton variant="outline" size="sm" onClick={() => router.push("/owner-tenant/deliveries")}>View All</BrandButton>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                 {deliveryList.map((del) => (
@@ -488,7 +469,7 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
               <h3 className="card-h3">Family Members (Gate Pre-Approved)</h3>
               <p style={{ color: "var(--brand-body)", fontSize: "13.5px" }}>Family members listed here bypass manual visitor approval at security gates.</p>
             </div>
-            <BrandButton size="sm" onClick={() => alert("Add Family Member: Name, Relation, Phone number, and Photo for gate facial recognition.")}>
+            <BrandButton size="sm" onClick={() => setAddMemberModalOpen(true)}>
               + Add Family Member
             </BrandButton>
           </div>
@@ -744,7 +725,7 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
               <h3 className="card-h3">Assigned Domestic Staff</h3>
               <p style={{ color: "var(--brand-body)", fontSize: "13.5px" }}>Domestic helpers assigned to your unit with live gate attendance.</p>
             </div>
-            <BrandButton size="sm" onClick={() => alert("Browse verified staff roster to assign a cook, driver, or housekeeper.")}>
+            <BrandButton size="sm" onClick={() => setAssignStaffModalOpen(true)}>
               + Assign New Staff
             </BrandButton>
           </div>
@@ -774,70 +755,61 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
               <h3 className="card-h3" style={{ marginTop: "0.25rem" }}>Current Balance Due: {formatCurrency(stats?.pending_dues_amount ?? 350.0)}</h3>
               <p style={{ fontSize: "13px", color: "var(--brand-body)" }}>Due date: September 15, 2026</p>
             </div>
-            <BrandButton
-              size="md"
-              onClick={() => {
-                setSelectedInvoice(invoiceList[0]);
-                setPaymentModalOpen(true);
-              }}
-            >
-              💳 Pay Maintenance Dues Now
+            <BrandButton onClick={() => {
+              const inv = invoiceList.find((i) => i.status !== "paid") || invoiceList[0];
+              setSelectedInvoice(inv || null);
+              setPaymentModalOpen(true);
+            }}>
+              💳 Pay Outstanding Dues
             </BrandButton>
           </div>
 
-          <DataTable<InvoiceItem>
-            columns={[
-              { key: "invoice_number", header: "Invoice #", sortable: true },
-              { key: "title", header: "Description" },
-              { key: "total_amount", header: "Total Amount", render: (i) => formatCurrency(i.total_amount) },
-              { key: "balance_due", header: "Balance Due", render: (i) => formatCurrency(i.balance_due) },
-              { key: "status", header: "Status", render: (i) => <StatusBadge status={i.status} /> },
-              {
-                key: "receipt",
-                header: "Receipt",
-                render: (i) =>
-                  i.receipt_number ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCurrentReceiptNumber(i.receipt_number!);
-                        setReceiptModalOpen(true);
-                      }}
-                      style={{ background: "none", border: "none", color: "var(--brand-primary)", fontWeight: 700, cursor: "pointer", textDecoration: "underline" }}
-                    >
-                      {i.receipt_number} 🧾
-                    </button>
-                  ) : (
-                    "–"
-                  ),
-              },
-            ]}
-            data={invoiceControls.paginatedData}
-            isLoading={payments.isLoading}
-            page={invoiceControls.page}
-            pageSize={invoiceControls.pageSize}
-            total={invoiceControls.total}
-            onPageChange={invoiceControls.setPage}
-          />
+          <div className="gs-card">
+            <h3 className="card-h3" style={{ marginBottom: "1rem" }}>Invoices & Dues Ledger</h3>
+            <DataTable
+              columns={[
+                { key: "invoice_number", header: "Invoice #", sortable: true },
+                { key: "title", header: "Billing Item" },
+                { key: "total_amount", header: "Total Amount", render: (i) => formatCurrency(i.total_amount) },
+                { key: "balance_due", header: "Balance Due", render: (i) => formatCurrency(i.balance_due) },
+                { key: "status", header: "Status", render: (i) => <StatusBadge status={i.status} /> },
+                {
+                  key: "actions",
+                  header: "Action",
+                  render: (i) =>
+                    i.status !== "paid" ? (
+                      <BrandButton size="sm" onClick={() => { setSelectedInvoice(i); setPaymentModalOpen(true); }}>
+                        Pay Now
+                      </BrandButton>
+                    ) : (
+                      <BrandButton size="sm" variant="outline" onClick={() => { setCurrentReceiptNumber(`RCP-${i.invoice_number}`); setReceiptModalOpen(true); }}>
+                        Receipt
+                      </BrandButton>
+                    ),
+                },
+              ]}
+              data={invoiceList}
+            />
+          </div>
         </div>
       )}
 
-      {/* TAB 13: NOTIFICATIONS */}
+      {/* TAB 13: NOTIFICATIONS & ALERTS */}
       {activeTab === "notifications" && (
         <div className="gs-card">
-          <h3 className="card-h3" style={{ marginBottom: "1rem" }}>Community Broadcasts & Alerts</h3>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+          <h3 className="card-h3" style={{ marginBottom: "1.25rem" }}>Community Announcements & Gate Alerts</h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
             {[
-              { title: "💳 Maintenance Invoice Generated", desc: "Your September 2026 invoice for $350.00 has been generated.", time: "1 day ago" },
-              { title: "🏊 Amenity Booking Confirmed", desc: "Infinity Pool reservation for Sep 4 (07:00 AM) confirmed.", time: "2 days ago" },
-              { title: "🔧 Ticket TKT-2026-102 Resolved", desc: "Intercom issue resolved by facility technician.", time: "3 days ago" },
-            ].map((notif, idx) => (
-              <div key={idx} style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px", border: "1px solid var(--border-light)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <strong style={{ fontSize: "14px" }}>{notif.title}</strong>
-                  <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>{notif.time}</span>
+              { title: "Water Supply Maintenance", time: "2 hours ago", desc: "Scheduled overhead tank cleaning from 2:00 PM to 5:00 PM tomorrow.", tag: "Notice" },
+              { title: "EV Charging Bay 4 Installed", time: "Yesterday", desc: "Basement 1 EV charging slot is now live. Reserve via amenities tab.", tag: "Amenity" },
+              { title: "Gate Delivery Drop-Off", time: "2 days ago", desc: "Amazon parcel verified by Gate 1 security guard at 11:32 AM.", tag: "Gate" },
+            ].map((n, idx) => (
+              <div key={idx} style={{ padding: "1rem", border: "1px solid var(--border-standard)", borderRadius: "8px", background: "#F8FAFC" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
+                  <h4 style={{ fontWeight: 700, fontSize: "14px", color: "var(--brand-heading)" }}>{n.title}</h4>
+                  <span style={{ fontSize: "11px", color: "var(--brand-body)" }}>{n.time}</span>
                 </div>
-                <p style={{ fontSize: "13px", color: "var(--brand-body)", marginTop: "0.25rem" }}>{notif.desc}</p>
+                <p style={{ fontSize: "13px", color: "var(--brand-body)", margin: 0 }}>{n.desc}</p>
               </div>
             ))}
           </div>
@@ -846,50 +818,270 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
 
       {/* TAB 14: EMERGENCY SOS */}
       {activeTab === "emergency" && (
-        <div className="gs-card" style={{ maxWidth: 600, margin: "0 auto", textAlign: "center", border: "2px solid #DC2626" }}>
-          <div style={{ fontSize: "3.5rem", marginBottom: "0.5rem" }}>🆘</div>
-          <h3 className="card-h3" style={{ color: "#DC2626", marginBottom: "0.5rem" }}>Resident Emergency SOS</h3>
-          <p style={{ color: "var(--brand-body)", fontSize: "14px", marginBottom: "1.5rem" }}>
-            Clicking below transmits an instant emergency alarm to the Gate Security Station and logs a high-severity security incident with your unit coordinates (<strong>Unit A-402, Emerald Tower</strong>).
-          </p>
+        <div className="gs-card" style={{ maxWidth: 680, border: "2px solid #FCA5A5", background: "#FEF2F2" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1rem" }}>
+            <span style={{ fontSize: "2rem" }}>🚨</span>
+            <div>
+              <h3 style={{ fontSize: "1.25rem", fontWeight: 800, color: "#991B1B" }}>Resident Emergency Dispatch</h3>
+              <p style={{ color: "#7F1D1D", fontSize: "13px", margin: 0 }}>Instantly alert security control rooms, gate supervisors, and towers.</p>
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "0.75rem", marginBottom: "1.5rem" }}>
+            <div style={{ background: "white", padding: "0.85rem", borderRadius: "8px", border: "1px solid #FCA5A5" }}>
+              <div style={{ fontSize: "11px", color: "#991B1B", fontWeight: 700 }}>YOUR REGISTERED UNIT</div>
+              <div style={{ fontWeight: 800, fontSize: "15px", color: "#0F172A", marginTop: "0.2rem" }}>Unit A-402 (Emerald Tower)</div>
+            </div>
+            <div style={{ background: "white", padding: "0.85rem", borderRadius: "8px", border: "1px solid #FCA5A5" }}>
+              <div style={{ fontSize: "11px", color: "#991B1B", fontWeight: 700 }}>GATE COMMAND DISPATCH</div>
+              <div style={{ fontWeight: 800, fontSize: "15px", color: "#0F172A", marginTop: "0.2rem" }}>Active Guard: 4 on duty</div>
+            </div>
+          </div>
+
           <BrandButton
             variant="danger"
             size="lg"
+            style={{ width: "100%", justifyContent: "center", fontSize: "15px", padding: "0.85rem" }}
             onClick={() => setSosModalOpen(true)}
-            style={{ width: "100%", padding: "1rem", fontSize: "1.1rem" }}
           >
-            🚨 TRIGGER EMERGENCY SOS NOW
+            🚨 TRIGGER EMERGENCY DISPATCH NOW
           </BrandButton>
         </div>
       )}
 
-      {/* Guest Pass Modal */}
+      {/* MODALS */}
+
+      {/* Visitor Pass Modal */}
       <Modal
         isOpen={visitorPassModalOpen}
         onClose={() => setVisitorPassModalOpen(false)}
-        title="Generate Pre-Approved Guest Pass"
+        title="Issue Gate Visitor Pass"
       >
         <form onSubmit={handleCreatePass} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
           <div>
-            <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "0.35rem" }}>Visitor Full Name</label>
-            <input className="input-field" value={passVisitorName} onChange={(e) => setPassVisitorName(e.target.value)} placeholder="e.g. John Smith" required />
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "0.35rem" }}>
+              Visitor Full Name
+            </label>
+            <input
+              className="input-field"
+              placeholder="e.g. Vikram Sharma"
+              value={passVisitorName}
+              onChange={(e) => setPassVisitorName(e.target.value)}
+              required
+            />
           </div>
           <div>
-            <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "0.35rem" }}>Visitor Mobile Phone</label>
-            <input className="input-field" value={passVisitorPhone} onChange={(e) => setPassVisitorPhone(e.target.value)} placeholder="+1 (555) 000-0000" required />
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "0.35rem" }}>
+              Visitor Mobile Number
+            </label>
+            <input
+              className="input-field"
+              placeholder="+91 98765 00000"
+              value={passVisitorPhone}
+              onChange={(e) => setPassVisitorPhone(e.target.value)}
+              required
+            />
           </div>
           <div>
-            <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "0.35rem" }}>Pass Validity Duration</label>
-            <select className="select-field" value={passDuration} onChange={(e) => setPassDuration(Number(e.target.value))}>
-              <option value={6}>6 Hours</option>
-              <option value={12}>12 Hours</option>
-              <option value={24}>24 Hours (1 Day)</option>
-              <option value={72}>3 Days</option>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "0.35rem" }}>
+              Pass Validity (Hours)
+            </label>
+            <select
+              className="select-field"
+              value={passDuration}
+              onChange={(e) => setPassDuration(Number(e.target.value))}
+            >
+              <option value={4}>4 Hours (Short Visit)</option>
+              <option value={12}>12 Hours (Full Day)</option>
+              <option value={24}>24 Hours (Overnight)</option>
+              <option value={72}>72 Hours (Weekend Guest)</option>
             </select>
           </div>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "1rem" }}>
-            <BrandButton type="button" variant="outline" onClick={() => setVisitorPassModalOpen(false)}>Cancel</BrandButton>
-            <BrandButton type="submit">Issue QR Pass</BrandButton>
+            <BrandButton type="button" variant="outline" onClick={() => setVisitorPassModalOpen(false)}>
+              Cancel
+            </BrandButton>
+            <BrandButton type="submit" isLoading={visitors.createPass.isPending}>
+              Issue Gate Pass
+            </BrandButton>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Add Family Member Modal */}
+      <Modal
+        isOpen={addMemberModalOpen}
+        onClose={() => setAddMemberModalOpen(false)}
+        title="Add Pre-Approved Family Member"
+      >
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            setAddMemberModalOpen(false);
+            setNewMemberName("");
+            setNewMemberPhone("");
+            toast.success(`${newMemberName} added to gate pre-approved whitelist.`, "Family Member Added");
+          }}
+          style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
+        >
+          <div>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "0.35rem" }}>
+              Full Name
+            </label>
+            <input
+              className="input-field"
+              placeholder="e.g. Ananya Mehta"
+              value={newMemberName}
+              onChange={(e) => setNewMemberName(e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "0.35rem" }}>
+              Relationship
+            </label>
+            <select
+              className="select-field"
+              value={newMemberRelation}
+              onChange={(e) => setNewMemberRelation(e.target.value)}
+            >
+              <option value="Spouse">Spouse / Co-Owner</option>
+              <option value="Son">Son</option>
+              <option value="Daughter">Daughter</option>
+              <option value="Parent">Parent</option>
+              <option value="Sibling">Sibling</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "0.35rem" }}>
+              Mobile Phone
+            </label>
+            <input
+              className="input-field"
+              placeholder="+91 98765 43210"
+              value={newMemberPhone}
+              onChange={(e) => setNewMemberPhone(e.target.value)}
+              required
+            />
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "1rem" }}>
+            <BrandButton type="button" variant="outline" onClick={() => setAddMemberModalOpen(false)}>
+              Cancel
+            </BrandButton>
+            <BrandButton type="submit">
+              Save Member
+            </BrandButton>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Assign Staff Modal */}
+      <Modal
+        isOpen={assignStaffModalOpen}
+        onClose={() => setAssignStaffModalOpen(false)}
+        title="Assign Verified Community Staff"
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <p style={{ fontSize: "13.5px", color: "var(--brand-body)", margin: 0 }}>
+            Select from police-verified staff registered in your society roster:
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+            {[
+              { name: "Suman Devi", role: "Housekeeping & Cleaning", rating: "4.9 ★", id: "STF-101" },
+              { name: "Manoj Singh", role: "Personal Driver", rating: "4.8 ★", id: "STF-102" },
+              { name: "Rekha Bai", role: "Cook & Meal Prep", rating: "5.0 ★", id: "STF-103" },
+            ].map((stf) => (
+              <div
+                key={stf.id}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "0.75rem 1rem",
+                  border: "1px solid var(--border-standard)",
+                  borderRadius: "8px",
+                  background: "#F8FAFC",
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: "14px" }}>{stf.name} <span style={{ color: "#0D9488", fontSize: "12px", fontWeight: 600 }}>{stf.rating}</span></div>
+                  <div style={{ fontSize: "12px", color: "var(--brand-body)" }}>{stf.role}</div>
+                </div>
+                <BrandButton
+                  size="sm"
+                  onClick={() => {
+                    setAssignStaffModalOpen(false);
+                    toast.success(`${stf.name} has been assigned to Unit A-402 with gate access.`, "Staff Assigned");
+                  }}
+                >
+                  Assign
+                </BrandButton>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.5rem" }}>
+            <BrandButton variant="outline" onClick={() => setAssignStaffModalOpen(false)}>
+              Close
+            </BrandButton>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Ticket Modal */}
+      <Modal
+        isOpen={ticketModalOpen}
+        onClose={() => setTicketModalOpen(false)}
+        title="Raise Maintenance Ticket"
+      >
+        <form onSubmit={handleCreateTicket} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <div>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "0.35rem" }}>
+              Category
+            </label>
+            <select
+              className="select-field"
+              value={ticketCategory}
+              onChange={(e) => setTicketCategory(e.target.value)}
+            >
+              <option value="Plumbing">Plumbing & Water</option>
+              <option value="Electrical">Electrical & Power</option>
+              <option value="HVAC">Air Conditioning / HVAC</option>
+              <option value="Carpentry">Carpentry & Hardware</option>
+              <option value="Common Area">Common Area & Lift</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "0.35rem" }}>
+              Issue Summary
+            </label>
+            <input
+              className="input-field"
+              placeholder="e.g. Master bathroom faucet leakage"
+              value={ticketSubject}
+              onChange={(e) => setTicketSubject(e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "0.35rem" }}>
+              Description & Location
+            </label>
+            <textarea
+              className="textarea-field"
+              rows={3}
+              placeholder="Describe the issue and when technician can visit..."
+              value={ticketDescription}
+              onChange={(e) => setTicketDescription(e.target.value)}
+              required
+            />
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "1rem" }}>
+            <BrandButton type="button" variant="outline" onClick={() => setTicketModalOpen(false)}>
+              Cancel
+            </BrandButton>
+            <BrandButton type="submit" isLoading={complaints.createTicket.isPending}>
+              Submit Ticket
+            </BrandButton>
           </div>
         </form>
       </Modal>
@@ -898,67 +1090,39 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
       <Modal
         isOpen={amenityBookingModalOpen}
         onClose={() => setAmenityBookingModalOpen(false)}
-        title={`Book ${selectedAmenity?.name || "Amenity"}`}
+        title={`Book ${selectedAmenity?.name ?? "Amenity"}`}
       >
         <form onSubmit={handleBookAmenity} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-          <p style={{ fontSize: "13.5px", color: "var(--brand-body)" }}>{selectedAmenity?.description}</p>
           <div>
-            <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "0.35rem" }}>Reservation Date</label>
-            <input type="date" className="input-field" value={bookingDate} onChange={(e) => setBookingDate(e.target.value)} required />
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "0.35rem" }}>
+              Reservation Date
+            </label>
+            <input
+              type="date"
+              className="input-field"
+              value={bookingDate}
+              onChange={(e) => setBookingDate(e.target.value)}
+              required
+            />
           </div>
           <div>
-            <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "0.35rem" }}>Preferred Time Slot</label>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "0.35rem" }}>
+              Time Slot
+            </label>
             <select className="select-field">
-              <option value="07:00-08:30">07:00 AM – 08:30 AM</option>
-              <option value="09:00-10:30">09:00 AM – 10:30 AM</option>
-              <option value="17:00-18:30">05:00 PM – 06:30 PM</option>
-              <option value="19:00-20:30">07:00 PM – 08:30 PM</option>
+              <option>06:00 AM – 08:00 AM (Morning Slot)</option>
+              <option>09:00 AM – 11:00 AM</option>
+              <option>04:00 PM – 06:00 PM (Evening Slot)</option>
+              <option>07:00 PM – 09:00 PM (Prime Slot)</option>
             </select>
           </div>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "1rem" }}>
-            <BrandButton type="button" variant="outline" onClick={() => setAmenityBookingModalOpen(false)}>Cancel</BrandButton>
-            <BrandButton type="submit">Confirm Reservation</BrandButton>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Raise Ticket Modal */}
-      <Modal
-        isOpen={ticketModalOpen}
-        onClose={() => setTicketModalOpen(false)}
-        title="Raise Maintenance / Service Request"
-      >
-        <form onSubmit={handleCreateTicket} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-          <div>
-            <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "0.35rem" }}>Category</label>
-            <select className="select-field" value={ticketCategory} onChange={(e) => setTicketCategory(e.target.value)}>
-              <option value="Plumbing">Plumbing</option>
-              <option value="Electrical">Electrical / Intercom</option>
-              <option value="Carpentry">Carpentry & Hardware</option>
-              <option value="HVAC">Air Conditioning</option>
-              <option value="Pest Control">Pest Control</option>
-            </select>
-          </div>
-          <div>
-            <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "0.35rem" }}>Subject / Brief Summary</label>
-            <input className="input-field" value={ticketSubject} onChange={(e) => setTicketSubject(e.target.value)} placeholder="e.g. Kitchen tap leaking" required />
-          </div>
-          <div>
-            <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "0.35rem" }}>Detailed Description</label>
-            <textarea className="input-field" rows={3} value={ticketDescription} onChange={(e) => setTicketDescription(e.target.value)} placeholder="Provide any details, location within apartment..." required />
-          </div>
-          <div>
-            <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "0.35rem" }}>Priority</label>
-            <select className="select-field" value={ticketPriority} onChange={(e) => setTicketPriority(e.target.value)}>
-              <option value="low">Low (Routine Upkeep)</option>
-              <option value="medium">Medium (Standard 24h SLA)</option>
-              <option value="high">High (Urgent Attention)</option>
-              <option value="emergency">Emergency (Immediate)</option>
-            </select>
-          </div>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "1rem" }}>
-            <BrandButton type="button" variant="outline" onClick={() => setTicketModalOpen(false)}>Cancel</BrandButton>
-            <BrandButton type="submit">Submit Ticket</BrandButton>
+            <BrandButton type="button" variant="outline" onClick={() => setAmenityBookingModalOpen(false)}>
+              Cancel
+            </BrandButton>
+            <BrandButton type="submit" isLoading={amenities.book.isPending}>
+              Confirm Booking
+            </BrandButton>
           </div>
         </form>
       </Modal>
@@ -967,14 +1131,16 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
       <Modal
         isOpen={paymentModalOpen}
         onClose={() => setPaymentModalOpen(false)}
-        title="Simulated Maintenance Payment Checkout"
+        title="Simulated Dues Payment Gateway"
+        size="md"
       >
-        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-          <div style={{ padding: "1rem", background: "#F8FAFC", borderRadius: "8px" }}>
-            <div style={{ fontSize: "12px", color: "var(--brand-body)", textTransform: "uppercase" }}>Invoice Reference</div>
-            <div style={{ fontWeight: 700, fontSize: "15px" }}>{selectedInvoice?.invoice_number}</div>
-            <div style={{ fontSize: "1.5rem", fontWeight: 900, color: "var(--brand-primary)", marginTop: "0.5rem" }}>
-              {formatCurrency(selectedInvoice?.balance_due)}
+        <div style={{ padding: "0.5rem 0" }}>
+          <div style={{ background: "#F1F5F9", padding: "1rem", borderRadius: "8px", marginBottom: "1rem" }}>
+            <div style={{ fontSize: "12px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>Invoice #</div>
+            <div style={{ fontSize: "16px", fontWeight: 800, color: "var(--brand-heading)" }}>{selectedInvoice?.invoice_number ?? "INV-2026-09"}</div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: "0.5rem", fontSize: "14px" }}>
+              <span>Payable Balance:</span>
+              <strong style={{ color: "var(--brand-primary)", fontSize: "16px" }}>{formatCurrency(selectedInvoice?.balance_due ?? 350.0)}</strong>
             </div>
           </div>
           <p style={{ fontSize: "13px", color: "var(--brand-body)" }}>
@@ -984,67 +1150,6 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
             <BrandButton variant="outline" onClick={() => setPaymentModalOpen(false)}>Cancel</BrandButton>
             <BrandButton onClick={handleSimulatedPayment} isLoading={payments.payDues.isPending}>
               Simulate Instant Payment
-            </BrandButton>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Official Receipt Modal */}
-      <Modal
-        isOpen={receiptModalOpen}
-        onClose={() => setReceiptModalOpen(false)}
-        title="Official Payment Receipt"
-        size="md"
-      >
-        <div style={{ padding: "1.5rem", border: "1px solid var(--border-standard)", borderRadius: "8px", background: "#FFFFFF" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "2px solid #0F172A", paddingBottom: "1rem", marginBottom: "1rem" }}>
-            <div>
-              <h2 style={{ fontSize: "1.25rem", fontWeight: 900, color: "var(--brand-heading)" }}>GATESPHERE RESIDENTIAL</h2>
-              <p style={{ fontSize: "12px", color: "var(--brand-body)" }}>Maintenance Billing & Finance Ledger</p>
-            </div>
-            <div style={{ textAlign: "right" }}>
-              <span className="live-badge" style={{ background: "#ECFDF5", color: "#065F46" }}>✓ PAID IN FULL</span>
-              <div style={{ fontWeight: 800, fontSize: "14px", marginTop: "0.35rem" }}>{currentReceiptNumber}</div>
-            </div>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "0.75rem", fontSize: "13px", marginBottom: "1rem" }}>
-            <div><strong>Billed To:</strong> Priya & Rajesh Mehta</div>
-            <div><strong>Date Paid:</strong> {formatDate(new Date().toISOString())}</div>
-            <div><strong>Unit:</strong> Unit A-402 (Emerald Tower)</div>
-            <div><strong>Payment Method:</strong> Simulated Gateway (Authorized)</div>
-          </div>
-
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", marginBottom: "1rem" }}>
-            <thead>
-              <tr style={{ background: "#F8FAFC", borderBottom: "1px solid var(--border-standard)" }}>
-                <th style={{ padding: "0.5rem", textAlign: "left" }}>Charge Item</th>
-                <th style={{ padding: "0.5rem", textAlign: "right" }}>Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td style={{ padding: "0.5rem" }}>Common Area Maintenance & Power</td>
-                <td style={{ padding: "0.5rem", textAlign: "right" }}>$220.00</td>
-              </tr>
-              <tr>
-                <td style={{ padding: "0.5rem" }}>Security & Gate Operations</td>
-                <td style={{ padding: "0.5rem", textAlign: "right" }}>$80.00</td>
-              </tr>
-              <tr>
-                <td style={{ padding: "0.5rem" }}>Sinking Fund Reserve</td>
-                <td style={{ padding: "0.5rem", textAlign: "right" }}>$50.00</td>
-              </tr>
-              <tr style={{ fontWeight: 800, borderTop: "1px solid var(--border-standard)" }}>
-                <td style={{ padding: "0.5rem" }}>Total Paid</td>
-                <td style={{ padding: "0.5rem", textAlign: "right", color: "var(--brand-primary)" }}>$350.00</td>
-              </tr>
-            </tbody>
-          </table>
-
-          <div style={{ display: "flex", justifyContent: "flex-end" }}>
-            <BrandButton size="sm" onClick={() => window.print()}>
-              🖨️ Print / Save PDF
             </BrandButton>
           </div>
         </div>

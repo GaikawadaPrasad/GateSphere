@@ -34,7 +34,7 @@ export function Sidebar() {
     navConfig = {
       title: "GateSphere",
       roleLabel: "Auditor (Read-Only)",
-      accentColor: "#475569",
+      accentColor: "#64748B",
       items: AUDITOR_NAV.navItems,
     };
   } else if (pathname.startsWith("/domestic-staff") || pathname.startsWith("/dashboard/domestic-staff")) {
@@ -48,7 +48,7 @@ export function Sidebar() {
     navConfig = {
       title: "GateSphere",
       roleLabel: "Owner / Tenant",
-      accentColor: "#1D4ED8",
+      accentColor: "#2563EB",
       items: OWNER_TENANT_NAV.navItems,
     };
   } else if (pathname.startsWith("/super-admin") || pathname.startsWith("/dashboard/super-admin")) {
@@ -57,6 +57,48 @@ export function Sidebar() {
       roleLabel: "Super Admin",
       accentColor: "#3B82F6",
       items: SUPER_ADMIN_NAV_ITEMS,
+    };
+  } else if (pathname.startsWith("/dashboard/community-admin")) {
+    navConfig = {
+      title: "GateSphere",
+      roleLabel: "Community Admin",
+      accentColor: "#2563EB",
+      items: [{ id: "dashboard", label: "Dashboard", href: "/dashboard/community-admin", icon: "🏢" }],
+    };
+  } else if (pathname.startsWith("/dashboard/security-guard")) {
+    navConfig = {
+      title: "GateSphere",
+      roleLabel: "Security Guard",
+      accentColor: "#DC2626",
+      items: [{ id: "dashboard", label: "Dashboard", href: "/dashboard/security-guard", icon: "🛡️" }],
+    };
+  } else if (pathname.startsWith("/dashboard/security-supervisor")) {
+    navConfig = {
+      title: "GateSphere",
+      roleLabel: "Security Supervisor",
+      accentColor: "#EA580C",
+      items: [{ id: "dashboard", label: "Dashboard", href: "/dashboard/security-supervisor", icon: "👮" }],
+    };
+  } else if (pathname.startsWith("/dashboard/facility-manager")) {
+    navConfig = {
+      title: "GateSphere",
+      roleLabel: "Facility Manager",
+      accentColor: "#059669",
+      items: [{ id: "dashboard", label: "Dashboard", href: "/dashboard/facility-manager", icon: "🔧" }],
+    };
+  } else if (pathname.startsWith("/dashboard/association-committee")) {
+    navConfig = {
+      title: "GateSphere",
+      roleLabel: "Association Committee",
+      accentColor: "#7C3AED",
+      items: [{ id: "dashboard", label: "Dashboard", href: "/dashboard/association-committee", icon: "🏛️" }],
+    };
+  } else if (pathname.startsWith("/dashboard/vendor-technician")) {
+    navConfig = {
+      title: "GateSphere",
+      roleLabel: "Vendor Technician",
+      accentColor: "#D97706",
+      items: [{ id: "dashboard", label: "Dashboard", href: "/dashboard/vendor-technician", icon: "🔨" }],
     };
   }
 
@@ -156,8 +198,8 @@ export function Sidebar() {
             type="button"
             onClick={toggleSidebar}
             style={{
-              background: "transparent",
-              border: "none",
+              background: "rgba(255, 255, 255, 0.06)",
+              border: "1px solid rgba(255, 255, 255, 0.1)",
               color: "var(--sidebar-muted)",
               cursor: "pointer",
               padding: "0.35rem",

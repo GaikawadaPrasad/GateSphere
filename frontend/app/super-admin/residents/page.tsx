@@ -9,6 +9,7 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { residentsApi } from "@/lib/api";
 import { useCommunities } from "@/hooks/use-communities";
 import type { ResidentProfile } from "@/types/residents";
+import type { Community } from "@/types/communities";
 
 export default function ResidentsPage() {
   const [search, setSearch] = useState("");
@@ -96,7 +97,7 @@ export default function ResidentsPage() {
               style={{ width: "auto", height: 36, padding: "0.25rem 0.6rem", fontSize: "0.85rem" }}
             >
               <option value="">All Communities</option>
-              {communities?.map((c: any) => (
+              {communities?.map((c: Community) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
@@ -106,8 +107,8 @@ export default function ResidentsPage() {
         </div>
 
         <DataTable
-          columns={columns as unknown as Column<Record<string, unknown>>[]}
-          data={residents as unknown as Record<string, unknown>[]}
+          columns={columns}
+          data={residents}
           isLoading={isLoading}
           page={page}
           pageSize={pageSize}

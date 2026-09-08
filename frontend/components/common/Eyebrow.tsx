@@ -6,15 +6,25 @@ interface EyebrowProps {
   className?: string;
 }
 
-export function Eyebrow({ children, accentColor, className = "" }: EyebrowProps) {
+export function Eyebrow({ children, accentColor = "#2563EB", className = "" }: EyebrowProps) {
   return (
     <span
       className={`eyebrow-label ${className}`}
       style={{
-        borderColor: accentColor ? `${accentColor}40` : undefined,
-        color: accentColor || undefined,
+        background: `${accentColor}10`,
+        borderColor: `${accentColor}35`,
+        color: accentColor,
       }}
     >
+      <span
+        style={{
+          width: 5,
+          height: 5,
+          borderRadius: "50%",
+          background: accentColor,
+          display: "inline-block",
+        }}
+      />
       {children}
     </span>
   );

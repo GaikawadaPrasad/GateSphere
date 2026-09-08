@@ -32,6 +32,8 @@ const PROTECTED_PREFIXES = [
   "/reports",
   "/audit-logs",
   "/profile",
+  "/owner-tenant",
+  "/auditor",
 ];
 
 export function middleware(req: NextRequest) {
@@ -50,6 +52,17 @@ export function middleware(req: NextRequest) {
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }
+
+  // Normalize legacy /dashboard/<role>/<submodule> to /<role>/<submodule>
+  const dashboardRoleMatch = pathname.match(/^\/dashboard\/(domestic-staff|owner-tenant|auditor|super-admin)(\/.*)?$/);
+  if (dashboardRoleMatch) {
+    const roleSlug = dashboardRoleMatch[1];
+    const rest = dashboardRoleMatch[2];
+    const url = req.nextUrl.clone();
+    url.pathname = `/${roleSlug}${!rest || rest === "/" ? "/dashboard" : rest}`;
+    return NextResponse.redirect(url);
+  }
+
   return NextResponse.next();
 }
 
