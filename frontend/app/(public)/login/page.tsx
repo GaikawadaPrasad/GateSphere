@@ -31,8 +31,26 @@ function LoginForm() {
 
   const onSubmit = handleSubmit(async (values) => {
     try {
-      await login.mutateAsync(values);
-      router.replace(params.get("next") || "/dashboard");
+      const user = await login.mutateAsync(values);
+      const next = params.get("next");
+      if (next) {
+        router.replace(next);
+        return;
+      }
+
+      // active_role is always returned by /auth/login — use it as the source of truth
+      if (user?.is_superadmin || user?.active_role === "super_admin") {
+        router.replace("/super-admin/dashboard");
+      } else if (user?.active_role === "community_admin") {
+        router.replace("/community-admin/dashboard");
+      } else if (user?.active_role === "security_guard" || user?.active_role === "security_supervisor") {
+        router.replace("/gate/live");
+      } else if (user?.active_role === "resident") {
+        router.replace("/resident/home");
+      } else {
+        // Fallback: go to /dashboard which will re-detect and redirect
+        router.replace("/dashboard");
+      }
     } catch (err) {
       if (err instanceof ApiError && Object.keys(err.fields).length) {
         for (const [field, message] of Object.entries(err.fields)) {

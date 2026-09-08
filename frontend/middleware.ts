@@ -4,10 +4,11 @@ import type { NextRequest } from "next/server";
 /**
  * Coarse route guard (AGENTS.md §5.1): presence-only check on the session
  * cookie. The backend re-validates every request and is the real authority;
- * `app/(protected)/layout.tsx` re-checks against `/auth/me`; per-action RBAC
- * is done in the pages with `can()`.
+ * `app/super-admin/layout.tsx` and role guards enforce role boundaries.
  */
 const PROTECTED_PREFIXES = [
+  "/super-admin",
+  "/community-admin",
   "/dashboard",
   "/communities",
   "/towers",
@@ -42,6 +43,7 @@ export function middleware(req: NextRequest) {
   const hasSession =
     req.cookies.has("gs_session") ||
     req.cookies.getAll().some((c) => /^gatesphere_[a-z0-9_]+_session$/.test(c.name));
+
   if (!hasSession) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
