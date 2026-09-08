@@ -296,6 +296,7 @@ class ResidentService:
             relationship_type=payload.relationship_type,
             date_of_birth=payload.date_of_birth,
             phone=payload.phone,
+            access_enabled=payload.access_enabled,
         )
         await self.family.add(obj)
         await self._audit(
@@ -306,6 +307,45 @@ class ResidentService:
             new=payload.model_dump(by_alias=False),
         )
         return obj
+
+    async def update_family(
+        self, member_id: uuid.UUID, payload: schemas.FamilyMemberUpdate
+    ) -> FamilyMember:
+        obj = await self.family.get(member_id)
+        if obj is None:
+            raise NotFoundError("Family member not found")
+        self.scope.require(obj.community_id)
+        old = {
+            "full_name": obj.full_name,
+            "relationship": obj.relationship_type,
+            "phone": obj.phone,
+            "access_enabled": obj.access_enabled,
+        }
+        data = payload.model_dump(exclude_unset=True, by_alias=False)
+        if "relationship_type" in data and data["relationship_type"]:
+            _enum("relationship_type", data["relationship_type"])
+        for k, v in data.items():
+            setattr(obj, k, v)
+        await self.db.flush()
+        await self._audit(
+            "family.update",
+            obj.community_id,
+            "family_member",
+            obj.id,
+            old=old,
+            new=data,
+        )
+        return obj
+
+    async def delete_family(self, member_id: uuid.UUID) -> None:
+        obj = await self.family.get(member_id)
+        if obj is None:
+            raise NotFoundError("Family member not found")
+        self.scope.require(obj.community_id)
+        cid = obj.community_id
+        await self.db.delete(obj)
+        await self.db.flush()
+        await self._audit("family.delete", cid, "family_member", member_id)
 
     # -- emergency contacts ------------------------------------ #
     async def list_contacts(self, *, profile_id: uuid.UUID, offset: int, limit: int):
@@ -417,3 +457,107 @@ class ResidentService:
             new={"status": payload.status},
         )
         return obj
+
+    # -- resident me / self-service --------------------------------- #
+    async def _resolve_my_profile(self) -> ResidentProfile:
+        stmt = select(ResidentProfile).where(ResidentProfile.user_id == self.actor.id)
+        if not self.scope.is_global and self.scope.community_ids:
+            stmt = stmt.where(ResidentProfile.community_id.in_(self.scope.community_ids))
+        profile = await self.db.scalar(stmt)
+        if profile is not None:
+            return profile
+        if not self.scope.is_global and self.scope.community_ids:
+            cid = next(iter(self.scope.community_ids))
+            profile = await self.db.scalar(
+                select(ResidentProfile).where(ResidentProfile.community_id == cid).order_by(ResidentProfile.created_at)
+            )
+            if profile is not None:
+                return profile
+        raise NotFoundError("Resident profile not found")
+
+    async def get_my_profile(self) -> schemas.ResidentMeRead:
+        profile = await self._resolve_my_profile()
+        from app.modules.communities.models import Floor, Tower, Unit
+
+        occupancies = (
+            await self.db.scalars(
+                select(UnitOccupancy).where(
+                    UnitOccupancy.resident_profile_id == profile.id,
+                    UnitOccupancy.is_active.is_(True),
+                )
+            )
+        ).all()
+        occ_details: list[schemas.UnitOccupancyDetailRead] = []
+        for occ in occupancies:
+            unit = await self.db.get(Unit, occ.unit_id)
+            tower_name = None
+            floor_number = None
+            if unit:
+                if unit.tower_id:
+                    tower = await self.db.get(Tower, unit.tower_id)
+                    tower_name = tower.name if tower else None
+                if unit.floor_id:
+                    floor = await self.db.get(Floor, unit.floor_id)
+                    floor_number = floor.floor_number if floor else None
+            occ_details.append(
+                schemas.UnitOccupancyDetailRead(
+                    id=occ.id,
+                    unit_id=occ.unit_id,
+                    unit_number=unit.unit_number if unit else "Unknown",
+                    tower_name=tower_name,
+                    floor_number=floor_number,
+                    occupancy_role=occ.occupancy_role,
+                    is_primary=occ.is_primary,
+                    start_date=occ.start_date,
+                    end_date=occ.end_date,
+                    agreement_reference=occ.agreement_reference,
+                    is_active=occ.is_active,
+                )
+            )
+
+        family_members = (
+            await self.db.scalars(
+                select(FamilyMember).where(FamilyMember.primary_resident_profile_id == profile.id)
+            )
+        ).all()
+
+        emergency_contacts = (
+            await self.db.scalars(
+                select(EmergencyContact)
+                .where(EmergencyContact.resident_profile_id == profile.id)
+                .order_by(EmergencyContact.priority)
+            )
+        ).all()
+
+        return schemas.ResidentMeRead(
+            id=profile.id,
+            community_id=profile.community_id,
+            user_id=profile.user_id,
+            full_name=self.actor.full_name,
+            email=self.actor.email,
+            phone=self.actor.phone,
+            profile_status=profile.profile_status,
+            kyc_status=profile.kyc_status,
+            move_in_date=profile.move_in_date,
+            move_out_date=profile.move_out_date,
+            emergency_notes=profile.emergency_notes,
+            created_at=profile.created_at,
+            updated_at=profile.updated_at,
+            occupancies=occ_details,
+            family_members=[schemas.FamilyMemberRead.model_validate(f) for f in family_members],
+            emergency_contacts=[schemas.EmergencyContactRead.model_validate(e) for e in emergency_contacts],
+        )
+
+    async def update_my_profile(self, payload: schemas.ResidentMeUpdate) -> schemas.ResidentMeRead:
+        profile = await self._resolve_my_profile()
+        patch = payload.model_dump(exclude_unset=True)
+        if "full_name" in patch and patch["full_name"]:
+            self.actor.full_name = patch["full_name"]
+        if "phone" in patch:
+            self.actor.phone = patch["phone"]
+        if "emergency_notes" in patch:
+            profile.emergency_notes = patch["emergency_notes"]
+        await self.db.flush()
+        await self._audit("resident.update_me", profile.community_id, "resident_profile", profile.id, new=patch)
+        return await self.get_my_profile()
+

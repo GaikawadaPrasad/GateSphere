@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { makeQueryClient } from "@/lib/query";
 
+import { ToastContainer } from "@/components/common/ToastContainer";
+
 export function Providers({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [client] = useState(makeQueryClient);
@@ -24,5 +26,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
     return unsub;
   }, [client, router]);
 
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={client}>
+      {children}
+      <ToastContainer />
+    </QueryClientProvider>
+  );
 }

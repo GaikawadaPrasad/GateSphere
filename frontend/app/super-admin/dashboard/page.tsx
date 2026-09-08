@@ -17,7 +17,7 @@ import { useSuperAdminDashboardMetrics } from "@/hooks/use-dashboards";
 import { useCommunities, useCreateCommunity, useUpdateCommunity, useDeleteCommunity } from "@/hooks/use-communities";
 import { useGateEvents, usePanicAlerts } from "@/hooks/use-gate";
 import { INDIAN_STATES_AND_UTS, POPULAR_CITIES_BY_STATE, isValidCommunityName, isValidCityName } from "@/constants/locations";
-import type { Tower, Gate } from "@/types/communities";
+import type { Community, Tower, Gate } from "@/types/communities";
 
 export default function SuperAdminDashboardPage() {
   const router = useRouter();
@@ -152,7 +152,7 @@ export default function SuperAdminDashboardPage() {
   // Filter communities by search query and active status
   const filteredCommunities = useMemo(() => {
     if (!communities) return [];
-    return communities.filter((comm) => {
+    return communities.filter((comm: Community) => {
       const matchesSearch =
         searchQuery === "" ||
         comm.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

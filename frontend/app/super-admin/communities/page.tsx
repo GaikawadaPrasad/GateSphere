@@ -10,7 +10,7 @@ import { formatDate } from "@/lib/utils";
 import { communitiesApi } from "@/lib/api";
 import { useCommunities, useCreateCommunity, useUpdateCommunity, useDeleteCommunity } from "@/hooks/use-communities";
 import { INDIAN_STATES_AND_UTS, POPULAR_CITIES_BY_STATE, isValidCommunityName, isValidCityName } from "@/constants/locations";
-import type { Tower, Gate } from "@/types/communities";
+import type { Community, Tower, Gate } from "@/types/communities";
 
 export default function CommunitiesPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -126,7 +126,7 @@ export default function CommunitiesPage() {
 
   const filteredCommunities = useMemo(() => {
     if (!communities) return [];
-    return communities.filter((comm) => {
+    return communities.filter((comm: Community) => {
       const matchesSearch =
         searchQuery === "" ||
         comm.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

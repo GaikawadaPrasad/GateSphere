@@ -9,6 +9,7 @@ interface RoleGuardProps {
   children: ReactNode;
   requireSuperAdmin?: boolean;
   requiredPermission?: string;
+  allowedRoles?: string[];
   fallback?: ReactNode;
   redirectTo?: string;
 }
@@ -17,28 +18,51 @@ export function RoleGuard({
   children,
   requireSuperAdmin = false,
   requiredPermission,
+  allowedRoles,
   fallback = null,
   redirectTo,
 }: RoleGuardProps) {
   const router = useRouter();
   const { data: user, isLoading } = useMe();
 
+  const isSuper = Boolean(
+    user?.is_superadmin ||
+    user?.active_role === "super_admin" ||
+    user?.roles?.some((r) => r.role_slug === "super_admin")
+  );
+
+  const userRoles: string[] = [
+    ...(user?.active_role ? [user.active_role] : []),
+    ...(user?.roles?.map((r) => r.role_slug) || []),
+  ];
+  if (isSuper) {
+    userRoles.push("super_admin");
+  }
+
+  const hasAllowedRole =
+    !allowedRoles ||
+    allowedRoles.length === 0 ||
+    isSuper ||
+    allowedRoles.some((role) => userRoles.includes(role));
+
   useEffect(() => {
     if (isLoading) return;
 
     if (!user) {
-      router.replace(`/login?next=${encodeURIComponent(window.location.pathname)}`);
+      router.replace(`/login?next=${encodeURIComponent(typeof window !== "undefined" ? window.location.pathname : "")}`);
       return;
     }
 
-    if (requireSuperAdmin && !user.is_superadmin) {
-      if (redirectTo) {
-        router.replace(redirectTo);
-      } else {
-        router.replace("/unauthorized");
-      }
+    if (requireSuperAdmin && !isSuper) {
+      router.replace(redirectTo || "/unauthorized");
+      return;
     }
-  }, [user, isLoading, requireSuperAdmin, redirectTo, router]);
+
+    if (allowedRoles && !hasAllowedRole) {
+      router.replace(redirectTo || "/unauthorized");
+      return;
+    }
+  }, [user, isLoading, requireSuperAdmin, isSuper, allowedRoles, hasAllowedRole, redirectTo, router]);
 
   if (isLoading) {
     return (
@@ -50,13 +74,18 @@ export function RoleGuard({
 
   if (!user) return null;
 
-  if (requireSuperAdmin && !user.is_superadmin) {
+  if (requireSuperAdmin && !isSuper) {
     return fallback;
   }
 
-  if (requiredPermission && !user.is_superadmin && !user.permissions.includes(requiredPermission)) {
+  if (allowedRoles && !hasAllowedRole) {
+    return fallback;
+  }
+
+  if (requiredPermission && !isSuper && !user.permissions?.includes(requiredPermission)) {
     return fallback;
   }
 
   return <>{children}</>;
 }
+

@@ -2,12 +2,15 @@ import type { ReactNode } from "react";
 
 export type KpiAccent = "primary" | "success" | "warning" | "danger" | "purple" | "neutral";
 
-interface KpiCardProps {
+export interface KpiCardProps {
   title: string;
   value: string | number;
   subtitle?: ReactNode;
+  subtext?: ReactNode;
   icon: string | ReactNode;
   accent?: KpiAccent;
+  trend?: string;
+  trendValue?: string;
   badge?: {
     text: string;
     variant?: "success" | "warning" | "danger" | "primary" | "neutral";
@@ -16,7 +19,19 @@ interface KpiCardProps {
   isLoading?: boolean;
 }
 
-export function KpiCard({ title, value, subtitle, icon, accent = "primary", badge, onClick, isLoading }: KpiCardProps) {
+export function KpiCard({
+  title,
+  value,
+  subtitle,
+  subtext,
+  icon,
+  accent = "primary",
+  trend,
+  trendValue,
+  badge,
+  onClick,
+  isLoading,
+}: KpiCardProps) {
   if (isLoading) {
     return (
       <div className="card" style={{ display: "flex", flexDirection: "column", gap: "0.75rem", minHeight: 140 }}>
@@ -32,6 +47,10 @@ export function KpiCard({ title, value, subtitle, icon, accent = "primary", badg
   let iconBg = "#eff6ff";
   let iconColor = "#2563eb";
   let borderTop = "3px solid #3b82f6";
+
+  if (trend === "warning") accent = "warning";
+  if (trend === "danger") accent = "danger";
+  if (trend === "success") accent = "success";
 
   switch (accent) {
     case "success":
@@ -65,6 +84,8 @@ export function KpiCard({ title, value, subtitle, icon, accent = "primary", badg
       borderTop = "3px solid #3b82f6";
       break;
   }
+
+  const displaySubtitle = subtitle || subtext;
 
   return (
     <div
@@ -109,11 +130,17 @@ export function KpiCard({ title, value, subtitle, icon, accent = "primary", badg
       </div>
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "0.775rem", color: "var(--muted)", marginTop: "0.25rem" }}>
-        <span>{subtitle}</span>
-        {badge && (
-          <span className={`badge badge-${badge.variant || "neutral"}`} style={{ fontSize: "0.7rem", padding: "0.15rem 0.45rem" }}>
-            {badge.text}
+        <span>{displaySubtitle}</span>
+        {trendValue ? (
+          <span style={{ fontSize: "0.75rem", fontWeight: 600, color: iconColor }}>
+            {trendValue}
           </span>
+        ) : (
+          badge && (
+            <span className={`badge badge-${badge.variant || "neutral"}`} style={{ fontSize: "0.7rem", padding: "0.15rem 0.45rem" }}>
+              {badge.text}
+            </span>
+          )
         )}
       </div>
     </div>

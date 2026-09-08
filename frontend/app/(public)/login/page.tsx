@@ -1,19 +1,34 @@
 "use client";
 
+<<<<<<< HEAD
 import React, { useState, Suspense } from "react";
 import Link from "next/link";
+=======
+import React, { Suspense } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+>>>>>>> e7481ebae09d00f54b7fa3b0587749f5aec51468
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+<<<<<<< HEAD
 import GateSphereLogo from "@/components/public/GateSphereLogo";
 import { ApiError } from "@/lib/api";
+=======
+>>>>>>> e7481ebae09d00f54b7fa3b0587749f5aec51468
 import { useLogin } from "@/hooks/use-auth";
+import { ApiError } from "@/lib/api";
+import { getRoleLandingRoute } from "@/lib/permissions";
 
 const schema = z.object({
+<<<<<<< HEAD
   email: z.string().email("Enter a valid email address"),
+=======
+  email: z.string().email("Valid email required"),
+>>>>>>> e7481ebae09d00f54b7fa3b0587749f5aec51468
   password: z.string().min(1, "Password is required"),
 });
+
 type FormValues = z.infer<typeof schema>;
 
 const DEMO_ACCOUNTS = [
@@ -37,12 +52,13 @@ function LoginForm() {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { email: "super_admin@gatesphere.com", password: "" },
+    defaultValues: { email: "", password: "" },
   });
 
   const onSubmit = handleSubmit(async (values) => {
     try {
       const user = await login.mutateAsync(values);
+<<<<<<< HEAD
       const next = params.get("next");
       if (next) {
         router.replace(next);
@@ -65,10 +81,15 @@ function LoginForm() {
         // Fallback: go to /dashboard which will re-detect and redirect
         router.replace("/dashboard");
       }
+=======
+      const nextParam = params.get("next");
+      const targetUrl = nextParam && nextParam !== "/unauthorized" ? nextParam : getRoleLandingRoute(user);
+      router.replace(targetUrl);
+>>>>>>> e7481ebae09d00f54b7fa3b0587749f5aec51468
     } catch (err) {
-      if (err instanceof ApiError && Object.keys(err.fields).length) {
+      if (err instanceof ApiError && err.fields && Object.keys(err.fields).length) {
         for (const [field, message] of Object.entries(err.fields)) {
-          setError(field as keyof FormValues, { message });
+          setError(field as keyof FormValues, { message: Array.isArray(message) ? message[0] : String(message) });
         }
       } else {
         setError("root", {
@@ -84,6 +105,7 @@ function LoginForm() {
   };
 
   return (
+<<<<<<< HEAD
     <div className="min-h-screen w-full flex flex-col justify-center items-center bg-[#070C18] text-white relative overflow-hidden px-4 py-12 selection:bg-blue-600 selection:text-white">
       {/* Background Aurora Ambient Lights */}
       <div
@@ -274,11 +296,55 @@ function LoginForm() {
         </div>
       </div>
     </div>
+=======
+    <form onSubmit={onSubmit} className="card" noValidate>
+      {errors.root && (
+        <div role="alert" className="error-banner">
+          {errors.root.message}
+        </div>
+      )}
+
+      <label htmlFor="email">Email</label>
+      <input
+        id="email"
+        type="email"
+        autoComplete="email"
+        aria-invalid={Boolean(errors.email)}
+        aria-describedby={errors.email ? "email-error" : undefined}
+        {...register("email")}
+      />
+      {errors.email && (
+        <span id="email-error" className="error-text">
+          {errors.email.message}
+        </span>
+      )}
+
+      <label htmlFor="password">Password</label>
+      <input
+        id="password"
+        type="password"
+        autoComplete="current-password"
+        aria-invalid={Boolean(errors.password)}
+        aria-describedby={errors.password ? "password-error" : undefined}
+        {...register("password")}
+      />
+      {errors.password && (
+        <span id="password-error" className="error-text">
+          {errors.password.message}
+        </span>
+      )}
+
+      <button type="submit" disabled={isSubmitting || login.isPending}>
+        {isSubmitting || login.isPending ? "Signing in…" : "Sign in"}
+      </button>
+    </form>
+>>>>>>> e7481ebae09d00f54b7fa3b0587749f5aec51468
   );
 }
 
 export default function LoginPage() {
   return (
+<<<<<<< HEAD
     <Suspense
       fallback={
         <div className="min-h-screen w-full flex items-center justify-center bg-[#070C18] text-white">
@@ -288,5 +354,13 @@ export default function LoginPage() {
     >
       <LoginForm />
     </Suspense>
+=======
+    <main className="container">
+      <h1>Sign in to GateSphere</h1>
+      <Suspense fallback={<div className="card">Loading…</div>}>
+        <LoginForm />
+      </Suspense>
+    </main>
+>>>>>>> e7481ebae09d00f54b7fa3b0587749f5aec51468
   );
 }
