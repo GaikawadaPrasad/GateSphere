@@ -86,23 +86,28 @@ export function getRoleLandingRoute(user: CurrentUser | null | undefined): strin
   }
   const role = (user.active_role || user.roles?.[0]?.role_slug) as string | undefined;
   switch (role) {
-    case "auditor":
-      return "/auditor/dashboard";
-    case "domestic_staff":
-      return "/domestic-staff/dashboard";
+    case "super_admin":
+      return "/super-admin/dashboard";
+    case "community_admin":
+      return "/community-admin/dashboard";
+    case "association_committee":
+      return "/association-committee/governance";
+    case "facility_manager":
+      return "/facility-manager/dashboard";
+    case "security_supervisor":
+      return "/security-supervisor/dashboard";
+    case "security_guard":
+      return "/security-guard/dashboard";
     case "resident":
     case "owner":
     case "tenant":
       return "/owner-tenant/dashboard";
-    case "community_admin":
-      return "/community-admin/dashboard";
-    case "security_guard":
-    case "security_supervisor":
-      return "/security-guard/dashboard";
-    case "facility_manager":
-    case "association_committee":
+    case "domestic_staff":
+      return "/domestic-staff/dashboard";
     case "vendor_technician":
-      return "/community-admin/dashboard";
+      return "/vendor-technician/dashboard";
+    case "auditor":
+      return "/auditor/dashboard";
     default:
       return "/dashboard";
   }
