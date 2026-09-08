@@ -24,9 +24,10 @@ export default function SecurityGuardGateHistoryPage() {
   }, []);
 
   const filteredHistory = history.filter((h) => {
+    const vName = h.visitor_name || h.entity_name || "";
     const matchSearch =
-      h.visitor_name.toLowerCase().includes(search.toLowerCase()) ||
-      (h.vehicle_number && h.vehicle_number.toLowerCase().includes(search.toLowerCase()));
+      vName.toLowerCase().includes(search.toLowerCase()) ||
+      Boolean(h.vehicle_number && h.vehicle_number.toLowerCase().includes(search.toLowerCase()));
     const matchType = typeFilter === "all" || h.visitor_type === typeFilter;
     return matchSearch && matchType;
   });
@@ -97,7 +98,7 @@ export default function SecurityGuardGateHistoryPage() {
                     <td>{h.gate_name}</td>
                     <td>{h.guard_name}</td>
                     <td>
-                      <StatusBadge status={h.action} />
+                      <StatusBadge status={h.action || "Active"} />
                     </td>
                   </tr>
                 ))

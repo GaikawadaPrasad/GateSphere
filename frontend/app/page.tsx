@@ -1,16 +1,56 @@
-import Link from "next/link";
+"use client";
 
-export default function Home() {
+import React from "react";
+import PublicLayout from "@/components/public/PublicLayout";
+import Hero from "@/components/public/Hero";
+import TrustStrip from "@/components/public/TrustStrip";
+import EverythingYouNeed from "@/components/public/EverythingYouNeed";
+import SecuritySection from "@/components/public/SecuritySection";
+import VisitorManagement from "@/components/public/VisitorManagement";
+import ResidentExperience from "@/components/public/ResidentExperience";
+import MaintenanceTimeline from "@/components/public/MaintenanceTimeline";
+import Amenities from "@/components/public/Amenities";
+import Testimonials from "@/components/public/Testimonials";
+import RequestDemo from "@/components/public/RequestDemo";
+import FAQ from "@/components/public/FAQ";
+
+export default function HomePage() {
   return (
-    <main className="container">
-      <h1>GateSphere</h1>
-      <p>Enterprise residential community, visitor, security &amp; facility management platform.</p>
-      <div className="card">
-        <p>
-          <Link href="/login">Sign in</Link> · <Link href="/dashboard">Dashboard</Link> ·{" "}
-          <a href="/api/v1/openapi.json">API schema</a> · <a href="/docs">API docs</a>
-        </p>
+    <PublicLayout>
+      <div className="w-full">
+        {/* 1. Hero Fullscreen Cinematic Video */}
+        <Hero />
+
+        {/* 2. Trust Strip & Verified Stats */}
+        <TrustStrip />
+
+        {/* 3. Core Architecture 3D Interactive Grid */}
+        <EverythingYouNeed />
+
+        {/* 4. Gate Security & Surveillance Deep Dive */}
+        <SecuritySection />
+
+        {/* 5. Visitor Verification & Management */}
+        <VisitorManagement />
+
+        {/* 6. Resident Super-App Experience */}
+        <ResidentExperience />
+
+        {/* 7. Helpdesk & 2-Hour SLA Maintenance Timeline */}
+        <MaintenanceTimeline />
+
+        {/* 8. Clubhouse & Amenities Infinite Carousel */}
+        <Amenities />
+
+        {/* 9. Verified RWA & Leadership Testimonials */}
+        <Testimonials />
+
+        {/* 10. Live Demo Booking Form */}
+        <RequestDemo />
+
+        {/* 11. Frequently Asked Questions */}
+        <FAQ />
       </div>
-    </main>
+    </PublicLayout>
   );
 }

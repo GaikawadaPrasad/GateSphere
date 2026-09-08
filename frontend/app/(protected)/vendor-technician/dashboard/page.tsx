@@ -120,7 +120,7 @@ export default function VendorDashboardPage() {
         <div style={{ minWidth: 0 }}>
           <div className="card">
             <div className="card-header">
-              <h3 className="card-title">Today's Assigned Service Tickets</h3>
+              <h3 className="card-title">Today&apos;s Assigned Service Tickets</h3>
               <button
                 className="btn btn-secondary"
                 style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}

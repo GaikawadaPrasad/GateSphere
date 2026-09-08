@@ -35,7 +35,7 @@ export default function SecurityGuardEmergencyPage() {
     gateApi.alerts().then((data) => {
       if (mounted && data) {
         setAlertsList(data);
-        const live = data.find((a) => a.status === "Active" || a.status === "Acknowledged");
+        const live = data.find((a) => (a.status as string) === "Active" || (a.status as string) === "Acknowledged" || a.status === "acknowledged");
         if (live) setActiveSos(live);
       }
     });

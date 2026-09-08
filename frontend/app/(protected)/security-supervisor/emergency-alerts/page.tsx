@@ -46,8 +46,8 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
     }
   };
 
-  const handleStatusChange = async (id: string, status: "Active" | "Acknowledged" | "Resolving" | "Resolved") => {
-    setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
+  const handleStatusChange = async (id: string, status: any) => {
+    setAlerts((prev) => prev.map((a) => (a.id === id ? ({ ...a, status } as any) : a)));
 
     if (status === "Acknowledged") {
       await gateApi.acknowledgeAlert(id);
@@ -106,7 +106,7 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
                     <select
                       className="select-field"
                       value={a.status}
-                      onChange={(e) => handleStatusChange(a.id, e.target.value as PanicAlert["status"])}
+                      onChange={(e) => handleStatusChange(a.id, e.target.value)}
                       style={{ height: 28, fontSize: "0.75rem" }}
                     >
                       <option value="Active">Active</option>
