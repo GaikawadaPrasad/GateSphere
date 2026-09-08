@@ -240,3 +240,47 @@ class DashboardService:
                 Announcement.is_published.is_(True),
             ),
         )
+<<<<<<< Updated upstream
+=======
+
+    async def _resolve_role_category(self) -> str:
+        if self.actor.is_superadmin or self.scope.is_global:
+            return "super_admin"
+        unit_scope = await actor_unit_scope(self.db, self.actor)
+        if unit_scope is not None:
+            return "resident"
+        is_security = bool(
+            await self.db.scalar(
+                select(UserRole.id)
+                .join(Role, Role.id == UserRole.role_id)
+                .where(
+                    UserRole.user_id == self.actor.id,
+                    Role.slug.in_(("security_supervisor", "security_guard")),
+                )
+                .limit(1)
+            )
+        )
+        if is_security:
+            return "security"
+        return "admin"
+
+    # -- assistant / chatbot (backward-compatible delegate) --- #
+    async def assistant_quick_actions(
+        self, community_id: uuid.UUID | None
+    ):
+        from app.modules.assistant.service import AssistantService
+
+        svc = AssistantService(self.db, self.scope, self.actor, self.ctx)
+        return await svc.quick_actions(community_id)
+
+    async def assistant_query(
+        self, community_id: uuid.UUID | None, query: str
+    ):
+        from app.modules.assistant.service import AssistantService
+
+        svc = AssistantService(self.db, self.scope, self.actor, self.ctx)
+        return await svc.query(community_id, query)
+
+
+
+>>>>>>> Stashed changes

@@ -107,7 +107,7 @@ class Floor(Base, TimestampMixin, TenantMixin):
 class Unit(Base, TimestampMixin, TenantMixin):
     __tablename__ = "units"
     __table_args__ = (
-        UniqueConstraint("community_id", "tower_id", "floor_id", "unit_number"),
+        UniqueConstraint("community_id", "tower_id", "unit_number", name="uq_unit_tower_number"),
         UniqueConstraint("id", "community_id"),  # composite-FK target for other modules
         ForeignKeyConstraint(
             ["floor_id", "community_id", "tower_id"],

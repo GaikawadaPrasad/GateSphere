@@ -115,32 +115,45 @@ async def accept_invitation(
     )
 
 
-# --- direct tenant management ----------------------------------------- #
+# --- direct resident / tenant management ------------------------------- #
+@router.post(
+    "/communities/{community_id}/residents",
+    response_model=Envelope[schemas.TenantOut],
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[CREATE],
+)
 @router.post(
     "/communities/{community_id}/tenants",
     response_model=Envelope[schemas.TenantOut],
     status_code=status.HTTP_201_CREATED,
     dependencies=[CREATE],
+    include_in_schema=False,
 )
 async def add_tenant(
     community_id: uuid.UUID,
     payload: schemas.TenantAdd,
     svc: Svc = Depends(onboarding_service),
 ) -> dict:
-    return ok(await svc.add_tenant(community_id, payload), message="Tenant added")
+    return ok(await svc.add_tenant(community_id, payload), message="Resident added")
 
 
+@router.delete(
+    "/communities/{community_id}/residents/{profile_id}",
+    response_model=Envelope[schemas.TenantOut],
+    dependencies=[DELETE],
+)
 @router.delete(
     "/communities/{community_id}/tenants/{profile_id}",
     response_model=Envelope[schemas.TenantOut],
     dependencies=[DELETE],
+    include_in_schema=False,
 )
 async def remove_tenant(
     community_id: uuid.UUID,
     profile_id: uuid.UUID,
     svc: Svc = Depends(onboarding_service),
 ) -> dict:
-    return ok(await svc.remove_tenant(community_id, profile_id), message="Tenant removed")
+    return ok(await svc.remove_tenant(community_id, profile_id), message="Resident removed")
 
 
 @router.delete(

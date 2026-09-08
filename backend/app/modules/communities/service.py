@@ -136,6 +136,12 @@ class CommunityService:
         cid = self.scope.require(community_id)
         return await self.gates.list_for_community(cid, offset=offset, limit=limit)
 
+    async def get_gate(self, gate_id: uuid.UUID) -> Gate:
+        obj = await self.gates.get(gate_id)
+        if obj is None:
+            raise NotFoundError("Gate not found")
+        return obj
+
     async def create_gate(self, *, community_id: uuid.UUID, payload: schemas.GateCreate) -> Gate:
         cid = self.scope.require(community_id)
         _check_enum("gate_type", payload.gate_type)
@@ -147,6 +153,22 @@ class CommunityService:
         await self.gates.add(obj)
         await self._audit("gate.create", cid, "gate", obj.id, new=payload.model_dump())
         return obj
+
+    async def update_gate(self, gate_id: uuid.UUID, payload: schemas.GateUpdate) -> Gate:
+        obj = await self.get_gate(gate_id)
+        patch = payload.model_dump(exclude_unset=True)
+        _check_enum("gate_type", patch.get("gate_type"))
+        before = _snapshot(obj, patch)
+        _apply(obj, patch)
+        await self.db.flush()
+        await self._audit("gate.update", obj.community_id, "gate", obj.id, old=before, new=patch)
+        return obj
+
+    async def delete_gate(self, gate_id: uuid.UUID) -> None:
+        obj = await self.get_gate(gate_id)
+        await self.db.delete(obj)
+        await self.db.flush()
+        await self._audit("gate.delete", obj.community_id, "gate", gate_id)
 
     # -- towers ------------------------------------------------------- #
     async def list_towers(
@@ -182,6 +204,12 @@ class CommunityService:
         await self.db.flush()
         await self._audit("tower.update", obj.community_id, "tower", obj.id, old=before, new=patch)
         return obj
+
+    async def delete_tower(self, tower_id: uuid.UUID) -> None:
+        obj = await self.get_tower(tower_id)
+        await self.db.delete(obj)
+        await self.db.flush()
+        await self._audit("tower.delete", obj.community_id, "tower", tower_id)
 
     # -- floors ---------------------------------------------------- #
     async def list_floors(
@@ -220,12 +248,51 @@ class CommunityService:
         )
         return obj
 
+    async def update_floor(self, floor_id: uuid.UUID, payload: schemas.FloorUpdate) -> Floor:
+        obj = await self.get_floor(floor_id)
+        patch = payload.model_dump(exclude_unset=True)
+        before = _snapshot(obj, patch)
+        _apply(obj, patch)
+        await self.db.flush()
+        await self._audit("floor.update", obj.community_id, "floor", obj.id, old=before, new=patch)
+        return obj
+
+    async def delete_floor(self, floor_id: uuid.UUID) -> None:
+        obj = await self.get_floor(floor_id)
+        await self.db.delete(obj)
+        await self.db.flush()
+        await self._audit("floor.delete", obj.community_id, "floor", floor_id)
+
     # -- units --------------------------------------------------- #
     async def list_units(
         self, *, floor_id: uuid.UUID, offset: int, limit: int
     ) -> tuple[list[Unit], int]:
         floor = await self.get_floor(floor_id)
         return await self.units.list_for_floor(floor.id, offset=offset, limit=limit)
+
+    async def list_community_units(
+        self,
+        *,
+        community_id: uuid.UUID,
+        offset: int,
+        limit: int,
+        tower_id: uuid.UUID | None = None,
+        floor_id: uuid.UUID | None = None,
+        unit_type: str | None = None,
+        active: bool | None = None,
+    ) -> tuple[list[Unit], int]:
+        cid = self.scope.require(community_id)
+        if unit_type is not None:
+            _check_enum("unit_type", unit_type)
+        return await self.units.list_for_community(
+            cid,
+            offset=offset,
+            limit=limit,
+            tower_id=tower_id,
+            floor_id=floor_id,
+            unit_type=unit_type,
+            active=active,
+        )
 
     async def get_unit(self, unit_id: uuid.UUID) -> Unit:
         obj = await self.units.get(unit_id)
@@ -239,11 +306,10 @@ class CommunityService:
         if await self.units.by_number(
             community_id=floor.community_id,
             tower_id=floor.tower_id,
-            floor_id=floor.id,
             number=payload.unit_number,
         ):
             raise ConflictError(
-                "Unit number already exists on this floor",
+                "Unit number already exists in this tower",
                 code="UNIT_NUMBER_TAKEN",
                 fields={"unit_number": "taken"},
             )
@@ -271,3 +337,9 @@ class CommunityService:
         await self.db.flush()
         await self._audit("unit.update", obj.community_id, "unit", obj.id, old=before, new=patch)
         return obj
+
+    async def delete_unit(self, unit_id: uuid.UUID) -> None:
+        obj = await self.get_unit(unit_id)
+        await self.db.delete(obj)
+        await self.db.flush()
+        await self._audit("unit.delete", obj.community_id, "unit", unit_id)

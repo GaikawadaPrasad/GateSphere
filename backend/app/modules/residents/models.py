@@ -32,7 +32,7 @@ KYC_STATUS = ("not_started", "submitted", "verified", "rejected")
 OCCUPANCY_ROLES = ("primary_owner", "secondary_owner", "tenant", "family", "occupant")
 RELATIONSHIPS = ("spouse", "child", "parent", "sibling", "relative", "domestic_help", "other")
 MOVE_TYPES = ("move_in", "move_out")
-MOVE_STATUS = ("requested", "scheduled", "approved", "completed", "rejected", "cancelled")
+MOVE_STATUS = ("requested", "scheduled", "in_progress", "approved", "completed", "rejected", "cancelled")
 
 
 class ResidentProfile(Base, TimestampMixin, TenantMixin):
