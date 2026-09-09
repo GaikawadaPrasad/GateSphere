@@ -9,14 +9,6 @@ export default function IntroLoader({ onReady }: { onReady?: () => void }) {
   const [removed, setRemoved] = useState(false);
 
   useEffect(() => {
-    // Only run on initial load within session
-    const hasSeenIntro = sessionStorage.getItem("gatesphere_intro_seen");
-    if (hasSeenIntro) {
-      setRemoved(true);
-      if (onReady) onReady();
-      return;
-    }
-
     // Lock scroll during loader
     document.documentElement.style.overflow = "hidden";
 
@@ -32,7 +24,6 @@ export default function IntroLoader({ onReady }: { onReady?: () => void }) {
     const exitTimer = setTimeout(() => {
       setExiting(true);
       document.documentElement.style.overflow = "";
-      sessionStorage.setItem("gatesphere_intro_seen", "true");
       if (onReady) onReady();
 
       setTimeout(() => {

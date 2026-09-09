@@ -186,6 +186,18 @@ body {
   from { width: 0; }
   to { width: var(--target-width, 80%); }
 }
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes chatPanelIn {
+  from { opacity: 0; transform: scale(0.9) translateY(16px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes chatBubbleIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
 
 .hero-headline { animation: heroFadeUp 0.7s ease-out 0.2s both; }
 .hero-sub { animation: heroFadeUp 0.7s ease-out 0.4s both; }
