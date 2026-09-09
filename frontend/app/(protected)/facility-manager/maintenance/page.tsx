@@ -5,42 +5,69 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { SearchInput } from "@/components/forms/SearchInput";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
-import { maintenanceApi, vendorsApi, type MaintenanceRecord, type Vendor } from "@/lib/api";
+import { maintenanceApi, complaintsApi } from "@/lib/api";
+import { deriveTicketEscalationState, formatDate } from "@/lib/utils";
 
+interface MaintenanceTicket {
+  id: string;
+  ticket_number: string;
+  subject: string;
+  category_name: string;
+  priority: string;
+  status: string;
+  escalation_state: string;
+  created_at: string;
+}
+
+// Real backend enum (backend/app/modules/complaints/models.py TICKET_STATUS)
 const VALID_STATUS_TRANSITIONS: Record<string, string[]> = {
-  Scheduled: ["Vendor Assigned", "In Progress", "Cancelled"],
-  "Vendor Assigned": ["In Progress", "Cancelled"],
-  "In Progress": ["Completed", "Cancelled"],
-  Completed: [],
-  Cancelled: [],
+  created: ["assigned", "cancelled"],
+  assigned: ["acknowledged", "in_progress", "cancelled"],
+  acknowledged: ["in_progress", "cancelled"],
+  in_progress: ["resolved", "cancelled"],
+  resolved: ["closed", "reopened"],
+  reopened: ["assigned", "in_progress"],
+  closed: [],
+  cancelled: [],
 };
 
 export default function FacilityManagerMaintenancePage() {
-  const [records, setRecords] = useState<MaintenanceRecord[]>([]);
-  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [records, setRecords] = useState<MaintenanceTicket[]>([]);
   const [search, setSearch] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Modals state
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
-  const [selectedRecord, setSelectedRecord] = useState<MaintenanceRecord | null>(null);
-
-  // Form fields
-  const [facilityName, setFacilityName] = useState("");
-  const [category, setCategory] = useState("Preventive");
-  const [priority, setPriority] = useState<"Low" | "Medium" | "High" | "Emergency">("Medium");
-  const [scheduledDate, setScheduledDate] = useState("");
-  const [selectedVendorName, setSelectedVendorName] = useState("");
+  const [selectedRecord, setSelectedRecord] = useState<MaintenanceTicket | null>(null);
+  const [vendorName, setVendorName] = useState("");
 
   const loadData = async () => {
     setIsLoading(true);
-    const [recData, venData] = await Promise.all([maintenanceApi.list(), vendorsApi.list()]);
-    setRecords(recData);
-    setVendors(venData);
-    if (venData.length > 0) setSelectedVendorName(venData[0].name);
+    setLoadError(null);
+    try {
+      const [tickets, categories] = await Promise.all([
+        maintenanceApi.list(),
+        complaintsApi.categories(),
+      ]);
+      const categoryMap = new Map<string, string>();
+      for (const c of categories || []) if (c?.id) categoryMap.set(c.id, c.name);
+      setRecords(
+        (tickets || []).map((t: any) => ({
+          id: t.id,
+          ticket_number: t.ticket_number,
+          subject: t.subject,
+          category_name: categoryMap.get(t.category_id) || "Uncategorized",
+          priority: t.priority,
+          status: t.status,
+          escalation_state: deriveTicketEscalationState(t),
+          created_at: t.created_at,
+        }))
+      );
+    } catch (err: any) {
+      setLoadError(err?.message || "Failed to load maintenance tickets.");
+    }
     setIsLoading(false);
   };
 
@@ -48,45 +75,37 @@ export default function FacilityManagerMaintenancePage() {
     loadData();
   }, []);
 
-  const handleCreateMaintenance = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!facilityName.trim()) return;
-    await maintenanceApi.create({
-      facility_name: facilityName,
-      category,
-      priority,
-      scheduled_date: scheduledDate || new Date().toISOString().split("T")[0],
-    });
-    setIsCreateModalOpen(false);
-    setFacilityName("");
-    loadData();
-  };
-
   const handleStatusTransition = async (recordId: string, currentStatus: string, newStatus: string) => {
     const allowed = VALID_STATUS_TRANSITIONS[currentStatus] || [];
     if (!allowed.includes(newStatus)) {
       alert(`Invalid status transition from ${currentStatus} to ${newStatus}`);
       return;
     }
-    await maintenanceApi.updateStatus(recordId, newStatus);
-    setRecords((prev) =>
-      prev.map((r) => (r.id === recordId ? { ...r, status: newStatus as any } : r))
-    );
+    try {
+      await maintenanceApi.updateStatus(recordId, newStatus);
+      setRecords((prev) => prev.map((r) => (r.id === recordId ? { ...r, status: newStatus } : r)));
+    } catch (err: any) {
+      alert(err?.message || "Failed to update status.");
+    }
   };
 
   const handleAssignVendor = async () => {
-    if (!selectedRecord || !selectedVendorName) return;
-    await maintenanceApi.assignVendor(selectedRecord.id, selectedVendorName);
-    await maintenanceApi.updateStatus(selectedRecord.id, "Vendor Assigned");
-    setIsAssignModalOpen(false);
-    loadData();
+    if (!selectedRecord || !vendorName.trim()) return;
+    try {
+      await maintenanceApi.assignVendor(selectedRecord.id, vendorName.trim());
+      setIsAssignModalOpen(false);
+      setVendorName("");
+      loadData();
+    } catch (err: any) {
+      alert(err?.message || "Failed to assign vendor.");
+    }
   };
 
   const filteredRecords = records.filter((r) => {
     const matchSearch =
-      r.maintenance_id.toLowerCase().includes(search.toLowerCase()) ||
-      r.facility_name.toLowerCase().includes(search.toLowerCase()) ||
-      r.vendor_name.toLowerCase().includes(search.toLowerCase());
+      r.ticket_number.toLowerCase().includes(search.toLowerCase()) ||
+      r.subject.toLowerCase().includes(search.toLowerCase()) ||
+      r.category_name.toLowerCase().includes(search.toLowerCase());
     const matchPriority = priorityFilter === "all" || r.priority === priorityFilter;
     const matchStatus = statusFilter === "all" || r.status === statusFilter;
     return matchSearch && matchPriority && matchStatus;
@@ -95,25 +114,9 @@ export default function FacilityManagerMaintenancePage() {
   return (
     <div>
       <PageHeader
-        title="Maintenance Management"
-        subtitle="Schedule preventive maintenance, dispatch vendors, and record completion workflows"
+        title="Maintenance Tickets"
+        subtitle="Real-time service tickets for plumbing, electrical, lifts and housekeeping — assign vendors and track resolution"
         breadcrumbs={[{ label: "GateSphere" }, { label: "Facility Manager" }, { label: "Maintenance" }]}
-        actions={
-          <div style={{ display: "flex", gap: "0.75rem" }}>
-            <button className="btn btn-secondary" onClick={() => setIsCreateModalOpen(true)}>
-              ➕ Schedule Maintenance
-            </button>
-            <button
-              className="btn btn-danger"
-              onClick={() => {
-                setPriority("Emergency");
-                setIsCreateModalOpen(true);
-              }}
-            >
-              🚨 Emergency Maintenance
-            </button>
-          </div>
-        }
       />
 
       <div className="card">
@@ -127,7 +130,7 @@ export default function FacilityManagerMaintenancePage() {
 
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
             <div style={{ width: 220 }}>
-              <SearchInput value={search} onChange={setSearch} placeholder="Search ID/facility/vendor…" />
+              <SearchInput value={search} onChange={setSearch} placeholder="Search ticket #, subject, category…" />
             </div>
 
             <select
@@ -137,10 +140,10 @@ export default function FacilityManagerMaintenancePage() {
               style={{ width: "auto", height: 36 }}
             >
               <option value="all">All Priorities</option>
-              <option value="Low">Low</option>
-              <option value="Medium">Medium</option>
-              <option value="High">High</option>
-              <option value="Emergency">Emergency</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="critical">Critical</option>
             </select>
 
             <select
@@ -150,11 +153,11 @@ export default function FacilityManagerMaintenancePage() {
               style={{ width: "auto", height: 36 }}
             >
               <option value="all">All Statuses</option>
-              <option value="Scheduled">Scheduled</option>
-              <option value="Vendor Assigned">Vendor Assigned</option>
-              <option value="In Progress">In Progress</option>
-              <option value="Completed">Completed</option>
-              <option value="Cancelled">Cancelled</option>
+              {Object.keys(VALID_STATUS_TRANSITIONS).map((s) => (
+                <option key={s} value={s}>
+                  {s.replace(/_/g, " ")}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -163,12 +166,12 @@ export default function FacilityManagerMaintenancePage() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Maintenance ID</th>
-                <th>Facility</th>
+                <th>Ticket #</th>
+                <th>Subject</th>
                 <th>Category</th>
                 <th>Priority</th>
-                <th>Assigned Vendor</th>
-                <th>Scheduled Date</th>
+                <th>SLA</th>
+                <th>Raised</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -177,13 +180,19 @@ export default function FacilityManagerMaintenancePage() {
               {isLoading ? (
                 <tr>
                   <td colSpan={8} style={{ textAlign: "center", padding: "2rem" }}>
-                    Loading maintenance records…
+                    Loading maintenance tickets…
+                  </td>
+                </tr>
+              ) : loadError ? (
+                <tr>
+                  <td colSpan={8} style={{ textAlign: "center", padding: "2rem", color: "var(--danger, #dc2626)" }}>
+                    {loadError}
                   </td>
                 </tr>
               ) : filteredRecords.length === 0 ? (
                 <tr>
                   <td colSpan={8} style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
-                    No maintenance records found.
+                    No maintenance tickets found.
                   </td>
                 </tr>
               ) : (
@@ -191,25 +200,28 @@ export default function FacilityManagerMaintenancePage() {
                   const allowedTransitions = VALID_STATUS_TRANSITIONS[r.status] || [];
                   return (
                     <tr key={r.id}>
-                      <td style={{ fontWeight: 600 }}>{r.maintenance_id}</td>
-                      <td style={{ fontWeight: 500, color: "var(--fg)" }}>{r.facility_name}</td>
-                      <td>{r.category}</td>
+                      <td style={{ fontWeight: 600 }}>{r.ticket_number}</td>
+                      <td style={{ fontWeight: 500, color: "var(--fg)" }}>{r.subject}</td>
+                      <td>{r.category_name}</td>
                       <td>
                         <StatusBadge status={r.priority} />
                       </td>
-                      <td>{r.vendor_name || "Unassigned"}</td>
-                      <td>{r.scheduled_date}</td>
+                      <td>
+                        <StatusBadge status={r.escalation_state} />
+                      </td>
+                      <td>{formatDate(r.created_at)}</td>
                       <td>
                         <StatusBadge status={r.status} />
                       </td>
                       <td>
                         <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
-                          {r.status !== "Completed" && r.status !== "Cancelled" && (
+                          {r.status !== "closed" && r.status !== "cancelled" && (
                             <button
                               className="btn btn-secondary"
                               style={{ fontSize: "0.75rem", padding: "0.2rem 0.45rem", height: 26 }}
                               onClick={() => {
                                 setSelectedRecord(r);
+                                setVendorName("");
                                 setIsAssignModalOpen(true);
                               }}
                             >
@@ -219,11 +231,11 @@ export default function FacilityManagerMaintenancePage() {
                           {allowedTransitions.map((nextSt) => (
                             <button
                               key={nextSt}
-                              className={nextSt === "Completed" ? "btn btn-primary" : "btn btn-secondary"}
-                              style={{ fontSize: "0.75rem", padding: "0.2rem 0.45rem", height: 26 }}
+                              className={nextSt === "resolved" ? "btn btn-primary" : "btn btn-secondary"}
+                              style={{ fontSize: "0.75rem", padding: "0.2rem 0.45rem", height: 26, textTransform: "capitalize" }}
                               onClick={() => handleStatusTransition(r.id, r.status, nextSt)}
                             >
-                              {nextSt}
+                              {nextSt.replace(/_/g, " ")}
                             </button>
                           ))}
                         </div>
@@ -237,91 +249,17 @@ export default function FacilityManagerMaintenancePage() {
         </div>
       </div>
 
-      {/* Schedule Maintenance Modal */}
-      <Modal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        title="Schedule Facility Maintenance"
-        footer={
-          <>
-            <button className="btn btn-secondary" onClick={() => setIsCreateModalOpen(false)}>
-              Cancel
-            </button>
-            <button className="btn btn-primary" onClick={handleCreateMaintenance}>
-              Create Maintenance Ticket
-            </button>
-          </>
-        }
-      >
-        <form onSubmit={handleCreateMaintenance}>
-          <div style={{ marginBottom: "1rem" }}>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
-              Facility Name *
-            </label>
-            <input
-              type="text"
-              className="input-field"
-              placeholder="e.g. Swimming Pool Filter Plant"
-              value={facilityName}
-              onChange={(e) => setFacilityName(e.target.value)}
-              required
-            />
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
-            <div>
-              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
-                Maintenance Category
-              </label>
-              <select className="select-field" value={category} onChange={(e) => setCategory(e.target.value)}>
-                <option value="Preventive">Preventive</option>
-                <option value="Scheduled">Scheduled</option>
-                <option value="Emergency">Emergency</option>
-              </select>
-            </div>
-
-            <div>
-              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
-                Priority
-              </label>
-              <select
-                className="select-field"
-                value={priority}
-                onChange={(e) => setPriority(e.target.value as any)}
-              >
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
-                <option value="Emergency">Emergency</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
-              Scheduled Date
-            </label>
-            <input
-              type="date"
-              className="input-field"
-              value={scheduledDate}
-              onChange={(e) => setScheduledDate(e.target.value)}
-            />
-          </div>
-        </form>
-      </Modal>
-
       {/* Assign Vendor Modal */}
       <Modal
         isOpen={isAssignModalOpen}
         onClose={() => setIsAssignModalOpen(false)}
-        title={`Assign Vendor to ${selectedRecord?.maintenance_id}`}
+        title={`Assign Vendor to ${selectedRecord?.ticket_number || ""}`}
         footer={
           <>
             <button className="btn btn-secondary" onClick={() => setIsAssignModalOpen(false)}>
               Cancel
             </button>
-            <button className="btn btn-primary" onClick={handleAssignVendor}>
+            <button className="btn btn-primary" onClick={handleAssignVendor} disabled={!vendorName.trim()}>
               Confirm Assignment
             </button>
           </>
@@ -329,19 +267,15 @@ export default function FacilityManagerMaintenancePage() {
       >
         <div>
           <p style={{ marginBottom: "1rem", fontSize: "0.875rem" }}>
-            Select a verified vendor to assign to <strong>{selectedRecord?.facility_name}</strong>:
+            Enter the vendor or contractor name to assign to <strong>{selectedRecord?.subject}</strong>:
           </p>
-          <select
-            className="select-field"
-            value={selectedVendorName}
-            onChange={(e) => setSelectedVendorName(e.target.value)}
-          >
-            {vendors.map((v) => (
-              <option key={v.id} value={v.name}>
-                {v.name} ({v.category}) — Rating: {v.rating}★
-              </option>
-            ))}
-          </select>
+          <input
+            type="text"
+            className="input-field"
+            placeholder="e.g. Apex Water Treatment Solutions"
+            value={vendorName}
+            onChange={(e) => setVendorName(e.target.value)}
+          />
         </div>
       </Modal>
     </div>

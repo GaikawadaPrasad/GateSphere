@@ -103,31 +103,31 @@ function LoginForm() {
         }}
       />
 
-      <div className="relative z-10 w-full max-w-md mx-auto">
+      <div className="relative z-10 w-full max-w-md mx-auto flex flex-col items-center">
         {/* Top Branding */}
-        <div className="text-center mb-6 sm:mb-8">
-          <Link href="/" className="inline-block transition-transform hover:scale-105 mb-3 sm:mb-4">
+        <div className="w-full flex flex-col items-center text-center mb-6 sm:mb-8">
+          <Link href="/" className="inline-flex items-center justify-center transition-transform hover:scale-105 mb-3 sm:mb-4">
             <GateSphereLogo className="justify-center" variant="light" size="large" />
           </Link>
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-[11px] text-blue-400 font-mono mb-2">
+          <div className="flex justify-center mb-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-[11px] text-blue-400 font-mono">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               <span>Enterprise Security Access</span>
             </div>
           </div>
           <h1
-            className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight"
+            className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight text-center"
             style={{ fontFamily: "'Outfit', 'Plus Jakarta Sans', sans-serif" }}
           >
             Sign in to GateSphere
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-sm mx-auto">
+          <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-sm mx-auto text-center">
             Access your township management &amp; security gate terminal
           </p>
         </div>
 
         {/* Main Glassmorphic Login Card */}
-        <div className="rounded-2xl sm:rounded-3xl bg-slate-900/80 border border-slate-800 shadow-[0_20px_60px_rgba(0,0,0,0.5)] backdrop-blur-xl p-5 sm:p-8">
+        <div className="w-full rounded-2xl sm:rounded-3xl bg-slate-900/80 border border-slate-800 shadow-[0_20px_60px_rgba(0,0,0,0.5)] backdrop-blur-xl p-5 sm:p-8">
           <form onSubmit={onSubmit} noValidate className="space-y-4">
             {/* Root Error Alert */}
             {errors.root && (
@@ -246,7 +246,7 @@ function LoginForm() {
               href="/demo"
               className="text-blue-400 hover:text-blue-300 font-semibold transition-colors underline-offset-2 hover:underline"
             >
-              Book a Live Demo →
+              Contact Us →
             </Link>
           </div>
         </div>

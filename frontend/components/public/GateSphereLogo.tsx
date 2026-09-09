@@ -35,7 +35,7 @@ export default function GateSphereLogo({
       {variant !== "compact" && (
         <span
           className={`${isLarge ? "font-extrabold" : "font-bold"} tracking-tight transition-all duration-300 ease-in-out overflow-hidden ${
-            showText ? "max-w-[200px] opacity-100 ml-2 text-2xl md:text-3xl" : "max-w-0 opacity-0 ml-0 text-[0px]"
+            showText ? "max-w-[200px] opacity-100 text-2xl md:text-3xl" : "max-w-0 opacity-0 text-[0px]"
           } ${variant === "light" ? "text-white" : "text-slate-900"}`}
           style={{ fontFamily: "'Outfit', sans-serif" }}
         >

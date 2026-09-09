@@ -93,3 +93,29 @@ export function formatDateTime(date: string | Date | null | undefined): string {
     hour12: true,
   });
 }
+
+/**
+ * Derives a complaint/service ticket's SLA escalation state client-side from its
+ * timestamps. `TicketRead` (backend/app/modules/complaints/schemas.py) does not
+ * serialize an `escalation_state` field, so this must be computed rather than read.
+ */
+export function deriveTicketEscalationState(ticket: {
+  status: string;
+  created_at: string;
+  resolution_due_at?: string | null;
+  sla_breached_at?: string | null;
+}): "on_track" | "at_risk" | "breached" | "escalated" {
+  if (ticket.status === "resolved" || ticket.status === "closed") return "on_track";
+  if (ticket.sla_breached_at) return "breached";
+  if (!ticket.resolution_due_at) return "on_track";
+
+  const due = new Date(ticket.resolution_due_at).getTime();
+  const now = Date.now();
+  if (now >= due) return "breached";
+
+  const created = new Date(ticket.created_at).getTime();
+  const totalWindow = due - created;
+  const remaining = due - now;
+  if (totalWindow > 0 && remaining / totalWindow < 0.25) return "at_risk";
+  return "on_track";
+}

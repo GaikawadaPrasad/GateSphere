@@ -1,61 +1,160 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
-import { useQueryClient } from "@tanstack/react-query";
-import { serviceRequestsApi } from "@/lib/api";
+import { complaintsApi, amenitiesApi, communitiesApi } from "@/lib/api";
+import { deriveTicketEscalationState, formatDate } from "@/lib/utils";
+
+interface DashboardTicket {
+  id: string;
+  ticket_number: string;
+  subject: string;
+  category_name: string;
+  priority: string;
+  status: string;
+  escalation_state: string;
+  created_at: string;
+}
 
 export default function FacilityManagerDashboardPage() {
   const router = useRouter();
-  const queryClient = useQueryClient();
+  const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [tickets, setTickets] = useState<DashboardTicket[]>([]);
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [units, setUnits] = useState<{ id: string; unit_number: string }[]>([]);
+  const [amenitiesCount, setAmenitiesCount] = useState(0);
+  const [bookingsToday, setBookingsToday] = useState(0);
 
-  // Quick form state
-  const [reqTitle, setReqTitle] = useState("");
-  const [reqCategory, setReqCategory] = useState("Plumbing");
-  const [reqPriority, setReqPriority] = useState<"Low" | "Medium" | "High" | "Critical">("High");
+  // Quick ticket modal
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [reqSubject, setReqSubject] = useState("");
+  const [reqDescription, setReqDescription] = useState("");
+  const [reqCategoryId, setReqCategoryId] = useState("");
+  const [reqUnitId, setReqUnitId] = useState("");
+  const [reqPriority, setReqPriority] = useState("medium");
+  const [isSubmittingTicket, setIsSubmittingTicket] = useState(false);
+
+  const loadData = async () => {
+    const [ticketsRes, categoriesRes, amenitiesRes, bookingsRes, communitiesRes] = await Promise.allSettled([
+      complaintsApi.list(),
+      complaintsApi.categories(),
+      amenitiesApi.list(),
+      amenitiesApi.bookings(),
+      communitiesApi.list(),
+    ]);
+
+    if (categoriesRes.status === "fulfilled") {
+      setCategories((categoriesRes.value || []).map((c: any) => ({ id: c.id, name: c.name })));
+    }
+
+    if (communitiesRes.status === "fulfilled" && communitiesRes.value?.length) {
+      const commId = communitiesRes.value[0].id;
+      try {
+        const uList = await communitiesApi.communityUnits(commId);
+        setUnits((uList || []).map((u: any) => ({ id: u.id, unit_number: u.unit_number })));
+      } catch {
+        // graceful fallback
+      }
+    }
+
+    if (ticketsRes.status === "fulfilled") {
+      const categoryMap = new Map<string, string>();
+      if (categoriesRes.status === "fulfilled") {
+        for (const c of categoriesRes.value || []) if (c?.id) categoryMap.set(c.id, c.name);
+      }
+      setTickets(
+        (ticketsRes.value || []).map((t: any) => ({
+          id: t.id,
+          ticket_number: t.ticket_number,
+          subject: t.subject,
+          category_name: categoryMap.get(t.category_id) || "Uncategorized",
+          priority: t.priority,
+          status: t.status,
+          escalation_state: deriveTicketEscalationState(t),
+          created_at: t.created_at,
+        }))
+      );
+    }
+
+    if (amenitiesRes.status === "fulfilled") setAmenitiesCount((amenitiesRes.value || []).length);
+
+    if (bookingsRes.status === "fulfilled") {
+      const today = new Date().toISOString().split("T")[0];
+      setBookingsToday(
+        (bookingsRes.value || []).filter((b: any) => {
+          const bookingDate = b.booking_date || (b.start_at ? String(b.start_at).split("T")[0] : "");
+          return bookingDate === today;
+        }).length
+      );
+    }
+
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await queryClient.invalidateQueries();
-    setTimeout(() => setIsRefreshing(false), 500);
+    await loadData();
+    setIsRefreshing(false);
   };
 
   const handleQuickCreateRequest = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!reqTitle.trim()) return;
-    await serviceRequestsApi.create({ title: reqTitle, category: reqCategory, priority: reqPriority });
-    setIsModalOpen(false);
-    setReqTitle("");
-    router.push("/facility-manager/service-requests");
+    if (!reqSubject.trim()) return;
+    const effectiveUnitId = reqUnitId || (units[0]?.id);
+    if (!effectiveUnitId) {
+      alert("No unit available for this ticket.");
+      return;
+    }
+    const effectiveCatId = reqCategoryId || (categories[0]?.id);
+    if (!effectiveCatId) {
+      alert("Please select a category.");
+      return;
+    }
+    setIsSubmittingTicket(true);
+    try {
+      await complaintsApi.create({
+        unit_id: effectiveUnitId,
+        category_id: effectiveCatId,
+        subject: reqSubject,
+        description: reqDescription,
+        priority: reqPriority,
+      });
+      setIsModalOpen(false);
+      setReqSubject("");
+      setReqDescription("");
+      loadData();
+      router.push("/facility-manager/service-requests");
+    } catch (err: any) {
+      alert(err?.message || "Failed to create ticket.");
+    }
+    setIsSubmittingTicket(false);
   };
+
+  const openTickets = tickets.filter((t) => !["resolved", "closed", "cancelled"].includes(t.status));
+  const slaWarnings = tickets.filter((t) => t.escalation_state === "at_risk" || t.escalation_state === "breached");
+  const highPriorityOpen = openTickets.filter((t) => t.priority === "high" || t.priority === "critical");
 
   return (
     <div>
       <PageHeader
         title="Facility Manager Dashboard"
-        subtitle="Operational facilities oversight, preventive maintenance, vendor status & SLA warnings"
+        subtitle="Operational facilities oversight, service tickets & SLA warnings"
         breadcrumbs={[{ label: "GateSphere" }, { label: "Facility Manager" }, { label: "Dashboard" }]}
         actions={
           <div style={{ display: "flex", gap: "0.75rem" }}>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-            >
+            <button type="button" className="btn btn-secondary" onClick={handleRefresh} disabled={isRefreshing}>
               🔄 {isRefreshing ? "Refreshing…" : "Refresh"}
             </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => setIsModalOpen(true)}
-            >
+            <button type="button" className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
               ➕ Quick Service Ticket
             </button>
           </div>
@@ -73,47 +172,33 @@ export default function FacilityManagerDashboardPage() {
       >
         <KpiCard
           title="Total Facilities"
-          value="12"
-          subtext="4 Available, 2 Maintenance"
+          value={isLoading ? "…" : String(amenitiesCount)}
+          subtext="Managed amenities & common areas"
           icon="🏢"
           onClick={() => router.push("/facility-manager/facilities")}
         />
         <KpiCard
-          title="Open Service Requests"
-          value="8"
-          subtext="3 High Priority"
+          title="Open Service Tickets"
+          value={isLoading ? "…" : String(openTickets.length)}
+          subtext={`${highPriorityOpen.length} high/critical priority`}
           icon="📋"
-          trend="warning"
-          trendValue="2 At Risk SLA"
+          trend={highPriorityOpen.length > 0 ? "warning" : undefined}
+          trendValue={highPriorityOpen.length > 0 ? `${highPriorityOpen.length} needs triage` : undefined}
           onClick={() => router.push("/facility-manager/service-requests")}
         />
         <KpiCard
-          title="Scheduled Maintenance"
-          value="5"
-          subtext="2 Starting Today"
-          icon="🔧"
+          title="SLA At Risk / Breached"
+          value={isLoading ? "…" : String(slaWarnings.length)}
+          subtext="Tickets needing attention"
+          icon="⚠️"
+          trend={slaWarnings.length > 0 ? "danger" : undefined}
+          trendValue={slaWarnings.length > 0 ? "Review now" : undefined}
           onClick={() => router.push("/facility-manager/maintenance")}
         />
         <KpiCard
-          title="Active Vendors"
-          value="6"
-          subtext="3 On-Site Working"
-          icon="🛠️"
-          onClick={() => router.push("/facility-manager/vendors")}
-        />
-        <KpiCard
-          title="Open Complaints"
-          value="4"
-          subtext="1 Breached SLA"
-          icon="🎫"
-          trend="danger"
-          trendValue="Needs Triage"
-          onClick={() => router.push("/facility-manager/complaints")}
-        />
-        <KpiCard
-          title="Amenity Bookings"
-          value="15"
-          subtext="Today's Total Slots"
+          title="Amenity Bookings Today"
+          value={isLoading ? "…" : String(bookingsToday)}
+          subtext="Slots reserved for today"
           icon="🏊"
           onClick={() => router.push("/facility-manager/amenities")}
         />
@@ -136,22 +221,16 @@ export default function FacilityManagerDashboardPage() {
             🏢 Add / Edit Facility
           </button>
           <button className="btn btn-secondary" onClick={() => router.push("/facility-manager/maintenance")}>
-            🔧 Schedule Maintenance
+            🔧 Maintenance Tickets
           </button>
           <button className="btn btn-secondary" onClick={() => router.push("/facility-manager/service-requests")}>
-            📋 Create Service Request
-          </button>
-          <button className="btn btn-secondary" onClick={() => router.push("/facility-manager/vendors")}>
-            🛠️ Assign Vendor
+            📋 Service Requests
           </button>
           <button className="btn btn-secondary" onClick={() => router.push("/facility-manager/amenities")}>
-            🏊 Block Amenity Slot
+            🏊 Manage Amenity Bookings
           </button>
           <button className="btn btn-secondary" onClick={() => router.push("/facility-manager/complaints")}>
             🎫 View Complaints
-          </button>
-          <button className="btn btn-secondary" onClick={() => router.push("/facility-manager/incidents")}>
-            ⚠️ View Incidents
           </button>
         </div>
       </div>
@@ -165,15 +244,15 @@ export default function FacilityManagerDashboardPage() {
           alignItems: "start",
         }}
       >
-        {/* Left Side: Recent Active Maintenance & Service Tickets */}
+        {/* Left Side: Open Tickets */}
         <div style={{ minWidth: 0 }}>
           <div className="card" style={{ marginBottom: "1.5rem" }}>
             <div className="card-header">
-              <h3 className="card-title">Active Maintenance & Repairs</h3>
+              <h3 className="card-title">Open Service Tickets</h3>
               <button
                 className="btn btn-secondary"
                 style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
-                onClick={() => router.push("/facility-manager/maintenance")}
+                onClick={() => router.push("/facility-manager/service-requests")}
               >
                 View All
               </button>
@@ -182,96 +261,75 @@ export default function FacilityManagerDashboardPage() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Maintenance ID</th>
-                    <th>Facility</th>
+                    <th>Ticket #</th>
+                    <th>Subject</th>
+                    <th>Category</th>
                     <th>Priority</th>
-                    <th>Vendor</th>
                     <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr>
-                    <td style={{ fontWeight: 600 }}>MNT-2026-089</td>
-                    <td>Olympic Swimming Pool</td>
-                    <td><StatusBadge status="High" /></td>
-                    <td>Apex Water Treatment</td>
-                    <td><StatusBadge status="In Progress" /></td>
-                  </tr>
-                  <tr>
-                    <td style={{ fontWeight: 600 }}>MNT-2026-090</td>
-                    <td>Elevator Shaft B3</td>
-                    <td><StatusBadge status="Emergency" /></td>
-                    <td>Schindler Elevator Techs</td>
-                    <td><StatusBadge status="Vendor Assigned" /></td>
-                  </tr>
-                  <tr>
-                    <td style={{ fontWeight: 600 }}>MNT-2026-091</td>
-                    <td>Main Diesel Generator</td>
-                    <td><StatusBadge status="Medium" /></td>
-                    <td>PowerGen Services</td>
-                    <td><StatusBadge status="Scheduled" /></td>
-                  </tr>
+                  {isLoading ? (
+                    <tr>
+                      <td colSpan={5} style={{ textAlign: "center", padding: "1.5rem" }}>
+                        Loading…
+                      </td>
+                    </tr>
+                  ) : openTickets.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}>
+                        No open tickets.
+                      </td>
+                    </tr>
+                  ) : (
+                    openTickets.slice(0, 5).map((t) => (
+                      <tr key={t.id}>
+                        <td style={{ fontWeight: 600 }}>{t.ticket_number}</td>
+                        <td>{t.subject}</td>
+                        <td>{t.category_name}</td>
+                        <td><StatusBadge status={t.priority} /></td>
+                        <td><StatusBadge status={t.status} /></td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
         </div>
 
-        {/* Right Side: SLA Warnings & High-Priority Alerts */}
+        {/* Right Side: SLA Warnings */}
         <div style={{ maxWidth: 460, width: "100%" }}>
           <div className="card">
             <div className="card-header">
               <h3 className="card-title">⚠️ SLA Warnings & Action Items</h3>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
-              <div
-                style={{
-                  padding: "0.75rem",
-                  borderRadius: "var(--radius-sm)",
-                  background: "var(--danger-light)",
-                  border: "1px solid var(--danger-border)",
-                }}
-              >
-                <div style={{ fontWeight: 600, fontSize: "0.85rem", color: "#991b1b" }}>
-                  🚨 SLA Breached: Unauthorized Parking Complaint CMP-402
-                </div>
-                <div style={{ fontSize: "0.75rem", color: "#b91c1c", marginTop: "0.25rem" }}>
-                  Overdue by 2 hours. Requires supervisor dispatch.
-                </div>
+            {isLoading ? (
+              <p style={{ fontSize: "0.85rem", color: "var(--muted)" }}>Loading…</p>
+            ) : slaWarnings.length === 0 ? (
+              <p style={{ fontSize: "0.85rem", color: "var(--muted)" }}>No tickets at risk or breached right now.</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+                {slaWarnings.slice(0, 5).map((t) => (
+                  <div
+                    key={t.id}
+                    style={{
+                      padding: "0.75rem",
+                      borderRadius: "var(--radius-sm)",
+                      background: t.escalation_state === "breached" ? "var(--danger-light)" : "var(--warning-light)",
+                      border: `1px solid ${t.escalation_state === "breached" ? "var(--danger-border)" : "var(--warning-border)"}`,
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, fontSize: "0.85rem", color: t.escalation_state === "breached" ? "#991b1b" : "#92400e" }}>
+                      {t.escalation_state === "breached" ? "🚨 SLA Breached" : "⚠️ SLA At Risk"}: {t.subject} ({t.ticket_number})
+                    </div>
+                    <div style={{ fontSize: "0.75rem", color: t.escalation_state === "breached" ? "#b91c1c" : "#b45309", marginTop: "0.25rem" }}>
+                      {t.category_name} · Raised {formatDate(t.created_at)}
+                    </div>
+                  </div>
+                ))}
               </div>
-
-              <div
-                style={{
-                  padding: "0.75rem",
-                  borderRadius: "var(--radius-sm)",
-                  background: "var(--warning-light)",
-                  border: "1px solid var(--warning-border)",
-                }}
-              >
-                <div style={{ fontWeight: 600, fontSize: "0.85rem", color: "#92400e" }}>
-                  ⚠️ SLA At Risk: Corridor Light Fixture SR-8802
-                </div>
-                <div style={{ fontSize: "0.75rem", color: "#b45309", marginTop: "0.25rem" }}>
-                  Assigned to ElectroSpark. 30 mins remaining.
-                </div>
-              </div>
-
-              <div
-                style={{
-                  padding: "0.75rem",
-                  borderRadius: "var(--radius-sm)",
-                  background: "var(--primary-light)",
-                  border: "1px solid #bfdbfe",
-                }}
-              >
-                <div style={{ fontWeight: 600, fontSize: "0.85rem", color: "#1e40af" }}>
-                  🛠️ Vendor Work Pending Review: Swimming Pool Pump
-                </div>
-                <div style={{ fontSize: "0.75rem", color: "#1e3a8a", marginTop: "0.25rem" }}>
-                  Apex Water submitted completion proof. Awaiting manager signoff.
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
@@ -280,14 +338,14 @@ export default function FacilityManagerDashboardPage() {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Create Service Request Ticket"
+        title="Create Service Ticket"
         footer={
           <>
             <button className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>
               Cancel
             </button>
-            <button className="btn btn-primary" onClick={handleQuickCreateRequest}>
-              Create Request
+            <button className="btn btn-primary" onClick={handleQuickCreateRequest} disabled={isSubmittingTicket}>
+              {isSubmittingTicket ? "Creating…" : "Create Ticket"}
             </button>
           </>
         }
@@ -295,51 +353,81 @@ export default function FacilityManagerDashboardPage() {
         <form onSubmit={handleQuickCreateRequest}>
           <div style={{ marginBottom: "1rem" }}>
             <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
-              Request Title / Issue *
+              Subject / Issue *
             </label>
             <input
               type="text"
               className="input-field"
               placeholder="e.g. Main Gate Barrier Arm Stuck"
-              value={reqTitle}
-              onChange={(e) => setReqTitle(e.target.value)}
+              value={reqSubject}
+              onChange={(e) => setReqSubject(e.target.value)}
               required
             />
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+          <div style={{ marginBottom: "1rem" }}>
+            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              Description
+            </label>
+            <textarea
+              className="input-field"
+              style={{ minHeight: 70 }}
+              value={reqDescription}
+              onChange={(e) => setReqDescription(e.target.value)}
+            />
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
             <div>
               <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
-                Category
+                Category *
               </label>
               <select
                 className="select-field"
-                value={reqCategory}
-                onChange={(e) => setReqCategory(e.target.value)}
+                value={reqCategoryId}
+                onChange={(e) => setReqCategoryId(e.target.value)}
               >
-                <option value="Plumbing">Plumbing</option>
-                <option value="Electrical">Electrical</option>
-                <option value="Elevator">Elevator</option>
-                <option value="Security Hardware">Security Hardware</option>
-                <option value="Civil/Structure">Civil / Structure</option>
+                <option value="">Select category…</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
               </select>
             </div>
 
             <div>
               <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
-                Priority
+                Target Unit / Common Area *
               </label>
               <select
                 className="select-field"
-                value={reqPriority}
-                onChange={(e) => setReqPriority(e.target.value as any)}
+                value={reqUnitId}
+                onChange={(e) => setReqUnitId(e.target.value)}
               >
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
-                <option value="Critical">Critical</option>
+                {units.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    Unit {u.unit_number}
+                  </option>
+                ))}
               </select>
             </div>
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              Priority
+            </label>
+            <select
+              className="select-field"
+              value={reqPriority}
+              onChange={(e) => setReqPriority(e.target.value)}
+            >
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="critical">Critical</option>
+            </select>
           </div>
         </form>
       </Modal>

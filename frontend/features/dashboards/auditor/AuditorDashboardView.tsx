@@ -167,11 +167,74 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
     },
   ];
 
+  const tabMeta: Record<
+    AuditorTab,
+    { title: string; eyebrow: string; description: string }
+  > = {
+    overview: {
+      title: "Compliance & Audit Portal",
+      eyebrow: "Auditor Console (Strictly Read-Only)",
+      description: "Full historical system trail, gate operation oversight, financial reconciliation, and anomaly verification.",
+    },
+    "audit-logs": {
+      title: "System Audit Logs (Immutable)",
+      eyebrow: "Compliance Audit Trail",
+      description: "Chronological ledger of all system mutations, user actions, and security events across modules.",
+    },
+    "user-activity": {
+      title: "User Access & Authentication Activity",
+      eyebrow: "Access & Session Trail",
+      description: "Historical record of user sign-ins, role changes, privilege escalations, and permission audits.",
+    },
+    "gate-activity": {
+      title: "Security Gate & Entry Audit Trail",
+      eyebrow: "Physical Security Logs",
+      description: "Complete timestamped gate traffic events, guard shift checkpoints, and panic alert dispatches.",
+    },
+    "visitor-records": {
+      title: "Visitor & Pass Audit Register",
+      eyebrow: "Visitor Lifecycle Audit",
+      description: "Full archive of visitor passes, resident approval decisions, and gate check-in/out timestamps.",
+    },
+    "maintenance-records": {
+      title: "Service Desk & Maintenance History",
+      eyebrow: "Operational SLA Review",
+      description: "Audit trail of complaint tickets, SLA compliance metrics, technician allocations, and resident feedback.",
+    },
+    "vendor-activity": {
+      title: "Vendor & Contractor Verification Log",
+      eyebrow: "External Workforce Compliance",
+      description: "Inspection log of vendor service passes, work completion proof, and contractor activity.",
+    },
+    "incident-records": {
+      title: "Security Incidents & Action Log",
+      eyebrow: "Emergency Response Audit",
+      description: "Official record of security breaches, medical/fire alerts, responder dispatches, and resolution notes.",
+    },
+    "financial-records": {
+      title: "Financial Ledger & Payment Reconciliation",
+      eyebrow: "Accounting & Statutory Audit",
+      description: "Comprehensive debit/credit ledgers, maintenance invoice registers, and simulated payment receipts.",
+    },
+    reports: {
+      title: "Statutory & Compliance Reports",
+      eyebrow: "Audit Exports & Analytics",
+      description: "Export full operational datasets and statutory audit summaries in standardized CSV formats.",
+    },
+    "audit-search": {
+      title: "Deep Audit Search & Query Engine",
+      eyebrow: "Forensic Investigation",
+      description: "Perform structured queries across entities, timestamps, IP addresses, and mutation diffs.",
+    },
+  };
+
+  const currentMeta = tabMeta[activeTab] || tabMeta.overview;
+
   return (
     <DashboardShell
-      title="Compliance & Audit Portal"
-      eyebrow="Auditor Console (Strictly Read-Only)"
-      description="Full historical system trail, gate operation oversight, financial reconciliation, and anomaly verification."
+      title={currentMeta.title}
+      eyebrow={currentMeta.eyebrow}
+      description={currentMeta.description}
       accentColor="#475569"
       headerActions={
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>

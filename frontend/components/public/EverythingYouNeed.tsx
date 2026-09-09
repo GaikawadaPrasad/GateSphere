@@ -351,7 +351,7 @@ export default function EverythingYouNeed() {
                   onClick={() => setSelectedModule(null)}
                   className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-700 hover:to-sky-600 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-500/25 transition-all flex items-center justify-center gap-2"
                 >
-                  Book a Demo <span>→</span>
+                  Get in Contact <span>→</span>
                 </Link>
               </div>
             </div>

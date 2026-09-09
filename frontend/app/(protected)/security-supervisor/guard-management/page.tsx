@@ -9,9 +9,13 @@ import { gateApi } from "@/lib/api";
 interface GuardRosterItem {
   id: string;
   guard_name: string;
+  guard_user_id: string;
   shift: string;
   assigned_gate: string;
-  status: "On Duty" | "Scheduled" | "Off Duty";
+  status: string;
+  shift_date: string;
+  shift_start: string;
+  shift_end: string;
 }
 
 export default function SecuritySupervisorGuardManagementPage() {
@@ -21,13 +25,28 @@ export default function SecuritySupervisorGuardManagementPage() {
   // Assign Shift Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedGuard, setSelectedGuard] = useState<GuardRosterItem | null>(null);
-  const [newShift, setNewShift] = useState("Morning (06:00 - 14:00)");
-  const [newGate, setNewGate] = useState("Main Gate North");
+  const [newStatus, setNewStatus] = useState("active");
 
   const loadData = async () => {
     setIsLoading(true);
-    const data = await gateApi.rosters();
-    setRoster(data as unknown as GuardRosterItem[]);
+    try {
+      const data = await gateApi.rosters();
+      setRoster(
+        (data || []).map((r: any) => ({
+          id: r.id,
+          guard_name: `Guard (${r.guard_user_id ? r.guard_user_id.slice(0, 8) : "Staff"})`,
+          guard_user_id: r.guard_user_id,
+          shift: `${r.shift_start || "08:00"} - ${r.shift_end || "16:00"}`,
+          assigned_gate: "Main Perimeter Gate",
+          status: r.status ? r.status.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) : "Planned",
+          shift_date: r.shift_date,
+          shift_start: r.shift_start,
+          shift_end: r.shift_end,
+        }))
+      );
+    } catch {
+      // fallback
+    }
     setIsLoading(false);
   };
 
@@ -35,16 +54,16 @@ export default function SecuritySupervisorGuardManagementPage() {
     loadData();
   }, []);
 
-  const handleSaveAssignment = () => {
+  const handleSaveAssignment = async () => {
     if (!selectedGuard) return;
-    setRoster((prev) =>
-      prev.map((g) =>
-        g.id === selectedGuard.id
-          ? { ...g, shift: newShift, assigned_gate: newGate }
-          : g
-      )
-    );
-    setIsModalOpen(false);
+    try {
+      const statusSlug = newStatus.toLowerCase().replace(/\s+/g, "_");
+      await gateApi.transitionRoster(selectedGuard.id, statusSlug, "Supervisor roster update");
+      setIsModalOpen(false);
+      loadData();
+    } catch (err: any) {
+      alert(err?.message || "Failed to update guard shift status.");
+    }
   };
 
   return (
@@ -93,12 +112,11 @@ export default function SecuritySupervisorGuardManagementPage() {
                         style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}
                         onClick={() => {
                           setSelectedGuard(g);
-                          setNewShift(g.shift);
-                          setNewGate(g.assigned_gate);
+                          setNewStatus(g.status.toLowerCase().replace(/\s+/g, "_"));
                           setIsModalOpen(true);
                         }}
                       >
-                        Change Shift / Gate
+                        Update Duty Status
                       </button>
                     </td>
                   </tr>
@@ -113,14 +131,14 @@ export default function SecuritySupervisorGuardManagementPage() {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={`Assign Shift & Gate — ${selectedGuard?.guard_name}`}
+        title={`Duty Status & Shift Transition — ${selectedGuard?.guard_name}`}
         footer={
           <>
             <button className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>
               Cancel
             </button>
             <button className="btn btn-primary" onClick={handleSaveAssignment}>
-              Save Assignment
+              Update Status
             </button>
           </>
         }
@@ -128,24 +146,20 @@ export default function SecuritySupervisorGuardManagementPage() {
         <div>
           <div style={{ marginBottom: "1rem" }}>
             <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
-              Select Shift
+              Roster Duty Status
             </label>
-            <select className="select-field" value={newShift} onChange={(e) => setNewShift(e.target.value)}>
-              <option value="Morning (06:00 - 14:00)">Morning (06:00 - 14:00)</option>
-              <option value="Evening (14:00 - 22:00)">Evening (14:00 - 22:00)</option>
-              <option value="Night (22:00 - 06:00)">Night (22:00 - 06:00)</option>
+            <select className="select-field" value={newStatus} onChange={(e) => setNewStatus(e.target.value)}>
+              <option value="planned">Planned (Scheduled)</option>
+              <option value="active">Active (On Duty)</option>
+              <option value="completed">Completed (Shift Done)</option>
+              <option value="cancelled">Cancelled</option>
             </select>
           </div>
 
           <div>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
-              Assigned Gate Post
-            </label>
-            <select className="select-field" value={newGate} onChange={(e) => setNewGate(e.target.value)}>
-              <option value="Main Gate North">Main Gate North</option>
-              <option value="Service Gate South">Service Gate South</option>
-              <option value="Clubhouse Perimeter Patrol">Clubhouse Perimeter Patrol</option>
-            </select>
+            <p style={{ fontSize: "0.8rem", color: "var(--muted)" }}>
+              Shift Time: {selectedGuard?.shift} | Date: {selectedGuard?.shift_date}
+            </p>
           </div>
         </div>
       </Modal>

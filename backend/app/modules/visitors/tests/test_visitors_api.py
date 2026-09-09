@@ -21,6 +21,22 @@ def _unit_in(community_id: str) -> str:
         u = db.scalar(
             select(Unit).where(Unit.community_id == community_id).order_by(Unit.unit_number)
         )
+        if u is None:
+            from app.modules.communities.models import Tower, Floor
+            t = db.scalar(select(Tower).where(Tower.community_id == community_id))
+            if not t:
+                t = Tower(community_id=community_id, name="Test Tower", code="TT-01")
+                db.add(t)
+                db.flush()
+            fl = db.scalar(select(Floor).where(Floor.tower_id == t.id))
+            if not fl:
+                fl = Floor(community_id=community_id, tower_id=t.id, floor_number=1, label="Floor 1")
+                db.add(fl)
+                db.flush()
+            u = Unit(community_id=community_id, tower_id=t.id, floor_id=fl.id, unit_number="T-101")
+            db.add(u)
+            db.commit()
+            db.refresh(u)
         return str(u.id)
 
 

@@ -13,8 +13,40 @@ export default function SecuritySupervisorDomesticStaffPage() {
 
   const loadData = async () => {
     setIsLoading(true);
-    const data = await staffApi.list();
-    setStaff(data);
+    try {
+      const [staffRes, attendanceRes] = await Promise.allSettled([
+        staffApi.list(),
+        staffApi.attendance({ page_size: 50 }),
+      ]);
+
+      const staffList = staffRes.status === "fulfilled" ? staffRes.value : [];
+      const attendanceList = attendanceRes.status === "fulfilled" ? attendanceRes.value : [];
+
+      const latestAttByStaff = new Map<string, any>();
+      for (const att of attendanceList || []) {
+        if (att.staff_id && !latestAttByStaff.has(att.staff_id)) {
+          latestAttByStaff.set(att.staff_id, att);
+        }
+      }
+
+      setStaff(
+        (staffList || []).map((s: any) => {
+          const att = latestAttByStaff.get(s.id);
+          const isInside = att && !att.check_out_at;
+          return {
+            id: s.id,
+            name: s.full_name || "Domestic Staff",
+            role: s.service_type ? s.service_type.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) : "Housekeeping",
+            assigned_units: ["Verified Staff"],
+            check_in_time: att?.check_in_at ? new Date(att.check_in_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : null,
+            check_out_time: att?.check_out_at ? new Date(att.check_out_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : null,
+            status: isInside ? "Inside Premises" : "Checked Out",
+          };
+        })
+      );
+    } catch {
+      // fallback
+    }
     setIsLoading(false);
   };
 

@@ -57,7 +57,12 @@ def seed_rbac(db: Session) -> None:
     for slug, name in ROLES.items():
         role, _ = _get_or_create(db, Role, slug=slug, defaults={"name": name})
         granted = ROLE_PERMISSIONS.get(slug, [])
-        codes = PERMISSIONS.keys() if granted == ["*"] else granted
+        codes = set(PERMISSIONS.keys() if granted == ["*"] else granted)
+        current_rps = db.scalars(select(RolePermission).where(RolePermission.role_id == role.id)).all()
+        for rp in current_rps:
+            p_obj = db.scalar(select(Permission).where(Permission.id == rp.permission_id))
+            if p_obj and p_obj.code not in codes:
+                db.delete(rp)
         for code in codes:
             _get_or_create(db, RolePermission, role_id=role.id, permission_id=perms[code].id)
 
