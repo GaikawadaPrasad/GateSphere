@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { deriveTicketEscalationState } from "@/lib/utils";
 
 export interface ResidentDashboardStats {
   pending_dues_amount: number;
@@ -343,22 +344,29 @@ export function useResidentComplaints() {
   const query = useQuery<ComplaintTicket[]>({
     queryKey: ["resident", "complaints"],
     queryFn: async () => {
-      const res = await api.get<any[]>("/complaints/tickets");
+      const [res, categoriesRes] = await Promise.all([
+        api.get<any[]>("/complaints/tickets"),
+        api.get<any[]>("/complaints/categories").catch(() => []),
+      ]);
       if (!Array.isArray(res)) return [];
+      const categoryMap = new Map<string, string>();
+      if (Array.isArray(categoriesRes)) {
+        for (const c of categoriesRes) if (c?.id) categoryMap.set(c.id, c.name);
+      }
       return res.map((t: any) => ({
         id: t.id,
         ticket_number: t.ticket_number || `TKT-${t.id.slice(0, 6)}`,
         subject: t.subject,
-        category_name: t.category?.name || "General Maintenance",
+        category_name: categoryMap.get(t.category_id) || "Uncategorized",
         description: t.description || "",
         priority: t.priority || "medium",
         status: t.status || "created",
-        escalation_state: t.escalation_state || "on_track",
+        escalation_state: deriveTicketEscalationState(t),
         created_at: t.created_at,
-        assigned_to: t.assigned_vendor?.name || t.assigned_user?.full_name || "Facility Maintenance Team",
-        assigned_role: t.assigned_vendor ? "vendor_technician" : "facility_manager",
+        assigned_to: t.status === "created" ? "Unassigned" : "Assigned",
+        assigned_role: undefined,
         resolved_at: t.resolved_at,
-        messages_count: t.messages_count || 1,
+        messages_count: 0,
       }));
     },
   });
@@ -460,30 +468,6 @@ export interface FamilyMember {
   created_at?: string;
 }
 
-const DEFAULT_FAMILY_MEMBERS: FamilyMember[] = [
-  {
-    id: "fam-1",
-    name: "Rajesh Mehta",
-    relation: "Self / Owner",
-    phone: "+1 555-019-2834",
-    access_enabled: true,
-  },
-  {
-    id: "fam-2",
-    name: "Priya Mehta",
-    relation: "Co-Owner / Spouse",
-    phone: "+1 555-019-2835",
-    access_enabled: true,
-  },
-  {
-    id: "fam-3",
-    name: "Aarav Mehta",
-    relation: "Son (Age 14)",
-    phone: "+1 555-019-9911",
-    access_enabled: true,
-  },
-];
-
 export function useResidentFamilyMembers() {
   const queryClient = useQueryClient();
 
@@ -517,7 +501,7 @@ export function useResidentFamilyMembers() {
           } catch {}
         }
       }
-      return DEFAULT_FAMILY_MEMBERS;
+      return [];
     },
   });
 
@@ -562,7 +546,7 @@ export function useResidentFamilyMembers() {
         access_enabled: payload.access_enabled !== false,
         created_at: new Date().toISOString(),
       };
-      const current = query.data || DEFAULT_FAMILY_MEMBERS;
+      const current = query.data || [];
       const updated = [...current, newMember];
       if (typeof window !== "undefined") {
         localStorage.setItem("gatesphere_family_members", JSON.stringify(updated));
@@ -600,7 +584,7 @@ export function useResidentFamilyMembers() {
         // Fallback to client-side persistence
       }
 
-      const current = query.data || DEFAULT_FAMILY_MEMBERS;
+      const current = query.data || [];
       const updated = current.map((m) =>
         m.id === payload.id
           ? {
@@ -630,7 +614,7 @@ export function useResidentFamilyMembers() {
       } catch {
         // Fallback to client-side persistence
       }
-      const current = query.data || DEFAULT_FAMILY_MEMBERS;
+      const current = query.data || [];
       const updated = current.filter((m) => m.id !== id);
       if (typeof window !== "undefined") {
         localStorage.setItem("gatesphere_family_members", JSON.stringify(updated));
@@ -645,7 +629,7 @@ export function useResidentFamilyMembers() {
 
   return {
     ...query,
-    familyMembers: query.data || DEFAULT_FAMILY_MEMBERS,
+    familyMembers: query.data || [],
     addMember: addMemberMutation,
     updateMember: updateMemberMutation,
     removeMember: removeMemberMutation,
@@ -681,6 +665,134 @@ export function useResidentProfile() {
   });
 
   return { ...query, updateProfile, addFamilyMember };
+}
+
+export interface DeliveryProtocolItem {
+  id: string;
+  delivery_type: string;
+  protocol_type: string;
+  requires_otp: boolean;
+  is_active: boolean;
+}
+
+export function useResidentDeliveryProtocols() {
+  return useQuery<DeliveryProtocolItem[]>({
+    queryKey: ["resident", "delivery-protocols"],
+    queryFn: async () => {
+      const res = await api.get<any[]>("/deliveries/protocols");
+      if (!Array.isArray(res)) return [];
+      return res.map((p: any) => ({
+        id: p.id,
+        delivery_type: p.delivery_type,
+        protocol_type: p.protocol_type,
+        requires_otp: Boolean(p.requires_otp),
+        is_active: p.is_active !== false,
+      }));
+    },
+  });
+}
+
+export interface ResidentVehicle {
+  id: string;
+  plate: string;
+  make_model: string;
+  vehicle_type: string;
+  slot: string;
+  rfid_tag: string;
+  violations: number;
+}
+
+export function useResidentVehicles() {
+  return useQuery<ResidentVehicle[]>({
+    queryKey: ["resident", "vehicles"],
+    queryFn: async () => {
+      const me = await api.get<any>("/residents/me");
+      const communityId = me?.community_id;
+      const params = communityId ? { community_id: communityId } : undefined;
+      const [vehiclesRes, allocationsRes, slotsRes, violationsRes] = await Promise.all([
+        api.get<any[]>("/vehicles", params),
+        api.get<any[]>("/vehicles/parking/allocations", params).catch(() => []),
+        api.get<any[]>("/vehicles/parking/slots", params).catch(() => []),
+        api.get<any[]>("/vehicles/parking/violations", params).catch(() => []),
+      ]);
+
+      const myVehicles = (Array.isArray(vehiclesRes) ? vehiclesRes : []).filter(
+        (v: any) => v.resident_profile_id === me?.id
+      );
+
+      const slotMap = new Map<string, string>();
+      if (Array.isArray(slotsRes)) {
+        for (const s of slotsRes) if (s?.id) slotMap.set(s.id, s.slot_code);
+      }
+
+      const allocationByVehicle = new Map<string, any>();
+      if (Array.isArray(allocationsRes)) {
+        for (const a of allocationsRes) {
+          if (a?.vehicle_id && a?.status === "active") allocationByVehicle.set(a.vehicle_id, a);
+        }
+      }
+
+      const violationCountByVehicle = new Map<string, number>();
+      if (Array.isArray(violationsRes)) {
+        for (const v of violationsRes) {
+          if (v?.vehicle_id) {
+            violationCountByVehicle.set(v.vehicle_id, (violationCountByVehicle.get(v.vehicle_id) || 0) + 1);
+          }
+        }
+      }
+
+      return myVehicles.map((v: any) => {
+        const alloc = allocationByVehicle.get(v.id);
+        return {
+          id: v.id,
+          plate: v.registration_number,
+          make_model: [v.make, v.model].filter(Boolean).join(" ") || v.vehicle_type,
+          vehicle_type: v.vehicle_type,
+          slot: alloc ? slotMap.get(alloc.slot_id) || "Allocated" : "Not Allocated",
+          rfid_tag: v.sticker_number || "Not Issued",
+          violations: violationCountByVehicle.get(v.id) || 0,
+        };
+      });
+    },
+  });
+}
+
+export interface AssignedDomesticStaff {
+  id: string;
+  staff_id: string;
+  name: string;
+  role: string;
+  phone: string;
+  police_verified: boolean;
+  is_active: boolean;
+}
+
+export function useResidentDomesticStaff() {
+  return useQuery<AssignedDomesticStaff[]>({
+    queryKey: ["resident", "domestic-staff"],
+    queryFn: async () => {
+      const me = await api.get<any>("/residents/me");
+      const unitId = me?.occupancies?.[0]?.unit_id;
+      if (!unitId) return [];
+      const assignments = await api.get<any[]>("/domestic-staff/assignments", { unit_id: unitId });
+      if (!Array.isArray(assignments) || assignments.length === 0) return [];
+      const staffList = await Promise.all(
+        assignments.map((a: any) => api.get<any>(`/domestic-staff/${a.staff_id}`).catch(() => null))
+      );
+      return assignments.map((a: any, idx: number) => {
+        const staff = staffList[idx];
+        return {
+          id: a.id,
+          staff_id: a.staff_id,
+          name: staff?.full_name || "Staff Member",
+          role: staff?.staff_type ? String(staff.staff_type).replace(/_/g, " ") : a.work_type,
+          phone: staff?.phone || "",
+          police_verified: staff?.police_verification_status === "verified",
+          is_active: Boolean(a.is_active),
+        };
+      });
+    },
+  });
 }
 
 export function useSendResidentPanic() {

@@ -561,7 +561,7 @@ export default function ProductEcosystem() {
                       background: 'linear-gradient(135deg, #1D4ED8 0%, #3B82F6 100%)',
                     }}
                   >
-                    <span>Request Module Demo</span>
+                    <span>Get in Contact</span>
                     <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4">
                       <path
                         d="M3 8h10M9 4l4 4-4 4"

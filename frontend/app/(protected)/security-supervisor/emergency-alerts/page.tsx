@@ -5,18 +5,31 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
 import { gateApi, type PanicAlert } from "@/lib/api";
+import { formatDateTime } from "@/lib/utils";
+
+// Real backend enum (backend/app/modules/gate/models.py ALERT_TYPES)
+const ALERT_TYPES = [
+  { label: "Medical Emergency", value: "medical" },
+  { label: "Fire", value: "fire" },
+  { label: "Security Threat", value: "security" },
+  { label: "Unauthorized Person / Intrusion", value: "intrusion" },
+  { label: "Other", value: "other" },
+];
 
 export default function SecuritySupervisorEmergencyAlertsPage() {
   const [alerts, setAlerts] = useState<PanicAlert[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [alertType, setAlertType] = useState("Medical Emergency");
+  const [alertType, setAlertType] = useState("medical");
   const [location, setLocation] = useState("");
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchAlerts = async () => {
+    setIsLoading(true);
     const data = await gateApi.alerts();
     if (data) setAlerts(data);
+    setIsLoading(false);
   };
 
   useEffect(() => {
@@ -29,30 +42,39 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
     setIsSubmitting(true);
 
     try {
+      const message = [location.trim() && `Location: ${location.trim()}`, description.trim()].filter(Boolean).join(" — ");
       await gateApi.triggerEmergency({
-        type: alertType,
-        location: location || "Community Main Grounds",
-        description: description || undefined,
+        alert_type: alertType,
         severity: "critical",
+        message: message || undefined,
       });
       setIsModalOpen(false);
       setLocation("");
       setDescription("");
       await fetchAlerts();
-    } catch {
-      // Handled
+    } catch (err: any) {
+      alert(err?.message || "Failed to broadcast emergency alert.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleStatusChange = async (id: string, status: any) => {
-    setAlerts((prev) => prev.map((a) => (a.id === id ? ({ ...a, status } as any) : a)));
-
-    if (status === "Acknowledged") {
+  const handleAcknowledge = async (id: string) => {
+    try {
       await gateApi.acknowledgeAlert(id);
-    } else if (status === "Resolved") {
-      await gateApi.resolveAlert(id);
+      fetchAlerts();
+    } catch (err: any) {
+      alert(err?.message || "Failed to acknowledge alert.");
+    }
+  };
+
+  const handleResolve = async (id: string) => {
+    const summary = window.prompt("Resolution summary (optional):") || undefined;
+    try {
+      await gateApi.resolveAlert(id, summary);
+      fetchAlerts();
+    } catch (err: any) {
+      alert(err?.message || "Failed to resolve alert.");
     }
   };
 
@@ -79,44 +101,53 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
             <thead>
               <tr>
                 <th>Ref ID</th>
-                <th>Emergency Type</th>
-                <th>Location / Unit</th>
+                <th>Type</th>
+                <th>Details</th>
                 <th>Triggered Time</th>
-                <th>Reported By</th>
-                <th>Assigned Responder</th>
                 <th>Alert Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {alerts.map((a) => (
-                <tr key={a.id} style={{ background: a.status === "Active" ? "var(--danger-light)" : undefined }}>
-                  <td style={{ fontWeight: 700, fontFamily: "monospace", whiteSpace: "nowrap" }}>
-                    {a.reference_id || `SOS-${a.id.slice(0, 4).toUpperCase()}`}
-                  </td>
-                  <td style={{ fontWeight: 700, color: "var(--danger)" }}>🚨 {a.alert_type}</td>
-                  <td style={{ fontWeight: 600 }}>{a.location}</td>
-                  <td>{a.timestamp}</td>
-                  <td>{a.reported_by}</td>
-                  <td>{a.assigned_responder || "Supervisor Devraj"}</td>
-                  <td>
-                    <StatusBadge status={a.status} />
-                  </td>
-                  <td>
-                    <select
-                      className="select-field"
-                      value={a.status}
-                      onChange={(e) => handleStatusChange(a.id, e.target.value)}
-                      style={{ height: 28, fontSize: "0.75rem" }}
-                    >
-                      <option value="Active">Active</option>
-                      <option value="Acknowledged">Acknowledged</option>
-                      <option value="Resolving">Resolving</option>
-                      <option value="Resolved">Resolved</option>
-                    </select>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: "center", padding: "2rem" }}>Loading…</td>
+                </tr>
+              ) : alerts.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
+                    No emergency alerts recorded.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                alerts.map((a) => (
+                  <tr key={a.id} style={{ background: a.status === "active" ? "var(--danger-light)" : undefined }}>
+                    <td style={{ fontWeight: 700, fontFamily: "monospace", whiteSpace: "nowrap" }}>
+                      SOS-{a.id.slice(0, 8).toUpperCase()}
+                    </td>
+                    <td style={{ fontWeight: 700, color: "var(--danger)", textTransform: "capitalize" }}>🚨 {a.alert_type}</td>
+                    <td style={{ fontWeight: 600 }}>{a.message || "—"}</td>
+                    <td>{formatDateTime(a.triggered_at)}</td>
+                    <td>
+                      <StatusBadge status={a.status} />
+                    </td>
+                    <td>
+                      <div style={{ display: "flex", gap: "0.4rem" }}>
+                        {a.status === "active" && (
+                          <button className="btn btn-secondary" style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }} onClick={() => handleAcknowledge(a.id)}>
+                            Acknowledge
+                          </button>
+                        )}
+                        {(a.status === "active" || a.status === "acknowledged") && (
+                          <button className="btn btn-primary" style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }} onClick={() => handleResolve(a.id)}>
+                            Resolve
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -158,19 +189,15 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
               Emergency Category *
             </label>
             <select className="select-field" value={alertType} onChange={(e) => setAlertType(e.target.value)}>
-              <option value="Medical Emergency">Medical Emergency</option>
-              <option value="Fire">Fire</option>
-              <option value="Security Threat">Security Threat</option>
-              <option value="Unauthorized Person">Unauthorized Person</option>
-              <option value="Accident">Accident</option>
-              <option value="Suspicious Activity">Suspicious Activity</option>
-              <option value="Other">Other</option>
+              {ALERT_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
             </select>
           </div>
 
           <div style={{ marginBottom: "1rem" }}>
             <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
-              Location / Building Block *
+              Location / Building Block
             </label>
             <input
               type="text"
@@ -178,7 +205,6 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
               placeholder="e.g. Tower A Floor 12"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              required
             />
           </div>
 
@@ -199,4 +225,3 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
     </div>
   );
 }
-

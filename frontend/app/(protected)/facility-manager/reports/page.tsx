@@ -1,133 +1,141 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { complaintsApi, amenitiesApi } from "@/lib/api";
+
+interface CategoryReportRow {
+  category_name: string;
+  total: number;
+  resolved: number;
+  onTrackPct: number;
+}
 
 export default function FacilityManagerReportsPage() {
-  const [reportType, setReportType] = useState("maintenance");
-  const [dateRange, setDateRange] = useState("this_month");
-  const [isApplying, setIsApplying] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [categoryRows, setCategoryRows] = useState<CategoryReportRow[]>([]);
+  const [amenityBookingsTotal, setAmenityBookingsTotal] = useState(0);
+  const [amenityBookingsCancelled, setAmenityBookingsCancelled] = useState(0);
 
-  const handleApply = () => {
-    setIsApplying(true);
-    setTimeout(() => setIsApplying(false), 400);
-  };
+  useEffect(() => {
+    (async () => {
+      setIsLoading(true);
+      setLoadError(null);
+      try {
+        const [tickets, categories, bookings] = await Promise.all([
+          complaintsApi.list(),
+          complaintsApi.categories(),
+          amenitiesApi.bookings(),
+        ]);
 
-  const handleReset = () => {
-    setReportType("maintenance");
-    setDateRange("this_month");
-  };
+        const categoryMap = new Map<string, string>();
+        for (const c of categories || []) if (c?.id) categoryMap.set(c.id, c.name);
+
+        const byCategory = new Map<string, { total: number; resolved: number; onTrack: number }>();
+        for (const t of tickets || []) {
+          const name = categoryMap.get((t as any).category_id) || "Uncategorized";
+          const bucket = byCategory.get(name) || { total: 0, resolved: 0, onTrack: 0 };
+          bucket.total += 1;
+          if ((t as any).status === "resolved" || (t as any).status === "closed") bucket.resolved += 1;
+          if (!(t as any).sla_breached_at) bucket.onTrack += 1;
+          byCategory.set(name, bucket);
+        }
+        setCategoryRows(
+          Array.from(byCategory.entries()).map(([category_name, s]) => ({
+            category_name,
+            total: s.total,
+            resolved: s.resolved,
+            onTrackPct: s.total > 0 ? Math.round((s.onTrack / s.total) * 100) : 0,
+          }))
+        );
+
+        setAmenityBookingsTotal((bookings || []).length);
+        setAmenityBookingsCancelled((bookings || []).filter((b: any) => b.status === "cancelled").length);
+      } catch (err: any) {
+        setLoadError(err?.message || "Failed to load report data.");
+      }
+      setIsLoading(false);
+    })();
+  }, []);
 
   return (
     <div>
       <PageHeader
         title="Facility & Operational Reports"
-        subtitle="Exportable analytical views for facility utilization, SLA compliance, and vendor performance"
+        subtitle="Ticket volume and SLA performance by category, and amenity booking activity"
         breadcrumbs={[{ label: "GateSphere" }, { label: "Facility Manager" }, { label: "Reports" }]}
       />
 
-      {/* Filter Control Bar */}
       <div className="card" style={{ marginBottom: "1.75rem" }}>
-        <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", alignItems: "center" }}>
-          <div>
-            <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", marginBottom: "0.25rem" }}>
-              Report View
-            </label>
-            <select
-              className="select-field"
-              value={reportType}
-              onChange={(e) => setReportType(e.target.value)}
-              style={{ height: 36, minWidth: 220 }}
-            >
-              <option value="maintenance">Maintenance Reports</option>
-              <option value="facility_utilization">Facility Utilization</option>
-              <option value="vendor_performance">Vendor Performance</option>
-              <option value="service_sla">Service Request SLA</option>
-              <option value="complaint_status">Complaint Status</option>
-              <option value="amenity_utilization">Amenity Utilization</option>
-              <option value="incident_summary">Incident Summary</option>
-            </select>
-          </div>
-
-          <div>
-            <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", marginBottom: "0.25rem" }}>
-              Timeframe
-            </label>
-            <select
-              className="select-field"
-              value={dateRange}
-              onChange={(e) => setDateRange(e.target.value)}
-              style={{ height: 36, minWidth: 160 }}
-            >
-              <option value="today">Today</option>
-              <option value="this_week">This Week</option>
-              <option value="this_month">This Month</option>
-              <option value="last_quarter">Last Quarter</option>
-            </select>
-          </div>
-
-          <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem" }}>
-            <button className="btn btn-primary" onClick={handleApply} disabled={isApplying}>
-              {isApplying ? "Filtering…" : "Apply Filters"}
-            </button>
-            <button className="btn btn-secondary" onClick={handleReset}>
-              Reset
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Generated Report Summary Table */}
-      <div className="card">
         <div className="card-header">
-          <h3 className="card-title">
-            Generated Report: {reportType.replace("_", " ").toUpperCase()} ({dateRange.replace("_", " ")})
-          </h3>
+          <h3 className="card-title">Service Tickets by Category</h3>
         </div>
 
         <div className="table-container">
           <table className="data-table">
             <thead>
               <tr>
-                <th>Category / Module</th>
-                <th>Total Volume</th>
-                <th>Completed / Resolved</th>
+                <th>Category</th>
+                <th>Total Tickets</th>
+                <th>Resolved / Closed</th>
                 <th>SLA On-Track %</th>
-                <th>Average Resolution Time</th>
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td style={{ fontWeight: 600 }}>Plumbing & Water Systems</td>
-                <td>24 Tickets</td>
-                <td>22 Resolved</td>
-                <td style={{ color: "var(--success)", fontWeight: 600 }}>91.6%</td>
-                <td>4.2 Hours</td>
-              </tr>
-              <tr>
-                <td style={{ fontWeight: 600 }}>Elevators & Vertical Transport</td>
-                <td>12 Tickets</td>
-                <td>12 Resolved</td>
-                <td style={{ color: "var(--success)", fontWeight: 600 }}>100%</td>
-                <td>1.8 Hours</td>
-              </tr>
-              <tr>
-                <td style={{ fontWeight: 600 }}>Electrical & Power Generators</td>
-                <td>18 Tickets</td>
-                <td>15 Resolved</td>
-                <td style={{ color: "var(--warning)", fontWeight: 600 }}>83.3%</td>
-                <td>6.5 Hours</td>
-              </tr>
-              <tr>
-                <td style={{ fontWeight: 600 }}>Amenities & Event Spaces</td>
-                <td>45 Bookings</td>
-                <td>45 Completed</td>
-                <td style={{ color: "var(--success)", fontWeight: 600 }}>100%</td>
-                <td>N/A</td>
-              </tr>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={4} style={{ textAlign: "center", padding: "2rem" }}>
+                    Loading…
+                  </td>
+                </tr>
+              ) : loadError ? (
+                <tr>
+                  <td colSpan={4} style={{ textAlign: "center", padding: "2rem", color: "var(--danger, #dc2626)" }}>
+                    {loadError}
+                  </td>
+                </tr>
+              ) : categoryRows.length === 0 ? (
+                <tr>
+                  <td colSpan={4} style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
+                    No tickets recorded yet.
+                  </td>
+                </tr>
+              ) : (
+                categoryRows.map((row) => (
+                  <tr key={row.category_name}>
+                    <td style={{ fontWeight: 600 }}>{row.category_name}</td>
+                    <td>{row.total} Tickets</td>
+                    <td>{row.resolved} Resolved</td>
+                    <td style={{ color: row.onTrackPct >= 90 ? "var(--success)" : "var(--warning)", fontWeight: 600 }}>
+                      {row.onTrackPct}%
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <h3 className="card-title">Amenity Booking Activity</h3>
+        </div>
+        {isLoading ? (
+          <p style={{ padding: "1rem", color: "var(--muted)" }}>Loading…</p>
+        ) : (
+          <div style={{ padding: "0.5rem 1rem 1rem", display: "flex", gap: "2rem", fontSize: "0.875rem" }}>
+            <div>
+              <div style={{ color: "var(--muted)", fontSize: "0.75rem" }}>Total Bookings</div>
+              <div style={{ fontWeight: 700, fontSize: "1.25rem" }}>{amenityBookingsTotal}</div>
+            </div>
+            <div>
+              <div style={{ color: "var(--muted)", fontSize: "0.75rem" }}>Cancelled</div>
+              <div style={{ fontWeight: 700, fontSize: "1.25rem" }}>{amenityBookingsCancelled}</div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

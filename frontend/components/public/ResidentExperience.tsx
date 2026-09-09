@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Image from "next/image";
 import { useReveal } from "@/hooks/use-reveal";
 
@@ -106,121 +106,128 @@ const residentFeatures: ResidentFeature[] = [
 
 export default function ResidentExperience() {
   const { ref, visible } = useReveal();
-  const [activeItem, setActiveItem] = useState(0);
 
   return (
     <section
       ref={ref}
-      className="relative pt-6 pb-12 sm:pt-8 sm:pb-16 bg-[#FAF9F7] overflow-hidden border-b border-slate-200/80"
+      className="relative py-6 sm:py-8 bg-[#FAFCFF] overflow-hidden border-b border-slate-200/60"
+      style={{
+        backgroundImage:
+          "radial-gradient(circle at 10% 20%, rgba(224, 242, 254, 0.4) 0%, transparent 45%), radial-gradient(circle at 90% 80%, rgba(238, 242, 255, 0.45) 0%, transparent 45%)",
+      }}
     >
-      <div className="max-w-7xl mx-auto px-6 sm:px-8 relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
-          {/* ── LEFT COLUMN: Lifestyle Mockup Image ── */}
-          <div className={`lg:col-span-6 reveal-left ${visible ? "visible" : ""}`}>
-            <div className="relative rounded-3xl overflow-hidden border border-slate-200/90 shadow-2xl group bg-white">
-              <div className="relative h-[400px] sm:h-[460px] w-full">
-                <Image
-                  src="/images/resident-lifestyle.webp"
-                  alt="Residents enjoying smart gated community living with mobile app"
-                  fill
-                  sizes="(max-width: 1024px) 100vw, 50vw"
-                  className="object-cover transition-transform duration-700 group-hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
+      {/* Subtle Background Geometric Grid */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#E2E8F0_1px,transparent_1px),linear-gradient(to_bottom,#E2E8F0_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_70%_60%_at_50%_50%,#000_70%,transparent_100%)] opacity-30 pointer-events-none" />
 
-                {/* Floating Notification Badge */}
-                <div className="absolute top-6 left-6 right-6 sm:right-auto sm:max-w-sm bg-white/95 backdrop-blur-md rounded-2xl p-3.5 border border-slate-200/80 shadow-xl flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-700 font-bold shrink-0">
-                    🛎️
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-bold text-slate-900">Guest at Main Gate</div>
-                    <div className="text-[11px] text-slate-500">Priya Sharma requested entry</div>
-                  </div>
-                  <span className="text-[10px] font-bold px-2 py-1 bg-emerald-100 text-emerald-800 rounded-lg shrink-0">
-                    Approved
-                  </span>
-                </div>
+      <div className="max-w-7xl mx-auto px-6 sm:px-8 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center relative z-10">
+        {/* ── LEFT COLUMN: Clean 4K Luxury Community Lifestyle Showcase (5 Cols) ── */}
+        <div className={`lg:col-span-5 reveal-left ${visible ? "visible" : ""} relative`}>
+          {/* Main 4K Image Container */}
+          <div className="relative h-[460px] rounded-3xl overflow-hidden shadow-2xl border border-slate-200/90 group">
+            <Image
+              src="/images/resident-lifestyle.webp"
+              alt="Luxury gated community poolside and modern villas lifestyle"
+              fill
+              sizes="(max-width: 1024px) 100vw, 500px"
+              className="object-cover transition-transform duration-700 group-hover:scale-105"
+            />
 
-                {/* Bottom Resident App Quote */}
-                <div className="absolute bottom-6 left-6 right-6 text-white">
-                  <div className="text-xs font-bold tracking-wider text-sky-400 uppercase font-mono">
-                    RESIDENT SUPER-APP
-                  </div>
-                  <div className="text-xl sm:text-2xl font-bold tracking-tight mt-1" style={{ fontFamily: "'Outfit', sans-serif" }}>
-                    Everything at your fingertips.
-                  </div>
-                  <p className="text-xs text-slate-300 mt-1 max-w-md">
-                    One tap to pre-approve guests, pay society maintenance, book the clubhouse, and track parcel deliveries.
-                  </p>
+            {/* Subtle Gradient Overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent pointer-events-none" />
+
+            {/* Bottom In-Image Trust Strip */}
+            <div className="absolute bottom-4 left-4 right-4 bg-slate-950/90 backdrop-blur-md rounded-2xl p-3 border border-white/15 text-white flex items-center justify-between shadow-xl">
+              <div>
+                <div className="text-[9px] font-extrabold tracking-wider uppercase text-cyan-400">
+                  GATESPHERE RESIDENT OS
                 </div>
+                <div className="text-[12.5px] font-bold text-white tracking-tight">
+                  Clubhouse, Pool &amp; Home Automation
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 text-[9.5px] font-mono text-emerald-300 font-bold bg-emerald-950/80 px-2.5 py-1 rounded-lg border border-emerald-500/30">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                14,000+ HOMES
               </div>
             </div>
           </div>
 
-          {/* ── RIGHT COLUMN: 6 Feature Cards Grid ── */}
-          <div className={`lg:col-span-6 reveal-right ${visible ? "visible" : ""}`}>
-            {/* Pill Badge */}
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 border border-blue-200 mb-3.5 shadow-xs">
-              <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-              <span
-                className="text-[11px] font-bold tracking-wider text-blue-900 uppercase"
-                style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
-              >
-                Resident Super-App
-              </span>
+          {/* Floating Luxury Status Chip: Bottom Left */}
+          <div
+            className="absolute -bottom-3 -left-3 sm:-left-4 bg-white border border-slate-200 rounded-2xl p-2.5 shadow-2xl backdrop-blur-md z-20 flex items-center gap-2.5"
+            style={{ animation: "floatCard1 5.5s ease-in-out infinite" }}
+          >
+            <div className="w-8 h-8 rounded-xl bg-blue-100 border border-blue-200 text-blue-700 flex items-center justify-center font-bold text-sm shadow-xs">
+              ⭐
             </div>
+            <div className="leading-tight pr-1">
+              <div className="text-[12px] font-extrabold text-slate-900">4.9 / 5 Rating</div>
+              <div className="text-[9.5px] text-slate-500 font-medium">99.2% Resident Adoption</div>
+            </div>
+          </div>
+        </div>
 
-            {/* Headline */}
-            <h2
-              className="text-3xl sm:text-4xl lg:text-[42px] font-extrabold text-slate-950 tracking-tight leading-[1.14] mb-3"
-              style={{ fontFamily: "'Outfit', 'Plus Jakarta Sans', sans-serif" }}
-            >
-              Everyday living,{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-700 via-indigo-600 to-teal-600">
-                simplified.
-              </span>
-            </h2>
-
-            <p
-              className="text-[15px] sm:text-[16px] text-slate-600 font-normal leading-relaxed mb-6"
+        {/* ── RIGHT COLUMN: Content & Uniform 2x3 Feature Matrix (7 Cols) ── */}
+        <div className={`lg:col-span-7 reveal-right ${visible ? "visible" : ""}`}>
+          {/* Pill Badge */}
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 border border-emerald-300 mb-2.5 shadow-xs">
+            <span className="w-2 h-2 rounded-full bg-emerald-600 animate-ping" />
+            <span
+              className="text-[11px] font-bold tracking-wider text-emerald-900 uppercase"
               style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
             >
-              Built to make high-rise apartment and gated township life completely effortless for owners and tenants alike.
-            </p>
+              Resident Experience
+            </span>
+          </div>
 
-            {/* 2x3 Feature Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {residentFeatures.map((item, idx) => {
-                const isSelected = activeItem === idx;
-                return (
+          {/* Heading */}
+          <h2
+            className="text-2xl sm:text-3xl lg:text-[38px] font-extrabold text-slate-950 tracking-tight leading-[1.12] mb-2"
+            style={{ fontFamily: "'Outfit', 'Plus Jakarta Sans', sans-serif" }}
+          >
+            Everything residents need,<br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-700 via-indigo-600 to-teal-600">
+              right where they live.
+            </span>
+          </h2>
+
+          {/* Subtitle */}
+          <p
+            className="text-[14px] sm:text-[15px] text-slate-700 font-normal leading-relaxed max-w-xl mb-5"
+            style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+          >
+            A single app that handles daily community life — from inviting guests to booking the pool — so residents spend more time enjoying their home.
+          </p>
+
+          {/* 2x3 Uniform Feature Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {residentFeatures.map((item) => (
+              <div
+                key={item.id}
+                className="group p-3.5 sm:p-4 rounded-xl border border-slate-200 bg-white hover:border-blue-400 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer shadow-xs"
+              >
+                <div className="flex items-center gap-3 mb-2">
                   <div
-                    key={item.id}
-                    onClick={() => setActiveItem(idx)}
-                    className={`p-4 rounded-2xl border transition-all duration-200 cursor-pointer ${
-                      isSelected
-                        ? "bg-white border-blue-500 shadow-md shadow-blue-500/10"
-                        : "bg-white/80 border-slate-200 hover:bg-white hover:border-slate-300"
-                    }`}
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center border ${item.iconBg} transition-transform duration-300 group-hover:scale-110 shadow-xs shrink-0`}
                   >
-                    <div className="flex items-center justify-between mb-2.5">
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center border ${item.iconBg}`}>
-                        {item.icon}
-                      </div>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${item.tagColor}`}>
-                        {item.tag}
-                      </span>
-                    </div>
-                    <h4 className="text-[13.5px] font-bold text-slate-900 mb-1">
-                      {item.title}
-                    </h4>
-                    <p className="text-[11.5px] text-slate-500 leading-snug">
-                      {item.desc}
-                    </p>
+                    {item.icon}
                   </div>
-                );
-              })}
-            </div>
+                  <h3
+                    className="text-[14.5px] font-bold text-slate-900 group-hover:text-blue-700 transition-colors tracking-tight"
+                    style={{ fontFamily: "'Outfit', sans-serif" }}
+                  >
+                    {item.title}
+                  </h3>
+                </div>
+
+                <p
+                  className="text-[12px] text-slate-600 font-normal leading-relaxed"
+                  style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                >
+                  {item.desc}
+                </p>
+              </div>
+            ))}
           </div>
         </div>
       </div>

@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import Image from "next/image";
+import React, { useState, useEffect, useRef } from "react";
 import { useReveal } from "@/hooks/use-reveal";
 
 interface StepData {
@@ -75,7 +74,7 @@ const STEPS: StepData[] = [
     time: "2:15 PM",
     accent: "#10B981",
     gradient: "from-emerald-500 to-teal-400",
-    glowColor: "rgba(16, 185, 129, 0.25)",
+    glowColor: "rgba(168, 85, 247, 0.25)",
     icon: (
       <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" strokeLinecap="round" />
@@ -105,131 +104,389 @@ const STEPS: StepData[] = [
 ];
 
 export default function MaintenanceTimeline() {
-  const { ref, visible } = useReveal();
+  const sectionRef = useRef<HTMLDivElement>(null);
   const [activeStep, setActiveStep] = useState(0);
+  const { ref: revealRef, visible } = useReveal();
 
-  // Auto step every 4s
   useEffect(() => {
-    const timer = setInterval(() => {
-      setActiveStep((prev) => (prev + 1) % STEPS.length);
-    }, 4500);
-    return () => clearInterval(timer);
+    const handleScroll = () => {
+      if (!sectionRef.current) return;
+      const rect = sectionRef.current.getBoundingClientRect();
+      const windowH = window.innerHeight;
+
+      // Calculate how far through the section we have scrolled
+      const totalH = rect.height - windowH;
+      if (totalH <= 0) return;
+
+      const current = -rect.top;
+      const progress = Math.min(Math.max(current / totalH, 0), 0.999);
+      const stepIdx = Math.floor(progress * 5);
+      setActiveStep(stepIdx);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   const current = STEPS[activeStep];
 
   return (
     <section
-      ref={ref}
-      className="relative pt-6 pb-12 sm:pt-8 sm:pb-16 bg-white overflow-hidden border-b border-slate-200/80"
+      ref={sectionRef}
+      className="relative bg-[#080D1A] text-white"
+      style={{ height: "320vh" }}
     >
-      <div className="max-w-7xl mx-auto px-6 sm:px-8 relative z-10">
-        {/* Section Header */}
-        <div className={`text-center mb-10 reveal ${visible ? "visible" : ""}`}>
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 border border-blue-200 mb-3.5 shadow-xs">
-            <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-            <span
-              className="text-[11px] font-bold tracking-wider text-blue-900 uppercase"
-              style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
-            >
-              Guaranteed 2-Hour SLA
-            </span>
+      {/* ── STICKY PINNED PRESENTATION VIEWPORT ── */}
+      <div className="sticky top-0 h-screen w-full flex flex-col justify-between py-8 px-6 lg:px-12 overflow-hidden">
+        {/* Background Ambient Glows */}
+        <div
+          className="absolute -top-24 left-1/4 w-96 h-96 rounded-full blur-3xl pointer-events-none transition-colors duration-700 opacity-20"
+          style={{ backgroundColor: current.accent }}
+        />
+        <div className="absolute -bottom-24 right-10 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
+
+        {/* ── 1. HEADER AREA ── */}
+        <div ref={revealRef} className={`max-w-4xl mx-auto text-center shrink-0 relative z-10 reveal ${visible ? "visible" : ""}`}>
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[11px] font-semibold tracking-wider uppercase mb-3 shadow-xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+            Maintenance
           </div>
 
           <h2
-            className="text-3xl sm:text-4xl lg:text-[42px] font-extrabold text-slate-950 tracking-tight leading-[1.14] mb-3"
+            className="text-3xl sm:text-4xl lg:text-[42px] font-bold text-white tracking-tight leading-tight"
             style={{ fontFamily: "'Outfit', 'Plus Jakarta Sans', sans-serif" }}
           >
-            End-to-end maintenance,{" "}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-700 via-indigo-600 to-teal-600">
-              fully tracked.
+            From complaint to{" "}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-orange-400 to-teal-400">
+              resolution.
             </span>
           </h2>
 
           <p
-            className="text-[15px] sm:text-[16px] text-slate-600 font-normal leading-relaxed max-w-xl mx-auto"
+            className="mt-2 text-sm sm:text-base text-slate-400 max-w-xl mx-auto hidden sm:block"
             style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
           >
-            From plumbing leaks to lift maintenance, every request follows an automated transparent workflow with live timestamps.
+            Every maintenance request tracked end-to-end with full accountability at every step.
           </p>
         </div>
 
-        {/* Timeline Step Indicators */}
-        <div className="grid grid-cols-5 gap-2 sm:gap-4 mb-8">
-          {STEPS.map((step, idx) => {
-            const isSelected = activeStep === idx;
-            return (
-              <button
-                key={step.id}
-                onClick={() => setActiveStep(idx)}
-                className={`flex flex-col items-center p-3 rounded-2xl border transition-all text-center cursor-pointer ${
-                  isSelected
-                    ? "bg-blue-50/80 border-blue-500 shadow-md shadow-blue-500/10 scale-102"
-                    : "bg-slate-50 border-slate-200 hover:bg-white hover:border-slate-300"
-                }`}
-              >
-                <div
-                  className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold mb-1.5 transition-colors ${
-                    isSelected ? "bg-blue-600 text-white" : "bg-white text-slate-700 border border-slate-200"
-                  }`}
-                >
-                  0{step.id}
-                </div>
-                <div className={`text-xs font-bold leading-tight ${isSelected ? "text-blue-900" : "text-slate-700"}`}>
-                  {step.shortTitle}
-                </div>
-                <div className="text-[10px] text-slate-400 font-mono mt-0.5">{step.time}</div>
-              </button>
-            );
-          })}
+        {/* ── 2. PROCESS TIMELINE BAR (Horizontal with glowing progress) ── */}
+        <div className="max-w-5xl mx-auto w-full relative z-20 my-auto shrink-0 py-2">
+          <div className="relative">
+            {/* Background Rail */}
+            <div className="absolute top-1/2 -translate-y-1/2 left-6 right-6 h-[2px] bg-slate-800" />
+
+            {/* Glowing Active Progress Fill */}
+            <div
+              className="absolute top-1/2 -translate-y-1/2 left-6 h-[2px] rounded-full transition-all duration-300 ease-out"
+              style={{
+                width: `calc(${((activeStep) / 4) * 100}% * 0.9 + 2%)`,
+                background: "linear-gradient(90deg, #38BDF8, #2DD4BF, #F59E0B, #10B981, #A855F7)",
+                boxShadow: `0 0 12px ${current.accent}`,
+              }}
+            />
+
+            {/* 5 Step Nodes */}
+            <div className="flex items-center justify-between relative z-10">
+              {STEPS.map((step, idx) => {
+                const isCompleted = idx < activeStep;
+                const isActive = idx === activeStep;
+
+                return (
+                  <button
+                    key={step.id}
+                    onClick={() => setActiveStep(idx)}
+                    className="group flex flex-col items-center cursor-pointer transition-all duration-300 focus:outline-none"
+                  >
+                    {/* Circle Node */}
+                    <div
+                      className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center transition-all duration-300 border ${
+                        isActive
+                          ? "bg-[#151F33] text-white scale-110 shadow-lg"
+                          : isCompleted
+                          ? "bg-slate-900/90 text-emerald-400 border-emerald-500/40"
+                          : "bg-[#0B101E] text-slate-500 border-slate-800 hover:border-slate-700"
+                      }`}
+                      style={{
+                        borderColor: isActive ? step.accent : undefined,
+                        boxShadow: isActive ? `0 0 16px ${step.glowColor}` : undefined,
+                      }}
+                    >
+                      {isCompleted ? (
+                        <svg className="w-5 h-5 text-emerald-400" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      ) : (
+                        <span style={{ color: isActive ? step.accent : undefined }}>
+                          {step.icon}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Node Text */}
+                    <div className="mt-2 text-center hidden sm:block">
+                      <div
+                        className={`text-[12px] transition-colors ${
+                          isActive ? "font-bold text-white" : isCompleted ? "font-semibold text-slate-300" : "font-medium text-slate-500"
+                        }`}
+                        style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                      >
+                        {step.title}
+                      </div>
+                      <div
+                        className="text-[10px] font-mono mt-0.5"
+                        style={{ color: isActive ? step.accent : "#64748B" }}
+                      >
+                        {step.time}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
-        {/* Live Active Step Detail Card */}
-        <div className="bg-slate-900 text-white rounded-3xl p-6 sm:p-8 border border-slate-800 shadow-2xl">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            {/* Left: Detail Info */}
-            <div className="lg:col-span-7 space-y-4">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-950 border border-blue-500/40 text-blue-300 text-xs font-mono">
-                <span>STEP 0{current.id} OF 05</span>
-                <span>·</span>
-                <span>{current.time}</span>
+        {/* ── 3. MAIN WORKFLOW VISUAL & DEVICE SHOWCASE ── */}
+        <div className="max-w-5xl mx-auto w-full relative z-10 my-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-center bg-[#0D1424]/80 backdrop-blur-xl border border-slate-800/90 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
+            {/* ── LEFT: Stage Narrative & Action Card ── */}
+            <div className="lg:col-span-6 flex flex-col justify-center">
+              {/* Active Step Badge */}
+              <div className="flex items-center gap-2.5 mb-3.5">
+                <span
+                  className="px-3 py-1 rounded-md text-[11px] font-bold tracking-wider uppercase text-white shadow-xs"
+                  style={{ backgroundColor: current.accent }}
+                >
+                  Step {activeStep + 1} of 5
+                </span>
+                <span className="text-xs font-mono text-slate-400 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  {current.time}
+                </span>
               </div>
 
-              <h3 className="text-2xl sm:text-3xl font-bold tracking-tight text-white" style={{ fontFamily: "'Outfit', sans-serif" }}>
+              {/* Title */}
+              <h3
+                className="text-2xl sm:text-3xl font-bold text-white tracking-tight"
+                style={{ fontFamily: "'Outfit', 'Plus Jakarta Sans', sans-serif" }}
+              >
                 {current.title}
               </h3>
 
-              <p className="text-slate-300 text-sm sm:text-base leading-relaxed max-w-xl">
+              {/* Description */}
+              <p
+                className="mt-2 text-slate-300 text-sm leading-relaxed"
+                style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+              >
                 {current.desc}
               </p>
 
-              <div className="flex flex-wrap items-center gap-4 pt-2 text-xs text-slate-400 font-mono">
-                <span className="flex items-center gap-1.5 text-emerald-400">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  SLA TIMER ACTIVE
-                </span>
-                <span>TICKET #TK-4821</span>
-                <span>UNIT: TOWER B-402</span>
+              {/* Live Context Card */}
+              <div className="mt-5 space-y-2.5">
+                {activeStep === 0 && (
+                  <div className="p-3.5 rounded-xl bg-[#131C31] border border-cyan-500/30 text-xs text-slate-300 space-y-1">
+                    <div className="font-semibold text-cyan-400 flex items-center gap-1.5">
+                      <span>✓</span> Resident App • Unit A-204
+                    </div>
+                    <div className="text-slate-400 text-[11.5px]">
+                      Photo captured with AI issue tagging • Priority set to <strong>Standard Plumbing</strong>.
+                    </div>
+                  </div>
+                )}
+
+                {activeStep === 1 && (
+                  <div className="p-3.5 rounded-xl bg-[#131C31] border border-teal-500/30 text-xs text-slate-300 space-y-1">
+                    <div className="font-semibold text-teal-400 flex items-center gap-1.5">
+                      <span>✓</span> Manager Dispatch Hub
+                    </div>
+                    <div className="text-slate-400 text-[11.5px]">
+                      Auto-matched to Arun Kumar (Certified Plumber • 4.9★). SLA assigned: <strong>&lt; 2 Hours</strong>.
+                    </div>
+                  </div>
+                )}
+
+                {activeStep === 2 && (
+                  <div className="p-3.5 rounded-xl bg-[#131C31] border border-amber-500/30 text-xs text-slate-300 space-y-1">
+                    <div className="font-semibold text-amber-400 flex items-center gap-1.5">
+                      <span>✓</span> Field Technician On-Site
+                    </div>
+                    <div className="text-slate-400 text-[11.5px]">
+                      Cartridge valve replaced, pressure testing completed. Digital proof uploaded.
+                    </div>
+                  </div>
+                )}
+
+                {activeStep === 3 && (
+                  <div className="p-3.5 rounded-xl bg-[#131C31] border border-emerald-500/30 text-xs text-slate-300 space-y-1">
+                    <div className="font-semibold text-emerald-400 flex items-center gap-1.5">
+                      <span>✓</span> Resident Verification
+                    </div>
+                    <div className="text-slate-400 text-[11.5px]">
+                      Resident Rahul signed off digitally with <strong>5.0 / 5.0 Star Rating</strong>.
+                    </div>
+                  </div>
+                )}
+
+                {activeStep === 4 && (
+                  <div className="p-3.5 rounded-xl bg-[#131C31] border border-purple-500/30 text-xs text-slate-300 space-y-1">
+                    <div className="font-semibold text-purple-400 flex items-center gap-1.5">
+                      <span>✓</span> Society Ledger Stored
+                    </div>
+                    <div className="text-slate-400 text-[11.5px]">
+                      Cryptographic audit hash generated. Zero paper receipts required.
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Scroll / Action Hint */}
+              <div className="mt-4 flex items-center gap-2 text-[11.5px] text-slate-400">
+                <span className="text-cyan-400 animate-bounce">↓</span>
+                <span>Scroll to scrub through the 5-step maintenance lifecycle</span>
               </div>
             </div>
 
-            {/* Right: Simulated Preview Graphic */}
-            <div className="lg:col-span-5 relative">
-              <div className="relative rounded-2xl overflow-hidden border border-slate-700 shadow-xl h-48 sm:h-56 w-full">
-                <Image
-                  src="/images/helpdesk.webp"
-                  alt="Technician Helpdesk SLA Tracker"
-                  fill
-                  sizes="(max-width: 1024px) 100vw, 40vw"
-                  className="object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent" />
-                <div className="absolute bottom-3 left-3 right-3 bg-slate-950/90 backdrop-blur-md p-3 rounded-xl border border-white/10 text-xs">
-                  <div className="text-[10px] text-sky-400 font-mono font-bold">DIGITAL AUDIT STAMP</div>
-                  <div className="text-slate-200 font-semibold">{current.title} · Verified at {current.time}</div>
+            {/* ── RIGHT: High-End GateSphere Device Preview ── */}
+            <div className="lg:col-span-6 flex justify-center">
+              <div className="w-full max-w-[340px] bg-[#0A0F1D] border border-slate-700/80 rounded-2xl p-4 shadow-2xl relative">
+                {/* Device Header */}
+                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-md bg-blue-600 flex items-center justify-center text-white text-[10px] font-bold">
+                      GS
+                    </div>
+                    <span className="text-xs font-bold text-white tracking-tight">GateSphere Operations</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-cyan-400 font-semibold">{current.time}</span>
+                </div>
+
+                {/* Dynamic Screen Content */}
+                <div className="py-4 min-h-[220px] flex flex-col justify-center">
+                  {/* Step 1 Screen */}
+                  {activeStep === 0 && (
+                    <div className="space-y-3 animate-in fade-in duration-300">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="font-bold text-white">Ticket #GS-9402</span>
+                        <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 text-[10px] font-semibold">
+                          PLUMBING
+                        </span>
+                      </div>
+
+                      <div className="p-3 rounded-xl bg-[#111A2E] border border-slate-800 space-y-1.5">
+                        <div className="text-xs font-bold text-white">Kitchen Tap Cartridge Leak</div>
+                        <div className="text-[11px] text-slate-400">Unit A-204 • Rahul Mehta</div>
+                        <div className="flex items-center gap-2 pt-1">
+                          <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] text-emerald-400 font-semibold">
+                            📷 photo_attached.webp
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="w-full py-2 rounded-xl bg-blue-600 text-white font-bold text-xs text-center shadow-md">
+                        ✓ Ticket Raised (10:00 AM)
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step 2 Screen */}
+                  {activeStep === 1 && (
+                    <div className="space-y-3 animate-in fade-in duration-300">
+                      <div className="p-2.5 rounded-xl bg-teal-950/40 border border-teal-500/30 flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-full bg-teal-500/20 text-teal-400 flex items-center justify-center text-xs font-bold">
+                          AK
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-white">Arun Kumar</div>
+                          <div className="text-[10px] text-teal-300">Master Plumber • 4.9★</div>
+                        </div>
+                      </div>
+
+                      <div className="p-2.5 rounded-xl bg-[#111A2E] border border-slate-800 text-[11px] space-y-1">
+                        <div className="text-slate-400">Assigned by: <strong className="text-white">Deepak Sharma (Manager)</strong></div>
+                        <div className="text-slate-400">Gate Entry: <strong className="text-emerald-400">Pre-Approved ✓</strong></div>
+                      </div>
+
+                      <div className="w-full py-2 rounded-xl bg-teal-600 text-white font-bold text-xs text-center shadow-md">
+                        ✓ Technician Dispatched (10:08 AM)
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step 3 Screen */}
+                  {activeStep === 2 && (
+                    <div className="space-y-3 animate-in fade-in duration-300">
+                      <div className="p-3 rounded-xl bg-amber-950/30 border border-amber-500/30 text-center space-y-1">
+                        <div className="text-amber-400 text-lg">🔧 ➔ ✨</div>
+                        <div className="text-xs font-bold text-white">Cartridge Replaced &amp; Leak Sealed</div>
+                        <div className="text-[10px] text-slate-400">Pressure Test: 3.2 Bar Passed</div>
+                      </div>
+
+                      <div className="w-full py-2 rounded-xl bg-amber-600 text-white font-bold text-xs text-center shadow-md">
+                        ✓ Work Completed (11:30 AM)
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step 4 Screen */}
+                  {activeStep === 3 && (
+                    <div className="space-y-3 animate-in fade-in duration-300 text-center">
+                      <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30 space-y-1">
+                        <div className="text-[11px] font-bold text-slate-300">Resident Rating</div>
+                        <div className="text-amber-400 text-base tracking-widest">★★★★★</div>
+                        <div className="text-[10.5px] text-emerald-400 font-semibold">5.0 / 5.0 — &quot;Fast &amp; clean fix&quot;</div>
+                      </div>
+
+                      <div className="w-full py-2 rounded-xl bg-emerald-600 text-white font-bold text-xs text-center shadow-md">
+                        ✓ Resident Confirmed (2:15 PM)
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step 5 Screen */}
+                  {activeStep === 4 && (
+                    <div className="space-y-2.5 animate-in fade-in duration-300">
+                      <div className="p-2.5 rounded-xl bg-purple-950/40 border border-purple-500/30 text-center">
+                        <div className="text-xs font-bold text-purple-300">STATUS: CLOSED ✓</div>
+                      </div>
+
+                      <div className="p-2.5 rounded-xl bg-[#111A2E] border border-slate-800 text-[10px] space-y-1 font-mono text-slate-400">
+                        <div className="flex justify-between"><span>10:00 AM</span><span className="text-white">Reported</span></div>
+                        <div className="flex justify-between"><span>10:08 AM</span><span className="text-white">Assigned</span></div>
+                        <div className="flex justify-between"><span>11:30 AM</span><span className="text-white">Repaired</span></div>
+                        <div className="flex justify-between"><span>2:15 PM</span><span className="text-white">Confirmed (5★)</span></div>
+                        <div className="flex justify-between text-purple-400 font-bold"><span>2:17 PM</span><span>Archived</span></div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Device Footer status */}
+                <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400 font-mono">
+                  <span>SLA Met: 100%</span>
+                  <span className="text-emerald-400">Encrypted Log ✓</span>
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* ── 4. BOTTOM THREE METRIC STATS ── */}
+        <div className="max-w-5xl mx-auto w-full grid grid-cols-3 gap-3 sm:gap-4 shrink-0">
+          <div className="bg-[#0D1424]/90 border border-slate-800 rounded-2xl p-3 sm:p-4 text-center shadow-lg">
+            <div className="text-lg sm:text-2xl font-black text-cyan-400 leading-none" style={{ fontFamily: "'Outfit', sans-serif" }}>&lt; 4hr</div>
+            <div className="text-[10px] sm:text-[12px] font-medium text-slate-400 mt-1">Avg Resolution Time</div>
+          </div>
+
+          <div className="bg-[#0D1424]/90 border border-slate-800 rounded-2xl p-3 sm:p-4 text-center shadow-lg">
+            <div className="text-lg sm:text-2xl font-black text-emerald-400 leading-none" style={{ fontFamily: "'Outfit', sans-serif" }}>98%</div>
+            <div className="text-[10px] sm:text-[12px] font-medium text-slate-400 mt-1">Ticket Closure Rate</div>
+          </div>
+
+          <div className="bg-[#0D1424]/90 border border-slate-800 rounded-2xl p-3 sm:p-4 text-center shadow-lg">
+            <div className="text-lg sm:text-2xl font-black text-amber-400 leading-none" style={{ fontFamily: "'Outfit', sans-serif" }}>4.9★</div>
+            <div className="text-[10px] sm:text-[12px] font-medium text-slate-400 mt-1">Resident Satisfaction</div>
           </div>
         </div>
       </div>

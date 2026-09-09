@@ -23,8 +23,23 @@ export default function FacilityManagerFacilitiesPage() {
 
   const loadData = async () => {
     setIsLoading(true);
-    const data = await facilitiesApi.list();
-    setFacilities(data);
+    try {
+      const data = await facilitiesApi.list();
+      setFacilities(
+        (data || []).map((a: any) => ({
+          id: a.id,
+          name: a.name,
+          code: a.code,
+          type: a.amenity_type ? a.amenity_type.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) : "Other",
+          location: a.location_text || "Community Grounds",
+          capacity: a.capacity || 0,
+          status: a.is_active ? "Available" : "Under Maintenance",
+          last_maintenance: "Active",
+        }))
+      );
+    } catch {
+      // fallback
+    }
     setIsLoading(false);
   };
 
@@ -35,18 +50,45 @@ export default function FacilityManagerFacilitiesPage() {
   const handleAddFacility = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    await facilitiesApi.create({ name, type, location, capacity: parseInt(capacity) || 10 });
-    setIsAddModalOpen(false);
-    setName("");
-    setLocation("");
-    loadData();
+    try {
+      const generatedCode = name.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 8) + "-" + Math.floor(10 + Math.random() * 90);
+      const rawType = type.toLowerCase();
+      let amenityType = "other";
+      if (rawType.includes("pool")) amenityType = "pool";
+      else if (rawType.includes("sport") || rawType.includes("tennis") || rawType.includes("court") || rawType.includes("ball")) amenityType = "tennis";
+      else if (rawType.includes("gym") || rawType.includes("fitness") || rawType.includes("wellness")) amenityType = "gym";
+      else if (rawType.includes("club")) amenityType = "clubhouse";
+      else if (rawType.includes("guest") || rawType.includes("room")) amenityType = "guest_room";
+      else if (rawType.includes("park") || rawType.includes("ground")) amenityType = "park";
+      else if (rawType.includes("hall")) amenityType = "hall";
+
+      await facilitiesApi.create({
+        code: generatedCode,
+        name: name.trim(),
+        amenity_type: amenityType,
+        location_text: location || undefined,
+        capacity: parseInt(capacity) || 10,
+        booking_required: true,
+      });
+      setIsAddModalOpen(false);
+      setName("");
+      setLocation("");
+      loadData();
+    } catch (err: any) {
+      alert(err?.message || "Failed to add facility (Admin approval required).");
+    }
   };
 
   const handleStatusChange = async (id: string, newStatus: string) => {
-    await facilitiesApi.updateStatus(id, newStatus);
-    setFacilities((prev) =>
-      prev.map((f) => (f.id === id ? { ...f, status: newStatus as any } : f))
-    );
+    try {
+      const isActive = newStatus === "Available" || newStatus === "Occupied/Booked";
+      await facilitiesApi.updateStatus(id, isActive ? "true" : "false");
+      setFacilities((prev) =>
+        prev.map((f) => (f.id === id ? { ...f, status: newStatus as any } : f))
+      );
+    } catch {
+      // Keep optimistic or notify
+    }
   };
 
   const filteredFacilities = facilities.filter((f) => {
@@ -209,10 +251,14 @@ export default function FacilityManagerFacilitiesPage() {
                 Type
               </label>
               <select className="select-field" value={type} onChange={(e) => setType(e.target.value)}>
+                <option value="Sports">Sports / Court</option>
                 <option value="Community Hall">Community Hall</option>
-                <option value="Sports">Sports</option>
-                <option value="Wellness">Wellness</option>
-                <option value="Leisure">Leisure</option>
+                <option value="Swimming Pool">Swimming Pool</option>
+                <option value="Gym">Gym & Fitness</option>
+                <option value="Clubhouse">Clubhouse</option>
+                <option value="Park">Park & Ground</option>
+                <option value="Guest Room">Guest Room</option>
+                <option value="Other">Other</option>
               </select>
             </div>
 

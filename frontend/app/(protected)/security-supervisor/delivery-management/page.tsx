@@ -14,8 +14,23 @@ export default function SecuritySupervisorDeliveryManagementPage() {
 
   const loadData = async () => {
     setIsLoading(true);
-    const data = await deliveriesApi.list();
-    setDeliveries(data);
+    try {
+      const data = await deliveriesApi.list();
+      setDeliveries(
+        (data || []).map((d: any) => ({
+          id: d.id,
+          gate_time: d.arrived_at ? new Date(d.arrived_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Expected",
+          company: d.provider_name || "Commercial Courier",
+          courier: d.executive_name || (d.executive_phone ? `Phone: ${d.executive_phone}` : "Courier Executive"),
+          category: d.delivery_type ? d.delivery_type.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) : "Package",
+          unit: `Unit ${d.unit_id ? d.unit_id.slice(0, 6) : "Direct"}`,
+          protocol: d.approval_status ? d.approval_status.replace(/_/g, " ").toUpperCase() : "STANDARD",
+          status: d.status ? d.status.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) : "Expected",
+        }))
+      );
+    } catch {
+      // fallback
+    }
     setIsLoading(false);
   };
 
@@ -28,7 +43,7 @@ export default function SecuritySupervisorDeliveryManagementPage() {
       d.company.toLowerCase().includes(search.toLowerCase()) ||
       d.courier.toLowerCase().includes(search.toLowerCase()) ||
       d.unit.toLowerCase().includes(search.toLowerCase());
-    const matchCategory = categoryFilter === "all" || d.category === categoryFilter;
+    const matchCategory = categoryFilter === "all" || d.category.toLowerCase().includes(categoryFilter.toLowerCase());
     return matchSearch && matchCategory;
   });
 

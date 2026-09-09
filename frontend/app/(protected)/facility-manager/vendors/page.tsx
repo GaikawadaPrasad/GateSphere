@@ -12,6 +12,7 @@ export default function FacilityManagerVendorsPage() {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Review Completion Modal
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
@@ -20,8 +21,15 @@ export default function FacilityManagerVendorsPage() {
 
   const loadData = async () => {
     setIsLoading(true);
-    const data = await vendorsApi.list();
-    setVendors(data);
+    setLoadError(null);
+    try {
+      // NOTE: facility_manager does not currently hold users:view in the backend RBAC
+      // seed (backend/app/core/rbac.py), so this 403s today — see the integration report.
+      const data = await vendorsApi.list();
+      setVendors(data);
+    } catch (err: any) {
+      setLoadError(err?.message || "Failed to load vendors.");
+    }
     setIsLoading(false);
   };
 
@@ -31,11 +39,17 @@ export default function FacilityManagerVendorsPage() {
 
   const handleReviewWork = async (decision: "Approve" | "Request Rework") => {
     if (!selectedVendor) return;
-    await vendorsApi.reviewCompletion(selectedVendor.id, decision);
-    alert(`Work submission for ${selectedVendor.name} has been: ${decision}`);
-    setIsReviewModalOpen(false);
-    setFeedback("");
-    loadData();
+    try {
+      // NOTE: POST /users/{id}/review does not exist in the backend — there is no
+      // vendor-work-review concept implemented at all. See the integration report.
+      await vendorsApi.reviewCompletion(selectedVendor.id, decision);
+      alert(`Work submission for ${selectedVendor.name} has been: ${decision}`);
+      setIsReviewModalOpen(false);
+      setFeedback("");
+      loadData();
+    } catch (err: any) {
+      alert(err?.message || "Failed to submit review.");
+    }
   };
 
   const filteredVendors = vendors.filter((v) => {
@@ -104,6 +118,12 @@ export default function FacilityManagerVendorsPage() {
                 <tr>
                   <td colSpan={9} style={{ textAlign: "center", padding: "2rem" }}>
                     Loading vendors…
+                  </td>
+                </tr>
+              ) : loadError ? (
+                <tr>
+                  <td colSpan={9} style={{ textAlign: "center", padding: "2rem", color: "var(--danger, #dc2626)" }}>
+                    {loadError}
                   </td>
                 </tr>
               ) : filteredVendors.length === 0 ? (

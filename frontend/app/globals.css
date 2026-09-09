@@ -1,6 +1,13 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Syne:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@theme {
+  --font-sans: var(--font-inter), 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-outfit: var(--font-outfit), 'Outfit', sans-serif;
+  --font-jakarta: var(--font-jakarta), 'Plus Jakarta Sans', sans-serif;
+  --font-syne: var(--font-syne), 'Syne', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
 
 :root {
   /* Enterprise Modern Theme Tokens */
@@ -88,7 +95,7 @@ html {
 
 body {
   min-height: 100%;
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-inter), 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -714,5 +721,101 @@ body {
     background: rgba(15, 23, 42, 0.6);
     backdrop-filter: blur(2px);
     z-index: 90;
+  }
+}
+
+/* ── Typography Utility Classes ── */
+.font-outfit, [style*="Outfit"], text[font-family*="Outfit"], svg text[font-family*="Outfit"] {
+  font-family: var(--font-outfit), 'Outfit', sans-serif !important;
+}
+.font-jakarta, [style*="Plus Jakarta Sans"], text[font-family*="Plus Jakarta Sans"], svg text[font-family*="Plus Jakarta Sans"] {
+  font-family: var(--font-jakarta), 'Plus Jakarta Sans', sans-serif !important;
+}
+.font-syne, [style*="Syne"], text[font-family*="Syne"], svg text[font-family*="Syne"] {
+  font-family: var(--font-syne), 'Syne', sans-serif !important;
+}
+
+/* ── Public Prototype Animations & Keyframes ── */
+@keyframes heroFadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes heroScaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes floatCard1 {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+@keyframes floatCard2 {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-4px); }
+}
+@keyframes pulseLive {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+@keyframes driftDownward {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(720px); }
+}
+@keyframes scanBeam {
+  0% { top: 0%; opacity: 0; }
+  20% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+@keyframes slideNotif {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes countUp {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes progressFill {
+  from { width: 0; }
+  to { width: var(--target-width, 80%); }
+}
+
+/* Infinite Slider Keyframes */
+@keyframes infinite-slider-vertical {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(calc(-50% - (var(--slider-gap, 16px) / 2)));
+  }
+}
+
+@keyframes infinite-slider-vertical-reverse {
+  0% {
+    transform: translateY(calc(-50% - (var(--slider-gap, 16px) / 2)));
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes infinite-slider-horizontal {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(calc(-50% - (var(--slider-gap, 16px) / 2)));
+  }
+}
+
+@keyframes infinite-slider-horizontal-reverse {
+  0% {
+    transform: translateX(calc(-50% - (var(--slider-gap, 16px) / 2)));
+  }
+  100% {
+    transform: translateX(0);
   }
 }

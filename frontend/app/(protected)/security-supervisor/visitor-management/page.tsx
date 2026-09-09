@@ -14,8 +14,22 @@ export default function SecuritySupervisorVisitorManagementPage() {
 
   const loadData = async () => {
     setIsLoading(true);
-    const data = await visitorsApi.list();
-    setVisitors(data);
+    try {
+      const data = await visitorsApi.requests();
+      setVisitors(
+        (data || []).map((v: any) => ({
+          id: v.id,
+          pass_code: v.id ? `REQ-${v.id.slice(0, 6).toUpperCase()}` : "PASS",
+          name: v.visitor?.full_name || (v.visitor_name || "Visitor"),
+          phone: v.visitor?.phone || (v.phone || "—"),
+          type: v.visitor_type ? v.visitor_type.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) : "Guest",
+          unit: `Unit ${v.unit_id ? v.unit_id.slice(0, 6) : "Direct"}`,
+          status: v.status === "pending" ? "Pending Approval" : v.status ? v.status.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) : "Expected",
+        }))
+      );
+    } catch {
+      // fallback
+    }
     setIsLoading(false);
   };
 
@@ -24,21 +38,29 @@ export default function SecuritySupervisorVisitorManagementPage() {
   }, []);
 
   const handleApprove = async (id: string) => {
-    await visitorsApi.approve(id);
-    setVisitors((prev) => prev.map((v) => (v.id === id ? { ...v, status: "Approved" } : v)));
+    try {
+      await visitorsApi.approve(id, "Approved by Security Supervisor");
+      setVisitors((prev) => prev.map((v) => (v.id === id ? { ...v, status: "Approved" } : v)));
+    } catch (err: any) {
+      alert(err?.message || "Failed to approve visitor request.");
+    }
   };
 
   const handleReject = async (id: string) => {
-    await visitorsApi.reject(id);
-    setVisitors((prev) => prev.map((v) => (v.id === id ? { ...v, status: "Rejected" } : v)));
+    try {
+      await visitorsApi.reject(id, "Rejected by Security Supervisor");
+      setVisitors((prev) => prev.map((v) => (v.id === id ? { ...v, status: "Rejected" } : v)));
+    } catch (err: any) {
+      alert(err?.message || "Failed to reject visitor request.");
+    }
   };
 
   const filteredVisitors = visitors.filter((v) => {
     const matchSearch =
       v.name.toLowerCase().includes(search.toLowerCase()) ||
-      v.phone.toLowerCase().includes(search.toLowerCase()) ||
-      v.pass_code.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = statusFilter === "all" || v.status === statusFilter;
+      (v.phone && v.phone.toLowerCase().includes(search.toLowerCase())) ||
+      (v.pass_code && v.pass_code.toLowerCase().includes(search.toLowerCase()));
+    const matchStatus = statusFilter === "all" || v.status.toLowerCase() === statusFilter.toLowerCase();
     return matchSearch && matchStatus;
   });
 

@@ -22,6 +22,10 @@ import {
   useResidentPayments,
   useResidentFamilyMembers,
   FamilyMember,
+  useResidentProfile,
+  useResidentDeliveryProtocols,
+  useResidentVehicles,
+  useResidentDomesticStaff,
   useSendResidentPanic,
   VisitorRequest,
   DeliveryItem,
@@ -30,6 +34,8 @@ import {
   ComplaintTicket,
   InvoiceItem,
 } from "@/hooks/use-owner-tenant-data";
+import { useAnnouncements } from "@/hooks/use-communication";
+import { useMyNotifications } from "@/hooks/use-notifications";
 import { useTableControls } from "@/hooks/use-table-controls";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { useUiStore } from "@/store/ui";
@@ -79,7 +85,6 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
   const [addMemberModalOpen, setAddMemberModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<FamilyMember | null>(null);
   const [memberToDelete, setMemberToDelete] = useState<FamilyMember | null>(null);
-  const [assignStaffModalOpen, setAssignStaffModalOpen] = useState(false);
   const [newMemberName, setNewMemberName] = useState("");
   const [newMemberRelation, setNewMemberRelation] = useState("Spouse");
   const [newMemberPhone, setNewMemberPhone] = useState("");
@@ -96,21 +101,13 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
   const [ticketDescription, setTicketDescription] = useState("");
   const [ticketPriority, setTicketPriority] = useState("medium");
 
-  // Countdown timer & dismissed state for live visitor approval
-  const [visitorTimer, setVisitorTimer] = useState(78);
+  // Dismissed state for live visitor approval banner
   const [visitorBannerDismissed, setVisitorBannerDismissed] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined" && sessionStorage.getItem("gatesphere_gate_alert_dismissed") === "true") {
       setVisitorBannerDismissed(true);
     }
-  }, []);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setVisitorTimer((prev) => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-    return () => clearInterval(timer);
   }, []);
 
   // Data queries
@@ -121,12 +118,24 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
   const complaints = useResidentComplaints();
   const payments = useResidentPayments();
   const family = useResidentFamilyMembers();
+  const profile = useResidentProfile();
+  const deliveryProtocols = useResidentDeliveryProtocols();
+  const vehicles = useResidentVehicles();
+  const domesticStaff = useResidentDomesticStaff();
+  const announcements = useAnnouncements();
+  const myNotifications = useMyNotifications({ page_size: 20 });
   const panicMutation = useSendResidentPanic();
 
   const visitorList = visitors.data || [];
   const deliveryList = deliveries.data || [];
   const complaintList = complaints.data || [];
   const invoiceList = payments.data || [];
+  const myOccupancy = profile.data?.occupancies?.[0];
+
+  const nextDueInvoice = invoiceList.find((i) => i.balance_due > 0);
+  const openTicket = complaintList.find((t) => t.status !== "resolved" && t.status !== "closed");
+  const activeStaffCount = (domesticStaff.data || []).filter((s) => s.is_active).length;
+  const nextBooking = (amenities.bookings.data || []).find((b) => b.status === "confirmed");
 
   const pendingVisitor = visitorList.find((v) => v.status === "pending");
 
@@ -369,10 +378,14 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
     }
   };
 
+  const residentUnit = myOccupancy?.unit_number
+    ? `${myOccupancy.unit_number.startsWith("Unit") ? myOccupancy.unit_number : `Unit ${myOccupancy.unit_number}`}${myOccupancy.tower_name ? `, ${myOccupancy.tower_name}` : ""}`
+    : "Registered Unit";
+
   const handleTriggerPanic = async () => {
     try {
       await panicMutation.mutateAsync({
-        unit_id: "Unit 402, Emerald Tower",
+        unit_id: residentUnit,
         note: "Emergency SOS triggered by resident from portal",
       });
       setSosModalOpen(false);
@@ -383,11 +396,89 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
     }
   };
 
+  const tabMeta: Record<
+    OwnerTenantTab,
+    { title: string; eyebrow: string; description: string }
+  > = {
+    overview: {
+      title: "Resident Self-Service Portal",
+      eyebrow: "Owner & Tenant Home Console",
+      description: "Manage visitor approvals, standing gate delivery rules, amenities, maintenance tickets, and simulated dues payments.",
+    },
+    profile: {
+      title: "My Resident Profile",
+      eyebrow: "Household & Personal Info",
+      description: "Manage your contact details, unit occupancies, and emergency contacts.",
+    },
+    property: {
+      title: "My Property & Unit Details",
+      eyebrow: "Residential Unit Master",
+      description: "View assigned tower, floor, unit configuration, and parking allocations.",
+    },
+    "family-members": {
+      title: "Family Members & Co-Occupants",
+      eyebrow: "Authorized Residents",
+      description: "Manage registered family members and household co-occupants for gate access.",
+    },
+    visitors: {
+      title: "Visitor Management & Passes",
+      eyebrow: "Guest & Visitor Access",
+      description: "Create pre-approved visitor passes, generate QR codes, and view entry history.",
+    },
+    deliveries: {
+      title: "Delivery Management & Protocols",
+      eyebrow: "Parcel & Courier Handling",
+      description: "Configure gate delivery rules and track incoming couriers and packages.",
+    },
+    amenities: {
+      title: "Community Amenities & Bookings",
+      eyebrow: "Facility Reservations",
+      description: "Reserve clubhouse, sports courts, pool, and community spaces with instant slot booking.",
+    },
+    maintenance: {
+      title: "Community Notices & Announcements",
+      eyebrow: "Society Communications",
+      description: "Stay informed with official circulars, maintenance notices, and society updates.",
+    },
+    complaints: {
+      title: "Complaints & Service Desk",
+      eyebrow: "Helpdesk & Maintenance",
+      description: "Raise maintenance tickets, track technician resolution status, and submit service ratings.",
+    },
+    vehicles: {
+      title: "Vehicles & Parking Allocations",
+      eyebrow: "Vehicle Registry",
+      description: "Manage registered vehicles, assigned parking slots, and parking violation notices.",
+    },
+    "domestic-staff": {
+      title: "Domestic Staff & Daily Help",
+      eyebrow: "Household Workforce",
+      description: "View assigned household staff, gate check-in status, and performance ratings.",
+    },
+    payments: {
+      title: "Maintenance Dues & Payments",
+      eyebrow: "Billing & Financial Ledger",
+      description: "Review maintenance invoices, outstanding balances, and simulated payment receipts.",
+    },
+    notifications: {
+      title: "Notifications & Alerts",
+      eyebrow: "Personal Inbox",
+      description: "Live notifications for gate arrivals, delivery drop-offs, dues, and announcements.",
+    },
+    emergency: {
+      title: "Emergency SOS & Incident Response",
+      eyebrow: "Crisis & Security Desk",
+      description: "Trigger instant panic alerts to on-duty security guards and view emergency contacts.",
+    },
+  };
+
+  const currentMeta = tabMeta[activeTab] || tabMeta.overview;
+
   return (
     <DashboardShell
-      title="Resident Self-Service Portal"
-      eyebrow="Owner & Tenant Home Console"
-      description="Manage visitor approvals, standing gate delivery rules, amenities, maintenance tickets, and simulated dues payments."
+      title={currentMeta.title}
+      eyebrow={currentMeta.eyebrow}
+      description={currentMeta.description}
       accentColor="#1D4ED8"
       headerActions={
         <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
@@ -402,7 +493,7 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
       {activeTab === "overview" && (
         <div>
           {/* REAL-TIME VISITOR APPROVAL PROMPT (Sticky Banner on Pending Visitor or Live Gate Alert) */}
-          {!visitorBannerDismissed && (pendingVisitor || visitorTimer > 0) && (
+          {!visitorBannerDismissed && pendingVisitor && (
             <div
               className="gs-card card-hover"
               style={{
@@ -439,13 +530,13 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
                     <span style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", background: "rgba(255,255,255,0.25)", padding: "0.2rem 0.6rem", borderRadius: "9999px" }}>
                       GATE APPROVAL REQUEST
                     </span>
-                    <span style={{ fontSize: "12px", color: "#93C5FD" }}>⏱️ Timeout in {visitorTimer}s</span>
+                    <span style={{ fontSize: "12px", color: "#93C5FD" }}>Awaiting your decision</span>
                   </div>
                   <h3 style={{ fontSize: "1.25rem", fontWeight: 800, marginTop: "0.25rem", color: "white" }}>
-                    {pendingVisitor ? `${pendingVisitor.visitor_name} is at Main Gate 1 for your unit` : "Robert Langdon is at Main Gate 1 for your unit"}
+                    {pendingVisitor.visitor_name} is requesting entry for your unit
                   </h3>
                   <p style={{ fontSize: "13px", color: "#DBEAFE" }}>
-                    Purpose: {pendingVisitor?.purpose || "Guest / Dinner"} · Vehicle: {pendingVisitor?.vehicle_number || "CA-9081"} · Phone: {pendingVisitor?.phone || "+1 (555) 234-5678"}
+                    Purpose: {pendingVisitor.purpose || "—"} · Vehicle: {pendingVisitor.vehicle_number || "—"} · Phone: {pendingVisitor.phone || "—"}
                   </p>
                 </div>
               </div>
@@ -455,14 +546,14 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
                   variant="outline"
                   size="sm"
                   style={{ background: "rgba(255,255,255,0.15)", color: "white", borderColor: "rgba(255,255,255,0.3)" }}
-                  onClick={() => handleVisitorDecision(pendingVisitor?.id || "sim-live-1", false)}
+                  onClick={() => handleVisitorDecision(pendingVisitor.id, false)}
                 >
                   ✕ Reject Entry
                 </BrandButton>
                 <BrandButton
                   size="sm"
                   style={{ background: "#FFFFFF", color: "#1D4ED8", fontWeight: 800 }}
-                  onClick={() => handleVisitorDecision(pendingVisitor?.id || "sim-live-1", true)}
+                  onClick={() => handleVisitorDecision(pendingVisitor.id, true)}
                 >
                   ✓ Approve Entry
                 </BrandButton>
@@ -480,34 +571,40 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
           >
             <StatMetric
               label="Outstanding Dues"
-              value={formatCurrency(stats?.pending_dues_amount ?? 350.0)}
+              value={formatCurrency(stats?.pending_dues_amount ?? 0)}
               accentColor="#D97706"
               icon="💳"
-              description="Due by Sep 15, 2026"
+              description={
+                nextDueInvoice ? `Due by ${formatDate(nextDueInvoice.due_date)}` : "No outstanding dues"
+              }
               onClick={() => router.push("/owner-tenant/payments")}
             />
             <StatMetric
               label="Open Service Tickets"
-              value={stats?.open_service_tickets ?? 2}
+              value={stats?.open_service_tickets ?? 0}
               accentColor="#DC2626"
               icon="🎫"
-              description="1 Plumbing (In Progress)"
+              description={
+                openTicket ? `${openTicket.category_name} (${openTicket.status.replace(/_/g, " ")})` : "No open tickets"
+              }
               onClick={() => router.push("/owner-tenant/complaints")}
             />
             <StatMetric
-              label="Staff On-Site"
-              value={stats?.staff_on_duty_count ?? 2}
+              label="Domestic Staff Assigned"
+              value={activeStaffCount}
               accentColor="#0D9488"
               icon="🧹"
-              description="Housekeeping (Checked In)"
+              description={activeStaffCount > 0 ? `${activeStaffCount} active assignment(s)` : "No staff assigned"}
               onClick={() => router.push("/owner-tenant/domestic-staff")}
             />
             <StatMetric
               label="Booked Amenities"
-              value={stats?.upcoming_amenity_bookings ?? 1}
+              value={stats?.upcoming_amenity_bookings ?? 0}
               accentColor="#9333EA"
               icon="🏊"
-              description="Infinity Pool (Sep 4)"
+              description={
+                nextBooking ? `${nextBooking.amenity_name} (${formatDate(nextBooking.date)})` : "No upcoming bookings"
+              }
               onClick={() => router.push("/owner-tenant/amenities")}
             />
           </div>
@@ -577,24 +674,32 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
       {activeTab === "profile" && (
         <div className="gs-card" style={{ maxWidth: 700 }}>
           <h3 className="card-h3" style={{ marginBottom: "1.5rem" }}>Resident Profile & Emergency Contacts</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "1rem", marginBottom: "1.5rem" }}>
-            <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
-              <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>Full Name</div>
-              <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>Priya & Rajesh Mehta</div>
+          {profile.isLoading ? (
+            <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>Loading profile…</p>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "1rem", marginBottom: "1.5rem" }}>
+              <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
+                <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>Full Name</div>
+                <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>{profile.data?.full_name || "—"}</div>
+              </div>
+              <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
+                <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>Registered Email</div>
+                <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>{profile.data?.email || "—"}</div>
+              </div>
+              <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
+                <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>Primary Mobile</div>
+                <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>{profile.data?.phone || "Not added"}</div>
+              </div>
+              <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
+                <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>Emergency Contact</div>
+                <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>
+                  {profile.data?.emergency_contacts?.[0]
+                    ? `${profile.data.emergency_contacts[0].name} (${profile.data.emergency_contacts[0].phone})`
+                    : "Not added"}
+                </div>
+              </div>
             </div>
-            <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
-              <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>Registered Email</div>
-              <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>resident.mehta@gatesphere.com</div>
-            </div>
-            <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
-              <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>Primary Mobile</div>
-              <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>+1 (555) 019-2834</div>
-            </div>
-            <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
-              <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>Emergency Contact</div>
-              <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>Dr. K. Mehta (+1 555-099-1234)</div>
-            </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -602,24 +707,36 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
       {activeTab === "property" && (
         <div className="gs-card" style={{ maxWidth: 750 }}>
           <h3 className="card-h3" style={{ marginBottom: "1.5rem" }}>Property & Tenancy Information</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "1rem", marginBottom: "1.5rem" }}>
-            <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
-              <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>Assigned Unit</div>
-              <div style={{ fontSize: "15px", fontWeight: 700, marginTop: "0.25rem", color: "var(--brand-primary)" }}>Unit A-402, Emerald Tower</div>
+          {profile.isLoading ? (
+            <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>Loading property details…</p>
+          ) : !myOccupancy ? (
+            <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>No active unit occupancy found for this profile.</p>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "1rem", marginBottom: "1.5rem" }}>
+              <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
+                <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>Assigned Unit</div>
+                <div style={{ fontSize: "15px", fontWeight: 700, marginTop: "0.25rem", color: "var(--brand-primary)" }}>
+                  Unit {myOccupancy.unit_number}{myOccupancy.tower_name ? `, ${myOccupancy.tower_name}` : ""}{myOccupancy.floor_number != null ? ` (Floor ${myOccupancy.floor_number})` : ""}
+                </div>
+              </div>
+              <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
+                <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>Occupancy Status</div>
+                <div style={{ marginTop: "0.25rem" }}>
+                  <StatusBadge status={myOccupancy.is_active ? "active" : "inactive"} label={myOccupancy.occupancy_role.replace(/_/g, " ")} />
+                </div>
+              </div>
+              <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
+                <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>Resident Since</div>
+                <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>{formatDate(myOccupancy.start_date)}</div>
+              </div>
+              <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
+                <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>Assigned Parking</div>
+                <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>
+                  {(vehicles.data || []).find((v) => v.slot !== "Not Allocated")?.slot || "No slot allocated"}
+                </div>
+              </div>
             </div>
-            <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
-              <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>Occupancy Status</div>
-              <div style={{ marginTop: "0.25rem" }}><StatusBadge status="active" label="Owner (Primary Resident)" /></div>
-            </div>
-            <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
-              <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>Super Built-Up Area</div>
-              <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>1,850 sq.ft (3 BHK + Balcony)</div>
-            </div>
-            <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
-              <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>Assigned Parking</div>
-              <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>Slot B1-104 (EV Ready)</div>
-            </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -784,21 +901,22 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
             <p style={{ color: "var(--brand-body)", fontSize: "14px", marginBottom: "1rem" }}>
               Configure how the Security Guard handles deliveries automatically without calling your intercom.
             </p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem" }}>
-              {[
-                { category: "Food & Groceries (Swiggy/Zomato)", current: "Allow at Gate without OTP" },
-                { category: "E-Commerce (Amazon / Flipkart)", current: "Leave at Security Reception" },
-                { category: "Valuable Goods & Electronics", current: "Require Resident Approval" },
-                { category: "Unscheduled Couriers", current: "Call Intercom First" },
-              ].map((proto, idx) => (
-                <div key={idx} style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px", border: "1px solid var(--border-light)" }}>
-                  <div style={{ fontWeight: 700, fontSize: "13.5px" }}>{proto.category}</div>
-                  <div style={{ fontSize: "12px", color: "var(--brand-primary)", marginTop: "0.25rem", fontWeight: 600 }}>
-                    Protocol: {proto.current}
+            {deliveryProtocols.isLoading ? (
+              <p style={{ color: "var(--brand-body)", fontSize: "13px" }}>Loading protocols…</p>
+            ) : (deliveryProtocols.data || []).length === 0 ? (
+              <p style={{ color: "var(--brand-body)", fontSize: "13px" }}>No delivery protocols configured for this community yet.</p>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem" }}>
+                {(deliveryProtocols.data || []).map((proto) => (
+                  <div key={proto.id} style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px", border: "1px solid var(--border-light)" }}>
+                    <div style={{ fontWeight: 700, fontSize: "13.5px", textTransform: "capitalize" }}>{proto.delivery_type}</div>
+                    <div style={{ fontSize: "12px", color: "var(--brand-primary)", marginTop: "0.25rem", fontWeight: 600 }}>
+                      Protocol: {proto.protocol_type.replace(/_/g, " ")}{proto.requires_otp ? " · OTP Required" : ""}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <DataTable
@@ -907,18 +1025,23 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
           <p style={{ color: "var(--brand-body)", marginBottom: "1.25rem", fontSize: "14px" }}>
             Scheduled maintenance affecting water, power, elevators, and clubhouse areas.
           </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-            {[
-              { title: "🚰 Overhead Water Tank Cleaning", time: "Sep 08, 2026 (10:00 AM – 02:00 PM)", desc: "Water supply to Tower A and B will be throttled for scheduled bi-annual cleaning." },
-              { title: "⚡ DG Backup Load Testing", time: "Sep 12, 2026 (02:00 PM – 03:00 PM)", desc: "15-minute switchover test for emergency generator systems." },
-            ].map((m, i) => (
-              <div key={i} style={{ padding: "1rem", background: "#F8FAFC", borderRadius: "8px", border: "1px solid var(--border-light)" }}>
-                <div style={{ fontWeight: 700, fontSize: "14px" }}>{m.title}</div>
-                <div style={{ fontSize: "12px", color: "var(--brand-primary)", fontWeight: 600, marginTop: "0.2rem" }}>{m.time}</div>
-                <p style={{ fontSize: "13px", color: "var(--brand-body)", marginTop: "0.35rem" }}>{m.desc}</p>
-              </div>
-            ))}
-          </div>
+          {announcements.isLoading ? (
+            <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>Loading notices…</p>
+          ) : (announcements.data || []).length === 0 ? (
+            <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>No community notices published yet.</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              {(announcements.data || []).map((m: any) => (
+                <div key={m.id} style={{ padding: "1rem", background: "#F8FAFC", borderRadius: "8px", border: "1px solid var(--border-light)" }}>
+                  <div style={{ fontWeight: 700, fontSize: "14px" }}>{m.title}</div>
+                  <div style={{ fontSize: "12px", color: "var(--brand-primary)", fontWeight: 600, marginTop: "0.2rem" }}>
+                    {formatDate(m.publish_at || m.created_at)}
+                  </div>
+                  <p style={{ fontSize: "13px", color: "var(--brand-body)", marginTop: "0.35rem" }}>{m.body}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -974,10 +1097,8 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
                 { key: "rfid_tag", header: "Gate FastTag / RFID" },
                 { key: "violations", header: "Recorded Violations", render: (i) => i.violations === 0 ? <StatusBadge status="active" label="0 Violations" /> : <StatusBadge status="warning" label={`${i.violations} Warning`} /> },
               ]}
-              data={[
-                { plate: "CA-992-K", make_model: "Tesla Model 3 (White)", slot: "Basement 1, Spot #B1-104", rfid_tag: "TAG-9018-ACTIVE", violations: 0 },
-                { plate: "CA-441-B", make_model: "Honda CR-V (Silver)", slot: "Basement 1, Spot #B1-105", rfid_tag: "TAG-9019-ACTIVE", violations: 0 },
-              ]}
+              data={vehicles.data || []}
+              isLoading={vehicles.isLoading}
             />
           </div>
         </div>
@@ -989,11 +1110,8 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
             <div>
               <h3 className="card-h3">Assigned Domestic Staff</h3>
-              <p style={{ color: "var(--brand-body)", fontSize: "13.5px" }}>Domestic helpers assigned to your unit with live gate attendance.</p>
+              <p style={{ color: "var(--brand-body)", fontSize: "13.5px" }}>Domestic helpers assigned to your unit. New assignments are made by your Community Admin.</p>
             </div>
-            <BrandButton size="sm" onClick={() => setAssignStaffModalOpen(true)}>
-              + Assign New Staff
-            </BrandButton>
           </div>
 
           <DataTable
@@ -1001,13 +1119,20 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
               { key: "name", header: "Staff Member", sortable: true },
               { key: "role", header: "Service Type" },
               { key: "phone", header: "Phone" },
-              { key: "police_verified", header: "Verification", render: () => <StatusBadge status="verified" label="✓ Police Verified" /> },
-              { key: "status", header: "Gate Presence Today", render: (i) => <StatusBadge status={i.status} /> },
+              {
+                key: "police_verified",
+                header: "Verification",
+                render: (i) =>
+                  i.police_verified ? (
+                    <StatusBadge status="verified" label="✓ Police Verified" />
+                  ) : (
+                    <StatusBadge status="pending" label="Verification Pending" />
+                  ),
+              },
+              { key: "is_active", header: "Assignment Status", render: (i) => <StatusBadge status={i.is_active ? "active" : "inactive"} /> },
             ]}
-            data={[
-              { name: "Anita Sharma", role: "Housekeeping & Cooking", phone: "+91 98765 43210", status: "checked_in" },
-              { name: "Ramesh Kumar", role: "Personal Driver", phone: "+91 98765 11223", status: "checked_out" },
-            ]}
+            data={domesticStaff.data || []}
+            isLoading={domesticStaff.isLoading}
           />
         </div>
       )}
@@ -1018,8 +1143,10 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
           <div className="gs-card" style={{ marginBottom: "1.5rem", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
             <div>
               <span className="eyebrow-label">BILLING SUMMARY</span>
-              <h3 className="card-h3" style={{ marginTop: "0.25rem" }}>Current Balance Due: {formatCurrency(stats?.pending_dues_amount ?? 350.0)}</h3>
-              <p style={{ fontSize: "13px", color: "var(--brand-body)" }}>Due date: September 15, 2026</p>
+              <h3 className="card-h3" style={{ marginTop: "0.25rem" }}>Current Balance Due: {formatCurrency(stats?.pending_dues_amount ?? 0)}</h3>
+              <p style={{ fontSize: "13px", color: "var(--brand-body)" }}>
+                {nextDueInvoice ? `Due date: ${formatDate(nextDueInvoice.due_date)}` : "No outstanding dues"}
+              </p>
             </div>
             <BrandButton onClick={() => {
               const inv = invoiceList.find((i) => i.status !== "paid") || invoiceList[0];
@@ -1063,22 +1190,32 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
       {/* TAB 13: NOTIFICATIONS & ALERTS */}
       {activeTab === "notifications" && (
         <div className="gs-card">
-          <h3 className="card-h3" style={{ marginBottom: "1.25rem" }}>Community Announcements & Gate Alerts</h3>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
-            {[
-              { title: "Water Supply Maintenance", time: "2 hours ago", desc: "Scheduled overhead tank cleaning from 2:00 PM to 5:00 PM tomorrow.", tag: "Notice" },
-              { title: "EV Charging Bay 4 Installed", time: "Yesterday", desc: "Basement 1 EV charging slot is now live. Reserve via amenities tab.", tag: "Amenity" },
-              { title: "Gate Delivery Drop-Off", time: "2 days ago", desc: "Amazon parcel verified by Gate 1 security guard at 11:32 AM.", tag: "Gate" },
-            ].map((n, idx) => (
-              <div key={idx} style={{ padding: "1rem", border: "1px solid var(--border-standard)", borderRadius: "8px", background: "#F8FAFC" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
-                  <h4 style={{ fontWeight: 700, fontSize: "14px", color: "var(--brand-heading)" }}>{n.title}</h4>
-                  <span style={{ fontSize: "11px", color: "var(--brand-body)" }}>{n.time}</span>
+          <h3 className="card-h3" style={{ marginBottom: "1.25rem" }}>Notifications & Gate Alerts</h3>
+          {myNotifications.isLoading ? (
+            <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>Loading notifications…</p>
+          ) : (myNotifications.data || []).length === 0 ? (
+            <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>No notifications yet.</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+              {(myNotifications.data || []).map((n) => (
+                <div
+                  key={n.id}
+                  style={{
+                    padding: "1rem",
+                    border: n.is_read ? "1px solid var(--border-standard)" : "1px solid var(--brand-primary)",
+                    borderRadius: "8px",
+                    background: n.is_read ? "#F8FAFC" : "#EFF6FF",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
+                    <h4 style={{ fontWeight: 700, fontSize: "14px", color: "var(--brand-heading)" }}>{n.title}</h4>
+                    <span style={{ fontSize: "11px", color: "var(--brand-body)" }}>{formatDate(n.created_at)}</span>
+                  </div>
+                  <p style={{ fontSize: "13px", color: "var(--brand-body)", margin: 0 }}>{n.body}</p>
                 </div>
-                <p style={{ fontSize: "13px", color: "var(--brand-body)", margin: 0 }}>{n.desc}</p>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -1096,11 +1233,13 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "0.75rem", marginBottom: "1.5rem" }}>
             <div style={{ background: "white", padding: "0.85rem", borderRadius: "8px", border: "1px solid #FCA5A5" }}>
               <div style={{ fontSize: "11px", color: "#991B1B", fontWeight: 700 }}>YOUR REGISTERED UNIT</div>
-              <div style={{ fontWeight: 800, fontSize: "15px", color: "#0F172A", marginTop: "0.2rem" }}>Unit A-402 (Emerald Tower)</div>
+              <div style={{ fontWeight: 800, fontSize: "15px", color: "#0F172A", marginTop: "0.2rem" }}>
+                {myOccupancy ? `Unit ${myOccupancy.unit_number}${myOccupancy.tower_name ? `, ${myOccupancy.tower_name}` : ""}` : "—"}
+              </div>
             </div>
             <div style={{ background: "white", padding: "0.85rem", borderRadius: "8px", border: "1px solid #FCA5A5" }}>
               <div style={{ fontSize: "11px", color: "#991B1B", fontWeight: 700 }}>GATE COMMAND DISPATCH</div>
-              <div style={{ fontWeight: 800, fontSize: "15px", color: "#0F172A", marginTop: "0.2rem" }}>Active Guard: 4 on duty</div>
+              <div style={{ fontWeight: 800, fontSize: "15px", color: "#0F172A", marginTop: "0.2rem" }}>Security control room notified instantly</div>
             </div>
           </div>
 
@@ -1403,58 +1542,6 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
               }}
             >
               Confirm Removal
-            </BrandButton>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Assign Staff Modal */}
-      <Modal
-        isOpen={assignStaffModalOpen}
-        onClose={() => setAssignStaffModalOpen(false)}
-        title="Assign Verified Community Staff"
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-          <p style={{ fontSize: "13.5px", color: "var(--brand-body)", margin: 0 }}>
-            Select from police-verified staff registered in your society roster:
-          </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-            {[
-              { name: "Suman Devi", role: "Housekeeping & Cleaning", rating: "4.9 ★", id: "STF-101" },
-              { name: "Manoj Singh", role: "Personal Driver", rating: "4.8 ★", id: "STF-102" },
-              { name: "Rekha Bai", role: "Cook & Meal Prep", rating: "5.0 ★", id: "STF-103" },
-            ].map((stf) => (
-              <div
-                key={stf.id}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: "0.75rem 1rem",
-                  border: "1px solid var(--border-standard)",
-                  borderRadius: "8px",
-                  background: "#F8FAFC",
-                }}
-              >
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: "14px" }}>{stf.name} <span style={{ color: "#0D9488", fontSize: "12px", fontWeight: 600 }}>{stf.rating}</span></div>
-                  <div style={{ fontSize: "12px", color: "var(--brand-body)" }}>{stf.role}</div>
-                </div>
-                <BrandButton
-                  size="sm"
-                  onClick={() => {
-                    setAssignStaffModalOpen(false);
-                    toast.success(`${stf.name} has been assigned to Unit A-402 with gate access.`, "Staff Assigned");
-                  }}
-                >
-                  Assign
-                </BrandButton>
-              </div>
-            ))}
-          </div>
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.5rem" }}>
-            <BrandButton variant="outline" onClick={() => setAssignStaffModalOpen(false)}>
-              Close
             </BrandButton>
           </div>
         </div>
@@ -1818,7 +1905,7 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
       >
         <div style={{ padding: "1rem 0" }}>
           <p style={{ fontSize: "14px", marginBottom: "1rem" }}>
-            Are you sure you want to trigger an emergency SOS alert? Security Guards and Supervisors will instantly be dispatched to your registered address (<strong>Unit A-402, Emerald Tower</strong>).
+            Are you sure you want to trigger an emergency SOS alert? Security Guards and Supervisors will instantly be dispatched to your registered address (<strong>{residentUnit}</strong>).
           </p>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
             <BrandButton variant="outline" onClick={() => setSosModalOpen(false)}>Cancel</BrandButton>

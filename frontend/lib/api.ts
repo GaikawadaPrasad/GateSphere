@@ -16,7 +16,7 @@ import type { Staff, StaffAssignment, StaffAttendance, StaffCreate, CheckInPaylo
 import type { Incident, IncidentAction, IncidentCreate, IncidentHistory, IncidentTransition } from "@/types/incidents";
 import type { AppNotification, NotificationPreference } from "@/types/notifications";
 
-export type { CurrentUser, GateEvent, PanicAlert, GuardRoster };
+export type { CurrentUser, GateEvent, PanicAlert, GuardRoster, ServiceTicket, ServiceCategory };
 export type NotificationItem = AppNotification;
 export type VisitorRecord = Record<string, any>;
 export type BlacklistEntry = Record<string, any>;
@@ -332,6 +332,7 @@ export const communitiesApi = {
     apiSend<Gate>("POST", `/communities/${communityId}/gates`, data),
   floors: (towerId: string) => apiGet<Floor[]>(`/communities/towers/${towerId}/floors`),
   units: (floorId: string) => apiGet<Unit[]>(`/communities/floors/${floorId}/units`),
+  communityUnits: (communityId: string) => apiGet<Unit[]>(`/communities/${communityId}/units`),
 };
 
 export const dashboardsApi = {
@@ -347,19 +348,32 @@ export const dashboardsApi = {
 
 export const gateApi = {
   events: (params?: ListQueryParams) => apiGet<GateEvent[]>("/gate/events", params as Record<string, unknown>),
-  alerts: (params?: ListQueryParams) => apiGet<PanicAlert[]>("/gate/panic-alerts", params as Record<string, unknown>),
-  rosters: (params?: ListQueryParams) => apiGet<GuardRoster[]>("/gate/guard-rosters", params as Record<string, unknown>),
-  triggerEmergency: (data: any) => apiSend<any>("POST", "/gate/alerts", data),
+  alerts: (params?: ListQueryParams) => apiGet<PanicAlert[]>("/gate/alerts", params as Record<string, unknown>),
+  rosters: (params?: ListQueryParams) => apiGet<GuardRoster[]>("/gate/rosters", params as Record<string, unknown>),
+  triggerEmergency: (data: { alert_type: string; severity?: string; gate_id?: string; message?: string }) =>
+    apiSend<any>("POST", "/gate/alerts", data),
   verifyPass: (tokenOrPin: string) => apiSend<any>("POST", "/gate/verify-pass", { token: tokenOrPin }),
   recordEntry: (data: any) => apiSend<any>("POST", "/gate/events", { ...data, event_type: "entry" }),
   recordExit: (data: any) => apiSend<any>("POST", "/gate/events", { ...data, event_type: "exit" }),
   acknowledgeAlert: (alertId: string) => apiSend<any>("POST", `/gate/alerts/${alertId}/acknowledge`),
-  resolveAlert: (alertId: string, notes?: string) => apiSend<any>("POST", `/gate/alerts/${alertId}/resolve`, { notes }),
+  resolveAlert: (alertId: string, resolutionSummary?: string) =>
+    apiSend<any>("POST", `/gate/alerts/${alertId}/resolve`, { resolution_summary: resolutionSummary }),
+  assignments: (params?: { gate_id?: string; active_only?: boolean }) =>
+    apiGet<any[]>("/gate/assignments", params as Record<string, unknown>),
+  createAssignment: (data: { guard_user_id: string; gate_id: string; roster_id?: string; assigned_from?: string; assigned_to?: string }) =>
+    apiSend<any>("POST", "/gate/assignments", data),
+  endAssignment: (assignmentId: string) =>
+    apiSend<any>("POST", `/gate/assignments/${assignmentId}/end`),
+  createRoster: (data: { guard_user_id: string; shift_date: string; shift_start: string; shift_end: string; notes?: string }) =>
+    apiSend<any>("POST", "/gate/rosters", data),
+  transitionRoster: (rosterId: string, status: string, reason?: string) =>
+    apiSend<any>("POST", `/gate/rosters/${rosterId}/status`, { status, reason }),
 };
 
 export const checkpointsApi = {
-  list: (params?: ListQueryParams) => apiGet<Record<string, unknown>[]>("/gate/events", params as Record<string, unknown>),
-  override: (data: Record<string, unknown>) => apiSend<Record<string, unknown>>("POST", "/gate/checkpoint-override", data),
+  list: (params?: ListQueryParams) => apiGet<Record<string, unknown>[]>("/gate/assignments", params as Record<string, unknown>),
+  override: (data: { gate_id: string; reason: string; reference_type?: string; reference_id?: string }) =>
+    apiSend<Record<string, unknown>>("POST", "/gate/checkpoint-override", data),
 };
 
 export const complaintsApi = {
@@ -371,10 +385,10 @@ export const complaintsApi = {
     apiGet<ServiceCategory[]>("/complaints/categories", communityId ? { community_id: communityId } : undefined),
   create: (data: any) =>
     apiSend<any>("POST", "/complaints/tickets", data),
-  assignVendor: (id: string, vendorId: string) =>
-    apiSend<any>("POST", `/complaints/tickets/${id}/assign`, { vendor_id: vendorId }),
+  assignVendor: (id: string, vendorName: string) =>
+    apiSend<any>("POST", `/complaints/tickets/${id}/assign`, { vendor_name: vendorName }),
   updateStatus: (id: string, status: string, notes?: string) =>
-    apiSend<any>("POST", `/complaints/tickets/${id}/transition`, { status, notes }),
+    apiSend<any>("POST", `/complaints/tickets/${id}/transition`, { status, remarks: notes }),
 };
 
 export const serviceRequestsApi = complaintsApi;
@@ -410,27 +424,27 @@ export const assessmentsApi = {
 
 export const communicationApi = {
   announcements: (params?: any) =>
-    apiGet<any[]>("/communications/announcements", typeof params === "string" ? { community_id: params } : (params as Record<string, unknown>)),
+    apiGet<any[]>("/communication/announcements", typeof params === "string" ? { community_id: params } : (params as Record<string, unknown>)),
   getAnnouncement: (id: string) =>
-    apiGet<any>(`/communications/announcements/${id}`),
+    apiGet<any>(`/communication/announcements/${id}`),
   createAnnouncement: (data: any, communityId?: string) =>
-    apiSend<any>("POST", "/communications/announcements", data, communityId ? { community_id: communityId } : undefined),
+    apiSend<any>("POST", "/communication/announcements", data, communityId ? { community_id: communityId } : undefined),
   publishAnnouncement: (id: string) =>
-    apiSend<any>("POST", `/communications/announcements/${id}/publish`),
+    apiSend<any>("POST", `/communication/announcements/${id}/publish`),
   expireAnnouncement: (id: string) =>
-    apiSend<any>("POST", `/communications/announcements/${id}/expire`),
+    apiSend<any>("POST", `/communication/announcements/${id}/expire`),
   polls: (communityId?: string) =>
-    apiGet<any[]>("/communications/polls", communityId ? { community_id: communityId } : undefined),
+    apiGet<any[]>("/communication/polls", communityId ? { community_id: communityId } : undefined),
   pollResults: (pollId: string) =>
-    apiGet<any>(`/communications/polls/${pollId}/results`),
+    apiGet<any>(`/communication/polls/${pollId}/results`),
   createPoll: (data: any) =>
-    apiSend<any>("POST", "/communications/polls", data),
+    apiSend<any>("POST", "/communication/polls", data),
   votePoll: (pollId: string, optionId: string) =>
-    apiSend<any>("POST", `/communications/polls/${pollId}/vote`, { option_id: optionId }),
+    apiSend<any>("POST", `/communication/polls/${pollId}/vote`, { option_id: optionId }),
   groups: (communityId?: string) =>
-    apiGet<any[]>("/communications/groups", communityId ? { community_id: communityId } : undefined),
+    apiGet<any[]>("/communication/groups", communityId ? { community_id: communityId } : undefined),
   createGroup: (data: any, communityId?: string) =>
-    apiSend<any>("POST", "/communications/groups", data, communityId ? { community_id: communityId } : undefined),
+    apiSend<any>("POST", "/communication/groups", data, communityId ? { community_id: communityId } : undefined),
 };
 
 export const auditApi = {
@@ -496,10 +510,8 @@ export const blacklistApi = {
 export const vendorTicketsApi = {
   list: (params?: ListQueryParams) => apiGet<Record<string, unknown>[]>("/complaints/tickets", params as Record<string, unknown>),
   get: (id: string) => apiGet<Record<string, unknown>>(`/complaints/tickets/${id}`),
-  updateProgress: (id: string, data: Record<string, unknown>) => apiSend<Record<string, unknown>>("POST", `/complaints/tickets/${id}/transition`, data),
-  completeWork: (id: string, data: Record<string, unknown>) => apiSend<Record<string, unknown>>("POST", `/complaints/tickets/${id}/transition`, { ...data, status: "resolved" }),
-  updateStatus: (id: string, status: string, notes?: string) => apiSend<Record<string, unknown>>("POST", `/complaints/tickets/${id}/transition`, { status, notes }),
-  submitCompletion: (id: string, data: Record<string, unknown>) => apiSend<Record<string, unknown>>("POST", `/complaints/tickets/${id}/transition`, { ...data, status: "resolved" }),
+  updateStatus: (id: string, status: string, notes?: string) => apiSend<Record<string, unknown>>("POST", `/complaints/tickets/${id}/transition`, { status, remarks: notes }),
+  submitCompletion: (id: string, notes?: string) => apiSend<Record<string, unknown>>("POST", `/complaints/tickets/${id}/transition`, { status: "resolved", remarks: notes }),
   getEntryPass: (id: string) => apiGet<Record<string, unknown>>(`/complaints/tickets/${id}/entry-pass`),
 };
 
@@ -525,9 +537,8 @@ export const facilitiesApi = {
 export const maintenanceApi = {
   list: (params?: ListQueryParams) => apiGet<any[]>("/complaints/tickets", params as Record<string, unknown>),
   get: (id: string) => apiGet<any>(`/complaints/tickets/${id}`),
-  create: (data: any) => apiSend<any>("POST", "/complaints/tickets", data),
-  assignVendor: (id: string, vendorId: string) => apiSend<any>("POST", `/complaints/tickets/${id}/assign`, { vendor_id: vendorId }),
-  updateStatus: (id: string, status: string, notes?: string) => apiSend<any>("POST", `/complaints/tickets/${id}/transition`, { status, notes }),
+  assignVendor: (id: string, vendorName: string) => apiSend<any>("POST", `/complaints/tickets/${id}/assign`, { vendor_name: vendorName }),
+  updateStatus: (id: string, status: string, notes?: string) => apiSend<any>("POST", `/complaints/tickets/${id}/transition`, { status, remarks: notes }),
 };
 
 export const vendorsApi = {
@@ -539,6 +550,7 @@ export const vendorsApi = {
 export const visitorsApi = {
   list: (params?: ListQueryParams) => apiGet<Record<string, unknown>[]>("/visitors/entries", params as Record<string, unknown>),
   requests: (params?: ListQueryParams) => apiGet<Record<string, unknown>[]>("/visitors/requests", params as Record<string, unknown>),
+  getRequest: (requestId: string) => apiGet<Record<string, unknown>>(`/visitors/requests/${requestId}`),
   createRequest: (data: Record<string, unknown>) => apiSend<Record<string, unknown>>("POST", "/visitors/requests", data),
   decideRequest: (requestId: string, decision: string, remarks?: string) =>
     apiSend<Record<string, unknown>>("POST", `/visitors/requests/${requestId}/decision`, { decision, remarks }),
@@ -546,6 +558,13 @@ export const visitorsApi = {
   reject: (requestId: string, remarks?: string) => visitorsApi.decideRequest(requestId, "rejected", remarks),
   createPass: (requestId: string, data?: Record<string, unknown>) => apiSend<Record<string, unknown>>("POST", `/visitors/requests/${requestId}/passes`, data || {}),
   entries: (params?: ListQueryParams) => apiGet<Record<string, unknown>[]>("/visitors/entries", params as Record<string, unknown>),
+  // Recording an entry (by pass_token, pin, request_id, or visitor_id) IS the pass-verification step —
+  // there is no separate /gate/verify-pass endpoint in the backend.
+  recordEntry: (data: { pass_token?: string; pin?: string; request_id?: string; visitor_id?: string; gate_id?: string; vehicle_number?: string }) =>
+    apiSend<Record<string, unknown>>("POST", "/visitors/entries", data),
+  recordExit: (entryId: string) => apiSend<Record<string, unknown>>("PATCH", `/visitors/entries/${entryId}/exit`),
+  directory: (params?: { community_id?: string; q?: string; page_size?: number }) =>
+    apiGet<Record<string, unknown>[]>("/visitors", params as Record<string, unknown>),
 };
 
 export const deliveriesApi = {
@@ -553,6 +572,10 @@ export const deliveriesApi = {
   create: (data: Record<string, unknown>) => apiSend<Record<string, unknown>>("POST", "/deliveries", data),
   protocols: () => apiGet<Record<string, unknown>[]>("/deliveries/protocols"),
   updateProtocol: (data: Record<string, unknown>) => apiSend<Record<string, unknown>>("PUT", "/deliveries/protocols", data),
+  recordArrival: (id: string, data?: { gate_id?: string; executive_name?: string; executive_phone?: string }) =>
+    apiSend<Record<string, unknown>>("POST", `/deliveries/${id}/arrival`, data || {}),
+  markDelivered: (id: string) => apiSend<Record<string, unknown>>("POST", `/deliveries/${id}/delivered`),
+  cancel: (id: string) => apiSend<Record<string, unknown>>("POST", `/deliveries/${id}/cancel`),
 };
 
 export const vehiclesApi = {
