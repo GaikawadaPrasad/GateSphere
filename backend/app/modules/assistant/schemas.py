@@ -7,10 +7,16 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class AssistantAction(BaseModel):
-    """Action button or link returned with an assistant response."""
+    """Action button or link returned with an assistant response.
+
+    `action_type="navigate"` sends the user to `url`. `action_type="action"` instead
+    re-submits `query` to the assistant in-chat — for answers (e.g. payment history)
+    that don't have a dedicated page to deep-link to.
+    """
     label: str
-    url: str
+    url: str = ""
     action_type: str = "navigate"  # navigate | action
+    query: str | None = None
 
 
 class AssistantQuickChip(BaseModel):
