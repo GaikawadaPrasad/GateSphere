@@ -1,13 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
 import { useQueryClient } from "@tanstack/react-query";
-import { gateApi } from "@/lib/api";
+import { gateApi, dashboardsApi, visitorsApi, deliveriesApi, domesticStaffApi, blacklistApi } from "@/lib/api";
+import type { SecurityStats } from "@/types/dashboards";
+import type { GuardRoster, GateEvent, PanicAlert } from "@/types/gate";
+import { formatDateTime } from "@/lib/utils";
+
+// Real backend enum (backend/app/modules/gate/models.py ALERT_TYPES)
+const EMERGENCY_TYPES = [
+  { label: "Medical Emergency", value: "medical" },
+  { label: "Fire", value: "fire" },
+  { label: "Security Breach", value: "security" },
+  { label: "Suspicious / Intrusion", value: "intrusion" },
+  { label: "Other", value: "other" },
+];
 
 export default function SecuritySupervisorDashboardPage() {
   const router = useRouter();
@@ -16,18 +28,67 @@ export default function SecuritySupervisorDashboardPage() {
 
   // Emergency Modal
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
-  const [emergencyType, setEmergencyType] = useState("Medical Emergency");
+  const [emergencyType, setEmergencyType] = useState("medical");
   const [location, setLocation] = useState("");
+
+  // Operational data
+  const [isLoading, setIsLoading] = useState(true);
+  const [securityStats, setSecurityStats] = useState<SecurityStats | null>(null);
+  const [pendingVisitorCount, setPendingVisitorCount] = useState(0);
+  const [deliveriesTodayCount, setDeliveriesTodayCount] = useState(0);
+  const [deliveriesAtGateCount, setDeliveriesAtGateCount] = useState(0);
+  const [staffInsideCount, setStaffInsideCount] = useState(0);
+  const [blacklistCount, setBlacklistCount] = useState(0);
+  const [activeRosters, setActiveRosters] = useState<GuardRoster[]>([]);
+  const [recentEvents, setRecentEvents] = useState<GateEvent[]>([]);
+  const [activeAlerts, setActiveAlerts] = useState<PanicAlert[]>([]);
+
+  const loadData = async () => {
+    setIsLoading(true);
+    const [statsRes, visitorsRes, deliveriesRes, staffRes, blacklistRes, rostersRes, eventsRes, alertsRes] = await Promise.allSettled([
+      dashboardsApi.security(),
+      visitorsApi.requests(),
+      deliveriesApi.list(),
+      domesticStaffApi.attendance({ open_only: true }),
+      blacklistApi.list(),
+      gateApi.rosters(),
+      gateApi.events({ page_size: 5 }),
+      gateApi.alerts(),
+    ]);
+    if (statsRes.status === "fulfilled") setSecurityStats(statsRes.value);
+    if (visitorsRes.status === "fulfilled") {
+      setPendingVisitorCount((visitorsRes.value || []).filter((v: any) => v.status === "pending").length);
+    }
+    if (deliveriesRes.status === "fulfilled") {
+      setDeliveriesTodayCount((deliveriesRes.value || []).length);
+      setDeliveriesAtGateCount((deliveriesRes.value || []).filter((d: any) => d.status === "at_gate").length);
+    }
+    if (staffRes.status === "fulfilled") setStaffInsideCount((staffRes.value || []).length);
+    if (blacklistRes.status === "fulfilled") setBlacklistCount((blacklistRes.value || []).filter((b: any) => b.is_active).length);
+    if (rostersRes.status === "fulfilled") setActiveRosters((rostersRes.value || []).filter((r) => r.status === "active"));
+    if (eventsRes.status === "fulfilled") setRecentEvents(eventsRes.value || []);
+    if (alertsRes.status === "fulfilled") setActiveAlerts((alertsRes.value || []).filter((a) => a.status === "active" || a.status === "acknowledged"));
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await queryClient.invalidateQueries();
-    setTimeout(() => setIsRefreshing(false), 500);
+    await loadData();
+    setIsRefreshing(false);
   };
 
   const handleTriggerEmergency = async (e: React.FormEvent) => {
     e.preventDefault();
-    await gateApi.triggerEmergency({ type: emergencyType, location: location || "Main Grounds" });
+    await gateApi.triggerEmergency({
+      alert_type: emergencyType,
+      severity: "critical",
+      message: location.trim() ? `Location: ${location.trim()}` : undefined,
+    });
     setIsEmergencyModalOpen(false);
     setLocation("");
     router.push("/security-supervisor/emergency-alerts");
@@ -61,49 +122,48 @@ export default function SecuritySupervisorDashboardPage() {
         }}
       >
         <KpiCard
-          title="Guards On Duty"
-          value="8"
-          subtext="2 Gates Covered"
+          title="Guards On Active Shift"
+          value={isLoading ? "…" : String(activeRosters.length)}
+          subtext="Currently on duty"
           icon="👮"
           onClick={() => router.push("/security-supervisor/guard-management")}
         />
         <KpiCard
           title="Live Gate Traffic"
-          value="42"
-          subtext="18 Visitors Inside"
+          value={isLoading ? "…" : String((securityStats?.visitors_inside ?? 0) + (securityStats?.vehicles_inside ?? 0))}
+          subtext={`${securityStats?.visitors_inside ?? 0} Visitors Inside`}
           icon="🛡️"
           onClick={() => router.push("/security-supervisor/gate-operations")}
         />
         <KpiCard
           title="Pending Approvals"
-          value="5"
-          subtext="Requires Resident/Supervisor Signoff"
+          value={isLoading ? "…" : String(pendingVisitorCount)}
+          subtext="Requires resident signoff"
           icon="👥"
-          trend="warning"
-          trendValue="Action Needed"
+          trend={pendingVisitorCount > 0 ? "warning" : undefined}
+          trendValue={pendingVisitorCount > 0 ? "Action Needed" : undefined}
           onClick={() => router.push("/security-supervisor/visitor-management")}
         />
         <KpiCard
           title="Deliveries Today"
-          value="24"
-          subtext="3 At Gate Desk"
+          value={isLoading ? "…" : String(deliveriesTodayCount)}
+          subtext={`${deliveriesAtGateCount} at gate desk`}
           icon="📦"
           onClick={() => router.push("/security-supervisor/delivery-management")}
         />
         <KpiCard
           title="Domestic Staff Inside"
-          value="14"
-          subtext="Active Attendance"
+          value={isLoading ? "…" : String(staffInsideCount)}
+          subtext="Open gate attendance"
           icon="👔"
           onClick={() => router.push("/security-supervisor/domestic-staff")}
         />
         <KpiCard
-          title="Blacklist Attempts"
-          value="1"
-          subtext="Blocked Today"
+          title="Active Blacklist Entries"
+          value={isLoading ? "…" : String(blacklistCount)}
+          subtext="Currently enforced"
           icon="🚫"
-          trend="danger"
-          trendValue="1 Attempted"
+          trend={blacklistCount > 0 ? "danger" : undefined}
           onClick={() => router.push("/security-supervisor/blacklist")}
         />
       </div>
@@ -169,34 +229,28 @@ export default function SecuritySupervisorDashboardPage() {
                 <thead>
                   <tr>
                     <th>Time</th>
-                    <th>Visitor / Vehicle</th>
+                    <th>Event Type</th>
                     <th>Gate</th>
-                    <th>Duty Guard</th>
-                    <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr>
-                    <td>10:20</td>
-                    <td style={{ fontWeight: 600 }}>Rohan Mehta (KA-01-MJ-4412)</td>
-                    <td>North Gate Main</td>
-                    <td>Guard Somnath</td>
-                    <td><StatusBadge status="Approved" /></td>
-                  </tr>
-                  <tr>
-                    <td>10:18</td>
-                    <td style={{ fontWeight: 600 }}>Amazon Courier (KA-05-EV-1029)</td>
-                    <td>South Service Gate</td>
-                    <td>Guard Vikram</td>
-                    <td><StatusBadge status="Approved" /></td>
-                  </tr>
-                  <tr>
-                    <td>09:50</td>
-                    <td style={{ fontWeight: 600, color: "var(--danger)" }}>Unidentified Person (BL-8809)</td>
-                    <td>North Gate Main</td>
-                    <td>Guard Somnath</td>
-                    <td><StatusBadge status="Blocked" /></td>
-                  </tr>
+                  {isLoading ? (
+                    <tr>
+                      <td colSpan={3} style={{ textAlign: "center", padding: "1.5rem" }}>Loading…</td>
+                    </tr>
+                  ) : recentEvents.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}>No recent gate events.</td>
+                    </tr>
+                  ) : (
+                    recentEvents.map((ev) => (
+                      <tr key={ev.id}>
+                        <td>{formatDateTime(ev.occurred_at)}</td>
+                        <td style={{ fontWeight: 600 }}><StatusBadge status={ev.event_type} /></td>
+                        <td>{ev.gate_id ? `Gate #${ev.gate_id.slice(0, 8)}` : "—"}</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -217,20 +271,21 @@ export default function SecuritySupervisorDashboardPage() {
               </button>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.6rem", background: "#f8fafc", borderRadius: "var(--radius-sm)" }}>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: "0.85rem" }}>Somnath Patil</div>
-                  <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Main Gate North (Morning)</div>
-                </div>
-                <StatusBadge status="Active" />
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.6rem", background: "#f8fafc", borderRadius: "var(--radius-sm)" }}>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: "0.85rem" }}>Vikram Singh</div>
-                  <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Service Gate South (Morning)</div>
-                </div>
-                <StatusBadge status="Active" />
-              </div>
+              {isLoading ? (
+                <p style={{ fontSize: "0.85rem", color: "var(--muted)" }}>Loading…</p>
+              ) : activeRosters.length === 0 ? (
+                <p style={{ fontSize: "0.85rem", color: "var(--muted)" }}>No guards currently on an active shift.</p>
+              ) : (
+                activeRosters.map((r) => (
+                  <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.6rem", background: "#f8fafc", borderRadius: "var(--radius-sm)" }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: "0.85rem" }}>{r.shift_date}</div>
+                      <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>{r.shift_start} – {r.shift_end}</div>
+                    </div>
+                    <StatusBadge status={r.status} />
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
@@ -238,21 +293,32 @@ export default function SecuritySupervisorDashboardPage() {
             <div className="card-header">
               <h3 className="card-title">🚨 Active Emergency Alerts</h3>
             </div>
-            <div
-              style={{
-                padding: "0.75rem",
-                borderRadius: "var(--radius-sm)",
-                background: "var(--danger-light)",
-                border: "1px solid var(--danger-border)",
-              }}
-            >
-              <div style={{ fontWeight: 600, fontSize: "0.85rem", color: "#991b1b" }}>
-                Medical Emergency — Tower B 12th Floor
+            {isLoading ? (
+              <p style={{ fontSize: "0.85rem", color: "var(--muted)" }}>Loading…</p>
+            ) : activeAlerts.length === 0 ? (
+              <p style={{ fontSize: "0.85rem", color: "var(--muted)" }}>No active emergency alerts.</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                {activeAlerts.map((a) => (
+                  <div
+                    key={a.id}
+                    style={{
+                      padding: "0.75rem",
+                      borderRadius: "var(--radius-sm)",
+                      background: "var(--danger-light)",
+                      border: "1px solid var(--danger-border)",
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, fontSize: "0.85rem", color: "#991b1b", textTransform: "capitalize" }}>
+                      {a.alert_type} {(a as any).message ? `— ${(a as any).message}` : ""}
+                    </div>
+                    <div style={{ fontSize: "0.75rem", color: "#b91c1c", marginTop: "0.25rem", textTransform: "capitalize" }}>
+                      Status: {a.status}
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div style={{ fontSize: "0.75rem", color: "#b91c1c", marginTop: "0.25rem" }}>
-                Reported by Mrs. Kapoor. Responder: Supervisor Devraj (Acknowledged).
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
@@ -297,11 +363,9 @@ export default function SecuritySupervisorDashboardPage() {
               value={emergencyType}
               onChange={(e) => setEmergencyType(e.target.value)}
             >
-              <option value="Medical Emergency">Medical Emergency</option>
-              <option value="Fire Breakout">Fire Breakout</option>
-              <option value="Security Breach">Security Breach</option>
-              <option value="Suspicious Visitor">Suspicious Visitor</option>
-              <option value="Theft Alert">Theft Alert</option>
+              {EMERGENCY_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
             </select>
           </div>
 

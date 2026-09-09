@@ -50,11 +50,11 @@ export function ActivityFeed({ events, alerts, isLoading }: ActivityFeedProps) {
               <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
                 <span style={{ fontSize: "1.1rem" }}>🚨</span>
                 <div>
-                  <div style={{ fontWeight: 600, color: "#991b1b", fontSize: "0.85rem" }}>
-                    Panic Alert Raised {alert.unit_number ? `at Unit ${alert.unit_number}` : ""}
+                  <div style={{ fontWeight: 600, color: "#991b1b", fontSize: "0.85rem", textTransform: "capitalize" }}>
+                    {alert.alert_type} Alert{alert.message ? ` — ${alert.message}` : ""}
                   </div>
                   <div style={{ fontSize: "0.75rem", color: "#b91c1c" }}>
-                    {alert.user_name || "Resident"} · {formatRelativeTime(alert.created_at)}
+                    {formatRelativeTime(alert.created_at)}
                   </div>
                 </div>
               </div>
@@ -84,9 +84,8 @@ export function ActivityFeed({ events, alerts, isLoading }: ActivityFeedProps) {
                       : "👷"}
                 </span>
                 <div>
-                  <div style={{ fontWeight: 500, color: "var(--fg)" }}>
-                    {evt.entity_name || "Visitor"} (
-                    {evt.event_type.replace(/_/g, " ")})
+                  <div style={{ fontWeight: 500, color: "var(--fg)", textTransform: "capitalize" }}>
+                    {evt.event_type.replace(/_/g, " ")}
                   </div>
                   <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
                     {formatRelativeTime(evt.occurred_at)}

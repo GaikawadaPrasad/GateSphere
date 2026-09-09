@@ -100,9 +100,9 @@ export default function Footer() {
             <ul className="space-y-2 text-[13px]">
               {[
                 { label: "About GateSphere", href: "/about" },
+                { label: "Platform Architecture", href: "/platform" },
                 { label: "Security & Privacy", href: "/security" },
-                { label: "Book a Live Demo", href: "/demo" },
-                { label: "Member Login", href: "/login" },
+                { label: "Contact Us", href: "/demo" },
               ].map((item) => (
                 <li key={item.label}>
                   <Link
@@ -144,12 +144,17 @@ export default function Footer() {
                 </div>
                 <span>+91 98765 43210</span>
               </a>
-              <div className="flex items-start gap-2.5 text-slate-400">
-                <div className="w-7 h-7 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-slate-300 mt-0.5">
+              <a
+                href="https://maps.google.com/?q=Prestige+Tech+Park+Outer+Ring+Road+Bengaluru"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-start gap-2.5 hover:text-cyan-400 transition-colors cursor-pointer group"
+              >
+                <div className="w-7 h-7 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-slate-300 mt-0.5 group-hover:border-cyan-400/50">
                   📍
                 </div>
                 <span className="leading-snug">Prestige Tech Park, Outer Ring Road, Bengaluru, Karnataka</span>
-              </div>
+              </a>
             </div>
           </div>
 
@@ -160,7 +165,7 @@ export default function Footer() {
               className="inline-flex items-center justify-center px-4 py-2.5 rounded-full text-[12px] font-bold uppercase tracking-wider text-white bg-gradient-to-r from-red-600 to-rose-500 hover:from-red-500 hover:to-rose-400 transition-all shadow-lg shadow-red-500/25 whitespace-nowrap cursor-pointer hover:scale-105"
               style={{ fontFamily: "'Outfit', sans-serif" }}
             >
-              Book Demo
+              Contact Us
             </Link>
           </div>
         </div>
@@ -253,7 +258,7 @@ export default function Footer() {
             <span className="text-slate-700">·</span>
             <Link href="/about" className="text-slate-400 hover:text-white transition-colors cursor-pointer">About</Link>
             <span className="text-slate-700">·</span>
-            <Link href="/demo" className="text-slate-400 hover:text-white transition-colors cursor-pointer">Demo</Link>
+            <Link href="/demo" className="text-slate-400 hover:text-white transition-colors cursor-pointer">Contact Us</Link>
           </div>
 
           <div className="flex items-center gap-1.5 text-slate-400">

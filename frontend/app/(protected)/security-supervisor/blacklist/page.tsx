@@ -32,23 +32,22 @@ export default function SecuritySupervisorBlacklistPage() {
 
   const handleAddBlacklist = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !reason.trim()) return;
-    await blacklistApi.add({
-      name,
-      phone,
-      vehicle_number: vehicleNumber,
-      reason,
-      added_by: "Supervisor Devraj",
-      date_added: new Date().toISOString().split("T")[0],
-      attempts_count: 0,
-      status: "Active",
-    });
-    setIsAddModalOpen(false);
-    setName("");
-    setPhone("");
-    setVehicleNumber("");
-    setReason("");
-    loadData();
+    if (!phone.trim() || !reason.trim()) return;
+    try {
+      await blacklistApi.add({
+        phone: phone.trim(),
+        reason: `${name.trim() ? name.trim() + ": " : ""}${reason.trim()}${vehicleNumber ? " (Vehicle: " + vehicleNumber + ")" : ""}`,
+        risk_level: "high",
+      });
+      setIsAddModalOpen(false);
+      setName("");
+      setPhone("");
+      setVehicleNumber("");
+      setReason("");
+      loadData();
+    } catch (err: any) {
+      alert(err?.message || "Failed to add to blacklist.");
+    }
   };
 
   const filteredBlacklist = blacklist.filter((b) => {

@@ -6,7 +6,12 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { vendorTicketsApi, type VendorTicket } from "@/lib/api";
 
-const PROGRESSION_STEPS = ["Assigned", "Accepted", "On The Way", "Arrived", "In Progress", "Work Completed"];
+const PROGRESSION_STEPS = [
+  { key: "assigned", label: "Assigned" },
+  { key: "acknowledged", label: "Accepted" },
+  { key: "in_progress", label: "In Progress" },
+  { key: "resolved", label: "Completed" },
+];
 
 export default function VendorWorkProgressPage() {
   const router = useRouter();
@@ -16,53 +21,73 @@ export default function VendorWorkProgressPage() {
 
   const loadData = async () => {
     setIsLoading(true);
-    const data = await vendorTicketsApi.list();
-    setTickets(data);
-    setIsLoading(false);
+    try {
+      const data = await vendorTicketsApi.list();
+      setTickets(
+        (data || []).map((t: any) => ({
+          id: t.id,
+          ticket_number: t.ticket_number || `TKT-${t.id.slice(0, 6).toUpperCase()}`,
+          title: t.subject || "Service Ticket",
+          facility: t.vendor_name || "Community Grounds",
+          location: t.description || "Community Facility",
+          status: t.status || "created",
+        }))
+      );
+    } catch {
+      setTickets([]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
     loadData();
   }, []);
 
-  const handleProgressStep = async (ticketId: string, currentStatus: string, nextStatus: string) => {
-    const currIdx = PROGRESSION_STEPS.indexOf(currentStatus);
-    const nextIdx = PROGRESSION_STEPS.indexOf(nextStatus);
+  const handleProgressStep = async (ticketId: string, nextStatus: string, remarksText?: string) => {
+    try {
+      await vendorTicketsApi.updateStatus(ticketId, nextStatus, remarksText || `Updated by technician to ${nextStatus}`);
+      setTickets((prev) => prev.map((t) => (t.id === ticketId ? { ...t, status: nextStatus as any } : t)));
+      setFeedback({ id: ticketId, msg: `Job successfully updated to: ${nextStatus.replace(/_/g, " ").toUpperCase()}`, type: "success" });
 
-    if (nextIdx !== currIdx + 1 && !(currIdx === -1 && nextIdx === 1)) {
-      setFeedback({ id: ticketId, msg: `Invalid status jump from ${currentStatus} to ${nextStatus}`, type: "error" });
-      return;
+      if (nextStatus === "resolved") {
+        setTimeout(() => router.push("/vendor-technician/service-history"), 1000);
+      }
+    } catch (err: any) {
+      setFeedback({ id: ticketId, msg: err?.message || `Failed to transition status to ${nextStatus}`, type: "error" });
     }
+  };
 
-    await vendorTicketsApi.updateStatus(ticketId, nextStatus);
-    setTickets((prev) => prev.map((t) => (t.id === ticketId ? { ...t, status: nextStatus as any } : t)));
-    setFeedback({ id: ticketId, msg: `Status updated to: ${nextStatus}`, type: "success" });
-
-    if (nextStatus === "Work Completed") {
-      setTimeout(() => router.push("/vendor-technician/work-completion"), 800);
-    }
+  const getStepIndex = (status: string) => {
+    if (status === "created" || status === "assigned") return 0;
+    if (status === "acknowledged") return 1;
+    if (status === "in_progress") return 2;
+    if (status === "resolved" || status === "resident_confirmation" || status === "closed") return 3;
+    return 0;
   };
 
   return (
     <div>
       <PageHeader
         title="Work Status Progression"
-        subtitle="Update step-by-step job status (Accepted -> On The Way -> Arrived -> In Progress -> Work Completed)"
+        subtitle="Update step-by-step job status (Assigned -> Accepted -> In Progress -> Work Completed)"
         breadcrumbs={[{ label: "GateSphere" }, { label: "Vendor" }, { label: "Work Progress" }]}
       />
 
       <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
         {isLoading ? (
           <div className="card" style={{ textAlign: "center", padding: "2rem" }}>
-            Loading active jobs…
+            Loading active jobs from backend…
           </div>
         ) : tickets.length === 0 ? (
           <div className="card" style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
-            No active jobs to progress.
+            No service jobs found.
           </div>
         ) : (
           tickets.map((t) => {
-            const currentIdx = PROGRESSION_STEPS.indexOf(t.status);
+            const currentIdx = getStepIndex(t.status);
+            const isCompleted = t.status === "resolved" || t.status === "resident_confirmation" || t.status === "closed";
+
             return (
               <div key={t.id} className="card" style={{ border: "1px solid var(--border)" }}>
                 <div className="card-header">
@@ -74,7 +99,7 @@ export default function VendorWorkProgressPage() {
                       {t.facility} — {t.location}
                     </p>
                   </div>
-                  <StatusBadge status={t.status} />
+                  <StatusBadge status={(t.status || "created").replace(/_/g, " ").toUpperCase()} />
                 </div>
 
                 {/* Step Progression Visual Bar */}
@@ -87,13 +112,13 @@ export default function VendorWorkProgressPage() {
                     padding: "0 0.5rem",
                   }}
                 >
-                  {PROGRESSION_STEPS.slice(1).map((step, idx) => {
+                  {PROGRESSION_STEPS.map((step, idx) => {
                     const stepNum = idx + 1;
-                    const isPassed = currentIdx >= stepNum;
-                    const isCurrent = currentIdx === stepNum;
+                    const isPassed = currentIdx >= idx;
+                    const isCurrent = currentIdx === idx;
                     return (
                       <div
-                        key={step}
+                        key={step.key}
                         style={{
                           display: "flex",
                           flexDirection: "column",
@@ -128,7 +153,7 @@ export default function VendorWorkProgressPage() {
                             textAlign: "center",
                           }}
                         >
-                          {step}
+                          {step.label}
                         </div>
                       </div>
                     );
@@ -154,55 +179,51 @@ export default function VendorWorkProgressPage() {
                 )}
 
                 {/* Progression Actions */}
-                <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-                  {t.status === "Assigned" && (
+                <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
+                  {(t.status === "assigned" || t.status === "created") && (
                     <button
                       className="btn btn-primary"
-                      onClick={() => handleProgressStep(t.id, t.status, "Accepted")}
+                      onClick={() => handleProgressStep(t.id, "acknowledged", "Accepted by Technician")}
                     >
-                      Step 1: Accept Work
+                      Step 1: Accept Work Order
                     </button>
                   )}
-                  {t.status === "Accepted" && (
+                  {t.status === "acknowledged" && (
                     <button
                       className="btn btn-primary"
-                      onClick={() => handleProgressStep(t.id, t.status, "On The Way")}
+                      onClick={() => handleProgressStep(t.id, "in_progress", "Technician started work on site")}
                     >
-                      Step 2: Mark On The Way
+                      Step 2: Start Work On Site
                     </button>
                   )}
-                  {t.status === "On The Way" && (
-                    <button
-                      className="btn btn-primary"
-                      onClick={() => handleProgressStep(t.id, t.status, "Arrived")}
-                    >
-                      Step 3: Mark Arrived at Gate
-                    </button>
+                  {t.status === "in_progress" && (
+                    <>
+                      <button
+                        className="btn btn-primary"
+                        onClick={() => router.push(`/vendor-technician/work-completion?ticketId=${t.id}`)}
+                      >
+                        Step 3: Submit Completion Report
+                      </button>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => handleProgressStep(t.id, "resolved", "Work completed and tested on site")}
+                      >
+                        Quick Complete
+                      </button>
+                    </>
                   )}
-                  {t.status === "Arrived" && (
-                    <button
-                      className="btn btn-primary"
-                      onClick={() => handleProgressStep(t.id, t.status, "In Progress")}
-                    >
-                      Step 4: Start Work
-                    </button>
+                  {isCompleted && (
+                    <span style={{ fontSize: "0.85rem", color: "var(--success)", fontWeight: 600 }}>
+                      ✓ Work Completed & Submitted for Final Signoff
+                    </span>
                   )}
-                  {t.status === "In Progress" && (
-                    <button
-                      className="btn btn-primary"
-                      onClick={() => handleProgressStep(t.id, t.status, "Work Completed")}
-                    >
-                      Step 5: Mark Work Completed
-                    </button>
-                  )}
-                  {t.status === "Work Completed" && (
-                    <button
-                      className="btn btn-secondary"
-                      onClick={() => router.push("/vendor-technician/work-completion")}
-                    >
-                      Submit Completion Proof
-                    </button>
-                  )}
+
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => router.push("/vendor-technician/entry-pass")}
+                  >
+                    🪪 Digital Gate Pass
+                  </button>
                 </div>
               </div>
             );

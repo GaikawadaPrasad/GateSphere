@@ -1,21 +1,71 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
+import { complaintsApi, authApi, type CurrentUser } from "@/lib/api";
 
 export default function VendorDashboardPage() {
   const router = useRouter();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isPassModalOpen, setIsPassModalOpen] = useState(false);
+  const [tickets, setTickets] = useState<any[]>([]);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const loadData = async () => {
+    setIsLoading(true);
+    try {
+      const [ticketsRes, meRes] = await Promise.allSettled([
+        complaintsApi.tickets({ page_size: 50 }),
+        authApi.me("vendor_technician"),
+      ]);
+
+      if (ticketsRes.status === "fulfilled" && Array.isArray(ticketsRes.value)) {
+        setTickets(ticketsRes.value);
+      } else {
+        setTickets([]);
+      }
+
+      if (meRes.status === "fulfilled" && meRes.value) {
+        setCurrentUser(meRes.value);
+      }
+    } catch {
+      setTickets([]);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const handleRefresh = () => {
     setIsRefreshing(true);
-    setTimeout(() => setIsRefreshing(false), 500);
+    loadData();
   };
+
+  const assignedTickets = tickets.filter(
+    (t) => t.status === "assigned" || t.status === "acknowledged" || t.status === "created"
+  );
+  const inProgressTickets = tickets.filter((t) => t.status === "in_progress");
+  const completedTickets = tickets.filter(
+    (t) => t.status === "resolved" || t.status === "resident_confirmation" || t.status === "closed"
+  );
+
+  const activeJob = inProgressTickets[0] || assignedTickets[0] || null;
+  const passCode = activeJob
+    ? `PASS-${(activeJob.ticket_number || activeJob.id.slice(0, 6)).toUpperCase()}`
+    : "NO-ACTIVE-JOB";
+
+  const highPriorityCount = assignedTickets.filter(
+    (t) => t.priority === "high" || t.priority === "critical"
+  ).length;
 
   return (
     <div>
@@ -46,31 +96,31 @@ export default function VendorDashboardPage() {
       >
         <KpiCard
           title="Assigned Tickets"
-          value="2"
-          subtext="1 High Priority"
+          value={isLoading ? "…" : String(assignedTickets.length)}
+          subtext={`${highPriorityCount} High / Critical`}
           icon="🎫"
           onClick={() => router.push("/vendor-technician/assigned-tickets")}
         />
         <KpiCard
           title="Jobs In Progress"
-          value="1"
-          subtext="Swimming Pool Pump"
+          value={isLoading ? "…" : String(inProgressTickets.length)}
+          subtext={inProgressTickets[0]?.subject || (inProgressTickets.length === 0 ? "None active" : "Multiple active")}
           icon="⏳"
-          trend="primary"
-          trendValue="Active Now"
+          trend={inProgressTickets.length > 0 ? "primary" : undefined}
+          trendValue={inProgressTickets.length > 0 ? "Active Now" : "Idle"}
           onClick={() => router.push("/vendor-technician/work-progress")}
         />
         <KpiCard
           title="Active Gate Pass"
-          value="PASS-VEN-8812"
-          subtext="Valid for North Gate"
+          value={activeJob ? passCode : "None"}
+          subtext={activeJob ? `Valid for ${activeJob.ticket_number || "Active Job"}` : "No pass generated"}
           icon="🪪"
           onClick={() => router.push("/vendor-technician/entry-pass")}
         />
         <KpiCard
           title="Completed Jobs"
-          value="45"
-          subtext="Lifetime Approved"
+          value={isLoading ? "…" : String(completedTickets.length)}
+          subtext="Resolved & Signed Off"
           icon="✅"
           onClick={() => router.push("/vendor-technician/service-history")}
         />
@@ -107,7 +157,7 @@ export default function VendorDashboardPage() {
         </div>
       </div>
 
-      {/* Main Grid matching Super Admin */}
+      {/* Main Grid */}
       <div
         style={{
           display: "grid",
@@ -120,13 +170,13 @@ export default function VendorDashboardPage() {
         <div style={{ minWidth: 0 }}>
           <div className="card">
             <div className="card-header">
-              <h3 className="card-title">Today&apos;s Assigned Service Tickets</h3>
+              <h3 className="card-title">Assigned Service Tickets</h3>
               <button
                 className="btn btn-secondary"
                 style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
                 onClick={() => router.push("/vendor-technician/assigned-tickets")}
               >
-                View Tickets
+                View All
               </button>
             </div>
             <div className="table-container">
@@ -135,33 +185,44 @@ export default function VendorDashboardPage() {
                   <tr>
                     <th>Ticket #</th>
                     <th>Task Summary</th>
-                    <th>Facility Location</th>
                     <th>Priority</th>
                     <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr>
-                    <td style={{ fontWeight: 600 }}>VT-901</td>
-                    <td style={{ fontWeight: 500, color: "var(--fg)" }}>Swimming Pool Pump Replacement</td>
-                    <td>Olympic Swimming Pool</td>
-                    <td><StatusBadge status="High" /></td>
-                    <td><StatusBadge status="In Progress" /></td>
-                  </tr>
-                  <tr>
-                    <td style={{ fontWeight: 600 }}>VT-902</td>
-                    <td style={{ fontWeight: 500, color: "var(--fg)" }}>Elevator B3 Sensor Error Code E-409</td>
-                    <td>Tower B Shaft B3</td>
-                    <td><StatusBadge status="Emergency" /></td>
-                    <td><StatusBadge status="Assigned" /></td>
-                  </tr>
+                  {isLoading ? (
+                    <tr>
+                      <td colSpan={4} style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}>
+                        Loading tickets from backend…
+                      </td>
+                    </tr>
+                  ) : tickets.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}>
+                        No service tickets assigned at present.
+                      </td>
+                    </tr>
+                  ) : (
+                    tickets.slice(0, 5).map((t) => (
+                      <tr key={t.id} style={{ cursor: "pointer" }} onClick={() => router.push("/vendor-technician/work-progress")}>
+                        <td style={{ fontWeight: 600, fontFamily: "monospace" }}>{t.ticket_number || `TKT-${t.id.slice(0, 6)}`}</td>
+                        <td style={{ fontWeight: 500, color: "var(--fg)" }}>{t.subject || "Service Ticket"}</td>
+                        <td>
+                          <StatusBadge status={(t.priority || "medium").toUpperCase()} />
+                        </td>
+                        <td>
+                          <StatusBadge status={(t.status || "created").replace(/_/g, " ").toUpperCase()} />
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
         </div>
 
-        {/* Right Side: Active Entry Pass QR Card & SLA Countdown */}
+        {/* Right Side: Active Entry Pass QR Card */}
         <div style={{ maxWidth: 460, width: "100%" }}>
           <div
             className="card"
@@ -173,13 +234,13 @@ export default function VendorDashboardPage() {
           >
             <div className="card-header" style={{ borderBottom: "1px solid #1e293b" }}>
               <h3 className="card-title" style={{ color: "white" }}>🪪 Active Gate Entry Pass</h3>
-              <StatusBadge status="Active" />
+              <StatusBadge status={activeJob ? "Active" : "Inactive"} />
             </div>
 
             <div style={{ textAlign: "center", padding: "1rem 0" }}>
               <div style={{ fontSize: "0.75rem", color: "#94a3b8", textTransform: "uppercase" }}>Pass Code</div>
               <div style={{ fontSize: "1.5rem", fontWeight: 700, fontFamily: "monospace", color: "#60a5fa" }}>
-                PASS-VEN-8812
+                {passCode}
               </div>
               <div
                 style={{
@@ -195,12 +256,24 @@ export default function VendorDashboardPage() {
                   fontSize: "0.75rem",
                   color: "#0f172a",
                   fontWeight: 700,
+                  textAlign: "center",
                 }}
               >
-                [ QR CODE PASS ]
+                {activeJob ? (
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                    <span style={{ fontSize: "1.8rem" }}>📱</span>
+                    <span style={{ fontSize: "0.65rem", fontFamily: "monospace", marginTop: "4px" }}>
+                      {activeJob.ticket_number || "QR PASS"}
+                    </span>
+                  </div>
+                ) : (
+                  <span style={{ color: "#94a3b8" }}>No active job</span>
+                )}
               </div>
               <div style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>
-                Show this QR at Security Gate North for instant verification
+                {activeJob
+                  ? `Show at Security Gate for service on ticket ${activeJob.ticket_number || activeJob.id.slice(0, 6)}`
+                  : "Pass generates automatically when a service ticket is assigned"}
               </div>
             </div>
           </div>
@@ -221,13 +294,16 @@ export default function VendorDashboardPage() {
         <div style={{ textAlign: "center", padding: "1rem 0" }}>
           <div style={{ fontSize: "0.85rem", color: "var(--muted)" }}>Authorized Vendor Technician</div>
           <div style={{ fontSize: "1.2rem", fontWeight: 700, color: "var(--fg)" }}>
-            Alexander Wright (Apex Water)
+            {currentUser?.full_name || "Vendor Technician"}
           </div>
-          <div style={{ fontSize: "1.4rem", fontWeight: 700, fontFamily: "monospace", color: "var(--primary)", marginTop: "0.5rem" }}>
-            PASS-VEN-8812
+          <div style={{ fontSize: "0.85rem", color: "var(--muted)", marginTop: "0.25rem" }}>
+            {currentUser?.email || "technician@gatesphere.com"}
           </div>
-          <div style={{ fontSize: "0.8rem", color: "var(--success)", fontWeight: 600, marginTop: "0.2rem" }}>
-            ● Valid Today 08:00 - 20:00
+          <div style={{ fontSize: "1.4rem", fontWeight: 700, fontFamily: "monospace", color: "var(--primary)", marginTop: "0.75rem" }}>
+            {passCode}
+          </div>
+          <div style={{ fontSize: "0.8rem", color: activeJob ? "var(--success)" : "var(--muted)", fontWeight: 600, marginTop: "0.2rem" }}>
+            {activeJob ? "● Valid Today — Single Work Entry" : "○ Inactive — No Active Job"}
           </div>
         </div>
       </Modal>

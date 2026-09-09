@@ -40,31 +40,29 @@ export default function GateTrafficPage() {
       render: (item) => <StatusBadge status={item.event_type} />,
     },
     {
-      key: "entity_name",
-      header: "Entity / Subject",
-      render: (item) => item.entity_name || `${item.entity_type} (#${item.entity_id.slice(0, 8)})`,
+      key: "reference_type",
+      header: "Reference",
+      render: (item) =>
+        item.reference_type
+          ? `${item.reference_type.replace(/_/g, " ")} (#${(item.reference_id || "").slice(0, 8)})`
+          : "—",
     },
     {
       key: "gate_id",
       header: "Gate",
-      render: (item) => `Gate #${item.gate_id.slice(0, 8)}`,
+      render: (item) => (item.gate_id ? `Gate #${item.gate_id.slice(0, 8)}` : "—"),
     },
   ];
 
   const rosterColumns: Column<GuardRoster>[] = [
     {
-      key: "guard_name",
-      header: "Guard Name",
-      render: (item) => item.guard_name || "Assigned Guard",
-    },
-    {
-      key: "shift_name",
-      header: "Shift",
+      key: "shift_date",
+      header: "Shift Date",
     },
     {
       key: "time",
       header: "Shift Timing",
-      render: (item) => `${item.start_time} - ${item.end_time}`,
+      render: (item) => `${item.shift_start} - ${item.shift_end}`,
     },
     {
       key: "status",
@@ -125,8 +123,8 @@ export default function GateTrafficPage() {
                 }}
               >
                 <div>
-                  <span style={{ fontWeight: 600, color: "#991b1b" }}>
-                    {a.user_name || "Resident"} ({a.unit_number ? `Unit ${a.unit_number}` : "Community Grounds"})
+                  <span style={{ fontWeight: 600, color: "#991b1b", textTransform: "capitalize" }}>
+                    {a.alert_type} {(a as any).message ? `— ${(a as any).message}` : ""}
                   </span>
                   <span style={{ fontSize: "0.75rem", color: "var(--muted)", marginLeft: "0.75rem" }}>
                     {formatDateTime(a.created_at)}

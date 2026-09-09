@@ -90,11 +90,11 @@ export default function Header() {
             </Link>
           </div>
 
-          {/* ── RIGHT: Search Icon & Action Buttons ── */}
-          <div className="flex items-center gap-3 sm:gap-4">
+          {/* ── RIGHT: Minimal Search Icon & Sign In Button ── */}
+          <div className="flex items-center gap-3">
             <button
               onClick={() => setSearchOpen(true)}
-              className="w-9 h-9 rounded-full flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 transition-all cursor-pointer bg-transparent border-0"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 transition-all cursor-pointer bg-transparent border-0"
               title="Search"
               aria-label="Search"
             >
@@ -112,18 +112,14 @@ export default function Header() {
               </svg>
             </button>
 
-            {/* Quick Demo & Login CTA */}
             <Link
               href="/login"
-              className="hidden sm:inline-flex items-center text-xs font-semibold text-white/80 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors"
+              className="px-3.5 py-1.5 rounded-full text-[12.5px] font-semibold text-white/90 hover:text-white bg-white/10 hover:bg-white/20 border border-white/15 transition-all shadow-xs flex items-center gap-1.5"
             >
-              Sign In
-            </Link>
-            <Link
-              href="/demo"
-              className="inline-flex items-center justify-center px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-500 hover:to-sky-400 shadow-md shadow-blue-500/20 hover:scale-105 transition-all"
-            >
-              Book Demo
+              <span>Sign In</span>
+              <svg className="w-3 h-3 text-white/70" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M6 4l4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </Link>
           </div>
         </div>
@@ -209,7 +205,7 @@ export default function Header() {
                 onClick={() => setMenuOpen(false)}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-sky-500 text-white font-bold text-sm shadow-lg shadow-blue-500/25 hover:opacity-95 transition"
               >
-                <span>Book a Live Demo</span>
+                <span>Contact Us</span>
                 <span>→</span>
               </Link>
               <Link
@@ -219,7 +215,7 @@ export default function Header() {
               >
                 Sign In to Your Account
               </Link>
-              <p className="text-center text-xs text-slate-500 mt-2">
+              <p className="text-center text-xs text-slate-500 mt-1">
                 Empowering 500+ residential communities worldwide.
               </p>
             </div>

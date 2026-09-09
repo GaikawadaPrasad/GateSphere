@@ -49,7 +49,7 @@ export default function RequestDemo() {
                 className="text-[11px] font-bold tracking-wider text-blue-900 uppercase"
                 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
               >
-                Request a Live Demo
+                Contact us
               </span>
             </div>
 
@@ -146,7 +146,7 @@ export default function RequestDemo() {
                       className="text-[20px] font-extrabold text-slate-950 tracking-tight"
                       style={{ fontFamily: "'Outfit', sans-serif" }}
                     >
-                      Book Your Society Demo
+                      Contact us
                     </h3>
                     <p className="text-[12.5px] text-slate-500 font-normal">
                       Fill in your details for a tailored 1-on-1 walkthrough.
@@ -271,7 +271,7 @@ export default function RequestDemo() {
                     type="submit"
                     className="w-full flex items-center justify-center gap-2 py-3 px-6 rounded-xl text-[14.5px] font-extrabold text-white bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 hover:from-blue-800 hover:to-indigo-800 shadow-lg shadow-blue-500/20 active:scale-[0.99] transition-all cursor-pointer mt-2"
                   >
-                    Schedule Live Demo
+                    Submit
                     <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2">
                       <path d="M3 8h10M9 4l4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>

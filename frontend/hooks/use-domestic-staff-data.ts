@@ -68,7 +68,7 @@ export function useStaffProfile() {
         emergency_contact: res.emergency_address || "None specified",
         service_type: res.staff_type ? `${res.staff_type.toUpperCase()} Services` : "General Help",
         police_verified: res.police_verification_status === "verified",
-        verification_id: res.id_type ? `${res.id_type.toUpperCase()}` : "POL-VER-2026",
+        verification_id: res.id_type ? `${res.id_type.toUpperCase()}` : "",
         rating: Number(res.rating_avg ?? 5.0),
         total_ratings: Number(res.ratings_count ?? 0),
         active: res.is_active ?? true,

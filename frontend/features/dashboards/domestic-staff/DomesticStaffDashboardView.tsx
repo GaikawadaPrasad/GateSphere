@@ -20,6 +20,7 @@ import {
   AttendanceRecord,
   StaffVisit,
 } from "@/hooks/use-domestic-staff-data";
+import { useMyNotifications } from "@/hooks/use-notifications";
 import { useTableControls } from "@/hooks/use-table-controls";
 import { formatDate } from "@/lib/utils";
 
@@ -45,8 +46,8 @@ export function DomesticStaffDashboardView({ initialTab = "overview" }: Domestic
   const activeTab = initialTab;
   const [sosModalOpen, setSosModalOpen] = useState(false);
   const [editProfileOpen, setEditProfileOpen] = useState(false);
-  const [phoneInput, setPhoneInput] = useState("+91 98765 43210");
-  const [emergencyInput, setEmergencyInput] = useState("+91 98765 00000 (Spouse)");
+  const [phoneInput, setPhoneInput] = useState("");
+  const [emergencyInput, setEmergencyInput] = useState("");
 
   const { data: profile, isLoading: profileLoading } = useStaffProfile();
   const { data: homes = [], isLoading: homesLoading } = useAssignedHomes();
@@ -54,6 +55,10 @@ export function DomesticStaffDashboardView({ initialTab = "overview" }: Domestic
   const { data: visits = [], isLoading: visitsLoading } = useStaffVisits();
   const updateProfile = useUpdateStaffProfile();
   const panicMutation = useSendStaffPanic();
+  const myNotifications = useMyNotifications({ page_size: 20 });
+
+  const openAttendance = attendance.find((a) => a.status === "open");
+  const activeHome = homes[0];
 
   const homeControls = useTableControls<AssignedHome>({
     data: homes,
@@ -75,11 +80,12 @@ export function DomesticStaffDashboardView({ initialTab = "overview" }: Domestic
 
   const handleTriggerPanic = async () => {
     try {
+      const location = activeHome ? `${activeHome.unit_number}, ${activeHome.tower_name}` : "Domestic staff location unavailable";
       await panicMutation.mutateAsync({
-        location: "Unit A-402, Emerald Tower",
+        location,
         note: "Emergency SOS triggered by domestic staff",
       });
-      toast.success("Security Guards & Supervisors have been dispatched to Unit A-402.", "🚨 Emergency SOS Dispatched");
+      toast.success(`Security Guards & Supervisors have been dispatched to ${location}.`, "🚨 Emergency SOS Dispatched");
       setSosModalOpen(false);
     } catch {
       toast.success("Emergency SOS alert recorded and sent to security console.", "🚨 SOS Alert Sent");
@@ -102,11 +108,64 @@ export function DomesticStaffDashboardView({ initialTab = "overview" }: Domestic
     }
   };
 
+  const tabMeta: Record<
+    DomesticStaffTab,
+    { title: string; eyebrow: string; description: string }
+  > = {
+    overview: {
+      title: "Domestic Staff Operations",
+      eyebrow: "Staff Portal & Daily Work Console",
+      description: "Manage today's shift, view assigned units, monitor gate check-in/out status, and access emergency assistance.",
+    },
+    profile: {
+      title: "My Staff Profile & Verification",
+      eyebrow: "Identity & Police Verification",
+      description: "View verified identification credentials, contact information, and community badge status.",
+    },
+    "assigned-homes": {
+      title: "Assigned Households & Units",
+      eyebrow: "Workplace Directory",
+      description: "Direct list of all community apartments, resident hosts, and primary contact intercom numbers.",
+    },
+    schedule: {
+      title: "Work Schedule & Weekly Timetable",
+      eyebrow: "Shift Planning",
+      description: "View upcoming shift timings, weekly duty days, and assigned working hours per unit.",
+    },
+    attendance: {
+      title: "Attendance & Entry/Exit Log",
+      eyebrow: "Duty Check-In History",
+      description: "Official timestamped check-in and check-out logs stamped at community security gates.",
+    },
+    "entry-exit": {
+      title: "Digital QR Badge & Gate Pass",
+      eyebrow: "Security Gate Access",
+      description: "Display your digital identification pass with QR code for quick scanning at entry gates.",
+    },
+    visits: {
+      title: "Resident Feedback & Service Ratings",
+      eyebrow: "Performance Reviews",
+      description: "Feedback, compliments, and ratings received from residents of assigned households.",
+    },
+    notifications: {
+      title: "Staff Notifications & Shifts",
+      eyebrow: "Personal Inbox",
+      description: "Official notifications regarding gate clearance, shift updates, and resident notices.",
+    },
+    emergency: {
+      title: "Emergency SOS & Incident Help",
+      eyebrow: "Security Desk Alert",
+      description: "Send immediate panic alerts with your coordinates to security guards and supervisors.",
+    },
+  };
+
+  const currentMeta = tabMeta[activeTab] || tabMeta.overview;
+
   return (
     <DashboardShell
-      title="Domestic Staff Operations"
-      eyebrow="Staff Portal & Daily Work Console"
-      description="Manage today's shift, view assigned units, monitor gate check-in/out status, and access emergency assistance."
+      title={currentMeta.title}
+      eyebrow={currentMeta.eyebrow}
+      description={currentMeta.description}
       accentColor="#0D9488"
       headerActions={
         <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
@@ -143,27 +202,27 @@ export function DomesticStaffDashboardView({ initialTab = "overview" }: Domestic
             />
             <StatMetric
               label="Current Shift Status"
-              value="Checked In"
-              accentColor="#16A34A"
+              value={openAttendance ? "Checked In" : "Not Checked In"}
+              accentColor={openAttendance ? "#16A34A" : "#94A3B8"}
               icon="⏱️"
-              description="Gate 1 entrance at 08:02 AM"
+              description={openAttendance ? `${openAttendance.gate_name} at ${openAttendance.check_in_at}` : "No active gate check-in today"}
               onClick={() => router.push("/domestic-staff/entry-exit")}
             />
             <StatMetric
               label="Performance Rating"
-              value={profile?.rating ?? 4.85}
+              value={profile?.rating ?? 0}
               suffix="/ 5.0"
               accentColor="#D97706"
               icon="⭐"
-              description={`Based on ${profile?.total_ratings ?? 42} resident reviews`}
+              description={`Based on ${profile?.total_ratings ?? 0} resident reviews`}
               onClick={() => router.push("/domestic-staff/visits")}
             />
             <StatMetric
               label="Police Verification"
-              value="Verified"
-              accentColor="#1D4ED8"
+              value={profile?.police_verified ? "Verified" : "Pending"}
+              accentColor={profile?.police_verified ? "#1D4ED8" : "#D97706"}
               icon="🛡️"
-              description="ID: POL-VER-2026-8812 (Active)"
+              description={profile?.verification_id ? `ID: ${profile.verification_id}` : "No verification ID on file"}
               onClick={() => router.push("/domestic-staff/profile")}
             />
           </div>
@@ -172,29 +231,37 @@ export function DomesticStaffDashboardView({ initialTab = "overview" }: Domestic
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: "1.5rem" }}>
             {/* Active Unit Card */}
             <div className="gs-card" style={{ borderLeft: "4px solid #0D9488" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1rem" }}>
-                <div>
-                  <span className="eyebrow-label" style={{ background: "#F0FDFA", color: "#0D9488", borderColor: "#99F6E4" }}>
-                    CURRENT ACTIVE UNIT
-                  </span>
-                  <h3 className="card-h3" style={{ fontSize: "1.25rem", marginTop: "0.4rem" }}>Unit A-402 (Emerald Tower)</h3>
-                  <p style={{ color: "var(--brand-body)", fontSize: "13.5px" }}>Resident: Priya & Rajesh Mehta · +91 98123 45678</p>
-                </div>
-                <StatusBadge status="active" label="In Progress" />
-              </div>
+              {!activeHome ? (
+                <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>No active unit assignment found.</p>
+              ) : (
+                <>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1rem" }}>
+                    <div>
+                      <span className="eyebrow-label" style={{ background: "#F0FDFA", color: "#0D9488", borderColor: "#99F6E4" }}>
+                        CURRENT ACTIVE UNIT
+                      </span>
+                      <h3 className="card-h3" style={{ fontSize: "1.25rem", marginTop: "0.4rem" }}>{activeHome.unit_number} ({activeHome.tower_name})</h3>
+                      <p style={{ color: "var(--brand-body)", fontSize: "13.5px" }}>Resident: {activeHome.resident_name} · {activeHome.resident_phone}</p>
+                    </div>
+                    <StatusBadge status="active" label="Assigned" />
+                  </div>
 
-              <div style={{ padding: "0.75rem", background: "#F8FAFC", borderRadius: "6px", fontSize: "13px", marginBottom: "1rem" }}>
-                <strong>Special Instructions:</strong> Key under plant pot on Tuesdays. Morning cleaning & dusting.
-              </div>
+                  {activeHome.special_instructions && (
+                    <div style={{ padding: "0.75rem", background: "#F8FAFC", borderRadius: "6px", fontSize: "13px", marginBottom: "1rem" }}>
+                      <strong>Duty:</strong> {activeHome.special_instructions} · {activeHome.expected_hours}
+                    </div>
+                  )}
 
-              <div style={{ display: "flex", gap: "0.75rem" }}>
-                <BrandButton size="sm" onClick={() => router.push("/domestic-staff/assigned-homes")}>
-                  View Resident Info
-                </BrandButton>
-                <BrandButton variant="outline" size="sm" onClick={() => router.push("/domestic-staff/entry-exit")}>
-                  Show Gate QR Pass
-                </BrandButton>
-              </div>
+                  <div style={{ display: "flex", gap: "0.75rem" }}>
+                    <BrandButton size="sm" onClick={() => router.push("/domestic-staff/assigned-homes")}>
+                      View Resident Info
+                    </BrandButton>
+                    <BrandButton variant="outline" size="sm" onClick={() => router.push("/domestic-staff/entry-exit")}>
+                      Show Gate QR Pass
+                    </BrandButton>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Upcoming Shift Reminders */}
@@ -255,7 +322,15 @@ export function DomesticStaffDashboardView({ initialTab = "overview" }: Domestic
                 <p style={{ color: "var(--brand-body)", fontSize: "13.5px" }}>{profile?.service_type}</p>
               </div>
             </div>
-            <BrandButton size="sm" variant="outline" onClick={() => setEditProfileOpen(true)}>
+            <BrandButton
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setPhoneInput(profile?.phone || "");
+                setEmergencyInput(profile?.emergency_contact || "");
+                setEditProfileOpen(true);
+              }}
+            >
               ✏️ Edit Contact Info
             </BrandButton>
           </div>
@@ -318,35 +393,45 @@ export function DomesticStaffDashboardView({ initialTab = "overview" }: Domestic
       {activeTab === "schedule" && (
         <div className="gs-card">
           <h3 className="card-h3" style={{ marginBottom: "1rem" }}>Weekly Duty & Shift Schedule</h3>
-          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-            {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day) => (
-              <div
-                key={day}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "0.85rem 1.25rem",
-                  borderRadius: "8px",
-                  background: "#F8FAFC",
-                  border: "1px solid var(--border-standard)",
-                }}
-              >
-                <div style={{ width: 120, fontWeight: 700, color: "var(--brand-heading)" }}>{day}</div>
-                <div style={{ flex: 1, display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                  <span style={{ fontSize: "12px", padding: "0.25rem 0.6rem", background: "#EFF6FF", color: "#1D4ED8", borderRadius: "4px", fontWeight: 600 }}>
-                    08:00 AM – 11:00 AM (Unit A-402)
-                  </span>
-                  <span style={{ fontSize: "12px", padding: "0.25rem 0.6rem", background: "#F0FDFA", color: "#0D9488", borderRadius: "4px", fontWeight: 600 }}>
-                    11:30 AM – 02:00 PM (Unit B-701)
-                  </span>
-                </div>
-                <div>
-                  <span style={{ fontSize: "12px", color: "#16A34A", fontWeight: 700 }}>5.5 Hours Total</span>
-                </div>
-              </div>
-            ))}
-          </div>
+          {homesLoading ? (
+            <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>Loading schedule…</p>
+          ) : homes.length === 0 ? (
+            <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>No active unit assignments found.</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((dayCode, idx) => {
+                const dayFull = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][idx];
+                const dayHomes = homes.filter((h) => h.schedule_days.includes(dayCode));
+                return (
+                  <div
+                    key={dayCode}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "0.85rem 1.25rem",
+                      borderRadius: "8px",
+                      background: "#F8FAFC",
+                      border: "1px solid var(--border-standard)",
+                    }}
+                  >
+                    <div style={{ width: 120, fontWeight: 700, color: "var(--brand-heading)" }}>{dayFull}</div>
+                    <div style={{ flex: 1, display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                      {dayHomes.length === 0 ? (
+                        <span style={{ fontSize: "12px", color: "var(--brand-body)" }}>No duty scheduled</span>
+                      ) : (
+                        dayHomes.map((h) => (
+                          <span key={h.id} style={{ fontSize: "12px", padding: "0.25rem 0.6rem", background: "#EFF6FF", color: "#1D4ED8", borderRadius: "4px", fontWeight: 600 }}>
+                            {h.expected_hours} ({h.unit_number})
+                          </span>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -379,9 +464,9 @@ export function DomesticStaffDashboardView({ initialTab = "overview" }: Domestic
       {/* TAB 6: ENTRY / EXIT */}
       {activeTab === "entry-exit" && (
         <div style={{ maxWidth: 600, margin: "0 auto", textAlign: "center" }} className="gs-card">
-          <h3 className="card-h3" style={{ marginBottom: "0.5rem" }}>Gate Pass & QR Token</h3>
+          <h3 className="card-h3" style={{ marginBottom: "0.5rem" }}>Gate Pass & Check-In Status</h3>
           <p style={{ color: "var(--brand-body)", fontSize: "14px", marginBottom: "1.5rem" }}>
-            Present this QR code to the Security Guard tablet at Gate 1 or Gate 2 for seamless entry.
+            Present this pass to the Security Guard at the gate — check-in and check-out are recorded by the guard, not self-service.
           </p>
 
           <div
@@ -401,16 +486,18 @@ export function DomesticStaffDashboardView({ initialTab = "overview" }: Domestic
           >
             <div style={{ fontSize: "5rem" }}>📱</div>
             <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--brand-primary)", letterSpacing: "0.08em" }}>
-              STAFF-PASS-8812
+              {profile?.verification_id || profile?.id?.slice(0, 8).toUpperCase() || "STAFF PASS"}
             </span>
           </div>
 
           <div style={{ display: "flex", justifyContent: "center", gap: "1rem", marginBottom: "1rem" }}>
-            <LiveDot label="CURRENT STATUS: ON-DUTY" />
+            <LiveDot label={openAttendance ? "CURRENT STATUS: ON-DUTY" : "CURRENT STATUS: OFF-DUTY"} />
           </div>
 
           <p style={{ fontSize: "13px", color: "var(--brand-body)" }}>
-            Checked in at <strong>Gate 1 (08:02 AM)</strong> · Auto check-out will occur upon departure.
+            {openAttendance
+              ? <>Checked in at <strong>{openAttendance.gate_name} ({openAttendance.check_in_at})</strong> · Check-out will be recorded by the guard on departure.</>
+              : "Not currently checked in at any gate."}
           </p>
         </div>
       )}
@@ -445,21 +532,23 @@ export function DomesticStaffDashboardView({ initialTab = "overview" }: Domestic
       {activeTab === "notifications" && (
         <div className="gs-card">
           <h3 className="card-h3" style={{ marginBottom: "1rem" }}>Staff Notice Board & Alerts</h3>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-            {[
-              { title: "⭐ New 5-Star Rating Received", desc: "Resident Priya Mehta (A-402) submitted a 5-star rating for kitchen cleaning.", time: "2 hours ago" },
-              { title: "📅 Schedule Update", desc: "Dr. Ananya Roy requested shift time adjustment to 11:30 AM on Fridays.", time: "Yesterday" },
-              { title: "📢 Community Notice: Gate 3 Under Maintenance", desc: "All staff are requested to use Gate 1 or Gate 2 for entry during repaving works.", time: "2 days ago" },
-            ].map((n, i) => (
-              <div key={i} style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px", border: "1px solid var(--border-light)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <strong style={{ fontSize: "14px" }}>{n.title}</strong>
-                  <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>{n.time}</span>
+          {myNotifications.isLoading ? (
+            <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>Loading notifications…</p>
+          ) : (myNotifications.data || []).length === 0 ? (
+            <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>No notifications yet.</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              {(myNotifications.data || []).map((n) => (
+                <div key={n.id} style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px", border: "1px solid var(--border-light)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <strong style={{ fontSize: "14px" }}>{n.title}</strong>
+                    <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>{formatDate(n.created_at)}</span>
+                  </div>
+                  <p style={{ fontSize: "13px", color: "var(--brand-body)", marginTop: "0.25rem" }}>{n.body}</p>
                 </div>
-                <p style={{ fontSize: "13px", color: "var(--brand-body)", marginTop: "0.25rem" }}>{n.desc}</p>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -491,7 +580,8 @@ export function DomesticStaffDashboardView({ initialTab = "overview" }: Domestic
       >
         <div style={{ padding: "1rem 0" }}>
           <p style={{ fontSize: "14px", marginBottom: "1rem" }}>
-            Are you sure you want to trigger an emergency alert? On-duty security personnel will immediately be dispatched to your location (<strong>Unit A-402</strong>).
+            Are you sure you want to trigger an emergency alert? On-duty security personnel will immediately be dispatched to your location
+            {activeHome ? <> (<strong>{activeHome.unit_number}, {activeHome.tower_name}</strong>)</> : ""}.
           </p>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
             <BrandButton variant="outline" onClick={() => setSosModalOpen(false)}>

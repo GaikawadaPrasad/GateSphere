@@ -6,16 +6,17 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
-import { gateApi, type PanicAlert } from "@/lib/api";
+import { gateApi, dashboardsApi, visitorsApi, deliveriesApi, type PanicAlert, type GuardRoster } from "@/lib/api";
+import type { SecurityStats } from "@/types/dashboards";
+import { formatDateTime } from "@/lib/utils";
 
+// Real backend enum (backend/app/modules/gate/models.py ALERT_TYPES)
 const EMERGENCY_TYPES = [
-  { label: "Medical Emergency", icon: "🚑" },
-  { label: "Fire", icon: "🔥" },
-  { label: "Security Threat", icon: "🚨" },
-  { label: "Unauthorized Person", icon: "🚷" },
-  { label: "Accident", icon: "💥" },
-  { label: "Suspicious Activity", icon: "👁️" },
-  { label: "Other", icon: "⚠️" },
+  { label: "Medical Emergency", value: "medical", icon: "🚑" },
+  { label: "Fire", value: "fire", icon: "🔥" },
+  { label: "Security Threat", value: "security", icon: "🚨" },
+  { label: "Unauthorized Person / Intrusion", value: "intrusion", icon: "🚷" },
+  { label: "Other", value: "other", icon: "⚠️" },
 ];
 
 export default function SecurityGuardDashboardPage() {
@@ -29,7 +30,7 @@ export default function SecurityGuardDashboardPage() {
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
   // Form Fields
-  const [emergencyType, setEmergencyType] = useState("Medical Emergency");
+  const [emergencyType, setEmergencyType] = useState("medical");
   const [location, setLocation] = useState("Main Gate North");
   const [description, setDescription] = useState("");
 
@@ -38,15 +39,45 @@ export default function SecurityGuardDashboardPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Fetch initial active emergency alert
+  // Operational stats
+  const [securityStats, setSecurityStats] = useState<SecurityStats | null>(null);
+  const [pendingVisitors, setPendingVisitors] = useState<any[]>([]);
+  const [pendingDeliveryCount, setPendingDeliveryCount] = useState(0);
+  const [activeRoster, setActiveRoster] = useState<GuardRoster | null>(null);
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
+
+  // Fetch initial active emergency alert + operational KPIs
   useEffect(() => {
     let mounted = true;
     gateApi.alerts().then((alerts) => {
       if (mounted && alerts && alerts.length > 0) {
-        const live = alerts.find((a) => a.status === "Active" || a.status === "Acknowledged");
+        const live = alerts.find((a) => a.status === "active" || a.status === "acknowledged");
         if (live) setActiveSos(live);
       }
+    }).catch(() => {});
+
+    Promise.allSettled([
+      dashboardsApi.security(),
+      visitorsApi.requests(),
+      deliveriesApi.list(),
+      gateApi.rosters(),
+    ]).then(([statsRes, visitorsRes, deliveriesRes, rostersRes]) => {
+      if (!mounted) return;
+      if (statsRes.status === "fulfilled") setSecurityStats(statsRes.value);
+      if (visitorsRes.status === "fulfilled") {
+        setPendingVisitors((visitorsRes.value || []).filter((v: any) => v.status === "pending"));
+      }
+      if (deliveriesRes.status === "fulfilled") {
+        setPendingDeliveryCount(
+          (deliveriesRes.value || []).filter((d: any) => d.status === "expected" || d.status === "at_gate").length
+        );
+      }
+      if (rostersRes.status === "fulfilled") {
+        setActiveRoster((rostersRes.value || []).find((r) => r.status === "active") || null);
+      }
+      setIsLoadingStats(false);
     });
+
     return () => {
       mounted = false;
     };
@@ -75,17 +106,17 @@ export default function SecurityGuardDashboardPage() {
     setErrorMessage(null);
 
     try {
+      const message = [location.trim() && `Location: ${location.trim()}`, description.trim()].filter(Boolean).join(" — ");
       const sosRecord = await gateApi.triggerEmergency({
-        type: emergencyType,
-        location: location.trim(),
-        description: description.trim() || undefined,
+        alert_type: emergencyType,
         severity: "critical",
+        message: message || undefined,
       });
 
       setActiveSos(sosRecord);
       setIsConfirmModalOpen(false);
       setSuccessMessage(
-        `SOS Emergency Alert (${sosRecord.reference_id || sosRecord.id}) dispatched successfully. Security Supervisor notified.`
+        `SOS Emergency Alert (${sosRecord.id.slice(0, 8).toUpperCase()}) dispatched successfully. Security Supervisor notified.`
       );
       
       // Reset optional fields
@@ -196,7 +227,7 @@ export default function SecurityGuardDashboardPage() {
                   whiteSpace: "nowrap",
                 }}
               >
-                REF: {activeSos.reference_id || `SOS-${activeSos.id.slice(0, 4).toUpperCase()}`}
+                REF: SOS-{activeSos.id.slice(0, 8).toUpperCase()}
               </span>
             </div>
 
@@ -225,20 +256,20 @@ export default function SecurityGuardDashboardPage() {
           >
             <div>
               <span style={{ opacity: 0.8, fontSize: "0.75rem", display: "block" }}>Emergency Type</span>
-              <strong style={{ fontSize: "1rem", color: "#fef2f2" }}>🚨 {activeSos.alert_type}</strong>
+              <strong style={{ fontSize: "1rem", color: "#fef2f2", textTransform: "capitalize" }}>🚨 {activeSos.alert_type}</strong>
             </div>
             <div>
-              <span style={{ opacity: 0.8, fontSize: "0.75rem", display: "block" }}>Location</span>
-              <strong style={{ fontSize: "1rem", color: "#fef2f2" }}>📍 {activeSos.location}</strong>
+              <span style={{ opacity: 0.8, fontSize: "0.75rem", display: "block" }}>Details</span>
+              <strong style={{ fontSize: "1rem", color: "#fef2f2" }}>{(activeSos as any).message || "—"}</strong>
             </div>
             <div>
               <span style={{ opacity: 0.8, fontSize: "0.75rem", display: "block" }}>Time Sent</span>
-              <strong style={{ fontSize: "0.95rem", color: "#fef2f2" }}>⏱️ {activeSos.timestamp}</strong>
+              <strong style={{ fontSize: "0.95rem", color: "#fef2f2" }}>⏱️ {formatDateTime((activeSos as any).triggered_at)}</strong>
             </div>
             <div>
               <span style={{ opacity: 0.8, fontSize: "0.75rem", display: "block" }}>Current Escalation / Response</span>
-              <strong style={{ fontSize: "0.95rem", color: "#fecaca" }}>
-                🛡️ {activeSos.status} ({activeSos.assigned_responder || "Security Supervisor"})
+              <strong style={{ fontSize: "0.95rem", color: "#fecaca", textTransform: "capitalize" }}>
+                🛡️ {activeSos.status}
               </strong>
             </div>
           </div>
@@ -256,31 +287,31 @@ export default function SecurityGuardDashboardPage() {
       >
         <KpiCard
           title="Active Visitors Inside"
-          value="18"
-          subtext="5 Expected Today"
+          value={isLoadingStats ? "…" : String(securityStats?.visitors_inside ?? 0)}
+          subtext={`${securityStats?.expected_visitors ?? 0} Expected Today`}
           icon="👥"
           onClick={() => router.push("/security-guard/visitors")}
         />
         <KpiCard
           title="Pending Approvals"
-          value="5"
+          value={isLoadingStats ? "…" : String(pendingVisitors.length)}
           subtext="Awaiting Resident Confirmation"
           icon="⏳"
-          trend="warning"
-          trendValue="Check Desk"
+          trend={pendingVisitors.length > 0 ? "warning" : undefined}
+          trendValue={pendingVisitors.length > 0 ? "Check Desk" : undefined}
           onClick={() => router.push("/security-guard/live-gate")}
         />
         <KpiCard
           title="Pending Deliveries"
-          value="8"
-          subtext="3 Left at Gate Desk"
+          value={isLoadingStats ? "…" : String(pendingDeliveryCount)}
+          subtext="Expected or at gate desk"
           icon="📦"
           onClick={() => router.push("/security-guard/deliveries")}
         />
         <KpiCard
-          title="Staff Checked In"
-          value="14"
-          subtext="Housekeeping & Drivers"
+          title="Staff Inside"
+          value={isLoadingStats ? "…" : String(securityStats?.staff_inside ?? 0)}
+          subtext="Domestic staff currently on-site"
           icon="🪪"
           onClick={() => router.push("/security-guard/staff-attendance")}
         />
@@ -378,25 +409,31 @@ export default function SecurityGuardDashboardPage() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Pass Code</th>
                   <th>Visitor</th>
-                  <th>Destination</th>
+                  <th>Purpose</th>
                   <th>Status</th>
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td style={{ fontWeight: 700, fontFamily: "monospace" }}>GP-9912</td>
-                  <td>Rajiv Malhotra (Guest)</td>
-                  <td>Tower A 302</td>
-                  <td><StatusBadge status="Approved" /></td>
-                </tr>
-                <tr>
-                  <td style={{ fontWeight: 700, fontFamily: "monospace" }}>GP-9913</td>
-                  <td>Zomato Delivery</td>
-                  <td>Tower B 501</td>
-                  <td><StatusBadge status="Pending Approval" /></td>
-                </tr>
+                {isLoadingStats ? (
+                  <tr>
+                    <td colSpan={3} style={{ textAlign: "center", padding: "1.5rem" }}>Loading…</td>
+                  </tr>
+                ) : pendingVisitors.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}>
+                      No pending gate approvals.
+                    </td>
+                  </tr>
+                ) : (
+                  pendingVisitors.slice(0, 5).map((v) => (
+                    <tr key={v.id}>
+                      <td style={{ fontWeight: 700 }}>{v.visitor?.full_name || v.visitor_name || "Visitor"}</td>
+                      <td>{v.purpose || "—"}</td>
+                      <td><StatusBadge status={v.status} /></td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -406,20 +443,22 @@ export default function SecurityGuardDashboardPage() {
           <div className="card-header">
             <h3 className="card-title">Current Duty Assignment</h3>
           </div>
+          {isLoadingStats ? (
+            <p style={{ padding: "0.5rem 0", color: "var(--muted)" }}>Loading…</p>
+          ) : !activeRoster ? (
+            <p style={{ padding: "0.5rem 0", color: "var(--muted)" }}>No active shift assignment found on today&apos;s roster.</p>
+          ) : (
           <div style={{ padding: "0.5rem 0" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.75rem" }}>
-              <span style={{ color: "var(--muted)" }}>Assigned Post:</span>
-              <span style={{ fontWeight: 600 }}>Main Gate North</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.75rem" }}>
-              <span style={{ color: "var(--muted)" }}>Current Shift:</span>
-              <span style={{ fontWeight: 600 }}>Morning (06:00 - 14:00)</span>
+              <span style={{ color: "var(--muted)" }}>Shift Date:</span>
+              <span style={{ fontWeight: 600 }}>{activeRoster.shift_date}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <span style={{ color: "var(--muted)" }}>Supervisor On Call:</span>
-              <span style={{ fontWeight: 600, color: "var(--primary)" }}>Devraj (+91 98000 11122)</span>
+              <span style={{ color: "var(--muted)" }}>Time:</span>
+              <span style={{ fontWeight: 600 }}>{activeRoster.shift_start} – {activeRoster.shift_end}</span>
             </div>
           </div>
+          )}
         </div>
       </div>
 
@@ -455,12 +494,12 @@ export default function SecurityGuardDashboardPage() {
             </label>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "0.6rem" }}>
               {EMERGENCY_TYPES.map((item) => {
-                const isSelected = emergencyType === item.label;
+                const isSelected = emergencyType === item.value;
                 return (
                   <button
-                    key={item.label}
+                    key={item.value}
                     type="button"
-                    onClick={() => setEmergencyType(item.label)}
+                    onClick={() => setEmergencyType(item.value)}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -591,7 +630,7 @@ export default function SecurityGuardDashboardPage() {
           >
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
               <span style={{ color: "var(--muted)" }}>Emergency Type:</span>
-              <strong style={{ color: "var(--danger)" }}>🚨 {emergencyType}</strong>
+              <strong style={{ color: "var(--danger)" }}>🚨 {EMERGENCY_TYPES.find((t) => t.value === emergencyType)?.label || emergencyType}</strong>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
               <span style={{ color: "var(--muted)" }}>Location:</span>

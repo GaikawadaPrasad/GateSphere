@@ -1,36 +1,73 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { vendorTicketsApi } from "@/lib/api";
 
 export default function VendorWorkCompletionPage() {
   const router = useRouter();
-  const [ticketNumber, setTicketNumber] = useState("VT-901");
+  const searchParams = useSearchParams();
+  const urlTicketId = searchParams.get("ticketId");
+
+  const [tickets, setTickets] = useState<any[]>([]);
+  const [selectedTicketId, setSelectedTicketId] = useState<string>("");
   const [workPerformed, setWorkPerformed] = useState("");
   const [materialsUsed, setMaterialsUsed] = useState("");
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("11:30");
   const [remarks, setRemarks] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  useEffect(() => {
+    async function loadTickets() {
+      setIsLoading(true);
+      try {
+        const list = await vendorTicketsApi.list();
+        const activeList = (list || []).filter(
+          (t: any) => t.status === "in_progress" || t.status === "acknowledged" || t.status === "assigned"
+        );
+        setTickets(activeList);
+        if (urlTicketId) {
+          setSelectedTicketId(urlTicketId);
+        } else if (activeList.length > 0) {
+          setSelectedTicketId(String(activeList[0].id));
+        }
+      } catch {
+        setTickets([]);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadTickets();
+  }, [urlTicketId]);
 
   const handleSubmitCompletion = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedTicketId) {
+      setErrorMsg("Please select an active ticket");
+      return;
+    }
     if (!workPerformed.trim()) return;
     setIsSubmitting(true);
-    await vendorTicketsApi.submitCompletion(ticketNumber, {
-      work_performed: workPerformed,
-      materials_used: materialsUsed,
-      start_time: startTime,
-      end_time: endTime,
-      remarks,
-    });
-    setIsSubmitting(false);
-    setSubmittedSuccess(true);
-    setTimeout(() => router.push("/vendor-technician/dashboard"), 1500);
+    setErrorMsg("");
+
+    try {
+      const summary = `Work: ${workPerformed}. Materials: ${materialsUsed || "None"}. Time: ${startTime}-${endTime}. Remarks: ${remarks || "Work completed on site."}`.trim();
+      await vendorTicketsApi.submitCompletion(selectedTicketId, summary);
+      setIsSubmitting(false);
+      setSubmittedSuccess(true);
+      setTimeout(() => router.push("/vendor-technician/service-history"), 1500);
+    } catch (err: any) {
+      setIsSubmitting(false);
+      setErrorMsg(err?.message || "Failed to submit work completion.");
+    }
   };
+
+  const selectedTicket = tickets.find((t) => t.id === selectedTicketId);
 
   return (
     <div>
@@ -55,8 +92,25 @@ export default function VendorWorkCompletionPage() {
             ✅ WORK COMPLETION SUBMITTED SUCCESSFULLY
           </h3>
           <p style={{ fontSize: "0.9rem", color: "#047857" }}>
-            Job completion proof for ticket <strong>{ticketNumber}</strong> has been sent to the Facility Manager for final review.
+            Job completion proof for ticket <strong>{selectedTicket?.ticket_number || selectedTicketId}</strong> has been recorded and submitted for manager signoff.
           </p>
+        </div>
+      )}
+
+      {errorMsg && (
+        <div
+          style={{
+            padding: "0.75rem 1rem",
+            marginBottom: "1.5rem",
+            background: "var(--danger-light, #fee2e2)",
+            border: "1px solid var(--danger-border, #fca5a5)",
+            borderRadius: "var(--radius-sm)",
+            color: "#991b1b",
+            fontSize: "0.85rem",
+            fontWeight: 600,
+          }}
+        >
+          {errorMsg}
         </div>
       )}
 
@@ -68,16 +122,28 @@ export default function VendorWorkCompletionPage() {
         <form onSubmit={handleSubmitCompletion}>
           <div style={{ marginBottom: "1rem" }}>
             <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
-              Assigned Ticket Number *
+              Assigned Ticket *
             </label>
-            <select
-              className="select-field"
-              value={ticketNumber}
-              onChange={(e) => setTicketNumber(e.target.value)}
-            >
-              <option value="VT-901">VT-901: Swimming Pool Pump Replacement</option>
-              <option value="VT-902">VT-902: Elevator B3 Sensor Error Code E-409</option>
-            </select>
+            {isLoading ? (
+              <div style={{ fontSize: "0.85rem", color: "var(--muted)" }}>Loading active jobs…</div>
+            ) : tickets.length === 0 ? (
+              <div style={{ fontSize: "0.85rem", color: "var(--muted)", padding: "0.5rem 0" }}>
+                No active service tickets found to complete.
+              </div>
+            ) : (
+              <select
+                className="select-field"
+                value={selectedTicketId}
+                onChange={(e) => setSelectedTicketId(e.target.value)}
+                required
+              >
+                {tickets.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.ticket_number || `TKT-${t.id.slice(0, 6)}`}: {t.subject || "Service Work"} ({t.status})
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           <div style={{ marginBottom: "1rem" }}>
@@ -87,7 +153,7 @@ export default function VendorWorkCompletionPage() {
             <textarea
               className="input-field"
               rows={3}
-              placeholder="Describe work completed (e.g. Replaced dual impeller pump & pressure tested chlorination line)..."
+              placeholder="Describe work completed (e.g. Replaced dual impeller pump & pressure tested line)..."
               value={workPerformed}
               onChange={(e) => setWorkPerformed(e.target.value)}
               required
@@ -149,7 +215,7 @@ export default function VendorWorkCompletionPage() {
           <button
             type="submit"
             className="btn btn-primary"
-            disabled={isSubmitting}
+            disabled={isSubmitting || tickets.length === 0}
             style={{ width: "100%", padding: "0.75rem", fontSize: "0.95rem", fontWeight: 700 }}
           >
             {isSubmitting ? "Submitting…" : "SUBMIT FOR MANAGER REVIEW"}

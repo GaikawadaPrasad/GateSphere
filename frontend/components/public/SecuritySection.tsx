@@ -4,15 +4,7 @@ import React, { useState } from "react";
 import Image from "next/image";
 import { useReveal } from "@/hooks/use-reveal";
 
-interface SecurityFeature {
-  id: string;
-  icon: React.ReactNode;
-  iconBg: string;
-  title: string;
-  detail: string;
-}
-
-const securityFeatures: SecurityFeature[] = [
+const securityFeatures = [
   {
     id: "lookup",
     icon: (
@@ -125,82 +117,159 @@ export default function SecuritySection() {
                   className={`group relative flex items-start gap-4 p-3.5 sm:p-4 rounded-2xl border transition-all duration-200 cursor-pointer ${
                     isSelected
                       ? "bg-[#151F33] border-cyan-500/60 shadow-lg shadow-cyan-950/40 translate-x-1"
-                      : "bg-[#0F172A]/70 border-slate-800/80 hover:bg-[#151F33]/70 hover:border-slate-700"
+                      : "bg-[#0E1524]/90 border-slate-800/90 hover:bg-[#151F33]/70 hover:border-slate-700 hover:translate-x-0.5"
                   }`}
                 >
+                  {/* Icon Box */}
                   <div
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${item.iconBg} transition-transform group-hover:scale-105`}
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${item.iconBg} transition-transform duration-200 group-hover:scale-105 mt-0.5`}
                   >
                     {item.icon}
                   </div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <h4
-                        className={`text-sm sm:text-[14.5px] font-bold transition-colors ${
-                          isSelected ? "text-cyan-300" : "text-white group-hover:text-cyan-300"
-                        }`}
-                        style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
-                      >
-                        {item.title}
-                      </h4>
-                      {isSelected && (
-                        <span className="text-xs text-cyan-400 font-mono shrink-0 font-bold">
-                          ACTIVE
-                        </span>
-                      )}
+                  {/* Feature Text */}
+                  <div className="flex-1 pr-4">
+                    <div
+                      className={`text-sm sm:text-[14.5px] font-bold transition-colors leading-snug ${
+                        isSelected ? "text-white" : "text-slate-200 group-hover:text-white"
+                      }`}
+                      style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                    >
+                      {item.title}
                     </div>
-                    <p className="text-xs text-slate-400 mt-1 leading-relaxed font-normal">
-                      {item.detail}
-                    </p>
+                    {isSelected && (
+                      <div className="text-xs text-slate-400 mt-1 font-light leading-relaxed">
+                        {item.detail}
+                      </div>
+                    )}
                   </div>
+
+                  {/* Active Indicator Accent */}
+                  {isSelected && (
+                    <div className="w-1.5 h-6 rounded-full bg-gradient-to-b from-cyan-400 to-teal-400 self-center shrink-0" />
+                  )}
                 </div>
               );
             })}
           </div>
         </div>
 
-        {/* ── RIGHT VISUAL (6 COLS) ── */}
-        <div className={`lg:col-span-6 reveal-right ${visible ? "visible" : ""}`}>
-          <div className="relative rounded-3xl overflow-hidden border border-slate-700/80 shadow-2xl bg-slate-950/80 backdrop-blur-xl group">
-            {/* Top Terminal Status Bar */}
-            <div className="flex items-center justify-between px-5 py-3.5 bg-slate-900/90 border-b border-slate-800 text-xs">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400" />
-                <span className="text-slate-300 font-mono font-medium">GATE-NORTH · TERMINAL 01</span>
+        {/* ── RIGHT VISUAL & FLOATING DASHBOARDS (6 COLS) ── */}
+        <div className={`lg:col-span-6 reveal-right ${visible ? "visible" : ""} relative flex justify-center`}>
+          <div className="relative w-full max-w-[480px]">
+            {/* Main Entrance Photo with Rounded 3XL & Clean Border */}
+            <div className="relative h-[360px] sm:h-[400px] rounded-3xl overflow-hidden border border-white/15 shadow-2xl bg-slate-900">
+              <Image
+                src="/images/security-gate-entrance.webp"
+                alt="GateSphere smart security entrance and automated barrier"
+                fill
+                sizes="(max-width: 1024px) 100vw, 480px"
+                className="object-cover transition-transform duration-500 hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#090D16]/80 via-transparent to-transparent pointer-events-none" />
+            </div>
+
+            {/* ── FLOATING CARD 1: GATE 01 METRICS (Top Left) ── */}
+            <div
+              className="absolute -top-3 -left-3 sm:-left-6 bg-[#0F172A]/95 border border-slate-700/80 rounded-2xl p-3.5 w-48 sm:w-52 shadow-2xl backdrop-blur-xl z-20"
+              style={{
+                animation: "floatCard1 5s ease-in-out infinite",
+              }}
+            >
+              <div className="mb-2.5">
+                <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider font-mono">
+                  GATE 01
+                </div>
+                <div
+                  className="text-sm font-bold text-white tracking-tight"
+                  style={{ fontFamily: "'Outfit', sans-serif" }}
+                >
+                  Main Entrance
+                </div>
               </div>
-              <div className="flex items-center gap-3 text-slate-400 font-mono text-[11px]">
-                <span className="bg-slate-800 px-2 py-0.5 rounded text-emerald-400 font-semibold">ANPR LIVE</span>
-                <span>SUB-SECOND AI</span>
+
+              {/* 2x2 Metric Grid */}
+              <div className="grid grid-cols-2 gap-1.5">
+                <div className="bg-[#1E293B]/80 border border-slate-700/40 rounded-xl p-2 text-center">
+                  <div
+                    className="text-[17px] font-bold text-[#38BDF8] leading-none"
+                    style={{ fontFamily: "'Outfit', sans-serif" }}
+                  >
+                    18
+                  </div>
+                  <div className="text-[9.5px] font-medium text-slate-400 mt-0.5">Visitors</div>
+                </div>
+
+                <div className="bg-[#1E293B]/80 border border-slate-700/40 rounded-xl p-2 text-center">
+                  <div
+                    className="text-[17px] font-bold text-[#2DD4BF] leading-none"
+                    style={{ fontFamily: "'Outfit', sans-serif" }}
+                  >
+                    07
+                  </div>
+                  <div className="text-[9.5px] font-medium text-slate-400 mt-0.5">Deliveries</div>
+                </div>
+
+                <div className="bg-[#1E293B]/80 border border-slate-700/40 rounded-xl p-2 text-center">
+                  <div
+                    className="text-[17px] font-bold text-[#4ADE80] leading-none"
+                    style={{ fontFamily: "'Outfit', sans-serif" }}
+                  >
+                    24
+                  </div>
+                  <div className="text-[9.5px] font-medium text-slate-400 mt-0.5">Staff</div>
+                </div>
+
+                <div className="bg-[#1E293B]/80 border border-slate-700/40 rounded-xl p-2 text-center">
+                  <div
+                    className="text-[17px] font-bold text-[#F87171] leading-none"
+                    style={{ fontFamily: "'Outfit', sans-serif" }}
+                  >
+                    02
+                  </div>
+                  <div className="text-[9.5px] font-medium text-slate-400 mt-0.5">Alerts</div>
+                </div>
               </div>
             </div>
 
-            {/* Embedded Live Gate Showcase Image */}
-            <div className="relative h-[340px] sm:h-[390px] w-full overflow-hidden">
-              <Image
-                src="/images/security-gate-entrance.webp"
-                alt="Automated High-Security Residential Gate Entrance"
-                fill
-                sizes="(max-width: 1024px) 100vw, 50vw"
-                className="object-cover transition-transform duration-700 group-hover:scale-105"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" />
+            {/* ── FLOATING CARD 2: QR VERIFICATION (Bottom Right) ── */}
+            <div
+              className="absolute -bottom-3 -right-3 sm:-right-6 bg-[#0F172A]/95 border border-slate-700/80 rounded-2xl p-3.5 w-52 sm:w-56 shadow-2xl backdrop-blur-xl z-20"
+              style={{
+                animation: "floatCard2 6s ease-in-out infinite 1.5s",
+              }}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-teal-950/80 border border-teal-500/40 text-teal-400 shrink-0">
+                  <svg viewBox="0 0 24 24" fill="none" className="w-3.5 h-3.5" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                    <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                    <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                    <path d="M14 14h3M14 17h1M17 17h3" />
+                  </svg>
+                </div>
+                <span className="text-xs font-bold text-white tracking-tight">
+                  QR Verification
+                </span>
+              </div>
 
-              {/* Live Overlay Badge - Verified Entry */}
-              <div className="absolute bottom-5 left-5 right-5 bg-slate-950/90 backdrop-blur-md rounded-2xl p-4 border border-cyan-500/30 text-white shadow-xl">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                    <span className="text-xs font-mono font-bold text-emerald-300 uppercase">
-                      Vehicle Verified · Gate Opened
-                    </span>
-                  </div>
-                  <span className="text-[11px] font-mono text-slate-400">0.42s latency</span>
-                </div>
-                <div className="flex items-center justify-between text-xs text-slate-300 font-medium">
-                  <div>KA-01-MJ-4028 · Guest of Tower B, 1402</div>
-                  <div className="text-cyan-400 font-mono font-bold">PASS #GS-7821</div>
-                </div>
+              {/* Progress Line */}
+              <div className="w-full h-1.5 rounded-full overflow-hidden bg-slate-800 mb-2 relative">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-teal-400 to-cyan-400 transition-all duration-1000 shadow-xs shadow-cyan-500/50"
+                  style={{ width: "100%" }}
+                />
+              </div>
+
+              <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
+                <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z" />
+                </svg>
+                Identity confirmed
+              </div>
+
+              <div className="text-[10px] font-medium text-slate-400 mt-0.5">
+                Rahul Mehta • Tower C
               </div>
             </div>
           </div>

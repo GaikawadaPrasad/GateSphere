@@ -15,6 +15,11 @@ P = "/api/v1/gate"
 def _gate_in(community_id: str) -> str:
     with SessionLocal() as db:
         g = db.scalar(select(Gate).where(Gate.community_id == community_id).order_by(Gate.code))
+        if g is None:
+            g = Gate(community_id=community_id, name="Other Gate", code="OG-01", gate_type="main")
+            db.add(g)
+            db.commit()
+            db.refresh(g)
         return str(g.id)
 
 

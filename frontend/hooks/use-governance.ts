@@ -76,7 +76,9 @@ export function useGovernanceOverview(communityId?: string | null) {
 }
 
 /**
- * Hook to list Special Assessments with fallback to mock/derived charge heads if endpoint returns 404.
+ * Hook to list Special Assessments. The backend has no dedicated assessments module
+ * (no /billing/assessments route or table) — this surfaces as a real empty state rather
+ * than fabricating placeholder records.
  */
 export function useSpecialAssessments(params?: { community_id?: string | null; status?: string; page?: number; page_size?: number }) {
   const cid = params?.community_id || undefined;
@@ -91,47 +93,9 @@ export function useSpecialAssessments(params?: { community_id?: string | null; s
           page: params?.page,
           page_size: params?.page_size,
         });
-        if (Array.isArray(res)) return res;
-        return [];
+        return Array.isArray(res) ? res : [];
       } catch (err: unknown) {
-        if (err instanceof ApiError && err.status === 404) {
-          // Graceful fallback for UI demonstration if backend assessments sub-module is pending
-          return [
-            {
-              id: "sa-101",
-              community_id: cid,
-              title: "Clubhouse Solar Panel Infrastructure",
-              purpose: "Installation of 50kW rooftop solar system for common area energy efficiency.",
-              description: "CapEx initiative approved in AGM to reduce long-term common maintenance electricity tariffs.",
-              target_amount: "1500000.00",
-              amount_collected: "950000.00",
-              per_unit_amount: "12500.00",
-              effective_date: "2026-10-01",
-              due_date: "2026-11-15",
-              affected_units_count: 120,
-              status: "under_review" as const,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            },
-            {
-              id: "sa-102",
-              community_id: cid,
-              title: "High-Speed Elevator Modernization (Tower A & B)",
-              purpose: "Replacement of traction hoist motors and controller logic boards.",
-              description: "Preventative overhaul following annual safety audit recommendations.",
-              target_amount: "2800000.00",
-              amount_collected: "2800000.00",
-              per_unit_amount: "23333.33",
-              effective_date: "2026-08-15",
-              due_date: "2026-09-30",
-              affected_units_count: 120,
-              status: "approved" as const,
-              approved_at: "2026-08-20T10:00:00Z",
-              created_at: new Date(Date.now() - 30 * 86400000).toISOString(),
-              updated_at: new Date().toISOString(),
-            },
-          ];
-        }
+        if (err instanceof ApiError && err.status === 404) return [];
         throw err;
       }
     },
@@ -141,7 +105,8 @@ export function useSpecialAssessments(params?: { community_id?: string | null; s
 }
 
 /**
- * Hook to get a single special assessment by ID.
+ * Hook to get a single special assessment by ID. Returns null (not found) on 404 —
+ * see useSpecialAssessments for why the endpoint doesn't exist yet.
  */
 export function useSpecialAssessment(assessmentId: string, communityId?: string | null) {
   return useQuery<SpecialAssessment | null>({
@@ -150,24 +115,7 @@ export function useSpecialAssessment(assessmentId: string, communityId?: string 
       try {
         return await assessmentsApi.get(assessmentId);
       } catch (err: unknown) {
-        if (err instanceof ApiError && err.status === 404) {
-          return {
-            id: assessmentId,
-            community_id: communityId || "comm-default",
-            title: "Clubhouse Solar Panel Infrastructure",
-            purpose: "Installation of 50kW rooftop solar system for common area energy efficiency.",
-            description: "CapEx initiative approved in AGM to reduce long-term common maintenance electricity tariffs.",
-            target_amount: "1500000.00",
-            amount_collected: "950000.00",
-            per_unit_amount: "12500.00",
-            effective_date: "2026-10-01",
-            due_date: "2026-11-15",
-            affected_units_count: 120,
-            status: "under_review",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          };
-        }
+        if (err instanceof ApiError && err.status === 404) return null;
         throw err;
       }
     },
@@ -182,20 +130,7 @@ export function useApproveAssessment() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, notes }: { id: string; notes?: string }) => {
-      try {
-        return await assessmentsApi.approve(id, notes);
-      } catch (err: unknown) {
-        if (err instanceof ApiError && err.status === 404) {
-          // Fallback response for demonstration
-          return {
-            id,
-            status: "approved" as const,
-            approved_at: new Date().toISOString(),
-            approval_notes: notes,
-          };
-        }
-        throw err;
-      }
+      return await assessmentsApi.approve(id, notes);
     },
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: governanceKeys.all });
@@ -211,18 +146,7 @@ export function useRejectAssessment() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason?: string }) => {
-      try {
-        return await assessmentsApi.reject(id, reason);
-      } catch (err: unknown) {
-        if (err instanceof ApiError && err.status === 404) {
-          return {
-            id,
-            status: "rejected" as const,
-            rejection_reason: reason,
-          };
-        }
-        throw err;
-      }
+      return await assessmentsApi.reject(id, reason);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: governanceKeys.all });

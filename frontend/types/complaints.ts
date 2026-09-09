@@ -1,4 +1,4 @@
-export type TicketPriority = "low" | "medium" | "high" | "emergency";
+export type TicketPriority = "low" | "medium" | "high" | "critical" | "urgent" | "emergency";
 
 export type TicketStatus =
   | "created"
@@ -8,7 +8,8 @@ export type TicketStatus =
   | "resolved"
   | "resident_confirmation"
   | "closed"
-  | "reopened";
+  | "reopened"
+  | "cancelled";
 
 export interface ServiceCategory {
   id: string;
@@ -26,15 +27,19 @@ export interface ServiceTicket {
   unit_number?: string;
   category_id: string;
   category_name?: string;
-  title: string;
-  description: string;
+  ticket_number: string;
+  subject: string;
+  title?: string;
+  description?: string | null;
   priority: TicketPriority;
   status: TicketStatus;
-  raised_by_user_id: string;
+  resident_confirmation_status?: string;
+  raised_by_user_id?: string | null;
   raised_by_name?: string;
-  assigned_to_user_id?: string;
+  assigned_to_user_id?: string | null;
   assigned_to_name?: string;
   created_at: string;
   updated_at?: string;
-  resolved_at?: string;
+  resolved_at?: string | null;
+  closed_at?: string | null;
 }

@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { deriveTicketEscalationState } from "@/lib/utils";
 
 export interface AuditLogItem {
   id: string;
@@ -172,7 +173,7 @@ export function useAuditorComplaints(communityId?: string | null) {
         subject: t.subject,
         priority: t.priority || "medium",
         status: t.status || "open",
-        escalation_state: t.escalation_state || "on_track",
+        escalation_state: deriveTicketEscalationState(t),
         created_at: t.created_at,
       }));
     },
