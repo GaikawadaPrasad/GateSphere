@@ -6,7 +6,13 @@ interface SkeletonProps {
   style?: React.CSSProperties;
 }
 
-export function Skeleton({ width = "100%", height = "1rem", borderRadius, className, style }: SkeletonProps) {
+export function Skeleton({
+  width = "100%",
+  height = "1rem",
+  borderRadius,
+  className,
+  style,
+}: SkeletonProps) {
   return (
     <div
       className={`skeleton ${className || ""}`}
@@ -41,7 +47,10 @@ export function TableSkeleton({ rows = 5, cols = 6 }: { rows?: number; cols?: nu
 
 export function KpiCardSkeleton() {
   return (
-    <div className="card" style={{ display: "flex", flexDirection: "column", gap: "0.75rem", minHeight: 140 }}>
+    <div
+      className="card"
+      style={{ display: "flex", flexDirection: "column", gap: "0.75rem", minHeight: 140 }}
+    >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <Skeleton width="40%" height="0.875rem" />
         <Skeleton width="2rem" height="2rem" borderRadius="50%" />
@@ -54,7 +63,13 @@ export function KpiCardSkeleton() {
 
 export function MetricsSkeleton({ count = 4 }: { count?: number }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(220px, 1fr))`, gap: "1rem" }}>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: `repeat(auto-fit, minmax(220px, 1fr))`,
+        gap: "1rem",
+      }}
+    >
       {Array.from({ length: count }).map((_, i) => (
         <KpiCardSkeleton key={i} />
       ))}

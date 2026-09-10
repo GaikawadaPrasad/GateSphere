@@ -49,7 +49,12 @@ export function useEmergencyContacts(profileId?: string) {
   });
 }
 
-export function useMoveRecords(params?: { community_id?: string; move_status?: string; page?: number; page_size?: number }) {
+export function useMoveRecords(params?: {
+  community_id?: string;
+  move_status?: string;
+  page?: number;
+  page_size?: number;
+}) {
   return useQuery({
     queryKey: ["move-records", params],
     queryFn: () => residentsApi.moveRecords(params),
@@ -60,8 +65,13 @@ export function useMoveRecords(params?: { community_id?: string; move_status?: s
 export function useTransitionMoveRecord() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ moveId, data }: { moveId: string; data: { status: string; clearance_notes?: string; scheduled_at?: string } }) =>
-      residentsApi.transitionMove(moveId, data),
+    mutationFn: ({
+      moveId,
+      data,
+    }: {
+      moveId: string;
+      data: { status: string; clearance_notes?: string; scheduled_at?: string };
+    }) => residentsApi.transitionMove(moveId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["move-records"] });
       queryClient.invalidateQueries({ queryKey: ["residents"] });

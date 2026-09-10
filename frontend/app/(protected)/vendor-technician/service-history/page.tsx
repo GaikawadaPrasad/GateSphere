@@ -19,7 +19,7 @@ export default function VendorServiceHistoryPage() {
           (t) =>
             t.status === "resolved" ||
             t.status === "resident_confirmation" ||
-            t.status === "closed"
+            t.status === "closed",
         );
         setTickets(completed);
       } else {
@@ -45,7 +45,10 @@ export default function VendorServiceHistoryPage() {
       />
 
       <div className="card">
-        <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div
+          className="card-header"
+          style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
+        >
           <h3 className="card-title">Completed Work Log ({tickets.length})</h3>
           <button
             className="btn btn-secondary"
@@ -71,13 +74,19 @@ export default function VendorServiceHistoryPage() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: "center", padding: "2.5rem", color: "var(--muted)" }}>
+                  <td
+                    colSpan={6}
+                    style={{ textAlign: "center", padding: "2.5rem", color: "var(--muted)" }}
+                  >
                     Loading service history records…
                   </td>
                 </tr>
               ) : tickets.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: "center", padding: "2.5rem", color: "var(--muted)" }}>
+                  <td
+                    colSpan={6}
+                    style={{ textAlign: "center", padding: "2.5rem", color: "var(--muted)" }}
+                  >
                     No completed service records found in the archive yet.
                   </td>
                 </tr>
@@ -86,12 +95,14 @@ export default function VendorServiceHistoryPage() {
                   const resolvedDate = h.resolved_at
                     ? new Date(h.resolved_at).toLocaleDateString()
                     : h.closed_at
-                    ? new Date(h.closed_at).toLocaleDateString()
-                    : "Completed";
+                      ? new Date(h.closed_at).toLocaleDateString()
+                      : "Completed";
 
                   return (
                     <tr key={h.id}>
-                      <td style={{ fontWeight: 600, fontFamily: "monospace" }}>{h.ticket_number}</td>
+                      <td style={{ fontWeight: 600, fontFamily: "monospace" }}>
+                        {h.ticket_number}
+                      </td>
                       <td style={{ fontWeight: 500, color: "var(--fg)" }}>{h.subject}</td>
                       <td>
                         <span
@@ -105,14 +116,14 @@ export default function VendorServiceHistoryPage() {
                               h.priority === "urgent" || h.priority === "emergency"
                                 ? "#fee2e2"
                                 : h.priority === "high"
-                                ? "#ffedd5"
-                                : "#f1f5f9",
+                                  ? "#ffedd5"
+                                  : "#f1f5f9",
                             color:
                               h.priority === "urgent" || h.priority === "emergency"
                                 ? "#991b1b"
                                 : h.priority === "high"
-                                ? "#9a3412"
-                                : "#475569",
+                                  ? "#9a3412"
+                                  : "#475569",
                           }}
                         >
                           {h.priority}
@@ -128,8 +139,8 @@ export default function VendorServiceHistoryPage() {
                               h.resident_confirmation_status === "confirmed"
                                 ? "var(--success)"
                                 : h.resident_confirmation_status === "disputed"
-                                ? "var(--danger)"
-                                : "var(--muted)",
+                                  ? "var(--danger)"
+                                  : "var(--muted)",
                           }}
                         >
                           {h.resident_confirmation_status || "Pending"}

@@ -2,13 +2,26 @@
 
 import { useState } from "react";
 import { useUiStore } from "@/store/ui";
-import { useStaffList, useStaffAttendance, useStaffAssignments, useCheckInStaff, useCheckOutStaff, useCreateStaff } from "@/hooks/use-staff";
+import {
+  useStaffList,
+  useStaffAttendance,
+  useStaffAssignments,
+  useCheckInStaff,
+  useCheckOutStaff,
+  useCreateStaff,
+} from "@/hooks/use-staff";
 import { useGates } from "@/hooks/use-communities";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { FilterPanel } from "@/components/common/FilterPanel";
 import { Modal } from "@/components/common/Modal";
-import type { Staff, StaffAttendance, StaffAssignment, StaffType, VerificationStatus } from "@/types/staff";
+import type {
+  Staff,
+  StaffAttendance,
+  StaffAssignment,
+  StaffType,
+  VerificationStatus,
+} from "@/types/staff";
 import { formatDateTime } from "@/lib/utils";
 
 export default function CommunityAdminStaffPage() {
@@ -19,12 +32,20 @@ export default function CommunityAdminStaffPage() {
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
 
   // Queries
-  const { data: staffList, isLoading: staffLoading, refetch: refetchStaff } = useStaffList({
+  const {
+    data: staffList,
+    isLoading: staffLoading,
+    refetch: refetchStaff,
+  } = useStaffList({
     community_id: activeCommunityId || undefined,
     q: searchTerm || undefined,
   });
 
-  const { data: attendance, isLoading: attendanceLoading, refetch: refetchAttendance } = useStaffAttendance({
+  const {
+    data: attendance,
+    isLoading: attendanceLoading,
+    refetch: refetchAttendance,
+  } = useStaffAttendance({
     community_id: activeCommunityId || undefined,
   });
 
@@ -177,7 +198,10 @@ export default function CommunityAdminStaffPage() {
         const isPending = status === "pending";
         const isRejected = status === "rejected";
         return (
-          <span className={`badge ${isVerified ? "badge-success" : isRejected ? "badge-danger" : isPending ? "badge-warning" : "badge-neutral"}`} style={{ textTransform: "capitalize" }}>
+          <span
+            className={`badge ${isVerified ? "badge-success" : isRejected ? "badge-danger" : isPending ? "badge-warning" : "badge-neutral"}`}
+            style={{ textTransform: "capitalize" }}
+          >
             {isVerified ? "Verified ✓" : status?.replace("_", " ") || "Not Started"}
           </span>
         );
@@ -220,7 +244,11 @@ export default function CommunityAdminStaffPage() {
         return (
           <div>
             <strong>{name}</strong>
-            <div style={{ fontSize: "0.75rem", color: "var(--muted)", textTransform: "capitalize" }}>{role}</div>
+            <div
+              style={{ fontSize: "0.75rem", color: "var(--muted)", textTransform: "capitalize" }}
+            >
+              {role}
+            </div>
           </div>
         );
       },
@@ -233,13 +261,21 @@ export default function CommunityAdminStaffPage() {
     {
       key: "check_out_at",
       header: "Check-Out Time",
-      render: (a) => (a.check_out_at ? formatDateTime(a.check_out_at) : <span className="badge badge-success">Currently In</span>),
+      render: (a) =>
+        a.check_out_at ? (
+          formatDateTime(a.check_out_at)
+        ) : (
+          <span className="badge badge-success">Currently In</span>
+        ),
     },
     {
       key: "attendance_status",
       header: "Status",
       render: (a) => (
-        <span className={`badge ${!a.check_out_at ? "badge-success" : "badge-neutral"}`} style={{ textTransform: "capitalize" }}>
+        <span
+          className={`badge ${!a.check_out_at ? "badge-success" : "badge-neutral"}`}
+          style={{ textTransform: "capitalize" }}
+        >
           {a.attendance_status || (!a.check_out_at ? "Checked In" : "Checked Out")}
         </span>
       ),
@@ -273,10 +309,24 @@ export default function CommunityAdminStaffPage() {
         description="Workforce registry, daily gate attendance tracking, police verification, and unit service assignments."
         action={
           <div style={{ display: "flex", gap: "0.5rem" }}>
-            <button type="button" className="btn btn-secondary" onClick={() => { setErrorMessage(null); setIsCheckInModalOpen(true); }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                setErrorMessage(null);
+                setIsCheckInModalOpen(true);
+              }}
+            >
               ⏱️ Record Check-In
             </button>
-            <button type="button" className="btn btn-primary" onClick={() => { setErrorMessage(null); setIsAddStaffModalOpen(true); }}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                setErrorMessage(null);
+                setIsAddStaffModalOpen(true);
+              }}
+            >
               + Register Staff
             </button>
           </div>
@@ -295,7 +345,8 @@ export default function CommunityAdminStaffPage() {
             fontSize: "0.95rem",
             fontWeight: activeTab === "directory" ? 700 : 500,
             color: activeTab === "directory" ? "var(--primary)" : "var(--muted)",
-            borderBottom: activeTab === "directory" ? "2px solid var(--primary)" : "2px solid transparent",
+            borderBottom:
+              activeTab === "directory" ? "2px solid var(--primary)" : "2px solid transparent",
             cursor: "pointer",
           }}
         >
@@ -312,7 +363,8 @@ export default function CommunityAdminStaffPage() {
             fontSize: "0.95rem",
             fontWeight: activeTab === "attendance" ? 700 : 500,
             color: activeTab === "attendance" ? "var(--primary)" : "var(--muted)",
-            borderBottom: activeTab === "attendance" ? "2px solid var(--primary)" : "2px solid transparent",
+            borderBottom:
+              activeTab === "attendance" ? "2px solid var(--primary)" : "2px solid transparent",
             cursor: "pointer",
           }}
         >
@@ -369,7 +421,17 @@ export default function CommunityAdminStaffPage() {
       >
         {selectedStaff && (
           <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", background: "#f8fafc", padding: "1rem", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "1rem",
+                background: "#f8fafc",
+                padding: "1rem",
+                borderRadius: "var(--radius-sm)",
+                border: "1px solid var(--border)",
+              }}
+            >
               <div>
                 <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Role / Category</div>
                 <div style={{ fontWeight: 600, textTransform: "capitalize", marginTop: "0.2rem" }}>
@@ -381,35 +443,61 @@ export default function CommunityAdminStaffPage() {
                 <div style={{ fontWeight: 600, marginTop: "0.2rem" }}>{selectedStaff.phone}</div>
               </div>
               <div>
-                <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Police Verification</div>
+                <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                  Police Verification
+                </div>
                 <div style={{ marginTop: "0.2rem" }}>
-                  <span className={`badge ${selectedStaff.police_verification_status === "verified" ? "badge-success" : selectedStaff.police_verification_status === "rejected" ? "badge-danger" : "badge-warning"}`} style={{ textTransform: "capitalize" }}>
-                    {selectedStaff.police_verification_status === "verified" ? "Verified ✓" : selectedStaff.police_verification_status?.replace("_", " ") || "Pending"}
+                  <span
+                    className={`badge ${selectedStaff.police_verification_status === "verified" ? "badge-success" : selectedStaff.police_verification_status === "rejected" ? "badge-danger" : "badge-warning"}`}
+                    style={{ textTransform: "capitalize" }}
+                  >
+                    {selectedStaff.police_verification_status === "verified"
+                      ? "Verified ✓"
+                      : selectedStaff.police_verification_status?.replace("_", " ") || "Pending"}
                   </span>
                 </div>
               </div>
               <div>
                 <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>ID Document</div>
                 <div style={{ fontWeight: 500, marginTop: "0.2rem" }}>
-                  {selectedStaff.id_type ? `${selectedStaff.id_type}: ` : ""}{selectedStaff.id_number || "–"}
+                  {selectedStaff.id_type ? `${selectedStaff.id_type}: ` : ""}
+                  {selectedStaff.id_number || "–"}
                 </div>
               </div>
             </div>
 
             {/* Assigned Units */}
             <div>
-              <h4 style={{ fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.5rem" }}>🚪 Assigned Residential Units</h4>
+              <h4 style={{ fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.5rem" }}>
+                🚪 Assigned Residential Units
+              </h4>
               {assignments && assignments.length > 0 ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
                   {assignments.map((asg: StaffAssignment) => (
-                    <div key={asg.id} style={{ padding: "0.5rem 0.75rem", background: "#ffffff", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", display: "flex", justifyContent: "space-between", fontSize: "0.85rem" }}>
-                      <span><strong>Unit {asg.unit_number || asg.unit_id}</strong> ({asg.tower_name || "Tower"})</span>
+                    <div
+                      key={asg.id}
+                      style={{
+                        padding: "0.5rem 0.75rem",
+                        background: "#ffffff",
+                        border: "1px solid var(--border)",
+                        borderRadius: "var(--radius-sm)",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        fontSize: "0.85rem",
+                      }}
+                    >
+                      <span>
+                        <strong>Unit {asg.unit_number || asg.unit_id}</strong> (
+                        {asg.tower_name || "Tower"})
+                      </span>
                       <span className="badge badge-success">Active Service</span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div style={{ fontSize: "0.8rem", color: "var(--muted)", fontStyle: "italic" }}>No residential units currently assigned.</div>
+                <div style={{ fontSize: "0.8rem", color: "var(--muted)", fontStyle: "italic" }}>
+                  No residential units currently assigned.
+                </div>
               )}
             </div>
           </div>
@@ -422,15 +510,34 @@ export default function CommunityAdminStaffPage() {
         onClose={() => setIsCheckInModalOpen(false)}
         title="Record Staff Gate Check-In"
       >
-        <form onSubmit={handleCheckIn} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+        <form
+          onSubmit={handleCheckIn}
+          style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
+        >
           {errorMessage && (
-            <div style={{ padding: "0.6rem 0.8rem", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "var(--radius-sm)", color: "#b91c1c", fontSize: "0.85rem" }}>
+            <div
+              style={{
+                padding: "0.6rem 0.8rem",
+                background: "#fef2f2",
+                border: "1px solid #fecaca",
+                borderRadius: "var(--radius-sm)",
+                color: "#b91c1c",
+                fontSize: "0.85rem",
+              }}
+            >
               {errorMessage}
             </div>
           )}
 
           <div>
-            <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+            <label
+              style={{
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                display: "block",
+                marginBottom: "0.25rem",
+              }}
+            >
               Select Staff Member
             </label>
             <select
@@ -449,7 +556,14 @@ export default function CommunityAdminStaffPage() {
           </div>
 
           <div>
-            <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+            <label
+              style={{
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                display: "block",
+                marginBottom: "0.25rem",
+              }}
+            >
               Entry Gate (Optional)
             </label>
             <select
@@ -466,11 +580,26 @@ export default function CommunityAdminStaffPage() {
             </select>
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "1rem" }}>
-            <button type="button" className="btn btn-secondary" onClick={() => setIsCheckInModalOpen(false)}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: "0.5rem",
+              marginTop: "1rem",
+            }}
+          >
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setIsCheckInModalOpen(false)}
+            >
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary" disabled={isSubmitting || !checkInForm.staff_id}>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={isSubmitting || !checkInForm.staff_id}
+            >
               {isSubmitting ? "Recording…" : "Confirm Check-In"}
             </button>
           </div>
@@ -483,15 +612,34 @@ export default function CommunityAdminStaffPage() {
         onClose={() => setIsAddStaffModalOpen(false)}
         title="Register New Domestic Staff"
       >
-        <form onSubmit={handleAddStaff} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+        <form
+          onSubmit={handleAddStaff}
+          style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
+        >
           {errorMessage && (
-            <div style={{ padding: "0.6rem 0.8rem", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "var(--radius-sm)", color: "#b91c1c", fontSize: "0.85rem" }}>
+            <div
+              style={{
+                padding: "0.6rem 0.8rem",
+                background: "#fef2f2",
+                border: "1px solid #fecaca",
+                borderRadius: "var(--radius-sm)",
+                color: "#b91c1c",
+                fontSize: "0.85rem",
+              }}
+            >
               {errorMessage}
             </div>
           )}
 
           <div>
-            <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+            <label
+              style={{
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                display: "block",
+                marginBottom: "0.25rem",
+              }}
+            >
               Full Name
             </label>
             <input
@@ -505,7 +653,14 @@ export default function CommunityAdminStaffPage() {
           </div>
 
           <div>
-            <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+            <label
+              style={{
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                display: "block",
+                marginBottom: "0.25rem",
+              }}
+            >
               Phone Number
             </label>
             <input
@@ -519,13 +674,22 @@ export default function CommunityAdminStaffPage() {
           </div>
 
           <div>
-            <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+            <label
+              style={{
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                display: "block",
+                marginBottom: "0.25rem",
+              }}
+            >
               Role / Profession
             </label>
             <select
               className="select-field"
               value={newStaffForm.staff_type}
-              onChange={(e) => setNewStaffForm({ ...newStaffForm, staff_type: e.target.value as StaffType })}
+              onChange={(e) =>
+                setNewStaffForm({ ...newStaffForm, staff_type: e.target.value as StaffType })
+              }
             >
               <option value="maid">Maid / Housekeeper</option>
               <option value="cook">Cook / Chef</option>
@@ -540,7 +704,14 @@ export default function CommunityAdminStaffPage() {
 
           <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: "0.75rem" }}>
             <div>
-              <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+              <label
+                style={{
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  display: "block",
+                  marginBottom: "0.25rem",
+                }}
+              >
                 Govt ID Type
               </label>
               <select
@@ -556,7 +727,14 @@ export default function CommunityAdminStaffPage() {
               </select>
             </div>
             <div>
-              <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+              <label
+                style={{
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  display: "block",
+                  marginBottom: "0.25rem",
+                }}
+              >
                 ID Number
               </label>
               <input
@@ -586,8 +764,19 @@ export default function CommunityAdminStaffPage() {
             </label>
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "1rem" }}>
-            <button type="button" className="btn btn-secondary" onClick={() => setIsAddStaffModalOpen(false)}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: "0.5rem",
+              marginTop: "1rem",
+            }}
+          >
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setIsAddStaffModalOpen(false)}
+            >
               Cancel
             </button>
             <button type="submit" className="btn btn-primary" disabled={isSubmitting}>

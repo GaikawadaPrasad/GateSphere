@@ -1,5 +1,13 @@
 /** Matches backend StaffRead schema exactly */
-export type StaffType = "maid" | "cook" | "driver" | "nanny" | "caretaker" | "gardener" | "nurse" | "other";
+export type StaffType =
+  | "maid"
+  | "cook"
+  | "driver"
+  | "nanny"
+  | "caretaker"
+  | "gardener"
+  | "nurse"
+  | "other";
 export type VerificationStatus = "not_started" | "pending" | "verified" | "rejected" | "expired";
 
 export interface Staff {

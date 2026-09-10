@@ -23,16 +23,23 @@ export default function SecurityGuardBlacklistCheckPage() {
       <PageHeader
         title="Instant Blacklist Lookup Console"
         subtitle="Perform high-speed identity and vehicle plate checks against the security blacklist registry"
-        breadcrumbs={[{ label: "GateSphere" }, { label: "Security Guard" }, { label: "Blacklist Check" }]}
+        breadcrumbs={[
+          { label: "GateSphere" },
+          { label: "Security Guard" },
+          { label: "Blacklist Check" },
+        ]}
       />
 
-      <div className="card" style={{ marginBottom: "1.75rem", background: "linear-gradient(135deg, #ffffff, #f8fafc)" }}>
+      <div
+        className="card"
+        style={{ marginBottom: "1.75rem", background: "linear-gradient(135deg, #ffffff, #f8fafc)" }}
+      >
         <h3 className="card-title" style={{ marginBottom: "1rem" }}>
           🔍 Instant Identity / Vehicle Check
         </h3>
 
         <form onSubmit={handleSearch} style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: 260 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <input
               type="text"
               className="input-field"
@@ -66,20 +73,42 @@ export default function SecurityGuardBlacklistCheckPage() {
                 padding: "1.5rem",
               }}
             >
-              <h3 style={{ fontSize: "1.25rem", fontWeight: 700, marginBottom: "0.75rem", color: "#991b1b" }}>
+              <h3
+                style={{
+                  fontSize: "1.25rem",
+                  fontWeight: 700,
+                  marginBottom: "0.75rem",
+                  color: "#991b1b",
+                }}
+              >
                 🚨 ENTRY RESTRICTED — MATCH FOUND IN BLACKLIST REGISTRY
               </h3>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem", marginBottom: "1rem" }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                  gap: "1rem",
+                  marginBottom: "1rem",
+                }}
+              >
                 <div>
-                  <div style={{ fontSize: "0.75rem", textTransform: "uppercase", fontWeight: 600 }}>Blacklisted Person / Entity</div>
+                  <div style={{ fontSize: "0.75rem", textTransform: "uppercase", fontWeight: 600 }}>
+                    Blacklisted Person / Entity
+                  </div>
                   <div style={{ fontSize: "1.1rem", fontWeight: 700 }}>{result.entry.name}</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: "0.75rem", textTransform: "uppercase", fontWeight: 600 }}>Vehicle Plate #</div>
-                  <div style={{ fontSize: "1.1rem", fontWeight: 700, fontFamily: "monospace" }}>{result.entry.vehicle_number || "N/A"}</div>
+                  <div style={{ fontSize: "0.75rem", textTransform: "uppercase", fontWeight: 600 }}>
+                    Vehicle Plate #
+                  </div>
+                  <div style={{ fontSize: "1.1rem", fontWeight: 700, fontFamily: "monospace" }}>
+                    {result.entry.vehicle_number || "N/A"}
+                  </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: "0.75rem", textTransform: "uppercase", fontWeight: 600 }}>Recorded Security Reason</div>
+                  <div style={{ fontSize: "0.75rem", textTransform: "uppercase", fontWeight: 600 }}>
+                    Recorded Security Reason
+                  </div>
                   <div style={{ fontSize: "0.95rem", fontWeight: 600 }}>{result.entry.reason}</div>
                 </div>
               </div>
@@ -93,7 +122,8 @@ export default function SecurityGuardBlacklistCheckPage() {
                   fontSize: "0.9rem",
                 }}
               >
-                🛑 MANDATORY ACTION: DO NOT ALLOW GATE ENTRY. Notify Security Supervisor immediately.
+                🛑 MANDATORY ACTION: DO NOT ALLOW GATE ENTRY. Notify Security Supervisor
+                immediately.
               </div>
             </div>
           ) : (
@@ -106,11 +136,19 @@ export default function SecurityGuardBlacklistCheckPage() {
                 padding: "1.5rem",
               }}
             >
-              <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "0.5rem", color: "#065f46" }}>
+              <h3
+                style={{
+                  fontSize: "1.1rem",
+                  fontWeight: 700,
+                  marginBottom: "0.5rem",
+                  color: "#065f46",
+                }}
+              >
                 ✅ NO RESTRICTIONS FOUND
               </h3>
               <p style={{ color: "#047857", fontSize: "0.9rem" }}>
-                No blacklist entries or security violations match &quot;{query}&quot;. Normal gate verification workflow may proceed.
+                No blacklist entries or security violations match &quot;{query}&quot;. Normal gate
+                verification workflow may proceed.
               </p>
             </div>
           )}

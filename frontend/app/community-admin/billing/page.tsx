@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 import { useUiStore } from "@/store/ui";
-import { useInvoices, usePayments, useChargeHeads, useBillingRules, useUnitLedger } from "@/hooks/use-billing";
+import {
+  useInvoices,
+  usePayments,
+  useChargeHeads,
+  useBillingRules,
+  useUnitLedger,
+} from "@/hooks/use-billing";
 import { useFinancialStats } from "@/hooks/use-dashboards";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, type Column } from "@/components/tables/DataTable";
@@ -30,9 +36,13 @@ export default function CommunityAdminBillingPage() {
     community_id: activeCommunityId || undefined,
     page_size: 50,
   });
-  const { data: chargeHeads, isLoading: chargeHeadsLoading } = useChargeHeads(activeCommunityId || undefined);
+  const { data: chargeHeads, isLoading: chargeHeadsLoading } = useChargeHeads(
+    activeCommunityId || undefined,
+  );
   const { data: billingRules } = useBillingRules(activeCommunityId || undefined);
-  const { data: ledgerEntries, isLoading: ledgerLoading } = useUnitLedger(selectedUnitId || undefined);
+  const { data: ledgerEntries, isLoading: ledgerLoading } = useUnitLedger(
+    selectedUnitId || undefined,
+  );
 
   // Handle Export CSV
   const handleExportInvoices = async () => {
@@ -94,7 +104,12 @@ export default function CommunityAdminBillingPage() {
       key: "balance_due",
       header: "Balance Due",
       render: (i) => (
-        <span style={{ fontWeight: Number(i.balance_due) > 0 ? 600 : 400, color: Number(i.balance_due) > 0 ? "#dc2626" : "var(--fg)" }}>
+        <span
+          style={{
+            fontWeight: Number(i.balance_due) > 0 ? 600 : 400,
+            color: Number(i.balance_due) > 0 ? "#dc2626" : "var(--fg)",
+          }}
+        >
           {formatCurrency(Number(i.balance_due))}
         </span>
       ),
@@ -133,19 +148,27 @@ export default function CommunityAdminBillingPage() {
       render: (p) => (
         <div>
           <strong>{p.payment_reference}</strong>
-          {p.receipt_number && <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>#{p.receipt_number}</div>}
+          {p.receipt_number && (
+            <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>#{p.receipt_number}</div>
+          )}
         </div>
       ),
     },
     {
       key: "amount",
       header: "Amount",
-      render: (p) => <strong style={{ color: "#059669" }}>{formatCurrency(Number(p.amount))}</strong>,
+      render: (p) => (
+        <strong style={{ color: "#059669" }}>{formatCurrency(Number(p.amount))}</strong>
+      ),
     },
     {
       key: "payment_method",
       header: "Payment Method",
-      render: (p) => <span className="badge badge-neutral" style={{ textTransform: "capitalize" }}>{p.payment_method}</span>,
+      render: (p) => (
+        <span className="badge badge-neutral" style={{ textTransform: "capitalize" }}>
+          {p.payment_method}
+        </span>
+      ),
     },
     {
       key: "payment_status",
@@ -162,10 +185,34 @@ export default function CommunityAdminBillingPage() {
   // Charge Heads Columns
   const chargeHeadColumns: Column<ChargeHead>[] = [
     { key: "name", header: "Charge Name", render: (c) => <strong>{c.name}</strong> },
-    { key: "code", header: "Code", render: (c) => <span className="badge badge-neutral">{c.code}</span> },
-    { key: "charge_type", header: "Type", render: (c) => <span className="badge badge-primary" style={{ textTransform: "capitalize" }}>{c.charge_type}</span> },
-    { key: "default_amount", header: "Default Rate", render: (c) => formatCurrency(Number(c.default_amount)) },
-    { key: "is_active", header: "Status", render: (c) => <span className={`badge ${c.is_active ? "badge-success" : "badge-neutral"}`}>{c.is_active ? "Active" : "Disabled"}</span> },
+    {
+      key: "code",
+      header: "Code",
+      render: (c) => <span className="badge badge-neutral">{c.code}</span>,
+    },
+    {
+      key: "charge_type",
+      header: "Type",
+      render: (c) => (
+        <span className="badge badge-primary" style={{ textTransform: "capitalize" }}>
+          {c.charge_type}
+        </span>
+      ),
+    },
+    {
+      key: "default_amount",
+      header: "Default Rate",
+      render: (c) => formatCurrency(Number(c.default_amount)),
+    },
+    {
+      key: "is_active",
+      header: "Status",
+      render: (c) => (
+        <span className={`badge ${c.is_active ? "badge-success" : "badge-neutral"}`}>
+          {c.is_active ? "Active" : "Disabled"}
+        </span>
+      ),
+    },
   ];
 
   // Ledger Columns
@@ -176,7 +223,10 @@ export default function CommunityAdminBillingPage() {
       key: "entry_type",
       header: "Type",
       render: (l) => (
-        <span className={`badge ${l.entry_type === "credit" ? "badge-success" : "badge-warning"}`} style={{ textTransform: "uppercase" }}>
+        <span
+          className={`badge ${l.entry_type === "credit" ? "badge-success" : "badge-warning"}`}
+          style={{ textTransform: "uppercase" }}
+        >
           {l.entry_type}
         </span>
       ),
@@ -186,11 +236,16 @@ export default function CommunityAdminBillingPage() {
       header: "Amount",
       render: (l) => (
         <strong style={{ color: l.entry_type === "credit" ? "#059669" : "#dc2626" }}>
-          {l.entry_type === "credit" ? "+" : "-"}{formatCurrency(Number(l.amount))}
+          {l.entry_type === "credit" ? "+" : "-"}
+          {formatCurrency(Number(l.amount))}
         </strong>
       ),
     },
-    { key: "balance_after", header: "Balance After", render: (l) => formatCurrency(Number(l.balance_after)) },
+    {
+      key: "balance_after",
+      header: "Balance After",
+      render: (l) => formatCurrency(Number(l.balance_after)),
+    },
   ];
 
   const billed = Number(financial?.total_billed || 0);
@@ -228,29 +283,67 @@ export default function CommunityAdminBillingPage() {
       />
 
       {/* Financial Health Overview KPI Row */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem" }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gap: "1rem",
+        }}
+      >
         <div className="card">
-          <div style={{ fontSize: "0.75rem", color: "var(--muted)", fontWeight: 500 }}>Total Invoiced</div>
-          <div style={{ fontSize: "1.4rem", fontWeight: 700, color: "var(--fg)", marginTop: "0.25rem" }}>
+          <div style={{ fontSize: "0.75rem", color: "var(--muted)", fontWeight: 500 }}>
+            Total Invoiced
+          </div>
+          <div
+            style={{
+              fontSize: "1.4rem",
+              fontWeight: 700,
+              color: "var(--fg)",
+              marginTop: "0.25rem",
+            }}
+          >
             {formatCurrency(billed)}
           </div>
-          <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.25rem" }}>Maintenance billed</div>
+          <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.25rem" }}>
+            Maintenance billed
+          </div>
         </div>
 
         <div className="card">
-          <div style={{ fontSize: "0.75rem", color: "var(--muted)", fontWeight: 500 }}>Total Collected</div>
-          <div style={{ fontSize: "1.4rem", fontWeight: 700, color: "#059669", marginTop: "0.25rem" }}>
+          <div style={{ fontSize: "0.75rem", color: "var(--muted)", fontWeight: 500 }}>
+            Total Collected
+          </div>
+          <div
+            style={{ fontSize: "1.4rem", fontWeight: 700, color: "#059669", marginTop: "0.25rem" }}
+          >
             {formatCurrency(collected)}
           </div>
-          <div style={{ fontSize: "0.75rem", color: "#059669", marginTop: "0.25rem" }}>{collectionRate}% collection rate</div>
+          <div style={{ fontSize: "0.75rem", color: "#059669", marginTop: "0.25rem" }}>
+            {collectionRate}% collection rate
+          </div>
         </div>
 
         <div className="card">
-          <div style={{ fontSize: "0.75rem", color: "var(--muted)", fontWeight: 500 }}>Outstanding Balance</div>
-          <div style={{ fontSize: "1.4rem", fontWeight: 700, color: outstanding > 0 ? "#dc2626" : "var(--fg)", marginTop: "0.25rem" }}>
+          <div style={{ fontSize: "0.75rem", color: "var(--muted)", fontWeight: 500 }}>
+            Outstanding Balance
+          </div>
+          <div
+            style={{
+              fontSize: "1.4rem",
+              fontWeight: 700,
+              color: outstanding > 0 ? "#dc2626" : "var(--fg)",
+              marginTop: "0.25rem",
+            }}
+          >
             {formatCurrency(outstanding)}
           </div>
-          <div style={{ fontSize: "0.75rem", color: outstanding > 0 ? "#dc2626" : "var(--muted)", marginTop: "0.25rem" }}>
+          <div
+            style={{
+              fontSize: "0.75rem",
+              color: outstanding > 0 ? "#dc2626" : "var(--muted)",
+              marginTop: "0.25rem",
+            }}
+          >
             {outstanding > 0 ? "Pending resident dues" : "Zero arrears"}
           </div>
         </div>
@@ -268,7 +361,8 @@ export default function CommunityAdminBillingPage() {
             fontSize: "0.95rem",
             fontWeight: activeTab === "invoices" ? 700 : 500,
             color: activeTab === "invoices" ? "var(--primary)" : "var(--muted)",
-            borderBottom: activeTab === "invoices" ? "2px solid var(--primary)" : "2px solid transparent",
+            borderBottom:
+              activeTab === "invoices" ? "2px solid var(--primary)" : "2px solid transparent",
             cursor: "pointer",
           }}
         >
@@ -285,7 +379,8 @@ export default function CommunityAdminBillingPage() {
             fontSize: "0.95rem",
             fontWeight: activeTab === "payments" ? 700 : 500,
             color: activeTab === "payments" ? "var(--primary)" : "var(--muted)",
-            borderBottom: activeTab === "payments" ? "2px solid var(--primary)" : "2px solid transparent",
+            borderBottom:
+              activeTab === "payments" ? "2px solid var(--primary)" : "2px solid transparent",
             cursor: "pointer",
           }}
         >
@@ -302,7 +397,8 @@ export default function CommunityAdminBillingPage() {
             fontSize: "0.95rem",
             fontWeight: activeTab === "rules" ? 700 : 500,
             color: activeTab === "rules" ? "var(--primary)" : "var(--muted)",
-            borderBottom: activeTab === "rules" ? "2px solid var(--primary)" : "2px solid transparent",
+            borderBottom:
+              activeTab === "rules" ? "2px solid var(--primary)" : "2px solid transparent",
             cursor: "pointer",
           }}
         >
@@ -352,32 +448,55 @@ export default function CommunityAdminBillingPage() {
         <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
           {billingRules && (
             <div className="card" style={{ background: "#f8fafc" }}>
-              <h4 style={{ marginBottom: "0.75rem", fontSize: "0.9rem" }}>📋 Community Billing Rules</h4>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "1rem" }}>
+              <h4 style={{ marginBottom: "0.75rem", fontSize: "0.9rem" }}>
+                📋 Community Billing Rules
+              </h4>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                  gap: "1rem",
+                }}
+              >
                 <div>
                   <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Billing Cycle</div>
-                  <div style={{ fontWeight: 600, textTransform: "capitalize", marginTop: "0.15rem" }}>
-                    {(billingRules as any)?.billing_frequency || (billingRules as any)?.[0]?.billing_frequency || "Monthly"}
+                  <div
+                    style={{ fontWeight: 600, textTransform: "capitalize", marginTop: "0.15rem" }}
+                  >
+                    {(billingRules as any)?.billing_frequency ||
+                      (billingRules as any)?.[0]?.billing_frequency ||
+                      "Monthly"}
                   </div>
                 </div>
                 <div>
                   <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Payment Window</div>
                   <div style={{ fontWeight: 600, marginTop: "0.15rem" }}>
-                    {(billingRules as any)?.due_days ?? (billingRules as any)?.[0]?.due_days ?? 15} days from issue
+                    {(billingRules as any)?.due_days ?? (billingRules as any)?.[0]?.due_days ?? 15}{" "}
+                    days from issue
                   </div>
                 </div>
                 <div>
                   <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Grace Period</div>
                   <div style={{ fontWeight: 600, marginTop: "0.15rem" }}>
-                    {(billingRules as any)?.grace_period_days ?? (billingRules as any)?.[0]?.grace_period_days ?? 5} days
+                    {(billingRules as any)?.grace_period_days ??
+                      (billingRules as any)?.[0]?.grace_period_days ??
+                      5}{" "}
+                    days
                   </div>
                 </div>
                 <div>
                   <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Late Fee Penalty</div>
                   <div style={{ fontWeight: 600, marginTop: "0.15rem" }}>
-                    {((billingRules as any)?.late_fee_type || (billingRules as any)?.[0]?.late_fee_type) === "percentage"
+                    {((billingRules as any)?.late_fee_type ||
+                      (billingRules as any)?.[0]?.late_fee_type) === "percentage"
                       ? `${(billingRules as any)?.late_fee_amount ?? (billingRules as any)?.[0]?.late_fee_amount ?? 5}%`
-                      : formatCurrency(Number((billingRules as any)?.late_fee_amount ?? (billingRules as any)?.[0]?.late_fee_amount ?? 0))}
+                      : formatCurrency(
+                          Number(
+                            (billingRules as any)?.late_fee_amount ??
+                              (billingRules as any)?.[0]?.late_fee_amount ??
+                              0,
+                          ),
+                        )}
                   </div>
                 </div>
               </div>

@@ -21,7 +21,8 @@ export default function ResidentsPage() {
 
   const { data: residents, isLoading } = useQuery({
     queryKey: ["residents", "list", { page, page_size: pageSize, community_id: communityId }],
-    queryFn: () => residentsApi.list({ page, page_size: pageSize, community_id: communityId || undefined }),
+    queryFn: () =>
+      residentsApi.list({ page, page_size: pageSize, community_id: communityId || undefined }),
   });
 
   const columns: Column<ResidentProfile>[] = [
@@ -31,7 +32,9 @@ export default function ResidentsPage() {
       render: (r) => (
         <div>
           <div style={{ fontWeight: 600, color: "var(--fg)" }}>{r.full_name}</div>
-          <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>{r.email || r.phone || "No contact"}</div>
+          <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+            {r.email || r.phone || "No contact"}
+          </div>
         </div>
       ),
     },
@@ -70,7 +73,10 @@ export default function ResidentsPage() {
       <PageHeader
         title="Global Residents Directory"
         subtitle="View registered owners, tenants, and family occupants across communities"
-        breadcrumbs={[{ label: "Super Admin", href: "/super-admin/dashboard" }, { label: "Residents" }]}
+        breadcrumbs={[
+          { label: "Super Admin", href: "/super-admin/dashboard" },
+          { label: "Residents" },
+        ]}
       />
 
       <div className="card">

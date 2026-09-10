@@ -36,7 +36,9 @@ export default function BillingPage() {
       render: (inv) => (
         <div>
           <span style={{ fontWeight: 600, color: "var(--fg)" }}>{inv.invoice_number}</span>
-          <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Unit {inv.unit_number || "–"}</div>
+          <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+            Unit {inv.unit_number || "–"}
+          </div>
         </div>
       ),
     },
@@ -51,7 +53,12 @@ export default function BillingPage() {
       header: "Balance Due",
       align: "right",
       render: (inv) => (
-        <span style={{ color: parseFloat(inv.balance_due) > 0 ? "var(--danger)" : "var(--success)", fontWeight: 500 }}>
+        <span
+          style={{
+            color: parseFloat(inv.balance_due) > 0 ? "var(--danger)" : "var(--success)",
+            fontWeight: 500,
+          }}
+        >
           {formatCurrency(inv.balance_due)}
         </span>
       ),
@@ -80,7 +87,9 @@ export default function BillingPage() {
       key: "amount",
       header: "Amount",
       align: "right",
-      render: (p) => <span style={{ fontWeight: 600, color: "var(--success)" }}>{formatCurrency(p.amount)}</span>,
+      render: (p) => (
+        <span style={{ fontWeight: 600, color: "var(--success)" }}>{formatCurrency(p.amount)}</span>
+      ),
     },
     {
       key: "payment_method",
@@ -107,7 +116,10 @@ export default function BillingPage() {
       <PageHeader
         title="Billing & Financial Overview"
         subtitle="Global maintenance invoices, ledger health, and simulated payments"
-        breadcrumbs={[{ label: "Super Admin", href: "/super-admin/dashboard" }, { label: "Billing & Finance" }]}
+        breadcrumbs={[
+          { label: "Super Admin", href: "/super-admin/dashboard" },
+          { label: "Billing & Finance" },
+        ]}
         actions={
           <select
             className="select-field"

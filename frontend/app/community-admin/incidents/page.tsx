@@ -43,16 +43,26 @@ export default function CommunityAdminIncidentsPage() {
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
 
   // Queries
-  const { data: incidents, isLoading: incidentsLoading, refetch: refetchIncidents } = useIncidents({
+  const {
+    data: incidents,
+    isLoading: incidentsLoading,
+    refetch: refetchIncidents,
+  } = useIncidents({
     community_id: activeCommunityId || undefined,
     incident_status: statusFilter || undefined,
     severity: severityFilter || undefined,
     q: searchTerm || undefined,
   });
 
-  const { data: incidentDetail, refetch: refetchDetail } = useIncidentDetails(selectedIncidentId || undefined);
-  const { data: history, refetch: refetchHistory } = useIncidentHistory(selectedIncidentId || undefined);
-  const { data: actions, refetch: refetchActions } = useIncidentActions(selectedIncidentId || undefined);
+  const { data: incidentDetail, refetch: refetchDetail } = useIncidentDetails(
+    selectedIncidentId || undefined,
+  );
+  const { data: history, refetch: refetchHistory } = useIncidentHistory(
+    selectedIncidentId || undefined,
+  );
+  const { data: actions, refetch: refetchActions } = useIncidentActions(
+    selectedIncidentId || undefined,
+  );
 
   // Mutations
   const createIncident = useCreateIncident();
@@ -91,12 +101,19 @@ export default function CommunityAdminIncidentsPage() {
       await createIncident.mutateAsync({
         incident_type: newIncidentForm.incident_type,
         severity: newIncidentForm.severity,
-        location_text: newIncidentForm.location_text ? newIncidentForm.location_text.trim() : undefined,
+        location_text: newIncidentForm.location_text
+          ? newIncidentForm.location_text.trim()
+          : undefined,
         description: newIncidentForm.description.trim(),
         community_id: activeCommunityId || undefined,
       });
       setIsCreateModalOpen(false);
-      setNewIncidentForm({ incident_type: "suspicious", severity: "medium", location_text: "", description: "" });
+      setNewIncidentForm({
+        incident_type: "suspicious",
+        severity: "medium",
+        location_text: "",
+        description: "",
+      });
       refetchIncidents();
     } catch (err: unknown) {
       console.error(err);
@@ -123,7 +140,8 @@ export default function CommunityAdminIncidentsPage() {
         payload: {
           status: transitionStatus,
           reason: transitionReason.trim() || undefined,
-          resolution_summary: transitionStatus === "resolved" ? resolutionSummary.trim() : undefined,
+          resolution_summary:
+            transitionStatus === "resolved" ? resolutionSummary.trim() : undefined,
         },
       });
       setIsTransitionModalOpen(false);
@@ -206,7 +224,9 @@ export default function CommunityAdminIncidentsPage() {
       render: (i) => (
         <div>
           <strong style={{ textTransform: "capitalize" }}>{i.incident_type} Incident</strong>
-          <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>📍 {i.location_text || "Community Grounds"}</div>
+          <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+            📍 {i.location_text || "Community Grounds"}
+          </div>
         </div>
       ),
     },
@@ -256,7 +276,14 @@ export default function CommunityAdminIncidentsPage() {
         description="Community security incident tracking, escalation logs, action timelines, and resolution workflows."
         action={
           <div style={{ display: "flex", gap: "0.5rem" }}>
-            <button type="button" className="btn btn-primary" onClick={() => { setErrorMessage(null); setIsCreateModalOpen(true); }}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                setErrorMessage(null);
+                setIsCreateModalOpen(true);
+              }}
+            >
               🚨 Log Incident Report
             </button>
           </div>
@@ -301,12 +328,30 @@ export default function CommunityAdminIncidentsPage() {
       <Modal
         isOpen={Boolean(selectedIncidentId)}
         onClose={() => setSelectedIncidentId(null)}
-        title={incidentDetail ? `Incident: ${incidentDetail.incident_number || "Detail"}` : "Incident Detail"}
+        title={
+          incidentDetail
+            ? `Incident: ${incidentDetail.incident_number || "Detail"}`
+            : "Incident Detail"
+        }
       >
         {incidentDetail && (
           <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-            <div style={{ background: "#f8fafc", padding: "1rem", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+            <div
+              style={{
+                background: "#f8fafc",
+                padding: "1rem",
+                borderRadius: "var(--radius-sm)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "0.5rem",
+                }}
+              >
                 <div style={{ display: "flex", gap: "0.5rem" }}>
                   {getSeverityBadge(incidentDetail.severity)}
                   {getStatusBadge(incidentDetail.status)}
@@ -327,7 +372,8 @@ export default function CommunityAdminIncidentsPage() {
                 )}
               </div>
               <div style={{ fontSize: "0.85rem", color: "var(--fg)", marginTop: "0.5rem" }}>
-                <strong>Type:</strong> <span style={{ textTransform: "capitalize" }}>{incidentDetail.incident_type}</span>
+                <strong>Type:</strong>{" "}
+                <span style={{ textTransform: "capitalize" }}>{incidentDetail.incident_type}</span>
               </div>
               {incidentDetail.description && (
                 <div style={{ fontSize: "0.85rem", color: "var(--fg)", marginTop: "0.3rem" }}>
@@ -335,31 +381,72 @@ export default function CommunityAdminIncidentsPage() {
                 </div>
               )}
               {incidentDetail.resolution_summary && (
-                <div style={{ fontSize: "0.85rem", color: "#065f46", marginTop: "0.3rem", background: "#ecfdf5", padding: "0.5rem", borderRadius: "var(--radius-sm)" }}>
+                <div
+                  style={{
+                    fontSize: "0.85rem",
+                    color: "#065f46",
+                    marginTop: "0.3rem",
+                    background: "#ecfdf5",
+                    padding: "0.5rem",
+                    borderRadius: "var(--radius-sm)",
+                  }}
+                >
                   <strong>Resolution Summary:</strong> {incidentDetail.resolution_summary}
                 </div>
               )}
               <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.5rem" }}>
-                📍 Location: {incidentDetail.location_text || "Community Grounds"} · Reported {formatDateTime(incidentDetail.reported_at || incidentDetail.created_at)}
+                📍 Location: {incidentDetail.location_text || "Community Grounds"} · Reported{" "}
+                {formatDateTime(incidentDetail.reported_at || incidentDetail.created_at)}
               </div>
             </div>
 
             {/* Actions Timeline */}
             <div>
-              <h4 style={{ fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.5rem" }}>📋 Actions Taken &amp; Investigation Log</h4>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", maxHeight: 180, overflowY: "auto", marginBottom: "0.75rem" }}>
+              <h4 style={{ fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.5rem" }}>
+                📋 Actions Taken &amp; Investigation Log
+              </h4>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.5rem",
+                  maxHeight: 180,
+                  overflowY: "auto",
+                  marginBottom: "0.75rem",
+                }}
+              >
                 {actions && actions.length > 0 ? (
                   actions.map((act: IncidentAction) => (
-                    <div key={act.id} style={{ padding: "0.5rem 0.75rem", background: "#ffffff", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: "0.8rem" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", color: "var(--muted)", fontSize: "0.7rem" }}>
+                    <div
+                      key={act.id}
+                      style={{
+                        padding: "0.5rem 0.75rem",
+                        background: "#ffffff",
+                        border: "1px solid var(--border)",
+                        borderRadius: "var(--radius-sm)",
+                        fontSize: "0.8rem",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          color: "var(--muted)",
+                          fontSize: "0.7rem",
+                        }}
+                      >
                         <span style={{ textTransform: "capitalize" }}>{act.action_type}</span>
                         <span>{formatDateTime(act.action_at || act.created_at)}</span>
                       </div>
-                      <div style={{ color: "var(--fg)", marginTop: "0.2rem" }}>{act.details || "Action noted"}</div>
+                      <div style={{ color: "var(--fg)", marginTop: "0.2rem" }}>
+                        {act.details || "Action noted"}
+                      </div>
                     </div>
                   ))
                 ) : (
-                  <div style={{ fontSize: "0.8rem", color: "var(--muted)", fontStyle: "italic" }}>No action notes logged yet.</div>
+                  <div style={{ fontSize: "0.8rem", color: "var(--muted)", fontStyle: "italic" }}>
+                    No action notes logged yet.
+                  </div>
                 )}
               </div>
 
@@ -372,7 +459,12 @@ export default function CommunityAdminIncidentsPage() {
                   value={newActionText}
                   onChange={(e) => setNewActionText(e.target.value)}
                 />
-                <button type="submit" className="btn btn-secondary" style={{ fontSize: "0.8rem" }} disabled={!newActionText.trim()}>
+                <button
+                  type="submit"
+                  className="btn btn-secondary"
+                  style={{ fontSize: "0.8rem" }}
+                  disabled={!newActionText.trim()}
+                >
                   Post
                 </button>
               </form>
@@ -380,17 +472,23 @@ export default function CommunityAdminIncidentsPage() {
 
             {/* Lifecycle History */}
             <div>
-              <h4 style={{ fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.5rem" }}>🕒 Lifecycle Status Transitions</h4>
+              <h4 style={{ fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.5rem" }}>
+                🕒 Lifecycle Status Transitions
+              </h4>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
                 {history && history.length > 0 ? (
                   history.map((h: IncidentHistory) => (
                     <div key={h.id} style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-                      • Transitioned {h.old_status ? `from ${h.old_status} ` : ""}→ <strong style={{ textTransform: "capitalize" }}>{h.new_status}</strong> on {formatDateTime(h.changed_at || h.created_at)}
+                      • Transitioned {h.old_status ? `from ${h.old_status} ` : ""}→{" "}
+                      <strong style={{ textTransform: "capitalize" }}>{h.new_status}</strong> on{" "}
+                      {formatDateTime(h.changed_at || h.created_at)}
                       {h.reason && <span> ({h.reason})</span>}
                     </div>
                   ))
                 ) : (
-                  <div style={{ fontSize: "0.8rem", color: "var(--muted)", fontStyle: "italic" }}>No status changes recorded.</div>
+                  <div style={{ fontSize: "0.8rem", color: "var(--muted)", fontStyle: "italic" }}>
+                    No status changes recorded.
+                  </div>
                 )}
               </div>
             </div>
@@ -404,22 +502,46 @@ export default function CommunityAdminIncidentsPage() {
         onClose={() => setIsCreateModalOpen(false)}
         title="🚨 Log Security Incident Report"
       >
-        <form onSubmit={handleCreateIncident} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+        <form
+          onSubmit={handleCreateIncident}
+          style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
+        >
           {errorMessage && (
-            <div style={{ padding: "0.6rem 0.8rem", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "var(--radius-sm)", color: "#b91c1c", fontSize: "0.85rem" }}>
+            <div
+              style={{
+                padding: "0.6rem 0.8rem",
+                background: "#fef2f2",
+                border: "1px solid #fecaca",
+                borderRadius: "var(--radius-sm)",
+                color: "#b91c1c",
+                fontSize: "0.85rem",
+              }}
+            >
               {errorMessage}
             </div>
           )}
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
             <div>
-              <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+              <label
+                style={{
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  display: "block",
+                  marginBottom: "0.25rem",
+                }}
+              >
                 Incident Category
               </label>
               <select
                 className="select-field"
                 value={newIncidentForm.incident_type}
-                onChange={(e) => setNewIncidentForm({ ...newIncidentForm, incident_type: e.target.value as IncidentType })}
+                onChange={(e) =>
+                  setNewIncidentForm({
+                    ...newIncidentForm,
+                    incident_type: e.target.value as IncidentType,
+                  })
+                }
               >
                 <option value="suspicious">Suspicious Activity</option>
                 <option value="breach">Security Breach</option>
@@ -434,13 +556,25 @@ export default function CommunityAdminIncidentsPage() {
             </div>
 
             <div>
-              <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+              <label
+                style={{
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  display: "block",
+                  marginBottom: "0.25rem",
+                }}
+              >
                 Severity
               </label>
               <select
                 className="select-field"
                 value={newIncidentForm.severity}
-                onChange={(e) => setNewIncidentForm({ ...newIncidentForm, severity: e.target.value as IncidentSeverity })}
+                onChange={(e) =>
+                  setNewIncidentForm({
+                    ...newIncidentForm,
+                    severity: e.target.value as IncidentSeverity,
+                  })
+                }
               >
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
@@ -451,7 +585,14 @@ export default function CommunityAdminIncidentsPage() {
           </div>
 
           <div>
-            <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+            <label
+              style={{
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                display: "block",
+                marginBottom: "0.25rem",
+              }}
+            >
               Location Text
             </label>
             <input
@@ -459,12 +600,21 @@ export default function CommunityAdminIncidentsPage() {
               className="input-field"
               placeholder="e.g. Tower B Basement Parking / Main Gate"
               value={newIncidentForm.location_text}
-              onChange={(e) => setNewIncidentForm({ ...newIncidentForm, location_text: e.target.value })}
+              onChange={(e) =>
+                setNewIncidentForm({ ...newIncidentForm, location_text: e.target.value })
+              }
             />
           </div>
 
           <div>
-            <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+            <label
+              style={{
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                display: "block",
+                marginBottom: "0.25rem",
+              }}
+            >
               Detailed Description
             </label>
             <textarea
@@ -473,12 +623,25 @@ export default function CommunityAdminIncidentsPage() {
               required
               placeholder="Describe the incident, people involved, and initial observations..."
               value={newIncidentForm.description}
-              onChange={(e) => setNewIncidentForm({ ...newIncidentForm, description: e.target.value })}
+              onChange={(e) =>
+                setNewIncidentForm({ ...newIncidentForm, description: e.target.value })
+              }
             />
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "1rem" }}>
-            <button type="button" className="btn btn-secondary" onClick={() => setIsCreateModalOpen(false)}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: "0.5rem",
+              marginTop: "1rem",
+            }}
+          >
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setIsCreateModalOpen(false)}
+            >
               Cancel
             </button>
             <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
@@ -494,15 +657,34 @@ export default function CommunityAdminIncidentsPage() {
         onClose={() => setIsTransitionModalOpen(false)}
         title="Update Incident Lifecycle Status"
       >
-        <form onSubmit={handleTransition} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+        <form
+          onSubmit={handleTransition}
+          style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
+        >
           {errorMessage && (
-            <div style={{ padding: "0.6rem 0.8rem", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "var(--radius-sm)", color: "#b91c1c", fontSize: "0.85rem" }}>
+            <div
+              style={{
+                padding: "0.6rem 0.8rem",
+                background: "#fef2f2",
+                border: "1px solid #fecaca",
+                borderRadius: "var(--radius-sm)",
+                color: "#b91c1c",
+                fontSize: "0.85rem",
+              }}
+            >
               {errorMessage}
             </div>
           )}
 
           <div>
-            <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+            <label
+              style={{
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                display: "block",
+                marginBottom: "0.25rem",
+              }}
+            >
               New Status
             </label>
             <select
@@ -522,7 +704,14 @@ export default function CommunityAdminIncidentsPage() {
           </div>
 
           <div>
-            <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+            <label
+              style={{
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                display: "block",
+                marginBottom: "0.25rem",
+              }}
+            >
               Transition Reason (Optional)
             </label>
             <input
@@ -536,7 +725,14 @@ export default function CommunityAdminIncidentsPage() {
 
           {transitionStatus === "resolved" && (
             <div>
-              <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+              <label
+                style={{
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  display: "block",
+                  marginBottom: "0.25rem",
+                }}
+              >
                 Resolution Summary <span style={{ color: "#dc2626" }}>*</span>
               </label>
               <textarea
@@ -550,8 +746,19 @@ export default function CommunityAdminIncidentsPage() {
             </div>
           )}
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "1rem" }}>
-            <button type="button" className="btn btn-secondary" onClick={() => setIsTransitionModalOpen(false)}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: "0.5rem",
+              marginTop: "1rem",
+            }}
+          >
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setIsTransitionModalOpen(false)}
+            >
               Cancel
             </button>
             <button type="submit" className="btn btn-primary" disabled={isSubmitting}>

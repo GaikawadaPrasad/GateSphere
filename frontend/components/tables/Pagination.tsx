@@ -6,7 +6,13 @@ interface PaginationProps {
   onPageSizeChange?: (size: number) => void;
 }
 
-export function Pagination({ page, pageSize, total, onPageChange, onPageSizeChange }: PaginationProps) {
+export function Pagination({
+  page,
+  pageSize,
+  total,
+  onPageChange,
+  onPageSizeChange,
+}: PaginationProps) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const startItem = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const endItem = Math.min(page * pageSize, total);
@@ -33,7 +39,9 @@ export function Pagination({ page, pageSize, total, onPageChange, onPageSizeChan
 
       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
         {onPageSizeChange && (
-          <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginRight: "1rem" }}>
+          <div
+            style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginRight: "1rem" }}
+          >
             <span style={{ color: "var(--muted)", fontSize: "0.8rem" }}>Per page:</span>
             <select
               className="select-field"

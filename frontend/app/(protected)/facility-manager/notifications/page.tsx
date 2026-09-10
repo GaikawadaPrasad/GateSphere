@@ -35,7 +35,11 @@ export default function FacilityManagerNotificationsPage() {
       <PageHeader
         title="Notifications & System Alerts"
         subtitle="Operational notifications for maintenance, vendors, service tickets, and emergency alerts"
-        breadcrumbs={[{ label: "GateSphere" }, { label: "Facility Manager" }, { label: "Notifications" }]}
+        breadcrumbs={[
+          { label: "GateSphere" },
+          { label: "Facility Manager" },
+          { label: "Notifications" },
+        ]}
         actions={
           <button className="btn btn-secondary" onClick={handleMarkAllRead}>
             ✓ Mark All as Read

@@ -100,7 +100,9 @@ export function useResidentOverview(communityId?: string | null) {
   return useQuery({
     queryKey: ["resident", "overview", communityId],
     queryFn: async () => {
-      const stats = await api.get<any>(`/dashboards/resident${communityId ? `?community_id=${communityId}` : ""}`);
+      const stats = await api.get<any>(
+        `/dashboards/resident${communityId ? `?community_id=${communityId}` : ""}`,
+      );
       return {
         pending_dues_amount: Number(stats?.pending_dues_amount ?? 0),
         pending_visitor_count: Number(stats?.pending_visitor_count ?? 0),
@@ -130,7 +132,9 @@ export function useResidentVisitors() {
         status: r.status,
         created_at: r.created_at,
         valid_until: r.valid_until,
-        pass_code: r.passes?.[0]?.pin || (r.passes?.[0]?.token ? `QR-${r.passes[0].token.slice(0, 6)}` : undefined),
+        pass_code:
+          r.passes?.[0]?.pin ||
+          (r.passes?.[0]?.token ? `QR-${r.passes[0].token.slice(0, 6)}` : undefined),
         qr_token: r.passes?.[0]?.token,
         entry_time: r.entries?.[0]?.entry_at,
         exit_time: r.entries?.[0]?.exit_at,
@@ -140,7 +144,15 @@ export function useResidentVisitors() {
   });
 
   const decideMutation = useMutation({
-    mutationFn: async ({ requestId, approved, note }: { requestId: string; approved: boolean; note?: string }) => {
+    mutationFn: async ({
+      requestId,
+      approved,
+      note,
+    }: {
+      requestId: string;
+      approved: boolean;
+      note?: string;
+    }) => {
       return await api.post(`/visitors/requests/${requestId}/decision`, {
         decision: approved ? "approved" : "rejected",
         remarks: note || (approved ? "Approved by resident" : "Rejected by resident"),
@@ -153,7 +165,11 @@ export function useResidentVisitors() {
   });
 
   const createPassMutation = useMutation({
-    mutationFn: async (payload: { visitor_name: string; phone: string; valid_for_hours: number }) => {
+    mutationFn: async (payload: {
+      visitor_name: string;
+      phone: string;
+      valid_for_hours: number;
+    }) => {
       const profile = await api.get<any>("/residents/me");
       const unitId = profile?.occupancies?.[0]?.unit_id;
       if (!unitId) {
@@ -193,8 +209,11 @@ export function useResidentDeliveries() {
       if (!Array.isArray(res)) return [];
       return res.map((d: any) => ({
         id: d.id,
-        courier_company: d.provider_name || (d.delivery_type ? d.delivery_type.toUpperCase() : "Courier"),
-        package_type: d.delivery_type ? `${d.delivery_type.toUpperCase()} Package` : "General Package",
+        courier_company:
+          d.provider_name || (d.delivery_type ? d.delivery_type.toUpperCase() : "Courier"),
+        package_type: d.delivery_type
+          ? `${d.delivery_type.toUpperCase()} Package`
+          : "General Package",
         tracking_id: d.tracking_reference || d.id.slice(0, 8),
         protocol: d.protocol_id || "allow_gate",
         status: d.status || "expected",
@@ -265,7 +284,8 @@ export function useResidentAmenities() {
         id: a.id,
         name: a.name,
         category: a.amenity_type ? a.amenity_type.toUpperCase() : "Facility",
-        description: a.description || `Community ${a.name} access. Capacity: ${a.capacity || 20} persons.`,
+        description:
+          a.description || `Community ${a.name} access. Capacity: ${a.capacity || 20} persons.`,
         capacity: a.capacity || 20,
         pricing_type: a.pricing_type || "free",
         price_per_hour: Number(a.price_per_hour ?? 0),
@@ -295,8 +315,12 @@ export function useResidentAmenities() {
         amenity_id: b.amenity_id,
         amenity_name: b.amenity?.name || amenitiesMap.get(b.amenity_id) || "Community Amenity",
         date: b.booking_date || (b.start_at ? b.start_at.split("T")[0] : ""),
-        start_time: b.start_at ? new Date(b.start_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
-        end_time: b.end_at ? new Date(b.end_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
+        start_time: b.start_at
+          ? new Date(b.start_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+          : "",
+        end_time: b.end_at
+          ? new Date(b.end_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+          : "",
         status: b.status || "confirmed",
         guests_count: b.participant_count || 1,
         total_amount: Number(b.amount_charged ?? 0),
@@ -305,7 +329,12 @@ export function useResidentAmenities() {
   });
 
   const bookMutation = useMutation({
-    mutationFn: async (payload: { amenity_id: string; slot_id: string; date: string; guests: number }) => {
+    mutationFn: async (payload: {
+      amenity_id: string;
+      slot_id: string;
+      date: string;
+      guests: number;
+    }) => {
       return await api.post("/amenities/bookings", {
         amenity_id: payload.amenity_id,
         slot_id: payload.slot_id,
@@ -322,7 +351,9 @@ export function useResidentAmenities() {
 
   const cancelMutation = useMutation({
     mutationFn: async (bookingId: string) => {
-      return await api.post(`/amenities/bookings/${bookingId}/cancel`, { reason: "Resident requested cancellation" });
+      return await api.post(`/amenities/bookings/${bookingId}/cancel`, {
+        reason: "Resident requested cancellation",
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["resident", "my-bookings"] });
@@ -372,7 +403,12 @@ export function useResidentComplaints() {
   });
 
   const createTicketMutation = useMutation({
-    mutationFn: async (payload: { subject: string; category_id?: string; description: string; priority: string }) => {
+    mutationFn: async (payload: {
+      subject: string;
+      category_id?: string;
+      description: string;
+      priority: string;
+    }) => {
       const profile = await api.get<any>("/residents/me");
       const unitId = profile?.occupancies?.[0]?.unit_id;
       if (!unitId) {
@@ -400,8 +436,19 @@ export function useResidentComplaints() {
   });
 
   const confirmTicketMutation = useMutation({
-    mutationFn: async ({ ticketId, satisfied, notes }: { ticketId: string; satisfied: boolean; notes?: string }) => {
-      return await api.post(`/complaints/tickets/${ticketId}/confirm`, { satisfied, notes: notes || "Confirmed by resident" });
+    mutationFn: async ({
+      ticketId,
+      satisfied,
+      notes,
+    }: {
+      ticketId: string;
+      satisfied: boolean;
+      notes?: string;
+    }) => {
+      return await api.post(`/complaints/tickets/${ticketId}/confirm`, {
+        satisfied,
+        notes: notes || "Confirmed by resident",
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["resident", "complaints"] });
@@ -432,14 +479,25 @@ export function useResidentPayments() {
         due_date: inv.due_date || inv.created_at,
         receipt_number: inv.receipt_number,
         line_items: Array.isArray(inv.items)
-          ? inv.items.map((i: any) => ({ head: i.description || "Maintenance Charge", amount: Number(i.amount ?? 0) }))
+          ? inv.items.map((i: any) => ({
+              head: i.description || "Maintenance Charge",
+              amount: Number(i.amount ?? 0),
+            }))
           : [],
       }));
     },
   });
 
   const payDuesMutation = useMutation({
-    mutationFn: async ({ invoiceId, amount, method }: { invoiceId: string; amount: number; method?: string }) => {
+    mutationFn: async ({
+      invoiceId,
+      amount,
+      method,
+    }: {
+      invoiceId: string;
+      amount: number;
+      method?: string;
+    }) => {
       return await api.post("/billing/payments", {
         amount: Number(amount),
         payment_method: "upi",
@@ -506,21 +564,26 @@ export function useResidentFamilyMembers() {
   });
 
   const addMemberMutation = useMutation({
-    mutationFn: async (payload: { name: string; relation: string; phone: string; access_enabled?: boolean }) => {
+    mutationFn: async (payload: {
+      name: string;
+      relation: string;
+      phone: string;
+      access_enabled?: boolean;
+    }) => {
       try {
         const me = await api.get<any>("/residents/me");
         const unitId = me?.occupancies?.[0]?.unit_id;
         const profileId = me?.id;
         if (unitId && profileId) {
           const relationshipTypeMap: Record<string, string> = {
-            "Spouse": "spouse",
+            Spouse: "spouse",
             "Co-Owner / Spouse": "spouse",
-            "Son": "child",
-            "Daughter": "child",
-            "Child": "child",
-            "Parent": "parent",
-            "Sibling": "sibling",
-            "Relative": "relative",
+            Son: "child",
+            Daughter: "child",
+            Child: "child",
+            Parent: "parent",
+            Sibling: "sibling",
+            Relative: "relative",
             "Domestic Help": "domestic_help",
           };
           const relEnum = relationshipTypeMap[payload.relation] || "other";
@@ -560,17 +623,23 @@ export function useResidentFamilyMembers() {
   });
 
   const updateMemberMutation = useMutation({
-    mutationFn: async (payload: { id: string; name: string; relation: string; phone: string; access_enabled?: boolean }) => {
+    mutationFn: async (payload: {
+      id: string;
+      name: string;
+      relation: string;
+      phone: string;
+      access_enabled?: boolean;
+    }) => {
       try {
         const relationshipTypeMap: Record<string, string> = {
-          "Spouse": "spouse",
+          Spouse: "spouse",
           "Co-Owner / Spouse": "spouse",
-          "Son": "child",
-          "Daughter": "child",
-          "Child": "child",
-          "Parent": "parent",
-          "Sibling": "sibling",
-          "Relative": "relative",
+          Son: "child",
+          Daughter: "child",
+          Child: "child",
+          Parent: "parent",
+          Sibling: "sibling",
+          Relative: "relative",
           "Domestic Help": "domestic_help",
         };
         const relEnum = relationshipTypeMap[payload.relation] || "other";
@@ -592,9 +661,10 @@ export function useResidentFamilyMembers() {
               name: payload.name,
               relation: payload.relation,
               phone: payload.phone,
-              access_enabled: payload.access_enabled !== undefined ? payload.access_enabled : m.access_enabled,
+              access_enabled:
+                payload.access_enabled !== undefined ? payload.access_enabled : m.access_enabled,
             }
-          : m
+          : m,
       );
       if (typeof window !== "undefined") {
         localStorage.setItem("gatesphere_family_members", JSON.stringify(updated));
@@ -656,7 +726,13 @@ export function useResidentProfile() {
   });
 
   const addFamilyMember = useMutation({
-    mutationFn: async (data: { unit_id: string; primary_resident_profile_id: string; full_name: string; relationship: string; phone?: string }) => {
+    mutationFn: async (data: {
+      unit_id: string;
+      primary_resident_profile_id: string;
+      full_name: string;
+      relationship: string;
+      phone?: string;
+    }) => {
       return await api.post("/residents/family-members", data);
     },
     onSuccess: () => {
@@ -717,7 +793,7 @@ export function useResidentVehicles() {
       ]);
 
       const myVehicles = (Array.isArray(vehiclesRes) ? vehiclesRes : []).filter(
-        (v: any) => v.resident_profile_id === me?.id
+        (v: any) => v.resident_profile_id === me?.id,
       );
 
       const slotMap = new Map<string, string>();
@@ -736,7 +812,10 @@ export function useResidentVehicles() {
       if (Array.isArray(violationsRes)) {
         for (const v of violationsRes) {
           if (v?.vehicle_id) {
-            violationCountByVehicle.set(v.vehicle_id, (violationCountByVehicle.get(v.vehicle_id) || 0) + 1);
+            violationCountByVehicle.set(
+              v.vehicle_id,
+              (violationCountByVehicle.get(v.vehicle_id) || 0) + 1,
+            );
           }
         }
       }
@@ -777,7 +856,9 @@ export function useResidentDomesticStaff() {
       const assignments = await api.get<any[]>("/domestic-staff/assignments", { unit_id: unitId });
       if (!Array.isArray(assignments) || assignments.length === 0) return [];
       const staffList = await Promise.all(
-        assignments.map((a: any) => api.get<any>(`/domestic-staff/${a.staff_id}`).catch(() => null))
+        assignments.map((a: any) =>
+          api.get<any>(`/domestic-staff/${a.staff_id}`).catch(() => null),
+        ),
       );
       return assignments.map((a: any, idx: number) => {
         const staff = staffList[idx];

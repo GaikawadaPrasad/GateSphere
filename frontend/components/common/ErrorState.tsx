@@ -39,8 +39,17 @@ export function ErrorState({
       >
         ⚠️
       </div>
-      <h3 style={{ fontSize: "1rem", fontWeight: 600, color: "#991b1b", marginBottom: "0.25rem" }}>{title}</h3>
-      <p style={{ maxWidth: 420, color: "#b91c1c", fontSize: "0.875rem", marginBottom: onRetry ? "1.25rem" : 0 }}>
+      <h3 style={{ fontSize: "1rem", fontWeight: 600, color: "#991b1b", marginBottom: "0.25rem" }}>
+        {title}
+      </h3>
+      <p
+        style={{
+          maxWidth: 420,
+          color: "#b91c1c",
+          fontSize: "0.875rem",
+          marginBottom: onRetry ? "1.25rem" : 0,
+        }}
+      >
         {message}
       </p>
       {onRetry && (

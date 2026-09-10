@@ -32,7 +32,8 @@ export function StatMetric({
   onClick,
   className = "",
 }: StatMetricProps) {
-  const numericValue = typeof value === "number" ? value : parseFloat(String(value).replace(/[^0-9.-]+/g, ""));
+  const numericValue =
+    typeof value === "number" ? value : parseFloat(String(value).replace(/[^0-9.-]+/g, ""));
   const isNumber = !isNaN(numericValue);
   const countUpValue = useCountUp(isNumber ? numericValue : 0);
   const animatedValue = isNumber ? countUpValue : value;
@@ -49,7 +50,14 @@ export function StatMetric({
         borderTop: `3px solid ${accentColor}`,
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "0.85rem",
+        }}
+      >
         <span
           style={{
             fontSize: "11.5px",
@@ -83,7 +91,14 @@ export function StatMetric({
 
       <div style={{ display: "flex", alignItems: "baseline", gap: "0.2rem", margin: "0.15rem 0" }}>
         {prefix && (
-          <span style={{ fontSize: "1.4rem", fontWeight: 800, color: accentColor, marginRight: "0.15rem" }}>
+          <span
+            style={{
+              fontSize: "1.4rem",
+              fontWeight: 800,
+              color: accentColor,
+              marginRight: "0.15rem",
+            }}
+          >
             {prefix}
           </span>
         )}
@@ -91,14 +106,29 @@ export function StatMetric({
           {isNumber ? animatedValue.toLocaleString() : value}
         </span>
         {suffix && (
-          <span style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--muted)", marginLeft: "0.3rem" }}>
+          <span
+            style={{
+              fontSize: "0.95rem",
+              fontWeight: 700,
+              color: "var(--muted)",
+              marginLeft: "0.3rem",
+            }}
+          >
             {suffix}
           </span>
         )}
       </div>
 
       {trend && (
-        <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginTop: "0.5rem", fontSize: "12px" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.35rem",
+            marginTop: "0.5rem",
+            fontSize: "12px",
+          }}
+        >
           <span
             style={{
               display: "inline-flex",
@@ -113,12 +143,21 @@ export function StatMetric({
           >
             {trend.isPositive ? "↑" : "↓"} {trend.value}
           </span>
-          {trend.label && <span style={{ color: "var(--muted)", fontSize: "11.5px" }}>{trend.label}</span>}
+          {trend.label && (
+            <span style={{ color: "var(--muted)", fontSize: "11.5px" }}>{trend.label}</span>
+          )}
         </div>
       )}
 
       {description && (
-        <p style={{ fontSize: "12px", color: "var(--brand-body)", marginTop: "0.4rem", lineHeight: 1.4 }}>
+        <p
+          style={{
+            fontSize: "12px",
+            color: "var(--brand-body)",
+            marginTop: "0.4rem",
+            lineHeight: 1.4,
+          }}
+        >
           {description}
         </p>
       )}

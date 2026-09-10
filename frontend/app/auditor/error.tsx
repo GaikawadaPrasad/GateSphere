@@ -18,7 +18,10 @@ export default function AuditorError({
     <div style={{ padding: "2rem 0" }}>
       <ErrorState
         title="Failed to load Auditor Console"
-        message={error.message || "An unexpected error occurred while loading this compliance audit section."}
+        message={
+          error.message ||
+          "An unexpected error occurred while loading this compliance audit section."
+        }
         onRetry={reset}
       />
     </div>

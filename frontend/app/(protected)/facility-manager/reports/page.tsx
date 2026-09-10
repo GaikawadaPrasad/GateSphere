@@ -37,7 +37,8 @@ export default function FacilityManagerReportsPage() {
           const name = categoryMap.get((t as any).category_id) || "Uncategorized";
           const bucket = byCategory.get(name) || { total: 0, resolved: 0, onTrack: 0 };
           bucket.total += 1;
-          if ((t as any).status === "resolved" || (t as any).status === "closed") bucket.resolved += 1;
+          if ((t as any).status === "resolved" || (t as any).status === "closed")
+            bucket.resolved += 1;
           if (!(t as any).sla_breached_at) bucket.onTrack += 1;
           byCategory.set(name, bucket);
         }
@@ -47,11 +48,13 @@ export default function FacilityManagerReportsPage() {
             total: s.total,
             resolved: s.resolved,
             onTrackPct: s.total > 0 ? Math.round((s.onTrack / s.total) * 100) : 0,
-          }))
+          })),
         );
 
         setAmenityBookingsTotal((bookings || []).length);
-        setAmenityBookingsCancelled((bookings || []).filter((b: any) => b.status === "cancelled").length);
+        setAmenityBookingsCancelled(
+          (bookings || []).filter((b: any) => b.status === "cancelled").length,
+        );
       } catch (err: any) {
         setLoadError(err?.message || "Failed to load report data.");
       }
@@ -91,13 +94,23 @@ export default function FacilityManagerReportsPage() {
                 </tr>
               ) : loadError ? (
                 <tr>
-                  <td colSpan={4} style={{ textAlign: "center", padding: "2rem", color: "var(--danger, #dc2626)" }}>
+                  <td
+                    colSpan={4}
+                    style={{
+                      textAlign: "center",
+                      padding: "2rem",
+                      color: "var(--danger, #dc2626)",
+                    }}
+                  >
                     {loadError}
                   </td>
                 </tr>
               ) : categoryRows.length === 0 ? (
                 <tr>
-                  <td colSpan={4} style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
+                  <td
+                    colSpan={4}
+                    style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
+                  >
                     No tickets recorded yet.
                   </td>
                 </tr>
@@ -107,7 +120,12 @@ export default function FacilityManagerReportsPage() {
                     <td style={{ fontWeight: 600 }}>{row.category_name}</td>
                     <td>{row.total} Tickets</td>
                     <td>{row.resolved} Resolved</td>
-                    <td style={{ color: row.onTrackPct >= 90 ? "var(--success)" : "var(--warning)", fontWeight: 600 }}>
+                    <td
+                      style={{
+                        color: row.onTrackPct >= 90 ? "var(--success)" : "var(--warning)",
+                        fontWeight: 600,
+                      }}
+                    >
                       {row.onTrackPct}%
                     </td>
                   </tr>
@@ -125,7 +143,14 @@ export default function FacilityManagerReportsPage() {
         {isLoading ? (
           <p style={{ padding: "1rem", color: "var(--muted)" }}>Loading…</p>
         ) : (
-          <div style={{ padding: "0.5rem 1rem 1rem", display: "flex", gap: "2rem", fontSize: "0.875rem" }}>
+          <div
+            style={{
+              padding: "0.5rem 1rem 1rem",
+              display: "flex",
+              gap: "2rem",
+              fontSize: "0.875rem",
+            }}
+          >
             <div>
               <div style={{ color: "var(--muted)", fontSize: "0.75rem" }}>Total Bookings</div>
               <div style={{ fontWeight: 700, fontSize: "1.25rem" }}>{amenityBookingsTotal}</div>

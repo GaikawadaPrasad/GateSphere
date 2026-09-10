@@ -40,29 +40,87 @@ export function FinancialHealthCard({ data, isLoading }: FinancialHealthCardProp
             Collection efficiency &amp; invoice reconciliation
           </p>
         </div>
-        <Link href="/community-admin/billing" className="btn btn-secondary" style={{ fontSize: "0.75rem", padding: "0.3rem 0.6rem" }}>
+        <Link
+          href="/community-admin/billing"
+          className="btn btn-secondary"
+          style={{ fontSize: "0.75rem", padding: "0.3rem 0.6rem" }}
+        >
           View Ledger →
         </Link>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.75rem", margin: "1rem 0" }}>
-        <div style={{ background: "#f8fafc", padding: "0.75rem", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
-          <div style={{ fontSize: "0.75rem", color: "var(--muted)", fontWeight: 500 }}>Total Billed</div>
-          <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--fg)", marginTop: "0.25rem" }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3, 1fr)",
+          gap: "0.75rem",
+          margin: "1rem 0",
+        }}
+      >
+        <div
+          style={{
+            background: "#f8fafc",
+            padding: "0.75rem",
+            borderRadius: "var(--radius-sm)",
+            border: "1px solid var(--border)",
+          }}
+        >
+          <div style={{ fontSize: "0.75rem", color: "var(--muted)", fontWeight: 500 }}>
+            Total Billed
+          </div>
+          <div
+            style={{
+              fontSize: "1.1rem",
+              fontWeight: 700,
+              color: "var(--fg)",
+              marginTop: "0.25rem",
+            }}
+          >
             {formatCurrency(billed)}
           </div>
         </div>
 
-        <div style={{ background: "#ecfdf5", padding: "0.75rem", borderRadius: "var(--radius-sm)", border: "1px solid #a7f3d0" }}>
+        <div
+          style={{
+            background: "#ecfdf5",
+            padding: "0.75rem",
+            borderRadius: "var(--radius-sm)",
+            border: "1px solid #a7f3d0",
+          }}
+        >
           <div style={{ fontSize: "0.75rem", color: "#065f46", fontWeight: 500 }}>Collected</div>
-          <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "#059669", marginTop: "0.25rem" }}>
+          <div
+            style={{ fontSize: "1.1rem", fontWeight: 700, color: "#059669", marginTop: "0.25rem" }}
+          >
             {formatCurrency(collected)}
           </div>
         </div>
 
-        <div style={{ background: outstanding > 0 ? "#fef2f2" : "#f8fafc", padding: "0.75rem", borderRadius: "var(--radius-sm)", border: `1px solid ${outstanding > 0 ? "#fecaca" : "var(--border)"}` }}>
-          <div style={{ fontSize: "0.75rem", color: outstanding > 0 ? "#991b1b" : "var(--muted)", fontWeight: 500 }}>Outstanding</div>
-          <div style={{ fontSize: "1.1rem", fontWeight: 700, color: outstanding > 0 ? "#dc2626" : "var(--fg)", marginTop: "0.25rem" }}>
+        <div
+          style={{
+            background: outstanding > 0 ? "#fef2f2" : "#f8fafc",
+            padding: "0.75rem",
+            borderRadius: "var(--radius-sm)",
+            border: `1px solid ${outstanding > 0 ? "#fecaca" : "var(--border)"}`,
+          }}
+        >
+          <div
+            style={{
+              fontSize: "0.75rem",
+              color: outstanding > 0 ? "#991b1b" : "var(--muted)",
+              fontWeight: 500,
+            }}
+          >
+            Outstanding
+          </div>
+          <div
+            style={{
+              fontSize: "1.1rem",
+              fontWeight: 700,
+              color: outstanding > 0 ? "#dc2626" : "var(--fg)",
+              marginTop: "0.25rem",
+            }}
+          >
             {formatCurrency(outstanding)}
           </div>
         </div>
@@ -70,9 +128,24 @@ export function FinancialHealthCard({ data, isLoading }: FinancialHealthCardProp
 
       {/* Collection Progress Bar */}
       <div style={{ marginTop: "auto", paddingTop: "0.75rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", marginBottom: "0.35rem" }}>
-          <span style={{ fontWeight: 600, color: "var(--fg-secondary)" }}>Collection Efficiency</span>
-          <span style={{ fontWeight: 700, color: collectionRate >= 80 ? "#10b981" : collectionRate >= 50 ? "#f59e0b" : "#ef4444" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            fontSize: "0.8rem",
+            marginBottom: "0.35rem",
+          }}
+        >
+          <span style={{ fontWeight: 600, color: "var(--fg-secondary)" }}>
+            Collection Efficiency
+          </span>
+          <span
+            style={{
+              fontWeight: 700,
+              color:
+                collectionRate >= 80 ? "#10b981" : collectionRate >= 50 ? "#f59e0b" : "#ef4444",
+            }}
+          >
             {collectionRate}%
           </span>
         </div>
@@ -81,7 +154,12 @@ export function FinancialHealthCard({ data, isLoading }: FinancialHealthCardProp
             style={{
               height: "100%",
               width: `${collectionRate}%`,
-              background: collectionRate >= 80 ? "linear-gradient(90deg, #10b981, #059669)" : collectionRate >= 50 ? "#f59e0b" : "#ef4444",
+              background:
+                collectionRate >= 80
+                  ? "linear-gradient(90deg, #10b981, #059669)"
+                  : collectionRate >= 50
+                    ? "#f59e0b"
+                    : "#ef4444",
               borderRadius: 4,
               transition: "width 0.5s ease",
             }}

@@ -89,7 +89,8 @@ export function useCreateCommunity() {
 export function useUpdateCommunity() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<Community> }) => communitiesApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: Partial<Community> }) =>
+      communitiesApi.update(id, data),
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: communityKeys.detail(id) });
       qc.invalidateQueries({ queryKey: communityKeys.all });
@@ -112,8 +113,13 @@ export function useDeleteCommunity() {
 export function useCreateTower() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ communityId, data }: { communityId: string; data: { name: string; code: string; structure_type?: string; total_floors?: number } }) =>
-      communitiesApi.createTower(communityId, data),
+    mutationFn: ({
+      communityId,
+      data,
+    }: {
+      communityId: string;
+      data: { name: string; code: string; structure_type?: string; total_floors?: number };
+    }) => communitiesApi.createTower(communityId, data),
     onSuccess: (_, { communityId }) => {
       qc.invalidateQueries({ queryKey: ["towers", communityId] });
       qc.invalidateQueries({ queryKey: ["dashboards"] });
@@ -137,8 +143,13 @@ export function useCreateFloor() {
 export function useCreateUnit() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { floor_id: string; unit_number: string; unit_type?: string; bedrooms?: number; area_sqft?: number }) =>
-      communitiesApi.createUnit(data),
+    mutationFn: (data: {
+      floor_id: string;
+      unit_number: string;
+      unit_type?: string;
+      bedrooms?: number;
+      area_sqft?: number;
+    }) => communitiesApi.createUnit(data),
     onSuccess: (_, { floor_id }) => {
       qc.invalidateQueries({ queryKey: ["units", floor_id] });
       qc.invalidateQueries({ queryKey: ["floors"] });
@@ -150,8 +161,13 @@ export function useCreateUnit() {
 export function useCreateGate() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ communityId, data }: { communityId: string; data: { name: string; code: string; gate_type: string } }) =>
-      communitiesApi.createGate(communityId, data),
+    mutationFn: ({
+      communityId,
+      data,
+    }: {
+      communityId: string;
+      data: { name: string; code: string; gate_type: string };
+    }) => communitiesApi.createGate(communityId, data),
     onSuccess: (_, { communityId }) => {
       qc.invalidateQueries({ queryKey: ["gates", communityId] });
     },

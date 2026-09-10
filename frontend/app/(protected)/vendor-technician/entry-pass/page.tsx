@@ -27,7 +27,9 @@ export default function VendorEntryPassPage() {
           // Priority: in_progress first, then acknowledged, then assigned
           const inProgress = ticketsRes.value.find((t) => t.status === "in_progress");
           const acknowledged = ticketsRes.value.find((t) => t.status === "acknowledged");
-          const assigned = ticketsRes.value.find((t) => t.status === "assigned" || t.status === "created");
+          const assigned = ticketsRes.value.find(
+            (t) => t.status === "assigned" || t.status === "created",
+          );
           setActiveTicket(inProgress || acknowledged || assigned || null);
         }
       } catch {
@@ -71,9 +73,19 @@ export default function VendorEntryPassPage() {
         ) : !activeTicket ? (
           <div style={{ textAlign: "center", padding: "2.5rem" }}>
             <div style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}>🎫</div>
-            <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "0.5rem" }}>No Active Work Order</h3>
-            <p style={{ fontSize: "0.85rem", color: "var(--muted)", maxWidth: 360, margin: "0 auto" }}>
-              Entry passes are automatically generated when you have an assigned, acknowledged, or in-progress service ticket.
+            <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "0.5rem" }}>
+              No Active Work Order
+            </h3>
+            <p
+              style={{
+                fontSize: "0.85rem",
+                color: "var(--muted)",
+                maxWidth: 360,
+                margin: "0 auto",
+              }}
+            >
+              Entry passes are automatically generated when you have an assigned, acknowledged, or
+              in-progress service ticket.
             </p>
           </div>
         ) : (
@@ -91,14 +103,24 @@ export default function VendorEntryPassPage() {
               <div>
                 <div style={{ fontWeight: 700, fontSize: "1.1rem" }}>GateSphere Vendor Pass</div>
                 <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-                  Ref Ticket: <strong style={{ color: "var(--fg)" }}>{activeTicket.ticket_number}</strong>
+                  Ref Ticket:{" "}
+                  <strong style={{ color: "var(--fg)" }}>{activeTicket.ticket_number}</strong>
                 </div>
               </div>
-              <StatusBadge status={activeTicket.status === "in_progress" ? "Active" : "Authorized"} />
+              <StatusBadge
+                status={activeTicket.status === "in_progress" ? "Active" : "Authorized"}
+              />
             </div>
 
             <div style={{ textAlign: "center", padding: "1rem 0" }}>
-              <div style={{ fontSize: "0.75rem", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>
+              <div
+                style={{
+                  fontSize: "0.75rem",
+                  color: "var(--muted)",
+                  textTransform: "uppercase",
+                  fontWeight: 600,
+                }}
+              >
                 Pass Code
               </div>
               <div
@@ -146,16 +168,31 @@ export default function VendorEntryPassPage() {
                 </div>
               </div>
 
-              <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--fg)", marginBottom: "0.25rem" }}>
+              <div
+                style={{
+                  fontSize: "0.95rem",
+                  fontWeight: 700,
+                  color: "var(--fg)",
+                  marginBottom: "0.25rem",
+                }}
+              >
                 {currentUser?.full_name || "Vendor Technician"}
               </div>
               <div style={{ fontSize: "0.8rem", color: "var(--muted)" }}>
                 Subject: <strong>{activeTicket.subject}</strong>
               </div>
               <div style={{ fontSize: "0.8rem", color: "var(--muted)", marginTop: "0.2rem" }}>
-                Community: <strong>{(currentUser as any)?.community_name || "GateSphere Community"}</strong>
+                Community:{" "}
+                <strong>{(currentUser as any)?.community_name || "GateSphere Community"}</strong>
               </div>
-              <div style={{ fontSize: "0.8rem", color: "var(--success)", fontWeight: 600, marginTop: "0.35rem" }}>
+              <div
+                style={{
+                  fontSize: "0.8rem",
+                  color: "var(--success)",
+                  fontWeight: 600,
+                  marginTop: "0.35rem",
+                }}
+              >
                 Valid for Today&apos;s Scheduled Gate Entry
               </div>
             </div>
@@ -172,7 +209,8 @@ export default function VendorEntryPassPage() {
                 textAlign: "center",
               }}
             >
-              ℹ️ Show this screen to the Security Guard at Gate for instant QR verification and entry authorization.
+              ℹ️ Show this screen to the Security Guard at Gate for instant QR verification and
+              entry authorization.
             </div>
           </div>
         )}

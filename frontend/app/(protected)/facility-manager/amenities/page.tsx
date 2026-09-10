@@ -32,7 +32,7 @@ export default function FacilityManagerAmenitiesPage() {
     if (!selectedAmenity) return;
     await amenitiesApi.blockSlot(selectedAmenity.id, blockReason);
     setAmenities((prev) =>
-      prev.map((a) => (a.id === selectedAmenity.id ? { ...a, status: "Maintenance Block" } : a))
+      prev.map((a) => (a.id === selectedAmenity.id ? { ...a, status: "Maintenance Block" } : a)),
     );
     setIsBlockModalOpen(false);
     setBlockReason("");
@@ -40,9 +40,7 @@ export default function FacilityManagerAmenitiesPage() {
 
   const handleUnblockSlot = async (id: string) => {
     await amenitiesApi.unblockSlot(id);
-    setAmenities((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status: "Available" } : a))
-    );
+    setAmenities((prev) => prev.map((a) => (a.id === id ? { ...a, status: "Available" } : a)));
   };
 
   return (
@@ -50,10 +48,21 @@ export default function FacilityManagerAmenitiesPage() {
       <PageHeader
         title="Amenities & Slot Management"
         subtitle="Manage resident amenity availability, view booking schedules, and enforce maintenance blocks"
-        breadcrumbs={[{ label: "GateSphere" }, { label: "Facility Manager" }, { label: "Amenities" }]}
+        breadcrumbs={[
+          { label: "GateSphere" },
+          { label: "Facility Manager" },
+          { label: "Amenities" },
+        ]}
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.75rem", alignItems: "start" }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "1.75rem",
+          alignItems: "start",
+        }}
+      >
         {/* Left Side: Amenities List & Block Controls */}
         <div className="card">
           <div className="card-header">
@@ -140,7 +149,10 @@ export default function FacilityManagerAmenitiesPage() {
                   </tr>
                 ) : bookings.length === 0 ? (
                   <tr>
-                    <td colSpan={4} style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}>
+                    <td
+                      colSpan={4}
+                      style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}
+                    >
                       No upcoming bookings.
                     </td>
                   </tr>
@@ -154,7 +166,9 @@ export default function FacilityManagerAmenitiesPage() {
                       </td>
                       <td>
                         <div>{b.date}</div>
-                        <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>{b.time_slot}</div>
+                        <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                          {b.time_slot}
+                        </div>
                       </td>
                       <td>
                         <StatusBadge status={b.status} />
@@ -190,7 +204,14 @@ export default function FacilityManagerAmenitiesPage() {
             <strong>{selectedAmenity?.name}</strong>:
           </p>
           <div style={{ marginBottom: "1rem" }}>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
               Reason for Maintenance Block *
             </label>
             <input

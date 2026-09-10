@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useMyNotifications, useMarkNotificationRead, useMarkAllNotificationsRead } from "@/hooks/use-notifications";
+import {
+  useMyNotifications,
+  useMarkNotificationRead,
+  useMarkAllNotificationsRead,
+} from "@/hooks/use-notifications";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { Modal } from "@/components/common/Modal";
@@ -13,7 +17,11 @@ export default function CommunityAdminNotificationsPage() {
   const [selectedNotification, setSelectedNotification] = useState<AppNotification | null>(null);
 
   // Queries
-  const { data: notifications, isLoading, refetch } = useMyNotifications({
+  const {
+    data: notifications,
+    isLoading,
+    refetch,
+  } = useMyNotifications({
     unread_only: unreadOnly,
     page_size: 50,
   });
@@ -72,10 +80,28 @@ export default function CommunityAdminNotificationsPage() {
             <div style={{ fontWeight: n.is_read ? 500 : 700, color: "var(--fg)" }}>
               {n.title}
               {!n.is_read && (
-                <span style={{ marginLeft: "0.5rem", width: 8, height: 8, borderRadius: "50%", background: "#ef4444", display: "inline-block" }} />
+                <span
+                  style={{
+                    marginLeft: "0.5rem",
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    background: "#ef4444",
+                    display: "inline-block",
+                  }}
+                />
               )}
             </div>
-            <div style={{ fontSize: "0.75rem", color: "var(--muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 380 }}>
+            <div
+              style={{
+                fontSize: "0.75rem",
+                color: "var(--muted)",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                maxWidth: 380,
+              }}
+            >
               {n.body}
             </div>
           </div>
@@ -168,7 +194,11 @@ export default function CommunityAdminNotificationsPage() {
       <Modal
         isOpen={Boolean(selectedNotification)}
         onClose={() => setSelectedNotification(null)}
-        title={selectedNotification ? `${getCategoryIcon(selectedNotification.category)} ${selectedNotification.title}` : "Notification Details"}
+        title={
+          selectedNotification
+            ? `${getCategoryIcon(selectedNotification.category)} ${selectedNotification.title}`
+            : "Notification Details"
+        }
       >
         {selectedNotification && (
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
@@ -176,13 +206,27 @@ export default function CommunityAdminNotificationsPage() {
               Received: {formatDateTime(selectedNotification.created_at)}
             </div>
 
-            <div style={{ background: "#f8fafc", padding: "1rem", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)", fontSize: "0.9rem", lineHeight: 1.6, color: "var(--fg)" }}>
+            <div
+              style={{
+                background: "#f8fafc",
+                padding: "1rem",
+                borderRadius: "var(--radius-sm)",
+                border: "1px solid var(--border)",
+                fontSize: "0.9rem",
+                lineHeight: 1.6,
+                color: "var(--fg)",
+              }}
+            >
               {selectedNotification.body}
             </div>
 
             {selectedNotification.action_url && (
               <div style={{ marginTop: "0.5rem" }}>
-                <a href={selectedNotification.action_url} className="btn btn-primary" style={{ width: "100%", justifyContent: "center" }}>
+                <a
+                  href={selectedNotification.action_url}
+                  className="btn btn-primary"
+                  style={{ width: "100%", justifyContent: "center" }}
+                >
                   Go to Action Link →
                 </a>
               </div>

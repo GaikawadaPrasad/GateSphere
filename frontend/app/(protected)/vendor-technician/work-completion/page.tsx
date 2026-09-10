@@ -28,7 +28,8 @@ export default function VendorWorkCompletionPage() {
       try {
         const list = await vendorTicketsApi.list();
         const activeList = (list || []).filter(
-          (t: any) => t.status === "in_progress" || t.status === "acknowledged" || t.status === "assigned"
+          (t: any) =>
+            t.status === "in_progress" || t.status === "acknowledged" || t.status === "assigned",
         );
         setTickets(activeList);
         if (urlTicketId) {
@@ -56,7 +57,8 @@ export default function VendorWorkCompletionPage() {
     setErrorMsg("");
 
     try {
-      const summary = `Work: ${workPerformed}. Materials: ${materialsUsed || "None"}. Time: ${startTime}-${endTime}. Remarks: ${remarks || "Work completed on site."}`.trim();
+      const summary =
+        `Work: ${workPerformed}. Materials: ${materialsUsed || "None"}. Time: ${startTime}-${endTime}. Remarks: ${remarks || "Work completed on site."}`.trim();
       await vendorTicketsApi.submitCompletion(selectedTicketId, summary);
       setIsSubmitting(false);
       setSubmittedSuccess(true);
@@ -92,7 +94,9 @@ export default function VendorWorkCompletionPage() {
             ✅ WORK COMPLETION SUBMITTED SUCCESSFULLY
           </h3>
           <p style={{ fontSize: "0.9rem", color: "#047857" }}>
-            Job completion proof for ticket <strong>{selectedTicket?.ticket_number || selectedTicketId}</strong> has been recorded and submitted for manager signoff.
+            Job completion proof for ticket{" "}
+            <strong>{selectedTicket?.ticket_number || selectedTicketId}</strong> has been recorded
+            and submitted for manager signoff.
           </p>
         </div>
       )}
@@ -121,7 +125,14 @@ export default function VendorWorkCompletionPage() {
 
         <form onSubmit={handleSubmitCompletion}>
           <div style={{ marginBottom: "1rem" }}>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
               Assigned Ticket *
             </label>
             {isLoading ? (
@@ -139,7 +150,8 @@ export default function VendorWorkCompletionPage() {
               >
                 {tickets.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.ticket_number || `TKT-${t.id.slice(0, 6)}`}: {t.subject || "Service Work"} ({t.status})
+                    {t.ticket_number || `TKT-${t.id.slice(0, 6)}`}: {t.subject || "Service Work"} (
+                    {t.status})
                   </option>
                 ))}
               </select>
@@ -147,7 +159,14 @@ export default function VendorWorkCompletionPage() {
           </div>
 
           <div style={{ marginBottom: "1rem" }}>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
               Work Performed Summary *
             </label>
             <textarea
@@ -161,7 +180,14 @@ export default function VendorWorkCompletionPage() {
           </div>
 
           <div style={{ marginBottom: "1rem" }}>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
               Materials / Spare Parts Used
             </label>
             <input
@@ -173,9 +199,23 @@ export default function VendorWorkCompletionPage() {
             />
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1.25rem" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "1rem",
+              marginBottom: "1.25rem",
+            }}
+          >
             <div>
-              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Start Time
               </label>
               <input
@@ -187,7 +227,14 @@ export default function VendorWorkCompletionPage() {
             </div>
 
             <div>
-              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Completion Time
               </label>
               <input
@@ -200,7 +247,14 @@ export default function VendorWorkCompletionPage() {
           </div>
 
           <div style={{ marginBottom: "1.5rem" }}>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
               Technician Remarks / Signoff Notes
             </label>
             <input

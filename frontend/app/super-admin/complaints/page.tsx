@@ -66,7 +66,10 @@ export default function ComplaintsPage() {
       <PageHeader
         title="Complaints & Service Tickets"
         subtitle="Global maintenance, facilities, and service requests tracker"
-        breadcrumbs={[{ label: "Super Admin", href: "/super-admin/dashboard" }, { label: "Complaints" }]}
+        breadcrumbs={[
+          { label: "Super Admin", href: "/super-admin/dashboard" },
+          { label: "Complaints" },
+        ]}
       />
 
       <div className="card">
@@ -79,7 +82,7 @@ export default function ComplaintsPage() {
           </div>
 
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-            <div style={{ width: 220 }}>
+            <div style={{ width: "100%", maxWidth: 220 }}>
               <SearchInput value={search} onChange={setSearch} placeholder="Search tickets…" />
             </div>
 

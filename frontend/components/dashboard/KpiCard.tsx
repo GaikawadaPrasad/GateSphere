@@ -34,10 +34,16 @@ export function KpiCard({
 }: KpiCardProps) {
   if (isLoading) {
     return (
-      <div className="card" style={{ display: "flex", flexDirection: "column", gap: "0.75rem", minHeight: 140 }}>
+      <div
+        className="card"
+        style={{ display: "flex", flexDirection: "column", gap: "0.75rem", minHeight: 140 }}
+      >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div className="skeleton" style={{ width: "40%", height: "0.875rem" }} />
-          <div className="skeleton" style={{ width: "2rem", height: "2rem", borderRadius: "50%" }} />
+          <div
+            className="skeleton"
+            style={{ width: "2rem", height: "2rem", borderRadius: "50%" }}
+          />
         </div>
         <div className="skeleton" style={{ width: "60%", height: "2rem" }} />
         <div className="skeleton" style={{ width: "80%", height: "0.75rem" }} />
@@ -102,7 +108,15 @@ export function KpiCard({
       }}
     >
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
-        <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.025em" }}>
+        <span
+          style={{
+            fontSize: "0.85rem",
+            fontWeight: 600,
+            color: "var(--muted)",
+            textTransform: "uppercase",
+            letterSpacing: "0.025em",
+          }}
+        >
           {title}
         </span>
         <div
@@ -129,7 +143,16 @@ export function KpiCard({
         </div>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "0.775rem", color: "var(--muted)", marginTop: "0.25rem" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          fontSize: "0.775rem",
+          color: "var(--muted)",
+          marginTop: "0.25rem",
+        }}
+      >
         <span>{displaySubtitle}</span>
         {trendValue ? (
           <span style={{ fontSize: "0.75rem", fontWeight: 600, color: iconColor }}>
@@ -137,7 +160,10 @@ export function KpiCard({
           </span>
         ) : (
           badge && (
-            <span className={`badge badge-${badge.variant || "neutral"}`} style={{ fontSize: "0.7rem", padding: "0.15rem 0.45rem" }}>
+            <span
+              className={`badge badge-${badge.variant || "neutral"}`}
+              style={{ fontSize: "0.7rem", padding: "0.15rem 0.45rem" }}
+            >
               {badge.text}
             </span>
           )

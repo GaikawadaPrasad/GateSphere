@@ -44,9 +44,7 @@ export default function SecurityIncidentsReviewPage() {
       key: "incident_type",
       header: "Category",
       render: (item) => (
-        <span style={{ fontWeight: 600, textTransform: "capitalize" }}>
-          {item.incident_type}
-        </span>
+        <span style={{ fontWeight: 600, textTransform: "capitalize" }}>{item.incident_type}</span>
       ),
     },
     {
@@ -142,7 +140,9 @@ export default function SecurityIncidentsReviewPage() {
       >
         <span>🛡️</span>
         <div>
-          <strong>Governance Oversight Role (FR-13):</strong> Review incident logs, responder timelines, and resolution summaries. Live dispatch and gate controls are restricted to security personnel.
+          <strong>Governance Oversight Role (FR-13):</strong> Review incident logs, responder
+          timelines, and resolution summaries. Live dispatch and gate controls are restricted to
+          security personnel.
         </div>
       </div>
 

@@ -4,7 +4,15 @@ export interface GateEvent {
   community_id: string;
   gate_id: string | null;
   actor_user_id?: string | null;
-  event_type: "visitor_entry" | "visitor_exit" | "vehicle_entry" | "vehicle_exit" | "staff_entry" | "staff_exit" | "checkpoint_override" | string;
+  event_type:
+    | "visitor_entry"
+    | "visitor_exit"
+    | "vehicle_entry"
+    | "vehicle_exit"
+    | "staff_entry"
+    | "staff_exit"
+    | "checkpoint_override"
+    | string;
   reference_type?: string | null;
   reference_id?: string | null;
   occurred_at: string;

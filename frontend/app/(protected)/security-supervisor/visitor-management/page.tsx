@@ -20,12 +20,19 @@ export default function SecuritySupervisorVisitorManagementPage() {
         (data || []).map((v: any) => ({
           id: v.id,
           pass_code: v.id ? `REQ-${v.id.slice(0, 6).toUpperCase()}` : "PASS",
-          name: v.visitor?.full_name || (v.visitor_name || "Visitor"),
-          phone: v.visitor?.phone || (v.phone || "—"),
-          type: v.visitor_type ? v.visitor_type.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) : "Guest",
+          name: v.visitor?.full_name || v.visitor_name || "Visitor",
+          phone: v.visitor?.phone || v.phone || "—",
+          type: v.visitor_type
+            ? v.visitor_type.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
+            : "Guest",
           unit: `Unit ${v.unit_id ? v.unit_id.slice(0, 6) : "Direct"}`,
-          status: v.status === "pending" ? "Pending Approval" : v.status ? v.status.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) : "Expected",
-        }))
+          status:
+            v.status === "pending"
+              ? "Pending Approval"
+              : v.status
+                ? v.status.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
+                : "Expected",
+        })),
       );
     } catch {
       // fallback
@@ -60,7 +67,8 @@ export default function SecuritySupervisorVisitorManagementPage() {
       v.name.toLowerCase().includes(search.toLowerCase()) ||
       (v.phone && v.phone.toLowerCase().includes(search.toLowerCase())) ||
       (v.pass_code && v.pass_code.toLowerCase().includes(search.toLowerCase()));
-    const matchStatus = statusFilter === "all" || v.status.toLowerCase() === statusFilter.toLowerCase();
+    const matchStatus =
+      statusFilter === "all" || v.status.toLowerCase() === statusFilter.toLowerCase();
     return matchSearch && matchStatus;
   });
 
@@ -69,7 +77,11 @@ export default function SecuritySupervisorVisitorManagementPage() {
       <PageHeader
         title="Visitor Lifecycle Management"
         subtitle="Review visitor access requests, pass verifications, pending approvals, and historical entry logs"
-        breadcrumbs={[{ label: "GateSphere" }, { label: "Security Supervisor" }, { label: "Visitor Management" }]}
+        breadcrumbs={[
+          { label: "GateSphere" },
+          { label: "Security Supervisor" },
+          { label: "Visitor Management" },
+        ]}
       />
 
       <div className="card">
@@ -82,8 +94,12 @@ export default function SecuritySupervisorVisitorManagementPage() {
           </div>
 
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-            <div style={{ width: 220 }}>
-              <SearchInput value={search} onChange={setSearch} placeholder="Search visitor name/pass/phone…" />
+            <div style={{ width: "100%", maxWidth: 220 }}>
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Search visitor name/pass/phone…"
+              />
             </div>
 
             <select
@@ -125,7 +141,10 @@ export default function SecuritySupervisorVisitorManagementPage() {
                 </tr>
               ) : filteredVisitors.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
+                  <td
+                    colSpan={7}
+                    style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
+                  >
                     No visitor records found.
                   </td>
                 </tr>

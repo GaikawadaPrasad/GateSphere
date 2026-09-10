@@ -30,12 +30,14 @@ export default function FacilityManagerFacilitiesPage() {
           id: a.id,
           name: a.name,
           code: a.code,
-          type: a.amenity_type ? a.amenity_type.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) : "Other",
+          type: a.amenity_type
+            ? a.amenity_type.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
+            : "Other",
           location: a.location_text || "Community Grounds",
           capacity: a.capacity || 0,
           status: a.is_active ? "Available" : "Under Maintenance",
           last_maintenance: "Active",
-        }))
+        })),
       );
     } catch {
       // fallback
@@ -51,12 +53,29 @@ export default function FacilityManagerFacilitiesPage() {
     e.preventDefault();
     if (!name.trim()) return;
     try {
-      const generatedCode = name.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 8) + "-" + Math.floor(10 + Math.random() * 90);
+      const generatedCode =
+        name
+          .replace(/[^A-Za-z0-9]/g, "")
+          .toUpperCase()
+          .slice(0, 8) +
+        "-" +
+        Math.floor(10 + Math.random() * 90);
       const rawType = type.toLowerCase();
       let amenityType = "other";
       if (rawType.includes("pool")) amenityType = "pool";
-      else if (rawType.includes("sport") || rawType.includes("tennis") || rawType.includes("court") || rawType.includes("ball")) amenityType = "tennis";
-      else if (rawType.includes("gym") || rawType.includes("fitness") || rawType.includes("wellness")) amenityType = "gym";
+      else if (
+        rawType.includes("sport") ||
+        rawType.includes("tennis") ||
+        rawType.includes("court") ||
+        rawType.includes("ball")
+      )
+        amenityType = "tennis";
+      else if (
+        rawType.includes("gym") ||
+        rawType.includes("fitness") ||
+        rawType.includes("wellness")
+      )
+        amenityType = "gym";
       else if (rawType.includes("club")) amenityType = "clubhouse";
       else if (rawType.includes("guest") || rawType.includes("room")) amenityType = "guest_room";
       else if (rawType.includes("park") || rawType.includes("ground")) amenityType = "park";
@@ -84,7 +103,7 @@ export default function FacilityManagerFacilitiesPage() {
       const isActive = newStatus === "Available" || newStatus === "Occupied/Booked";
       await facilitiesApi.updateStatus(id, isActive ? "true" : "false");
       setFacilities((prev) =>
-        prev.map((f) => (f.id === id ? { ...f, status: newStatus as any } : f))
+        prev.map((f) => (f.id === id ? { ...f, status: newStatus as any } : f)),
       );
     } catch {
       // Keep optimistic or notify
@@ -105,7 +124,11 @@ export default function FacilityManagerFacilitiesPage() {
       <PageHeader
         title="Facility Management"
         subtitle="Manage community facilities, operational availability, schedules, and maintenance status"
-        breadcrumbs={[{ label: "GateSphere" }, { label: "Facility Manager" }, { label: "Facilities" }]}
+        breadcrumbs={[
+          { label: "GateSphere" },
+          { label: "Facility Manager" },
+          { label: "Facilities" },
+        ]}
         actions={
           <button className="btn btn-primary" onClick={() => setIsAddModalOpen(true)}>
             ➕ Add Facility
@@ -123,8 +146,12 @@ export default function FacilityManagerFacilitiesPage() {
           </div>
 
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-            <div style={{ width: 220 }}>
-              <SearchInput value={search} onChange={setSearch} placeholder="Search facility name/location…" />
+            <div style={{ width: "100%", maxWidth: 220 }}>
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Search facility name/location…"
+              />
             </div>
 
             <select
@@ -176,7 +203,10 @@ export default function FacilityManagerFacilitiesPage() {
                 </tr>
               ) : filteredFacilities.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
+                  <td
+                    colSpan={7}
+                    style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
+                  >
                     No facilities found.
                   </td>
                 </tr>
@@ -232,7 +262,14 @@ export default function FacilityManagerFacilitiesPage() {
       >
         <form onSubmit={handleAddFacility}>
           <div style={{ marginBottom: "1rem" }}>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
               Facility Name *
             </label>
             <input
@@ -245,12 +282,30 @@ export default function FacilityManagerFacilitiesPage() {
             />
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "1rem",
+              marginBottom: "1rem",
+            }}
+          >
             <div>
-              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Type
               </label>
-              <select className="select-field" value={type} onChange={(e) => setType(e.target.value)}>
+              <select
+                className="select-field"
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+              >
                 <option value="Sports">Sports / Court</option>
                 <option value="Community Hall">Community Hall</option>
                 <option value="Swimming Pool">Swimming Pool</option>
@@ -263,7 +318,14 @@ export default function FacilityManagerFacilitiesPage() {
             </div>
 
             <div>
-              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Max Capacity
               </label>
               <input
@@ -276,7 +338,14 @@ export default function FacilityManagerFacilitiesPage() {
           </div>
 
           <div>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
               Location / Block
             </label>
             <input
