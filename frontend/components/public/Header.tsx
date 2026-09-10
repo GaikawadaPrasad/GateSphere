@@ -58,30 +58,30 @@ export default function Header() {
             : "bg-[#090E1A]/95 backdrop-blur-xl border-b border-white/10 py-3.5 shadow-2xl"
         }`}
       >
-        <div className="w-full max-w-7xl mx-auto px-6 sm:px-8 flex items-center justify-between">
+        <div className="w-full max-w-7xl mx-auto px-3.5 sm:px-8 flex items-center justify-between">
           {/* ── LEFT: MENU Trigger & Compact Logo ── */}
-          <div className="flex items-center gap-6 sm:gap-7">
+          <div className="flex items-center gap-3 sm:gap-7 min-w-0">
             {/* MENU Trigger (Staggered 3-Bar Hamburger) */}
             <button
               onClick={() => setMenuOpen(true)}
-              className="group flex items-center gap-3 text-white hover:text-sky-300 transition-colors cursor-pointer select-none bg-transparent border-0"
+              className="group flex items-center gap-2 sm:gap-3 text-white hover:text-sky-300 transition-colors cursor-pointer select-none bg-transparent border-0 shrink-0"
               aria-label="Open navigation menu"
             >
-              <span className="text-[13px] sm:text-[14px] font-normal tracking-[0.04em] text-white leading-none">
+              <span className="text-[12px] sm:text-[14px] font-normal tracking-[0.04em] text-white leading-none">
                 MENU
               </span>
-              <div className="flex flex-col justify-between w-[20px] h-[12px] shrink-0">
+              <div className="flex flex-col justify-between w-[18px] sm:w-[20px] h-[11px] sm:h-[12px] shrink-0">
                 {/* Top line */}
-                <span className="w-[10px] h-[1.8px] bg-white rounded-none block" />
+                <span className="w-[9px] sm:w-[10px] h-[1.8px] bg-white rounded-none block" />
                 {/* Middle line */}
-                <span className="w-[20px] h-[1.8px] bg-white rounded-none block" />
+                <span className="w-[18px] sm:w-[20px] h-[1.8px] bg-white rounded-none block" />
                 {/* Bottom line */}
-                <span className="w-[10px] h-[1.8px] bg-white rounded-none block ml-auto" />
+                <span className="w-[9px] sm:w-[10px] h-[1.8px] bg-white rounded-none block ml-auto" />
               </div>
             </button>
 
             {/* Logo */}
-            <Link href="/" className="flex items-center gap-2.5 group">
+            <Link href="/" className="flex items-center gap-1.5 sm:gap-2.5 group shrink-0 min-w-0">
               <GateSphereLogo
                 variant="light"
                 className="transition-transform duration-200 group-hover:scale-105"
@@ -91,15 +91,15 @@ export default function Header() {
           </div>
 
           {/* ── RIGHT: Minimal Search Icon & Sign In Button ── */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <button
               onClick={() => setSearchOpen(true)}
-              className="w-8 h-8 rounded-full flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 transition-all cursor-pointer bg-transparent border-0"
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 transition-all cursor-pointer bg-transparent border-0 shrink-0"
               title="Search"
               aria-label="Search"
             >
               <svg
-                className="w-4 h-4"
+                className="w-3.5 h-3.5 sm:w-4 sm:h-4"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -114,10 +114,10 @@ export default function Header() {
 
             <Link
               href="/login"
-              className="px-3.5 py-1.5 rounded-full text-[12.5px] font-semibold text-white/90 hover:text-white bg-white/10 hover:bg-white/20 border border-white/15 transition-all shadow-xs flex items-center gap-1.5"
+              className="px-2.5 py-1 sm:px-3.5 sm:py-1.5 rounded-full text-[11.5px] sm:text-[12.5px] font-semibold text-white/90 hover:text-white bg-white/10 hover:bg-white/20 border border-white/15 transition-all shadow-xs flex items-center gap-1 sm:gap-1.5 shrink-0"
             >
               <span>Sign In</span>
-              <svg className="w-3 h-3 text-white/70" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white/70" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M6 4l4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </Link>

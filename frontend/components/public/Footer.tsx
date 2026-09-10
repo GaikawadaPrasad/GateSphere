@@ -42,10 +42,42 @@ export default function Footer() {
             {/* Social Icons */}
             <div className="flex items-center gap-2 pt-1">
               {[
-                { label: "𝕏", name: "Twitter", url: "https://twitter.com" },
-                { label: "in", name: "LinkedIn", url: "https://linkedin.com" },
-                { label: "yt", name: "YouTube", url: "https://youtube.com" },
-                { label: "gh", name: "GitHub", url: "https://github.com" },
+                {
+                  name: "X (Twitter)",
+                  url: "https://twitter.com",
+                  icon: (
+                    <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
+                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.253 5.622 5.911-5.622Zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                    </svg>
+                  ),
+                },
+                {
+                  name: "LinkedIn",
+                  url: "https://linkedin.com",
+                  icon: (
+                    <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
+                      <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+                    </svg>
+                  ),
+                },
+                {
+                  name: "YouTube",
+                  url: "https://youtube.com",
+                  icon: (
+                    <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
+                      <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+                    </svg>
+                  ),
+                },
+                {
+                  name: "GitHub",
+                  url: "https://github.com",
+                  icon: (
+                    <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
+                      <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
+                    </svg>
+                  ),
+                },
               ].map((social) => (
                 <a
                   key={social.name}
@@ -53,9 +85,9 @@ export default function Footer() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={social.name}
-                  className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 hover:border-blue-400/50 hover:bg-blue-600/20 text-slate-300 hover:text-white flex items-center justify-center text-xs font-bold transition-all cursor-pointer"
+                  className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 hover:border-blue-400/50 hover:bg-blue-600/20 text-slate-300 hover:text-white flex items-center justify-center transition-all cursor-pointer"
                 >
-                  {social.label}
+                  {social.icon}
                 </a>
               ))}
             </div>
@@ -170,73 +202,7 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* ── MIDDLE SECTION: Newsletter (Left) + Accreditation Badges (Right) ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 py-8 border-b border-slate-800/80 items-center">
-          {/* Newsletter Box (5 Cols) */}
-          <div className="lg:col-span-5 space-y-2">
-            <h4
-              className="text-[12px] font-bold uppercase tracking-wider text-white"
-              style={{ fontFamily: "'Outfit', sans-serif" }}
-            >
-              STAY UPDATED
-            </h4>
-            <p className="text-[12px] text-slate-400">
-              Community management insights, security updates, and feature releases.
-            </p>
-            {subscribed ? (
-              <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-950/60 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
-                <span>✓ Subscribed! You will receive our latest society updates.</span>
-              </div>
-            ) : (
-              <form onSubmit={handleSubscribe} className="flex items-center gap-2 pt-1">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  placeholder="Enter your society email address..."
-                  className="w-full px-3.5 py-2 rounded-xl text-[12.5px] text-white bg-white/5 border border-white/15 focus:border-cyan-400 outline-none transition-all"
-                />
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-xl text-[12px] font-bold text-slate-950 bg-white hover:bg-slate-200 transition-all uppercase tracking-wider shrink-0 cursor-pointer"
-                >
-                  Subscribe
-                </button>
-              </form>
-            )}
-          </div>
-
-          {/* Accreditation Badges (7 Cols) -> Clickable to /security */}
-          <div className="lg:col-span-7 space-y-2">
-            <h4
-              className="text-[12px] font-bold uppercase tracking-wider text-white"
-              style={{ fontFamily: "'Outfit', sans-serif" }}
-            >
-              TRUSTED SECURITY &amp; ACCREDITATION
-            </h4>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-              {[
-                { icon: "🔒", title: "ISO 27001", sub: "Certified Platform" },
-                { icon: "🛡️", title: "SOC 2 Type II", sub: "Audited Systems" },
-                { icon: "⚡", title: "DPDP Act", sub: "2023 Compliant" },
-                { icon: "💳", title: "NPCI / UPI", sub: "Verified Gateway" },
-              ].map((badge) => (
-                <Link
-                  key={badge.title}
-                  href="/security"
-                  className="flex items-center gap-2 p-2 rounded-xl bg-white/5 border border-white/5 hover:border-cyan-500/40 hover:bg-white/10 transition-all cursor-pointer group"
-                >
-                  <span className="text-base shrink-0 group-hover:scale-110 transition-transform">{badge.icon}</span>
-                  <div>
-                    <div className="text-[11.5px] font-bold text-slate-200 leading-tight group-hover:text-cyan-300 transition-colors">{badge.title}</div>
-                    <div className="text-[10px] text-slate-500 leading-tight">{badge.sub}</div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </div>
+       
 
         {/* ── BOTTOM BAR: Copyright + Active Navigation Links ── */}
         <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-[12px] text-slate-500 text-center sm:text-left">
@@ -245,7 +211,7 @@ export default function Footer() {
           </div>
 
           {/* Direct Quick Links Bar */}
-          <div className="flex flex-wrap items-center justify-center gap-4 text-xs font-medium">
+          <div className="flex flex-nowrap items-center justify-center gap-3 text-xs font-medium">
             <Link href="/" className="text-slate-400 hover:text-white transition-colors cursor-pointer">Home</Link>
             <span className="text-slate-700">·</span>
             <Link href="/platform" className="text-slate-400 hover:text-white transition-colors cursor-pointer">Platform</Link>
