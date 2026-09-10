@@ -16,9 +16,25 @@ export default function VendorAssignedTicketsPage() {
 
   const loadData = async () => {
     setIsLoading(true);
-    const data = await vendorTicketsApi.list();
-    setTickets(data);
-    setIsLoading(false);
+    try {
+      const data = await vendorTicketsApi.list();
+      setTickets(
+        (data || []).map((t: any) => ({
+          id: t.id,
+          ticket_number: t.ticket_number || `TKT-${t.id.slice(0, 6).toUpperCase()}`,
+          title: t.subject || "Service Ticket",
+          facility: t.vendor_name || "Community Grounds",
+          location: t.description || "Community Facility",
+          priority: (t.priority || "medium").toUpperCase(),
+          sla_deadline: t.resolution_due_at ? new Date(t.resolution_due_at).toLocaleDateString() : "Within SLA",
+          status: t.status || "created",
+        }))
+      );
+    } catch {
+      setTickets([]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -26,9 +42,13 @@ export default function VendorAssignedTicketsPage() {
   }, []);
 
   const handleAcceptTicket = async (ticketId: string) => {
-    await vendorTicketsApi.updateStatus(ticketId, "Accepted");
-    setTickets((prev) => prev.map((t) => (t.id === ticketId ? { ...t, status: "Accepted" } : t)));
-    alert(`Ticket #${ticketId} Accepted! Move to Work Progress to update status as you travel.`);
+    try {
+      await vendorTicketsApi.updateStatus(ticketId, "acknowledged", "Accepted by Technician");
+      setTickets((prev) => prev.map((t) => (t.id === ticketId ? { ...t, status: "acknowledged" } : t)));
+      alert("Ticket Accepted! You can now start work on-site or view your digital gate pass.");
+    } catch (err: any) {
+      alert(err?.message || "Failed to update ticket status");
+    }
   };
 
   const filteredTickets = tickets.filter((t) => {
@@ -36,7 +56,7 @@ export default function VendorAssignedTicketsPage() {
       t.ticket_number.toLowerCase().includes(search.toLowerCase()) ||
       t.title.toLowerCase().includes(search.toLowerCase()) ||
       t.facility.toLowerCase().includes(search.toLowerCase());
-    const matchPriority = priorityFilter === "all" || t.priority === priorityFilter;
+    const matchPriority = priorityFilter === "all" || t.priority.toLowerCase() === priorityFilter.toLowerCase();
     return matchSearch && matchPriority;
   });
 
@@ -69,10 +89,10 @@ export default function VendorAssignedTicketsPage() {
               style={{ width: "auto", height: 36 }}
             >
               <option value="all">All Priorities</option>
-              <option value="Low">Low</option>
-              <option value="Medium">Medium</option>
-              <option value="High">High</option>
-              <option value="Emergency">Emergency</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="critical">Critical</option>
             </select>
           </div>
         </div>
@@ -83,7 +103,7 @@ export default function VendorAssignedTicketsPage() {
               <tr>
                 <th>Ticket #</th>
                 <th>Task Summary</th>
-                <th>Facility / Location</th>
+                <th>Facility / Details</th>
                 <th>Priority</th>
                 <th>SLA Deadline</th>
                 <th>Status</th>
@@ -106,7 +126,7 @@ export default function VendorAssignedTicketsPage() {
               ) : (
                 filteredTickets.map((t) => (
                   <tr key={t.id}>
-                    <td style={{ fontWeight: 600 }}>{t.ticket_number}</td>
+                    <td style={{ fontWeight: 600, fontFamily: "monospace" }}>{t.ticket_number}</td>
                     <td style={{ fontWeight: 500, color: "var(--fg)" }}>{t.title}</td>
                     <td>
                       <div>{t.facility}</div>
@@ -117,11 +137,11 @@ export default function VendorAssignedTicketsPage() {
                     </td>
                     <td style={{ fontWeight: 600, color: "var(--warning)" }}>{t.sla_deadline}</td>
                     <td>
-                      <StatusBadge status={t.status} />
+                      <StatusBadge status={t.status.replace(/_/g, " ").toUpperCase()} />
                     </td>
                     <td>
                       <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
-                        {t.status === "Assigned" ? (
+                        {t.status === "assigned" || t.status === "created" ? (
                           <button
                             className="btn btn-primary"
                             style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}

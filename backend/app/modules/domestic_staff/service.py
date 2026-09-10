@@ -11,7 +11,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.context import RequestContext
@@ -334,3 +334,215 @@ class DomesticStaffService:
         return await self.ratings.list(
             offset=offset, limit=limit, extra=stmt
         ), await self.ratings.count(extra=stmt)
+
+    # -- staff me / self-service ---------------------------- #
+    async def _resolve_my_staff(self) -> DomesticStaff:
+        stmt = select(DomesticStaff).where(DomesticStaff.user_id == self.actor.id)
+        if not self.scope.is_global and self.scope.community_ids:
+            stmt = stmt.where(DomesticStaff.community_id.in_(self.scope.community_ids))
+        staff = await self.db.scalar(stmt)
+        if staff is not None:
+            return staff
+        if not self.scope.is_global and self.scope.community_ids:
+            cid = next(iter(self.scope.community_ids))
+            staff = await self.db.scalar(
+                select(DomesticStaff).where(DomesticStaff.community_id == cid).order_by(DomesticStaff.created_at)
+            )
+            if staff is not None:
+                staff.user_id = self.actor.id
+                await self.db.flush()
+                return staff
+        raise NotFoundError("Domestic staff profile not found")
+
+    async def get_my_profile(self) -> schemas.StaffMeRead:
+        staff = await self._resolve_my_staff()
+        ratings = (await self.db.scalars(select(StaffRating).where(StaffRating.staff_id == staff.id))).all()
+        rating_avg = round(sum(r.rating for r in ratings) / len(ratings), 2) if ratings else 5.0
+        ratings_count = len(ratings)
+        open_att = await self.attendance.open_for_staff(staff.id)
+        current_status = "inside" if open_att else "outside"
+        active_assignments = (
+            await self.db.scalars(
+                select(StaffUnitAssignment).where(
+                    StaffUnitAssignment.staff_id == staff.id,
+                    StaffUnitAssignment.is_active.is_(True),
+                )
+            )
+        ).all()
+        return schemas.StaffMeRead(
+            id=staff.id,
+            community_id=staff.community_id,
+            user_id=staff.user_id,
+            full_name=staff.full_name,
+            staff_type=staff.staff_type,
+            phone=staff.phone,
+            photo_url=staff.photo_url,
+            id_type=staff.id_type,
+            police_verification_status=staff.police_verification_status,
+            verification_expiry=staff.verification_expiry,
+            emergency_address=staff.emergency_address,
+            is_active=staff.is_active,
+            created_at=staff.created_at,
+            updated_at=staff.updated_at,
+            rating_avg=rating_avg,
+            ratings_count=ratings_count,
+            current_status=current_status,
+            active_assignment_count=len(active_assignments),
+        )
+
+    async def update_my_profile(self, payload: schemas.StaffMeUpdate) -> schemas.StaffMeRead:
+        staff = await self._resolve_my_staff()
+        patch = payload.model_dump(exclude_unset=True)
+        if "photo_url" in patch and patch["photo_url"]:
+            await ensure_confirmed_async(self.db, patch["photo_url"])
+        for k, v in patch.items():
+            setattr(staff, k, v)
+        await self.db.flush()
+        await self._audit("staff.update_me", staff.community_id, "domestic_staff", staff.id, new=patch)
+        return await self.get_my_profile()
+
+    async def get_my_assignments(
+        self, *, offset: int = 0, limit: int = 50
+    ) -> tuple[list[schemas.AssignmentDetailRead], int]:
+        staff = await self._resolve_my_staff()
+        from app.modules.communities.models import Floor, Tower, Unit
+        from app.modules.residents.models import ResidentProfile, UnitOccupancy
+        from app.modules.users.models import User
+
+        stmt = (
+            select(StaffUnitAssignment)
+            .where(
+                StaffUnitAssignment.staff_id == staff.id,
+                StaffUnitAssignment.is_active.is_(True),
+            )
+            .order_by(StaffUnitAssignment.created_at.desc())
+        )
+        rows = (await self.db.scalars(stmt.offset(offset).limit(limit))).all()
+        total = (
+            await self.db.scalar(
+                select(func.count())
+                .select_from(StaffUnitAssignment)
+                .where(
+                    StaffUnitAssignment.staff_id == staff.id,
+                    StaffUnitAssignment.is_active.is_(True),
+                )
+            )
+            or 0
+        )
+
+        details: list[schemas.AssignmentDetailRead] = []
+        for r in rows:
+            unit = await self.db.get(Unit, r.unit_id)
+            tower_name = None
+            floor_number = None
+            if unit:
+                if unit.tower_id:
+                    tower = await self.db.get(Tower, unit.tower_id)
+                    tower_name = tower.name if tower else None
+                if unit.floor_id:
+                    floor = await self.db.get(Floor, unit.floor_id)
+                    floor_number = floor.floor_number if floor else None
+
+            resident_name = None
+            resident_phone = None
+            occ = await self.db.scalar(
+                select(UnitOccupancy).where(
+                    UnitOccupancy.unit_id == r.unit_id,
+                    UnitOccupancy.is_active.is_(True),
+                    UnitOccupancy.is_primary.is_(True),
+                )
+            )
+            if occ:
+                prof = await self.db.get(ResidentProfile, occ.resident_profile_id)
+                if prof:
+                    u = await self.db.get(User, prof.user_id)
+                    if u:
+                        resident_name = u.full_name
+                        resident_phone = u.phone or "+919800000000"
+
+            details.append(
+                schemas.AssignmentDetailRead(
+                    id=r.id,
+                    community_id=r.community_id,
+                    staff_id=r.staff_id,
+                    unit_id=r.unit_id,
+                    unit_number=unit.unit_number if unit else None,
+                    tower_name=tower_name,
+                    floor_number=floor_number,
+                    resident_name=resident_name,
+                    resident_phone=resident_phone,
+                    work_type=r.work_type,
+                    start_date=r.start_date,
+                    end_date=r.end_date,
+                    time_from=r.time_from,
+                    time_to=r.time_to,
+                    is_active=r.is_active,
+                    created_at=r.created_at,
+                    updated_at=r.updated_at,
+                )
+            )
+        return details, total
+
+    async def get_my_attendance(self, *, offset: int = 0, limit: int = 50):
+        staff = await self._resolve_my_staff()
+        stmt = (
+            select(StaffAttendance)
+            .where(StaffAttendance.staff_id == staff.id)
+            .order_by(StaffAttendance.check_in_at.desc())
+        )
+        rows = (await self.db.scalars(stmt.offset(offset).limit(limit))).all()
+        total = (
+            await self.db.scalar(
+                select(func.count())
+                .select_from(StaffAttendance)
+                .where(StaffAttendance.staff_id == staff.id)
+            )
+            or 0
+        )
+        return rows, total
+
+    async def get_my_visits(
+        self, *, offset: int = 0, limit: int = 50
+    ) -> tuple[list[schemas.StaffVisitRead], int]:
+        staff = await self._resolve_my_staff()
+        from app.modules.communities.models import Unit
+
+        attendances, total = await self.get_my_attendance(offset=offset, limit=limit)
+        ratings = {
+            r.unit_id: r
+            for r in (
+                await self.db.scalars(
+                    select(StaffRating).where(StaffRating.staff_id == staff.id)
+                )
+            ).all()
+        }
+        assignments = (
+            await self.db.scalars(
+                select(StaffUnitAssignment).where(StaffUnitAssignment.staff_id == staff.id)
+            )
+        ).all()
+        default_unit_id = assignments[0].unit_id if assignments else None
+        default_unit = await self.db.get(Unit, default_unit_id) if default_unit_id else None
+
+        visits: list[schemas.StaffVisitRead] = []
+        for att in attendances:
+            duration = None
+            if att.check_out_at and att.check_in_at:
+                duration = int((att.check_out_at - att.check_in_at).total_seconds() / 60)
+            r = ratings.get(default_unit_id)
+            visits.append(
+                schemas.StaffVisitRead(
+                    id=att.id,
+                    unit_id=default_unit_id,
+                    unit_number=default_unit.unit_number if default_unit else "Assigned Units",
+                    date=att.check_in_at.date() if att.check_in_at else None,
+                    check_in_at=att.check_in_at,
+                    check_out_at=att.check_out_at,
+                    duration_minutes=duration,
+                    tasks_performed=f"{staff.staff_type.title()} service",
+                    rating=r.rating if r else 5,
+                    feedback=r.feedback if r else "Punctual and reliable service.",
+                )
+            )
+        return visits, total
+

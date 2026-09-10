@@ -12,6 +12,10 @@ export interface AppNotification {
   is_read: boolean;
   read_at?: string | null;
   metadata_json?: Record<string, unknown> | null;
+  read?: boolean;
+  message?: string;
+  type?: string;
+  timestamp?: string;
 }
 
 export interface NotificationPreference {

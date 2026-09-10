@@ -21,8 +21,8 @@ export interface CurrentUser {
   permission_version: number;
   community_ids: string[];
   /** The role this session was opened as — returned directly by /auth/login and /auth/me */
-  active_role: RoleSlug | null;
-  session_bucket: string | null;
+  active_role?: RoleSlug | string | null;
+  session_bucket?: string | null;
   roles?: {
     id: string;
     role_slug: RoleSlug;

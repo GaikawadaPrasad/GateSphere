@@ -5,22 +5,22 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Modal } from "@/components/common/Modal";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { gateApi, type PanicAlert } from "@/lib/api";
+import { formatDateTime } from "@/lib/utils";
 
+// Real backend enum (backend/app/modules/gate/models.py ALERT_TYPES)
 const EMERGENCY_TYPES = [
-  { label: "Medical Emergency", icon: "🚑" },
-  { label: "Fire", icon: "🔥" },
-  { label: "Security Threat", icon: "🚨" },
-  { label: "Unauthorized Person", icon: "🚷" },
-  { label: "Accident", icon: "💥" },
-  { label: "Suspicious Activity", icon: "👁️" },
-  { label: "Other", icon: "⚠️" },
+  { label: "Medical Emergency", value: "medical", icon: "🚑" },
+  { label: "Fire", value: "fire", icon: "🔥" },
+  { label: "Security Threat", value: "security", icon: "🚨" },
+  { label: "Unauthorized Person / Intrusion", value: "intrusion", icon: "🚷" },
+  { label: "Other", value: "other", icon: "⚠️" },
 ];
 
 export default function SecurityGuardEmergencyPage() {
   const [alertsList, setAlertsList] = useState<PanicAlert[]>([]);
   const [activeSos, setActiveSos] = useState<PanicAlert | null>(null);
 
-  const [emergencyType, setEmergencyType] = useState("Medical Emergency");
+  const [emergencyType, setEmergencyType] = useState("medical");
   const [location, setLocation] = useState("Main Gate North");
   const [description, setDescription] = useState("");
 
@@ -35,10 +35,10 @@ export default function SecurityGuardEmergencyPage() {
     gateApi.alerts().then((data) => {
       if (mounted && data) {
         setAlertsList(data);
-        const live = data.find((a) => a.status === "Active" || a.status === "Acknowledged");
+        const live = data.find((a) => a.status === "active" || a.status === "acknowledged");
         if (live) setActiveSos(live);
       }
-    });
+    }).catch(() => {});
     return () => {
       mounted = false;
     };
@@ -61,17 +61,17 @@ export default function SecurityGuardEmergencyPage() {
     setErrorMessage(null);
 
     try {
+      const message = [location.trim() && `Location: ${location.trim()}`, description.trim()].filter(Boolean).join(" — ");
       const sosRecord = await gateApi.triggerEmergency({
-        type: emergencyType,
-        location: location.trim(),
-        description: description.trim() || undefined,
+        alert_type: emergencyType,
         severity: "critical",
+        message: message || undefined,
       });
 
       setDispatchedAlert(sosRecord);
       setActiveSos(sosRecord);
       setAlertsList((prev) => {
-        const filtered = prev.filter((a) => a.id !== sosRecord.id && a.reference_id !== sosRecord.reference_id);
+        const filtered = prev.filter((a) => a.id !== sosRecord.id);
         return [sosRecord, ...filtered];
       });
       setIsConfirmModalOpen(false);
@@ -131,26 +131,26 @@ export default function SecurityGuardEmergencyPage() {
                 whiteSpace: "nowrap",
               }}
             >
-              REFERENCE: {activeSos.reference_id || `SOS-${activeSos.id.slice(0, 4).toUpperCase()}`}
+              REFERENCE: SOS-{activeSos.id.slice(0, 8).toUpperCase()}
             </span>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "1rem", fontSize: "0.9rem" }}>
             <div>
               <span style={{ opacity: 0.8, fontSize: "0.75rem", display: "block" }}>Emergency Type</span>
-              <strong>🚨 {activeSos.alert_type}</strong>
+              <strong style={{ textTransform: "capitalize" }}>🚨 {activeSos.alert_type}</strong>
             </div>
             <div>
-              <span style={{ opacity: 0.8, fontSize: "0.75rem", display: "block" }}>Location</span>
-              <strong>📍 {activeSos.location}</strong>
+              <span style={{ opacity: 0.8, fontSize: "0.75rem", display: "block" }}>Details</span>
+              <strong>{(activeSos as any).message || "—"}</strong>
             </div>
             <div>
               <span style={{ opacity: 0.8, fontSize: "0.75rem", display: "block" }}>Time Sent</span>
-              <strong>⏱️ {activeSos.timestamp}</strong>
+              <strong>⏱️ {formatDateTime((activeSos as any).triggered_at)}</strong>
             </div>
             <div>
               <span style={{ opacity: 0.8, fontSize: "0.75rem", display: "block" }}>Current Escalation</span>
-              <strong>🛡️ {activeSos.status} ({activeSos.assigned_responder || "Security Supervisor"})</strong>
+              <strong style={{ textTransform: "capitalize" }}>🛡️ {activeSos.status}</strong>
             </div>
           </div>
         </div>
@@ -174,7 +174,7 @@ export default function SecurityGuardEmergencyPage() {
                 🚨 SOS EMERGENCY ALERT DISPATCHED
               </h3>
               <p style={{ fontSize: "0.9rem", color: "#b91c1c" }}>
-                Reference ID: <strong>{dispatchedAlert.reference_id}</strong> | Type: <strong>{dispatchedAlert.alert_type}</strong> at <strong>{dispatchedAlert.location}</strong>. Alert broadcasted to Security Supervisor and active response team.
+                Reference: <strong>SOS-{dispatchedAlert.id.slice(0, 8).toUpperCase()}</strong> | Type: <strong>{dispatchedAlert.alert_type}</strong>. Alert broadcasted to Security Supervisor and active response team.
               </p>
             </div>
             <button
@@ -219,12 +219,12 @@ export default function SecurityGuardEmergencyPage() {
               </label>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "0.6rem" }}>
                 {EMERGENCY_TYPES.map((item) => {
-                  const isSelected = emergencyType === item.label;
+                  const isSelected = emergencyType === item.value;
                   return (
                     <button
-                      key={item.label}
+                      key={item.value}
                       type="button"
-                      onClick={() => setEmergencyType(item.label)}
+                      onClick={() => setEmergencyType(item.value)}
                       style={{
                         display: "flex",
                         alignItems: "center",
@@ -296,25 +296,33 @@ export default function SecurityGuardEmergencyPage() {
                 <tr>
                   <th>Ref ID</th>
                   <th>Type</th>
-                  <th>Location</th>
+                  <th>Details</th>
                   <th>Time</th>
                   <th>Status</th>
                 </tr>
               </thead>
               <tbody>
-                {alertsList.map((a) => (
-                  <tr key={a.id} style={{ background: a.status === "Active" ? "var(--danger-light)" : undefined }}>
-                    <td style={{ fontWeight: 700, fontFamily: "monospace", whiteSpace: "nowrap" }}>
-                      {a.reference_id || `SOS-${a.id.slice(0, 4).toUpperCase()}`}
-                    </td>
-                    <td style={{ fontWeight: 600, color: "var(--danger)" }}>🚨 {a.alert_type}</td>
-                    <td>{a.location}</td>
-                    <td>{a.timestamp}</td>
-                    <td>
-                      <StatusBadge status={a.status} />
+                {alertsList.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}>
+                      No emergency alerts recorded.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  alertsList.map((a) => (
+                    <tr key={a.id} style={{ background: a.status === "active" ? "var(--danger-light)" : undefined }}>
+                      <td style={{ fontWeight: 700, fontFamily: "monospace", whiteSpace: "nowrap" }}>
+                        SOS-{a.id.slice(0, 8).toUpperCase()}
+                      </td>
+                      <td style={{ fontWeight: 600, color: "var(--danger)", textTransform: "capitalize" }}>🚨 {a.alert_type}</td>
+                      <td>{(a as any).message || "—"}</td>
+                      <td>{formatDateTime((a as any).triggered_at)}</td>
+                      <td>
+                        <StatusBadge status={a.status} />
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -377,7 +385,7 @@ export default function SecurityGuardEmergencyPage() {
           >
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.4rem" }}>
               <span style={{ color: "var(--muted)" }}>Emergency Type:</span>
-              <strong style={{ color: "var(--danger)" }}>🚨 {emergencyType}</strong>
+              <strong style={{ color: "var(--danger)" }}>🚨 {EMERGENCY_TYPES.find((t) => t.value === emergencyType)?.label || emergencyType}</strong>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span style={{ color: "var(--muted)" }}>Location:</span>

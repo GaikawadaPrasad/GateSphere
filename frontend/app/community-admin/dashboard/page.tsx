@@ -181,7 +181,7 @@ export default function CommunityAdminDashboardPage() {
               </div>
               {announcements && announcements.length > 0 ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                  {announcements.slice(0, 3).map((a) => (
+                  {announcements.slice(0, 3).map((a: any) => (
                     <div
                       key={a.id}
                       style={{

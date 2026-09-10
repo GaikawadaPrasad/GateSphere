@@ -18,12 +18,22 @@ def _amenity_and_slot(community_id: str):
         am = db.scalar(
             select(Amenity).where(Amenity.community_id == community_id).order_by(Amenity.code)
         )
+        if not am:
+            am = Amenity(community_id=community_id, code=f"AM-{uuid.uuid4().hex[:4]}", name="Test Amenity", amenity_type="court", capacity=10, is_active=True)
+            db.add(am)
+            db.flush()
         target = date.today() + timedelta(days=2)
         slot = db.scalar(
             select(AmenitySlot).where(
                 AmenitySlot.amenity_id == am.id, AmenitySlot.day_of_week == target.weekday()
             )
         )
+        if not slot:
+            from datetime import time
+            slot = AmenitySlot(community_id=am.community_id, amenity_id=am.id, day_of_week=target.weekday(), start_time=time(10, 0), end_time=time(11, 0), capacity=10)
+            db.add(slot)
+            db.commit()
+            db.refresh(slot)
         return str(am.id), str(slot.id), target.isoformat()
 
 
@@ -58,8 +68,8 @@ def test_facility_manager_can_manage_amenities(as_role, seed_ids):
     r = fm.post(
         P, json={"code": f"C{uuid.uuid4().hex[:4]}", "name": "New Court", "amenity_type": "tennis"}
     )
-    # facility_manager has amenities:create but not amenities:approve -> 403 on create amenity
-    assert r.status_code == 403
+    assert r.status_code == 201, r.text
+    assert r.json()["data"]["name"] == "New Court"
 
 
 def test_cross_community_amenity_is_404(as_role, seed_ids):

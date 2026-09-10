@@ -57,7 +57,12 @@ def seed_rbac(db: Session) -> None:
     for slug, name in ROLES.items():
         role, _ = _get_or_create(db, Role, slug=slug, defaults={"name": name})
         granted = ROLE_PERMISSIONS.get(slug, [])
-        codes = PERMISSIONS.keys() if granted == ["*"] else granted
+        codes = set(PERMISSIONS.keys() if granted == ["*"] else granted)
+        current_rps = db.scalars(select(RolePermission).where(RolePermission.role_id == role.id)).all()
+        for rp in current_rps:
+            p_obj = db.scalar(select(Permission).where(Permission.id == rp.permission_id))
+            if p_obj and p_obj.code not in codes:
+                db.delete(rp)
         for code in codes:
             _get_or_create(db, RolePermission, role_id=role.id, permission_id=perms[code].id)
 
@@ -297,6 +302,8 @@ def seed_domestic_staff(db: Session, communities: list[Community]) -> None:
     from app.modules.communities.models import Unit
     from app.modules.domestic_staff.models import DomesticStaff, StaffUnitAssignment
 
+    staff_user = db.scalar(select(User).where(User.email == f"domestic_staff@{DEMO_DOMAIN}"))
+
     for c in communities:
         unit = db.scalar(select(Unit).where(Unit.community_id == c.id).order_by(Unit.unit_number))
         for i, (name, kind) in enumerate(
@@ -308,11 +315,14 @@ def seed_domestic_staff(db: Session, communities: list[Community]) -> None:
                 community_id=c.id,
                 phone=f"+9197{c.code[-2:]}00{i:04d}",
                 defaults={
+                    "user_id": staff_user.id if (i == 1 and staff_user and c == communities[0]) else None,
                     "full_name": name,
                     "staff_type": kind,
                     "police_verification_status": "verified",
                 },
             )
+            if staff and i == 1 and staff_user and c == communities[0] and not staff.user_id:
+                staff.user_id = staff_user.id
             if created and unit is not None and i == 1:
                 db.add(
                     StaffUnitAssignment(
@@ -322,6 +332,7 @@ def seed_domestic_staff(db: Session, communities: list[Community]) -> None:
                         work_type="part_time",
                     )
                 )
+
 
 
 def seed_deliveries(db: Session, communities: list[Community]) -> None:

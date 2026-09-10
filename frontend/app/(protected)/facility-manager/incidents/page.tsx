@@ -1,71 +1,76 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
+import { incidentsApi } from "@/lib/api";
+import { formatDateTime } from "@/lib/utils";
+import type { Incident, IncidentType, IncidentSeverity, IncidentStatus } from "@/types/incidents";
 
-interface OperationalIncident {
-  id: string;
-  incident_number: string;
-  title: string;
-  severity: "Low" | "Medium" | "High" | "Critical";
-  location: string;
-  reported_at: string;
-  assigned_to: string;
-  status: "Open" | "Investigating" | "Action In Progress" | "Resolved" | "Closed";
-}
+// Real backend enum (backend/app/modules/incidents/models.py)
+const INCIDENT_TYPES: IncidentType[] = ["medical", "fire", "theft", "suspicious", "breach", "other"];
+const INCIDENT_STATUSES: IncidentStatus[] = ["reported", "acknowledged", "responding", "contained", "resolved", "closed", "false_alarm"];
 
 export default function FacilityManagerIncidentsPage() {
-  const [incidents, setIncidents] = useState<OperationalIncident[]>([
-    {
-      id: "inc-1",
-      incident_number: "INC-901",
-      title: "Basement Parking B2 Water Pipe Burst",
-      severity: "Critical",
-      location: "Basement B2 Pillar 14",
-      reported_at: "2026-09-03 07:45",
-      assigned_to: "Alexander Wright (Facility Mgr)",
-      status: "Action In Progress",
-    },
-    {
-      id: "inc-2",
-      incident_number: "INC-902",
-      title: "Main Gate CCTV Camera 3 Signal Loss",
-      severity: "Medium",
-      location: "North Gate Entrance",
-      reported_at: "2026-09-02 22:15",
-      assigned_to: "Supervisor Devraj",
-      status: "Investigating",
-    },
-  ]);
+  const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [title, setTitle] = useState("");
-  const [location, setLocation] = useState("");
-  const [severity, setSeverity] = useState<"Low" | "Medium" | "High" | "Critical">("High");
+  const [description, setDescription] = useState("");
+  const [locationText, setLocationText] = useState("");
+  const [incidentType, setIncidentType] = useState<IncidentType>("other");
+  const [severity, setSeverity] = useState<IncidentSeverity>("high");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleCreateIncident = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim()) return;
-    const newInc: OperationalIncident = {
-      id: `inc-${Date.now()}`,
-      incident_number: `INC-${Math.floor(Math.random() * 900 + 100)}`,
-      title,
-      severity,
-      location: location || "Facility Grounds",
-      reported_at: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      assigned_to: "Alexander Wright",
-      status: "Open",
-    };
-    setIncidents([newInc, ...incidents]);
-    setIsModalOpen(false);
-    setTitle("");
-    setLocation("");
+  const loadIncidents = async () => {
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      const res = await incidentsApi.list();
+      setIncidents(res || []);
+    } catch (err: any) {
+      // NOTE: facility_manager does not currently hold incidents:view in the backend
+      // RBAC seed (backend/app/core/rbac.py) — this will 403 until granted. See the
+      // integration report for the exact permission gap.
+      setLoadError(err?.message || "Failed to load incidents.");
+    }
+    setIsLoading(false);
   };
 
-  const handleStatusChange = (id: string, newStatus: any) => {
-    setIncidents((prev) => prev.map((inc) => (inc.id === id ? { ...inc, status: newStatus } : inc)));
+  useEffect(() => {
+    loadIncidents();
+  }, []);
+
+  const handleCreateIncident = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!description.trim()) return;
+    setIsSubmitting(true);
+    try {
+      await incidentsApi.create({
+        incident_type: incidentType,
+        severity,
+        location_text: locationText || undefined,
+        description,
+      });
+      setIsModalOpen(false);
+      setDescription("");
+      setLocationText("");
+      loadIncidents();
+    } catch (err: any) {
+      alert(err?.message || "Failed to log incident.");
+    }
+    setIsSubmitting(false);
+  };
+
+  const handleStatusChange = async (id: string, newStatus: IncidentStatus) => {
+    try {
+      await incidentsApi.transition(id, { status: newStatus });
+      loadIncidents();
+    } catch (err: any) {
+      alert(err?.message || "Failed to update incident status.");
+    }
   };
 
   return (
@@ -91,45 +96,63 @@ export default function FacilityManagerIncidentsPage() {
             <thead>
               <tr>
                 <th>Incident #</th>
-                <th>Title / Summary</th>
+                <th>Type</th>
                 <th>Severity</th>
                 <th>Location</th>
-                <th>Reported Time</th>
-                <th>Assigned Responder</th>
+                <th>Reported</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {incidents.map((inc) => (
-                <tr key={inc.id}>
-                  <td style={{ fontWeight: 600 }}>{inc.incident_number}</td>
-                  <td style={{ fontWeight: 500, color: "var(--fg)" }}>{inc.title}</td>
-                  <td>
-                    <StatusBadge status={inc.severity} />
-                  </td>
-                  <td>{inc.location}</td>
-                  <td>{inc.reported_at}</td>
-                  <td>{inc.assigned_to}</td>
-                  <td>
-                    <StatusBadge status={inc.status} />
-                  </td>
-                  <td>
-                    <select
-                      className="select-field"
-                      value={inc.status}
-                      onChange={(e) => handleStatusChange(inc.id, e.target.value)}
-                      style={{ height: 28, fontSize: "0.75rem" }}
-                    >
-                      <option value="Open">Open</option>
-                      <option value="Investigating">Investigating</option>
-                      <option value="Action In Progress">Action In Progress</option>
-                      <option value="Resolved">Resolved</option>
-                      <option value="Closed">Closed</option>
-                    </select>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: "center", padding: "2rem" }}>
+                    Loading incidents…
                   </td>
                 </tr>
-              ))}
+              ) : loadError ? (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: "center", padding: "2rem", color: "var(--danger, #dc2626)" }}>
+                    {loadError}
+                  </td>
+                </tr>
+              ) : incidents.length === 0 ? (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
+                    No incidents logged.
+                  </td>
+                </tr>
+              ) : (
+                incidents.map((inc) => (
+                  <tr key={inc.id}>
+                    <td style={{ fontWeight: 600 }}>{inc.incident_number}</td>
+                    <td style={{ textTransform: "capitalize" }}>{inc.incident_type.replace(/_/g, " ")}</td>
+                    <td>
+                      <StatusBadge status={inc.severity} />
+                    </td>
+                    <td>{inc.location_text || "—"}</td>
+                    <td>{formatDateTime(inc.reported_at)}</td>
+                    <td>
+                      <StatusBadge status={inc.status} />
+                    </td>
+                    <td>
+                      <select
+                        className="select-field"
+                        value={inc.status}
+                        onChange={(e) => handleStatusChange(inc.id, e.target.value as IncidentStatus)}
+                        style={{ height: 28, fontSize: "0.75rem" }}
+                      >
+                        {INCIDENT_STATUSES.map((s) => (
+                          <option key={s} value={s}>
+                            {s.replace(/_/g, " ")}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -145,8 +168,8 @@ export default function FacilityManagerIncidentsPage() {
             <button className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>
               Cancel
             </button>
-            <button className="btn btn-primary" onClick={handleCreateIncident}>
-              Log Incident
+            <button className="btn btn-primary" onClick={handleCreateIncident} disabled={isSubmitting}>
+              {isSubmitting ? "Logging…" : "Log Incident"}
             </button>
           </>
         }
@@ -154,14 +177,14 @@ export default function FacilityManagerIncidentsPage() {
         <form onSubmit={handleCreateIncident}>
           <div style={{ marginBottom: "1rem" }}>
             <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
-              Incident Title *
+              Description *
             </label>
-            <input
-              type="text"
+            <textarea
               className="input-field"
-              placeholder="e.g. Main Transformer Oil Pressure Warning"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              style={{ minHeight: 70 }}
+              placeholder="e.g. Main transformer oil pressure warning"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
               required
             />
           </div>
@@ -169,32 +192,49 @@ export default function FacilityManagerIncidentsPage() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
             <div>
               <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
-                Severity
+                Type
               </label>
               <select
                 className="select-field"
-                value={severity}
-                onChange={(e) => setSeverity(e.target.value as any)}
+                value={incidentType}
+                onChange={(e) => setIncidentType(e.target.value as IncidentType)}
               >
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
-                <option value="Critical">Critical</option>
+                {INCIDENT_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t.replace(/_/g, " ")}
+                  </option>
+                ))}
               </select>
             </div>
 
             <div>
               <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
-                Specific Location
+                Severity
               </label>
-              <input
-                type="text"
-                className="input-field"
-                placeholder="e.g. Substation Room 1"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-              />
+              <select
+                className="select-field"
+                value={severity}
+                onChange={(e) => setSeverity(e.target.value as IncidentSeverity)}
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+              </select>
             </div>
+          </div>
+
+          <div style={{ marginTop: "1rem" }}>
+            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              Specific Location
+            </label>
+            <input
+              type="text"
+              className="input-field"
+              placeholder="e.g. Substation Room 1"
+              value={locationText}
+              onChange={(e) => setLocationText(e.target.value)}
+            />
           </div>
         </form>
       </Modal>

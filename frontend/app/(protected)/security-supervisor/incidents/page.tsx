@@ -1,62 +1,77 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
+import { incidentsApi } from "@/lib/api";
 
 interface SecurityIncident {
   id: string;
   incident_number: string;
   title: string;
-  severity: "Low" | "Medium" | "High" | "Critical";
+  severity: string;
   assigned_guard: string;
   reported_time: string;
-  status: "Reported" | "Assigned" | "Investigating" | "Action Taken" | "Resolved" | "Closed";
+  status: string;
 }
 
 export default function SecuritySupervisorIncidentsPage() {
-  const [incidents, setIncidents] = useState<SecurityIncident[]>([
-    {
-      id: "inc-s1",
-      incident_number: "SEC-801",
-      title: "Unauthorized Perimeter Fence Crossing near Gate B",
-      severity: "Critical",
-      assigned_guard: "Guard Vikram Singh",
-      reported_time: "2026-09-03 09:10",
-      status: "Investigating",
-    },
-    {
-      id: "inc-s2",
-      incident_number: "SEC-802",
-      title: "Tailgating Attempt at Main Gate North",
-      severity: "High",
-      assigned_guard: "Guard Somnath Patil",
-      reported_time: "2026-09-03 08:20",
-      status: "Action Taken",
-    },
-  ]);
+  const [incidents, setIncidents] = useState<SecurityIncident[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [title, setTitle] = useState("");
-  const [severity, setSeverity] = useState<"Low" | "Medium" | "High" | "Critical">("High");
-  const [assignedGuard, setAssignedGuard] = useState("Guard Somnath Patil");
+  const [severity, setSeverity] = useState<any>("high");
+  const [incidentType, setIncidentType] = useState<any>("breach");
+  const [locationText, setLocationText] = useState("Main Gate Perimeter");
+  const [assignedGuard, setAssignedGuard] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleCreateIncident = (e: React.FormEvent) => {
+  const loadData = async () => {
+    setIsLoading(true);
+    try {
+      const data = await incidentsApi.list();
+      setIncidents(
+        (data || []).map((inc: any) => ({
+          id: inc.id,
+          incident_number: inc.incident_number || `INC-${inc.id.slice(0, 6).toUpperCase()}`,
+          title: inc.description || "Security Incident",
+          severity: inc.severity ? inc.severity.replace(/\b\w/g, (c: string) => c.toUpperCase()) : "High",
+          assigned_guard: inc.responder_user_id ? `Responder (${inc.responder_user_id.slice(0, 6)})` : "Duty Security Team",
+          reported_time: inc.reported_at ? new Date(inc.reported_at).toLocaleString([], { dateStyle: "short", timeStyle: "short" }) : "Recent",
+          status: inc.status ? inc.status.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) : "Reported",
+        }))
+      );
+    } catch {
+      // fallback
+    }
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleCreateIncident = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
-    const newInc: SecurityIncident = {
-      id: `inc-s-${Date.now()}`,
-      incident_number: `SEC-${Math.floor(Math.random() * 900 + 100)}`,
-      title,
-      severity,
-      assigned_guard: assignedGuard,
-      reported_time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      status: "Reported",
-    };
-    setIncidents([newInc, ...incidents]);
-    setIsModalOpen(false);
-    setTitle("");
+    setIsSubmitting(true);
+    try {
+      await incidentsApi.create({
+        incident_type: incidentType,
+        severity,
+        location_text: locationText,
+        description: title.trim(),
+      });
+      setIsModalOpen(false);
+      setTitle("");
+      setAssignedGuard("");
+      loadData();
+    } catch (err: any) {
+      alert(err?.message || "Failed to log security incident.");
+    }
+    setIsSubmitting(false);
   };
 
   const handleStatusChange = (id: string, status: any) => {
@@ -179,17 +194,15 @@ export default function SecuritySupervisorIncidentsPage() {
 
             <div>
               <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
-                Assign Responder Guard
+                Assigned Responder
               </label>
-              <select
-                className="select-field"
+              <input
+                type="text"
+                className="input-field"
+                placeholder="Enter responder name"
                 value={assignedGuard}
                 onChange={(e) => setAssignedGuard(e.target.value)}
-              >
-                <option value="Guard Somnath Patil">Guard Somnath Patil</option>
-                <option value="Guard Vikram Singh">Guard Vikram Singh</option>
-                <option value="Supervisor Devraj">Supervisor Devraj</option>
-              </select>
+              />
             </div>
           </div>
         </form>

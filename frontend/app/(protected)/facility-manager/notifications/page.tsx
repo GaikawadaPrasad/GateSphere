@@ -70,7 +70,7 @@ export default function FacilityManagerNotificationsPage() {
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                  <StatusBadge status={n.type} />
+                  <StatusBadge status={n.type || "Info"} />
                   <div>
                     <div style={{ fontWeight: 600, color: "var(--fg)", fontSize: "0.9rem" }}>
                       {n.title} {!n.read && <span style={{ color: "var(--primary)" }}>●</span>}

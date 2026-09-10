@@ -6,15 +6,45 @@ import { SearchInput } from "@/components/forms/SearchInput";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { deliveriesApi } from "@/lib/api";
 
+interface DeliveryRow {
+  id: string;
+  provider_name: string;
+  delivery_type: string;
+  executive_name: string;
+  tracking_reference: string;
+  status: string;
+  protocol_type: string;
+  arrived_at?: string | null;
+}
+
 export default function SecurityGuardDeliveriesPage() {
-  const [deliveries, setDeliveries] = useState<any[]>([]);
+  const [deliveries, setDeliveries] = useState<DeliveryRow[]>([]);
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadData = async () => {
     setIsLoading(true);
-    const data = await deliveriesApi.list();
-    setDeliveries(data);
+    setLoadError(null);
+    try {
+      const [data, protocols] = await Promise.all([deliveriesApi.list(), deliveriesApi.protocols()]);
+      const protocolMap = new Map<string, string>();
+      for (const p of protocols || []) if ((p as any)?.id) protocolMap.set((p as any).id, (p as any).protocol_type);
+      setDeliveries(
+        (data || []).map((d: any) => ({
+          id: d.id,
+          provider_name: d.provider_name || d.delivery_type?.toUpperCase() || "Courier",
+          delivery_type: d.delivery_type,
+          executive_name: d.executive_name || "—",
+          tracking_reference: d.tracking_reference || d.id.slice(0, 8),
+          status: d.status,
+          protocol_type: protocolMap.get(d.protocol_id) || "—",
+          arrived_at: d.arrived_at,
+        }))
+      );
+    } catch (err: any) {
+      setLoadError(err?.message || "Failed to load deliveries.");
+    }
     setIsLoading(false);
   };
 
@@ -22,15 +52,39 @@ export default function SecurityGuardDeliveriesPage() {
     loadData();
   }, []);
 
-  const handleDecision = (id: string, newStatus: string) => {
-    setDeliveries((prev) => prev.map((d) => (d.id === id ? { ...d, status: newStatus } : d)));
+  const handleRecordArrival = async (id: string) => {
+    try {
+      await deliveriesApi.recordArrival(id);
+      loadData();
+    } catch (err: any) {
+      alert(err?.message || "Failed to record arrival.");
+    }
+  };
+
+  const handleMarkDelivered = async (id: string) => {
+    try {
+      await deliveriesApi.markDelivered(id);
+      loadData();
+    } catch (err: any) {
+      alert(err?.message || "Failed to mark delivered.");
+    }
+  };
+
+  const handleCancel = async (id: string) => {
+    try {
+      await deliveriesApi.cancel(id);
+      loadData();
+    } catch (err: any) {
+      alert(err?.message || "Failed to cancel delivery.");
+    }
   };
 
   const filteredDeliveries = deliveries.filter((d) => {
+    const q = search.toLowerCase();
     return (
-      d.company.toLowerCase().includes(search.toLowerCase()) ||
-      d.courier.toLowerCase().includes(search.toLowerCase()) ||
-      d.unit.toLowerCase().includes(search.toLowerCase())
+      d.provider_name.toLowerCase().includes(q) ||
+      d.executive_name.toLowerCase().includes(q) ||
+      d.tracking_reference.toLowerCase().includes(q)
     );
   });
 
@@ -38,7 +92,7 @@ export default function SecurityGuardDeliveriesPage() {
     <div>
       <PageHeader
         title="Delivery Verification & Gate Decision"
-        subtitle="Verify courier platform, check resident delivery protocol, and record final gate decision"
+        subtitle="Verify courier arrival, record gate hand-off, and track delivery protocol status"
         breadcrumbs={[{ label: "GateSphere" }, { label: "Security Guard" }, { label: "Deliveries" }]}
       />
 
@@ -52,7 +106,7 @@ export default function SecurityGuardDeliveriesPage() {
           </div>
 
           <div style={{ width: 220 }}>
-            <SearchInput value={search} onChange={setSearch} placeholder="Search courier/company/unit…" />
+            <SearchInput value={search} onChange={setSearch} placeholder="Search courier/tracking…" />
           </div>
         </div>
 
@@ -60,11 +114,11 @@ export default function SecurityGuardDeliveriesPage() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Company</th>
-                <th>Courier Name</th>
-                <th>Category</th>
-                <th>Destination Unit</th>
-                <th>Resident Protocol</th>
+                <th>Provider</th>
+                <th>Type</th>
+                <th>Executive</th>
+                <th>Tracking Ref</th>
+                <th>Protocol</th>
                 <th>Status</th>
                 <th>Gate Action</th>
               </tr>
@@ -76,55 +130,58 @@ export default function SecurityGuardDeliveriesPage() {
                     Loading deliveries…
                   </td>
                 </tr>
+              ) : loadError ? (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: "center", padding: "2rem", color: "var(--danger, #dc2626)" }}>
+                    {loadError}
+                  </td>
+                </tr>
+              ) : filteredDeliveries.length === 0 ? (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
+                    No deliveries found.
+                  </td>
+                </tr>
               ) : (
                 filteredDeliveries.map((d) => (
                   <tr key={d.id}>
-                    <td style={{ fontWeight: 600, color: "var(--fg)" }}>{d.company}</td>
-                    <td>{d.courier}</td>
-                    <td>{d.category}</td>
-                    <td>{d.unit}</td>
-                    <td>
-                      <StatusBadge status={d.protocol} />
-                    </td>
+                    <td style={{ fontWeight: 600, color: "var(--fg)" }}>{d.provider_name}</td>
+                    <td style={{ textTransform: "capitalize" }}>{d.delivery_type}</td>
+                    <td>{d.executive_name}</td>
+                    <td style={{ fontFamily: "monospace" }}>{d.tracking_reference}</td>
+                    <td style={{ textTransform: "capitalize" }}>{d.protocol_type.replace(/_/g, " ")}</td>
                     <td>
                       <StatusBadge status={d.status} />
                     </td>
                     <td>
                       <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
-                        {d.protocol === "Allow at Gate" && (
+                        {d.status === "expected" && (
                           <button
                             className="btn btn-primary"
                             style={{ fontSize: "0.75rem", padding: "0.2rem 0.45rem" }}
-                            onClick={() => handleDecision(d.id, "Handed Over")}
+                            onClick={() => handleRecordArrival(d.id)}
                           >
-                            Mark Handed Over
+                            Record Arrival
                           </button>
                         )}
-                        {d.protocol === "Leave at Gate Desk" && (
+                        {(d.status === "at_gate" || d.status === "in_transit") && (
                           <button
                             className="btn btn-secondary"
                             style={{ fontSize: "0.75rem", padding: "0.2rem 0.45rem" }}
-                            onClick={() => handleDecision(d.id, "Desk Left")}
+                            onClick={() => handleMarkDelivered(d.id)}
                           >
-                            Mark Left at Desk
+                            Mark Delivered
                           </button>
                         )}
-                        {d.protocol === "Resident Approval Required" && (
+                        {!["delivered", "collected", "cancelled", "returned"].includes(d.status) && (
                           <button
-                            className="btn btn-secondary"
+                            className="btn btn-danger"
                             style={{ fontSize: "0.75rem", padding: "0.2rem 0.45rem" }}
-                            onClick={() => handleDecision(d.id, "Pending Approval")}
+                            onClick={() => handleCancel(d.id)}
                           >
-                            Request Approval
+                            Reject
                           </button>
                         )}
-                        <button
-                          className="btn btn-danger"
-                          style={{ fontSize: "0.75rem", padding: "0.2rem 0.45rem" }}
-                          onClick={() => handleDecision(d.id, "Rejected")}
-                        >
-                          Reject
-                        </button>
                       </div>
                     </td>
                   </tr>

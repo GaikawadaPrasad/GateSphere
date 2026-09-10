@@ -5,7 +5,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 
 export default function SecurityGuardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <RoleGuard fallback={null}>
+    <RoleGuard allowedRoles={["security_guard", "super_admin"]} fallback={null}>
       <DashboardLayout>{children}</DashboardLayout>
     </RoleGuard>
   );

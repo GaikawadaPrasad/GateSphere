@@ -13,6 +13,9 @@ from fastapi import APIRouter, Depends
 from app.core.responses import Response as Envelope
 from app.core.responses import ok
 from app.core.tenancy import require_permission_async
+from app.modules.assistant import schemas as assistant_schemas
+from app.modules.assistant.deps import assistant_service
+from app.modules.assistant.service import AssistantService
 from app.modules.dashboards import schemas
 from app.modules.dashboards.deps import dashboard_service
 from app.modules.dashboards.service import DashboardService
@@ -54,3 +57,15 @@ async def resident(
     community_id: uuid.UUID | None = None, svc: Svc = Depends(dashboard_service)
 ) -> dict:
     return ok(await svc.resident(community_id))
+
+
+@router.post(
+    "/assistant/query",
+    response_model=Envelope[assistant_schemas.AssistantResponse],
+    dependencies=[VIEW],
+    summary="[Legacy] Query the assistant — superseded by POST /assistant/query",
+)
+async def legacy_assistant_query(
+    payload: assistant_schemas.AssistantQueryRequest, svc: AssistantService = Depends(assistant_service)
+) -> dict:
+    return ok(await svc.query(payload.community_id, payload.query))

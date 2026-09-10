@@ -8,6 +8,7 @@ import { useAuditLogs } from "@/hooks/use-audit";
 import { useCommunities } from "@/hooks/use-communities";
 import { auditApi } from "@/lib/api";
 import type { AuditLog } from "@/types/audit";
+import type { Community } from "@/types/communities";
 
 export default function AuditLogsPage() {
   const [module, setModule] = useState("");
@@ -137,7 +138,7 @@ export default function AuditLogsPage() {
               style={{ width: "auto", height: 36, padding: "0.25rem 0.6rem", fontSize: "0.85rem" }}
             >
               <option value="">All Communities</option>
-              {communities?.map((c) => (
+              {communities?.map((c: Community) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
@@ -147,8 +148,8 @@ export default function AuditLogsPage() {
         </div>
 
         <DataTable
-          columns={columns as unknown as Column<Record<string, unknown>>[]}
-          data={logs as unknown as Record<string, unknown>[]}
+          columns={columns}
+          data={logs}
           isLoading={isLoading}
           page={page}
           pageSize={pageSize}

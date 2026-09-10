@@ -147,6 +147,35 @@ async def create_family(
     )
 
 
+@router.patch(
+    "/family-members/{member_id}",
+    response_model=Envelope[schemas.FamilyMemberRead],
+    dependencies=[UPDATE],
+)
+async def update_family(
+    member_id: uuid.UUID,
+    payload: schemas.FamilyMemberUpdate,
+    svc: ResidentService = Depends(resident_service),
+) -> dict:
+    return ok(
+        schemas.FamilyMemberRead.model_validate(await svc.update_family(member_id, payload)),
+        message="Family member updated",
+    )
+
+
+@router.delete(
+    "/family-members/{member_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    dependencies=[DELETE],
+)
+async def delete_family(
+    member_id: uuid.UUID, svc: ResidentService = Depends(resident_service)
+) -> Response:
+    await svc.delete_family(member_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 # --- emergency contacts (delete-by-id) --------------------------------- #
 @router.delete(
     "/emergency-contacts/{contact_id}",
@@ -215,6 +244,19 @@ async def transition_move(
         schemas.MoveRecordRead.model_validate(await svc.transition_move(move_id, payload)),
         message="Updated",
     )
+
+
+# --- resident me / self-service (declared before /{profile_id}) ------- #
+@router.get("/me", response_model=Envelope[schemas.ResidentMeRead], dependencies=[VIEW])
+async def get_my_profile(svc: ResidentService = Depends(resident_service)) -> dict:
+    return ok(await svc.get_my_profile())
+
+
+@router.patch("/me", response_model=Envelope[schemas.ResidentMeRead], dependencies=[UPDATE])
+async def update_my_profile(
+    payload: schemas.ResidentMeUpdate, svc: ResidentService = Depends(resident_service)
+) -> dict:
+    return ok(await svc.update_my_profile(payload), message="Profile updated")
 
 
 # --- resident profile by id (catch-all — declared last) --------------- #

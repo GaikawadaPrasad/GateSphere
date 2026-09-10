@@ -39,7 +39,7 @@ export default function CommunityAdminBillingPage() {
     try {
       const csvData = await billingApi.exportInvoicesCsv({
         community_id: activeCommunityId || undefined,
-        invoice_status: statusFilter || undefined,
+        status: statusFilter || undefined,
       });
       const blob = new Blob([csvData], { type: "text/csv" });
       const url = window.URL.createObjectURL(blob);
@@ -54,7 +54,9 @@ export default function CommunityAdminBillingPage() {
 
   const handleExportPayments = async () => {
     try {
-      const csvData = await billingApi.exportPaymentsCsv(activeCommunityId || undefined);
+      const csvData = await billingApi.exportPaymentsCsv({
+        community_id: activeCommunityId || undefined,
+      });
       const blob = new Blob([csvData], { type: "text/csv" });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -354,20 +356,28 @@ export default function CommunityAdminBillingPage() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "1rem" }}>
                 <div>
                   <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Billing Cycle</div>
-                  <div style={{ fontWeight: 600, textTransform: "capitalize", marginTop: "0.15rem" }}>{billingRules.billing_frequency}</div>
+                  <div style={{ fontWeight: 600, textTransform: "capitalize", marginTop: "0.15rem" }}>
+                    {(billingRules as any)?.billing_frequency || (billingRules as any)?.[0]?.billing_frequency || "Monthly"}
+                  </div>
                 </div>
                 <div>
                   <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Payment Window</div>
-                  <div style={{ fontWeight: 600, marginTop: "0.15rem" }}>{billingRules.due_days} days from issue</div>
+                  <div style={{ fontWeight: 600, marginTop: "0.15rem" }}>
+                    {(billingRules as any)?.due_days ?? (billingRules as any)?.[0]?.due_days ?? 15} days from issue
+                  </div>
                 </div>
                 <div>
                   <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Grace Period</div>
-                  <div style={{ fontWeight: 600, marginTop: "0.15rem" }}>{billingRules.grace_period_days} days</div>
+                  <div style={{ fontWeight: 600, marginTop: "0.15rem" }}>
+                    {(billingRules as any)?.grace_period_days ?? (billingRules as any)?.[0]?.grace_period_days ?? 5} days
+                  </div>
                 </div>
                 <div>
                   <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Late Fee Penalty</div>
                   <div style={{ fontWeight: 600, marginTop: "0.15rem" }}>
-                    {billingRules.late_fee_type === "percentage" ? `${billingRules.late_fee_amount}%` : formatCurrency(Number(billingRules.late_fee_amount))}
+                    {((billingRules as any)?.late_fee_type || (billingRules as any)?.[0]?.late_fee_type) === "percentage"
+                      ? `${(billingRules as any)?.late_fee_amount ?? (billingRules as any)?.[0]?.late_fee_amount ?? 5}%`
+                      : formatCurrency(Number((billingRules as any)?.late_fee_amount ?? (billingRules as any)?.[0]?.late_fee_amount ?? 0))}
                   </div>
                 </div>
               </div>

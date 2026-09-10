@@ -3,72 +3,97 @@
 import { useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
-import { gateApi, blacklistApi } from "@/lib/api";
+import { visitorsApi } from "@/lib/api";
+
+interface VerifiedEntry {
+  entryId: string;
+  visitorName: string;
+  unitLabel: string;
+  vehicleNumber?: string | null;
+  status: string;
+}
 
 export default function SecurityGuardLiveGatePage() {
   const [passInput, setPassInput] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
-  const [verificationResult, setVerificationResult] = useState<any>(null);
+  const [verifiedEntry, setVerifiedEntry] = useState<VerifiedEntry | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [isExiting, setIsExiting] = useState(false);
 
+  // Real backend: verifying a pass IS recording the entry — POST /visitors/entries accepts
+  // a pass_token or pin and resolves the matching request server-side. There is no separate
+  // /gate/verify-pass endpoint.
   const handleVerifyPass = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!passInput.trim()) return;
+    const raw = passInput.trim();
+    if (!raw) return;
     setIsVerifying(true);
     setErrorMessage("");
     setSuccessMessage("");
-    setVerificationResult(null);
+    setVerifiedEntry(null);
 
-    // 1. Blacklist Check
-    const blCheck = await blacklistApi.check(passInput.trim());
-    if (blCheck.blacklisted) {
-      setErrorMessage(`🚨 DENIED: Entity is on Blacklist (${blCheck.entry?.reason})`);
-      setIsVerifying(false);
-      return;
-    }
+    try {
+      const isPin = /^\d{4,12}$/.test(raw);
+      const entry = await visitorsApi.recordEntry(isPin ? { pin: raw } : { pass_token: raw });
 
-    // 2. Pass Verification
-    const res = await gateApi.verifyPass(passInput.trim());
-    if (!res.valid) {
-      setErrorMessage(`❌ ${res.reason || "Invalid Pass Code"}`);
-    } else {
-      setVerificationResult(res.visitor);
-      setSuccessMessage(`✅ Pass Valid: ${res.visitor.name} for ${res.visitor.unit}`);
+      let visitorName = "Visitor";
+      let unitLabel = "—";
+      try {
+        if (entry.request_id) {
+          const request = await visitorsApi.getRequest(entry.request_id as string);
+          if (request?.visitor_id) {
+            const directory = await visitorsApi.directory({ q: undefined });
+            const match = (directory || []).find((v: any) => v.id === request.visitor_id);
+            if (match) visitorName = (match as any).full_name || visitorName;
+          }
+          unitLabel = (request?.group_label as string) || (request?.visitor_type as string)?.replace(/_/g, " ") || unitLabel;
+        }
+      } catch {
+        // Entry was recorded successfully even if the enrichment lookups fail — show what we have.
+      }
+
+      setVerifiedEntry({
+        entryId: entry.id as string,
+        visitorName,
+        unitLabel,
+        vehicleNumber: entry.vehicle_number as string | null,
+        status: entry.status as string,
+      });
+      setSuccessMessage(`✅ Entry recorded for ${visitorName}`);
+    } catch (err: any) {
+      setErrorMessage(`❌ ${err?.message || "Invalid pass / PIN, or visitor is blacklisted"}`);
     }
     setIsVerifying(false);
   };
 
-  const handleRecordEntry = async () => {
-    if (!verificationResult) return;
-    await gateApi.recordEntry({ visitor_name: verificationResult.name, pass_code: passInput });
-    alert(`Entry recorded for ${verificationResult.name} at Main Gate North`);
-    setVerificationResult(null);
-    setPassInput("");
-    setSuccessMessage("");
-  };
-
   const handleRecordExit = async () => {
-    if (!verificationResult) return;
-    await gateApi.recordExit({ visitor_name: verificationResult.name, pass_code: passInput });
-    alert(`Exit recorded for ${verificationResult.name}`);
-    setVerificationResult(null);
-    setPassInput("");
-    setSuccessMessage("");
+    if (!verifiedEntry) return;
+    setIsExiting(true);
+    try {
+      await visitorsApi.recordExit(verifiedEntry.entryId);
+      alert(`Exit recorded for ${verifiedEntry.visitorName}`);
+      setVerifiedEntry(null);
+      setPassInput("");
+      setSuccessMessage("");
+    } catch (err: any) {
+      setErrorMessage(err?.message || "Failed to record exit.");
+    }
+    setIsExiting(false);
   };
 
   return (
     <div>
       <PageHeader
         title="Live Security Gate Verification Console"
-        subtitle="Operational pass & QR verification, instant blacklist checks, resident approval verification, and entry/exit logging"
+        subtitle="Pass / PIN verification doubles as entry recording, with blacklist screening enforced server-side"
         breadcrumbs={[{ label: "GateSphere" }, { label: "Security Guard" }, { label: "Live Gate" }]}
       />
 
       {/* Pass Verification Form Card */}
       <div className="card" style={{ marginBottom: "1.75rem", background: "linear-gradient(135deg, #ffffff, #f8fafc)" }}>
         <h3 className="card-title" style={{ marginBottom: "1rem" }}>
-          🔍 Fast Pass / QR Code Verification
+          🔍 Verify & Record Entry (QR Token or PIN)
         </h3>
 
         <form onSubmit={handleVerifyPass} style={{ display: "flex", gap: "1rem", flexWrap: "wrap", alignItems: "center" }}>
@@ -76,7 +101,7 @@ export default function SecurityGuardLiveGatePage() {
             <input
               type="text"
               className="input-field"
-              placeholder="Enter Pass Code / OTP / Vehicle Plate (e.g. GP-9912)..."
+              placeholder="Scan QR token or enter 4-12 digit PIN..."
               value={passInput}
               onChange={(e) => setPassInput(e.target.value)}
               style={{ fontSize: "1.05rem", padding: "0.75rem 1rem", fontWeight: 600, fontFamily: "monospace" }}
@@ -89,11 +114,10 @@ export default function SecurityGuardLiveGatePage() {
             disabled={isVerifying || !passInput.trim()}
             style={{ padding: "0.75rem 1.5rem", fontSize: "1rem", fontWeight: 700 }}
           >
-            {isVerifying ? "Verifying…" : "CHECK PASS"}
+            {isVerifying ? "Verifying…" : "VERIFY & ALLOW ENTRY"}
           </button>
         </form>
 
-        {/* Feedback Banners */}
         {errorMessage && (
           <div
             style={{
@@ -130,48 +154,36 @@ export default function SecurityGuardLiveGatePage() {
       </div>
 
       {/* Verification Result Card */}
-      {verificationResult && (
+      {verifiedEntry && (
         <div className="card" style={{ marginBottom: "1.75rem", border: "2px solid var(--primary)" }}>
           <div className="card-header">
-            <h3 className="card-title">Pass Verification Result</h3>
-            <StatusBadge status="Valid Pass" />
+            <h3 className="card-title">Entry Recorded</h3>
+            <StatusBadge status={verifiedEntry.status} />
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem", marginBottom: "1.5rem" }}>
             <div>
               <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Visitor Name</div>
-              <div style={{ fontWeight: 700, fontSize: "1.1rem" }}>{verificationResult.name}</div>
+              <div style={{ fontWeight: 700, fontSize: "1.1rem" }}>{verifiedEntry.visitorName}</div>
             </div>
             <div>
-              <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Destination Unit</div>
-              <div style={{ fontWeight: 700, fontSize: "1.1rem" }}>{verificationResult.unit}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Host Resident</div>
-              <div style={{ fontWeight: 600 }}>{verificationResult.resident}</div>
+              <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Purpose / Group</div>
+              <div style={{ fontWeight: 700, fontSize: "1.1rem", textTransform: "capitalize" }}>{verifiedEntry.unitLabel}</div>
             </div>
             <div>
               <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Vehicle Number</div>
-              <div style={{ fontWeight: 600, fontFamily: "monospace" }}>{verificationResult.vehicle || "N/A"}</div>
+              <div style={{ fontWeight: 600, fontFamily: "monospace" }}>{verifiedEntry.vehicleNumber || "N/A"}</div>
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: "1rem" }}>
-            <button
-              className="btn btn-primary"
-              style={{ padding: "0.75rem 2rem", fontSize: "1rem", fontWeight: 700 }}
-              onClick={handleRecordEntry}
-            >
-              ✅ ALLOW ENTRY
-            </button>
-            <button
-              className="btn btn-secondary"
-              style={{ padding: "0.75rem 2rem", fontSize: "1rem", fontWeight: 700 }}
-              onClick={handleRecordExit}
-            >
-              🚪 RECORD EXIT
-            </button>
-          </div>
+          <button
+            className="btn btn-secondary"
+            style={{ padding: "0.75rem 2rem", fontSize: "1rem", fontWeight: 700 }}
+            onClick={handleRecordExit}
+            disabled={isExiting}
+          >
+            🚪 {isExiting ? "Recording…" : "RECORD EXIT"}
+          </button>
         </div>
       )}
     </div>
