@@ -128,6 +128,7 @@ async def list_tickets(
 
 
 @router.get("/tickets.csv", dependencies=[EXPORT])
+@router.get("/tickets/export", dependencies=[EXPORT])
 async def export_tickets(
     community_id: uuid.UUID | None = None,
     unit_id: uuid.UUID | None = None,

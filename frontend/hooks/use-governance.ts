@@ -147,6 +147,22 @@ export function useSpecialAssessment(assessmentId: string, communityId?: string 
 }
 
 /**
+ * Mutation to create/propose a special assessment.
+ */
+export function useCreateAssessment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ payload, communityId }: { payload: any; communityId?: string }) => {
+      return await assessmentsApi.create(payload, communityId);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: governanceKeys.all });
+      qc.invalidateQueries({ queryKey: ["billing"] });
+    },
+  });
+}
+
+/**
  * Mutation to approve a special assessment.
  */
 export function useApproveAssessment() {
@@ -173,6 +189,7 @@ export function useRejectAssessment() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: governanceKeys.all });
+      qc.invalidateQueries({ queryKey: ["billing"] });
     },
   });
 }

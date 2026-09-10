@@ -253,20 +253,23 @@ export function AssociationCommitteeSidebar() {
           </div>
         </nav>
 
-        {/* Footer info */}
-        {sidebarOpen && (
-          <div
-            style={{
-              padding: "0.75rem 1rem",
-              borderTop: "1px solid var(--sidebar-border)",
-              fontSize: "0.72rem",
-              color: "var(--sidebar-muted)",
-            }}
-          >
-            <div>GateSphere GSE-2026</div>
-            <div style={{ color: "#64748b", marginTop: "0.15rem" }}>
-              Sivion QA Verified · FR-01..FR-19
-            </div>
+        {/* Toggle button when collapsed */}
+        {!sidebarOpen && (
+          <div style={{ padding: "0.75rem", display: "flex", justifyContent: "center", borderTop: "1px solid var(--sidebar-border)" }}>
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: "var(--sidebar-muted)",
+                cursor: "pointer",
+                fontSize: "0.9rem",
+              }}
+              title="Expand sidebar"
+            >
+              ▶
+            </button>
           </div>
         )}
       </aside>

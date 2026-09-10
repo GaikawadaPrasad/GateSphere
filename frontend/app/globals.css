@@ -110,9 +110,11 @@ body {
 ::-webkit-scrollbar {
   width: 6px;
 }
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
   background: #cbd5e1;
   border-radius: 3px;
@@ -126,10 +128,12 @@ body {
     opacity 0.65s ease-out,
     transform 0.65s ease-out;
 }
+
 .reveal.visible {
   opacity: 1;
   transform: translateY(0);
 }
+
 .reveal-left {
   opacity: 0;
   transform: translateX(-28px);
@@ -137,10 +141,12 @@ body {
     opacity 0.65s ease-out,
     transform 0.65s ease-out;
 }
+
 .reveal-left.visible {
   opacity: 1;
   transform: translateX(0);
 }
+
 .reveal-right {
   opacity: 0;
   transform: translateX(28px);
@@ -148,25 +154,32 @@ body {
     opacity 0.65s ease-out,
     transform 0.65s ease-out;
 }
+
 .reveal-right.visible {
   opacity: 1;
   transform: translateX(0);
 }
+
 .reveal-delay-1 {
   transition-delay: 0.1s;
 }
+
 .reveal-delay-2 {
   transition-delay: 0.2s;
 }
+
 .reveal-delay-3 {
   transition-delay: 0.3s;
 }
+
 .reveal-delay-4 {
   transition-delay: 0.4s;
 }
+
 .reveal-delay-5 {
   transition-delay: 0.5s;
 }
+
 .reveal-delay-6 {
   transition-delay: 0.6s;
 }
@@ -177,133 +190,165 @@ body {
     opacity: 0;
     transform: translateY(24px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
   }
 }
+
 @keyframes heroScaleIn {
   from {
     opacity: 0;
     transform: scale(0.96);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
   }
 }
+
 @keyframes floatCard1 {
+
   0%,
   100% {
     transform: translateY(0px);
   }
+
   50% {
     transform: translateY(-6px);
   }
 }
+
 @keyframes floatCard2 {
+
   0%,
   100% {
     transform: translateY(0px);
   }
+
   50% {
     transform: translateY(-4px);
   }
 }
+
 @keyframes pulseLive {
+
   0%,
   100% {
     opacity: 1;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.5;
     transform: scale(0.85);
   }
 }
+
 @keyframes driftDownward {
   0% {
     transform: translateY(0);
   }
+
   100% {
     transform: translateY(720px);
   }
 }
+
 @keyframes scanBeam {
   0% {
     top: 0%;
     opacity: 0;
   }
+
   20% {
     opacity: 1;
   }
+
   80% {
     opacity: 1;
   }
+
   100% {
     top: 100%;
     opacity: 0;
   }
 }
+
 @keyframes slideNotif {
   from {
     opacity: 0;
     transform: translateX(20px);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
   }
 }
+
 @keyframes countUp {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
 }
+
 @keyframes shimmer {
   0% {
     background-position: -200% 0;
   }
+
   100% {
     background-position: 200% 0;
   }
 }
+
 @keyframes progressFill {
   from {
     width: 0;
   }
+
   to {
     width: var(--target-width, 80%);
   }
 }
+
 @keyframes modalIn {
   from {
     opacity: 0;
     transform: scale(0.95) translateY(8px);
   }
+
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
   }
 }
+
 @keyframes chatPanelIn {
   from {
     opacity: 0;
     transform: scale(0.9) translateY(16px);
   }
+
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
   }
 }
+
 @keyframes chatBubbleIn {
   from {
     opacity: 0;
     transform: translateY(6px) scale(0.98);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -313,25 +358,31 @@ body {
 .hero-headline {
   animation: heroFadeUp 0.7s ease-out 0.2s both;
 }
+
 .hero-sub {
   animation: heroFadeUp 0.7s ease-out 0.4s both;
 }
+
 .hero-btns {
   animation: heroFadeUp 0.7s ease-out 0.55s both;
 }
+
 .hero-image {
   animation: heroScaleIn 0.8s ease-out 0.3s both;
 }
+
 .hero-card-1 {
   animation:
     heroFadeUp 0.6s ease-out 0.7s both,
     floatCard1 4s ease-in-out 1.3s infinite;
 }
+
 .hero-card-2 {
   animation:
     heroFadeUp 0.6s ease-out 0.9s both,
     floatCard2 5s ease-in-out 1.5s infinite;
 }
+
 .hero-notif {
   animation: slideNotif 0.5s ease-out 1.1s both;
 }
@@ -347,16 +398,19 @@ body {
     box-shadow 0.2s ease,
     background-color 0.2s ease;
 }
+
 .btn-primary:hover {
   transform: translateY(-1px);
   box-shadow: 0 8px 24px rgba(29, 78, 216, 0.3);
 }
+
 .btn-outline {
   transition:
     transform 0.2s ease,
     background-color 0.2s ease,
     color 0.2s ease;
 }
+
 .btn-outline:hover {
   transform: translateY(-1px);
 }
@@ -366,6 +420,7 @@ body {
     transform 0.25s ease,
     box-shadow 0.25s ease;
 }
+
 .card-hover:hover {
   transform: translateY(-5px);
   box-shadow: 0 20px 48px rgba(0, 0, 0, 0.1);
@@ -374,6 +429,7 @@ body {
 .img-zoom {
   transition: transform 0.4s ease;
 }
+
 .img-zoom:hover {
   transform: scale(1.04);
 }
@@ -382,6 +438,7 @@ body {
 .nav-link {
   position: relative;
 }
+
 .nav-link::after {
   content: "";
   position: absolute;
@@ -392,6 +449,7 @@ body {
   background: var(--blue);
   transition: width 0.25s ease;
 }
+
 .nav-link:hover::after {
   width: 100%;
 }
@@ -405,6 +463,7 @@ body {
     opacity 0.3s ease;
   opacity: 0;
 }
+
 .faq-answer.open {
   max-height: 400px;
   opacity: 1;
@@ -417,10 +476,12 @@ body {
     stroke-width 0.3s ease,
     opacity 0.3s ease;
 }
+
 .eco-node {
   transition: all 0.25s ease;
   cursor: pointer;
 }
+
 .eco-node:hover {
   filter: drop-shadow(0 4px 12px rgba(29, 78, 216, 0.2));
 }
@@ -451,11 +512,13 @@ body {
     transform: scaleY(0);
     transform-origin: bottom;
   }
+
   to {
     transform: scaleY(1);
     transform-origin: bottom;
   }
 }
+
 .chart-bar {
   transform-origin: bottom;
   animation: barGrow 0.8s ease-out forwards;
@@ -467,20 +530,25 @@ body {
     opacity: 0;
     transform: translateY(-8px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
   }
 }
+
 .notif-item:nth-child(1) {
   animation: notifSlide 0.4s ease 0.2s both;
 }
+
 .notif-item:nth-child(2) {
   animation: notifSlide 0.4s ease 0.45s both;
 }
+
 .notif-item:nth-child(3) {
   animation: notifSlide 0.4s ease 0.7s both;
 }
+
 .notif-item:nth-child(4) {
   animation: notifSlide 0.4s ease 0.95s both;
 }
@@ -489,6 +557,7 @@ body {
 .phone-left {
   animation: heroFadeUp 0.7s ease-out 0.3s both;
 }
+
 .phone-right {
   animation: heroFadeUp 0.7s ease-out 0.5s both;
 }
@@ -498,6 +567,7 @@ body {
   0% {
     transform: translateX(0%);
   }
+
   100% {
     transform: translateX(-50%);
   }
@@ -516,13 +586,11 @@ body {
 
 .marquee-gradient-mask {
   mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
-  -webkit-mask-image: linear-gradient(
-    to right,
-    transparent 0%,
-    black 8%,
-    black 92%,
-    transparent 100%
-  );
+  -webkit-mask-image: linear-gradient(to right,
+      transparent 0%,
+      black 8%,
+      black 92%,
+      transparent 100%);
 }
 
 /* ========================================================================= */
@@ -575,11 +643,13 @@ body {
   font-weight: 600;
   color: var(--fg);
 }
+
 .dashboard-h2 {
   font-size: 1.25rem;
   font-weight: 600;
   color: var(--fg);
 }
+
 .dashboard-h3 {
   font-size: 1rem;
   font-weight: 600;
@@ -804,7 +874,8 @@ body {
 }
 
 /* Tables */
-.table-container {
+.table-container,
+.table-responsive-container {
   width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -812,6 +883,7 @@ body {
   border-radius: var(--radius);
   background: #ffffff;
   box-shadow: var(--shadow-xs);
+  margin-bottom: 0.5rem;
 }
 
 .data-table {
@@ -901,6 +973,7 @@ body {
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -917,6 +990,7 @@ body {
 
 /* --- Tablette & below (768px) --- */
 @media (max-width: 768px) {
+
   /* Sidebar: fixed overlay drawer, zero layout footprint */
   .app-sidebar {
     position: fixed !important;
@@ -1028,7 +1102,7 @@ body {
     align-items: flex-start !important;
   }
 
-  .card-header-responsive > * {
+  .card-header-responsive>* {
     width: 100% !important;
   }
 
@@ -1137,12 +1211,14 @@ text[font-family*="Outfit"],
 svg text[font-family*="Outfit"] {
   font-family: var(--font-outfit), "Outfit", sans-serif !important;
 }
+
 .font-jakarta,
 [style*="Plus Jakarta Sans"],
 text[font-family*="Plus Jakarta Sans"],
 svg text[font-family*="Plus Jakarta Sans"] {
   font-family: var(--font-jakarta), "Plus Jakarta Sans", sans-serif !important;
 }
+
 .font-syne,
 [style*="Syne"],
 text[font-family*="Syne"],
@@ -1156,104 +1232,130 @@ svg text[font-family*="Syne"] {
     opacity: 0;
     transform: translateY(24px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
   }
 }
+
 @keyframes heroScaleIn {
   from {
     opacity: 0;
     transform: scale(0.96);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
   }
 }
+
 @keyframes floatCard1 {
+
   0%,
   100% {
     transform: translateY(0px);
   }
+
   50% {
     transform: translateY(-6px);
   }
 }
+
 @keyframes floatCard2 {
+
   0%,
   100% {
     transform: translateY(0px);
   }
+
   50% {
     transform: translateY(-4px);
   }
 }
+
 @keyframes pulseLive {
+
   0%,
   100% {
     opacity: 1;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.5;
     transform: scale(0.85);
   }
 }
+
 @keyframes driftDownward {
   0% {
     transform: translateY(0);
   }
+
   100% {
     transform: translateY(720px);
   }
 }
+
 @keyframes scanBeam {
   0% {
     top: 0%;
     opacity: 0;
   }
+
   20% {
     opacity: 1;
   }
+
   80% {
     opacity: 1;
   }
+
   100% {
     top: 100%;
     opacity: 0;
   }
 }
+
 @keyframes slideNotif {
   from {
     opacity: 0;
     transform: translateX(20px);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
   }
 }
+
 @keyframes countUp {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
 }
+
 @keyframes shimmer {
   0% {
     background-position: -200% 0;
   }
+
   100% {
     background-position: 200% 0;
   }
 }
+
 @keyframes progressFill {
   from {
     width: 0;
   }
+
   to {
     width: var(--target-width, 80%);
   }
@@ -1264,6 +1366,7 @@ svg text[font-family*="Syne"] {
   0% {
     transform: translateY(0);
   }
+
   100% {
     transform: translateY(calc(-50% - (var(--slider-gap, 16px) / 2)));
   }
@@ -1273,6 +1376,7 @@ svg text[font-family*="Syne"] {
   0% {
     transform: translateY(calc(-50% - (var(--slider-gap, 16px) / 2)));
   }
+
   100% {
     transform: translateY(0);
   }
@@ -1282,6 +1386,7 @@ svg text[font-family*="Syne"] {
   0% {
     transform: translateX(0);
   }
+
   100% {
     transform: translateX(calc(-50% - (var(--slider-gap, 16px) / 2)));
   }
@@ -1291,6 +1396,7 @@ svg text[font-family*="Syne"] {
   0% {
     transform: translateX(calc(-50% - (var(--slider-gap, 16px) / 2)));
   }
+
   100% {
     transform: translateX(0);
   }

@@ -27,6 +27,8 @@ import {
   isValidCommunityName,
   isValidCityName,
 } from "@/constants/locations";
+import { DemoRequestsCard } from "@/components/dashboard/DemoRequestsCard";
+import type { DemoRequestLead } from "@/lib/demo-requests";
 import type { Community, Tower, Gate } from "@/types/communities";
 
 export default function SuperAdminDashboardPage() {
@@ -240,6 +242,20 @@ export default function SuperAdminDashboardPage() {
     setIsCreateModalOpen(true);
   };
 
+  const handleOnboardFromLead = (lead: DemoRequestLead) => {
+    setName(lead.community || "");
+    const generatedCode = (lead.community || "COM")
+      .replace(/[^a-zA-Z0-9]/g, "")
+      .substring(0, 4)
+      .toUpperCase() + "-01";
+    setCode(generatedCode);
+    setCity("Bengaluru");
+    setState("Karnataka");
+    setFormError("");
+    setTouched({});
+    setIsCreateModalOpen(true);
+  };
+
   const handleOpenEdit = (comm: CommunityWithMetrics) => {
     setEditingCommunity(comm);
     setEditName(comm.name);
@@ -434,6 +450,9 @@ export default function SuperAdminDashboardPage() {
           <ActivityFeed events={gateEvents} alerts={panicAlerts} isLoading={isEventsLoading} />
         </div>
       </div>
+
+      {/* Inbound Demo Requests & Township Leads Card */}
+      <DemoRequestsCard onOnboardCommunity={handleOnboardFromLead} />
 
       {/* Create Community Modal */}
       <Modal

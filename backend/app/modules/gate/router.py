@@ -55,6 +55,7 @@ async def list_events(
 
 
 @router.get("/events.csv", dependencies=[EXPORT])
+@router.get("/events/export", dependencies=[EXPORT])
 async def export_events(
     community_id: uuid.UUID | None = None,
     gate_id: uuid.UUID | None = None,

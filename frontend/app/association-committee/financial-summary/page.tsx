@@ -35,19 +35,26 @@ export default function FinancialSummaryPage() {
   const { data: chargeHeads } = useChargeHeads(activeCommunityId || undefined);
 
   const handleExportInvoices = async () => {
-    if (!activeCommunityId) return;
+    const cid = activeCommunityId || community?.id;
+    if (!cid) {
+      alert("No community selected.");
+      return;
+    }
     try {
       setIsExporting(true);
-      const csv = await billingApi.exportInvoicesCsv({ community_id: activeCommunityId });
+      const csv = await billingApi.exportInvoicesCsv({ community_id: cid });
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.setAttribute("href", url);
-      link.setAttribute("download", `financial_invoices_${community?.name || "community"}.csv`);
+      const safeName = (community?.name || "community").toLowerCase().replace(/[^a-z0-9]+/g, "_");
+      link.setAttribute("download", `financial_invoices_${safeName}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    } catch {
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      console.error("Failed to export invoices CSV:", err);
       alert("Failed to export invoices CSV");
     } finally {
       setIsExporting(false);
@@ -55,19 +62,26 @@ export default function FinancialSummaryPage() {
   };
 
   const handleExportPayments = async () => {
-    if (!activeCommunityId) return;
+    const cid = activeCommunityId || community?.id;
+    if (!cid) {
+      alert("No community selected.");
+      return;
+    }
     try {
       setIsExporting(true);
-      const csv = await billingApi.exportPaymentsCsv(activeCommunityId);
+      const csv = await billingApi.exportPaymentsCsv(cid);
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.setAttribute("href", url);
-      link.setAttribute("download", `collections_audit_${community?.name || "community"}.csv`);
+      const safeName = (community?.name || "community").toLowerCase().replace(/[^a-z0-9]+/g, "_");
+      link.setAttribute("download", `collections_audit_${safeName}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    } catch {
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      console.error("Failed to export collections CSV:", err);
       alert("Failed to export collections CSV");
     } finally {
       setIsExporting(false);
