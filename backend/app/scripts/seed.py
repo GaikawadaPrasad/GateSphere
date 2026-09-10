@@ -465,17 +465,28 @@ def seed_amenities(db: Session, communities: list[Community]) -> None:
                 defaults={"name": name, "amenity_type": atype, "capacity": cap},
             )
             if created:
+                standard_slot_times = [
+                    (time(6, 0), time(8, 0)),
+                    (time(8, 0), time(10, 0)),
+                    (time(10, 0), time(12, 0)),
+                    (time(12, 0), time(14, 0)),
+                    (time(14, 0), time(16, 0)),
+                    (time(16, 0), time(18, 0)),
+                    (time(18, 0), time(20, 0)),
+                    (time(20, 0), time(22, 0)),
+                ]
                 for dow in range(0, 7):
-                    db.add(
-                        AmenitySlot(
-                            community_id=c.id,
-                            amenity_id=am.id,
-                            day_of_week=dow,
-                            start_time=time(6, 0),
-                            end_time=time(22, 0),
-                            capacity=cap,
+                    for st, et in standard_slot_times:
+                        db.add(
+                            AmenitySlot(
+                                community_id=c.id,
+                                amenity_id=am.id,
+                                day_of_week=dow,
+                                start_time=st,
+                                end_time=et,
+                                capacity=cap,
+                            )
                         )
-                    )
                 db.add(
                     AmenityRule(
                         community_id=c.id,

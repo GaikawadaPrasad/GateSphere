@@ -647,11 +647,19 @@ export function useResidentProfile() {
   });
 
   const updateProfile = useMutation({
-    mutationFn: async (data: { full_name?: string; phone?: string; emergency_notes?: string }) => {
+    mutationFn: async (data: {
+      full_name?: string;
+      phone?: string;
+      emergency_notes?: string;
+      emergency_contact_name?: string;
+      emergency_contact_phone?: string;
+      emergency_contact_relationship?: string;
+    }) => {
       return await api.patch("/residents/me", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["resident", "me-profile"] });
+      queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
     },
   });
 
