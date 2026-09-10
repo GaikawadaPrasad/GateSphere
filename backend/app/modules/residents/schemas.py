@@ -214,4 +214,8 @@ class ResidentMeUpdate(_Write):
     full_name: str | None = Field(default=None, max_length=180)
     phone: str | None = _Phone
     emergency_notes: str | None = Field(default=None, max_length=2000)
+    emergency_contact_name: str | None = Field(default=None, max_length=180)
+    emergency_contact_phone: str | None = _Phone
+    emergency_contact_relationship: str | None = Field(default=None, max_length=40)
+
 

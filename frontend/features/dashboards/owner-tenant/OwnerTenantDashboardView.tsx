@@ -90,6 +90,15 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
   const [newMemberPhone, setNewMemberPhone] = useState("");
   const [newMemberAccess, setNewMemberAccess] = useState(true);
 
+  // Resident Profile edit state
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
+  const [profileFullName, setProfileFullName] = useState("");
+  const [profilePhone, setProfilePhone] = useState("");
+  const [profileEmergencyName, setProfileEmergencyName] = useState("");
+  const [profileEmergencyPhone, setProfileEmergencyPhone] = useState("");
+  const [profileEmergencyRel, setProfileEmergencyRel] = useState("Spouse");
+  const [profileEmergencyNotes, setProfileEmergencyNotes] = useState("");
+
   // Visitor Pass form state
   const [passVisitorName, setPassVisitorName] = useState("");
   const [passVisitorPhone, setPassVisitorPhone] = useState("");
@@ -227,19 +236,61 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
   };
 
   const currentDayOfWeek = getDayOfWeek(bookingDate);
-  const availableDaySlots = (amenitySlots.data || []).filter(
+  const rawDaySlots = (amenitySlots.data || []).filter(
     (s) => s.is_active && s.day_of_week === currentDayOfWeek
   );
 
+  // If backend returns only 1 wide monolithic slot (>=6 hrs) or no slots, provide standard 2-hr slots
+  const availableDaySlots: AmenitySlot[] = React.useMemo(() => {
+    const isMonolithic = rawDaySlots.length === 1 && (() => {
+      const s = rawDaySlots[0];
+      const startH = parseInt((s.start_time || "06:00").split(":")[0], 10);
+      const endH = parseInt((s.end_time || "22:00").split(":")[0], 10);
+      return (endH - startH) >= 6;
+    })();
+
+    if (rawDaySlots.length > 1 && !isMonolithic) {
+      return rawDaySlots;
+    }
+
+    // Standard 2-hour slots from 06:00 to 22:00
+    const standardIntervals = [
+      { start: "06:00", end: "08:00" },
+      { start: "08:00", end: "10:00" },
+      { start: "10:00", end: "12:00" },
+      { start: "12:00", end: "14:00" },
+      { start: "14:00", end: "16:00" },
+      { start: "16:00", end: "18:00" },
+      { start: "18:00", end: "20:00" },
+      { start: "20:00", end: "22:00" },
+    ];
+
+    const baseSlot = rawDaySlots[0];
+    return standardIntervals.map((interval, idx) => ({
+      id: baseSlot?.id && idx === 0 ? baseSlot.id : (baseSlot ? `${baseSlot.id}_slot_${idx}` : `slot_${currentDayOfWeek}_${idx}`),
+      community_id: baseSlot?.community_id || activeCommunityId || "",
+      amenity_id: selectedAmenity?.id || "",
+      day_of_week: currentDayOfWeek,
+      start_time: interval.start,
+      end_time: interval.end,
+      capacity: baseSlot?.capacity || selectedAmenity?.capacity || 20,
+      fee: baseSlot?.fee || "0",
+      is_active: true,
+    }));
+  }, [rawDaySlots, selectedAmenity, currentDayOfWeek, activeCommunityId]);
+
   useEffect(() => {
     if (availableDaySlots.length > 0) {
-      if (!availableDaySlots.some((s) => s.id === selectedSlotId)) {
-        setSelectedSlotId(availableDaySlots[0].id);
-      }
+      setSelectedSlotId((prev) => {
+        if (prev && availableDaySlots.some((s) => s.id === prev)) {
+          return prev;
+        }
+        return availableDaySlots[0].id;
+      });
     } else {
       setSelectedSlotId("");
     }
-  }, [bookingDate, amenitySlots.data, selectedSlotId]);
+  }, [bookingDate, selectedAmenity?.id, availableDaySlots]);
 
   const activeSelectedSlot = availableDaySlots.find((s) => s.id === selectedSlotId) || availableDaySlots[0];
   const slotTotalCapacity = activeSelectedSlot?.capacity || selectedAmenity?.capacity || 20;
@@ -249,7 +300,8 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
       (b) =>
         b.amenity_id === selectedAmenity?.id &&
         b.date === bookingDate &&
-        b.status !== "cancelled"
+        b.status !== "cancelled" &&
+        (b.slot_id ? b.slot_id === activeSelectedSlot?.id : (b.start_time ? b.start_time === activeSelectedSlot?.start_time : true))
     )
     .reduce((sum, b) => sum + (b.guests_count || 1), 0);
 
@@ -357,6 +409,35 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
       toast.success(`${updatedName}'s record and gate pre-approval status updated.`, "Family Member Updated");
     } catch (err: any) {
       toast.error(err?.message || "Failed to update family member.", "Error");
+    }
+  };
+
+  const handleOpenEditProfile = () => {
+    const contact = profile.data?.emergency_contacts?.[0];
+    setProfileFullName(profile.data?.full_name || "");
+    setProfilePhone(profile.data?.phone || "");
+    setProfileEmergencyName(contact?.name || "");
+    setProfileEmergencyPhone(contact?.phone || "");
+    setProfileEmergencyRel(contact?.relationship || "Spouse");
+    setProfileEmergencyNotes(profile.data?.emergency_notes || "");
+    setEditProfileOpen(true);
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await profile.updateProfile.mutateAsync({
+        full_name: profileFullName.trim() || undefined,
+        phone: profilePhone.trim() || undefined,
+        emergency_notes: profileEmergencyNotes.trim() || undefined,
+        emergency_contact_name: profileEmergencyName.trim() || undefined,
+        emergency_contact_phone: profileEmergencyPhone.trim() || undefined,
+        emergency_contact_relationship: profileEmergencyRel.trim() || undefined,
+      });
+      toast.success("Your resident profile and emergency contact details have been updated.", "Profile Saved");
+      setEditProfileOpen(false);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update resident profile. Please check the fields and try again.", "Update Failed");
     }
   };
 
@@ -672,33 +753,68 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
 
       {/* TAB 2: MY PROFILE */}
       {activeTab === "profile" && (
-        <div className="gs-card" style={{ maxWidth: 700 }}>
-          <h3 className="card-h3" style={{ marginBottom: "1.5rem" }}>Resident Profile & Emergency Contacts</h3>
+        <div className="gs-card" style={{ maxWidth: 750 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+            <div>
+              <h3 className="card-h3" style={{ margin: 0 }}>Resident Profile & Emergency Contacts</h3>
+              <p style={{ color: "var(--brand-body)", fontSize: "13px", marginTop: "0.25rem", margin: 0 }}>
+                Manage your personal identification, contact coordinates, and emergency escalation protocols.
+              </p>
+            </div>
+            <BrandButton
+              size="sm"
+              onClick={handleOpenEditProfile}
+            >
+              ✏️ Edit Profile
+            </BrandButton>
+          </div>
           {profile.isLoading ? (
             <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>Loading profile…</p>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "1rem", marginBottom: "1.5rem" }}>
-              <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
-                <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>Full Name</div>
-                <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>{profile.data?.full_name || "—"}</div>
-              </div>
-              <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
-                <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>Registered Email</div>
-                <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>{profile.data?.email || "—"}</div>
-              </div>
-              <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
-                <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>Primary Mobile</div>
-                <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>{profile.data?.phone || "Not added"}</div>
-              </div>
-              <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
-                <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>Emergency Contact</div>
-                <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>
-                  {profile.data?.emergency_contacts?.[0]
-                    ? `${profile.data.emergency_contacts[0].name} (${profile.data.emergency_contacts[0].phone})`
-                    : "Not added"}
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "1rem", marginBottom: "1.5rem" }}>
+                <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
+                  <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>Full Name</div>
+                  <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>{profile.data?.full_name || "—"}</div>
+                </div>
+                <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
+                  <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>Registered Email</div>
+                  <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>{profile.data?.email || "—"}</div>
+                </div>
+                <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
+                  <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>Primary Mobile</div>
+                  <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>{profile.data?.phone || "Not added"}</div>
+                </div>
+                <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
+                  <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>Emergency Contact</div>
+                  <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>
+                    {profile.data?.emergency_contacts?.[0] ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <span>{profile.data.emergency_contacts[0].name} ({profile.data.emergency_contacts[0].phone})</span>
+                        {profile.data.emergency_contacts[0].relationship && (
+                          <span style={{ fontSize: "11px", padding: "0.15rem 0.45rem", borderRadius: "4px", background: "#EEF2F6", color: "#475569", fontWeight: 600 }}>
+                            {profile.data.emergency_contacts[0].relationship}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      "Not added"
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+
+              {profile.data?.emergency_notes && (
+                <div style={{ padding: "0.85rem 1rem", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: "8px", marginBottom: "0.5rem" }}>
+                  <div style={{ fontSize: "11px", color: "#991B1B", textTransform: "uppercase", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                    <span>🚨 Medical & Emergency Notes</span>
+                  </div>
+                  <div style={{ fontSize: "13.5px", color: "#7F1D1D", marginTop: "0.3rem", lineHeight: 1.4 }}>
+                    {profile.data.emergency_notes}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
@@ -1666,83 +1782,117 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
                 ⚠️ No time slots configured for {new Date(`${bookingDate}T12:00:00`).toLocaleDateString(undefined, { weekday: "long" })}. Please select another date.
               </div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                {availableDaySlots.map((s) => {
-                  const isSelected = activeSelectedSlot?.id === s.id;
-                  const slotCap = s.capacity || selectedAmenity?.capacity || 20;
-                  const bookedForThisSlot = (amenities.bookings.data || [])
-                    .filter(
-                      (b) =>
-                        b.amenity_id === selectedAmenity?.id &&
-                        b.date === bookingDate &&
-                        b.status !== "cancelled"
-                    )
-                    .reduce((sum, b) => sum + (b.guests_count || 1), 0);
-                  const spotsLeft = Math.max(0, slotCap - bookedForThisSlot);
-                  const isFull = spotsLeft <= 0;
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                <select
+                  className="select-field"
+                  value={activeSelectedSlot?.id || ""}
+                  onChange={(e) => {
+                    const slotId = e.target.value;
+                    setSelectedSlotId(slotId);
+                    const chosenSlot = availableDaySlots.find((s) => s.id === slotId);
+                    if (chosenSlot) {
+                      const slotCap = chosenSlot.capacity || selectedAmenity?.capacity || 20;
+                      const bookedForThisSlot = (amenities.bookings.data || [])
+                        .filter(
+                          (b) =>
+                            b.amenity_id === selectedAmenity?.id &&
+                            b.date === bookingDate &&
+                            b.status !== "cancelled" &&
+                            (b.slot_id ? b.slot_id === chosenSlot.id : (b.start_time ? b.start_time === chosenSlot.start_time : true))
+                        )
+                        .reduce((sum, b) => sum + (b.guests_count || 1), 0);
+                      const spotsLeft = Math.max(0, slotCap - bookedForThisSlot);
+                      if (bookingGuests > spotsLeft && spotsLeft > 0) {
+                        setBookingGuests(spotsLeft);
+                      }
+                    }
+                  }}
+                  required
+                >
+                  {availableDaySlots.map((s) => {
+                    const slotCap = s.capacity || selectedAmenity?.capacity || 20;
+                    const bookedForThisSlot = (amenities.bookings.data || [])
+                      .filter(
+                        (b) =>
+                          b.amenity_id === selectedAmenity?.id &&
+                          b.date === bookingDate &&
+                          b.status !== "cancelled" &&
+                          (b.slot_id ? b.slot_id === s.id : (b.start_time ? b.start_time === s.start_time : true))
+                      )
+                      .reduce((sum, b) => sum + (b.guests_count || 1), 0);
+                    const spotsLeft = Math.max(0, slotCap - bookedForThisSlot);
+                    const isFull = spotsLeft <= 0;
+                    const startHour = parseInt((s.start_time || "06:00").split(":")[0], 10);
+                    const periodName = startHour < 12 ? "Morning" : startHour < 17 ? "Afternoon" : "Evening";
+                    const feeText = s.fee && Number(s.fee) > 0 ? ` • $${s.fee}` : "";
+                    const capacityStatus = isFull ? " (🔴 Fully Booked)" : ` (${spotsLeft} of ${slotCap} spots left)`;
 
-                  return (
-                    <div
-                      key={s.id}
-                      onClick={() => {
-                        if (!isFull) {
-                          setSelectedSlotId(s.id);
-                          if (bookingGuests > spotsLeft) {
-                            setBookingGuests(Math.max(1, spotsLeft));
-                          }
-                        }
-                      }}
-                      style={{
-                        padding: "0.75rem 1rem",
-                        borderRadius: "8px",
-                        border: isSelected ? "2px solid #2563EB" : "1px solid var(--border-standard)",
-                        background: isSelected ? "#EFF6FF" : isFull ? "#F8FAFC" : "#FFFFFF",
-                        cursor: isFull ? "not-allowed" : "pointer",
-                        opacity: isFull ? 0.65 : 1,
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        transition: "all 0.15s ease",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-                        <input
-                          type="radio"
-                          name="amenity_slot"
-                          checked={isSelected}
-                          disabled={isFull}
-                          onChange={() => setSelectedSlotId(s.id)}
-                        />
-                        <div>
-                          <strong style={{ fontSize: "13.5px", color: isFull ? "var(--brand-muted)" : "var(--brand-heading)" }}>
-                            {formatSlotTime(s.start_time)} – {formatSlotTime(s.end_time)}
-                          </strong>
-                          {s.fee && Number(s.fee) > 0 && (
-                            <span style={{ fontSize: "12px", color: "#2563EB", marginLeft: "0.5rem" }}>
-                              (${s.fee})
-                            </span>
-                          )}
+                    return (
+                      <option key={s.id} value={s.id} disabled={isFull}>
+                        {formatSlotTime(s.start_time)} – {formatSlotTime(s.end_time)} ({periodName}){feeText} — {capacityStatus}
+                      </option>
+                    );
+                  })}
+                </select>
+
+                {/* Selected Slot Information Card */}
+                {activeSelectedSlot && (
+                  <div
+                    style={{
+                      padding: "0.65rem 0.85rem",
+                      background: "#F8FAFC",
+                      border: "1px solid var(--border-standard)",
+                      borderRadius: "8px",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <strong style={{ fontSize: "13.5px", color: "var(--brand-heading)" }}>
+                          {formatSlotTime(activeSelectedSlot.start_time)} – {formatSlotTime(activeSelectedSlot.end_time)}
+                        </strong>
+                        <span
+                          style={{
+                            fontSize: "10.5px",
+                            padding: "0.1rem 0.4rem",
+                            borderRadius: "4px",
+                            background: "#E2E8F0",
+                            color: "#334155",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {(() => {
+                            const startHour = parseInt((activeSelectedSlot.start_time || "06:00").split(":")[0], 10);
+                            return startHour < 12 ? "🌅 Morning" : startHour < 17 ? "☀️ Afternoon" : "🌙 Evening";
+                          })()}
+                        </span>
+                      </div>
+                      {activeSelectedSlot.fee && Number(activeSelectedSlot.fee) > 0 && (
+                        <div style={{ fontSize: "12px", color: "#2563EB", marginTop: "0.15rem" }}>
+                          Slot Fee: ${activeSelectedSlot.fee}
                         </div>
-                      </div>
-
-                      <div>
-                        {isFull ? (
-                          <span style={{ fontSize: "11.5px", fontWeight: 700, padding: "0.2rem 0.5rem", borderRadius: "9999px", background: "#FEE2E2", color: "#991B1B" }}>
-                            🔴 Slot Full (0 Left)
-                          </span>
-                        ) : spotsLeft <= 5 ? (
-                          <span style={{ fontSize: "11.5px", fontWeight: 700, padding: "0.2rem 0.5rem", borderRadius: "9999px", background: "#FEF3C7", color: "#92400E" }}>
-                            🟠 {spotsLeft} of {slotCap} spots left
-                          </span>
-                        ) : (
-                          <span style={{ fontSize: "11.5px", fontWeight: 700, padding: "0.2rem 0.5rem", borderRadius: "9999px", background: "#ECFDF5", color: "#065F46" }}>
-                            🟢 {spotsLeft} of {slotCap} spots left
-                          </span>
-                        )}
-                      </div>
+                      )}
                     </div>
-                  );
-                })}
+
+                    <div>
+                      {remainingSpots <= 0 ? (
+                        <span style={{ fontSize: "11.5px", fontWeight: 700, padding: "0.2rem 0.5rem", borderRadius: "9999px", background: "#FEE2E2", color: "#991B1B" }}>
+                          🔴 Slot Full (0 Left)
+                        </span>
+                      ) : remainingSpots <= 5 ? (
+                        <span style={{ fontSize: "11.5px", fontWeight: 700, padding: "0.2rem 0.5rem", borderRadius: "9999px", background: "#FEF3C7", color: "#92400E" }}>
+                          🟠 {remainingSpots} of {slotTotalCapacity} spots left
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: "11.5px", fontWeight: 700, padding: "0.2rem 0.5rem", borderRadius: "9999px", background: "#ECFDF5", color: "#065F46" }}>
+                          🟢 {remainingSpots} of {slotTotalCapacity} spots left
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1964,6 +2114,132 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
             </BrandButton>
           </div>
         </div>
+      </Modal>
+
+      {/* Edit Resident Profile Modal */}
+      <Modal
+        isOpen={editProfileOpen}
+        onClose={() => setEditProfileOpen(false)}
+        title="Edit Resident Profile & Contacts"
+        size="md"
+      >
+        <form onSubmit={handleSaveProfile} style={{ display: "flex", flexDirection: "column", gap: "1.1rem", padding: "0.25rem 0" }}>
+          <div>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+              Full Name *
+            </label>
+            <input
+              type="text"
+              className="input-field"
+              placeholder="e.g. John Doe"
+              value={profileFullName}
+              onChange={(e) => setProfileFullName(e.target.value)}
+              required
+            />
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+              Registered Email
+            </label>
+            <input
+              type="email"
+              className="input-field"
+              value={profile.data?.email || ""}
+              disabled
+              style={{ background: "#F1F5F9", cursor: "not-allowed", color: "var(--brand-muted)" }}
+            />
+            <span style={{ fontSize: "11px", color: "var(--brand-muted)", marginTop: "0.2rem", display: "block" }}>
+              Registered email is linked to your authentication account and cannot be modified here.
+            </span>
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+              Primary Mobile Number
+            </label>
+            <input
+              type="tel"
+              className="input-field"
+              placeholder="e.g. +91 98765 43210"
+              value={profilePhone}
+              onChange={(e) => setProfilePhone(e.target.value)}
+            />
+          </div>
+
+          <div style={{ borderTop: "1px solid var(--border-standard)", paddingTop: "1rem" }}>
+            <h4 style={{ fontSize: "14px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.75rem" }}>
+              🚨 Emergency Contact Details
+            </h4>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "0.75rem" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--brand-heading)", marginBottom: "0.25rem" }}>
+                  Contact Name
+                </label>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="e.g. Jane Doe"
+                  value={profileEmergencyName}
+                  onChange={(e) => setProfileEmergencyName(e.target.value)}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--brand-heading)", marginBottom: "0.25rem" }}>
+                  Relationship
+                </label>
+                <select
+                  className="input-field"
+                  value={profileEmergencyRel}
+                  onChange={(e) => setProfileEmergencyRel(e.target.value)}
+                >
+                  <option value="Spouse">Spouse</option>
+                  <option value="Parent">Parent</option>
+                  <option value="Child">Child</option>
+                  <option value="Sibling">Sibling</option>
+                  <option value="Friend">Friend</option>
+                  <option value="Relative">Relative</option>
+                  <option value="Doctor">Doctor / Physician</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--brand-heading)", marginBottom: "0.25rem" }}>
+                Emergency Contact Phone
+              </label>
+              <input
+                type="tel"
+                className="input-field"
+                placeholder="e.g. +91 98765 43211"
+                value={profileEmergencyPhone}
+                onChange={(e) => setProfileEmergencyPhone(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+              Medical & Emergency Notes (Optional)
+            </label>
+            <textarea
+              className="input-field"
+              rows={2}
+              placeholder="e.g. Blood group O+, allergic to penicillin, senior citizen assistance required..."
+              value={profileEmergencyNotes}
+              onChange={(e) => setProfileEmergencyNotes(e.target.value)}
+            />
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
+            <BrandButton type="button" variant="outline" onClick={() => setEditProfileOpen(false)}>
+              Cancel
+            </BrandButton>
+            <BrandButton type="submit" isLoading={profile.updateProfile.isPending}>
+              Save Profile Changes
+            </BrandButton>
+          </div>
+        </form>
       </Modal>
     </DashboardShell>
   );
