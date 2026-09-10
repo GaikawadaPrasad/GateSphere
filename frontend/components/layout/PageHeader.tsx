@@ -65,7 +65,11 @@ export function PageHeader({ title, subtitle, description, breadcrumbs, actions,
           )}
         </div>
 
-        {acts && <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>{acts}</div>}
+        {acts && (
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+            {acts}
+          </div>
+        )}
       </div>
     </div>
   );

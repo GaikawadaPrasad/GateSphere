@@ -17,6 +17,8 @@ import { useSuperAdminDashboardMetrics } from "@/hooks/use-dashboards";
 import { useCommunities, useCreateCommunity, useUpdateCommunity, useDeleteCommunity } from "@/hooks/use-communities";
 import { useGateEvents, usePanicAlerts } from "@/hooks/use-gate";
 import { INDIAN_STATES_AND_UTS, POPULAR_CITIES_BY_STATE, isValidCommunityName, isValidCityName } from "@/constants/locations";
+import { DemoRequestsCard } from "@/components/dashboard/DemoRequestsCard";
+import type { DemoRequestLead } from "@/lib/demo-requests";
 import type { Community, Tower, Gate } from "@/types/communities";
 
 export default function SuperAdminDashboardPage() {
@@ -229,6 +231,20 @@ export default function SuperAdminDashboardPage() {
     setIsCreateModalOpen(true);
   };
 
+  const handleOnboardFromLead = (lead: DemoRequestLead) => {
+    setName(lead.community || "");
+    const generatedCode = (lead.community || "COM")
+      .replace(/[^a-zA-Z0-9]/g, "")
+      .substring(0, 4)
+      .toUpperCase() + "-01";
+    setCode(generatedCode);
+    setCity("Bengaluru");
+    setState("Karnataka");
+    setFormError("");
+    setTouched({});
+    setIsCreateModalOpen(true);
+  };
+
   const handleOpenEdit = (comm: CommunityWithMetrics) => {
     setEditingCommunity(comm);
     setEditName(comm.name);
@@ -426,6 +442,9 @@ export default function SuperAdminDashboardPage() {
           />
         </div>
       </div>
+
+      {/* Inbound Demo Requests & Township Leads Card */}
+      <DemoRequestsCard onOnboardCommunity={handleOnboardFromLead} />
 
       {/* Create Community Modal */}
       <Modal

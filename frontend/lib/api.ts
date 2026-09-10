@@ -61,20 +61,16 @@ export class ApiError extends Error {
 export function getActiveRole(): string | null {
   if (typeof window !== "undefined") {
     const pathname = window.location.pathname;
-    if (pathname.startsWith("/super-admin")) return "super_admin";
-    if (pathname.startsWith("/owner-tenant") || pathname.startsWith("/resident")) return "resident";
-    if (pathname.startsWith("/auditor")) return "auditor";
-    if (pathname.startsWith("/domestic-staff")) return "domestic_staff";
+    if (pathname.startsWith("/super-admin") || pathname.startsWith("/dashboard/super-admin")) return "super_admin";
+    if (pathname.startsWith("/owner-tenant") || pathname.startsWith("/resident") || pathname.startsWith("/dashboard/owner-tenant")) return "resident";
+    if (pathname.startsWith("/auditor") || pathname.startsWith("/dashboard/auditor")) return "auditor";
+    if (pathname.startsWith("/domestic-staff") || pathname.startsWith("/dashboard/domestic-staff")) return "domestic_staff";
     if (pathname.startsWith("/community-admin") || pathname.startsWith("/dashboard/community-admin")) return "community_admin";
     if (pathname.startsWith("/security-guard") || pathname.startsWith("/dashboard/security-guard")) return "security_guard";
     if (pathname.startsWith("/security-supervisor") || pathname.startsWith("/dashboard/security-supervisor")) return "security_supervisor";
-    if (pathname.startsWith("/dashboard/facility-manager")) return "facility_manager";
-    if (pathname.startsWith("/dashboard/association-committee")) return "association_committee";
-    if (pathname.startsWith("/dashboard/vendor-technician")) return "vendor_technician";
-    if (pathname.startsWith("/dashboard/super-admin")) return "super_admin";
-    if (pathname.startsWith("/dashboard/auditor")) return "auditor";
-    if (pathname.startsWith("/dashboard/domestic-staff")) return "domestic_staff";
-    if (pathname.startsWith("/dashboard/owner-tenant")) return "resident";
+    if (pathname.startsWith("/facility-manager") || pathname.startsWith("/dashboard/facility-manager")) return "facility_manager";
+    if (pathname.startsWith("/association-committee") || pathname.startsWith("/dashboard/association-committee")) return "association_committee";
+    if (pathname.startsWith("/vendor-technician") || pathname.startsWith("/dashboard/vendor-technician")) return "vendor_technician";
 
     const saved = localStorage.getItem("gatesphere_active_role");
     if (saved) return saved;
@@ -404,10 +400,20 @@ export const billingApi = {
     apiGet<any>("/billing/rules", communityId ? { community_id: communityId } : undefined),
   unitLedger: (unitId: string, params?: ListQueryParams) =>
     apiGet<any[]>(`/billing/units/${unitId}/ledger`, params as Record<string, unknown>),
-  exportInvoicesCsv: (params?: string | Record<string, unknown> | { community_id?: string; invoice_status?: string }) =>
-    apiGet<string>("/billing/invoices/export", typeof params === "string" ? { community_id: params } : params as Record<string, unknown>),
+  exportInvoicesCsv: (params?: string | Record<string, unknown> | { community_id?: string; invoice_status?: string; status?: string }) => {
+    let queryParams: Record<string, unknown> = {};
+    if (typeof params === "string") {
+      queryParams = { community_id: params };
+    } else if (params && typeof params === "object") {
+      queryParams = { ...params };
+      if ("status" in queryParams && !("invoice_status" in queryParams)) {
+        queryParams.invoice_status = queryParams.status;
+      }
+    }
+    return apiGet<string>("/billing/invoices.csv", queryParams);
+  },
   exportPaymentsCsv: (params?: string | Record<string, unknown> | { community_id?: string }) =>
-    apiGet<string>("/billing/payments/export", typeof params === "string" ? { community_id: params } : params as Record<string, unknown>),
+    apiGet<string>("/billing/payments.csv", typeof params === "string" ? { community_id: params } : (params as Record<string, unknown>)),
 };
 
 export const assessmentsApi = {
@@ -451,7 +457,7 @@ export const auditApi = {
   logs: (params?: AuditQueryParams) =>
     apiGet<AuditLog[]>("/audit/logs", params as Record<string, unknown>),
   exportCsv: (params?: AuditQueryParams) =>
-    apiGet<string>("/audit/logs/export", params as Record<string, unknown>),
+    apiGet<string>("/audit/logs.csv", params as Record<string, unknown>),
 };
 
 export const rbacApi = {

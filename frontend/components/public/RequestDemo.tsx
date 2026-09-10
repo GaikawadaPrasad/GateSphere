@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import { useReveal } from "@/hooks/use-reveal";
+import { saveDemoRequest } from "@/lib/demo-requests";
 
 export default function RequestDemo() {
   const { ref, visible } = useReveal();
@@ -22,6 +23,16 @@ export default function RequestDemo() {
     e.preventDefault();
     const generatedTicket = `#GS-DEMO-${Math.floor(1000 + Math.random() * 9000)}`;
     setTicketId(generatedTicket);
+    saveDemoRequest({
+      ticketId: generatedTicket,
+      fullName: formData.fullName,
+      email: formData.email,
+      phone: formData.phone,
+      community: formData.community,
+      units: formData.units,
+      role: formData.role,
+      product: formData.product,
+    });
     setSubmitted(true);
   };
 

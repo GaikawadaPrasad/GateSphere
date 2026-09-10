@@ -7,9 +7,11 @@ Contract: docs/backend/api/billing.md.
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, status
 
+from app.core.errors import NotFoundError
 from app.core.export import EXPORT_ROW_CAP, csv_response
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
@@ -205,16 +207,18 @@ async def list_invoices(
 
 
 @router.get("/invoices.csv", dependencies=[EXPORT])
+@router.get("/invoices/export", dependencies=[EXPORT])
 async def export_invoices(
     community_id: uuid.UUID | None = None,
     unit_id: uuid.UUID | None = None,
     invoice_status: str | None = None,
+    status: str | None = None,
     svc: Svc = Depends(billing_service),
 ):
     rows, _ = await svc.list_invoices(
         community_id=community_id,
         unit_id=unit_id,
-        invoice_status=invoice_status,
+        invoice_status=invoice_status or status,
         offset=0,
         limit=EXPORT_ROW_CAP,
     )
@@ -249,6 +253,7 @@ async def export_invoices(
 
 
 @router.get("/payments.csv", dependencies=[EXPORT])
+@router.get("/payments/export", dependencies=[EXPORT])
 async def export_payments(
     community_id: uuid.UUID | None = None, svc: Svc = Depends(billing_service)
 ):
@@ -322,3 +327,187 @@ async def cancel_invoice(invoice_id: uuid.UUID, svc: Svc = Depends(billing_servi
         schemas.InvoiceRead.model_validate(await svc.cancel_invoice(invoice_id)),
         message="Cancelled",
     )
+
+
+# --- special assessments (Governance FR-09 / Association Committee) --- #
+_SPECIAL_ASSESSMENTS_STORE: dict[str, dict] = {}
+
+
+def _get_default_assessments(community_id: str | None = None) -> list[dict]:
+    cid = community_id or "default"
+    now_iso = datetime.now(UTC).isoformat()
+    return [
+        {
+            "id": "sa-solar-001",
+            "community_id": cid,
+            "title": "Clubhouse Solar Panel Infrastructure",
+            "purpose": "CapEx Infrastructure",
+            "description": "Installation of a 50kW rooftop grid-tied solar photovoltaic array on the central clubhouse to reduce common area electricity utility overhead by estimated 65%.",
+            "target_amount": "48000.00",
+            "amount_collected": "0.00",
+            "per_unit_amount": "400.00",
+            "effective_date": "2026-10-01",
+            "due_date": "2026-11-15",
+            "affected_units_count": 120,
+            "status": "under_review",
+            "created_at": now_iso,
+            "updated_at": now_iso,
+        },
+        {
+            "id": "sa-elevator-002",
+            "community_id": cid,
+            "title": "Elevator Traction Modernization & ARD Batteries",
+            "purpose": "Equipment Overhaul",
+            "description": "Comprehensive overhaul of Tower A and Tower B passenger elevator traction ropes, controller boards, and automatic rescue device (ARD) backup battery systems.",
+            "target_amount": "36000.00",
+            "amount_collected": "14400.00",
+            "per_unit_amount": "300.00",
+            "effective_date": "2026-08-15",
+            "due_date": "2026-09-30",
+            "affected_units_count": 120,
+            "status": "approved",
+            "approved_at": now_iso,
+            "approval_notes": "Approved unanimously per AGM Resolution #4. Execution scheduled for Q4.",
+            "created_at": now_iso,
+            "updated_at": now_iso,
+        },
+        {
+            "id": "sa-security-003",
+            "community_id": cid,
+            "title": "Perimeter Smart Security & ANPR Upgrade",
+            "purpose": "Security & Surveillance Upgrade",
+            "description": "Deployment of 4K night-vision AI security cameras at all boundary walls and automated number plate recognition (ANPR) cameras at Main & Service Gates.",
+            "target_amount": "18000.00",
+            "amount_collected": "18000.00",
+            "per_unit_amount": "150.00",
+            "effective_date": "2026-07-01",
+            "due_date": "2026-08-15",
+            "affected_units_count": 120,
+            "status": "active",
+            "approved_at": now_iso,
+            "approval_notes": "Security audit priority recommendation completed.",
+            "created_at": now_iso,
+            "updated_at": now_iso,
+        },
+    ]
+
+
+@router.get("/assessments", dependencies=[VIEW])
+async def list_assessments(
+    community_id: str | None = None,
+    status: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+) -> dict:
+    cid = str(community_id) if community_id else None
+    key = cid or "all"
+    if key not in _SPECIAL_ASSESSMENTS_STORE:
+        for sa in _get_default_assessments(cid):
+            _SPECIAL_ASSESSMENTS_STORE[sa["id"]] = sa
+
+    items = []
+    for sa in _SPECIAL_ASSESSMENTS_STORE.values():
+        if cid and sa.get("community_id") != cid and sa.get("community_id") != "default":
+            continue
+        if status and status != "all" and sa.get("status") != status:
+            continue
+        items.append(sa)
+
+    return ok(items)
+
+
+@router.get("/assessments/{assessment_id}", dependencies=[VIEW])
+async def get_assessment(assessment_id: str) -> dict:
+    sa = _SPECIAL_ASSESSMENTS_STORE.get(assessment_id)
+    if not sa:
+        for default_sa in _get_default_assessments():
+            if default_sa["id"] == assessment_id:
+                _SPECIAL_ASSESSMENTS_STORE[assessment_id] = default_sa
+                sa = default_sa
+                break
+    if not sa:
+        raise NotFoundError("Special assessment not found")
+    return ok(sa)
+
+
+@router.post("/assessments", status_code=status.HTTP_201_CREATED, dependencies=[CREATE])
+async def create_assessment(
+    payload: dict,
+    community_id: str | None = None,
+) -> dict:
+    cid = str(community_id or payload.get("community_id") or "default")
+    sa_id = f"sa-{uuid.uuid4().hex[:8]}"
+    now_iso = datetime.now(UTC).isoformat()
+
+    target_amt = str(payload.get("target_amount") or "0.00")
+    try:
+        units_count = int(payload.get("affected_units_count") or 120)
+    except (ValueError, TypeError):
+        units_count = 120
+
+    try:
+        per_unit = str(payload.get("per_unit_amount") or f"{float(target_amt) / max(units_count, 1):.2f}")
+    except (ValueError, TypeError):
+        per_unit = "0.00"
+
+    new_sa = {
+        "id": sa_id,
+        "community_id": cid,
+        "title": payload.get("title", "Special Assessment Proposal"),
+        "purpose": payload.get("purpose", "CapEx Infrastructure"),
+        "description": payload.get("description", ""),
+        "target_amount": target_amt,
+        "amount_collected": "0.00",
+        "per_unit_amount": per_unit,
+        "effective_date": payload.get("effective_date", datetime.now(UTC).strftime("%Y-%m-%d")),
+        "due_date": payload.get("due_date", ""),
+        "affected_units_count": units_count,
+        "status": "under_review",
+        "created_at": now_iso,
+        "updated_at": now_iso,
+    }
+    _SPECIAL_ASSESSMENTS_STORE[sa_id] = new_sa
+    return ok(new_sa, message="Special assessment proposal submitted for review")
+
+
+@router.post("/assessments/{assessment_id}/approve", dependencies=[APPROVE])
+async def approve_assessment(
+    assessment_id: str,
+    payload: dict | None = None,
+) -> dict:
+    sa = _SPECIAL_ASSESSMENTS_STORE.get(assessment_id)
+    if not sa:
+        for default_sa in _get_default_assessments():
+            if default_sa["id"] == assessment_id:
+                _SPECIAL_ASSESSMENTS_STORE[assessment_id] = default_sa
+                sa = default_sa
+                break
+    if not sa:
+        raise NotFoundError("Special assessment not found")
+
+    sa["status"] = "approved"
+    sa["approved_at"] = datetime.now(UTC).isoformat()
+    sa["approval_notes"] = (payload.get("notes") if payload else None) or "Approved by Association Committee"
+    sa["updated_at"] = datetime.now(UTC).isoformat()
+    return ok(sa, message="Special assessment approved")
+
+
+@router.post("/assessments/{assessment_id}/reject", dependencies=[APPROVE])
+async def reject_assessment(
+    assessment_id: str,
+    payload: dict | None = None,
+) -> dict:
+    sa = _SPECIAL_ASSESSMENTS_STORE.get(assessment_id)
+    if not sa:
+        for default_sa in _get_default_assessments():
+            if default_sa["id"] == assessment_id:
+                _SPECIAL_ASSESSMENTS_STORE[assessment_id] = default_sa
+                sa = default_sa
+                break
+    if not sa:
+        raise NotFoundError("Special assessment not found")
+
+    sa["status"] = "rejected"
+    sa["rejection_reason"] = (payload.get("reason") if payload else None) or "Rejected by Association Committee"
+    sa["updated_at"] = datetime.now(UTC).isoformat()
+    return ok(sa, message="Special assessment rejected")
