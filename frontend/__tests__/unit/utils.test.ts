@@ -41,12 +41,14 @@ describe("UI and Data Formatting Utilities", () => {
 
   it("truncates long strings with ellipsis", () => {
     expect(truncate("Short string", 20)).toBe("Short string");
-    expect(truncate("This is an exceptionally long subject description that exceeds max limit", 15)).toBe(
-      "This is an exce…"
-    );
+    expect(
+      truncate("This is an exceptionally long subject description that exceeds max limit", 15),
+    ).toBe("This is an exce…");
   });
 
   it("joins conditional class names seamlessly with cn()", () => {
-    expect(cn("card", true && "card-active", false && "hidden", null, undefined)).toBe("card card-active");
+    expect(cn("card", true && "card-active", false && "hidden", null, undefined)).toBe(
+      "card card-active",
+    );
   });
 });

@@ -18,7 +18,10 @@ export default function DomesticStaffError({
     <div style={{ padding: "2rem 0" }}>
       <ErrorState
         title="Failed to load Domestic Staff Portal"
-        message={error.message || "An unexpected error occurred while loading this staff operations section."}
+        message={
+          error.message ||
+          "An unexpected error occurred while loading this staff operations section."
+        }
         onRetry={reset}
       />
     </div>

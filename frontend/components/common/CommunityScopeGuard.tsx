@@ -15,7 +15,10 @@ export function CommunityScopeGuard({ children }: CommunityScopeGuardProps) {
   const { data: user, isLoading: authLoading } = useMe();
   const { activeCommunityId, setActiveCommunity } = useUiStore();
 
-  const assignedCommunityId = user?.community_ids?.[0] || user?.roles?.find((r) => r.role_slug === "community_admin")?.community_id || null;
+  const assignedCommunityId =
+    user?.community_ids?.[0] ||
+    user?.roles?.find((r) => r.role_slug === "community_admin")?.community_id ||
+    null;
 
   useEffect(() => {
     if (authLoading) return;
@@ -51,7 +54,16 @@ export function CommunityScopeGuard({ children }: CommunityScopeGuardProps) {
 
   if (authLoading || (assignedCommunityId && communityLoading)) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", minHeight: "60vh", gap: "1rem" }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "60vh",
+          gap: "1rem",
+        }}
+      >
         <div className="skeleton" style={{ width: 220, height: 28, borderRadius: 8 }} />
         <div className="skeleton" style={{ width: 340, height: 16, borderRadius: 6 }} />
       </div>
@@ -67,7 +79,8 @@ export function CommunityScopeGuard({ children }: CommunityScopeGuardProps) {
           <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🏢</div>
           <h2>No Assigned Community</h2>
           <p style={{ marginTop: "0.5rem", color: "var(--muted)" }}>
-            Your account does not currently have an assigned residential community scope. Please contact your system administrator.
+            Your account does not currently have an assigned residential community scope. Please
+            contact your system administrator.
           </p>
         </div>
       </div>

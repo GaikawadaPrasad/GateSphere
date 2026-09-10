@@ -66,7 +66,13 @@ export function MetricsGrid({ metrics, isLoading, onCardClick }: MetricsGridProp
         value={`${metrics.occupancyRate}%`}
         subtitle={`${metrics.totalResidents} occupied of ${metrics.totalUnits} units`}
         icon="📊"
-        accent={metrics.occupancyRate >= 70 ? "success" : metrics.occupancyRate >= 40 ? "warning" : "neutral"}
+        accent={
+          metrics.occupancyRate >= 70
+            ? "success"
+            : metrics.occupancyRate >= 40
+              ? "warning"
+              : "neutral"
+        }
         badge={{
           text: metrics.occupancyRate >= 70 ? "High" : "Moderate",
           variant: metrics.occupancyRate >= 70 ? "success" : "warning",
@@ -90,7 +96,13 @@ export function MetricsGrid({ metrics, isLoading, onCardClick }: MetricsGridProp
         value={metrics.openComplaints}
         subtitle={`${metrics.criticalComplaints} high priority / incidents`}
         icon="🎫"
-        accent={metrics.openComplaints > 0 ? (metrics.criticalComplaints > 0 ? "danger" : "warning") : "success"}
+        accent={
+          metrics.openComplaints > 0
+            ? metrics.criticalComplaints > 0
+              ? "danger"
+              : "warning"
+            : "success"
+        }
         badge={{
           text: metrics.criticalComplaints > 0 ? "Needs Action" : "In SLA",
           variant: metrics.criticalComplaints > 0 ? "danger" : "neutral",

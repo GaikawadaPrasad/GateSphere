@@ -37,11 +37,22 @@ export default function SecuritySupervisorIncidentsPage() {
           id: inc.id,
           incident_number: inc.incident_number || `INC-${inc.id.slice(0, 6).toUpperCase()}`,
           title: inc.description || "Security Incident",
-          severity: inc.severity ? inc.severity.replace(/\b\w/g, (c: string) => c.toUpperCase()) : "High",
-          assigned_guard: inc.responder_user_id ? `Responder (${inc.responder_user_id.slice(0, 6)})` : "Duty Security Team",
-          reported_time: inc.reported_at ? new Date(inc.reported_at).toLocaleString([], { dateStyle: "short", timeStyle: "short" }) : "Recent",
-          status: inc.status ? inc.status.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) : "Reported",
-        }))
+          severity: inc.severity
+            ? inc.severity.replace(/\b\w/g, (c: string) => c.toUpperCase())
+            : "High",
+          assigned_guard: inc.responder_user_id
+            ? `Responder (${inc.responder_user_id.slice(0, 6)})`
+            : "Duty Security Team",
+          reported_time: inc.reported_at
+            ? new Date(inc.reported_at).toLocaleString([], {
+                dateStyle: "short",
+                timeStyle: "short",
+              })
+            : "Recent",
+          status: inc.status
+            ? inc.status.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
+            : "Reported",
+        })),
       );
     } catch {
       // fallback
@@ -83,7 +94,11 @@ export default function SecuritySupervisorIncidentsPage() {
       <PageHeader
         title="Security Incidents & Breach Response"
         subtitle="Log security breaches, assign security personnel, record corrective actions, and track investigation timeline"
-        breadcrumbs={[{ label: "GateSphere" }, { label: "Security Supervisor" }, { label: "Incidents" }]}
+        breadcrumbs={[
+          { label: "GateSphere" },
+          { label: "Security Supervisor" },
+          { label: "Incidents" },
+        ]}
         actions={
           <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
             ⚠️ Log Security Incident
@@ -162,7 +177,14 @@ export default function SecuritySupervisorIncidentsPage() {
       >
         <form onSubmit={handleCreateIncident}>
           <div style={{ marginBottom: "1rem" }}>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
               Incident / Breach Title *
             </label>
             <input
@@ -177,7 +199,14 @@ export default function SecuritySupervisorIncidentsPage() {
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
             <div>
-              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Severity
               </label>
               <select
@@ -193,7 +222,14 @@ export default function SecuritySupervisorIncidentsPage() {
             </div>
 
             <div>
-              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Assigned Responder
               </label>
               <input

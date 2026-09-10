@@ -79,8 +79,12 @@ export default function FacilityManagerVendorsPage() {
           </div>
 
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-            <div style={{ width: 220 }}>
-              <SearchInput value={search} onChange={setSearch} placeholder="Search vendor name/contact…" />
+            <div style={{ width: "100%", maxWidth: 220 }}>
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Search vendor name/contact…"
+              />
             </div>
 
             <select
@@ -122,13 +126,23 @@ export default function FacilityManagerVendorsPage() {
                 </tr>
               ) : loadError ? (
                 <tr>
-                  <td colSpan={9} style={{ textAlign: "center", padding: "2rem", color: "var(--danger, #dc2626)" }}>
+                  <td
+                    colSpan={9}
+                    style={{
+                      textAlign: "center",
+                      padding: "2rem",
+                      color: "var(--danger, #dc2626)",
+                    }}
+                  >
                     {loadError}
                   </td>
                 </tr>
               ) : filteredVendors.length === 0 ? (
                 <tr>
-                  <td colSpan={9} style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
+                  <td
+                    colSpan={9}
+                    style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
+                  >
                     No vendors found.
                   </td>
                 </tr>
@@ -196,7 +210,14 @@ export default function FacilityManagerVendorsPage() {
             Vendor <strong>{selectedVendor?.name}</strong> has submitted job completion proof.
           </p>
           <div style={{ marginBottom: "1rem" }}>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
               Manager Review Notes / Rework Instructions
             </label>
             <textarea

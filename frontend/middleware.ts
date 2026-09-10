@@ -55,7 +55,9 @@ export function middleware(req: NextRequest) {
   }
 
   // Normalize legacy /dashboard/<role>/<submodule> to /<role>/<submodule>
-  const dashboardRoleMatch = pathname.match(/^\/dashboard\/(domestic-staff|owner-tenant|auditor|super-admin)(\/.*)?$/);
+  const dashboardRoleMatch = pathname.match(
+    /^\/dashboard\/(domestic-staff|owner-tenant|auditor|super-admin)(\/.*)?$/,
+  );
   if (dashboardRoleMatch) {
     const roleSlug = dashboardRoleMatch[1];
     const rest = dashboardRoleMatch[2];

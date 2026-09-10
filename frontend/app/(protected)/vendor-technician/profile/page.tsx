@@ -76,7 +76,14 @@ export default function VendorProfilePage() {
         ) : (
           <form onSubmit={handleSaveProfile}>
             <div style={{ marginBottom: "1rem" }}>
-              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Company / Service Provider
               </label>
               <input
@@ -88,9 +95,23 @@ export default function VendorProfilePage() {
               />
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "1rem",
+                marginBottom: "1rem",
+              }}
+            >
               <div>
-                <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontWeight: 600,
+                    fontSize: "0.85rem",
+                    marginBottom: "0.35rem",
+                  }}
+                >
                   Technician Full Name
                 </label>
                 <input
@@ -103,7 +124,14 @@ export default function VendorProfilePage() {
               </div>
 
               <div>
-                <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontWeight: 600,
+                    fontSize: "0.85rem",
+                    marginBottom: "0.35rem",
+                  }}
+                >
                   Contact Phone
                 </label>
                 <input
@@ -117,7 +145,14 @@ export default function VendorProfilePage() {
             </div>
 
             <div style={{ marginBottom: "1rem" }}>
-              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Official Login Email (Verified)
               </label>
               <input
@@ -125,7 +160,11 @@ export default function VendorProfilePage() {
                 className="input-field"
                 value={email}
                 disabled
-                style={{ background: "var(--surface-subtle)", color: "var(--muted)", cursor: "not-allowed" }}
+                style={{
+                  background: "var(--surface-subtle)",
+                  color: "var(--muted)",
+                  cursor: "not-allowed",
+                }}
               />
               <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.25rem" }}>
                 Managed via GateSphere RBAC enterprise user identity.
@@ -133,7 +172,14 @@ export default function VendorProfilePage() {
             </div>
 
             <div style={{ marginBottom: "1rem" }}>
-              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Service Specializations
               </label>
               <input

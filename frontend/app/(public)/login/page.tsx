@@ -72,7 +72,8 @@ function LoginForm() {
         }
       } else {
         setError("root", {
-          message: err instanceof ApiError ? err.message : "Sign in failed. Check your credentials.",
+          message:
+            err instanceof ApiError ? err.message : "Sign in failed. Check your credentials.",
         });
       }
     }
@@ -90,7 +91,8 @@ function LoginForm() {
       <div
         className="absolute bottom-0 right-1/4 w-[280px] sm:w-[400px] h-[220px] sm:h-[300px] rounded-full blur-[90px] sm:blur-[120px] pointer-events-none opacity-20"
         style={{
-          background: "radial-gradient(circle, rgba(13, 148, 136, 0.35) 0%, rgba(7, 12, 24, 0) 70%)",
+          background:
+            "radial-gradient(circle, rgba(13, 148, 136, 0.35) 0%, rgba(7, 12, 24, 0) 70%)",
         }}
       />
 
@@ -106,7 +108,10 @@ function LoginForm() {
       <div className="relative z-10 w-full max-w-md mx-auto flex flex-col items-center">
         {/* Top Branding */}
         <div className="w-full flex flex-col items-center text-center mb-6 sm:mb-8">
-          <Link href="/" className="inline-flex items-center justify-center transition-transform hover:scale-105 mb-3 sm:mb-4">
+          <Link
+            href="/"
+            className="inline-flex items-center justify-center transition-transform hover:scale-105 mb-3 sm:mb-4"
+          >
             <GateSphereLogo className="justify-center" variant="light" size="large" />
           </Link>
           <div className="flex justify-center mb-2">
@@ -132,7 +137,13 @@ function LoginForm() {
             {/* Root Error Alert */}
             {errors.root && (
               <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2 font-medium">
-                <svg className="w-4 h-4 shrink-0 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  className="w-4 h-4 shrink-0 text-red-400"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <circle cx="12" cy="12" r="10" />
                   <line x1="12" y1="8" x2="12" y2="12" />
                   <line x1="12" y1="16" x2="12.01" y2="16" />
@@ -143,7 +154,10 @@ function LoginForm() {
 
             {/* Email Field */}
             <div>
-              <label htmlFor="email" className="block text-xs font-semibold text-slate-300 mb-1.5 font-mono">
+              <label
+                htmlFor="email"
+                className="block text-xs font-semibold text-slate-300 mb-1.5 font-mono"
+              >
                 Work Email Address
               </label>
               <div className="relative">
@@ -166,7 +180,10 @@ function LoginForm() {
             {/* Password Field */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label htmlFor="password" className="text-xs font-semibold text-slate-300 font-mono">
+                <label
+                  htmlFor="password"
+                  className="text-xs font-semibold text-slate-300 font-mono"
+                >
                   Password
                 </label>
                 <Link
@@ -184,7 +201,9 @@ function LoginForm() {
                   placeholder="••••••••••••"
                   {...register("password")}
                   className={`w-full px-4 py-2.5 sm:py-3 pr-11 rounded-xl bg-slate-800/80 border text-white text-sm placeholder-slate-500 transition-all outline-none focus:ring-2 focus:ring-blue-500/50 ${
-                    errors.password ? "border-red-500/80" : "border-slate-700 hover:border-slate-600"
+                    errors.password
+                      ? "border-red-500/80"
+                      : "border-slate-700 hover:border-slate-600"
                   }`}
                 />
                 <button
@@ -194,12 +213,24 @@ function LoginForm() {
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? (
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg
+                      className="w-4 h-4"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
                       <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
                       <line x1="1" y1="1" x2="23" y2="23" />
                     </svg>
                   ) : (
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg
+                      className="w-4 h-4"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
                       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                       <circle cx="12" cy="12" r="3" />
                     </svg>
@@ -222,16 +253,37 @@ function LoginForm() {
             >
               {isSubmitting || login.isPending ? (
                 <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  <svg
+                    className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
                   </svg>
                   <span>Verifying credentials…</span>
                 </>
               ) : (
                 <>
                   <span>Sign in to Dashboard</span>
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg
+                    className="w-4 h-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
                     <path d="M5 12h14M12 5l7 7-7 7" />
                   </svg>
                 </>

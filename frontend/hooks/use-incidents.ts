@@ -74,8 +74,13 @@ export function useTransitionIncident() {
 export function useAddIncidentAction() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: { action_type: string; details?: string } }) =>
-      incidentsApi.addAction(id, payload),
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload: { action_type: string; details?: string };
+    }) => incidentsApi.addAction(id, payload),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["incidents", variables.id, "actions"] });
     },

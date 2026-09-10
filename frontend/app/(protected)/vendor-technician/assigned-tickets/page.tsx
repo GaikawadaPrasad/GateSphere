@@ -26,9 +26,11 @@ export default function VendorAssignedTicketsPage() {
           facility: t.vendor_name || "Community Grounds",
           location: t.description || "Community Facility",
           priority: (t.priority || "medium").toUpperCase(),
-          sla_deadline: t.resolution_due_at ? new Date(t.resolution_due_at).toLocaleDateString() : "Within SLA",
+          sla_deadline: t.resolution_due_at
+            ? new Date(t.resolution_due_at).toLocaleDateString()
+            : "Within SLA",
           status: t.status || "created",
-        }))
+        })),
       );
     } catch {
       setTickets([]);
@@ -44,7 +46,9 @@ export default function VendorAssignedTicketsPage() {
   const handleAcceptTicket = async (ticketId: string) => {
     try {
       await vendorTicketsApi.updateStatus(ticketId, "acknowledged", "Accepted by Technician");
-      setTickets((prev) => prev.map((t) => (t.id === ticketId ? { ...t, status: "acknowledged" } : t)));
+      setTickets((prev) =>
+        prev.map((t) => (t.id === ticketId ? { ...t, status: "acknowledged" } : t)),
+      );
       alert("Ticket Accepted! You can now start work on-site or view your digital gate pass.");
     } catch (err: any) {
       alert(err?.message || "Failed to update ticket status");
@@ -56,7 +60,8 @@ export default function VendorAssignedTicketsPage() {
       t.ticket_number.toLowerCase().includes(search.toLowerCase()) ||
       t.title.toLowerCase().includes(search.toLowerCase()) ||
       t.facility.toLowerCase().includes(search.toLowerCase());
-    const matchPriority = priorityFilter === "all" || t.priority.toLowerCase() === priorityFilter.toLowerCase();
+    const matchPriority =
+      priorityFilter === "all" || t.priority.toLowerCase() === priorityFilter.toLowerCase();
     return matchSearch && matchPriority;
   });
 
@@ -78,8 +83,12 @@ export default function VendorAssignedTicketsPage() {
           </div>
 
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-            <div style={{ width: 220 }}>
-              <SearchInput value={search} onChange={setSearch} placeholder="Search ticket/title/facility…" />
+            <div style={{ width: "100%", maxWidth: 220 }}>
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Search ticket/title/facility…"
+              />
             </div>
 
             <select
@@ -119,7 +128,10 @@ export default function VendorAssignedTicketsPage() {
                 </tr>
               ) : filteredTickets.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
+                  <td
+                    colSpan={7}
+                    style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
+                  >
                     No assigned tickets found.
                   </td>
                 </tr>

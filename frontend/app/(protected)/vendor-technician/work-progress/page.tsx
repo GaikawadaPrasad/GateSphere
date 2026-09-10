@@ -17,7 +17,11 @@ export default function VendorWorkProgressPage() {
   const router = useRouter();
   const [tickets, setTickets] = useState<VendorTicket[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [feedback, setFeedback] = useState<{ id: string; msg: string; type: "success" | "error" } | null>(null);
+  const [feedback, setFeedback] = useState<{
+    id: string;
+    msg: string;
+    type: "success" | "error";
+  } | null>(null);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -31,7 +35,7 @@ export default function VendorWorkProgressPage() {
           facility: t.vendor_name || "Community Grounds",
           location: t.description || "Community Facility",
           status: t.status || "created",
-        }))
+        })),
       );
     } catch {
       setTickets([]);
@@ -46,15 +50,29 @@ export default function VendorWorkProgressPage() {
 
   const handleProgressStep = async (ticketId: string, nextStatus: string, remarksText?: string) => {
     try {
-      await vendorTicketsApi.updateStatus(ticketId, nextStatus, remarksText || `Updated by technician to ${nextStatus}`);
-      setTickets((prev) => prev.map((t) => (t.id === ticketId ? { ...t, status: nextStatus as any } : t)));
-      setFeedback({ id: ticketId, msg: `Job successfully updated to: ${nextStatus.replace(/_/g, " ").toUpperCase()}`, type: "success" });
+      await vendorTicketsApi.updateStatus(
+        ticketId,
+        nextStatus,
+        remarksText || `Updated by technician to ${nextStatus}`,
+      );
+      setTickets((prev) =>
+        prev.map((t) => (t.id === ticketId ? { ...t, status: nextStatus as any } : t)),
+      );
+      setFeedback({
+        id: ticketId,
+        msg: `Job successfully updated to: ${nextStatus.replace(/_/g, " ").toUpperCase()}`,
+        type: "success",
+      });
 
       if (nextStatus === "resolved") {
         setTimeout(() => router.push("/vendor-technician/service-history"), 1000);
       }
     } catch (err: any) {
-      setFeedback({ id: ticketId, msg: err?.message || `Failed to transition status to ${nextStatus}`, type: "error" });
+      setFeedback({
+        id: ticketId,
+        msg: err?.message || `Failed to transition status to ${nextStatus}`,
+        type: "error",
+      });
     }
   };
 
@@ -62,7 +80,8 @@ export default function VendorWorkProgressPage() {
     if (status === "created" || status === "assigned") return 0;
     if (status === "acknowledged") return 1;
     if (status === "in_progress") return 2;
-    if (status === "resolved" || status === "resident_confirmation" || status === "closed") return 3;
+    if (status === "resolved" || status === "resident_confirmation" || status === "closed")
+      return 3;
     return 0;
   };
 
@@ -80,13 +99,19 @@ export default function VendorWorkProgressPage() {
             Loading active jobs from backend…
           </div>
         ) : tickets.length === 0 ? (
-          <div className="card" style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
+          <div
+            className="card"
+            style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
+          >
             No service jobs found.
           </div>
         ) : (
           tickets.map((t) => {
             const currentIdx = getStepIndex(t.status);
-            const isCompleted = t.status === "resolved" || t.status === "resident_confirmation" || t.status === "closed";
+            const isCompleted =
+              t.status === "resolved" ||
+              t.status === "resident_confirmation" ||
+              t.status === "closed";
 
             return (
               <div key={t.id} className="card" style={{ border: "1px solid var(--border)" }}>
@@ -167,8 +192,14 @@ export default function VendorWorkProgressPage() {
                       marginBottom: "1rem",
                       padding: "0.6rem 0.85rem",
                       borderRadius: "var(--radius-sm)",
-                      background: feedback.type === "success" ? "var(--success-light)" : "var(--danger-light)",
-                      border: feedback.type === "success" ? "1px solid var(--success-border)" : "1px solid var(--danger-border)",
+                      background:
+                        feedback.type === "success"
+                          ? "var(--success-light)"
+                          : "var(--danger-light)",
+                      border:
+                        feedback.type === "success"
+                          ? "1px solid var(--success-border)"
+                          : "1px solid var(--danger-border)",
                       color: feedback.type === "success" ? "#065f46" : "#991b1b",
                       fontSize: "0.85rem",
                       fontWeight: 600,
@@ -179,11 +210,20 @@ export default function VendorWorkProgressPage() {
                 )}
 
                 {/* Progression Actions */}
-                <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "0.75rem",
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                  }}
+                >
                   {(t.status === "assigned" || t.status === "created") && (
                     <button
                       className="btn btn-primary"
-                      onClick={() => handleProgressStep(t.id, "acknowledged", "Accepted by Technician")}
+                      onClick={() =>
+                        handleProgressStep(t.id, "acknowledged", "Accepted by Technician")
+                      }
                     >
                       Step 1: Accept Work Order
                     </button>
@@ -191,7 +231,9 @@ export default function VendorWorkProgressPage() {
                   {t.status === "acknowledged" && (
                     <button
                       className="btn btn-primary"
-                      onClick={() => handleProgressStep(t.id, "in_progress", "Technician started work on site")}
+                      onClick={() =>
+                        handleProgressStep(t.id, "in_progress", "Technician started work on site")
+                      }
                     >
                       Step 2: Start Work On Site
                     </button>
@@ -200,13 +242,17 @@ export default function VendorWorkProgressPage() {
                     <>
                       <button
                         className="btn btn-primary"
-                        onClick={() => router.push(`/vendor-technician/work-completion?ticketId=${t.id}`)}
+                        onClick={() =>
+                          router.push(`/vendor-technician/work-completion?ticketId=${t.id}`)
+                        }
                       >
                         Step 3: Submit Completion Report
                       </button>
                       <button
                         className="btn btn-secondary"
-                        onClick={() => handleProgressStep(t.id, "resolved", "Work completed and tested on site")}
+                        onClick={() =>
+                          handleProgressStep(t.id, "resolved", "Work completed and tested on site")
+                        }
                       >
                         Quick Complete
                       </button>

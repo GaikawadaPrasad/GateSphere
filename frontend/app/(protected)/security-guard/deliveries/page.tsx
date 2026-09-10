@@ -27,9 +27,13 @@ export default function SecurityGuardDeliveriesPage() {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const [data, protocols] = await Promise.all([deliveriesApi.list(), deliveriesApi.protocols()]);
+      const [data, protocols] = await Promise.all([
+        deliveriesApi.list(),
+        deliveriesApi.protocols(),
+      ]);
       const protocolMap = new Map<string, string>();
-      for (const p of protocols || []) if ((p as any)?.id) protocolMap.set((p as any).id, (p as any).protocol_type);
+      for (const p of protocols || [])
+        if ((p as any)?.id) protocolMap.set((p as any).id, (p as any).protocol_type);
       setDeliveries(
         (data || []).map((d: any) => ({
           id: d.id,
@@ -40,7 +44,7 @@ export default function SecurityGuardDeliveriesPage() {
           status: d.status,
           protocol_type: protocolMap.get(d.protocol_id) || "—",
           arrived_at: d.arrived_at,
-        }))
+        })),
       );
     } catch (err: any) {
       setLoadError(err?.message || "Failed to load deliveries.");
@@ -93,7 +97,11 @@ export default function SecurityGuardDeliveriesPage() {
       <PageHeader
         title="Delivery Verification & Gate Decision"
         subtitle="Verify courier arrival, record gate hand-off, and track delivery protocol status"
-        breadcrumbs={[{ label: "GateSphere" }, { label: "Security Guard" }, { label: "Deliveries" }]}
+        breadcrumbs={[
+          { label: "GateSphere" },
+          { label: "Security Guard" },
+          { label: "Deliveries" },
+        ]}
       />
 
       <div className="card">
@@ -105,8 +113,12 @@ export default function SecurityGuardDeliveriesPage() {
             </p>
           </div>
 
-          <div style={{ width: 220 }}>
-            <SearchInput value={search} onChange={setSearch} placeholder="Search courier/tracking…" />
+          <div style={{ width: "100%", maxWidth: 220 }}>
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Search courier/tracking…"
+            />
           </div>
         </div>
 
@@ -132,13 +144,23 @@ export default function SecurityGuardDeliveriesPage() {
                 </tr>
               ) : loadError ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: "center", padding: "2rem", color: "var(--danger, #dc2626)" }}>
+                  <td
+                    colSpan={7}
+                    style={{
+                      textAlign: "center",
+                      padding: "2rem",
+                      color: "var(--danger, #dc2626)",
+                    }}
+                  >
                     {loadError}
                   </td>
                 </tr>
               ) : filteredDeliveries.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
+                  <td
+                    colSpan={7}
+                    style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
+                  >
                     No deliveries found.
                   </td>
                 </tr>
@@ -149,7 +171,9 @@ export default function SecurityGuardDeliveriesPage() {
                     <td style={{ textTransform: "capitalize" }}>{d.delivery_type}</td>
                     <td>{d.executive_name}</td>
                     <td style={{ fontFamily: "monospace" }}>{d.tracking_reference}</td>
-                    <td style={{ textTransform: "capitalize" }}>{d.protocol_type.replace(/_/g, " ")}</td>
+                    <td style={{ textTransform: "capitalize" }}>
+                      {d.protocol_type.replace(/_/g, " ")}
+                    </td>
                     <td>
                       <StatusBadge status={d.status} />
                     </td>
@@ -173,7 +197,9 @@ export default function SecurityGuardDeliveriesPage() {
                             Mark Delivered
                           </button>
                         )}
-                        {!["delivered", "collected", "cancelled", "returned"].includes(d.status) && (
+                        {!["delivered", "collected", "cancelled", "returned"].includes(
+                          d.status,
+                        ) && (
                           <button
                             className="btn btn-danger"
                             style={{ fontSize: "0.75rem", padding: "0.2rem 0.45rem" }}

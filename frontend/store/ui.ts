@@ -11,8 +11,10 @@ interface UiState {
   setActiveCommunity: (id: string | null) => void;
 }
 
+const isMobileInitial = typeof window !== "undefined" && window.innerWidth < 768;
+
 export const useUiStore = create<UiState>((set) => ({
-  sidebarOpen: true,
+  sidebarOpen: !isMobileInitial,
   activeCommunityId: null,
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
   setActiveCommunity: (id) => set({ activeCommunityId: id }),

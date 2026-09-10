@@ -32,22 +32,34 @@ export function RoleBasedSidebar() {
   const roleConfig = ROLE_CONFIGS[activeRoleKey] || ROLE_CONFIGS.super_admin;
   const navItems: NavItem[] = roleConfig.navItems;
 
+  const handleLinkClick = () => {
+    if (typeof window !== "undefined" && window.innerWidth < 768 && sidebarOpen) {
+      toggleSidebar();
+    }
+  };
+
   return (
-    <aside
-      style={{
-        width: sidebarOpen ? 250 : 72,
-        background: "var(--sidebar-bg)",
-        borderRight: "1px solid var(--sidebar-border)",
-        display: "flex",
-        flexDirection: "column",
-        transition: "width 0.2s ease",
-        flexShrink: 0,
-        position: "sticky",
-        top: 0,
-        height: "100vh",
-        zIndex: 40,
-      }}
-    >
+    <>
+      {sidebarOpen && (
+        <div className="sidebar-backdrop" onClick={toggleSidebar} aria-label="Close menu" />
+      )}
+
+      <aside
+        className={`app-sidebar ${sidebarOpen ? "open-mobile" : "collapsed-mobile"}`}
+        style={{
+          width: sidebarOpen ? 250 : 72,
+          background: "var(--sidebar-bg)",
+          borderRight: "1px solid var(--sidebar-border)",
+          display: "flex",
+          flexDirection: "column",
+          transition: "width 0.2s ease",
+          flexShrink: 0,
+          position: "sticky",
+          top: 0,
+          height: "100vh",
+          zIndex: 40,
+        }}
+      >
       {/* Brand Header matching Super Admin Sidebar */}
       <div
         style={{
@@ -148,6 +160,7 @@ export function RoleBasedSidebar() {
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={handleLinkClick}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -161,7 +174,9 @@ export function RoleBasedSidebar() {
                   fontSize: "0.85rem",
                   textDecoration: "none",
                   transition: "all 0.15s ease",
-                  borderLeft: isActive ? `3px solid ${roleConfig.badgeColor || "var(--primary)"}` : "3px solid transparent",
+                  borderLeft: isActive
+                    ? `3px solid ${roleConfig.badgeColor || "var(--primary)"}`
+                    : "3px solid transparent",
                 }}
                 title={item.label}
               >
@@ -198,6 +213,7 @@ export function RoleBasedSidebar() {
           </button>
         </div>
       )}
-    </aside>
+      </aside>
+    </>
   );
 }

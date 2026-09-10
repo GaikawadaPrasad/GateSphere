@@ -2,15 +2,25 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { dashboardsApi, communitiesApi } from "@/lib/api";
-import type { OverviewStats, SecurityStats, FinancialStats, ResidentStats, SuperAdminDashboardMetrics } from "@/types/dashboards";
+import type {
+  OverviewStats,
+  SecurityStats,
+  FinancialStats,
+  ResidentStats,
+  SuperAdminDashboardMetrics,
+} from "@/types/dashboards";
 import type { Community } from "@/types/communities";
 
 export const dashboardKeys = {
   all: ["dashboards"] as const,
-  overview: (communityId?: string | null) => [...dashboardKeys.all, "overview", communityId] as const,
-  security: (communityId?: string | null) => [...dashboardKeys.all, "security", communityId] as const,
-  financial: (communityId?: string | null) => [...dashboardKeys.all, "financial", communityId] as const,
-  resident: (communityId?: string | null) => [...dashboardKeys.all, "resident", communityId] as const,
+  overview: (communityId?: string | null) =>
+    [...dashboardKeys.all, "overview", communityId] as const,
+  security: (communityId?: string | null) =>
+    [...dashboardKeys.all, "security", communityId] as const,
+  financial: (communityId?: string | null) =>
+    [...dashboardKeys.all, "financial", communityId] as const,
+  resident: (communityId?: string | null) =>
+    [...dashboardKeys.all, "resident", communityId] as const,
   superAdmin: ["dashboards", "super-admin"] as const,
 };
 
@@ -67,12 +77,13 @@ export function useSuperAdminDashboardMetrics() {
             if (financial.status === "fulfilled") {
               totalBilled += parseFloat(String(financial.value?.total_billed || "0")) || 0;
               totalCollected += parseFloat(String(financial.value?.total_collected || "0")) || 0;
-              totalOutstanding += parseFloat(String(financial.value?.outstanding_balance || "0")) || 0;
+              totalOutstanding +=
+                parseFloat(String(financial.value?.outstanding_balance || "0")) || 0;
             }
           } catch {
             // best-effort per community aggregation
           }
-        })
+        }),
       );
 
       const collectionRate = totalBilled > 0 ? Math.round((totalCollected / totalBilled) * 100) : 0;

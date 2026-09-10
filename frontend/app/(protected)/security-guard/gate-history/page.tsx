@@ -28,7 +28,10 @@ export default function SecurityGuardGateHistoryPage() {
 
   const filteredHistory = history.filter((h) => {
     const ref = ((h as any).reference_type || "").toLowerCase();
-    const matchSearch = !search || ref.includes(search.toLowerCase()) || h.event_type.toLowerCase().includes(search.toLowerCase());
+    const matchSearch =
+      !search ||
+      ref.includes(search.toLowerCase()) ||
+      h.event_type.toLowerCase().includes(search.toLowerCase());
     const matchType = typeFilter === "all" || h.event_type === typeFilter;
     return matchSearch && matchType;
   });
@@ -38,7 +41,11 @@ export default function SecurityGuardGateHistoryPage() {
       <PageHeader
         title="Gate Movement History (Read-Only)"
         subtitle="Historical log of recorded gate events across all community gates"
-        breadcrumbs={[{ label: "GateSphere" }, { label: "Security Guard" }, { label: "Gate History" }]}
+        breadcrumbs={[
+          { label: "GateSphere" },
+          { label: "Security Guard" },
+          { label: "Gate History" },
+        ]}
       />
 
       <div className="card">
@@ -51,8 +58,12 @@ export default function SecurityGuardGateHistoryPage() {
           </div>
 
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-            <div style={{ width: 220 }}>
-              <SearchInput value={search} onChange={setSearch} placeholder="Search event/reference…" />
+            <div style={{ width: "100%", maxWidth: 220 }}>
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Search event/reference…"
+              />
             </div>
 
             <select
@@ -90,7 +101,10 @@ export default function SecurityGuardGateHistoryPage() {
                 </tr>
               ) : filteredHistory.length === 0 ? (
                 <tr>
-                  <td colSpan={4} style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
+                  <td
+                    colSpan={4}
+                    style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
+                  >
                     No gate events found.
                   </td>
                 </tr>
@@ -98,7 +112,9 @@ export default function SecurityGuardGateHistoryPage() {
                 filteredHistory.map((h) => (
                   <tr key={h.id}>
                     <td>{formatDateTime(h.occurred_at)}</td>
-                    <td style={{ fontWeight: 600, color: "var(--fg)", textTransform: "capitalize" }}>
+                    <td
+                      style={{ fontWeight: 600, color: "var(--fg)", textTransform: "capitalize" }}
+                    >
                       <StatusBadge status={h.event_type} />
                     </td>
                     <td>

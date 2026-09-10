@@ -76,7 +76,10 @@ export default function GateTrafficPage() {
       <PageHeader
         title="Gate Traffic & Security Operations"
         subtitle="Live gate events, active guard rosters, and panic alerts"
-        breadcrumbs={[{ label: "Super Admin", href: "/super-admin/dashboard" }, { label: "Gate Traffic" }]}
+        breadcrumbs={[
+          { label: "Super Admin", href: "/super-admin/dashboard" },
+          { label: "Gate Traffic" },
+        ]}
         actions={
           <select
             className="select-field"
@@ -126,7 +129,9 @@ export default function GateTrafficPage() {
                   <span style={{ fontWeight: 600, color: "#991b1b", textTransform: "capitalize" }}>
                     {a.alert_type} {(a as any).message ? `— ${(a as any).message}` : ""}
                   </span>
-                  <span style={{ fontSize: "0.75rem", color: "var(--muted)", marginLeft: "0.75rem" }}>
+                  <span
+                    style={{ fontSize: "0.75rem", color: "var(--muted)", marginLeft: "0.75rem" }}
+                  >
                     {formatDateTime(a.created_at)}
                   </span>
                 </div>
