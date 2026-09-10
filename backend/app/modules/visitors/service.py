@@ -336,6 +336,7 @@ class VisitorService(UnitScopedAccess):
                 reference_type="visitor_request",
                 reference_id=obj.id,
             )
+        obj.visitor = visitor
         return obj
 
     async def _primary_host(self, unit_id: uuid.UUID) -> uuid.UUID | None:

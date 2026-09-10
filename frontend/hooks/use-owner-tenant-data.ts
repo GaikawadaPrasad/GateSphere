@@ -129,8 +129,8 @@ export function useResidentVisitors() {
       if (!Array.isArray(res)) return [];
       return res.map((r: any) => ({
         id: r.id,
-        visitor_name: r.visitor?.full_name || r.visitor_name || "Visitor",
-        phone: r.visitor?.phone || r.phone || "",
+        visitor_name: r.visitor?.full_name || r.visitor_name || r.full_name || "Visitor",
+        phone: r.visitor?.phone || r.phone || r.visitor_phone || "",
         purpose: r.purpose || "Guest visit",
         vehicle_number: r.vehicle_number,
         status: r.status,
@@ -138,7 +138,8 @@ export function useResidentVisitors() {
         valid_until: r.valid_until,
         pass_code:
           r.passes?.[0]?.pin ||
-          (r.passes?.[0]?.token ? `QR-${r.passes[0].token.slice(0, 6)}` : undefined),
+          (r.passes?.[0]?.token ? `QR-${r.passes[0].token.slice(0, 6)}` : undefined) ||
+          r.pass_code,
         qr_token: r.passes?.[0]?.token,
         entry_time: r.entries?.[0]?.entry_at,
         exit_time: r.entries?.[0]?.exit_at,

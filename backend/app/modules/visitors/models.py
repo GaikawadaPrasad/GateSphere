@@ -115,11 +115,17 @@ class VisitorRequest(Base, TimestampMixin, TenantMixin):
     group_label: Mapped[str | None] = mapped_column(String(120))
     party_size: Mapped[int] = mapped_column(SmallInteger, default=1)
 
+    visitor: Mapped[Visitor | None] = relationship(
+        "Visitor",
+        foreign_keys=[visitor_id],
+        primaryjoin="VisitorRequest.visitor_id == Visitor.id",
+        lazy="joined",
+    )
     approvals: Mapped[list[VisitorApproval]] = relationship(
         back_populates="request", cascade="all, delete-orphan"
     )
     passes: Mapped[list[VisitorPass]] = relationship(
-        back_populates="request", cascade="all, delete-orphan"
+        back_populates="request", cascade="all, delete-orphan", lazy="selectin"
     )
 
 

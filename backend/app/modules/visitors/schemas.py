@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.core.files import ManagedFileUrl
 from app.modules.visitors.models import (
@@ -103,6 +104,26 @@ class GroupMemberRead(_Read):
     added_at: datetime
 
 
+class PassCreate(_Write):
+    pass_type: str = "qr"  # noqa: S105 - not a secret
+    valid_from: datetime | None = None
+    valid_to: datetime | None = None
+    max_entries: int = Field(default=1, ge=1, le=50)
+    with_pin: bool = False  # also issue a 6-digit gate PIN (implied for pin/otp pass types)
+
+
+class PassRead(_Read):
+    request_id: uuid.UUID
+    pass_type: str
+    valid_from: datetime
+    valid_to: datetime
+    max_entries: int
+    entry_count: int
+    is_revoked: bool
+    token: str | None = None  # returned once, at creation
+    pin: str | None = None  # returned once, at creation (when with_pin / pin / otp)
+
+
 class RequestDecision(_Write):
     decision: str
     remarks: str | None = Field(default=None, max_length=2000)
@@ -122,26 +143,32 @@ class RequestRead(_Read):
     vehicle_number: str | None
     group_label: str | None
     party_size: int
+    visitor: VisitorRead | None = None
+    visitor_name: str | None = None
+    phone: str | None = None
+    passes: list[PassRead] = []
 
-
-class PassCreate(_Write):
-    pass_type: str = "qr"  # noqa: S105 - not a secret
-    valid_from: datetime | None = None
-    valid_to: datetime | None = None
-    max_entries: int = Field(default=1, ge=1, le=50)
-    with_pin: bool = False  # also issue a 6-digit gate PIN (implied for pin/otp pass types)
-
-
-class PassRead(_Read):
-    request_id: uuid.UUID
-    pass_type: str
-    valid_from: datetime
-    valid_to: datetime
-    max_entries: int
-    entry_count: int
-    is_revoked: bool
-    token: str | None = None  # returned once, at creation
-    pin: str | None = None  # returned once, at creation (when with_pin / pin / otp)
+    @model_validator(mode="before")
+    @classmethod
+    def populate_visitor_fields(cls, data: Any) -> Any:
+        if hasattr(data, "visitor") and getattr(data, "visitor", None) is not None:
+            v = data.visitor
+            if getattr(data, "visitor_name", None) is None:
+                try:
+                    data.visitor_name = getattr(v, "full_name", None)
+                except Exception:
+                    pass
+            if getattr(data, "phone", None) is None:
+                try:
+                    data.phone = getattr(v, "phone", None)
+                except Exception:
+                    pass
+        elif isinstance(data, dict):
+            v = data.get("visitor")
+            if isinstance(v, dict):
+                data.setdefault("visitor_name", v.get("full_name"))
+                data.setdefault("phone", v.get("phone"))
+        return data
 
 
 class EntryCreate(_Write):
