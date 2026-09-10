@@ -195,17 +195,19 @@ export function OwnerTenantDashboardView({ initialTab = "overview" }: OwnerTenan
   const handleCreatePass = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const activeUnitId = profile.data?.occupancies?.[0]?.unit_id;
       await visitors.createPass.mutateAsync({
         visitor_name: passVisitorName,
         phone: passVisitorPhone,
         valid_for_hours: passDuration,
+        unit_id: activeUnitId,
       });
       setVisitorPassModalOpen(false);
       setPassVisitorName("");
       setPassVisitorPhone("");
       toast.success("A QR & 4-digit PIN code have been issued for your guest.", "Visitor Pass Generated");
-    } catch {
-      toast.error("Failed to generate visitor pass.", "Error");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to generate visitor pass.", "Error");
     }
   };
 

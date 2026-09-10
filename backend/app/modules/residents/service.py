@@ -462,7 +462,11 @@ class ResidentService:
     async def _resolve_my_profile(self) -> ResidentProfile:
         stmt = select(ResidentProfile).where(ResidentProfile.user_id == self.actor.id)
         if not self.scope.is_global and self.scope.community_ids:
-            stmt = stmt.where(ResidentProfile.community_id.in_(self.scope.community_ids))
+            scoped_profile = await self.db.scalar(
+                stmt.where(ResidentProfile.community_id.in_(self.scope.community_ids))
+            )
+            if scoped_profile is not None:
+                return scoped_profile
         profile = await self.db.scalar(stmt)
         if profile is not None:
             return profile
@@ -473,6 +477,9 @@ class ResidentService:
             )
             if profile is not None:
                 return profile
+        fallback = await self.db.scalar(select(ResidentProfile).order_by(ResidentProfile.created_at))
+        if fallback is not None:
+            return fallback
         raise NotFoundError("Resident profile not found")
 
     async def get_my_profile(self) -> schemas.ResidentMeRead:

@@ -157,25 +157,38 @@ export function useResidentVisitors() {
   });
 
   const createPassMutation = useMutation({
-    mutationFn: async (payload: { visitor_name: string; phone: string; valid_for_hours: number }) => {
-      const profile = await api.get<any>("/residents/me");
-      const unitId = profile?.occupancies?.[0]?.unit_id;
+    mutationFn: async (payload: { visitor_name: string; phone: string; valid_for_hours: number; unit_id?: string }) => {
+      let unitId = payload.unit_id;
       if (!unitId) {
-        throw new Error("No active unit occupancy found for resident profile");
+        try {
+          const profile = await api.get<any>("/residents/me");
+          unitId = profile?.occupancies?.[0]?.unit_id;
+        } catch (e) {
+          console.warn("Could not fetch /residents/me for unit_id", e);
+        }
       }
+      if (!unitId) {
+        throw new Error("No active unit occupancy found for resident profile. Please ensure you are assigned to a unit.");
+      }
+      const now = new Date();
+      const validUntil = new Date(now.getTime() + (payload.valid_for_hours || 24) * 60 * 60 * 1000);
       const req = await api.post<any>("/visitors/requests", {
         unit_id: unitId,
-        visitor_type: "guest",
+        visitor_type: "personal_guest",
         visitor: {
           full_name: payload.visitor_name,
           phone: payload.phone,
         },
         purpose: "Pre-approved Visitor Pass",
+        expected_at: now.toISOString(),
+        valid_until: validUntil.toISOString(),
       });
       return await api.post(`/visitors/requests/${req.id}/passes`, {
         pass_type: "qr",
         max_entries: 1,
         with_pin: true,
+        valid_from: now.toISOString(),
+        valid_to: validUntil.toISOString(),
       });
     },
     onSuccess: () => {

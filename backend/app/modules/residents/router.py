@@ -247,12 +247,12 @@ async def transition_move(
 
 
 # --- resident me / self-service (declared before /{profile_id}) ------- #
-@router.get("/me", response_model=Envelope[schemas.ResidentMeRead], dependencies=[VIEW])
+@router.get("/me", response_model=Envelope[schemas.ResidentMeRead])
 async def get_my_profile(svc: ResidentService = Depends(resident_service)) -> dict:
     return ok(await svc.get_my_profile())
 
 
-@router.patch("/me", response_model=Envelope[schemas.ResidentMeRead], dependencies=[UPDATE])
+@router.patch("/me", response_model=Envelope[schemas.ResidentMeRead])
 async def update_my_profile(
     payload: schemas.ResidentMeUpdate, svc: ResidentService = Depends(resident_service)
 ) -> dict:

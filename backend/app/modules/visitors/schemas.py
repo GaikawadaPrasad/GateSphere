@@ -17,7 +17,7 @@ from app.modules.visitors.models import (
 )
 
 ALLOWED = {
-    "visitor_type": set(VISITOR_TYPES),
+    "visitor_type": set(VISITOR_TYPES) | {"guest"},
     "status": set(REQUEST_STATUS),
     "risk_level": set(RISK_LEVELS),
     "pass_type": set(PASS_TYPES),
