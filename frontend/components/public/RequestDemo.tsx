@@ -162,7 +162,7 @@ export default function RequestDemo() {
                     className="text-2xl font-extrabold text-slate-900 tracking-tight"
                     style={{ fontFamily: "'Outfit', sans-serif" }}
                   >
-                    Demo Request Confirmed!
+                     Request Confirmed!
                   </h3>
                   <p className="text-[14px] text-slate-600 max-w-md mx-auto leading-relaxed">
                     Thank you! An executive community specialist will contact you shortly to schedule your personalized live walkthrough.

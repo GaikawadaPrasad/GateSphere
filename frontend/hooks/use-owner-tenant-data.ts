@@ -64,6 +64,10 @@ export interface AmenityBooking {
   status: "confirmed" | "cancelled" | "completed";
   guests_count: number;
   total_amount: number;
+  slot_id?: string;
+  unit_id?: string;
+  community_id?: string;
+  user_id?: string;
 }
 
 export interface ComplaintTicket {
