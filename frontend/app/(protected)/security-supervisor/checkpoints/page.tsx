@@ -73,10 +73,15 @@ export default function SecuritySupervisorCheckpointsPage() {
               location: g.code ? `Code: ${g.code}` : "Perimeter Boundary",
               assigned_guard: assign ? `Guard ${assign.guard_user_id.slice(0, 8)}` : "Unassigned",
               guard_id: assign?.guard_user_id,
-              last_patrol: assign?.assigned_from ? new Date(assign.assigned_from).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Active",
+              last_patrol: assign?.assigned_from
+                ? new Date(assign.assigned_from).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : "Active",
               status: assign ? "Active" : "Pending",
             };
-          })
+          }),
         );
       } else {
         setCheckpoints([]);
@@ -134,7 +139,11 @@ export default function SecuritySupervisorCheckpointsPage() {
       <PageHeader
         title="Perimeter Checkpoints & Guard Patrol"
         subtitle="Manage perimeter security checkpoints, guard duty assignments, and patrol check-in logs"
-        breadcrumbs={[{ label: "GateSphere" }, { label: "Security Supervisor" }, { label: "Checkpoints" }]}
+        breadcrumbs={[
+          { label: "GateSphere" },
+          { label: "Security Supervisor" },
+          { label: "Checkpoints" },
+        ]}
       />
 
       <div className="card">
@@ -163,7 +172,10 @@ export default function SecuritySupervisorCheckpointsPage() {
                 </tr>
               ) : checkpoints.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
+                  <td
+                    colSpan={6}
+                    style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
+                  >
                     No checkpoints found.
                   </td>
                 </tr>
@@ -225,7 +237,14 @@ export default function SecuritySupervisorCheckpointsPage() {
         }
       >
         <div>
-          <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+          <label
+            style={{
+              display: "block",
+              fontWeight: 600,
+              fontSize: "0.85rem",
+              marginBottom: "0.35rem",
+            }}
+          >
             Select Duty Guard
           </label>
           <select
@@ -264,9 +283,17 @@ export default function SecuritySupervisorCheckpointsPage() {
       >
         <div>
           <p style={{ fontSize: "0.825rem", color: "var(--muted)", marginBottom: "1rem" }}>
-            This action forces a checkpoint bypass / security override. An immutable audit record will be logged with your supervisor credential.
+            This action forces a checkpoint bypass / security override. An immutable audit record
+            will be logged with your supervisor credential.
           </p>
-          <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+          <label
+            style={{
+              display: "block",
+              fontWeight: 600,
+              fontSize: "0.85rem",
+              marginBottom: "0.35rem",
+            }}
+          >
             Override Reason *
           </label>
           <input

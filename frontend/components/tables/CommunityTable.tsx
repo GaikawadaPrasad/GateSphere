@@ -79,7 +79,8 @@ export function CommunityTable({ communities, isLoading, onView, onEdit }: Commu
                 style={{
                   width: `${occ}%`,
                   height: "100%",
-                  background: occ > 75 ? "var(--success)" : occ > 40 ? "var(--warning)" : "var(--primary)",
+                  background:
+                    occ > 75 ? "var(--success)" : occ > 40 ? "var(--warning)" : "var(--primary)",
                 }}
               />
             </div>
@@ -94,7 +95,12 @@ export function CommunityTable({ communities, isLoading, onView, onEdit }: Commu
       align: "center",
       render: (comm) => {
         const status = comm.financialStatus || "Good";
-        return <StatusBadge status={status === "Good" ? "paid" : status === "Attention" ? "pending" : "overdue"} label={status} />;
+        return (
+          <StatusBadge
+            status={status === "Good" ? "paid" : status === "Attention" ? "pending" : "overdue"}
+            label={status}
+          />
+        );
       },
     },
     {

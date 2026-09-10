@@ -43,8 +43,14 @@ export function EmptyState({
       >
         {icon || "📭"}
       </div>
-      <h3 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--fg)", marginBottom: "0.25rem" }}>{title}</h3>
-      <p style={{ maxWidth: 400, color: "var(--muted)", marginBottom: action ? "1.25rem" : 0 }}>{description}</p>
+      <h3
+        style={{ fontSize: "1rem", fontWeight: 600, color: "var(--fg)", marginBottom: "0.25rem" }}
+      >
+        {title}
+      </h3>
+      <p style={{ maxWidth: 400, color: "var(--muted)", marginBottom: action ? "1.25rem" : 0 }}>
+        {description}
+      </p>
       {action}
     </div>
   );

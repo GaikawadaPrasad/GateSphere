@@ -4,17 +4,22 @@ import React, { useState, useEffect } from "react";
 import GateSphereLogo from "./GateSphereLogo";
 
 export default function IntroLoader({ onReady }: { onReady?: () => void }) {
+  const [shouldShow, setShouldShow] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [exiting, setExiting] = useState(false);
   const [removed, setRemoved] = useState(false);
 
   useEffect(() => {
-    // Only run on initial load within session
-    const hasSeenIntro = sessionStorage.getItem("gatesphere_intro_seen");
-    if (hasSeenIntro) {
-      setRemoved(true);
-      if (onReady) onReady();
-      return;
+    // Check if intro has already played in this browser session
+    if (typeof window !== "undefined") {
+      const alreadyShown = sessionStorage.getItem("gs_intro_shown");
+      if (alreadyShown) {
+        setRemoved(true);
+        if (onReady) onReady();
+        return;
+      }
+      sessionStorage.setItem("gs_intro_shown", "true");
+      setShouldShow(true);
     }
 
     // Lock scroll during loader
@@ -32,7 +37,6 @@ export default function IntroLoader({ onReady }: { onReady?: () => void }) {
     const exitTimer = setTimeout(() => {
       setExiting(true);
       document.documentElement.style.overflow = "";
-      sessionStorage.setItem("gatesphere_intro_seen", "true");
       if (onReady) onReady();
 
       setTimeout(() => {
@@ -47,7 +51,7 @@ export default function IntroLoader({ onReady }: { onReady?: () => void }) {
     };
   }, [onReady]);
 
-  if (removed) return null;
+  if (removed || !shouldShow) return null;
 
   return (
     <aside

@@ -253,7 +253,8 @@ class VisitorService(UnitScopedAccess):
     async def create_request(self, payload: schemas.RequestCreate) -> VisitorRequest:
         unit = await self._unit_in_scope(payload.unit_id)
         await self._assert_unit_visible(unit.id)  # a resident invites guests to their own unit
-        _enum("visitor_type", payload.visitor_type)
+        visitor_type = "personal_guest" if payload.visitor_type == "guest" else payload.visitor_type
+        _enum("visitor_type", visitor_type)
         policy = await self._policy(unit.community_id)
 
         if payload.visitor_id is not None:
@@ -281,14 +282,14 @@ class VisitorService(UnitScopedAccess):
             )
             raise ForbiddenError("Visitor is blacklisted", code="VISITOR_BLACKLISTED")
 
-        approval_required = policy.approval_required and payload.visitor_type != "recurring"
+        approval_required = policy.approval_required and visitor_type != "recurring"
         obj = VisitorRequest(
             community_id=unit.community_id,
             visitor_id=visitor.id,
             unit_id=unit.id,
             host_user_id=await self._primary_host(unit.id),
             created_by_user_id=self.actor.id,
-            visitor_type=payload.visitor_type,
+            visitor_type=visitor_type,
             purpose=payload.purpose,
             expected_at=payload.expected_at,
             valid_until=payload.valid_until,

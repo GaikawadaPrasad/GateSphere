@@ -22,7 +22,8 @@ export default function NotFound() {
             className="text-slate-400 text-sm sm:text-base leading-relaxed mb-8"
             style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
           >
-            The page you are looking for doesn&apos;t exist or has been moved. Explore our main platform navigation below.
+            The page you are looking for doesn&apos;t exist or has been moved. Explore our main
+            platform navigation below.
           </p>
 
           <div className="flex flex-wrap items-center justify-center gap-3">
@@ -41,15 +42,25 @@ export default function NotFound() {
           </div>
 
           <div className="mt-10 pt-8 border-t border-slate-800/80 flex flex-wrap justify-center gap-4 text-xs text-slate-500">
-            <Link href="/solutions" className="hover:text-blue-400 transition">Solutions</Link>
+            <Link href="/solutions" className="hover:text-blue-400 transition">
+              Solutions
+            </Link>
             <span>•</span>
-            <Link href="/features" className="hover:text-blue-400 transition">Features</Link>
+            <Link href="/features" className="hover:text-blue-400 transition">
+              Features
+            </Link>
             <span>•</span>
-            <Link href="/security" className="hover:text-blue-400 transition">Security</Link>
+            <Link href="/security" className="hover:text-blue-400 transition">
+              Security
+            </Link>
             <span>•</span>
-            <Link href="/about" className="hover:text-blue-400 transition">About</Link>
+            <Link href="/about" className="hover:text-blue-400 transition">
+              About
+            </Link>
             <span>•</span>
-            <Link href="/demo" className="hover:text-blue-400 transition">Book Demo</Link>
+            <Link href="/demo" className="hover:text-blue-400 transition">
+              Book Demo
+            </Link>
           </div>
         </div>
       </div>

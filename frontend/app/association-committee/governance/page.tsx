@@ -73,7 +73,8 @@ export default function GovernanceOverviewPage() {
               Association Committee Governance Portal (PRD GSE-2026)
             </div>
             <div style={{ fontSize: "0.775rem", color: "#6d28d9" }}>
-              Access financial summaries · Approve special assessments · Review incident logs · Audit collections & ledger records
+              Access financial summaries · Approve special assessments · Review incident logs ·
+              Audit collections & ledger records
             </div>
           </div>
         </div>
@@ -156,20 +157,23 @@ export default function GovernanceOverviewPage() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 380px), 1fr))",
           gap: "1.5rem",
           marginBottom: "1.75rem",
         }}
       >
         <FinancialSummaryCard stats={overview?.financialStats} isLoading={overviewLoading} />
-        <AssessmentSummaryCard assessments={overview?.activeAssessments} isLoading={overviewLoading} />
+        <AssessmentSummaryCard
+          assessments={overview?.activeAssessments}
+          isLoading={overviewLoading}
+        />
       </div>
 
       {/* Bottom Grid: Security Incidents & Collection Audit */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 380px), 1fr))",
           gap: "1.5rem",
           marginBottom: "1.75rem",
         }}
@@ -182,7 +186,10 @@ export default function GovernanceOverviewPage() {
       <div className="card">
         <div className="card-header">
           <div>
-            <h2 className="card-title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <h2
+              className="card-title"
+              style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
+            >
               <span>📊</span> Governance Reporting & Statutory Traceability
             </h2>
             <p style={{ fontSize: "0.775rem", color: "var(--muted)", marginTop: "0.15rem" }}>
@@ -215,8 +222,12 @@ export default function GovernanceOverviewPage() {
           >
             <span style={{ fontSize: "1.5rem" }}>📑</span>
             <div>
-              <div style={{ fontWeight: 600, fontSize: "0.875rem", color: "var(--fg)" }}>Financial Ledger Report</div>
-              <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Invoices, adjustments & balance sheet</div>
+              <div style={{ fontWeight: 600, fontSize: "0.875rem", color: "var(--fg)" }}>
+                Financial Ledger Report
+              </div>
+              <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                Invoices, adjustments & balance sheet
+              </div>
             </div>
           </Link>
 
@@ -236,8 +247,12 @@ export default function GovernanceOverviewPage() {
           >
             <span style={{ fontSize: "1.5rem" }}>🧾</span>
             <div>
-              <div style={{ fontWeight: 600, fontSize: "0.875rem", color: "var(--fg)" }}>Collection Audit Report</div>
-              <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Payment receipts and channel reconciliations</div>
+              <div style={{ fontWeight: 600, fontSize: "0.875rem", color: "var(--fg)" }}>
+                Collection Audit Report
+              </div>
+              <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                Payment receipts and channel reconciliations
+              </div>
             </div>
           </Link>
 
@@ -257,8 +272,12 @@ export default function GovernanceOverviewPage() {
           >
             <span style={{ fontSize: "1.5rem" }}>📋</span>
             <div>
-              <div style={{ fontWeight: 600, fontSize: "0.875rem", color: "var(--fg)" }}>CapEx Review Register</div>
-              <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Special assessment approval audit trail</div>
+              <div style={{ fontWeight: 600, fontSize: "0.875rem", color: "var(--fg)" }}>
+                CapEx Review Register
+              </div>
+              <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                Special assessment approval audit trail
+              </div>
             </div>
           </Link>
 
@@ -278,8 +297,12 @@ export default function GovernanceOverviewPage() {
           >
             <span style={{ fontSize: "1.5rem" }}>🚨</span>
             <div>
-              <div style={{ fontWeight: 600, fontSize: "0.875rem", color: "var(--fg)" }}>Security Incident Archive</div>
-              <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Incident logs, investigations & resolutions</div>
+              <div style={{ fontWeight: 600, fontSize: "0.875rem", color: "var(--fg)" }}>
+                Security Incident Archive
+              </div>
+              <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                Incident logs, investigations & resolutions
+              </div>
             </div>
           </Link>
         </div>

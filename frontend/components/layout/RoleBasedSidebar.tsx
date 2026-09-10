@@ -40,13 +40,8 @@ export function RoleBasedSidebar() {
 
   return (
     <>
-      {/* Mobile Backdrop */}
       {sidebarOpen && (
-        <div
-          className="sidebar-backdrop"
-          onClick={toggleSidebar}
-          aria-label="Close menu"
-        />
+        <div className="sidebar-backdrop" onClick={toggleSidebar} aria-label="Close menu" />
       )}
 
       <aside
@@ -179,7 +174,9 @@ export function RoleBasedSidebar() {
                   fontSize: "0.85rem",
                   textDecoration: "none",
                   transition: "all 0.15s ease",
-                  borderLeft: isActive ? `3px solid ${roleConfig.badgeColor || "var(--primary)"}` : "3px solid transparent",
+                  borderLeft: isActive
+                    ? `3px solid ${roleConfig.badgeColor || "var(--primary)"}`
+                    : "3px solid transparent",
                 }}
                 title={item.label}
               >
@@ -216,7 +213,7 @@ export function RoleBasedSidebar() {
           </button>
         </div>
       )}
-    </aside>
+      </aside>
     </>
   );
 }

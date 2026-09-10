@@ -42,7 +42,11 @@ export default function FacilityManagerComplaintsPage() {
       <PageHeader
         title="Complaints Management & Escalations"
         subtitle="Review resident complaints, assign vendors/patrols, and track SLA escalations"
-        breadcrumbs={[{ label: "GateSphere" }, { label: "Facility Manager" }, { label: "Complaints" }]}
+        breadcrumbs={[
+          { label: "GateSphere" },
+          { label: "Facility Manager" },
+          { label: "Complaints" },
+        ]}
       />
 
       <div className="card">
@@ -55,8 +59,12 @@ export default function FacilityManagerComplaintsPage() {
           </div>
 
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-            <div style={{ width: 220 }}>
-              <SearchInput value={search} onChange={setSearch} placeholder="Search complaint/title…" />
+            <div style={{ width: "100%", maxWidth: 220 }}>
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Search complaint/title…"
+              />
             </div>
 
             <select
@@ -97,7 +105,10 @@ export default function FacilityManagerComplaintsPage() {
                 </tr>
               ) : filteredComplaints.length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
+                  <td
+                    colSpan={8}
+                    style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
+                  >
                     No complaints found.
                   </td>
                 </tr>

@@ -1,7 +1,13 @@
 export type ResidentType = "owner" | "tenant" | "family_member";
 export type ResidentStatus = "active" | "pending" | "moved_out";
 export type MoveType = "move_in" | "move_out";
-export type MoveStatus = "requested" | "scheduled" | "approved" | "completed" | "rejected" | "cancelled";
+export type MoveStatus =
+  | "requested"
+  | "scheduled"
+  | "approved"
+  | "completed"
+  | "rejected"
+  | "cancelled";
 
 export interface ResidentProfile {
   id: string;

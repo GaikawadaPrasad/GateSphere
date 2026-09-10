@@ -4,7 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import { useUiStore } from "@/store/ui";
 import { useCommunityDetails } from "@/hooks/use-communities";
-import { useSpecialAssessments, useCreateAssessment, useApproveAssessment, useRejectAssessment } from "@/hooks/use-governance";
+import {
+  useSpecialAssessments,
+  useCreateAssessment,
+  useApproveAssessment,
+  useRejectAssessment,
+} from "@/hooks/use-governance";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { StatusBadge } from "@/components/common/StatusBadge";
@@ -170,7 +175,9 @@ export default function SpecialAssessmentsPage() {
         return (
           <div>
             <span style={{ color: "#059669", fontWeight: 600 }}>{formatCurrency(collected)}</span>
-            <span style={{ fontSize: "0.725rem", color: "var(--muted)", marginLeft: "0.25rem" }}>({pct}%)</span>
+            <span style={{ fontSize: "0.725rem", color: "var(--muted)", marginLeft: "0.25rem" }}>
+              ({pct}%)
+            </span>
           </div>
         );
       },
@@ -257,7 +264,8 @@ export default function SpecialAssessmentsPage() {
             Committee Approval Authority (PRD FR-09)
           </div>
           <p style={{ fontSize: "0.775rem", color: "var(--muted)", marginTop: "0.15rem" }}>
-            The Association Committee evaluates CapEx projects, equipment overhauls, and exceptional infrastructure levies prior to unit billing.
+            The Association Committee evaluates CapEx projects, equipment overhauls, and exceptional
+            infrastructure levies prior to unit billing.
           </p>
         </div>
 
@@ -281,7 +289,9 @@ export default function SpecialAssessmentsPage() {
       {/* Assessments DataTable */}
       <div className="card">
         <DataTable<SpecialAssessment & Record<string, unknown>>
-          columns={assessmentColumns as unknown as Column<SpecialAssessment & Record<string, unknown>>[]}
+          columns={
+            assessmentColumns as unknown as Column<SpecialAssessment & Record<string, unknown>>[]
+          }
           data={filteredAssessments as unknown as (SpecialAssessment & Record<string, unknown>)[]}
           isLoading={isLoading}
           emptyTitle="No assessments found"
@@ -300,7 +310,14 @@ export default function SpecialAssessmentsPage() {
           title={isRejectMode ? "Reject Special Assessment" : "Association Committee Review"}
           maxWidth={560}
           footer={
-            <div style={{ display: "flex", gap: "0.5rem", width: "100%", justifyContent: "space-between" }}>
+            <div
+              style={{
+                display: "flex",
+                gap: "0.5rem",
+                width: "100%",
+                justifyContent: "space-between",
+              }}
+            >
               <button
                 type="button"
                 onClick={() => {
@@ -405,10 +422,18 @@ export default function SpecialAssessmentsPage() {
 
             {selectedAssessment.description && (
               <div style={{ marginBottom: "1rem" }}>
-                <label style={{ fontSize: "0.775rem", fontWeight: 600, color: "var(--fg-secondary)" }}>
+                <label
+                  style={{ fontSize: "0.775rem", fontWeight: 600, color: "var(--fg-secondary)" }}
+                >
                   Project Description & Justification
                 </label>
-                <p style={{ fontSize: "0.85rem", marginTop: "0.25rem", color: "var(--fg-secondary)" }}>
+                <p
+                  style={{
+                    fontSize: "0.85rem",
+                    marginTop: "0.25rem",
+                    color: "var(--fg-secondary)",
+                  }}
+                >
                   {selectedAssessment.description}
                 </p>
               </div>
@@ -416,7 +441,9 @@ export default function SpecialAssessmentsPage() {
 
             {!isRejectMode ? (
               <div>
-                <label style={{ fontSize: "0.775rem", fontWeight: 600, color: "var(--fg-secondary)" }}>
+                <label
+                  style={{ fontSize: "0.775rem", fontWeight: 600, color: "var(--fg-secondary)" }}
+                >
                   Committee Approval Notes (Optional)
                 </label>
                 <textarea
@@ -437,7 +464,12 @@ export default function SpecialAssessmentsPage() {
                   onChange={(e) => setRejectReason(e.target.value)}
                   placeholder="Specify why this proposal is returned (e.g. Requires revised contractor quotes)."
                   className="input-field"
-                  style={{ minHeight: 80, marginTop: "0.25rem", width: "100%", borderColor: "#fca5a5" }}
+                  style={{
+                    minHeight: 80,
+                    marginTop: "0.25rem",
+                    width: "100%",
+                    borderColor: "#fca5a5",
+                  }}
                 />
               </div>
             )}

@@ -98,7 +98,14 @@ function ToastCard({ toast, onClose }: { toast: ToastItem; onClose: () => void }
       <span style={{ fontSize: "1.25rem", lineHeight: 1, marginTop: "2px" }}>{theme.icon}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
         {toast.title && (
-          <h4 style={{ fontWeight: 700, fontSize: "14px", color: theme.titleColor, marginBottom: "0.2rem" }}>
+          <h4
+            style={{
+              fontWeight: 700,
+              fontSize: "14px",
+              color: theme.titleColor,
+              marginBottom: "0.2rem",
+            }}
+          >
             {toast.title}
           </h4>
         )}

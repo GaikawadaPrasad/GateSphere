@@ -7,7 +7,14 @@ import { KpiCard } from "@/components/dashboard/KpiCard";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
 import { useQueryClient } from "@tanstack/react-query";
-import { gateApi, dashboardsApi, visitorsApi, deliveriesApi, domesticStaffApi, blacklistApi } from "@/lib/api";
+import {
+  gateApi,
+  dashboardsApi,
+  visitorsApi,
+  deliveriesApi,
+  domesticStaffApi,
+  blacklistApi,
+} from "@/lib/api";
 import type { SecurityStats } from "@/types/dashboards";
 import type { GuardRoster, GateEvent, PanicAlert } from "@/types/gate";
 import { formatDateTime } from "@/lib/utils";
@@ -45,7 +52,16 @@ export default function SecuritySupervisorDashboardPage() {
 
   const loadData = async () => {
     setIsLoading(true);
-    const [statsRes, visitorsRes, deliveriesRes, staffRes, blacklistRes, rostersRes, eventsRes, alertsRes] = await Promise.allSettled([
+    const [
+      statsRes,
+      visitorsRes,
+      deliveriesRes,
+      staffRes,
+      blacklistRes,
+      rostersRes,
+      eventsRes,
+      alertsRes,
+    ] = await Promise.allSettled([
       dashboardsApi.security(),
       visitorsApi.requests(),
       deliveriesApi.list(),
@@ -57,17 +73,26 @@ export default function SecuritySupervisorDashboardPage() {
     ]);
     if (statsRes.status === "fulfilled") setSecurityStats(statsRes.value);
     if (visitorsRes.status === "fulfilled") {
-      setPendingVisitorCount((visitorsRes.value || []).filter((v: any) => v.status === "pending").length);
+      setPendingVisitorCount(
+        (visitorsRes.value || []).filter((v: any) => v.status === "pending").length,
+      );
     }
     if (deliveriesRes.status === "fulfilled") {
       setDeliveriesTodayCount((deliveriesRes.value || []).length);
-      setDeliveriesAtGateCount((deliveriesRes.value || []).filter((d: any) => d.status === "at_gate").length);
+      setDeliveriesAtGateCount(
+        (deliveriesRes.value || []).filter((d: any) => d.status === "at_gate").length,
+      );
     }
     if (staffRes.status === "fulfilled") setStaffInsideCount((staffRes.value || []).length);
-    if (blacklistRes.status === "fulfilled") setBlacklistCount((blacklistRes.value || []).filter((b: any) => b.is_active).length);
-    if (rostersRes.status === "fulfilled") setActiveRosters((rostersRes.value || []).filter((r) => r.status === "active"));
+    if (blacklistRes.status === "fulfilled")
+      setBlacklistCount((blacklistRes.value || []).filter((b: any) => b.is_active).length);
+    if (rostersRes.status === "fulfilled")
+      setActiveRosters((rostersRes.value || []).filter((r) => r.status === "active"));
     if (eventsRes.status === "fulfilled") setRecentEvents(eventsRes.value || []);
-    if (alertsRes.status === "fulfilled") setActiveAlerts((alertsRes.value || []).filter((a) => a.status === "active" || a.status === "acknowledged"));
+    if (alertsRes.status === "fulfilled")
+      setActiveAlerts(
+        (alertsRes.value || []).filter((a) => a.status === "active" || a.status === "acknowledged"),
+      );
     setIsLoading(false);
   };
 
@@ -99,7 +124,11 @@ export default function SecuritySupervisorDashboardPage() {
       <PageHeader
         title="Security Supervisor Dashboard"
         subtitle="Real-time gate traffic monitoring, guard roster management, panic alert command & blacklist oversight"
-        breadcrumbs={[{ label: "GateSphere" }, { label: "Security Supervisor" }, { label: "Dashboard" }]}
+        breadcrumbs={[
+          { label: "GateSphere" },
+          { label: "Security Supervisor" },
+          { label: "Dashboard" },
+        ]}
         actions={
           <div style={{ display: "flex", gap: "0.75rem" }}>
             <button className="btn btn-secondary" onClick={handleRefresh} disabled={isRefreshing}>
@@ -130,7 +159,13 @@ export default function SecuritySupervisorDashboardPage() {
         />
         <KpiCard
           title="Live Gate Traffic"
-          value={isLoading ? "…" : String((securityStats?.visitors_inside ?? 0) + (securityStats?.vehicles_inside ?? 0))}
+          value={
+            isLoading
+              ? "…"
+              : String(
+                  (securityStats?.visitors_inside ?? 0) + (securityStats?.vehicles_inside ?? 0),
+                )
+          }
           subtext={`${securityStats?.visitors_inside ?? 0} Visitors Inside`}
           icon="🛡️"
           onClick={() => router.push("/security-supervisor/gate-operations")}
@@ -177,26 +212,48 @@ export default function SecuritySupervisorDashboardPage() {
           background: "linear-gradient(135deg, #ffffff, #f8fafc)",
         }}
       >
-        <div style={{ fontWeight: 600, fontSize: "0.875rem", color: "var(--fg)", marginBottom: "0.75rem" }}>
+        <div
+          style={{
+            fontWeight: 600,
+            fontSize: "0.875rem",
+            color: "var(--fg)",
+            marginBottom: "0.75rem",
+          }}
+        >
           ⚡ Security Supervisor Quick Actions
         </div>
         <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-          <button className="btn btn-secondary" onClick={() => router.push("/security-supervisor/guard-management")}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => router.push("/security-supervisor/guard-management")}
+          >
             👮 Assign Guard Shift
           </button>
-          <button className="btn btn-secondary" onClick={() => router.push("/security-supervisor/gate-operations")}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => router.push("/security-supervisor/gate-operations")}
+          >
             🛡️ View Live Gate Activity
           </button>
-          <button className="btn btn-secondary" onClick={() => router.push("/security-supervisor/blacklist")}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => router.push("/security-supervisor/blacklist")}
+          >
             🚫 Add Blacklist Entry
           </button>
-          <button className="btn btn-secondary" onClick={() => router.push("/security-supervisor/incidents")}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => router.push("/security-supervisor/incidents")}
+          >
             ⚠️ Log Security Incident
           </button>
           <button className="btn btn-danger" onClick={() => setIsEmergencyModalOpen(true)}>
             🚨 Trigger Emergency Alert
           </button>
-          <button className="btn btn-secondary" onClick={() => router.push("/security-supervisor/checkpoints")}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => router.push("/security-supervisor/checkpoints")}
+          >
             📍 Manage Checkpoints
           </button>
         </div>
@@ -206,7 +263,7 @@ export default function SecuritySupervisorDashboardPage() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 360px), 1fr))",
           gap: "1.75rem",
           alignItems: "start",
         }}
@@ -236,17 +293,26 @@ export default function SecuritySupervisorDashboardPage() {
                 <tbody>
                   {isLoading ? (
                     <tr>
-                      <td colSpan={3} style={{ textAlign: "center", padding: "1.5rem" }}>Loading…</td>
+                      <td colSpan={3} style={{ textAlign: "center", padding: "1.5rem" }}>
+                        Loading…
+                      </td>
                     </tr>
                   ) : recentEvents.length === 0 ? (
                     <tr>
-                      <td colSpan={3} style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}>No recent gate events.</td>
+                      <td
+                        colSpan={3}
+                        style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}
+                      >
+                        No recent gate events.
+                      </td>
                     </tr>
                   ) : (
                     recentEvents.map((ev) => (
                       <tr key={ev.id}>
                         <td>{formatDateTime(ev.occurred_at)}</td>
-                        <td style={{ fontWeight: 600 }}><StatusBadge status={ev.event_type} /></td>
+                        <td style={{ fontWeight: 600 }}>
+                          <StatusBadge status={ev.event_type} />
+                        </td>
                         <td>{ev.gate_id ? `Gate #${ev.gate_id.slice(0, 8)}` : "—"}</td>
                       </tr>
                     ))
@@ -274,13 +340,27 @@ export default function SecuritySupervisorDashboardPage() {
               {isLoading ? (
                 <p style={{ fontSize: "0.85rem", color: "var(--muted)" }}>Loading…</p>
               ) : activeRosters.length === 0 ? (
-                <p style={{ fontSize: "0.85rem", color: "var(--muted)" }}>No guards currently on an active shift.</p>
+                <p style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
+                  No guards currently on an active shift.
+                </p>
               ) : (
                 activeRosters.map((r) => (
-                  <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.6rem", background: "#f8fafc", borderRadius: "var(--radius-sm)" }}>
+                  <div
+                    key={r.id}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "0.6rem",
+                      background: "#f8fafc",
+                      borderRadius: "var(--radius-sm)",
+                    }}
+                  >
                     <div>
                       <div style={{ fontWeight: 600, fontSize: "0.85rem" }}>{r.shift_date}</div>
-                      <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>{r.shift_start} – {r.shift_end}</div>
+                      <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                        {r.shift_start} – {r.shift_end}
+                      </div>
                     </div>
                     <StatusBadge status={r.status} />
                   </div>
@@ -296,7 +376,9 @@ export default function SecuritySupervisorDashboardPage() {
             {isLoading ? (
               <p style={{ fontSize: "0.85rem", color: "var(--muted)" }}>Loading…</p>
             ) : activeAlerts.length === 0 ? (
-              <p style={{ fontSize: "0.85rem", color: "var(--muted)" }}>No active emergency alerts.</p>
+              <p style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
+                No active emergency alerts.
+              </p>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
                 {activeAlerts.map((a) => (
@@ -309,10 +391,24 @@ export default function SecuritySupervisorDashboardPage() {
                       border: "1px solid var(--danger-border)",
                     }}
                   >
-                    <div style={{ fontWeight: 600, fontSize: "0.85rem", color: "#991b1b", textTransform: "capitalize" }}>
+                    <div
+                      style={{
+                        fontWeight: 600,
+                        fontSize: "0.85rem",
+                        color: "#991b1b",
+                        textTransform: "capitalize",
+                      }}
+                    >
                       {a.alert_type} {(a as any).message ? `— ${(a as any).message}` : ""}
                     </div>
-                    <div style={{ fontSize: "0.75rem", color: "#b91c1c", marginTop: "0.25rem", textTransform: "capitalize" }}>
+                    <div
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "#b91c1c",
+                        marginTop: "0.25rem",
+                        textTransform: "capitalize",
+                      }}
+                    >
                       Status: {a.status}
                     </div>
                   </div>
@@ -351,11 +447,19 @@ export default function SecuritySupervisorDashboardPage() {
               marginBottom: "1rem",
             }}
           >
-            ⚠️ Confirmation required: This will fan out emergency notifications to all on-duty guards and security personnel.
+            ⚠️ Confirmation required: This will fan out emergency notifications to all on-duty
+            guards and security personnel.
           </div>
 
           <div style={{ marginBottom: "1rem" }}>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
               Emergency Type *
             </label>
             <select
@@ -364,13 +468,22 @@ export default function SecuritySupervisorDashboardPage() {
               onChange={(e) => setEmergencyType(e.target.value)}
             >
               {EMERGENCY_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
               ))}
             </select>
           </div>
 
           <div>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
               Specific Location / Unit
             </label>
             <input

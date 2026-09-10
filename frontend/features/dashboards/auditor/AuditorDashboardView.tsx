@@ -49,13 +49,21 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
   const { activeCommunityId } = useUiStore();
 
   const { data: stats, isLoading: statsLoading } = useAuditorOverview(activeCommunityId);
-  const { data: rawLogs = [], isLoading: logsLoading } = useAuditorLogs({ community_id: activeCommunityId });
-  const { data: gateEvents = [], isLoading: gateLoading } = useAuditorGateActivity(activeCommunityId);
-  const { data: visitorRecords = [], isLoading: visitorsLoading } = useAuditorVisitorRecords(activeCommunityId);
-  const { data: financialRecords = [], isLoading: finLoading } = useAuditorFinancialLedger(activeCommunityId);
-  const { data: complaintRecords = [], isLoading: complaintsLoading } = useAuditorComplaints(activeCommunityId);
-  const { data: vendorRecords = [], isLoading: vendorsLoading } = useAuditorVendors(activeCommunityId);
-  const { data: incidentRecords = [], isLoading: incidentsLoading } = useAuditorIncidents(activeCommunityId);
+  const { data: rawLogs = [], isLoading: logsLoading } = useAuditorLogs({
+    community_id: activeCommunityId,
+  });
+  const { data: gateEvents = [], isLoading: gateLoading } =
+    useAuditorGateActivity(activeCommunityId);
+  const { data: visitorRecords = [], isLoading: visitorsLoading } =
+    useAuditorVisitorRecords(activeCommunityId);
+  const { data: financialRecords = [], isLoading: finLoading } =
+    useAuditorFinancialLedger(activeCommunityId);
+  const { data: complaintRecords = [], isLoading: complaintsLoading } =
+    useAuditorComplaints(activeCommunityId);
+  const { data: vendorRecords = [], isLoading: vendorsLoading } =
+    useAuditorVendors(activeCommunityId);
+  const { data: incidentRecords = [], isLoading: incidentsLoading } =
+    useAuditorIncidents(activeCommunityId);
 
   // Table controls for Audit Logs
   const logControls = useTableControls<AuditLogItem>({
@@ -129,7 +137,17 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
       header: "Module",
       sortable: true,
       render: (item) => (
-        <span style={{ textTransform: "uppercase", fontSize: "11px", fontWeight: 700, padding: "0.2rem 0.5rem", borderRadius: "4px", background: "#F1F5F9", color: "var(--brand-heading)" }}>
+        <span
+          style={{
+            textTransform: "uppercase",
+            fontSize: "11px",
+            fontWeight: 700,
+            padding: "0.2rem 0.5rem",
+            borderRadius: "4px",
+            background: "#F1F5F9",
+            color: "var(--brand-heading)",
+          }}
+        >
           {item.module}
         </span>
       ),
@@ -146,8 +164,14 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
       sortable: true,
       render: (item) => (
         <div>
-          <div style={{ fontWeight: 600, fontSize: "13px" }}>{item.actor_email || "System Service"}</div>
-          <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "capitalize" }}>{item.actor_role || "automated"}</div>
+          <div style={{ fontWeight: 600, fontSize: "13px" }}>
+            {item.actor_email || "System Service"}
+          </div>
+          <div
+            style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "capitalize" }}
+          >
+            {item.actor_role || "automated"}
+          </div>
         </div>
       ),
     },
@@ -156,75 +180,88 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
       header: "Entity Affected",
       render: (item) => (
         <span style={{ fontSize: "13px" }}>
-          <strong>{item.entity_type}</strong>: <code style={{ color: "var(--brand-primary)" }}>{item.entity_id}</code>
+          <strong>{item.entity_type}</strong>:{" "}
+          <code style={{ color: "var(--brand-primary)" }}>{item.entity_id}</code>
         </span>
       ),
     },
     {
       key: "ip_address",
       header: "IP Address",
-      render: (item) => <span style={{ fontSize: "12px", color: "var(--brand-body)" }}>{item.ip_address || "127.0.0.1"}</span>,
+      render: (item) => (
+        <span style={{ fontSize: "12px", color: "var(--brand-body)" }}>
+          {item.ip_address || "127.0.0.1"}
+        </span>
+      ),
     },
   ];
 
-  const tabMeta: Record<
-    AuditorTab,
-    { title: string; eyebrow: string; description: string }
-  > = {
+  const tabMeta: Record<AuditorTab, { title: string; eyebrow: string; description: string }> = {
     overview: {
       title: "Compliance & Audit Portal",
       eyebrow: "Auditor Console (Strictly Read-Only)",
-      description: "Full historical system trail, gate operation oversight, financial reconciliation, and anomaly verification.",
+      description:
+        "Full historical system trail, gate operation oversight, financial reconciliation, and anomaly verification.",
     },
     "audit-logs": {
       title: "System Audit Logs (Immutable)",
       eyebrow: "Compliance Audit Trail",
-      description: "Chronological ledger of all system mutations, user actions, and security events across modules.",
+      description:
+        "Chronological ledger of all system mutations, user actions, and security events across modules.",
     },
     "user-activity": {
       title: "User Access & Authentication Activity",
       eyebrow: "Access & Session Trail",
-      description: "Historical record of user sign-ins, role changes, privilege escalations, and permission audits.",
+      description:
+        "Historical record of user sign-ins, role changes, privilege escalations, and permission audits.",
     },
     "gate-activity": {
       title: "Security Gate & Entry Audit Trail",
       eyebrow: "Physical Security Logs",
-      description: "Complete timestamped gate traffic events, guard shift checkpoints, and panic alert dispatches.",
+      description:
+        "Complete timestamped gate traffic events, guard shift checkpoints, and panic alert dispatches.",
     },
     "visitor-records": {
       title: "Visitor & Pass Audit Register",
       eyebrow: "Visitor Lifecycle Audit",
-      description: "Full archive of visitor passes, resident approval decisions, and gate check-in/out timestamps.",
+      description:
+        "Full archive of visitor passes, resident approval decisions, and gate check-in/out timestamps.",
     },
     "maintenance-records": {
       title: "Service Desk & Maintenance History",
       eyebrow: "Operational SLA Review",
-      description: "Audit trail of complaint tickets, SLA compliance metrics, technician allocations, and resident feedback.",
+      description:
+        "Audit trail of complaint tickets, SLA compliance metrics, technician allocations, and resident feedback.",
     },
     "vendor-activity": {
       title: "Vendor & Contractor Verification Log",
       eyebrow: "External Workforce Compliance",
-      description: "Inspection log of vendor service passes, work completion proof, and contractor activity.",
+      description:
+        "Inspection log of vendor service passes, work completion proof, and contractor activity.",
     },
     "incident-records": {
       title: "Security Incidents & Action Log",
       eyebrow: "Emergency Response Audit",
-      description: "Official record of security breaches, medical/fire alerts, responder dispatches, and resolution notes.",
+      description:
+        "Official record of security breaches, medical/fire alerts, responder dispatches, and resolution notes.",
     },
     "financial-records": {
       title: "Financial Ledger & Payment Reconciliation",
       eyebrow: "Accounting & Statutory Audit",
-      description: "Comprehensive debit/credit ledgers, maintenance invoice registers, and simulated payment receipts.",
+      description:
+        "Comprehensive debit/credit ledgers, maintenance invoice registers, and simulated payment receipts.",
     },
     reports: {
       title: "Statutory & Compliance Reports",
       eyebrow: "Audit Exports & Analytics",
-      description: "Export full operational datasets and statutory audit summaries in standardized CSV formats.",
+      description:
+        "Export full operational datasets and statutory audit summaries in standardized CSV formats.",
     },
     "audit-search": {
       title: "Deep Audit Search & Query Engine",
       eyebrow: "Forensic Investigation",
-      description: "Perform structured queries across entities, timestamps, IP addresses, and mutation diffs.",
+      description:
+        "Perform structured queries across entities, timestamps, IP addresses, and mutation diffs.",
     },
   };
 
@@ -243,7 +280,16 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
             variant="outline"
             size="sm"
             onClick={() => {
-              const csvContent = "data:text/csv;charset=utf-8," + encodeURIComponent("id,occurred_at,module,action,actor\n" + rawLogs.map(l => `${l.id},${l.occurred_at},${l.module},${l.action},${l.actor_email}`).join("\n"));
+              const csvContent =
+                "data:text/csv;charset=utf-8," +
+                encodeURIComponent(
+                  "id,occurred_at,module,action,actor\n" +
+                    rawLogs
+                      .map(
+                        (l) => `${l.id},${l.occurred_at},${l.module},${l.action},${l.actor_email}`,
+                      )
+                      .join("\n"),
+                );
               const link = document.createElement("a");
               link.setAttribute("href", csvContent);
               link.setAttribute("download", `gatesphere_audit_export_${Date.now()}.csv`);
@@ -305,12 +351,33 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
           </div>
 
           {/* Quick Drilldown Panels */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: "1.5rem" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 400px), 1fr))",
+              gap: "1.5rem",
+            }}
+          >
             {/* Live Gate Operations Snapshot */}
             <div className="gs-card">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-                <h3 className="card-h3" style={{ fontSize: "1.1rem" }}>🛡️ Live Gate Activity Stream</h3>
-                <BrandButton variant="outline" size="sm" onClick={() => router.push("/auditor/gate-activity")}>View All</BrandButton>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "1rem",
+                }}
+              >
+                <h3 className="card-h3" style={{ fontSize: "1.1rem" }}>
+                  🛡️ Live Gate Activity Stream
+                </h3>
+                <BrandButton
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push("/auditor/gate-activity")}
+                >
+                  View All
+                </BrandButton>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                 {gateEvents.slice(0, 3).map((event: any) => (
@@ -327,12 +394,22 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
                     }}
                   >
                     <div>
-                      <div style={{ fontWeight: 600, fontSize: "13px" }}>{event.person_type} · {event.reference_code}</div>
-                      <div style={{ fontSize: "11px", color: "var(--brand-body)" }}>{event.gate_name} · by {event.actor_name}</div>
+                      <div style={{ fontWeight: 600, fontSize: "13px" }}>
+                        {event.person_type} · {event.reference_code}
+                      </div>
+                      <div style={{ fontSize: "11px", color: "var(--brand-body)" }}>
+                        {event.gate_name} · by {event.actor_name}
+                      </div>
                     </div>
                     <div style={{ textAlign: "right" }}>
                       <StatusBadge status={event.status} />
-                      <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "0.2rem" }}>
+                      <div
+                        style={{
+                          fontSize: "11px",
+                          color: "var(--text-muted)",
+                          marginTop: "0.2rem",
+                        }}
+                      >
                         {formatDate(event.occurred_at)}
                       </div>
                     </div>
@@ -343,9 +420,24 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
 
             {/* Recent Audit Trail */}
             <div className="gs-card">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-                <h3 className="card-h3" style={{ fontSize: "1.1rem" }}>📋 Recent Immutable Audit Trail</h3>
-                <BrandButton variant="outline" size="sm" onClick={() => router.push("/auditor/audit-logs")}>View Logs</BrandButton>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "1rem",
+                }}
+              >
+                <h3 className="card-h3" style={{ fontSize: "1.1rem" }}>
+                  📋 Recent Immutable Audit Trail
+                </h3>
+                <BrandButton
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push("/auditor/audit-logs")}
+                >
+                  View Logs
+                </BrandButton>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                 {rawLogs.slice(0, 3).map((log) => (
@@ -362,12 +454,22 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
                     }}
                   >
                     <div>
-                      <div style={{ fontWeight: 600, fontSize: "13px" }}>{log.module.toUpperCase()} · {log.action}</div>
-                      <div style={{ fontSize: "11px", color: "var(--brand-body)" }}>{log.actor_email}</div>
+                      <div style={{ fontWeight: 600, fontSize: "13px" }}>
+                        {log.module.toUpperCase()} · {log.action}
+                      </div>
+                      <div style={{ fontSize: "11px", color: "var(--brand-body)" }}>
+                        {log.actor_email}
+                      </div>
                     </div>
                     <div style={{ textAlign: "right" }}>
-                      <span style={{ fontSize: "11px", color: "var(--brand-primary)", fontWeight: 600 }}>{log.entity_type}</span>
-                      <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>{formatDate(log.occurred_at)}</div>
+                      <span
+                        style={{ fontSize: "11px", color: "var(--brand-primary)", fontWeight: 600 }}
+                      >
+                        {log.entity_type}
+                      </span>
+                      <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                        {formatDate(log.occurred_at)}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -420,9 +522,12 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
       {/* TAB 3: USER ACTIVITY */}
       {activeTab === "user-activity" && (
         <div className="gs-card">
-          <h3 className="card-h3" style={{ marginBottom: "0.5rem" }}>User Action History Reconstruction</h3>
+          <h3 className="card-h3" style={{ marginBottom: "0.5rem" }}>
+            User Action History Reconstruction
+          </h3>
           <p style={{ color: "var(--brand-body)", marginBottom: "1.25rem", fontSize: "14px" }}>
-            Reconstruct all operations performed by a specific user or role across the platform to verify scope boundaries.
+            Reconstruct all operations performed by a specific user or role across the platform to
+            verify scope boundaries.
           </p>
           <div style={{ width: 320, marginBottom: "1.5rem" }}>
             <DebouncedInput
@@ -471,8 +576,18 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
 
           <DataTable
             columns={[
-              { key: "occurred_at", header: "Time", sortable: true, render: (i) => formatDate(i.occurred_at) },
-              { key: "event_type", header: "Event", sortable: true, render: (i) => <StatusBadge status={i.event_type} /> },
+              {
+                key: "occurred_at",
+                header: "Time",
+                sortable: true,
+                render: (i) => formatDate(i.occurred_at),
+              },
+              {
+                key: "event_type",
+                header: "Event",
+                sortable: true,
+                render: (i) => <StatusBadge status={i.event_type} />,
+              },
               { key: "gate_name", header: "Gate Checkpoint", sortable: true },
               { key: "actor_name", header: "On-Duty Guard", sortable: true },
               { key: "person_type", header: "Person Type", sortable: true },
@@ -482,9 +597,13 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
                 header: "Audit Check",
                 render: (i) =>
                   i.anomaly_flag ? (
-                    <span style={{ color: "#DC2626", fontWeight: 700, fontSize: "12px" }}>⚠️ Flagged Anomaly</span>
+                    <span style={{ color: "#DC2626", fontWeight: 700, fontSize: "12px" }}>
+                      ⚠️ Flagged Anomaly
+                    </span>
                   ) : (
-                    <span style={{ color: "#16A34A", fontWeight: 600, fontSize: "12px" }}>✓ Compliant</span>
+                    <span style={{ color: "#16A34A", fontWeight: 600, fontSize: "12px" }}>
+                      ✓ Compliant
+                    </span>
                   ),
               },
             ]}
@@ -519,7 +638,11 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
               { key: "unit", header: "Destination Unit", sortable: true },
               { key: "host_name", header: "Host Resident", sortable: true },
               { key: "request_type", header: "Type" },
-              { key: "status", header: "Approval Status", render: (i) => <StatusBadge status={i.status} /> },
+              {
+                key: "status",
+                header: "Approval Status",
+                render: (i) => <StatusBadge status={i.status} />,
+              },
               { key: "entry_time", header: "Gate Entry", render: (i) => formatDate(i.entry_time) },
               { key: "exit_time", header: "Gate Exit", render: (i) => formatDate(i.exit_time) },
             ]}
@@ -536,17 +659,32 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
       {/* TAB 6: MAINTENANCE RECORDS */}
       {activeTab === "maintenance-records" && (
         <div className="gs-card">
-          <h3 className="card-h3" style={{ marginBottom: "0.5rem" }}>Maintenance SLA & Escalation Records</h3>
+          <h3 className="card-h3" style={{ marginBottom: "0.5rem" }}>
+            Maintenance SLA & Escalation Records
+          </h3>
           <p style={{ color: "var(--brand-body)", marginBottom: "1.25rem", fontSize: "14px" }}>
-            Audit verification of resolution times, contractor performance, and automatic SLA tier sweeps.
+            Audit verification of resolution times, contractor performance, and automatic SLA tier
+            sweeps.
           </p>
           <DataTable
             columns={[
               { key: "ticket_number", header: "Ticket #", sortable: true },
               { key: "subject", header: "Issue Subject" },
-              { key: "priority", header: "Priority", render: (i) => <StatusBadge status={i.priority} /> },
-              { key: "status", header: "Current Status", render: (i) => <StatusBadge status={i.status} /> },
-              { key: "escalation_state", header: "SLA Tracker", render: (i) => <StatusBadge status={i.escalation_state} /> },
+              {
+                key: "priority",
+                header: "Priority",
+                render: (i) => <StatusBadge status={i.priority} />,
+              },
+              {
+                key: "status",
+                header: "Current Status",
+                render: (i) => <StatusBadge status={i.status} />,
+              },
+              {
+                key: "escalation_state",
+                header: "SLA Tracker",
+                render: (i) => <StatusBadge status={i.escalation_state} />,
+              },
               { key: "created_at", header: "Raised At", render: (i) => formatDate(i.created_at) },
             ]}
             data={complaintControls.paginatedData}
@@ -562,7 +700,9 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
       {/* TAB 7: VENDOR ACTIVITY */}
       {activeTab === "vendor-activity" && (
         <div className="gs-card">
-          <h3 className="card-h3" style={{ marginBottom: "0.5rem" }}>Vendor & Contractor Accountability Log</h3>
+          <h3 className="card-h3" style={{ marginBottom: "0.5rem" }}>
+            Vendor & Contractor Accountability Log
+          </h3>
           <p style={{ color: "var(--brand-body)", marginBottom: "1.25rem", fontSize: "14px" }}>
             Track assigned specialized vendors, gate permits, and job completion proofs.
           </p>
@@ -572,7 +712,11 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
               { key: "contract_scope", header: "Work Domain" },
               { key: "technician", header: "Assigned Tech / Phone" },
               { key: "passes_issued", header: "Passes Issued" },
-              { key: "verification_status", header: "Insurance & KYC", render: (i) => <StatusBadge status={i.verification_status} /> },
+              {
+                key: "verification_status",
+                header: "Insurance & KYC",
+                render: (i) => <StatusBadge status={i.verification_status} />,
+              },
             ]}
             data={vendorControls.paginatedData}
             isLoading={vendorsLoading}
@@ -587,16 +731,27 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
       {/* TAB 8: INCIDENT RECORDS */}
       {activeTab === "incident-records" && (
         <div className="gs-card">
-          <h3 className="card-h3" style={{ marginBottom: "0.5rem" }}>Security Incident Trail</h3>
+          <h3 className="card-h3" style={{ marginBottom: "0.5rem" }}>
+            Security Incident Trail
+          </h3>
           <p style={{ color: "var(--brand-body)", marginBottom: "1.25rem", fontSize: "14px" }}>
-            Immutable audit record of all emergency panic triggers, security supervisor assignments, and guard responses.
+            Immutable audit record of all emergency panic triggers, security supervisor assignments,
+            and guard responses.
           </p>
           <DataTable
             columns={[
               { key: "id", header: "Incident ID", sortable: true },
-              { key: "type", header: "Incident Type", render: (i) => <StatusBadge status={i.type} /> },
+              {
+                key: "type",
+                header: "Incident Type",
+                render: (i) => <StatusBadge status={i.type} />,
+              },
               { key: "location", header: "Location / Unit", sortable: true },
-              { key: "severity", header: "Severity", render: (i) => <StatusBadge status={i.severity} /> },
+              {
+                key: "severity",
+                header: "Severity",
+                render: (i) => <StatusBadge status={i.severity} />,
+              },
               { key: "status", header: "Status", render: (i) => <StatusBadge status={i.status} /> },
               { key: "created_at", header: "Logged At", render: (i) => formatDate(i.created_at) },
             ]}
@@ -628,11 +783,41 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
             columns={[
               { key: "invoice_number", header: "Invoice #", sortable: true },
               { key: "unit_number", header: "Unit", sortable: true },
-              { key: "total_amount", header: "Total Amount", sortable: true, render: (i) => formatCurrency(i.total_amount) },
-              { key: "amount_paid", header: "Amount Paid", sortable: true, render: (i) => formatCurrency(i.amount_paid) },
-              { key: "balance_due", header: "Balance Due", sortable: true, render: (i) => formatCurrency(i.balance_due) },
-              { key: "status", header: "Payment Status", render: (i) => <StatusBadge status={i.status} /> },
-              { key: "receipt_number", header: "Receipt #", render: (i) => i.receipt_number ? <code style={{ color: "var(--brand-primary)", fontWeight: 700 }}>{i.receipt_number}</code> : "–" },
+              {
+                key: "total_amount",
+                header: "Total Amount",
+                sortable: true,
+                render: (i) => formatCurrency(i.total_amount),
+              },
+              {
+                key: "amount_paid",
+                header: "Amount Paid",
+                sortable: true,
+                render: (i) => formatCurrency(i.amount_paid),
+              },
+              {
+                key: "balance_due",
+                header: "Balance Due",
+                sortable: true,
+                render: (i) => formatCurrency(i.balance_due),
+              },
+              {
+                key: "status",
+                header: "Payment Status",
+                render: (i) => <StatusBadge status={i.status} />,
+              },
+              {
+                key: "receipt_number",
+                header: "Receipt #",
+                render: (i) =>
+                  i.receipt_number ? (
+                    <code style={{ color: "var(--brand-primary)", fontWeight: 700 }}>
+                      {i.receipt_number}
+                    </code>
+                  ) : (
+                    "–"
+                  ),
+              },
             ]}
             data={financialControls.paginatedData}
             isLoading={finLoading}
@@ -647,25 +832,59 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
       {/* TAB 10: REPORTS */}
       {activeTab === "reports" && (
         <div className="gs-card">
-          <h3 className="card-h3" style={{ marginBottom: "0.5rem" }}>Compliance & Financial Reports Aggregator</h3>
+          <h3 className="card-h3" style={{ marginBottom: "0.5rem" }}>
+            Compliance & Financial Reports Aggregator
+          </h3>
           <p style={{ color: "var(--brand-body)", marginBottom: "1.5rem", fontSize: "14px" }}>
-            Generate and download aggregate compliance summaries, financial audit balances, and security incident digests.
+            Generate and download aggregate compliance summaries, financial audit balances, and
+            security incident digests.
           </p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1.25rem" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+              gap: "1.25rem",
+            }}
+          >
             {[
-              { title: "Financial Ledger & Dues Audit", desc: "Complete invoice, payment, and refund ledger for current quarter.", icon: "💳" },
-              { title: "Gate Entry & Exit Compliance", desc: "Comprehensive log of all visitors, staff, and delivery movements.", icon: "🛡️" },
-              { title: "Service SLA Performance", desc: "Maintenance ticket resolution metrics, breaches, and vendor ratings.", icon: "🔧" },
-              { title: "Security & Incident Audit Trail", desc: "Emergency SOS dispatches, checkpoint overrides, and guard logs.", icon: "🚨" },
+              {
+                title: "Financial Ledger & Dues Audit",
+                desc: "Complete invoice, payment, and refund ledger for current quarter.",
+                icon: "💳",
+              },
+              {
+                title: "Gate Entry & Exit Compliance",
+                desc: "Comprehensive log of all visitors, staff, and delivery movements.",
+                icon: "🛡️",
+              },
+              {
+                title: "Service SLA Performance",
+                desc: "Maintenance ticket resolution metrics, breaches, and vendor ratings.",
+                icon: "🔧",
+              },
+              {
+                title: "Security & Incident Audit Trail",
+                desc: "Emergency SOS dispatches, checkpoint overrides, and guard logs.",
+                icon: "🚨",
+              },
             ].map((rep, idx) => (
               <div key={idx} className="gs-card card-hover" style={{ background: "#F8FAFC" }}>
                 <div style={{ fontSize: "1.75rem", marginBottom: "0.5rem" }}>{rep.icon}</div>
-                <h4 style={{ fontWeight: 700, fontSize: "15px", marginBottom: "0.25rem" }}>{rep.title}</h4>
-                <p style={{ fontSize: "13px", color: "var(--brand-body)", marginBottom: "1rem" }}>{rep.desc}</p>
+                <h4 style={{ fontWeight: 700, fontSize: "15px", marginBottom: "0.25rem" }}>
+                  {rep.title}
+                </h4>
+                <p style={{ fontSize: "13px", color: "var(--brand-body)", marginBottom: "1rem" }}>
+                  {rep.desc}
+                </p>
                 <BrandButton
                   size="sm"
                   variant="outline"
-                  onClick={() => toast.success(`Generating ${rep.title} export. File will download shortly.`, "Report Export Initiated")}
+                  onClick={() =>
+                    toast.success(
+                      `Generating ${rep.title} export. File will download shortly.`,
+                      "Report Export Initiated",
+                    )
+                  }
                 >
                   Download CSV / PDF
                 </BrandButton>
@@ -678,9 +897,12 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
       {/* TAB 11: AUDIT SEARCH */}
       {activeTab === "audit-search" && (
         <div className="gs-card">
-          <h3 className="card-h3" style={{ marginBottom: "0.5rem" }}>Cross-Module Historical Search</h3>
+          <h3 className="card-h3" style={{ marginBottom: "0.5rem" }}>
+            Cross-Module Historical Search
+          </h3>
           <p style={{ color: "var(--brand-body)", marginBottom: "1.5rem", fontSize: "14px" }}>
-            Instant GET-scoped keyword and entity ID search across all audit logs, gate passes, maintenance tickets, and financial receipts.
+            Instant GET-scoped keyword and entity ID search across all audit logs, gate passes,
+            maintenance tickets, and financial receipts.
           </p>
           <div style={{ width: "100%", maxWidth: 600, marginBottom: "1.5rem" }}>
             <DebouncedInput
@@ -694,7 +916,9 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
           <DataTable<AuditLogItem>
             columns={auditLogColumns}
             data={rawLogs.filter((l) =>
-              globalSearchQuery ? JSON.stringify(l).toLowerCase().includes(globalSearchQuery.toLowerCase()) : true
+              globalSearchQuery
+                ? JSON.stringify(l).toLowerCase().includes(globalSearchQuery.toLowerCase())
+                : true,
             )}
             isLoading={logsLoading}
             emptyTitle="No records matching search"

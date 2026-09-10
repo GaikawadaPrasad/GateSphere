@@ -61,7 +61,11 @@ export const ROLE_CONFIGS: Record<string, RoleConfig> = {
       { label: "Gate Operations", href: "/security-supervisor/gate-operations", icon: "🛡️" },
       { label: "Guard Management", href: "/security-supervisor/guard-management", icon: "👮" },
       { label: "Visitor Management", href: "/security-supervisor/visitor-management", icon: "👥" },
-      { label: "Delivery Management", href: "/security-supervisor/delivery-management", icon: "📦" },
+      {
+        label: "Delivery Management",
+        href: "/security-supervisor/delivery-management",
+        icon: "📦",
+      },
       { label: "Domestic Staff", href: "/security-supervisor/domestic-staff", icon: "👔" },
       { label: "Blacklist", href: "/security-supervisor/blacklist", icon: "🚫" },
       { label: "Incidents", href: "/security-supervisor/incidents", icon: "⚠️" },

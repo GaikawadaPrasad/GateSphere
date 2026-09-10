@@ -25,21 +25,43 @@ export default function SecurityGuardStaffAttendancePage() {
   const handleCheckIn = async (id: string) => {
     await staffApi.checkIn(id);
     setStaff((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, status: "Checked In", check_in_time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) } : s))
+      prev.map((s) =>
+        s.id === id
+          ? {
+              ...s,
+              status: "Checked In",
+              check_in_time: new Date().toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              }),
+            }
+          : s,
+      ),
     );
   };
 
   const handleCheckOut = async (id: string) => {
     await staffApi.checkOut(id);
     setStaff((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, status: "Checked Out", check_out_time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) } : s))
+      prev.map((s) =>
+        s.id === id
+          ? {
+              ...s,
+              status: "Checked Out",
+              check_out_time: new Date().toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              }),
+            }
+          : s,
+      ),
     );
   };
 
   const filteredStaff = staff.filter(
     (s) =>
       s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.role.toLowerCase().includes(search.toLowerCase())
+      s.role.toLowerCase().includes(search.toLowerCase()),
   );
 
   return (
@@ -47,7 +69,11 @@ export default function SecurityGuardStaffAttendancePage() {
       <PageHeader
         title="Domestic Staff Gate Attendance Console"
         subtitle="Verify domestic staff identity, verify unit access permissions, and record check-in / check-out timestamps"
-        breadcrumbs={[{ label: "GateSphere" }, { label: "Security Guard" }, { label: "Staff Attendance" }]}
+        breadcrumbs={[
+          { label: "GateSphere" },
+          { label: "Security Guard" },
+          { label: "Staff Attendance" },
+        ]}
       />
 
       <div className="card">
@@ -58,8 +84,12 @@ export default function SecurityGuardStaffAttendancePage() {
               {filteredStaff.length} staff records
             </p>
           </div>
-          <div style={{ width: 220 }}>
-            <SearchInput value={search} onChange={setSearch} placeholder="Search staff name/role…" />
+          <div style={{ width: "100%", maxWidth: 220 }}>
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Search staff name/role…"
+            />
           </div>
         </div>
 

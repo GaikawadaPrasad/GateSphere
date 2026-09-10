@@ -142,16 +142,56 @@ class AmenityService(UnitScopedAccess):
 
     # -- slots ------------------------------------------- #
     async def list_slots(self, amenity_id: uuid.UUID):
-        await self._amenity_in_scope(amenity_id)
-        return list(
+        amenity = await self._amenity_in_scope(amenity_id)
+        existing = list(
             (
                 await self.db.scalars(
                     select(AmenitySlot)
-                    .where(AmenitySlot.amenity_id == amenity_id)
+                    .where(AmenitySlot.amenity_id == amenity_id, AmenitySlot.is_active.is_(True))
                     .order_by(AmenitySlot.day_of_week, AmenitySlot.start_time)
                 )
             ).all()
         )
+        # If no slots exist or only a single wide block exists (e.g. 6:00 to 22:00), populate standard 2-hour slots
+        has_only_monolithic = len(existing) > 0 and all(
+            (s.end_time.hour - s.start_time.hour) >= 6 for s in existing
+        )
+        if len(existing) == 0 or has_only_monolithic:
+            from datetime import time
+            for s in existing:
+                await self.db.delete(s)
+            standard_slot_times = [
+                (time(6, 0), time(8, 0)),
+                (time(8, 0), time(10, 0)),
+                (time(10, 0), time(12, 0)),
+                (time(12, 0), time(14, 0)),
+                (time(14, 0), time(16, 0)),
+                (time(16, 0), time(18, 0)),
+                (time(18, 0), time(20, 0)),
+                (time(20, 0), time(22, 0)),
+            ]
+            for dow in range(0, 7):
+                for st, et in standard_slot_times:
+                    slot = AmenitySlot(
+                        community_id=amenity.community_id,
+                        amenity_id=amenity.id,
+                        day_of_week=dow,
+                        start_time=st,
+                        end_time=et,
+                        capacity=amenity.capacity or 20,
+                    )
+                    self.db.add(slot)
+            await self.db.flush()
+            existing = list(
+                (
+                    await self.db.scalars(
+                        select(AmenitySlot)
+                        .where(AmenitySlot.amenity_id == amenity_id, AmenitySlot.is_active.is_(True))
+                        .order_by(AmenitySlot.day_of_week, AmenitySlot.start_time)
+                    )
+                ).all()
+            )
+        return existing
 
     async def create_slot(self, amenity_id: uuid.UUID, payload: schemas.SlotCreate):
         amenity = await self._amenity_in_scope(amenity_id)

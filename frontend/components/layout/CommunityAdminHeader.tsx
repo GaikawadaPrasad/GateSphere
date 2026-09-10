@@ -42,7 +42,10 @@ export function CommunityAdminHeader() {
       }}
     >
       {/* Left section: Sidebar toggle & Community Scope badge */}
-      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", minWidth: 0, flex: 1 }}>
+      <div
+        className="mobile-header-left"
+        style={{ display: "flex", alignItems: "center", gap: "0.75rem", minWidth: 0, flex: 1 }}
+      >
         <button
           type="button"
           onClick={toggleSidebar}
@@ -53,8 +56,8 @@ export function CommunityAdminHeader() {
           ☰
         </button>
 
-        {/* Community Scope Badge (Single Community Isolation) */}
-        <div style={{ display: "flex", alignItems: "center", minWidth: 0 }}>
+        {/* Community Scope Badge (Single Community Isolation) - hidden on mobile */}
+        <div className="mobile-hide" style={{ display: "flex", alignItems: "center", minWidth: 0 }}>
           <div
             style={{
               display: "inline-flex",
@@ -74,10 +77,17 @@ export function CommunityAdminHeader() {
             }}
           >
             <span>🏢</span>
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{community?.name || "Community Portal"}</span>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+              {community?.name || "Community Portal"}
+            </span>
             <span
               title="Single Community Scope Enforced"
-              style={{ fontSize: "0.75rem", color: "#10b981", marginLeft: "0.15rem", flexShrink: 0 }}
+              style={{
+                fontSize: "0.75rem",
+                color: "#10b981",
+                marginLeft: "0.15rem",
+                flexShrink: 0,
+              }}
             >
               🔒
             </span>
@@ -86,7 +96,10 @@ export function CommunityAdminHeader() {
       </div>
 
       {/* Right section: Notification bell, User info & Actions */}
-      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexShrink: 0 }}>
+      <div
+        className="mobile-header-right"
+        style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexShrink: 0 }}
+      >
         {/* Notification Bell Icon */}
         <Link
           href="/community-admin/notifications"
@@ -132,7 +145,7 @@ export function CommunityAdminHeader() {
           )}
         </Link>
 
-        {/* User Pill */}
+        {/* User Pill - text hidden on mobile */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
           <div
             style={{
@@ -151,8 +164,13 @@ export function CommunityAdminHeader() {
           >
             {user?.full_name?.charAt(0).toUpperCase() || "A"}
           </div>
-          <div className="header-user-email" style={{ display: "flex", flexDirection: "column" }}>
-            <span style={{ fontSize: "0.825rem", fontWeight: 600, color: "var(--fg)", lineHeight: 1.2 }}>
+          <div
+            className="mobile-hide-text header-user-email"
+            style={{ display: "flex", flexDirection: "column" }}
+          >
+            <span
+              style={{ fontSize: "0.825rem", fontWeight: 600, color: "var(--fg)", lineHeight: 1.2 }}
+            >
               {user?.full_name || "Community Admin"}
             </span>
             <span style={{ fontSize: "0.7rem", color: "var(--muted)" }}>

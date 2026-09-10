@@ -38,11 +38,13 @@ export default function SecuritySupervisorGuardManagementPage() {
           guard_user_id: r.guard_user_id,
           shift: `${r.shift_start || "08:00"} - ${r.shift_end || "16:00"}`,
           assigned_gate: "Main Perimeter Gate",
-          status: r.status ? r.status.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) : "Planned",
+          status: r.status
+            ? r.status.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
+            : "Planned",
           shift_date: r.shift_date,
           shift_start: r.shift_start,
           shift_end: r.shift_end,
-        }))
+        })),
       );
     } catch {
       // fallback
@@ -71,7 +73,11 @@ export default function SecuritySupervisorGuardManagementPage() {
       <PageHeader
         title="Guard Management & Roster"
         subtitle="Assign security personnel to shifts and gates, manage duty rosters, and monitor attendance"
-        breadcrumbs={[{ label: "GateSphere" }, { label: "Security Supervisor" }, { label: "Guard Management" }]}
+        breadcrumbs={[
+          { label: "GateSphere" },
+          { label: "Security Supervisor" },
+          { label: "Guard Management" },
+        ]}
       />
 
       <div className="card">
@@ -145,10 +151,21 @@ export default function SecuritySupervisorGuardManagementPage() {
       >
         <div>
           <div style={{ marginBottom: "1rem" }}>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
               Roster Duty Status
             </label>
-            <select className="select-field" value={newStatus} onChange={(e) => setNewStatus(e.target.value)}>
+            <select
+              className="select-field"
+              value={newStatus}
+              onChange={(e) => setNewStatus(e.target.value)}
+            >
               <option value="planned">Planned (Scheduled)</option>
               <option value="active">Active (On Duty)</option>
               <option value="completed">Completed (Shift Done)</option>

@@ -31,7 +31,10 @@ export function SearchInput({
   }, [query, debounceMs, onChange]);
 
   return (
-    <div style={{ position: "relative", display: "inline-block", width: "100%" }} className={className}>
+    <div
+      style={{ position: "relative", display: "inline-block", width: "100%" }}
+      className={className}
+    >
       <span
         style={{
           position: "absolute",

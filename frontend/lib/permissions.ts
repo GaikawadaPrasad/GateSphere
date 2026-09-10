@@ -43,16 +43,15 @@ export function isSuperAdmin(user: CurrentUser | null | undefined): boolean {
   if (!user) return false;
   return Boolean(
     user.is_superadmin ||
-    user.active_role === "super_admin" ||
-    user.roles?.some((r) => r.role_slug === "super_admin")
+      user.active_role === "super_admin" ||
+      user.roles?.some((r) => r.role_slug === "super_admin"),
   );
 }
 
 export function isAuditor(user: CurrentUser | null | undefined): boolean {
   if (!user) return false;
   return Boolean(
-    user.active_role === "auditor" ||
-    user.roles?.some((r) => r.role_slug === "auditor")
+    user.active_role === "auditor" || user.roles?.some((r) => r.role_slug === "auditor"),
   );
 }
 
@@ -60,7 +59,7 @@ export function isDomesticStaff(user: CurrentUser | null | undefined): boolean {
   if (!user) return false;
   return Boolean(
     user.active_role === "domestic_staff" ||
-    user.roles?.some((r) => r.role_slug === "domestic_staff")
+      user.roles?.some((r) => r.role_slug === "domestic_staff"),
   );
 }
 
@@ -68,20 +67,24 @@ export function isResident(user: CurrentUser | null | undefined): boolean {
   if (!user) return false;
   return Boolean(
     (user.active_role as string) === "resident" ||
-    (user.active_role as string) === "owner" ||
-    (user.active_role as string) === "tenant" ||
-    user.roles?.some(
-      (r) =>
-        (r.role_slug as string) === "resident" ||
-        (r.role_slug as string) === "owner" ||
-        (r.role_slug as string) === "tenant"
-    )
+      (user.active_role as string) === "owner" ||
+      (user.active_role as string) === "tenant" ||
+      user.roles?.some(
+        (r) =>
+          (r.role_slug as string) === "resident" ||
+          (r.role_slug as string) === "owner" ||
+          (r.role_slug as string) === "tenant",
+      ),
   );
 }
 
 export function getRoleLandingRoute(user: CurrentUser | null | undefined): string {
   if (!user) return "/login";
-  if (user.is_superadmin || user.active_role === "super_admin" || user.roles?.some((r) => r.role_slug === "super_admin")) {
+  if (
+    user.is_superadmin ||
+    user.active_role === "super_admin" ||
+    user.roles?.some((r) => r.role_slug === "super_admin")
+  ) {
     return "/super-admin/dashboard";
   }
   const role = (user.active_role || user.roles?.[0]?.role_slug) as string | undefined;

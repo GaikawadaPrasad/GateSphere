@@ -27,8 +27,8 @@ export function RoleGuard({
 
   const isSuper = Boolean(
     user?.is_superadmin ||
-    user?.active_role === "super_admin" ||
-    user?.roles?.some((r) => r.role_slug === "super_admin")
+      user?.active_role === "super_admin" ||
+      user?.roles?.some((r) => r.role_slug === "super_admin"),
   );
 
   const userRoles: string[] = [
@@ -49,7 +49,9 @@ export function RoleGuard({
     if (isLoading) return;
 
     if (!user) {
-      router.replace(`/login?next=${encodeURIComponent(typeof window !== "undefined" ? window.location.pathname : "")}`);
+      router.replace(
+        `/login?next=${encodeURIComponent(typeof window !== "undefined" ? window.location.pathname : "")}`,
+      );
       return;
     }
 
@@ -62,11 +64,27 @@ export function RoleGuard({
       router.replace(redirectTo || "/unauthorized");
       return;
     }
-  }, [user, isLoading, requireSuperAdmin, isSuper, allowedRoles, hasAllowedRole, redirectTo, router]);
+  }, [
+    user,
+    isLoading,
+    requireSuperAdmin,
+    isSuper,
+    allowedRoles,
+    hasAllowedRole,
+    redirectTo,
+    router,
+  ]);
 
   if (isLoading) {
     return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "50vh" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "50vh",
+        }}
+      >
         <div className="skeleton" style={{ width: 180, height: 24, borderRadius: 8 }} />
       </div>
     );
@@ -88,4 +106,3 @@ export function RoleGuard({
 
   return <>{children}</>;
 }
-

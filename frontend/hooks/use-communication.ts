@@ -4,7 +4,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { communicationApi } from "@/lib/api";
 import type { AnnouncementCreate } from "@/types/communication";
 
-export function useAnnouncements(params?: { community_id?: string; published_only?: boolean; page?: number; page_size?: number }) {
+export function useAnnouncements(params?: {
+  community_id?: string;
+  published_only?: boolean;
+  page?: number;
+  page_size?: number;
+}) {
   return useQuery({
     queryKey: ["announcements", params],
     queryFn: () => communicationApi.announcements(params),
@@ -65,8 +70,12 @@ export function usePollResults(pollId?: string) {
 export function useCreatePoll() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: { question: string; description?: string; options: string[]; expires_at?: string }) =>
-      communicationApi.createPoll(payload),
+    mutationFn: (payload: {
+      question: string;
+      description?: string;
+      options: string[];
+      expires_at?: string;
+    }) => communicationApi.createPoll(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["polls"] });
     },
@@ -84,8 +93,13 @@ export function useResidentGroups(communityId?: string) {
 export function useCreateResidentGroup() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ payload, communityId }: { payload: { name: string; description?: string }; communityId?: string }) =>
-      communicationApi.createGroup(payload, communityId),
+    mutationFn: ({
+      payload,
+      communityId,
+    }: {
+      payload: { name: string; description?: string };
+      communityId?: string;
+    }) => communicationApi.createGroup(payload, communityId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["resident-groups"] });
     },

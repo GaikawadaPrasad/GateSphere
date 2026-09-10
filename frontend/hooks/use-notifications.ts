@@ -4,7 +4,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { notificationsApi } from "@/lib/api";
 import type { NotificationPreference } from "@/types/notifications";
 
-export function useMyNotifications(params?: { unread_only?: boolean; page?: number; page_size?: number }) {
+export function useMyNotifications(params?: {
+  unread_only?: boolean;
+  page?: number;
+  page_size?: number;
+}) {
   return useQuery({
     queryKey: ["notifications", params],
     queryFn: () => notificationsApi.list(params),
@@ -44,7 +48,8 @@ export function useNotificationPreferences() {
 export function useSetNotificationPreference() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: Partial<NotificationPreference>) => notificationsApi.setPreference(payload),
+    mutationFn: (payload: Partial<NotificationPreference>) =>
+      notificationsApi.setPreference(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notification-preferences"] });
     },

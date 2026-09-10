@@ -108,8 +108,11 @@ export function useAssignedHomes() {
         floor: a.floor_number || 1,
         resident_name: a.resident_name || "Resident",
         resident_phone: a.resident_phone || "+919800000000",
-        expected_hours: a.time_from && a.time_to ? `${a.time_from} – ${a.time_to}` : "08:00 AM – 11:00 AM",
-        special_instructions: a.work_type ? `${a.work_type.replace('_', ' ').toUpperCase()} duty` : undefined,
+        expected_hours:
+          a.time_from && a.time_to ? `${a.time_from} – ${a.time_to}` : "08:00 AM – 11:00 AM",
+        special_instructions: a.work_type
+          ? `${a.work_type.replace("_", " ").toUpperCase()} duty`
+          : undefined,
         schedule_days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
       }));
     },
@@ -125,11 +128,24 @@ export function useStaffAttendance() {
       return res.map((att: any) => ({
         id: att.id,
         date: att.check_in_at ? att.check_in_at.split("T")[0] : "",
-        check_in_at: att.check_in_at ? new Date(att.check_in_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
-        check_out_at: att.check_out_at ? new Date(att.check_out_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : null,
+        check_in_at: att.check_in_at
+          ? new Date(att.check_in_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+          : "",
+        check_out_at: att.check_out_at
+          ? new Date(att.check_out_at).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : null,
         gate_name: att.gate_id ? "Main Gate 1" : "Gate Operations",
         unit_number: "Assigned Units",
-        duration_minutes: att.check_out_at && att.check_in_at ? Math.round((new Date(att.check_out_at).getTime() - new Date(att.check_in_at).getTime()) / 60000) : null,
+        duration_minutes:
+          att.check_out_at && att.check_in_at
+            ? Math.round(
+                (new Date(att.check_out_at).getTime() - new Date(att.check_in_at).getTime()) /
+                  60000,
+              )
+            : null,
         status: att.check_out_at ? ("completed" as const) : ("open" as const),
       }));
     },
@@ -146,9 +162,19 @@ export function useStaffVisits() {
         id: v.id,
         unit_number: v.unit_number || "Assigned Unit",
         date: v.date || (v.check_in_at ? v.check_in_at.split("T")[0] : ""),
-        start_time: v.check_in_at ? new Date(v.check_in_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
-        end_time: v.check_out_at ? new Date(v.check_out_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "In Progress",
-        duration_minutes: v.duration_minutes || (v.check_out_at && v.check_in_at ? Math.round((new Date(v.check_out_at).getTime() - new Date(v.check_in_at).getTime()) / 60000) : null),
+        start_time: v.check_in_at
+          ? new Date(v.check_in_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+          : "",
+        end_time: v.check_out_at
+          ? new Date(v.check_out_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+          : "In Progress",
+        duration_minutes:
+          v.duration_minutes ||
+          (v.check_out_at && v.check_in_at
+            ? Math.round(
+                (new Date(v.check_out_at).getTime() - new Date(v.check_in_at).getTime()) / 60000,
+              )
+            : null),
         tasks_performed: v.tasks_performed || "Domestic Service",
         rating: v.rating ? Number(v.rating) : 5,
         feedback: v.feedback || "Good service provided.",

@@ -14,9 +14,19 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { formatDate } from "@/lib/utils";
 import { communitiesApi } from "@/lib/api";
 import { useSuperAdminDashboardMetrics } from "@/hooks/use-dashboards";
-import { useCommunities, useCreateCommunity, useUpdateCommunity, useDeleteCommunity } from "@/hooks/use-communities";
+import {
+  useCommunities,
+  useCreateCommunity,
+  useUpdateCommunity,
+  useDeleteCommunity,
+} from "@/hooks/use-communities";
 import { useGateEvents, usePanicAlerts } from "@/hooks/use-gate";
-import { INDIAN_STATES_AND_UTS, POPULAR_CITIES_BY_STATE, isValidCommunityName, isValidCityName } from "@/constants/locations";
+import {
+  INDIAN_STATES_AND_UTS,
+  POPULAR_CITIES_BY_STATE,
+  isValidCommunityName,
+  isValidCityName,
+} from "@/constants/locations";
 import { DemoRequestsCard } from "@/components/dashboard/DemoRequestsCard";
 import type { DemoRequestLead } from "@/lib/demo-requests";
 import type { Community, Tower, Gate } from "@/types/communities";
@@ -96,7 +106,8 @@ export default function SuperAdminDashboardPage() {
     } else if (trimmedCode.length < 2 || trimmedCode.length > 32) {
       errs.code = "Code must be between 2 and 32 characters";
     } else if (!/^[A-Z0-9][A-Z0-9_\-\/]*$/.test(trimmedCode)) {
-      errs.code = "Code must start with alphanumeric and only contain letters, numbers, hyphens or underscores (e.g. PMH-01)";
+      errs.code =
+        "Code must start with alphanumeric and only contain letters, numbers, hyphens or underscores (e.g. PMH-01)";
     }
 
     const trimmedCity = city.trim();
@@ -354,11 +365,7 @@ export default function SuperAdminDashboardPage() {
               <span className={isRefreshing ? "spin-animation" : ""}>🔄</span>{" "}
               {isRefreshing ? "Refreshing…" : "Refresh"}
             </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={handleOpenCreate}
-            >
+            <button type="button" className="btn btn-primary" onClick={handleOpenCreate}>
               ➕ New Community
             </button>
           </div>
@@ -403,7 +410,7 @@ export default function SuperAdminDashboardPage() {
 
               {/* Filters */}
               <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-                <div style={{ width: 220 }}>
+                <div style={{ width: "100%", maxWidth: 220 }}>
                   <SearchInput
                     value={searchQuery}
                     onChange={setSearchQuery}
@@ -415,7 +422,12 @@ export default function SuperAdminDashboardPage() {
                   className="select-field"
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value as "all" | "active" | "inactive")}
-                  style={{ width: "auto", height: 36, padding: "0.25rem 0.6rem", fontSize: "0.85rem" }}
+                  style={{
+                    width: "auto",
+                    height: 36,
+                    padding: "0.25rem 0.6rem",
+                    fontSize: "0.85rem",
+                  }}
                 >
                   <option value="all">All Statuses</option>
                   <option value="active">Active Only</option>
@@ -435,11 +447,7 @@ export default function SuperAdminDashboardPage() {
 
         {/* Right Side: Live Activity Feed */}
         <div style={{ maxWidth: 460, width: "100%" }}>
-          <ActivityFeed
-            events={gateEvents}
-            alerts={panicAlerts}
-            isLoading={isEventsLoading}
-          />
+          <ActivityFeed events={gateEvents} alerts={panicAlerts} isLoading={isEventsLoading} />
         </div>
       </div>
 
@@ -473,18 +481,36 @@ export default function SuperAdminDashboardPage() {
       >
         <form id="create-community-form" onSubmit={handleCreateCommunity} noValidate>
           {formError && (
-            <div className="badge badge-danger" style={{ display: "block", marginBottom: "1.25rem", padding: "0.6rem 0.75rem", textAlign: "left" }}>
+            <div
+              className="badge badge-danger"
+              style={{
+                display: "block",
+                marginBottom: "1.25rem",
+                padding: "0.6rem 0.75rem",
+                textAlign: "left",
+              }}
+            >
               ⚠️ {formError}
             </div>
           )}
 
           {/* Community Name Field */}
           <div style={{ marginBottom: "1.25rem" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem" }}>
-              <label htmlFor="comm-name" style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--fg)" }}>
+            <div
+              style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem" }}
+            >
+              <label
+                htmlFor="comm-name"
+                style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--fg)" }}
+              >
                 Community Name <span style={{ color: "var(--danger)" }}>*</span>
               </label>
-              <span style={{ fontSize: "0.75rem", color: name.length > 255 ? "var(--danger)" : "var(--muted)" }}>
+              <span
+                style={{
+                  fontSize: "0.75rem",
+                  color: name.length > 255 ? "var(--danger)" : "var(--muted)",
+                }}
+              >
                 {name.length}/255
               </span>
             </div>
@@ -505,7 +531,14 @@ export default function SuperAdminDashboardPage() {
               required
             />
             {touched.name && createErrors.name && (
-              <p style={{ color: "var(--danger)", fontSize: "0.75rem", marginTop: "0.3rem", fontWeight: 500 }}>
+              <p
+                style={{
+                  color: "var(--danger)",
+                  fontSize: "0.75rem",
+                  marginTop: "0.3rem",
+                  fontWeight: 500,
+                }}
+              >
                 ✕ {createErrors.name}
               </p>
             )}
@@ -513,11 +546,21 @@ export default function SuperAdminDashboardPage() {
 
           {/* Community Code Field */}
           <div style={{ marginBottom: "1.25rem" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem" }}>
-              <label htmlFor="comm-code" style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--fg)" }}>
+            <div
+              style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem" }}
+            >
+              <label
+                htmlFor="comm-code"
+                style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--fg)" }}
+              >
                 Community Code (Unique Slug) <span style={{ color: "var(--danger)" }}>*</span>
               </label>
-              <span style={{ fontSize: "0.75rem", color: code.length > 32 ? "var(--danger)" : "var(--muted)" }}>
+              <span
+                style={{
+                  fontSize: "0.75rem",
+                  color: code.length > 32 ? "var(--danger)" : "var(--muted)",
+                }}
+              >
                 {code.length}/32
               </span>
             </div>
@@ -542,7 +585,14 @@ export default function SuperAdminDashboardPage() {
               required
             />
             {touched.code && createErrors.code ? (
-              <p style={{ color: "var(--danger)", fontSize: "0.75rem", marginTop: "0.3rem", fontWeight: 500 }}>
+              <p
+                style={{
+                  color: "var(--danger)",
+                  fontSize: "0.75rem",
+                  marginTop: "0.3rem",
+                  fontWeight: 500,
+                }}
+              >
                 ✕ {createErrors.code}
               </p>
             ) : (
@@ -553,10 +603,26 @@ export default function SuperAdminDashboardPage() {
           </div>
 
           {/* State & City Section */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "1rem",
+              marginBottom: "1rem",
+            }}
+          >
             {/* State Selection */}
             <div>
-              <label htmlFor="comm-state" style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--fg)", display: "block", marginBottom: "0.35rem" }}>
+              <label
+                htmlFor="comm-state"
+                style={{
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  color: "var(--fg)",
+                  display: "block",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 State / UT
               </label>
               <select
@@ -588,7 +654,16 @@ export default function SuperAdminDashboardPage() {
 
             {/* City Selection with Datalist Autocomplete */}
             <div>
-              <label htmlFor="comm-city" style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--fg)", display: "block", marginBottom: "0.35rem" }}>
+              <label
+                htmlFor="comm-city"
+                style={{
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  color: "var(--fg)",
+                  display: "block",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 City
               </label>
               <input
@@ -596,7 +671,9 @@ export default function SuperAdminDashboardPage() {
                 type="text"
                 list="city-suggestions"
                 className="input-field"
-                placeholder={state ? `e.g. ${stateCitySuggestions[0] || "City Name"}` : "e.g. Bengaluru"}
+                placeholder={
+                  state ? `e.g. ${stateCitySuggestions[0] || "City Name"}` : "e.g. Bengaluru"
+                }
                 value={city}
                 onChange={(e) => {
                   setCity(e.target.value);
@@ -626,7 +703,11 @@ export default function SuperAdminDashboardPage() {
       <Modal
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
-        title={isConfirmingDelete ? "Confirm Community Deletion" : `Edit Community: ${editingCommunity?.name}`}
+        title={
+          isConfirmingDelete
+            ? "Confirm Community Deletion"
+            : `Edit Community: ${editingCommunity?.name}`
+        }
         footer={
           isConfirmingDelete ? (
             <>
@@ -687,9 +768,13 @@ export default function SuperAdminDashboardPage() {
                 color: "#991b1b",
               }}
             >
-              <h4 style={{ fontWeight: 600, marginBottom: "0.5rem" }}>⚠️ Are you sure you want to delete this community?</h4>
+              <h4 style={{ fontWeight: 600, marginBottom: "0.5rem" }}>
+                ⚠️ Are you sure you want to delete this community?
+              </h4>
               <p style={{ color: "#b91c1c", fontSize: "0.85rem" }}>
-                Deleting <strong>{editingCommunity?.name}</strong> ({editingCommunity?.code}) will permanently remove all associated gates, towers, units, resident profiles, tickets, and logs. This action <strong>cannot be undone</strong>.
+                Deleting <strong>{editingCommunity?.name}</strong> ({editingCommunity?.code}) will
+                permanently remove all associated gates, towers, units, resident profiles, tickets,
+                and logs. This action <strong>cannot be undone</strong>.
               </p>
             </div>
             {editError && (
@@ -701,17 +786,34 @@ export default function SuperAdminDashboardPage() {
         ) : (
           <form id="edit-community-form" onSubmit={handleSaveEdit} noValidate>
             {editError && (
-              <div className="badge badge-danger" style={{ display: "block", marginBottom: "1.25rem", padding: "0.6rem 0.75rem" }}>
+              <div
+                className="badge badge-danger"
+                style={{ display: "block", marginBottom: "1.25rem", padding: "0.6rem 0.75rem" }}
+              >
                 ⚠️ {editError}
               </div>
             )}
 
             <div style={{ marginBottom: "1.25rem" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem" }}>
-                <label htmlFor="edit-comm-name" style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--fg)" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: "0.35rem",
+                }}
+              >
+                <label
+                  htmlFor="edit-comm-name"
+                  style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--fg)" }}
+                >
                   Community Name <span style={{ color: "var(--danger)" }}>*</span>
                 </label>
-                <span style={{ fontSize: "0.75rem", color: editName.length > 255 ? "var(--danger)" : "var(--muted)" }}>
+                <span
+                  style={{
+                    fontSize: "0.75rem",
+                    color: editName.length > 255 ? "var(--danger)" : "var(--muted)",
+                  }}
+                >
                   {editName.length}/255
                 </span>
               </div>
@@ -738,7 +840,16 @@ export default function SuperAdminDashboardPage() {
             </div>
 
             <div style={{ marginBottom: "1.25rem" }}>
-              <label htmlFor="edit-comm-code" style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--muted)", display: "block", marginBottom: "0.35rem" }}>
+              <label
+                htmlFor="edit-comm-code"
+                style={{
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  color: "var(--muted)",
+                  display: "block",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Community Code (Read-Only)
               </label>
               <input
@@ -747,13 +858,34 @@ export default function SuperAdminDashboardPage() {
                 className="input-field"
                 value={editingCommunity?.code || ""}
                 disabled
-                style={{ background: "#f1f5f9", cursor: "not-allowed", fontWeight: 600, letterSpacing: "0.05em" }}
+                style={{
+                  background: "#f1f5f9",
+                  cursor: "not-allowed",
+                  fontWeight: 600,
+                  letterSpacing: "0.05em",
+                }}
               />
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1.25rem" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "1rem",
+                marginBottom: "1.25rem",
+              }}
+            >
               <div>
-                <label htmlFor="edit-comm-state" style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--fg)", display: "block", marginBottom: "0.35rem" }}>
+                <label
+                  htmlFor="edit-comm-state"
+                  style={{
+                    fontWeight: 600,
+                    fontSize: "0.85rem",
+                    color: "var(--fg)",
+                    display: "block",
+                    marginBottom: "0.35rem",
+                  }}
+                >
                   State / UT
                 </label>
                 <select
@@ -766,7 +898,8 @@ export default function SuperAdminDashboardPage() {
                   }}
                   onBlur={() => setEditTouched((t) => ({ ...t, state: true }))}
                   style={{
-                    borderColor: editTouched.state && editErrors.state ? "var(--danger)" : undefined,
+                    borderColor:
+                      editTouched.state && editErrors.state ? "var(--danger)" : undefined,
                   }}
                 >
                   <option value="">Select State / UT…</option>
@@ -784,7 +917,16 @@ export default function SuperAdminDashboardPage() {
               </div>
 
               <div>
-                <label htmlFor="edit-comm-city" style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--fg)", display: "block", marginBottom: "0.35rem" }}>
+                <label
+                  htmlFor="edit-comm-city"
+                  style={{
+                    fontWeight: 600,
+                    fontSize: "0.85rem",
+                    color: "var(--fg)",
+                    display: "block",
+                    marginBottom: "0.35rem",
+                  }}
+                >
                   City
                 </label>
                 <input
@@ -816,14 +958,18 @@ export default function SuperAdminDashboardPage() {
             </div>
 
             <div style={{ marginBottom: "0.5rem" }}>
-              <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
+              <label
+                style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}
+              >
                 <input
                   type="checkbox"
                   checked={editIsActive}
                   onChange={(e) => setEditIsActive(e.target.checked)}
                   style={{ width: "auto", margin: 0 }}
                 />
-                <span style={{ fontSize: "0.875rem", fontWeight: 500 }}>Active Community Status</span>
+                <span style={{ fontSize: "0.875rem", fontWeight: 500 }}>
+                  Active Community Status
+                </span>
               </label>
             </div>
           </form>
@@ -865,7 +1011,10 @@ export default function SuperAdminDashboardPage() {
               </div>
               <div>
                 <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Location</span>
-                <div style={{ fontWeight: 600 }}>{[viewingCommunity.city, viewingCommunity.state].filter(Boolean).join(", ") || "–"}</div>
+                <div style={{ fontWeight: 600 }}>
+                  {[viewingCommunity.city, viewingCommunity.state].filter(Boolean).join(", ") ||
+                    "–"}
+                </div>
               </div>
               <div>
                 <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Status</span>
@@ -875,7 +1024,9 @@ export default function SuperAdminDashboardPage() {
               </div>
               <div>
                 <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Created</span>
-                <div style={{ fontSize: "0.85rem", fontWeight: 500 }}>{formatDate(viewingCommunity.created_at)}</div>
+                <div style={{ fontSize: "0.85rem", fontWeight: 500 }}>
+                  {formatDate(viewingCommunity.created_at)}
+                </div>
               </div>
             </div>
 
@@ -886,8 +1037,21 @@ export default function SuperAdminDashboardPage() {
               </div>
             ) : (
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-                <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "0.75rem" }}>
-                  <h4 style={{ fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.5rem", color: "var(--fg)" }}>
+                <div
+                  style={{
+                    border: "1px solid var(--border)",
+                    borderRadius: "var(--radius-sm)",
+                    padding: "0.75rem",
+                  }}
+                >
+                  <h4
+                    style={{
+                      fontSize: "0.85rem",
+                      fontWeight: 600,
+                      marginBottom: "0.5rem",
+                      color: "var(--fg)",
+                    }}
+                  >
                     🏢 Towers ({communityTowers.length})
                   </h4>
                   {communityTowers.length > 0 ? (
@@ -910,12 +1074,27 @@ export default function SuperAdminDashboardPage() {
                       ))}
                     </div>
                   ) : (
-                    <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>No towers added yet</span>
+                    <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                      No towers added yet
+                    </span>
                   )}
                 </div>
 
-                <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "0.75rem" }}>
-                  <h4 style={{ fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.5rem", color: "var(--fg)" }}>
+                <div
+                  style={{
+                    border: "1px solid var(--border)",
+                    borderRadius: "var(--radius-sm)",
+                    padding: "0.75rem",
+                  }}
+                >
+                  <h4
+                    style={{
+                      fontSize: "0.85rem",
+                      fontWeight: 600,
+                      marginBottom: "0.5rem",
+                      color: "var(--fg)",
+                    }}
+                  >
                     🛡️ Gates ({communityGates.length})
                   </h4>
                   {communityGates.length > 0 ? (
@@ -933,12 +1112,16 @@ export default function SuperAdminDashboardPage() {
                           }}
                         >
                           <span style={{ fontWeight: 500 }}>{g.name}</span>
-                          <span style={{ color: "var(--muted)", textTransform: "capitalize" }}>{g.gate_type}</span>
+                          <span style={{ color: "var(--muted)", textTransform: "capitalize" }}>
+                            {g.gate_type}
+                          </span>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>No gates configured</span>
+                    <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                      No gates configured
+                    </span>
                   )}
                 </div>
               </div>

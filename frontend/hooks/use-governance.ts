@@ -2,16 +2,23 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { dashboardsApi, billingApi, incidentsApi, assessmentsApi, ApiError } from "@/lib/api";
-import type { SpecialAssessment, SpecialAssessmentCreate, GovernanceOverviewData, CollectionAuditSummary } from "@/types/governance";
+import type {
+  SpecialAssessment,
+  SpecialAssessmentCreate,
+  GovernanceOverviewData,
+  CollectionAuditSummary,
+} from "@/types/governance";
 import type { MaintenanceInvoice, Payment } from "@/types/billing";
 import type { Incident } from "@/types/incidents";
 
 export const governanceKeys = {
   all: ["governance"] as const,
   overview: (communityId?: string) => [...governanceKeys.all, "overview", communityId] as const,
-  assessments: (communityId?: string, status?: string) => [...governanceKeys.all, "assessments", communityId, status] as const,
+  assessments: (communityId?: string, status?: string) =>
+    [...governanceKeys.all, "assessments", communityId, status] as const,
   assessmentDetail: (id: string) => [...governanceKeys.all, "assessment", id] as const,
-  collectionAudit: (communityId?: string) => [...governanceKeys.all, "collection-audit", communityId] as const,
+  collectionAudit: (communityId?: string) =>
+    [...governanceKeys.all, "collection-audit", communityId] as const,
   incidentsReview: (communityId?: string, status?: string, severity?: string) =>
     [...governanceKeys.all, "incidents", communityId, status, severity] as const,
 };
@@ -37,26 +44,37 @@ export function useGovernanceOverview(communityId?: string | null) {
       }
 
       // Fetch financial dashboard, recent incidents, recent payments and invoices in parallel
-      const [financialStats, incidentsRes, paymentsRes, invoicesRes, assessmentsRes] = await Promise.allSettled([
-        dashboardsApi.financial(communityId),
-        incidentsApi.list({ community_id: communityId, page_size: 5 }),
-        billingApi.payments({ community_id: communityId, page_size: 5 }),
-        billingApi.invoices({ community_id: communityId, page_size: 10 }),
-        assessmentsApi.list({ community_id: communityId }).catch(() => [] as SpecialAssessment[]),
-      ]);
+      const [financialStats, incidentsRes, paymentsRes, invoicesRes, assessmentsRes] =
+        await Promise.allSettled([
+          dashboardsApi.financial(communityId),
+          incidentsApi.list({ community_id: communityId, page_size: 5 }),
+          billingApi.payments({ community_id: communityId, page_size: 5 }),
+          billingApi.invoices({ community_id: communityId, page_size: 10 }),
+          assessmentsApi.list({ community_id: communityId }).catch(() => [] as SpecialAssessment[]),
+        ]);
 
       const finData = financialStats.status === "fulfilled" ? financialStats.value : undefined;
-      const incidentsList: Incident[] = incidentsRes.status === "fulfilled" ? incidentsRes.value || [] : [];
-      const paymentsList: Payment[] = paymentsRes.status === "fulfilled" ? paymentsRes.value || [] : [];
-      const invoicesList: MaintenanceInvoice[] = invoicesRes.status === "fulfilled" ? invoicesRes.value || [] : [];
-      const assessmentsList: SpecialAssessment[] = assessmentsRes.status === "fulfilled" ? assessmentsRes.value || [] : [];
+      const incidentsList: Incident[] =
+        incidentsRes.status === "fulfilled" ? incidentsRes.value || [] : [];
+      const paymentsList: Payment[] =
+        paymentsRes.status === "fulfilled" ? paymentsRes.value || [] : [];
+      const invoicesList: MaintenanceInvoice[] =
+        invoicesRes.status === "fulfilled" ? invoicesRes.value || [] : [];
+      const assessmentsList: SpecialAssessment[] =
+        assessmentsRes.status === "fulfilled" ? assessmentsRes.value || [] : [];
 
       const totalBilled = finData?.total_billed ? String(finData.total_billed) : "0.00";
       const totalCollected = finData?.total_collected ? String(finData.total_collected) : "0.00";
-      const outstandingBalance = finData?.outstanding_balance ? String(finData.outstanding_balance) : "0.00";
+      const outstandingBalance = finData?.outstanding_balance
+        ? String(finData.outstanding_balance)
+        : "0.00";
 
-      const openIncidents = incidentsList.filter((i) => i.status !== "resolved" && i.status !== "closed" && i.status !== "false_alarm");
-      const pendingAssessments = assessmentsList.filter((a) => a.status === "under_review" || a.status === "draft");
+      const openIncidents = incidentsList.filter(
+        (i) => i.status !== "resolved" && i.status !== "closed" && i.status !== "false_alarm",
+      );
+      const pendingAssessments = assessmentsList.filter(
+        (a) => a.status === "under_review" || a.status === "draft",
+      );
 
       return {
         financialStats: finData,
@@ -80,7 +98,12 @@ export function useGovernanceOverview(communityId?: string | null) {
  * (no /billing/assessments route or table) — this surfaces as a real empty state rather
  * than fabricating placeholder records.
  */
-export function useSpecialAssessments(params?: { community_id?: string | null; status?: string; page?: number; page_size?: number }) {
+export function useSpecialAssessments(params?: {
+  community_id?: string | null;
+  status?: string;
+  page?: number;
+  page_size?: number;
+}) {
   const cid = params?.community_id || undefined;
   return useQuery<SpecialAssessment[]>({
     queryKey: governanceKeys.assessments(cid, params?.status),
@@ -196,7 +219,10 @@ export function useCollectionAudit(communityId?: string | null) {
       ]);
 
       const successPayments = (payments || []).filter((p) => p.payment_status === "success");
-      const totalCollectedNum = successPayments.reduce((acc, p) => acc + parseFloat(p.amount || "0"), 0);
+      const totalCollectedNum = successPayments.reduce(
+        (acc, p) => acc + parseFloat(p.amount || "0"),
+        0,
+      );
 
       const methodBreakdown: Record<string, { count: number; total_amount: string }> = {};
       for (const p of successPayments) {
@@ -206,13 +232,19 @@ export function useCollectionAudit(communityId?: string | null) {
         }
         methodBreakdown[method].count += 1;
         const currentSum = parseFloat(methodBreakdown[method].total_amount);
-        methodBreakdown[method].total_amount = (currentSum + parseFloat(p.amount || "0")).toFixed(2);
+        methodBreakdown[method].total_amount = (currentSum + parseFloat(p.amount || "0")).toFixed(
+          2,
+        );
       }
 
       const overdueInvoices = (invoices || []).filter(
-        (i) => i.status === "overdue" || (i.status === "posted" && parseFloat(i.balance_due || "0") > 0)
+        (i) =>
+          i.status === "overdue" || (i.status === "posted" && parseFloat(i.balance_due || "0") > 0),
       );
-      const totalOutstandingNum = overdueInvoices.reduce((acc, i) => acc + parseFloat(i.balance_due || "0"), 0);
+      const totalOutstandingNum = overdueInvoices.reduce(
+        (acc, i) => acc + parseFloat(i.balance_due || "0"),
+        0,
+      );
 
       return {
         total_collections: totalCollectedNum.toFixed(2),

@@ -1,10 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  output: "standalone",
+  ...(process.env.DOCKER_BUILD === "1" ? { output: "standalone" } : {}),
   async rewrites() {
     // Proxy same-origin /api/* to the backend so session cookies stay first-party in dev.
-    const backend = process.env.BACKEND_INTERNAL_URL || "http://localhost:8001";
+    const rawBackend = process.env.BACKEND_INTERNAL_URL || "http://localhost:8001";
+    const backend = rawBackend.replace(/\/+$/, "").replace(/\/api$/, "");
     return [{ source: "/api/:path*", destination: `${backend}/api/:path*` }];
   },
 };

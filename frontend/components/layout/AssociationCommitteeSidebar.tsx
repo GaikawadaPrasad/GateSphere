@@ -8,8 +8,18 @@ import { useGovernanceOverview } from "@/hooks/use-governance";
 const navItems = [
   { label: "Governance Overview", href: "/association-committee/governance", icon: "🏛️" },
   { label: "Financial Summary", href: "/association-committee/financial-summary", icon: "💰" },
-  { label: "Special Assessments", href: "/association-committee/assessments", icon: "📋", badgeKey: "assessments" },
-  { label: "Security Incidents", href: "/association-committee/incidents", icon: "🚨", badgeKey: "incidents" },
+  {
+    label: "Special Assessments",
+    href: "/association-committee/assessments",
+    icon: "📋",
+    badgeKey: "assessments",
+  },
+  {
+    label: "Security Incidents",
+    href: "/association-committee/incidents",
+    icon: "🚨",
+    badgeKey: "incidents",
+  },
   { label: "Collection Audit", href: "/association-committee/collection-audit", icon: "🔍" },
   { label: "Reports & Traceability", href: "/association-committee/reports", icon: "📊" },
 ];
@@ -32,11 +42,7 @@ export function AssociationCommitteeSidebar() {
     <>
       {/* Mobile Backdrop */}
       {sidebarOpen && (
-        <div
-          className="sidebar-backdrop"
-          onClick={toggleSidebar}
-          aria-label="Close menu"
-        />
+        <div className="sidebar-backdrop" onClick={toggleSidebar} aria-label="Close menu" />
       )}
 
       <aside
@@ -86,10 +92,25 @@ export function AssociationCommitteeSidebar() {
                 GS
               </div>
               <div>
-                <div style={{ fontWeight: 700, fontSize: "0.95rem", color: "var(--sidebar-fg)", letterSpacing: "-0.01em" }}>
+                <div
+                  style={{
+                    fontWeight: 700,
+                    fontSize: "0.95rem",
+                    color: "var(--sidebar-fg)",
+                    letterSpacing: "-0.01em",
+                  }}
+                >
                   GateSphere
                 </div>
-                <div style={{ fontSize: "0.65rem", color: "#a78bfa", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                <div
+                  style={{
+                    fontSize: "0.65rem",
+                    color: "#a78bfa",
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                  }}
+                >
                   Association Committee
                 </div>
               </div>
@@ -158,7 +179,8 @@ export function AssociationCommitteeSidebar() {
             {navItems.map((item) => {
               const isActive =
                 pathname === item.href ||
-                (item.href !== "/association-committee/governance" && pathname.startsWith(item.href));
+                (item.href !== "/association-committee/governance" &&
+                  pathname.startsWith(item.href));
 
               let badgeCount = 0;
               if (item.badgeKey === "assessments") badgeCount = pendingAssessments;
@@ -186,10 +208,18 @@ export function AssociationCommitteeSidebar() {
                   }}
                   title={!sidebarOpen ? item.label : undefined}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", minWidth: 0 }}>
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: "0.75rem", minWidth: 0 }}
+                  >
                     <span style={{ fontSize: "1.1rem", flexShrink: 0 }}>{item.icon}</span>
                     {sidebarOpen && (
-                      <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      <span
+                        style={{
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
                         {item.label}
                       </span>
                     )}
@@ -198,9 +228,15 @@ export function AssociationCommitteeSidebar() {
                   {sidebarOpen && badgeCount > 0 && (
                     <span
                       style={{
-                        background: item.badgeKey === "incidents" ? "rgba(239, 68, 68, 0.25)" : "rgba(245, 158, 11, 0.25)",
+                        background:
+                          item.badgeKey === "incidents"
+                            ? "rgba(239, 68, 68, 0.25)"
+                            : "rgba(245, 158, 11, 0.25)",
                         color: item.badgeKey === "incidents" ? "#fca5a5" : "#fde68a",
-                        border: item.badgeKey === "incidents" ? "1px solid rgba(239, 68, 68, 0.5)" : "1px solid rgba(245, 158, 11, 0.5)",
+                        border:
+                          item.badgeKey === "incidents"
+                            ? "1px solid rgba(239, 68, 68, 0.5)"
+                            : "1px solid rgba(245, 158, 11, 0.5)",
                         fontSize: "0.68rem",
                         fontWeight: 700,
                         padding: "0.1rem 0.45rem",

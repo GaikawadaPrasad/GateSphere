@@ -2,27 +2,50 @@
 
 import { useState } from "react";
 import { useUiStore } from "@/store/ui";
-import { useAnnouncements, useCreateAnnouncement, usePublishAnnouncement, useExpireAnnouncement, useResidentGroups, useCreateResidentGroup } from "@/hooks/use-communication";
+import {
+  useAnnouncements,
+  useCreateAnnouncement,
+  usePublishAnnouncement,
+  useExpireAnnouncement,
+  useResidentGroups,
+  useCreateResidentGroup,
+} from "@/hooks/use-communication";
 import { useTowers } from "@/hooks/use-communities";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { Modal } from "@/components/common/Modal";
-import type { Announcement, AnnouncementType, ResidentGroup, AnnouncementPriority, TargetAudienceType } from "@/types/communication";
+import type {
+  Announcement,
+  AnnouncementType,
+  ResidentGroup,
+  AnnouncementPriority,
+  TargetAudienceType,
+} from "@/types/communication";
 import { formatDateTime } from "@/lib/utils";
 
 export default function CommunityAdminCommunicationPage() {
   const { activeCommunityId } = useUiStore();
-  const [activeTab, setActiveTab] = useState<"announcements" | "emergency" | "groups">("announcements");
+  const [activeTab, setActiveTab] = useState<"announcements" | "emergency" | "groups">(
+    "announcements",
+  );
   const [publishedFilter, setPublishedFilter] = useState<boolean | undefined>(undefined);
 
   // Queries
-  const { data: announcements, isLoading: announcementsLoading, refetch: refetchAnnouncements } = useAnnouncements({
+  const {
+    data: announcements,
+    isLoading: announcementsLoading,
+    refetch: refetchAnnouncements,
+  } = useAnnouncements({
     community_id: activeCommunityId || undefined,
     published_only: publishedFilter,
   });
 
   const { data: towers } = useTowers(activeCommunityId || undefined);
-  const { data: groups, isLoading: groupsLoading, refetch: refetchGroups } = useResidentGroups(activeCommunityId || undefined);
+  const {
+    data: groups,
+    isLoading: groupsLoading,
+    refetch: refetchGroups,
+  } = useResidentGroups(activeCommunityId || undefined);
 
   // Mutations
   const createAnnouncement = useCreateAnnouncement();
@@ -39,8 +62,8 @@ export default function CommunityAdminCommunicationPage() {
     body: string;
     announcement_type: AnnouncementType;
     priority: AnnouncementPriority;
-    target_type: TargetAudienceType;  // UI only — not sent to backend
-    target_id: string;                // UI only — not sent to backend
+    target_type: TargetAudienceType; // UI only — not sent to backend
+    target_id: string; // UI only — not sent to backend
   }>({
     title: "",
     body: "",
@@ -82,7 +105,14 @@ export default function CommunityAdminCommunicationPage() {
         communityId: activeCommunityId,
       });
       setIsCreateOpen(false);
-      setForm({ title: "", body: "", announcement_type: "notice", priority: "normal", target_type: "all", target_id: "" });
+      setForm({
+        title: "",
+        body: "",
+        announcement_type: "notice",
+        priority: "normal",
+        target_type: "all",
+        target_id: "",
+      });
       refetchAnnouncements();
     } catch (err) {
       console.error(err);
@@ -139,7 +169,15 @@ export default function CommunityAdminCommunicationPage() {
       render: (a) => (
         <div style={{ maxWidth: 320 }}>
           <strong>{a.title}</strong>
-          <div style={{ fontSize: "0.75rem", color: "var(--muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          <div
+            style={{
+              fontSize: "0.75rem",
+              color: "var(--muted)",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
             {a.body}
           </div>
         </div>
@@ -149,8 +187,17 @@ export default function CommunityAdminCommunicationPage() {
       key: "priority",
       header: "Priority",
       render: (a) => {
-        const bg = a.priority === "emergency" ? "badge-danger" : a.priority === "urgent" ? "badge-warning" : "badge-neutral";
-        return <span className={`badge ${bg}`} style={{ textTransform: "capitalize" }}>{a.priority}</span>;
+        const bg =
+          a.priority === "emergency"
+            ? "badge-danger"
+            : a.priority === "urgent"
+              ? "badge-warning"
+              : "badge-neutral";
+        return (
+          <span className={`badge ${bg}`} style={{ textTransform: "capitalize" }}>
+            {a.priority}
+          </span>
+        );
       },
     },
     {
@@ -158,9 +205,11 @@ export default function CommunityAdminCommunicationPage() {
       header: "Audience",
       render: (a) => {
         const first = a.targets?.[0];
-        if (!first || first.target_all_community) return <span className="badge badge-primary">🌐 Entire Community</span>;
+        if (!first || first.target_all_community)
+          return <span className="badge badge-primary">🌐 Entire Community</span>;
         if (first.tower_id) return <span className="badge badge-primary">🏢 Tower Specific</span>;
-        if (first.resident_group_id) return <span className="badge badge-primary">👥 Resident Group</span>;
+        if (first.resident_group_id)
+          return <span className="badge badge-primary">👥 Resident Group</span>;
         if (first.unit_id) return <span className="badge badge-primary">🚪 Unit Specific</span>;
         return <span className="badge badge-neutral">Custom</span>;
       },
@@ -213,8 +262,20 @@ export default function CommunityAdminCommunicationPage() {
   const groupColumns: Column<ResidentGroup>[] = [
     { key: "name", header: "Group Name", render: (g) => <strong>{g.name}</strong> },
     { key: "description", header: "Description", render: (g) => g.description || "–" },
-    { key: "member_count", header: "Members", render: (g) => <span className="badge badge-neutral">{g.member_count || 0} residents</span> },
-    { key: "is_active", header: "Status", render: (g) => <span className={`badge ${g.is_active ? "badge-success" : "badge-neutral"}`}>{g.is_active ? "Active" : "Archived"}</span> },
+    {
+      key: "member_count",
+      header: "Members",
+      render: (g) => <span className="badge badge-neutral">{g.member_count || 0} residents</span>,
+    },
+    {
+      key: "is_active",
+      header: "Status",
+      render: (g) => (
+        <span className={`badge ${g.is_active ? "badge-success" : "badge-neutral"}`}>
+          {g.is_active ? "Active" : "Archived"}
+        </span>
+      ),
+    },
   ];
 
   return (
@@ -243,7 +304,8 @@ export default function CommunityAdminCommunicationPage() {
             fontSize: "0.95rem",
             fontWeight: activeTab === "announcements" ? 700 : 500,
             color: activeTab === "announcements" ? "var(--primary)" : "var(--muted)",
-            borderBottom: activeTab === "announcements" ? "2px solid var(--primary)" : "2px solid transparent",
+            borderBottom:
+              activeTab === "announcements" ? "2px solid var(--primary)" : "2px solid transparent",
             cursor: "pointer",
           }}
         >
@@ -260,7 +322,8 @@ export default function CommunityAdminCommunicationPage() {
             fontSize: "0.95rem",
             fontWeight: activeTab === "emergency" ? 700 : 500,
             color: activeTab === "emergency" ? "var(--primary)" : "var(--muted)",
-            borderBottom: activeTab === "emergency" ? "2px solid var(--primary)" : "2px solid transparent",
+            borderBottom:
+              activeTab === "emergency" ? "2px solid var(--primary)" : "2px solid transparent",
             cursor: "pointer",
           }}
         >
@@ -277,7 +340,8 @@ export default function CommunityAdminCommunicationPage() {
             fontSize: "0.95rem",
             fontWeight: activeTab === "groups" ? 700 : 500,
             color: activeTab === "groups" ? "var(--primary)" : "var(--muted)",
-            borderBottom: activeTab === "groups" ? "2px solid var(--primary)" : "2px solid transparent",
+            borderBottom:
+              activeTab === "groups" ? "2px solid var(--primary)" : "2px solid transparent",
             cursor: "pointer",
           }}
         >
@@ -287,7 +351,14 @@ export default function CommunityAdminCommunicationPage() {
 
       {activeTab === "announcements" && (
         <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "1rem",
+            }}
+          >
             <div style={{ display: "flex", gap: "0.5rem" }}>
               <button
                 type="button"
@@ -330,12 +401,20 @@ export default function CommunityAdminCommunicationPage() {
       {activeTab === "emergency" && (
         <div style={{ maxWidth: 700 }}>
           <div className="card" style={{ border: "1px solid #fecaca", background: "#fff5f5" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1rem" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.75rem",
+                marginBottom: "1rem",
+              }}
+            >
               <span style={{ fontSize: "2rem" }}>🚨</span>
               <div>
                 <h3 style={{ color: "#991b1b" }}>High-Priority Emergency Broadcast</h3>
                 <p style={{ fontSize: "0.8rem", color: "#b91c1c" }}>
-                  Dispatches immediate high-priority alerts to all residents across the community via In-App notifications and security logs.
+                  Dispatches immediate high-priority alerts to all residents across the community
+                  via In-App notifications and security logs.
                 </p>
               </div>
             </div>
@@ -366,7 +445,11 @@ export default function CommunityAdminCommunicationPage() {
       {activeTab === "groups" && (
         <div>
           <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1rem" }}>
-            <button type="button" className="btn btn-primary" onClick={() => setIsGroupModalOpen(true)}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => setIsGroupModalOpen(true)}
+            >
               + Create Resident Group
             </button>
           </div>
@@ -385,11 +468,25 @@ export default function CommunityAdminCommunicationPage() {
       <Modal
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
-        title={form.announcement_type === "emergency" ? "🚨 Compose Emergency Broadcast" : "📢 Create Announcement"}
+        title={
+          form.announcement_type === "emergency"
+            ? "🚨 Compose Emergency Broadcast"
+            : "📢 Create Announcement"
+        }
       >
-        <form onSubmit={handleCreateAnnouncement} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+        <form
+          onSubmit={handleCreateAnnouncement}
+          style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
+        >
           <div>
-            <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+            <label
+              style={{
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                display: "block",
+                marginBottom: "0.25rem",
+              }}
+            >
               Title
             </label>
             <input
@@ -404,13 +501,22 @@ export default function CommunityAdminCommunicationPage() {
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
             <div>
-              <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+              <label
+                style={{
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  display: "block",
+                  marginBottom: "0.25rem",
+                }}
+              >
                 Priority
               </label>
               <select
                 className="select-field"
                 value={form.priority}
-                onChange={(e) => setForm({ ...form, priority: e.target.value as typeof form.priority })}
+                onChange={(e) =>
+                  setForm({ ...form, priority: e.target.value as typeof form.priority })
+                }
               >
                 <option value="normal">Normal</option>
                 <option value="low">Low</option>
@@ -420,13 +526,26 @@ export default function CommunityAdminCommunicationPage() {
             </div>
 
             <div>
-              <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+              <label
+                style={{
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  display: "block",
+                  marginBottom: "0.25rem",
+                }}
+              >
                 Target Audience
               </label>
               <select
                 className="select-field"
                 value={form.target_type}
-                onChange={(e) => setForm({ ...form, target_type: e.target.value as typeof form.target_type, target_id: "" })}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    target_type: e.target.value as typeof form.target_type,
+                    target_id: "",
+                  })
+                }
               >
                 <option value="all">Entire Community</option>
                 <option value="tower">Specific Tower</option>
@@ -437,7 +556,14 @@ export default function CommunityAdminCommunicationPage() {
 
           {form.target_type === "tower" && (
             <div>
-              <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+              <label
+                style={{
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  display: "block",
+                  marginBottom: "0.25rem",
+                }}
+              >
                 Select Tower
               </label>
               <select
@@ -458,7 +584,14 @@ export default function CommunityAdminCommunicationPage() {
 
           {form.target_type === "resident_group" && (
             <div>
-              <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+              <label
+                style={{
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  display: "block",
+                  marginBottom: "0.25rem",
+                }}
+              >
                 Select Resident Group
               </label>
               <select
@@ -478,7 +611,14 @@ export default function CommunityAdminCommunicationPage() {
           )}
 
           <div>
-            <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+            <label
+              style={{
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                display: "block",
+                marginBottom: "0.25rem",
+              }}
+            >
               Message Content
             </label>
             <textarea
@@ -491,8 +631,19 @@ export default function CommunityAdminCommunicationPage() {
             />
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "1rem" }}>
-            <button type="button" className="btn btn-secondary" onClick={() => setIsCreateOpen(false)}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: "0.5rem",
+              marginTop: "1rem",
+            }}
+          >
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setIsCreateOpen(false)}
+            >
               Cancel
             </button>
             <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
@@ -508,9 +659,19 @@ export default function CommunityAdminCommunicationPage() {
         onClose={() => setIsGroupModalOpen(false)}
         title="Create Resident Group"
       >
-        <form onSubmit={handleCreateGroup} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+        <form
+          onSubmit={handleCreateGroup}
+          style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
+        >
           <div>
-            <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+            <label
+              style={{
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                display: "block",
+                marginBottom: "0.25rem",
+              }}
+            >
               Group Name
             </label>
             <input
@@ -524,7 +685,14 @@ export default function CommunityAdminCommunicationPage() {
           </div>
 
           <div>
-            <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+            <label
+              style={{
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                display: "block",
+                marginBottom: "0.25rem",
+              }}
+            >
               Description
             </label>
             <input
@@ -536,8 +704,19 @@ export default function CommunityAdminCommunicationPage() {
             />
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "1rem" }}>
-            <button type="button" className="btn btn-secondary" onClick={() => setIsGroupModalOpen(false)}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: "0.5rem",
+              marginTop: "1rem",
+            }}
+          >
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setIsGroupModalOpen(false)}
+            >
               Cancel
             </button>
             <button type="submit" className="btn btn-primary" disabled={isSubmitting}>

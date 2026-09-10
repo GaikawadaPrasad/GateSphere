@@ -31,10 +31,12 @@ export default function SecurityGuardCabTaxiPage() {
         visitorsApi.entries(),
       ]);
       const visitorMap = new Map<string, any>();
-      for (const v of directory || []) if ((v as any)?.id) visitorMap.set((v as any).id as string, v);
+      for (const v of directory || [])
+        if ((v as any)?.id) visitorMap.set((v as any).id as string, v);
       const openEntryByRequest = new Map<string, any>();
       for (const e of entries || []) {
-        if ((e as any).request_id && !(e as any).exit_at) openEntryByRequest.set((e as any).request_id as string, e);
+        if ((e as any).request_id && !(e as any).exit_at)
+          openEntryByRequest.set((e as any).request_id as string, e);
       }
 
       // Real backend: "cab_taxi" is a visitor_type on /visitors/requests (backend/app/modules/visitors/models.py VISITOR_TYPES).
@@ -51,7 +53,7 @@ export default function SecurityGuardCabTaxiPage() {
             status: r.status,
             entryId: openEntry?.id,
           };
-        })
+        }),
       );
     } catch (err: any) {
       setLoadError(err?.message || "Failed to load cab/taxi movements.");
@@ -85,7 +87,7 @@ export default function SecurityGuardCabTaxiPage() {
   const filteredCabs = cabs.filter(
     (c) =>
       c.vehicleNumber.toLowerCase().includes(search.toLowerCase()) ||
-      c.visitorName.toLowerCase().includes(search.toLowerCase())
+      c.visitorName.toLowerCase().includes(search.toLowerCase()),
   );
 
   return (
@@ -93,7 +95,11 @@ export default function SecurityGuardCabTaxiPage() {
       <PageHeader
         title="Cab & Taxi Verification"
         subtitle="Verify cab arrivals against resident-approved requests, and log gate entry/exit timestamps"
-        breadcrumbs={[{ label: "GateSphere" }, { label: "Security Guard" }, { label: "Cab / Taxi" }]}
+        breadcrumbs={[
+          { label: "GateSphere" },
+          { label: "Security Guard" },
+          { label: "Cab / Taxi" },
+        ]}
       />
 
       <div className="card">
@@ -101,8 +107,12 @@ export default function SecurityGuardCabTaxiPage() {
           <div>
             <h3 className="card-title">Commercial Cab Movements</h3>
           </div>
-          <div style={{ width: 220 }}>
-            <SearchInput value={search} onChange={setSearch} placeholder="Search vehicle/passenger…" />
+          <div style={{ width: "100%", maxWidth: 220 }}>
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Search vehicle/passenger…"
+            />
           </div>
         </div>
 
@@ -120,22 +130,38 @@ export default function SecurityGuardCabTaxiPage() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={5} style={{ textAlign: "center", padding: "2rem" }}>Loading…</td>
+                  <td colSpan={5} style={{ textAlign: "center", padding: "2rem" }}>
+                    Loading…
+                  </td>
                 </tr>
               ) : loadError ? (
                 <tr>
-                  <td colSpan={5} style={{ textAlign: "center", padding: "2rem", color: "var(--danger, #dc2626)" }}>{loadError}</td>
+                  <td
+                    colSpan={5}
+                    style={{
+                      textAlign: "center",
+                      padding: "2rem",
+                      color: "var(--danger, #dc2626)",
+                    }}
+                  >
+                    {loadError}
+                  </td>
                 </tr>
               ) : filteredCabs.length === 0 ? (
                 <tr>
-                  <td colSpan={5} style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
+                  <td
+                    colSpan={5}
+                    style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
+                  >
                     No cab/taxi requests found.
                   </td>
                 </tr>
               ) : (
                 filteredCabs.map((c) => (
                   <tr key={c.id}>
-                    <td style={{ fontFamily: "monospace", fontWeight: 700 }}>🚖 {c.vehicleNumber}</td>
+                    <td style={{ fontFamily: "monospace", fontWeight: 700 }}>
+                      🚖 {c.vehicleNumber}
+                    </td>
                     <td>{c.visitorName}</td>
                     <td>{c.purpose}</td>
                     <td>

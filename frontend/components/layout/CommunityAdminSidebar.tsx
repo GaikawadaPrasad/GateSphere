@@ -13,7 +13,12 @@ const navItems = [
   { label: "Communication", href: "/community-admin/communication", icon: "📢" },
   { label: "Billing & Finance", href: "/community-admin/billing", icon: "💳" },
   { label: "Incidents", href: "/community-admin/incidents", icon: "🚨" },
-  { label: "Notifications", href: "/community-admin/notifications", icon: "🔔", badgeKey: "notifications" },
+  {
+    label: "Notifications",
+    href: "/community-admin/notifications",
+    icon: "🔔",
+    badgeKey: "notifications",
+  },
 ];
 
 export function CommunityAdminSidebar() {
@@ -33,11 +38,7 @@ export function CommunityAdminSidebar() {
     <>
       {/* Mobile Backdrop */}
       {sidebarOpen && (
-        <div
-          className="sidebar-backdrop"
-          onClick={toggleSidebar}
-          aria-label="Close menu"
-        />
+        <div className="sidebar-backdrop" onClick={toggleSidebar} aria-label="Close menu" />
       )}
 
       <aside
@@ -86,10 +87,24 @@ export function CommunityAdminSidebar() {
                 GS
               </div>
               <div>
-                <div style={{ fontWeight: 700, fontSize: "0.95rem", color: "var(--sidebar-fg)", letterSpacing: "-0.01em" }}>
+                <div
+                  style={{
+                    fontWeight: 700,
+                    fontSize: "0.95rem",
+                    color: "var(--sidebar-fg)",
+                    letterSpacing: "-0.01em",
+                  }}
+                >
                   GateSphere
                 </div>
-                <div style={{ fontSize: "0.65rem", color: "#10b981", fontWeight: 600, textTransform: "uppercase" }}>
+                <div
+                  style={{
+                    fontSize: "0.65rem",
+                    color: "#10b981",
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                  }}
+                >
                   Community Admin
                 </div>
               </div>
@@ -135,7 +150,9 @@ export function CommunityAdminSidebar() {
         <nav style={{ padding: "1rem 0.5rem", flex: 1, overflowY: "auto" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
             {navItems.map((item) => {
-              const isActive = pathname === item.href || (item.href !== "/community-admin/dashboard" && pathname.startsWith(item.href));
+              const isActive =
+                pathname === item.href ||
+                (item.href !== "/community-admin/dashboard" && pathname.startsWith(item.href));
               return (
                 <Link
                   key={item.href}
@@ -189,7 +206,14 @@ export function CommunityAdminSidebar() {
 
         {/* Toggle button when collapsed */}
         {!sidebarOpen && (
-          <div style={{ padding: "0.75rem", display: "flex", justifyContent: "center", borderTop: "1px solid var(--sidebar-border)" }}>
+          <div
+            style={{
+              padding: "0.75rem",
+              display: "flex",
+              justifyContent: "center",
+              borderTop: "1px solid var(--sidebar-border)",
+            }}
+          >
             <button
               type="button"
               onClick={toggleSidebar}

@@ -12,7 +12,10 @@ interface CollectionAuditCardProps {
 export function CollectionAuditCard({ summary, isLoading }: CollectionAuditCardProps) {
   if (isLoading) {
     return (
-      <div className="card" style={{ height: "100%", display: "flex", flexDirection: "column", gap: "1rem" }}>
+      <div
+        className="card"
+        style={{ height: "100%", display: "flex", flexDirection: "column", gap: "1rem" }}
+      >
         <div className="skeleton" style={{ width: "45%", height: 20 }} />
         <div className="skeleton" style={{ width: "100%", height: 80 }} />
         <div className="skeleton" style={{ width: "100%", height: 100 }} />
@@ -27,7 +30,10 @@ export function CollectionAuditCard({ summary, isLoading }: CollectionAuditCardP
     <div className="card" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <div className="card-header">
         <div>
-          <h2 className="card-title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <h2
+            className="card-title"
+            style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
+          >
             <span>🔍</span> Collection Audit & Traceability
           </h2>
           <p style={{ fontSize: "0.775rem", color: "var(--muted)", marginTop: "0.15rem" }}>
@@ -45,12 +51,21 @@ export function CollectionAuditCard({ summary, isLoading }: CollectionAuditCardP
 
       {/* Methods distribution */}
       <div style={{ marginBottom: "1rem" }}>
-        <div style={{ fontSize: "0.775rem", fontWeight: 600, color: "var(--fg-secondary)", marginBottom: "0.5rem" }}>
+        <div
+          style={{
+            fontSize: "0.775rem",
+            fontWeight: 600,
+            color: "var(--fg-secondary)",
+            marginBottom: "0.5rem",
+          }}
+        >
           Payment Channels
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
           {Object.keys(methods).length === 0 ? (
-            <span style={{ fontSize: "0.775rem", color: "var(--muted)" }}>No payments recorded yet</span>
+            <span style={{ fontSize: "0.775rem", color: "var(--muted)" }}>
+              No payments recorded yet
+            </span>
           ) : (
             Object.entries(methods).map(([method, data]) => (
               <div
@@ -67,7 +82,9 @@ export function CollectionAuditCard({ summary, isLoading }: CollectionAuditCardP
                 }}
               >
                 <span style={{ fontWeight: 600, color: "var(--fg)" }}>{method}:</span>
-                <span style={{ color: "#059669", fontWeight: 600 }}>{formatCurrency(parseFloat(data.total_amount))}</span>
+                <span style={{ color: "#059669", fontWeight: 600 }}>
+                  {formatCurrency(parseFloat(data.total_amount))}
+                </span>
                 <span style={{ color: "var(--muted)", fontSize: "0.7rem" }}>({data.count})</span>
               </div>
             ))
@@ -77,11 +94,25 @@ export function CollectionAuditCard({ summary, isLoading }: CollectionAuditCardP
 
       {/* Recent payment transactions list */}
       <div style={{ flex: 1 }}>
-        <div style={{ fontSize: "0.775rem", fontWeight: 600, color: "var(--fg-secondary)", marginBottom: "0.5rem" }}>
+        <div
+          style={{
+            fontSize: "0.775rem",
+            fontWeight: 600,
+            color: "var(--fg-secondary)",
+            marginBottom: "0.5rem",
+          }}
+        >
           Recent Verified Collections
         </div>
         {payments.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "1.5rem 0", color: "var(--muted)", fontSize: "0.8rem" }}>
+          <div
+            style={{
+              textAlign: "center",
+              padding: "1.5rem 0",
+              color: "var(--muted)",
+              fontSize: "0.8rem",
+            }}
+          >
             No recent payment receipts available.
           </div>
         ) : (
@@ -105,7 +136,8 @@ export function CollectionAuditCard({ summary, isLoading }: CollectionAuditCardP
                     Ref: {p.payment_reference}
                   </div>
                   <div style={{ fontSize: "0.725rem", color: "var(--muted)" }}>
-                    {p.receipt_number ? `Receipt: ${p.receipt_number} · ` : ""}{formatDate(p.paid_at)} · {p.payment_method.toUpperCase()}
+                    {p.receipt_number ? `Receipt: ${p.receipt_number} · ` : ""}
+                    {formatDate(p.paid_at)} · {p.payment_method.toUpperCase()}
                   </div>
                 </div>
                 <div style={{ fontWeight: 700, color: "#059669" }}>

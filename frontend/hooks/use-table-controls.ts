@@ -22,7 +22,9 @@ export function useTableControls<T extends Record<string, any>>({
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(initialPageSize);
   const [sortKey, setSortKey] = useState<string | null>(initialSortKey || null);
-  const [sortDir, setSortDir] = useState<"asc" | "desc" | null>(initialSortKey ? initialSortDir : null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc" | null>(
+    initialSortKey ? initialSortDir : null,
+  );
 
   const setFilter = useCallback((key: string, value: string) => {
     setFilters((prev) => {
