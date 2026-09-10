@@ -8,6 +8,7 @@ export default function RequestDemo() {
   const { ref, visible } = useReveal();
   const [submitted, setSubmitted] = useState(false);
   const [ticketId, setTicketId] = useState("");
+  const [errors, setErrors] = useState<{ fullName?: string; email?: string; phone?: string; community?: string }>({});
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -18,8 +19,39 @@ export default function RequestDemo() {
     product: "Full Platform",
   });
 
+  const NAME_REGEX = /^[A-Za-z\s]{2,}$/;
+  const PHONE_REGEX = /^(\+91[\s-]?)?[6-9]\d{9}$/;
+
+  const isFormValid =
+    NAME_REGEX.test(formData.fullName.trim()) &&
+    formData.email.trim() !== "" &&
+    PHONE_REGEX.test(formData.phone.replace(/\s|-/g, "")) &&
+    formData.community.trim() !== "";
+
+  const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  const validate = () => {
+    const newErrors: { fullName?: string; email?: string; phone?: string; community?: string } = {};
+    if (!NAME_REGEX.test(formData.fullName.trim()))
+      newErrors.fullName = "Enter a valid name (letters and spaces only).";
+    if (!EMAIL_REGEX.test(formData.email.trim()))
+      newErrors.email = "Enter a valid email address.";
+    const normalizedPhone = formData.phone.replace(/\s|-/g, "");
+    if (!PHONE_REGEX.test(normalizedPhone))
+      newErrors.phone = "Enter a valid Indian mobile number starting with 6–9 (e.g. +91 98765 43210).";
+    if (!formData.community.trim())
+      newErrors.community = "Community / Society Name is required.";
+    return newErrors;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const validationErrors = validate();
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+    setErrors({});
     const generatedTicket = `#GS-DEMO-${Math.floor(1000 + Math.random() * 9000)}`;
     setTicketId(generatedTicket);
     setSubmitted(true);
@@ -136,7 +168,7 @@ export default function RequestDemo() {
                     Thank you! An executive community specialist will contact you shortly to schedule your personalized live walkthrough.
                   </p>
                   <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs text-slate-600 inline-block font-mono">
-                    Priority Ticket: <span className="font-bold text-blue-700">{ticketId}</span>
+                    Request ID: <span className="font-bold text-blue-700">{ticketId}</span>
                   </div>
                 </div>
               ) : (
@@ -164,9 +196,17 @@ export default function RequestDemo() {
                         placeholder="e.g. Rajan Pillai"
                         required
                         value={formData.fullName}
-                        onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                        className="w-full px-3.5 py-2.5 rounded-xl text-[13.5px] text-slate-900 bg-[#F8FAFC] border border-slate-200 focus:bg-white focus:border-blue-600 focus:ring-3 focus:ring-blue-500/10 outline-none transition-all"
+                        onChange={(e) => {
+                          setFormData({ ...formData, fullName: e.target.value });
+                          if (errors.fullName) setErrors((prev) => ({ ...prev, fullName: undefined }));
+                        }}
+                        className={`w-full px-3.5 py-2.5 rounded-xl text-[13.5px] text-slate-900 bg-[#F8FAFC] border focus:bg-white focus:ring-3 focus:ring-blue-500/10 outline-none transition-all ${
+                          errors.fullName ? "border-red-400 focus:border-red-500" : "border-slate-200 focus:border-blue-600"
+                        }`}
                       />
+                      {errors.fullName && (
+                        <p className="mt-1 text-[11px] text-red-500 font-medium">{errors.fullName}</p>
+                      )}
                     </div>
 
                     <div>
@@ -178,9 +218,17 @@ export default function RequestDemo() {
                         placeholder="name@community.com"
                         required
                         value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        className="w-full px-3.5 py-2.5 rounded-xl text-[13.5px] text-slate-900 bg-[#F8FAFC] border border-slate-200 focus:bg-white focus:border-blue-600 focus:ring-3 focus:ring-blue-500/10 outline-none transition-all"
+                        onChange={(e) => {
+                          setFormData({ ...formData, email: e.target.value });
+                          if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
+                        }}
+                        className={`w-full px-3.5 py-2.5 rounded-xl text-[13.5px] text-slate-900 bg-[#F8FAFC] border focus:bg-white focus:ring-3 focus:ring-blue-500/10 outline-none transition-all ${
+                          errors.email ? "border-red-400 focus:border-red-500" : "border-slate-200 focus:border-blue-600"
+                        }`}
                       />
+                      {errors.email && (
+                        <p className="mt-1 text-[11px] text-red-500 font-medium">{errors.email}</p>
+                      )}
                     </div>
                   </div>
 
@@ -195,9 +243,17 @@ export default function RequestDemo() {
                         placeholder="+91 98765 43210"
                         required
                         value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                        className="w-full px-3.5 py-2.5 rounded-xl text-[13.5px] text-slate-900 bg-[#F8FAFC] border border-slate-200 focus:bg-white focus:border-blue-600 focus:ring-3 focus:ring-blue-500/10 outline-none transition-all"
+                        onChange={(e) => {
+                          setFormData({ ...formData, phone: e.target.value });
+                          if (errors.phone) setErrors((prev) => ({ ...prev, phone: undefined }));
+                        }}
+                        className={`w-full px-3.5 py-2.5 rounded-xl text-[13.5px] text-slate-900 bg-[#F8FAFC] border focus:bg-white focus:ring-3 focus:ring-blue-500/10 outline-none transition-all ${
+                          errors.phone ? "border-red-400 focus:border-red-500" : "border-slate-200 focus:border-blue-600"
+                        }`}
                       />
+                      {errors.phone && (
+                        <p className="mt-1 text-[11px] text-red-500 font-medium">{errors.phone}</p>
+                      )}
                     </div>
 
                     <div>
@@ -209,9 +265,17 @@ export default function RequestDemo() {
                         placeholder="e.g. Serene Palms, Bengaluru"
                         required
                         value={formData.community}
-                        onChange={(e) => setFormData({ ...formData, community: e.target.value })}
-                        className="w-full px-3.5 py-2.5 rounded-xl text-[13.5px] text-slate-900 bg-[#F8FAFC] border border-slate-200 focus:bg-white focus:border-blue-600 focus:ring-3 focus:ring-blue-500/10 outline-none transition-all"
+                        onChange={(e) => {
+                          setFormData({ ...formData, community: e.target.value });
+                          if (errors.community) setErrors((prev) => ({ ...prev, community: undefined }));
+                        }}
+                        className={`w-full px-3.5 py-2.5 rounded-xl text-[13.5px] text-slate-900 bg-[#F8FAFC] border focus:bg-white focus:ring-3 focus:ring-blue-500/10 outline-none transition-all ${
+                          errors.community ? "border-red-400 focus:border-red-500" : "border-slate-200 focus:border-blue-600"
+                        }`}
                       />
+                      {errors.community && (
+                        <p className="mt-1 text-[11px] text-red-500 font-medium">{errors.community}</p>
+                      )}
                     </div>
                   </div>
 
@@ -269,7 +333,12 @@ export default function RequestDemo() {
 
                   <button
                     type="submit"
-                    className="w-full flex items-center justify-center gap-2 py-3 px-6 rounded-xl text-[14.5px] font-extrabold text-white bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 hover:from-blue-800 hover:to-indigo-800 shadow-lg shadow-blue-500/20 active:scale-[0.99] transition-all cursor-pointer mt-2"
+                    disabled={!isFormValid}
+                    className={`w-full flex items-center justify-center gap-2 py-3 px-6 rounded-xl text-[14.5px] font-extrabold text-white bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 shadow-lg shadow-blue-500/20 active:scale-[0.99] transition-all mt-2 ${
+                      isFormValid
+                        ? "hover:from-blue-800 hover:to-indigo-800 cursor-pointer"
+                        : "opacity-50 cursor-not-allowed"
+                    }`}
                   >
                     Submit
                     <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2">
