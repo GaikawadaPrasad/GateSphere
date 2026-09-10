@@ -15,6 +15,7 @@ import type { ResidentProfile } from "@/types/residents";
 import type { Staff, StaffAssignment, StaffAttendance, StaffCreate, CheckInPayload } from "@/types/staff";
 import type { Incident, IncidentAction, IncidentCreate, IncidentHistory, IncidentTransition } from "@/types/incidents";
 import type { AppNotification, NotificationPreference } from "@/types/notifications";
+import type { AssistantQuickActionsResponse, AssistantResponse } from "@/types/assistant";
 
 export type { CurrentUser, GateEvent, PanicAlert, GuardRoster, ServiceTicket, ServiceCategory };
 export type NotificationItem = AppNotification;
@@ -344,6 +345,13 @@ export const dashboardsApi = {
     apiGet<FinancialStats>("/dashboards/financial", communityId ? { community_id: communityId } : undefined),
   resident: (communityId?: string) =>
     apiGet<ResidentStats>("/dashboards/resident", communityId ? { community_id: communityId } : undefined),
+};
+
+export const assistantApi = {
+  quickActions: (communityId?: string) =>
+    apiGet<AssistantQuickActionsResponse>("/assistant/quick-actions", communityId ? { community_id: communityId } : undefined),
+  query: (query: string, communityId?: string) =>
+    apiSend<AssistantResponse>("POST", "/assistant/query", { query, community_id: communityId }),
 };
 
 export const gateApi = {

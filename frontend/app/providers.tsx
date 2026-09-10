@@ -7,6 +7,7 @@ import { ApiError } from "@/lib/api";
 import { makeQueryClient } from "@/lib/query";
 
 import { ToastContainer } from "@/components/common/ToastContainer";
+import { ChatbotWidget } from "@/components/assistant/ChatbotWidget";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -30,6 +31,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={client}>
       {children}
       <ToastContainer />
+      <ChatbotWidget />
     </QueryClientProvider>
   );
 }
