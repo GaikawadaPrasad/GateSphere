@@ -557,7 +557,37 @@ class ResidentService:
             self.actor.phone = patch["phone"]
         if "emergency_notes" in patch:
             profile.emergency_notes = patch["emergency_notes"]
+
+        contact_name = patch.get("emergency_contact_name")
+        contact_phone = patch.get("emergency_contact_phone")
+        contact_rel = patch.get("emergency_contact_relationship")
+
+        if contact_name is not None or contact_phone is not None or contact_rel is not None:
+            existing_contact = await self.db.scalar(
+                select(EmergencyContact)
+                .where(EmergencyContact.resident_profile_id == profile.id)
+                .order_by(EmergencyContact.priority)
+            )
+            if existing_contact is not None:
+                if contact_name is not None and contact_name != "":
+                    existing_contact.name = contact_name
+                if contact_phone is not None and contact_phone != "":
+                    existing_contact.phone = contact_phone
+                if contact_rel is not None and contact_rel != "":
+                    existing_contact.relationship_type = contact_rel
+            elif (contact_name and contact_name.strip()) or (contact_phone and contact_phone.strip()):
+                new_contact = EmergencyContact(
+                    community_id=profile.community_id,
+                    resident_profile_id=profile.id,
+                    name=contact_name.strip() if contact_name else "Emergency Contact",
+                    relationship_type=contact_rel.strip() if contact_rel else "Emergency",
+                    phone=contact_phone.strip() if contact_phone else "+0000000000",
+                    priority=1,
+                )
+                await self.contacts.add(new_contact)
+
         await self.db.flush()
         await self._audit("resident.update_me", profile.community_id, "resident_profile", profile.id, new=patch)
         return await self.get_my_profile()
+
 
