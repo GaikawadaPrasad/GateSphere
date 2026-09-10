@@ -32,13 +32,16 @@ export default function SecurityGuardEmergencyPage() {
   // Fetch emergency alerts
   useEffect(() => {
     let mounted = true;
-    gateApi.alerts().then((data) => {
-      if (mounted && data) {
-        setAlertsList(data);
-        const live = data.find((a) => a.status === "active" || a.status === "acknowledged");
-        if (live) setActiveSos(live);
-      }
-    }).catch(() => {});
+    gateApi
+      .alerts()
+      .then((data) => {
+        if (mounted && data) {
+          setAlertsList(data);
+          const live = data.find((a) => a.status === "active" || a.status === "acknowledged");
+          if (live) setActiveSos(live);
+        }
+      })
+      .catch(() => {});
     return () => {
       mounted = false;
     };
@@ -61,7 +64,9 @@ export default function SecurityGuardEmergencyPage() {
     setErrorMessage(null);
 
     try {
-      const message = [location.trim() && `Location: ${location.trim()}`, description.trim()].filter(Boolean).join(" — ");
+      const message = [location.trim() && `Location: ${location.trim()}`, description.trim()]
+        .filter(Boolean)
+        .join(" — ");
       const sosRecord = await gateApi.triggerEmergency({
         alert_type: emergencyType,
         severity: "critical",
@@ -77,7 +82,8 @@ export default function SecurityGuardEmergencyPage() {
       setIsConfirmModalOpen(false);
       setDescription("");
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to send SOS emergency alert. Please retry.";
+      const msg =
+        err instanceof Error ? err.message : "Failed to send SOS emergency alert. Please retry.";
       setErrorMessage(msg);
     } finally {
       setIsSubmitting(false);
@@ -105,7 +111,14 @@ export default function SecurityGuardEmergencyPage() {
             boxShadow: "0 10px 25px -5px rgba(220, 38, 38, 0.4)",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: "0.75rem",
+            }}
+          >
             <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
               <span
                 style={{
@@ -135,9 +148,18 @@ export default function SecurityGuardEmergencyPage() {
             </span>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "1rem", fontSize: "0.9rem" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+              gap: "1rem",
+              fontSize: "0.9rem",
+            }}
+          >
             <div>
-              <span style={{ opacity: 0.8, fontSize: "0.75rem", display: "block" }}>Emergency Type</span>
+              <span style={{ opacity: 0.8, fontSize: "0.75rem", display: "block" }}>
+                Emergency Type
+              </span>
               <strong style={{ textTransform: "capitalize" }}>🚨 {activeSos.alert_type}</strong>
             </div>
             <div>
@@ -149,7 +171,9 @@ export default function SecurityGuardEmergencyPage() {
               <strong>⏱️ {formatDateTime((activeSos as any).triggered_at)}</strong>
             </div>
             <div>
-              <span style={{ opacity: 0.8, fontSize: "0.75rem", display: "block" }}>Current Escalation</span>
+              <span style={{ opacity: 0.8, fontSize: "0.75rem", display: "block" }}>
+                Current Escalation
+              </span>
               <strong style={{ textTransform: "capitalize" }}>🛡️ {activeSos.status}</strong>
             </div>
           </div>
@@ -168,19 +192,29 @@ export default function SecurityGuardEmergencyPage() {
             color: "#991b1b",
           }}
         >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div
+            style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}
+          >
             <div>
               <h3 style={{ fontWeight: 700, fontSize: "1.1rem", marginBottom: "0.4rem" }}>
                 🚨 SOS EMERGENCY ALERT DISPATCHED
               </h3>
               <p style={{ fontSize: "0.9rem", color: "#b91c1c" }}>
-                Reference: <strong>SOS-{dispatchedAlert.id.slice(0, 8).toUpperCase()}</strong> | Type: <strong>{dispatchedAlert.alert_type}</strong>. Alert broadcasted to Security Supervisor and active response team.
+                Reference: <strong>SOS-{dispatchedAlert.id.slice(0, 8).toUpperCase()}</strong> |
+                Type: <strong>{dispatchedAlert.alert_type}</strong>. Alert broadcasted to Security
+                Supervisor and active response team.
               </p>
             </div>
             <button
               type="button"
               onClick={() => setDispatchedAlert(null)}
-              style={{ background: "none", border: "none", color: "#991b1b", fontWeight: 700, cursor: "pointer" }}
+              style={{
+                background: "none",
+                border: "none",
+                color: "#991b1b",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
             >
               ✕
             </button>
@@ -188,7 +222,13 @@ export default function SecurityGuardEmergencyPage() {
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: "1.75rem" }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 340px), 1fr))",
+          gap: "1.75rem",
+        }}
+      >
         {/* SOS Dispatch Form */}
         <div className="card">
           <div className="card-header">
@@ -214,10 +254,23 @@ export default function SecurityGuardEmergencyPage() {
 
           <form onSubmit={handleOpenConfirm}>
             <div style={{ marginBottom: "1.25rem" }}>
-              <label style={{ display: "block", fontWeight: 700, fontSize: "0.9rem", marginBottom: "0.5rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: 700,
+                  fontSize: "0.9rem",
+                  marginBottom: "0.5rem",
+                }}
+              >
                 Emergency Type *
               </label>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "0.6rem" }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                  gap: "0.6rem",
+                }}
+              >
                 {EMERGENCY_TYPES.map((item) => {
                   const isSelected = emergencyType === item.value;
                   return (
@@ -249,7 +302,14 @@ export default function SecurityGuardEmergencyPage() {
             </div>
 
             <div style={{ marginBottom: "1.25rem" }}>
-              <label style={{ display: "block", fontWeight: 700, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: 700,
+                  fontSize: "0.85rem",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Location *
               </label>
               <input
@@ -263,8 +323,16 @@ export default function SecurityGuardEmergencyPage() {
             </div>
 
             <div style={{ marginBottom: "1.5rem" }}>
-              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
-                Description <span style={{ color: "var(--muted)", fontWeight: 400 }}>(Optional)</span>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  marginBottom: "0.35rem",
+                }}
+              >
+                Description{" "}
+                <span style={{ color: "var(--muted)", fontWeight: 400 }}>(Optional)</span>
               </label>
               <textarea
                 className="input-field"
@@ -304,17 +372,35 @@ export default function SecurityGuardEmergencyPage() {
               <tbody>
                 {alertsList.length === 0 ? (
                   <tr>
-                    <td colSpan={5} style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}>
+                    <td
+                      colSpan={5}
+                      style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}
+                    >
                       No emergency alerts recorded.
                     </td>
                   </tr>
                 ) : (
                   alertsList.map((a) => (
-                    <tr key={a.id} style={{ background: a.status === "active" ? "var(--danger-light)" : undefined }}>
-                      <td style={{ fontWeight: 700, fontFamily: "monospace", whiteSpace: "nowrap" }}>
+                    <tr
+                      key={a.id}
+                      style={{
+                        background: a.status === "active" ? "var(--danger-light)" : undefined,
+                      }}
+                    >
+                      <td
+                        style={{ fontWeight: 700, fontFamily: "monospace", whiteSpace: "nowrap" }}
+                      >
                         SOS-{a.id.slice(0, 8).toUpperCase()}
                       </td>
-                      <td style={{ fontWeight: 600, color: "var(--danger)", textTransform: "capitalize" }}>🚨 {a.alert_type}</td>
+                      <td
+                        style={{
+                          fontWeight: 600,
+                          color: "var(--danger)",
+                          textTransform: "capitalize",
+                        }}
+                      >
+                        🚨 {a.alert_type}
+                      </td>
                       <td>{(a as any).message || "—"}</td>
                       <td>{formatDateTime((a as any).triggered_at)}</td>
                       <td>
@@ -370,7 +456,8 @@ export default function SecurityGuardEmergencyPage() {
               Are you sure you want to send an SOS emergency alert?
             </p>
             <p style={{ fontSize: "0.85rem", color: "#b91c1c" }}>
-              This will escalate an urgent alert to the Security Supervisor and trigger emergency notifications.
+              This will escalate an urgent alert to the Security Supervisor and trigger emergency
+              notifications.
             </p>
           </div>
 
@@ -383,9 +470,13 @@ export default function SecurityGuardEmergencyPage() {
               fontSize: "0.85rem",
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.4rem" }}>
+            <div
+              style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.4rem" }}
+            >
               <span style={{ color: "var(--muted)" }}>Emergency Type:</span>
-              <strong style={{ color: "var(--danger)" }}>🚨 {EMERGENCY_TYPES.find((t) => t.value === emergencyType)?.label || emergencyType}</strong>
+              <strong style={{ color: "var(--danger)" }}>
+                🚨 {EMERGENCY_TYPES.find((t) => t.value === emergencyType)?.label || emergencyType}
+              </strong>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span style={{ color: "var(--muted)" }}>Location:</span>
@@ -397,4 +488,3 @@ export default function SecurityGuardEmergencyPage() {
     </div>
   );
 }
-

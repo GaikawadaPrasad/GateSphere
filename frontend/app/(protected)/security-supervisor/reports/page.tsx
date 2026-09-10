@@ -19,7 +19,8 @@ export default function SecuritySupervisorReportsPage() {
           dashboardsApi.security(),
         ]);
 
-        const events = eventsRes.status === "fulfilled" && Array.isArray(eventsRes.value) ? eventsRes.value : [];
+        const events =
+          eventsRes.status === "fulfilled" && Array.isArray(eventsRes.value) ? eventsRes.value : [];
 
         if (events.length === 0) {
           setTrafficRows([]);
@@ -57,9 +58,17 @@ export default function SecuritySupervisorReportsPage() {
 
             if (evType.includes("deny") || evType.includes("denied") || evType.includes("block")) {
               group.denied++;
-            } else if (evType.includes("entry") || evType.includes("in") || evType === "gate_open") {
+            } else if (
+              evType.includes("entry") ||
+              evType.includes("in") ||
+              evType === "gate_open"
+            ) {
               group.entries++;
-            } else if (evType.includes("exit") || evType.includes("out") || evType === "gate_close") {
+            } else if (
+              evType.includes("exit") ||
+              evType.includes("out") ||
+              evType === "gate_close"
+            ) {
               group.exits++;
             } else {
               group.entries++;
@@ -112,13 +121,25 @@ export default function SecuritySupervisorReportsPage() {
       <PageHeader
         title="Security & Gate Analytics Reports"
         subtitle="Exportable analytical reports for gate traffic, visitor volume, guard attendance, and incident frequency"
-        breadcrumbs={[{ label: "GateSphere" }, { label: "Security Supervisor" }, { label: "Reports" }]}
+        breadcrumbs={[
+          { label: "GateSphere" },
+          { label: "Security Supervisor" },
+          { label: "Reports" },
+        ]}
       />
 
       <div className="card" style={{ marginBottom: "1.75rem" }}>
         <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", alignItems: "center" }}>
           <div>
-            <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", marginBottom: "0.25rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "0.75rem",
+                fontWeight: 600,
+                color: "var(--muted)",
+                marginBottom: "0.25rem",
+              }}
+            >
               Report Category
             </label>
             <select
@@ -137,7 +158,15 @@ export default function SecuritySupervisorReportsPage() {
           </div>
 
           <div>
-            <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", marginBottom: "0.25rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "0.75rem",
+                fontWeight: 600,
+                color: "var(--muted)",
+                marginBottom: "0.25rem",
+              }}
+            >
               Time Period
             </label>
             <select
@@ -181,7 +210,10 @@ export default function SecuritySupervisorReportsPage() {
                 </tr>
               ) : trafficRows.length === 0 ? (
                 <tr>
-                  <td colSpan={5} style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
+                  <td
+                    colSpan={5}
+                    style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
+                  >
                     No analytics records logged.
                   </td>
                 </tr>
@@ -191,7 +223,12 @@ export default function SecuritySupervisorReportsPage() {
                     <td style={{ fontWeight: 600 }}>{r.zone}</td>
                     <td>{r.entries} Entries</td>
                     <td>{r.exits} Exits</td>
-                    <td style={{ color: r.denied > 0 ? "var(--danger)" : "var(--success)", fontWeight: 600 }}>
+                    <td
+                      style={{
+                        color: r.denied > 0 ? "var(--danger)" : "var(--success)",
+                        fontWeight: 600,
+                      }}
+                    >
                       {r.denied} Denied
                     </td>
                     <td>{r.peak}</td>

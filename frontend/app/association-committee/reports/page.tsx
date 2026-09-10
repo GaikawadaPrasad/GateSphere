@@ -3,7 +3,11 @@
 import { useState } from "react";
 import { useUiStore } from "@/store/ui";
 import { useCommunityDetails } from "@/hooks/use-communities";
-import { useGovernanceOverview, useSpecialAssessments, useCollectionAudit } from "@/hooks/use-governance";
+import {
+  useGovernanceOverview,
+  useSpecialAssessments,
+  useCollectionAudit,
+} from "@/hooks/use-governance";
 import { useIncidents } from "@/hooks/use-incidents";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, type Column } from "@/components/tables/DataTable";
@@ -41,7 +45,10 @@ export default function GovernanceReportsPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.setAttribute("href", url);
-      link.setAttribute("download", `governance_financial_report_${community?.name || "community"}.csv`);
+      link.setAttribute(
+        "download",
+        `governance_financial_report_${community?.name || "community"}.csv`,
+      );
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -61,7 +68,10 @@ export default function GovernanceReportsPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.setAttribute("href", url);
-      link.setAttribute("download", `governance_collections_report_${community?.name || "community"}.csv`);
+      link.setAttribute(
+        "download",
+        `governance_collections_report_${community?.name || "community"}.csv`,
+      );
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -112,7 +122,11 @@ export default function GovernanceReportsPage() {
     {
       key: "payment_method",
       header: "Payment Method",
-      render: (item) => <span className="badge badge-neutral">{String(item.payment_method || "").toUpperCase()}</span>,
+      render: (item) => (
+        <span className="badge badge-neutral">
+          {String(item.payment_method || "").toUpperCase()}
+        </span>
+      ),
     },
     {
       key: "paid_at",
@@ -349,24 +363,75 @@ export default function GovernanceReportsPage() {
             </button>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem", marginBottom: "1.5rem" }}>
-            <div style={{ padding: "1rem", background: "#f8fafc", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: "1rem",
+              marginBottom: "1.5rem",
+            }}
+          >
+            <div
+              style={{
+                padding: "1rem",
+                background: "#f8fafc",
+                borderRadius: "var(--radius-sm)",
+                border: "1px solid var(--border)",
+              }}
+            >
               <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>GROSS INVOICED</div>
-              <div style={{ fontSize: "1.35rem", fontWeight: 700, color: "var(--fg)", marginTop: "0.25rem" }}>
+              <div
+                style={{
+                  fontSize: "1.35rem",
+                  fontWeight: 700,
+                  color: "var(--fg)",
+                  marginTop: "0.25rem",
+                }}
+              >
                 {formatCurrency(parseFloat(overview?.totalBilled || "0"))}
               </div>
             </div>
 
-            <div style={{ padding: "1rem", background: "#f8fafc", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
+            <div
+              style={{
+                padding: "1rem",
+                background: "#f8fafc",
+                borderRadius: "var(--radius-sm)",
+                border: "1px solid var(--border)",
+              }}
+            >
               <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>COLLECTED REVENUE</div>
-              <div style={{ fontSize: "1.35rem", fontWeight: 700, color: "#059669", marginTop: "0.25rem" }}>
+              <div
+                style={{
+                  fontSize: "1.35rem",
+                  fontWeight: 700,
+                  color: "#059669",
+                  marginTop: "0.25rem",
+                }}
+              >
                 {formatCurrency(parseFloat(overview?.totalCollected || "0"))}
               </div>
             </div>
 
-            <div style={{ padding: "1rem", background: "#f8fafc", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
-              <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>OUTSTANDING RECEIVABLES</div>
-              <div style={{ fontSize: "1.35rem", fontWeight: 700, color: "#dc2626", marginTop: "0.25rem" }}>
+            <div
+              style={{
+                padding: "1rem",
+                background: "#f8fafc",
+                borderRadius: "var(--radius-sm)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                OUTSTANDING RECEIVABLES
+              </div>
+              <div
+                style={{
+                  fontSize: "1.35rem",
+                  fontWeight: 700,
+                  color: "#dc2626",
+                  marginTop: "0.25rem",
+                }}
+              >
                 {formatCurrency(parseFloat(overview?.outstandingBalance || "0"))}
               </div>
             </div>

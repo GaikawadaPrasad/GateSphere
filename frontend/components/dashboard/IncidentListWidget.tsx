@@ -20,7 +20,9 @@ export function IncidentListWidget({ incidents, isLoading }: IncidentListWidgetP
   }
 
   const openIncidents =
-    incidents?.filter((i) => i.status !== "resolved" && i.status !== "closed" && i.status !== "false_alarm") || [];
+    incidents?.filter(
+      (i) => i.status !== "resolved" && i.status !== "closed" && i.status !== "false_alarm",
+    ) || [];
 
   const getSeverityBadge = (severity: string) => {
     switch (severity) {
@@ -44,15 +46,28 @@ export function IncidentListWidget({ incidents, isLoading }: IncidentListWidgetP
             Active security and facility escalations
           </p>
         </div>
-        <Link href="/community-admin/incidents" className="btn btn-secondary" style={{ fontSize: "0.75rem", padding: "0.3rem 0.6rem" }}>
+        <Link
+          href="/community-admin/incidents"
+          className="btn btn-secondary"
+          style={{ fontSize: "0.75rem", padding: "0.3rem 0.6rem" }}
+        >
           View All ({incidents?.length || 0}) →
         </Link>
       </div>
 
       <div style={{ flex: 1, overflowY: "auto", maxHeight: 220, marginTop: "0.5rem" }}>
         {openIncidents.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "2.5rem 0", color: "var(--muted)", fontSize: "0.85rem" }}>
-            <span style={{ fontSize: "1.5rem", display: "block", marginBottom: "0.25rem" }}>🛡️</span>
+          <div
+            style={{
+              textAlign: "center",
+              padding: "2.5rem 0",
+              color: "var(--muted)",
+              fontSize: "0.85rem",
+            }}
+          >
+            <span style={{ fontSize: "1.5rem", display: "block", marginBottom: "0.25rem" }}>
+              🛡️
+            </span>
             No open incidents or security alerts.
           </div>
         ) : (
@@ -72,14 +87,31 @@ export function IncidentListWidget({ incidents, isLoading }: IncidentListWidgetP
                 }}
               >
                 <div style={{ flex: 1, minWidth: 0, marginRight: "0.75rem" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.15rem" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.5rem",
+                      marginBottom: "0.15rem",
+                    }}
+                  >
                     {getSeverityBadge(incident.severity)}
-                    <span style={{ fontWeight: 600, color: "var(--fg)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textTransform: "capitalize" }}>
+                    <span
+                      style={{
+                        fontWeight: 600,
+                        color: "var(--fg)",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        textTransform: "capitalize",
+                      }}
+                    >
                       {incident.incident_type} Incident
                     </span>
                   </div>
                   <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-                    📍 {incident.location_text || "Community Grounds"} · Reported {formatDateTime(incident.reported_at || incident.created_at)}
+                    📍 {incident.location_text || "Community Grounds"} · Reported{" "}
+                    {formatDateTime(incident.reported_at || incident.created_at)}
                   </div>
                 </div>
 

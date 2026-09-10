@@ -39,7 +39,11 @@ export function DashboardShell({
                 <Eyebrow accentColor={accentColor}>{eyebrow}</Eyebrow>
               </div>
             )}
-            {title && <h1 className="hero-h1" style={{ fontSize: "2rem" }}>{title}</h1>}
+            {title && (
+              <h1 className="hero-h1" style={{ fontSize: "2rem" }}>
+                {title}
+              </h1>
+            )}
             {description && (
               <p style={{ color: "var(--brand-body)", marginTop: "0.25rem", fontSize: "15px" }}>
                 {description}
@@ -47,7 +51,9 @@ export function DashboardShell({
             )}
           </div>
           {headerActions && (
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+            <div
+              style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}
+            >
               {headerActions}
             </div>
           )}

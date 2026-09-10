@@ -32,7 +32,10 @@ export function Header() {
   return (
     <header className="header">
       {/* Left section: Hamburger & Role Badge & Scope */}
-      <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+      <div
+        className="mobile-header-left"
+        style={{ display: "flex", alignItems: "center", gap: "1rem" }}
+      >
         <button
           type="button"
           className="btn btn-ghost"
@@ -46,17 +49,27 @@ export function Header() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            flexShrink: 0,
           }}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+          >
             <line x1="3" y1="12" x2="21" y2="12" />
             <line x1="3" y1="6" x2="21" y2="6" />
             <line x1="3" y1="18" x2="21" y2="18" />
           </svg>
         </button>
 
-        {/* Role Badge with Live Pulse */}
+        {/* Role Badge with Live Pulse - hidden on mobile */}
         <div
+          className="mobile-hide"
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -83,8 +96,9 @@ export function Header() {
           {roleName}
         </div>
 
-        {/* Global Scope Selector */}
+        {/* Global Scope Selector - hidden on mobile */}
         <div
+          className="mobile-hide"
           style={{
             display: "flex",
             alignItems: "center",
@@ -121,8 +135,11 @@ export function Header() {
       </div>
 
       {/* Right section: User info & Actions */}
-      <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-        {/* User Profile Pill */}
+      <div
+        className="mobile-header-right"
+        style={{ display: "flex", alignItems: "center", gap: "1rem" }}
+      >
+        {/* User Profile Pill - text hidden on mobile, avatar stays */}
         <div
           style={{
             display: "flex",
@@ -147,17 +164,19 @@ export function Header() {
               fontWeight: 800,
               fontSize: "12px",
               boxShadow: "0 2px 6px rgba(29, 78, 216, 0.25)",
+              flexShrink: 0,
             }}
           >
             {user?.full_name?.charAt(0).toUpperCase() || "U"}
           </div>
-          <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.15 }}>
+          <div
+            className="mobile-hide-text"
+            style={{ display: "flex", flexDirection: "column", lineHeight: 1.15 }}
+          >
             <span style={{ fontSize: "12.5px", fontWeight: 700, color: "var(--fg)" }}>
               {user?.full_name || "User"}
             </span>
-            <span style={{ fontSize: "10.5px", color: "var(--muted)" }}>
-              {user?.email || ""}
-            </span>
+            <span style={{ fontSize: "10.5px", color: "var(--muted)" }}>{user?.email || ""}</span>
           </div>
         </div>
 

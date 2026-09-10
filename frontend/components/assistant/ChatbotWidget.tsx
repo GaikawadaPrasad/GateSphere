@@ -10,7 +10,17 @@ import type { AssistantAction, AssistantQuickChip } from "@/types/assistant";
 // visitor who happens to have a valid session cookie from the app in another tab.
 // Keep in sync with frontend/app/(public)/*, the root marketing page.tsx, and
 // frontend/app/unauthorized/.
-const PUBLIC_ROUTES = new Set(["/", "/about", "/demo", "/features", "/platform", "/security", "/solutions", "/login", "/unauthorized"]);
+const PUBLIC_ROUTES = new Set([
+  "/",
+  "/about",
+  "/demo",
+  "/features",
+  "/platform",
+  "/security",
+  "/solutions",
+  "/login",
+  "/unauthorized",
+]);
 
 interface ChatMessage {
   id: string;
@@ -25,13 +35,15 @@ function renderText(text: string) {
   return text.split("\n").map((line, i) => (
     <span key={i}>
       {i > 0 && <br />}
-      {line.split(/(\*\*[^*]+\*\*)/g).map((chunk, j) =>
-        chunk.startsWith("**") && chunk.endsWith("**") ? (
-          <strong key={j}>{chunk.slice(2, -2)}</strong>
-        ) : (
-          <span key={j}>{chunk}</span>
-        )
-      )}
+      {line
+        .split(/(\*\*[^*]+\*\*)/g)
+        .map((chunk, j) =>
+          chunk.startsWith("**") && chunk.endsWith("**") ? (
+            <strong key={j}>{chunk.slice(2, -2)}</strong>
+          ) : (
+            <span key={j}>{chunk}</span>
+          ),
+        )}
     </span>
   ));
 }
@@ -101,8 +113,8 @@ export function ChatbotWidget() {
         err instanceof ApiError && err.code === "COMMUNITY_REQUIRED"
           ? "Pick a community from a dashboard page first, then ask me again."
           : err instanceof ApiError
-          ? err.message
-          : "Something went wrong answering that — please try again.";
+            ? err.message
+            : "Something went wrong answering that — please try again.";
       setMessages((prev) => [...prev, { id: `e-${Date.now()}`, from: "bot", text: message }]);
     } finally {
       setIsLoading(false);
@@ -153,20 +165,38 @@ export function ChatbotWidget() {
               <span style={{ fontSize: "1.25rem" }}>🤖</span>
               <div>
                 <div style={{ fontWeight: 700, fontSize: "0.9rem" }}>GateSphere Assistant</div>
-                <div style={{ fontSize: "0.7rem", opacity: 0.85 }}>Ask about dues, visitors, tickets & more</div>
+                <div style={{ fontSize: "0.7rem", opacity: 0.85 }}>
+                  Ask about dues, visitors, tickets & more
+                </div>
               </div>
             </div>
             <button
               type="button"
               onClick={() => setIsOpen(false)}
               aria-label="Close assistant"
-              style={{ background: "transparent", border: "none", color: "#fff", cursor: "pointer", fontSize: "1.1rem" }}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: "#fff",
+                cursor: "pointer",
+                fontSize: "1.1rem",
+              }}
             >
               ✕
             </button>
           </div>
 
-          <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "1rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+          <div
+            ref={scrollRef}
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              padding: "1rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.75rem",
+            }}
+          >
             {messages.map((m) => (
               <div
                 key={m.id}
@@ -208,7 +238,14 @@ export function ChatbotWidget() {
                   </div>
                 )}
                 {m.relatedFaqs && m.relatedFaqs.length > 0 && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem", width: "100%" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.3rem",
+                      width: "100%",
+                    }}
+                  >
                     {m.relatedFaqs.map((faq) => (
                       <button
                         key={faq}
@@ -250,7 +287,15 @@ export function ChatbotWidget() {
             )}
 
             {isLoading && (
-              <div style={{ alignSelf: "flex-start", fontSize: "0.78rem", color: "var(--muted, #94a3b8)" }}>Thinking…</div>
+              <div
+                style={{
+                  alignSelf: "flex-start",
+                  fontSize: "0.78rem",
+                  color: "var(--muted, #94a3b8)",
+                }}
+              >
+                Thinking…
+              </div>
             )}
           </div>
 
@@ -259,7 +304,12 @@ export function ChatbotWidget() {
               e.preventDefault();
               send(input);
             }}
-            style={{ display: "flex", gap: "0.5rem", padding: "0.75rem", borderTop: "1px solid var(--border-standard, #e2e8f0)" }}
+            style={{
+              display: "flex",
+              gap: "0.5rem",
+              padding: "0.75rem",
+              borderTop: "1px solid var(--border-standard, #e2e8f0)",
+            }}
           >
             <input
               type="text"
@@ -270,7 +320,12 @@ export function ChatbotWidget() {
               disabled={isLoading}
               style={{ flex: 1 }}
             />
-            <button type="submit" className="btn btn-primary" disabled={isLoading || !input.trim()} style={{ padding: "0.5rem 0.9rem" }}>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={isLoading || !input.trim()}
+              style={{ padding: "0.5rem 0.9rem" }}
+            >
               ➤
             </button>
           </form>
@@ -296,7 +351,13 @@ export function ChatbotWidget() {
           transition: "transform 0.2s ease, box-shadow 0.2s ease",
         }}
       >
-        <span style={{ display: "inline-block", transition: "transform 0.2s ease", transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }}>
+        <span
+          style={{
+            display: "inline-block",
+            transition: "transform 0.2s ease",
+            transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+          }}
+        >
           {isOpen ? "✕" : "💬"}
         </span>
       </button>

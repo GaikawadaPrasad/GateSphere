@@ -51,6 +51,7 @@ export function Modal({ isOpen, onClose, title, children, footer, maxWidth, size
       onClick={onClose}
     >
       <div
+        className="modal-content"
         style={{
           background: "white",
           borderRadius: "var(--radius-card)",
@@ -60,6 +61,8 @@ export function Modal({ isOpen, onClose, title, children, footer, maxWidth, size
           border: "1px solid var(--border-standard)",
           overflow: "hidden",
           animation: "modalIn 0.2s ease-out",
+          margin: "0 auto",
+          maxHeight: "calc(100vh - 2rem)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -72,7 +75,9 @@ export function Modal({ isOpen, onClose, title, children, footer, maxWidth, size
             borderBottom: "1px solid var(--border-standard)",
           }}
         >
-          <h2 style={{ fontSize: "1.15rem", fontWeight: 700, color: "var(--brand-heading)" }}>{title}</h2>
+          <h2 style={{ fontSize: "1.15rem", fontWeight: 700, color: "var(--brand-heading)" }}>
+            {title}
+          </h2>
           <button
             type="button"
             onClick={onClose}
@@ -89,10 +94,13 @@ export function Modal({ isOpen, onClose, title, children, footer, maxWidth, size
           </button>
         </div>
 
-        <div style={{ padding: "1.5rem", maxHeight: "calc(80vh - 120px)", overflowY: "auto" }}>{children}</div>
+        <div style={{ padding: "1.5rem", maxHeight: "calc(80vh - 120px)", overflowY: "auto" }}>
+          {children}
+        </div>
 
         {footer && (
           <div
+            className="modal-footer-responsive"
             style={{
               display: "flex",
               alignItems: "center",

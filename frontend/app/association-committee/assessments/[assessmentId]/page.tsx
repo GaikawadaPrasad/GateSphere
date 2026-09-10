@@ -4,7 +4,11 @@ import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useUiStore } from "@/store/ui";
-import { useSpecialAssessment, useApproveAssessment, useRejectAssessment } from "@/hooks/use-governance";
+import {
+  useSpecialAssessment,
+  useApproveAssessment,
+  useRejectAssessment,
+} from "@/hooks/use-governance";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -59,7 +63,11 @@ export default function AssessmentDetailPage() {
         <p style={{ marginTop: "0.5rem", color: "var(--muted)" }}>
           The requested assessment proposal does not exist or has been removed.
         </p>
-        <Link href="/association-committee/assessments" className="btn btn-primary" style={{ marginTop: "1rem" }}>
+        <Link
+          href="/association-committee/assessments"
+          className="btn btn-primary"
+          style={{ marginTop: "1rem" }}
+        >
           ← Back to Assessments
         </Link>
       </div>
@@ -89,36 +97,94 @@ export default function AssessmentDetailPage() {
         }
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "1.5rem" }} className="responsive-grid">
+      <div className="responsive-grid">
         {/* Left Column: Details, Progress & Description */}
         <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
           {/* Status & Highlights Card */}
           <div className="card">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "1rem",
+              }}
+            >
               <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "var(--fg)" }}>
                 Assessment Proposal Overview
               </div>
               <StatusBadge status={assessment.status} />
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem", marginBottom: "1.25rem" }}>
-              <div style={{ padding: "0.85rem", background: "#f8fafc", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, 1fr)",
+                gap: "1rem",
+                marginBottom: "1.25rem",
+              }}
+            >
+              <div
+                style={{
+                  padding: "0.85rem",
+                  background: "#f8fafc",
+                  borderRadius: "var(--radius-sm)",
+                  border: "1px solid var(--border)",
+                }}
+              >
                 <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>TARGET BUDGET</div>
-                <div style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--fg)", marginTop: "0.25rem" }}>
+                <div
+                  style={{
+                    fontSize: "1.25rem",
+                    fontWeight: 700,
+                    color: "var(--fg)",
+                    marginTop: "0.25rem",
+                  }}
+                >
                   {formatCurrency(target)}
                 </div>
               </div>
 
-              <div style={{ padding: "0.85rem", background: "#f8fafc", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
-                <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>PER UNIT ALLOCATION</div>
-                <div style={{ fontSize: "1.25rem", fontWeight: 700, color: "#2563eb", marginTop: "0.25rem" }}>
+              <div
+                style={{
+                  padding: "0.85rem",
+                  background: "#f8fafc",
+                  borderRadius: "var(--radius-sm)",
+                  border: "1px solid var(--border)",
+                }}
+              >
+                <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                  PER UNIT ALLOCATION
+                </div>
+                <div
+                  style={{
+                    fontSize: "1.25rem",
+                    fontWeight: 700,
+                    color: "#2563eb",
+                    marginTop: "0.25rem",
+                  }}
+                >
                   {formatCurrency(parseFloat(assessment.per_unit_amount || "0"))}
                 </div>
               </div>
 
-              <div style={{ padding: "0.85rem", background: "#f8fafc", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
+              <div
+                style={{
+                  padding: "0.85rem",
+                  background: "#f8fafc",
+                  borderRadius: "var(--radius-sm)",
+                  border: "1px solid var(--border)",
+                }}
+              >
                 <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>TOTAL COLLECTED</div>
-                <div style={{ fontSize: "1.25rem", fontWeight: 700, color: "#059669", marginTop: "0.25rem" }}>
+                <div
+                  style={{
+                    fontSize: "1.25rem",
+                    fontWeight: 700,
+                    color: "#059669",
+                    marginTop: "0.25rem",
+                  }}
+                >
                   {formatCurrency(collected)}
                 </div>
               </div>
@@ -126,11 +192,27 @@ export default function AssessmentDetailPage() {
 
             {/* Collection Progress Bar */}
             <div style={{ marginBottom: "1rem" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", color: "var(--fg-secondary)", marginBottom: "0.35rem" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: "0.8rem",
+                  color: "var(--fg-secondary)",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 <span>Collection Progress</span>
                 <span style={{ fontWeight: 600 }}>{progress}% Complete</span>
               </div>
-              <div style={{ width: "100%", height: 10, background: "#e2e8f0", borderRadius: 999, overflow: "hidden" }}>
+              <div
+                style={{
+                  width: "100%",
+                  height: 10,
+                  background: "#e2e8f0",
+                  borderRadius: 999,
+                  overflow: "hidden",
+                }}
+              >
                 <div
                   style={{
                     width: `${progress}%`,
@@ -142,18 +224,31 @@ export default function AssessmentDetailPage() {
             </div>
 
             {/* Timelines & Scope */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", fontSize: "0.85rem", borderTop: "1px solid var(--border)", paddingTop: "1rem" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "0.75rem",
+                fontSize: "0.85rem",
+                borderTop: "1px solid var(--border)",
+                paddingTop: "1rem",
+              }}
+            >
               <div>
                 <span style={{ color: "var(--muted)" }}>Effective Start Date: </span>
                 <span style={{ fontWeight: 600 }}>{formatDate(assessment.effective_date)}</span>
               </div>
               <div>
                 <span style={{ color: "var(--muted)" }}>Due Date: </span>
-                <span style={{ fontWeight: 600 }}>{assessment.due_date ? formatDate(assessment.due_date) : "N/A"}</span>
+                <span style={{ fontWeight: 600 }}>
+                  {assessment.due_date ? formatDate(assessment.due_date) : "N/A"}
+                </span>
               </div>
               <div>
                 <span style={{ color: "var(--muted)" }}>Participating Units: </span>
-                <span style={{ fontWeight: 600 }}>{assessment.affected_units_count || 0} Units</span>
+                <span style={{ fontWeight: 600 }}>
+                  {assessment.affected_units_count || 0} Units
+                </span>
               </div>
               <div>
                 <span style={{ color: "var(--muted)" }}>Created On: </span>
@@ -168,7 +263,9 @@ export default function AssessmentDetailPage() {
               Project Scope & Objective
             </h2>
             <p style={{ fontSize: "0.875rem", lineHeight: 1.6, color: "var(--fg-secondary)" }}>
-              {assessment.description || assessment.purpose || "No additional project notes provided."}
+              {assessment.description ||
+                assessment.purpose ||
+                "No additional project notes provided."}
             </p>
           </div>
         </div>
@@ -177,16 +274,22 @@ export default function AssessmentDetailPage() {
         <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
           {assessment.status === "under_review" ? (
             <div className="card" style={{ borderTop: "3px solid #8b5cf6" }}>
-              <h2 className="card-title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <h2
+                className="card-title"
+                style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
+              >
                 <span>⚖️</span> Committee Governance Action
               </h2>
               <p style={{ fontSize: "0.775rem", color: "var(--muted)", margin: "0.35rem 0 1rem" }}>
-                As an Association Committee member, approve or return this special assessment proposal.
+                As an Association Committee member, approve or return this special assessment
+                proposal.
               </p>
 
               {!showRejectBox ? (
                 <div>
-                  <label style={{ fontSize: "0.775rem", fontWeight: 600, color: "var(--fg-secondary)" }}>
+                  <label
+                    style={{ fontSize: "0.775rem", fontWeight: 600, color: "var(--fg-secondary)" }}
+                  >
                     Committee Approval Notes
                   </label>
                   <textarea
@@ -194,7 +297,12 @@ export default function AssessmentDetailPage() {
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder="e.g. Approved per AGM resolution #12. Effective next billing cycle."
                     className="input-field"
-                    style={{ minHeight: 90, marginTop: "0.25rem", width: "100%", marginBottom: "1rem" }}
+                    style={{
+                      minHeight: 90,
+                      marginTop: "0.25rem",
+                      width: "100%",
+                      marginBottom: "1rem",
+                    }}
                   />
 
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
@@ -228,7 +336,13 @@ export default function AssessmentDetailPage() {
                     onChange={(e) => setRejectReason(e.target.value)}
                     placeholder="Specify reason for returning proposal..."
                     className="input-field"
-                    style={{ minHeight: 90, marginTop: "0.25rem", width: "100%", marginBottom: "1rem", borderColor: "#fca5a5" }}
+                    style={{
+                      minHeight: 90,
+                      marginTop: "0.25rem",
+                      width: "100%",
+                      marginBottom: "1rem",
+                      borderColor: "#fca5a5",
+                    }}
                   />
 
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
@@ -259,9 +373,17 @@ export default function AssessmentDetailPage() {
               <h2 className="card-title" style={{ marginBottom: "0.75rem" }}>
                 Governance Status
               </h2>
-              <div style={{ padding: "0.75rem", background: "#f8fafc", borderRadius: "var(--radius-sm)", fontSize: "0.85rem" }}>
+              <div
+                style={{
+                  padding: "0.75rem",
+                  background: "#f8fafc",
+                  borderRadius: "var(--radius-sm)",
+                  fontSize: "0.85rem",
+                }}
+              >
                 <div>
-                  <strong>Status:</strong> <span style={{ textTransform: "capitalize" }}>{assessment.status}</span>
+                  <strong>Status:</strong>{" "}
+                  <span style={{ textTransform: "capitalize" }}>{assessment.status}</span>
                 </div>
                 {assessment.approved_at && (
                   <div style={{ marginTop: "0.4rem", color: "var(--muted)", fontSize: "0.775rem" }}>
@@ -269,7 +391,13 @@ export default function AssessmentDetailPage() {
                   </div>
                 )}
                 {assessment.approval_notes && (
-                  <div style={{ marginTop: "0.4rem", fontSize: "0.8rem", color: "var(--fg-secondary)" }}>
+                  <div
+                    style={{
+                      marginTop: "0.4rem",
+                      fontSize: "0.8rem",
+                      color: "var(--fg-secondary)",
+                    }}
+                  >
                     <em>&ldquo;{assessment.approval_notes}&rdquo;</em>
                   </div>
                 )}

@@ -5,7 +5,7 @@ export default function DomesticStaffLoading() {
     <div>
       <div style={{ marginBottom: "1.75rem" }}>
         <div className="skeleton" style={{ width: 240, height: 32, marginBottom: "0.5rem" }} />
-        <div className="skeleton" style={{ width: 360, height: 16 }} />
+        <div className="skeleton" style={{ width: "100%", maxWidth: 360, height: 16 }} />
       </div>
 
       <div

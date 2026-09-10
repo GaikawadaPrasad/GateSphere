@@ -50,7 +50,14 @@ export function ActivityFeed({ events, alerts, isLoading }: ActivityFeedProps) {
               <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
                 <span style={{ fontSize: "1.1rem" }}>🚨</span>
                 <div>
-                  <div style={{ fontWeight: 600, color: "#991b1b", fontSize: "0.85rem", textTransform: "capitalize" }}>
+                  <div
+                    style={{
+                      fontWeight: 600,
+                      color: "#991b1b",
+                      fontSize: "0.85rem",
+                      textTransform: "capitalize",
+                    }}
+                  >
                     {alert.alert_type} Alert{alert.message ? ` — ${alert.message}` : ""}
                   </div>
                   <div style={{ fontSize: "0.75rem", color: "#b91c1c" }}>
@@ -99,7 +106,14 @@ export function ActivityFeed({ events, alerts, isLoading }: ActivityFeedProps) {
           ))}
 
           {!hasAlerts && recentEvents.length === 0 && (
-            <div style={{ textAlign: "center", padding: "1.5rem 0", color: "var(--muted)", fontSize: "0.85rem" }}>
+            <div
+              style={{
+                textAlign: "center",
+                padding: "1.5rem 0",
+                color: "var(--muted)",
+                fontSize: "0.85rem",
+              }}
+            >
               No recent gate activity
             </div>
           )}

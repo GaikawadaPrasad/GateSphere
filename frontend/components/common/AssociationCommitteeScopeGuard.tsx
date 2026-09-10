@@ -76,7 +76,8 @@ export function AssociationCommitteeScopeGuard({ children }: AssociationCommitte
           <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🏛️</div>
           <h2>No Assigned Governance Scope</h2>
           <p style={{ marginTop: "0.5rem", color: "var(--muted)" }}>
-            Your account is not currently assigned to a residential community committee. Please contact your system administrator.
+            Your account is not currently assigned to a residential community committee. Please
+            contact your system administrator.
           </p>
         </div>
       </div>

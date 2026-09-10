@@ -63,7 +63,7 @@ export default function FacilityManagerMaintenancePage() {
           status: t.status,
           escalation_state: deriveTicketEscalationState(t),
           created_at: t.created_at,
-        }))
+        })),
       );
     } catch (err: any) {
       setLoadError(err?.message || "Failed to load maintenance tickets.");
@@ -75,7 +75,11 @@ export default function FacilityManagerMaintenancePage() {
     loadData();
   }, []);
 
-  const handleStatusTransition = async (recordId: string, currentStatus: string, newStatus: string) => {
+  const handleStatusTransition = async (
+    recordId: string,
+    currentStatus: string,
+    newStatus: string,
+  ) => {
     const allowed = VALID_STATUS_TRANSITIONS[currentStatus] || [];
     if (!allowed.includes(newStatus)) {
       alert(`Invalid status transition from ${currentStatus} to ${newStatus}`);
@@ -116,7 +120,11 @@ export default function FacilityManagerMaintenancePage() {
       <PageHeader
         title="Maintenance Tickets"
         subtitle="Real-time service tickets for plumbing, electrical, lifts and housekeeping — assign vendors and track resolution"
-        breadcrumbs={[{ label: "GateSphere" }, { label: "Facility Manager" }, { label: "Maintenance" }]}
+        breadcrumbs={[
+          { label: "GateSphere" },
+          { label: "Facility Manager" },
+          { label: "Maintenance" },
+        ]}
       />
 
       <div className="card">
@@ -129,8 +137,12 @@ export default function FacilityManagerMaintenancePage() {
           </div>
 
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-            <div style={{ width: 220 }}>
-              <SearchInput value={search} onChange={setSearch} placeholder="Search ticket #, subject, category…" />
+            <div style={{ width: "100%", maxWidth: 220 }}>
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Search ticket #, subject, category…"
+              />
             </div>
 
             <select
@@ -185,13 +197,23 @@ export default function FacilityManagerMaintenancePage() {
                 </tr>
               ) : loadError ? (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: "center", padding: "2rem", color: "var(--danger, #dc2626)" }}>
+                  <td
+                    colSpan={8}
+                    style={{
+                      textAlign: "center",
+                      padding: "2rem",
+                      color: "var(--danger, #dc2626)",
+                    }}
+                  >
                     {loadError}
                   </td>
                 </tr>
               ) : filteredRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
+                  <td
+                    colSpan={8}
+                    style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
+                  >
                     No maintenance tickets found.
                   </td>
                 </tr>
@@ -231,8 +253,15 @@ export default function FacilityManagerMaintenancePage() {
                           {allowedTransitions.map((nextSt) => (
                             <button
                               key={nextSt}
-                              className={nextSt === "resolved" ? "btn btn-primary" : "btn btn-secondary"}
-                              style={{ fontSize: "0.75rem", padding: "0.2rem 0.45rem", height: 26, textTransform: "capitalize" }}
+                              className={
+                                nextSt === "resolved" ? "btn btn-primary" : "btn btn-secondary"
+                              }
+                              style={{
+                                fontSize: "0.75rem",
+                                padding: "0.2rem 0.45rem",
+                                height: 26,
+                                textTransform: "capitalize",
+                              }}
                               onClick={() => handleStatusTransition(r.id, r.status, nextSt)}
                             >
                               {nextSt.replace(/_/g, " ")}
@@ -259,7 +288,11 @@ export default function FacilityManagerMaintenancePage() {
             <button className="btn btn-secondary" onClick={() => setIsAssignModalOpen(false)}>
               Cancel
             </button>
-            <button className="btn btn-primary" onClick={handleAssignVendor} disabled={!vendorName.trim()}>
+            <button
+              className="btn btn-primary"
+              onClick={handleAssignVendor}
+              disabled={!vendorName.trim()}
+            >
               Confirm Assignment
             </button>
           </>
@@ -267,7 +300,8 @@ export default function FacilityManagerMaintenancePage() {
       >
         <div>
           <p style={{ marginBottom: "1rem", fontSize: "0.875rem" }}>
-            Enter the vendor or contractor name to assign to <strong>{selectedRecord?.subject}</strong>:
+            Enter the vendor or contractor name to assign to{" "}
+            <strong>{selectedRecord?.subject}</strong>:
           </p>
           <input
             type="text"

@@ -7,7 +7,15 @@ export interface AppNotification {
   community_id?: string | null;
   title: string;
   body: string;
-  category: "visitor" | "delivery" | "billing" | "complaint" | "amenity" | "announcement" | "emergency" | "system";
+  category:
+    | "visitor"
+    | "delivery"
+    | "billing"
+    | "complaint"
+    | "amenity"
+    | "announcement"
+    | "emergency"
+    | "system";
   action_url?: string | null;
   is_read: boolean;
   read_at?: string | null;

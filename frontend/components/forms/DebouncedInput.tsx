@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 
-interface DebouncedInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange"> {
+interface DebouncedInputProps
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange"> {
   value: string;
   onChange: (value: string) => void;
   debounce?: number;
@@ -33,7 +34,9 @@ export function DebouncedInput({
   }, [value, debounce, onChange]);
 
   return (
-    <div style={{ position: "relative", display: "inline-flex", alignItems: "center", width: "100%" }}>
+    <div
+      style={{ position: "relative", display: "inline-flex", alignItems: "center", width: "100%" }}
+    >
       {icon && (
         <span
           style={{

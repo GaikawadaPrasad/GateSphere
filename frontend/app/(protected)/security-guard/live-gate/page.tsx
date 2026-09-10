@@ -47,7 +47,10 @@ export default function SecurityGuardLiveGatePage() {
             const match = (directory || []).find((v: any) => v.id === request.visitor_id);
             if (match) visitorName = (match as any).full_name || visitorName;
           }
-          unitLabel = (request?.group_label as string) || (request?.visitor_type as string)?.replace(/_/g, " ") || unitLabel;
+          unitLabel =
+            (request?.group_label as string) ||
+            (request?.visitor_type as string)?.replace(/_/g, " ") ||
+            unitLabel;
         }
       } catch {
         // Entry was recorded successfully even if the enrichment lookups fail — show what we have.
@@ -91,20 +94,31 @@ export default function SecurityGuardLiveGatePage() {
       />
 
       {/* Pass Verification Form Card */}
-      <div className="card" style={{ marginBottom: "1.75rem", background: "linear-gradient(135deg, #ffffff, #f8fafc)" }}>
+      <div
+        className="card"
+        style={{ marginBottom: "1.75rem", background: "linear-gradient(135deg, #ffffff, #f8fafc)" }}
+      >
         <h3 className="card-title" style={{ marginBottom: "1rem" }}>
           🔍 Verify & Record Entry (QR Token or PIN)
         </h3>
 
-        <form onSubmit={handleVerifyPass} style={{ display: "flex", gap: "1rem", flexWrap: "wrap", alignItems: "center" }}>
-          <div style={{ flex: 1, minWidth: 260 }}>
+        <form
+          onSubmit={handleVerifyPass}
+          style={{ display: "flex", gap: "1rem", flexWrap: "wrap", alignItems: "center" }}
+        >
+          <div style={{ flex: 1, minWidth: 0 }}>
             <input
               type="text"
               className="input-field"
               placeholder="Scan QR token or enter 4-12 digit PIN..."
               value={passInput}
               onChange={(e) => setPassInput(e.target.value)}
-              style={{ fontSize: "1.05rem", padding: "0.75rem 1rem", fontWeight: 600, fontFamily: "monospace" }}
+              style={{
+                fontSize: "1.05rem",
+                padding: "0.75rem 1rem",
+                fontWeight: 600,
+                fontFamily: "monospace",
+              }}
               autoFocus
             />
           </div>
@@ -155,24 +169,38 @@ export default function SecurityGuardLiveGatePage() {
 
       {/* Verification Result Card */}
       {verifiedEntry && (
-        <div className="card" style={{ marginBottom: "1.75rem", border: "2px solid var(--primary)" }}>
+        <div
+          className="card"
+          style={{ marginBottom: "1.75rem", border: "2px solid var(--primary)" }}
+        >
           <div className="card-header">
             <h3 className="card-title">Entry Recorded</h3>
             <StatusBadge status={verifiedEntry.status} />
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem", marginBottom: "1.5rem" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+              gap: "1rem",
+              marginBottom: "1.5rem",
+            }}
+          >
             <div>
               <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Visitor Name</div>
               <div style={{ fontWeight: 700, fontSize: "1.1rem" }}>{verifiedEntry.visitorName}</div>
             </div>
             <div>
               <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Purpose / Group</div>
-              <div style={{ fontWeight: 700, fontSize: "1.1rem", textTransform: "capitalize" }}>{verifiedEntry.unitLabel}</div>
+              <div style={{ fontWeight: 700, fontSize: "1.1rem", textTransform: "capitalize" }}>
+                {verifiedEntry.unitLabel}
+              </div>
             </div>
             <div>
               <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Vehicle Number</div>
-              <div style={{ fontWeight: 600, fontFamily: "monospace" }}>{verifiedEntry.vehicleNumber || "N/A"}</div>
+              <div style={{ fontWeight: 600, fontFamily: "monospace" }}>
+                {verifiedEntry.vehicleNumber || "N/A"}
+              </div>
             </div>
           </div>
 

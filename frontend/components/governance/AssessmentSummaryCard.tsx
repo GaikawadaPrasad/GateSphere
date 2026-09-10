@@ -13,7 +13,10 @@ interface AssessmentSummaryCardProps {
 export function AssessmentSummaryCard({ assessments, isLoading }: AssessmentSummaryCardProps) {
   if (isLoading) {
     return (
-      <div className="card" style={{ height: "100%", display: "flex", flexDirection: "column", gap: "1rem" }}>
+      <div
+        className="card"
+        style={{ height: "100%", display: "flex", flexDirection: "column", gap: "1rem" }}
+      >
         <div className="skeleton" style={{ width: "45%", height: 20 }} />
         <div className="skeleton" style={{ width: "100%", height: 70 }} />
         <div className="skeleton" style={{ width: "100%", height: 70 }} />
@@ -22,13 +25,18 @@ export function AssessmentSummaryCard({ assessments, isLoading }: AssessmentSumm
   }
 
   const list = assessments || [];
-  const pendingCount = list.filter((a) => a.status === "under_review" || a.status === "draft").length;
+  const pendingCount = list.filter(
+    (a) => a.status === "under_review" || a.status === "draft",
+  ).length;
 
   return (
     <div className="card" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <div className="card-header">
         <div>
-          <h2 className="card-title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <h2
+            className="card-title"
+            style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
+          >
             <span>📋</span> Special Assessments
           </h2>
           <p style={{ fontSize: "0.775rem", color: "var(--muted)", marginTop: "0.15rem" }}>
@@ -62,13 +70,26 @@ export function AssessmentSummaryCard({ assessments, isLoading }: AssessmentSumm
         >
           <span>⚠️</span>
           <span>
-            <strong>{pendingCount} assessment{pendingCount > 1 ? "s" : ""}</strong> awaiting Association Committee review and approval.
+            <strong>
+              {pendingCount} assessment{pendingCount > 1 ? "s" : ""}
+            </strong>{" "}
+            awaiting Association Committee review and approval.
           </span>
         </div>
       )}
 
       {list.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "2rem 1rem", color: "var(--muted)", flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+        <div
+          style={{
+            textAlign: "center",
+            padding: "2rem 1rem",
+            color: "var(--muted)",
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+          }}
+        >
           <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>📋</div>
           <div style={{ fontWeight: 600, fontSize: "0.875rem" }}>No Special Assessments</div>
           <p style={{ fontSize: "0.775rem", marginTop: "0.25rem" }}>
@@ -97,22 +118,52 @@ export function AssessmentSummaryCard({ assessments, isLoading }: AssessmentSumm
                 }}
                 className="hover-panel"
               >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.5rem" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                    gap: "0.5rem",
+                  }}
+                >
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: "0.875rem", color: "var(--fg)" }}>{item.title}</div>
-                    <div style={{ fontSize: "0.775rem", color: "var(--muted)", marginTop: "0.15rem" }}>
-                      Effective: {formatDate(item.effective_date)} · {item.affected_units_count || 0} units
+                    <div style={{ fontWeight: 600, fontSize: "0.875rem", color: "var(--fg)" }}>
+                      {item.title}
+                    </div>
+                    <div
+                      style={{ fontSize: "0.775rem", color: "var(--muted)", marginTop: "0.15rem" }}
+                    >
+                      Effective: {formatDate(item.effective_date)} ·{" "}
+                      {item.affected_units_count || 0} units
                     </div>
                   </div>
                   <StatusBadge status={item.status} />
                 </div>
 
                 <div style={{ marginTop: "0.6rem" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", color: "var(--fg-secondary)", marginBottom: "0.25rem" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontSize: "0.75rem",
+                      color: "var(--fg-secondary)",
+                      marginBottom: "0.25rem",
+                    }}
+                  >
                     <span>Target: {formatCurrency(target)}</span>
-                    <span>Collected: {formatCurrency(collected)} ({progress}%)</span>
+                    <span>
+                      Collected: {formatCurrency(collected)} ({progress}%)
+                    </span>
                   </div>
-                  <div style={{ width: "100%", height: 6, background: "#e2e8f0", borderRadius: 999, overflow: "hidden" }}>
+                  <div
+                    style={{
+                      width: "100%",
+                      height: 6,
+                      background: "#e2e8f0",
+                      borderRadius: 999,
+                      overflow: "hidden",
+                    }}
+                  >
                     <div
                       style={{
                         width: `${progress}%`,

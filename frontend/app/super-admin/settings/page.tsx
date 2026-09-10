@@ -74,7 +74,10 @@ export default function SettingsPage() {
       <PageHeader
         title="System & RBAC Settings"
         subtitle="Configure platform permissions, role hierarchies, and system definitions"
-        breadcrumbs={[{ label: "Super Admin", href: "/super-admin/dashboard" }, { label: "System Settings" }]}
+        breadcrumbs={[
+          { label: "Super Admin", href: "/super-admin/dashboard" },
+          { label: "System Settings" },
+        ]}
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr", gap: "1.5rem" }}>
@@ -82,7 +85,9 @@ export default function SettingsPage() {
         <div className="card">
           <div className="card-header">
             <h3 className="card-title">Configured System Roles</h3>
-            <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>{roles?.length || 10} Roles</span>
+            <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+              {roles?.length || 10} Roles
+            </span>
           </div>
 
           <DataTable
