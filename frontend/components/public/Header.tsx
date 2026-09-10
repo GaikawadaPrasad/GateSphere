@@ -81,7 +81,7 @@ export default function Header() {
             </button>
 
             {/* Logo */}
-            <Link href="/" className="flex items-center gap-2.5 group">
+            <Link href="/" className="flex items-center gap-2.5 group shrink-0">
               <GateSphereLogo
                 variant="light"
                 className="transition-transform duration-200 group-hover:scale-105"
