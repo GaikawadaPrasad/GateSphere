@@ -19,7 +19,7 @@ export default function GateSphereLogo({
   const isLarge = size === "large";
 
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
+    <div className={`flex items-center gap-1.5 sm:gap-2 ${className}`}>
       <Image
         src={logoPath}
         alt="GateSphere"
@@ -28,13 +28,17 @@ export default function GateSphereLogo({
         priority
         className={`${
           isLarge
-            ? "h-12 md:h-14 w-auto object-contain drop-shadow-xl transition-all duration-300"
-            : "h-8 md:h-10 w-auto object-contain drop-shadow-lg transition-all duration-300"
+            ? "h-9 sm:h-12 md:h-14 w-auto object-contain drop-shadow-xl transition-all duration-300"
+            : "h-7 sm:h-8 md:h-10 w-auto object-contain drop-shadow-lg transition-all duration-300"
         }`}
       />
       {variant !== "compact" && (
         <span
-          className={`${isLarge ? "font-extrabold text-2xl md:text-3xl" : "font-bold text-xl md:text-2xl"} tracking-tight whitespace-nowrap transition-all duration-300 ease-in-out ${
+          className={`${
+            isLarge
+              ? "font-extrabold text-lg sm:text-2xl md:text-3xl"
+              : "font-bold text-base sm:text-xl md:text-2xl"
+          } tracking-tight whitespace-nowrap transition-all duration-300 ease-in-out ${
             showText ? "opacity-100" : "opacity-0 w-0"
           } ${variant === "light" ? "text-white" : "text-slate-900"}`}
           style={{ fontFamily: "'Outfit', sans-serif" }}

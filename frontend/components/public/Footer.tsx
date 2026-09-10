@@ -202,72 +202,7 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* ── MIDDLE SECTION: Newsletter (Left) + Accreditation Badges (Right) ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 py-8 border-b border-slate-800/80 items-center">
-          {/* Newsletter Box (5 Cols) */}
-          <div className="lg:col-span-5 space-y-2">
-            <h4
-              className="text-[12px] font-bold uppercase tracking-wider text-white"
-              style={{ fontFamily: "'Outfit', sans-serif" }}
-            >
-              STAY UPDATED
-            </h4>
-            <p className="text-[12px] text-slate-400">
-              Community management insights, security updates, and feature releases.
-            </p>
-            {subscribed ? (
-              <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-950/60 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
-                <span>✓ Subscribed! You will receive our latest society updates.</span>
-              </div>
-            ) : (
-              <form onSubmit={handleSubscribe} className="flex items-center gap-2 pt-1">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  placeholder="Enter your society email address..."
-                  className="w-full px-3.5 py-2 rounded-xl text-[12.5px] text-white bg-white/5 border border-white/15 focus:border-cyan-400 outline-none transition-all"
-                />
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-xl text-[12px] font-bold text-slate-950 bg-white hover:bg-slate-200 transition-all uppercase tracking-wider shrink-0 cursor-pointer"
-                >
-                  Subscribe
-                </button>
-              </form>
-            )}
-          </div>
-
-          {/* Accreditation Badges (7 Cols) -> Clickable to /security */}
-          <div className="lg:col-span-7 space-y-2">
-            <h4
-              className="text-[12px] font-bold uppercase tracking-wider text-white"
-              style={{ fontFamily: "'Outfit', sans-serif" }}
-            >
-              TRUSTED SECURITY &amp; ACCREDITATION
-            </h4>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-              {[
-                { icon: "🔒", title: "ISO 27001", sub: "Certified Platform" },
-                { icon: "🛡️", title: "SOC 2 Type II", sub: "Audited Systems" },
-                { icon: "⚡", title: "DPDP Act", sub: "2023 Compliant" },
-                { icon: "💳", title: "NPCI / UPI", sub: "Verified Gateway" },
-              ].map((badge) => (
-                <div
-                  key={badge.title}
-                  className="flex items-center gap-2 p-2 rounded-xl bg-white/5 border border-white/5"
-                >
-                  <span className="text-base shrink-0">{badge.icon}</span>
-                  <div>
-                    <div className="text-[11.5px] font-bold text-slate-200 leading-tight">{badge.title}</div>
-                    <div className="text-[10px] text-slate-500 leading-tight">{badge.sub}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+       
 
         {/* ── BOTTOM BAR: Copyright + Active Navigation Links ── */}
         <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-[12px] text-slate-500 text-center sm:text-left">
