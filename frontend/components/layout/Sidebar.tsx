@@ -103,7 +103,18 @@ export function Sidebar() {
       roleLabel: "Security Supervisor",
       accentColor: "#EA580C",
       items: [
-        { id: "dashboard", label: "Dashboard", href: "/security-guard/dashboard", icon: "👮" },
+        { id: "dashboard", label: "Dashboard", href: "/security-supervisor/dashboard", icon: "📊" },
+        { id: "gate-operations", label: "Gate Operations", href: "/security-supervisor/gate-operations", icon: "🛡️" },
+        { id: "guard-management", label: "Guard Management", href: "/security-supervisor/guard-management", icon: "👮" },
+        { id: "visitor-management", label: "Visitor Management", href: "/security-supervisor/visitor-management", icon: "👥" },
+        { id: "delivery-management", label: "Delivery Management", href: "/security-supervisor/delivery-management", icon: "📦" },
+        { id: "domestic-staff", label: "Domestic Staff", href: "/security-supervisor/domestic-staff", icon: "👔" },
+        { id: "blacklist", label: "Blacklist", href: "/security-supervisor/blacklist", icon: "🚫" },
+        { id: "incidents", label: "Incidents", href: "/security-supervisor/incidents", icon: "⚠️" },
+        { id: "emergency-alerts", label: "Emergency Alerts", href: "/security-supervisor/emergency-alerts", icon: "🚨" },
+        { id: "checkpoints", label: "Checkpoints", href: "/security-supervisor/checkpoints", icon: "📍" },
+        { id: "reports", label: "Reports", href: "/security-supervisor/reports", icon: "📈" },
+        { id: "audit-logs", label: "Audit Logs", href: "/security-supervisor/audit-logs", icon: "📋" },
       ],
     };
   } else if (pathname.startsWith("/dashboard/facility-manager")) {

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { QrCodeSvg } from "@/components/common/QrCodeSvg";
 import { complaintsApi, authApi, type CurrentUser, type ServiceTicket } from "@/lib/api";
 
 export default function VendorEntryPassPage() {
@@ -138,30 +139,22 @@ export default function VendorEntryPassPage() {
               {/* QR Code Container */}
               <div
                 style={{
-                  width: 170,
-                  height: 170,
                   margin: "1.25rem auto",
-                  background: "white",
-                  border: "2px solid var(--border)",
-                  borderRadius: "var(--radius)",
-                  padding: "0.75rem",
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
                   justifyContent: "center",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
                 }}
               >
-                <div style={{ fontSize: "2.75rem" }}>📱</div>
+                <QrCodeSvg value={qrData} size={180} />
                 <div
                   style={{
-                    fontSize: "0.65rem",
+                    fontSize: "0.75rem",
                     fontWeight: 700,
                     fontFamily: "monospace",
-                    color: "var(--fg)",
-                    marginTop: "0.5rem",
-                    wordBreak: "break-all",
-                    textAlign: "center",
+                    color: "var(--brand-heading)",
+                    marginTop: "0.65rem",
+                    letterSpacing: "0.05em",
                   }}
                 >
                   {qrData}

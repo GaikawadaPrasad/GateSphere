@@ -189,6 +189,7 @@ def test_resident_groups_and_group_target(as_role, seed_ids):
 
     # a user who is not a member of this community cannot be added
     with SessionLocal() as db:
+        from app.core.security import hash_password
         from app.modules.residents.models import ResidentProfile
 
         other = db.scalar(
@@ -196,6 +197,21 @@ def test_resident_groups_and_group_target(as_role, seed_ids):
                 ResidentProfile.community_id == _u.UUID(seed_ids["other_community_id"])
             )
         )
+        if other is None:
+            new_u = User(
+                email=f"other-user-{_u.uuid4().hex[:6]}@example.test",
+                full_name="Other User",
+                password_hash=hash_password("x"),
+            )
+            db.add(new_u)
+            db.flush()
+            prof = ResidentProfile(
+                community_id=_u.UUID(seed_ids["other_community_id"]),
+                user_id=new_u.id,
+            )
+            db.add(prof)
+            db.commit()
+            other = new_u.id
     assert other is not None
     bad = admin.post(f"{P}/groups/{gid}/members", json={"user_id": str(other)})
     assert bad.status_code == 404, bad.text

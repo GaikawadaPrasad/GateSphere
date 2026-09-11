@@ -151,24 +151,46 @@ class RequestRead(_Read):
     @model_validator(mode="before")
     @classmethod
     def populate_visitor_fields(cls, data: Any) -> Any:
-        if hasattr(data, "visitor") and getattr(data, "visitor", None) is not None:
-            v = data.visitor
-            if getattr(data, "visitor_name", None) is None:
-                try:
-                    data.visitor_name = getattr(v, "full_name", None)
-                except Exception:
-                    pass
-            if getattr(data, "phone", None) is None:
-                try:
-                    data.phone = getattr(v, "phone", None)
-                except Exception:
-                    pass
-        elif isinstance(data, dict):
+        if isinstance(data, dict):
             v = data.get("visitor")
             if isinstance(v, dict):
                 data.setdefault("visitor_name", v.get("full_name"))
                 data.setdefault("phone", v.get("phone"))
+            return data
+
+        # If data is an ORM instance or other object, extract attributes into dict safely
+        if hasattr(data, "__dict__") or hasattr(data, "visitor"):
+            v = getattr(data, "visitor", None)
+            v_name = getattr(v, "full_name", None) if v else None
+            v_phone = getattr(v, "phone", None) if v else None
+            passes = []
+            if "passes" in getattr(data, "__dict__", {}):
+                passes = data.__dict__["passes"]
+            return {
+                "id": getattr(data, "id", None),
+                "created_at": getattr(data, "created_at", None),
+                "updated_at": getattr(data, "updated_at", None),
+                "community_id": getattr(data, "community_id", None),
+                "visitor_id": getattr(data, "visitor_id", None),
+                "unit_id": getattr(data, "unit_id", None),
+                "host_user_id": getattr(data, "host_user_id", None),
+                "visitor_type": getattr(data, "visitor_type", None),
+                "purpose": getattr(data, "purpose", None),
+                "expected_at": getattr(data, "expected_at", None),
+                "valid_until": getattr(data, "valid_until", None),
+                "status": getattr(data, "status", None),
+                "approval_required": getattr(data, "approval_required", None),
+                "vehicle_number": getattr(data, "vehicle_number", None),
+                "group_label": getattr(data, "group_label", None),
+                "party_size": getattr(data, "party_size", 1),
+                "visitor": v,
+                "visitor_name": v_name,
+                "phone": v_phone,
+                "passes": passes,
+            }
         return data
+
+
 
 
 class EntryCreate(_Write):

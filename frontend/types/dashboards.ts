@@ -41,6 +41,15 @@ export interface ResidentStats {
   published_announcements: number;
 }
 
+export interface CommunityMetricsBreakdown {
+  totalUnits: number;
+  totalResidents: number;
+  occupancyRate: number;
+  totalTowers?: number;
+  financialStatus: "Good" | "Attention" | "Critical";
+  openTickets: number;
+}
+
 export interface SuperAdminDashboardMetrics {
   totalCommunities: number;
   activeCommunities: number;
@@ -60,4 +69,6 @@ export interface SuperAdminDashboardMetrics {
   totalCollected: number;
   totalOutstanding: number;
   collectionRate: number; // percentage (0-100)
+  communityBreakdown?: Record<string, CommunityMetricsBreakdown>;
 }
+

@@ -65,6 +65,14 @@ class ResidentProfileRead(_Read):
     move_in_date: date | None
     move_out_date: date | None
     emergency_notes: str | None
+    full_name: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    unit_number: str | None = None
+    tower_name: str | None = None
+    resident_type: str | None = None
+    is_primary: bool | None = None
+
 
 
 # --- UnitOccupancy ---------------------------------------------------- #
@@ -178,6 +186,9 @@ class MoveRecordRead(_Read):
     clearance_notes: str | None
     approved_by_user_id: uuid.UUID | None
     approved_at: datetime | None
+    unit_number: str | None = None
+    tower_name: str | None = None
+    resident_name: str | None = None
 
 
 # --- Resident Me / Self-service --------------------------------- #
