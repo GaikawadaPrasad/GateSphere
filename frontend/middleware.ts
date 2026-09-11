@@ -10,6 +10,13 @@ const PROTECTED_PREFIXES = [
   "/super-admin",
   "/community-admin",
   "/association-committee",
+  "/facility-manager",
+  "/security-supervisor",
+  "/security-guard",
+  "/vendor-technician",
+  "/domestic-staff",
+  "/owner-tenant",
+  "/auditor",
   "/dashboard",
   "/communities",
   "/towers",
@@ -19,7 +26,6 @@ const PROTECTED_PREFIXES = [
   "/visitors",
   "/gate",
   "/deliveries",
-  "/domestic-staff",
   "/vehicles",
   "/parking",
   "/violations",
@@ -33,8 +39,6 @@ const PROTECTED_PREFIXES = [
   "/reports",
   "/audit-logs",
   "/profile",
-  "/owner-tenant",
-  "/auditor",
 ];
 
 export function middleware(req: NextRequest) {

@@ -50,7 +50,13 @@ export function useCreateIncident() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: IncidentCreate) => incidentsApi.create(payload),
-    onSuccess: () => {
+    onSuccess: (newIncident) => {
+      queryClient.setQueriesData({ queryKey: ["incidents"] }, (old: any) => {
+        if (Array.isArray(old)) {
+          return [newIncident, ...old];
+        }
+        return old;
+      });
       queryClient.invalidateQueries({ queryKey: ["incidents"] });
       queryClient.invalidateQueries({ queryKey: ["dashboards"] });
     },
@@ -62,7 +68,18 @@ export function useTransitionIncident() {
   return useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: IncidentTransition }) =>
       incidentsApi.transition(id, payload),
-    onSuccess: (_, variables) => {
+    onSuccess: (updatedIncident, variables) => {
+      queryClient.setQueriesData({ queryKey: ["incidents"] }, (old: any) => {
+        if (Array.isArray(old)) {
+          return old.map((inc: any) =>
+            inc.id === variables.id ? { ...inc, ...(updatedIncident || {}), status: variables.payload.status } : inc,
+          );
+        }
+        return old;
+      });
+      if (updatedIncident) {
+        queryClient.setQueryData(["incidents", variables.id], updatedIncident);
+      }
       queryClient.invalidateQueries({ queryKey: ["incidents"] });
       queryClient.invalidateQueries({ queryKey: ["incidents", variables.id] });
       queryClient.invalidateQueries({ queryKey: ["incidents", variables.id, "history"] });
@@ -81,7 +98,15 @@ export function useAddIncidentAction() {
       id: string;
       payload: { action_type: string; details?: string };
     }) => incidentsApi.addAction(id, payload),
-    onSuccess: (_, variables) => {
+    onSuccess: (newAction, variables) => {
+      if (newAction) {
+        queryClient.setQueryData(["incidents", variables.id, "actions"], (old: any) => {
+          if (Array.isArray(old)) {
+            return [newAction, ...old];
+          }
+          return [newAction];
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["incidents", variables.id, "actions"] });
     },
   });

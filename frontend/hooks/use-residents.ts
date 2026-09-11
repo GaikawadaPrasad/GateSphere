@@ -85,8 +85,41 @@ export function useCreateResidentProfile() {
   return useMutation({
     mutationFn: ({ data, communityId }: { data: Partial<ResidentProfile>; communityId?: string }) =>
       residentsApi.create(data, communityId),
+    onSuccess: (newResident) => {
+      queryClient.setQueriesData({ queryKey: ["residents"] }, (old: any) => {
+        if (Array.isArray(old)) {
+          return [newResident, ...old];
+        }
+        return old;
+      });
+      queryClient.invalidateQueries({ queryKey: ["residents"] });
+    },
+  });
+}
+
+export function useAddResident() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      communityId,
+      data,
+    }: {
+      communityId: string;
+      data: {
+        email: string;
+        full_name: string;
+        phone?: string;
+        password?: string;
+        unit_id: string;
+        occupancy_role?: string;
+        is_primary?: boolean;
+        agreement_reference?: string;
+      };
+    }) => residentsApi.addResident(communityId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["residents"] });
+      queryClient.invalidateQueries({ queryKey: ["community-units"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboards"] });
     },
   });
 }

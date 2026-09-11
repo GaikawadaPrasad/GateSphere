@@ -24,14 +24,18 @@ export default function SecuritySupervisorGateOperationsPage() {
     loadData();
   }, []);
 
-  const eventTypes = Array.from(new Set(events.map((e) => e.event_type)));
+  const eventTypes = Array.from(new Set(events.map((e) => e.event_type).filter(Boolean)));
 
   const filteredEvents = events.filter((e) => {
+    const q = search.toLowerCase();
     const ref = ((e as any).reference_type || "").toLowerCase();
+    const evType = (e.event_type || "").toLowerCase();
+    const gateStr = (e.gate_id || "").toLowerCase();
     const matchSearch =
       !search ||
-      ref.includes(search.toLowerCase()) ||
-      e.event_type.toLowerCase().includes(search.toLowerCase());
+      ref.includes(q) ||
+      evType.includes(q) ||
+      gateStr.includes(q);
     const matchType = typeFilter === "all" || e.event_type === typeFilter;
     return matchSearch && matchType;
   });

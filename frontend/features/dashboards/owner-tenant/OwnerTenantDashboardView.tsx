@@ -221,13 +221,19 @@ export function OwnerTenantDashboardView({
       toast.error("Please select a visitor category.", "Category Required");
       return;
     }
+    const cleanPhone = passVisitorPhone.trim().replace(/[\s\-()]/g, "");
+    if (!cleanPhone || cleanPhone.length < 5) {
+      toast.error("Please enter a valid mobile number (at least 10 digits).", "Mobile Number Required");
+      return;
+    }
+
     try {
       const activeUnitId = profile.data?.occupancies?.[0]?.unit_id;
       const res = await visitors.createPass.mutateAsync({
-        visitor_name: passVisitorName,
-        phone: passVisitorPhone,
+        visitor_name: passVisitorName.trim() || "Guest Visitor",
+        phone: cleanPhone,
         category: passCategory,
-        reason: passReason,
+        reason: passReason.trim(),
         valid_for_hours: passDuration,
         unit_id: activeUnitId,
       });
@@ -235,9 +241,9 @@ export function OwnerTenantDashboardView({
       setActivePassResult({
         token: res.token,
         pin: res.pin,
-        visitor_name: res.visitor_name || passVisitorName || "Visitor",
+        visitor_name: res.visitor_name || passVisitorName.trim() || "Visitor",
         category: res.category || passCategory,
-        reason: res.reason || passReason || "Visitor Entry",
+        reason: res.reason || passReason.trim() || "Visitor Entry",
         valid_from: res.valid_from,
         valid_to: res.valid_to,
       });
@@ -252,7 +258,8 @@ export function OwnerTenantDashboardView({
         "Visitor Pass Generated",
       );
     } catch (err: any) {
-      toast.error(err?.message || "Failed to generate visitor pass.", "Error");
+      const fieldMsg = err?.fields ? Object.values(err.fields).join(" · ") : null;
+      toast.error(fieldMsg || err?.message || "Failed to generate visitor pass.", "Pass Generation Error");
     }
   };
 
@@ -1949,14 +1956,19 @@ export function OwnerTenantDashboardView({
                 marginBottom: "0.35rem",
               }}
             >
-              Visitor Mobile Number <span style={{ fontSize: "11.5px", color: "var(--muted)", fontWeight: 400 }}>(Optional)</span>
+              Visitor Mobile Number <span style={{ color: "var(--danger)" }}>*</span>
             </label>
             <input
               className="input-field"
-              placeholder="+91 98765 00000"
+              placeholder="e.g. 9876543210 or +91 98765 00000"
               value={passVisitorPhone}
               onChange={(e) => setPassVisitorPhone(e.target.value)}
+              type="tel"
+              required
             />
+            <span style={{ fontSize: "11px", color: "var(--muted)", marginTop: "0.25rem", display: "block" }}>
+              10-digit mobile number required for gate security & pass delivery
+            </span>
           </div>
           <div>
             <label

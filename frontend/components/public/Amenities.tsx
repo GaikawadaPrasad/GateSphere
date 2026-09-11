@@ -38,7 +38,7 @@ const PRD_AMENITIES: AmenityData[] = [
     categoryTag: "HEALTH & FITNESS",
     subDescription: "Technogym & cardio deck",
     icon: "💪",
-    src: "/images/smart-hardware.webp",
+    src: "/images/gym.webp",
     iconSvg: (
       <svg className="w-5 h-5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V6a2 2 0 012-2h1m13 4V6a2 2 0 00-2-2h-1M4 16v2a2 2 0 002 2h1m13-4v2a2 2 0 01-2 2h-1M3 10h18M3 14h18M7 4v16m10-16v16" />

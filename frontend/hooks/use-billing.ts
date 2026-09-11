@@ -1,8 +1,9 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { billingApi } from "@/lib/api";
 import type { ListQueryParams } from "@/types/api";
+import type { MaintenanceInvoice } from "@/types/billing";
 
 export const billingKeys = {
   all: ["billing"] as const,
@@ -19,6 +20,62 @@ export function useInvoices(params?: ListQueryParams) {
     queryKey: billingKeys.invoices(params),
     queryFn: () => billingApi.invoices(params),
     staleTime: 30_000,
+  });
+}
+
+export function useCreateInvoice() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Parameters<typeof billingApi.createInvoice>[0]) =>
+      billingApi.createInvoice(data),
+    onSuccess: (newInvoice) => {
+      qc.setQueriesData<MaintenanceInvoice[]>(
+        { queryKey: billingKeys.all },
+        (old) => {
+          if (!old || !Array.isArray(old)) return old;
+          if (old.some((i) => i.id === newInvoice.id)) return old;
+          return [newInvoice, ...old];
+        },
+      );
+      qc.invalidateQueries({ queryKey: billingKeys.all });
+      qc.invalidateQueries({ queryKey: ["dashboards"] });
+    },
+  });
+}
+
+export function usePostInvoice() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (invoiceId: string) => billingApi.postInvoice(invoiceId),
+    onSuccess: (updated) => {
+      qc.setQueriesData<MaintenanceInvoice[]>(
+        { queryKey: billingKeys.all },
+        (old) => {
+          if (!old || !Array.isArray(old)) return old;
+          return old.map((i) => (i.id === updated.id ? { ...i, ...updated } : i));
+        },
+      );
+      qc.invalidateQueries({ queryKey: billingKeys.all });
+      qc.invalidateQueries({ queryKey: ["dashboards"] });
+    },
+  });
+}
+
+export function useCancelInvoice() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (invoiceId: string) => billingApi.cancelInvoice(invoiceId),
+    onSuccess: (updated) => {
+      qc.setQueriesData<MaintenanceInvoice[]>(
+        { queryKey: billingKeys.all },
+        (old) => {
+          if (!old || !Array.isArray(old)) return old;
+          return old.map((i) => (i.id === updated.id ? { ...i, ...updated } : i));
+        },
+      );
+      qc.invalidateQueries({ queryKey: billingKeys.all });
+      qc.invalidateQueries({ queryKey: ["dashboards"] });
+    },
   });
 }
 

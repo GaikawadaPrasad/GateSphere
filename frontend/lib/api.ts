@@ -498,6 +498,27 @@ export const serviceRequestsApi = complaintsApi;
 export const billingApi = {
   invoices: (params?: ListQueryParams) =>
     apiGet<MaintenanceInvoice[]>("/billing/invoices", params as Record<string, unknown>),
+  getInvoice: (invoiceId: string) =>
+    apiGet<MaintenanceInvoice>(`/billing/invoices/${invoiceId}`),
+  createInvoice: (data: {
+    unit_id: string;
+    billing_period_start?: string;
+    billing_period_end?: string;
+    issue_date?: string;
+    due_date?: string;
+    discount?: number;
+    items: Array<{
+      description: string;
+      charge_head_id?: string;
+      quantity?: number;
+      unit_rate: number;
+      taxable?: boolean;
+    }>;
+  }) => apiSend<MaintenanceInvoice>("POST", "/billing/invoices", data),
+  postInvoice: (invoiceId: string) =>
+    apiSend<MaintenanceInvoice>("POST", `/billing/invoices/${invoiceId}/post`),
+  cancelInvoice: (invoiceId: string) =>
+    apiSend<MaintenanceInvoice>("POST", `/billing/invoices/${invoiceId}/cancel`),
   payments: (params?: ListQueryParams) =>
     apiGet<Payment[]>("/billing/payments", params as Record<string, unknown>),
   chargeHeads: (communityId?: string) =>
@@ -613,6 +634,50 @@ export const residentsApi = {
       data,
       communityId ? { community_id: communityId } : undefined,
     ),
+  addResident: (
+    communityId: string,
+    data: {
+      email: string;
+      full_name: string;
+      phone?: string;
+      password?: string;
+      unit_id: string;
+      occupancy_role?: string;
+      is_primary?: boolean;
+      agreement_reference?: string;
+    },
+  ) => apiSend<any>("POST", `/communities/${communityId}/residents`, data),
+};
+
+export const onboardingApi = {
+  addResident: (
+    communityId: string,
+    data: {
+      email: string;
+      full_name: string;
+      phone?: string;
+      password?: string;
+      unit_id: string;
+      occupancy_role?: string;
+      is_primary?: boolean;
+      agreement_reference?: string;
+    },
+  ) => apiSend<any>("POST", `/communities/${communityId}/residents`, data),
+  inviteResident: (
+    communityId: string,
+    data: {
+      unit_id: string;
+      invited_email: string;
+      invited_phone?: string;
+      full_name?: string;
+      occupancy_role?: string;
+      is_primary?: boolean;
+      agreement_reference?: string;
+      message?: string;
+    },
+  ) => apiSend<any>("POST", `/communities/${communityId}/invitations`, data),
+  listInvitations: (communityId: string) =>
+    apiGet<any[]>(`/communities/${communityId}/invitations`),
 };
 
 export const domesticStaffApi = {

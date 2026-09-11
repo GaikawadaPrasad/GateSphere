@@ -66,6 +66,15 @@ export function useUnits(floorId?: string) {
   });
 }
 
+export function useCommunityUnits(communityId?: string) {
+  return useQuery({
+    queryKey: ["community-units", communityId],
+    queryFn: () => (communityId ? communitiesApi.communityUnits(communityId) : []),
+    enabled: Boolean(communityId),
+    staleTime: 60_000,
+  });
+}
+
 export function useGates(communityId?: string) {
   return useQuery({
     queryKey: ["gates", communityId],

@@ -63,12 +63,15 @@ export default function SecuritySupervisorVisitorManagementPage() {
   };
 
   const filteredVisitors = visitors.filter((v) => {
+    const q = search.toLowerCase();
     const matchSearch =
-      v.name.toLowerCase().includes(search.toLowerCase()) ||
-      (v.phone && v.phone.toLowerCase().includes(search.toLowerCase())) ||
-      (v.pass_code && v.pass_code.toLowerCase().includes(search.toLowerCase()));
+      !search ||
+      (v.name && v.name.toLowerCase().includes(q)) ||
+      (v.phone && v.phone.toLowerCase().includes(q)) ||
+      (v.pass_code && v.pass_code.toLowerCase().includes(q)) ||
+      (v.unit && v.unit.toLowerCase().includes(q));
     const matchStatus =
-      statusFilter === "all" || v.status.toLowerCase() === statusFilter.toLowerCase();
+      statusFilter === "all" || (v.status && v.status.toLowerCase() === statusFilter.toLowerCase());
     return matchSearch && matchStatus;
   });
 

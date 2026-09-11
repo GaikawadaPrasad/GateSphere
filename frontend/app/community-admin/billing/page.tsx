@@ -8,7 +8,11 @@ import {
   useChargeHeads,
   useBillingRules,
   useUnitLedger,
+  useCreateInvoice,
+  usePostInvoice,
+  useCancelInvoice,
 } from "@/hooks/use-billing";
+import { useCommunityUnits } from "@/hooks/use-communities";
 import { useFinancialStats } from "@/hooks/use-dashboards";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, type Column } from "@/components/tables/DataTable";
@@ -19,12 +23,49 @@ import type { MaintenanceInvoice, Payment, ChargeHead, UnitLedgerEntry } from "@
 import { billingApi } from "@/lib/api";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 
+interface LineItemForm {
+  charge_head_id: string;
+  description: string;
+  quantity: number;
+  unit_rate: number;
+  taxable: boolean;
+}
+
 export default function CommunityAdminBillingPage() {
   const { activeCommunityId } = useUiStore();
   const [activeTab, setActiveTab] = useState<"invoices" | "payments" | "rules">("invoices");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
+
+  // Modal State for Invoice Generation
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [createUnitId, setCreateUnitId] = useState("");
+  const [billingPeriodStart, setBillingPeriodStart] = useState(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+  });
+  const [billingPeriodEnd, setBillingPeriodEnd] = useState(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10);
+  });
+  const [issueDate, setIssueDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [dueDate, setDueDate] = useState(() =>
+    new Date(Date.now() + 15 * 86400000).toISOString().slice(0, 10),
+  );
+  const [discount, setDiscount] = useState<number>(0);
+  const [postImmediately, setPostImmediately] = useState(true);
+  const [lineItems, setLineItems] = useState<LineItemForm[]>([
+    {
+      charge_head_id: "",
+      description: "Monthly Maintenance Assessment",
+      quantity: 1,
+      unit_rate: 2500,
+      taxable: false,
+    },
+  ]);
+  const [formError, setFormError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Queries
   const { data: financial } = useFinancialStats(activeCommunityId || undefined);
@@ -40,9 +81,154 @@ export default function CommunityAdminBillingPage() {
     activeCommunityId || undefined,
   );
   const { data: billingRules } = useBillingRules(activeCommunityId || undefined);
+  const { data: units } = useCommunityUnits(activeCommunityId || undefined);
   const { data: ledgerEntries, isLoading: ledgerLoading } = useUnitLedger(
     selectedUnitId || undefined,
   );
+
+  // Mutations
+  const createInvoiceMutation = useCreateInvoice();
+  const postInvoiceMutation = usePostInvoice();
+  const cancelInvoiceMutation = useCancelInvoice();
+
+  // Reset Modal Form
+  const resetInvoiceForm = () => {
+    setCreateUnitId(units?.[0]?.id || "");
+    const d = new Date();
+    setBillingPeriodStart(new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10));
+    setBillingPeriodEnd(new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10));
+    setIssueDate(new Date().toISOString().slice(0, 10));
+    setDueDate(new Date(Date.now() + 15 * 86400000).toISOString().slice(0, 10));
+    setDiscount(0);
+    setPostImmediately(true);
+    setFormError("");
+
+    const defaultCharge = chargeHeads?.[0];
+    setLineItems([
+      {
+        charge_head_id: defaultCharge?.id || "",
+        description: defaultCharge?.name || "Monthly Maintenance Assessment",
+        quantity: 1,
+        unit_rate: Number(defaultCharge?.default_amount) || 2500,
+        taxable: false,
+      },
+    ]);
+  };
+
+  const handleChargeHeadChange = (index: number, chargeHeadId: string) => {
+    const ch = chargeHeads?.find((c) => c.id === chargeHeadId);
+    setLineItems((prev) => {
+      const updated = [...prev];
+      if (ch) {
+        updated[index] = {
+          ...updated[index],
+          charge_head_id: ch.id,
+          description: ch.name,
+          unit_rate: Number(ch.default_amount) || 0,
+        };
+      } else {
+        updated[index] = {
+          ...updated[index],
+          charge_head_id: "",
+        };
+      }
+      return updated;
+    });
+  };
+
+  const updateLineItem = <K extends keyof LineItemForm>(
+    index: number,
+    field: K,
+    val: LineItemForm[K],
+  ) => {
+    setLineItems((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: val };
+      return updated;
+    });
+  };
+
+  const addLineItem = () => {
+    const defaultCharge = chargeHeads?.[0];
+    setLineItems((prev) => [
+      ...prev,
+      {
+        charge_head_id: defaultCharge?.id || "",
+        description: defaultCharge?.name || "Utility / Common Area Charge",
+        quantity: 1,
+        unit_rate: Number(defaultCharge?.default_amount) || 500,
+        taxable: false,
+      },
+    ]);
+  };
+
+  const removeLineItem = (index: number) => {
+    if (lineItems.length <= 1) return;
+    setLineItems((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Calculations
+  const itemsSubtotal = lineItems.reduce(
+    (sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unit_rate) || 0),
+    0,
+  );
+  const taxRatePercent = Number(
+    (billingRules as any)?.tax_percent ?? (billingRules as any)?.[0]?.tax_percent ?? 0,
+  );
+  const taxableSubtotal = lineItems
+    .filter((i) => i.taxable)
+    .reduce(
+      (sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unit_rate) || 0),
+      0,
+    );
+  const estimatedTax = (taxableSubtotal * taxRatePercent) / 100;
+  const totalCalculated = Math.max(0, itemsSubtotal - (Number(discount) || 0) + estimatedTax);
+
+  // Handle Create Invoice Submit
+  const handleCreateInvoiceSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!createUnitId) {
+      setFormError("Please select a residential unit.");
+      return;
+    }
+    if (
+      lineItems.length === 0 ||
+      lineItems.some((i) => !i.description.trim() || i.quantity <= 0 || i.unit_rate < 0)
+    ) {
+      setFormError("Please ensure all line items have a description, quantity > 0, and rate >= 0.");
+      return;
+    }
+
+    setFormError("");
+    setIsSubmitting(true);
+    try {
+      const newInvoice = await createInvoiceMutation.mutateAsync({
+        unit_id: createUnitId,
+        billing_period_start: billingPeriodStart || undefined,
+        billing_period_end: billingPeriodEnd || undefined,
+        issue_date: issueDate || undefined,
+        due_date: dueDate || undefined,
+        discount: Number(discount) || 0,
+        items: lineItems.map((item) => ({
+          description: item.description.trim(),
+          charge_head_id: item.charge_head_id || undefined,
+          quantity: Number(item.quantity),
+          unit_rate: Number(item.unit_rate),
+          taxable: Boolean(item.taxable),
+        })),
+      });
+
+      if (postImmediately && newInvoice?.id) {
+        await postInvoiceMutation.mutateAsync(newInvoice.id);
+      }
+
+      setIsCreateModalOpen(false);
+    } catch (err: any) {
+      setFormError(err?.message || "Failed to generate invoice.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   // Handle Export CSV
   const handleExportInvoices = async () => {
@@ -122,20 +308,53 @@ export default function CommunityAdminBillingPage() {
     {
       key: "due_date",
       header: "Due Date",
-      render: (i) => i.due_date,
+      render: (i) => i.due_date || "–",
     },
     {
       key: "actions",
-      header: "Ledger",
+      header: "Actions",
       render: (i) => (
-        <button
-          type="button"
-          className="btn btn-secondary"
-          style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
-          onClick={() => setSelectedUnitId(i.unit_id)}
-        >
-          Unit Ledger →
-        </button>
+        <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
+          {i.status === "draft" && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
+              onClick={async () => {
+                if (confirm(`Post invoice ${i.invoice_number} to unit ledger now?`)) {
+                  await postInvoiceMutation.mutateAsync(i.id);
+                }
+              }}
+              disabled={postInvoiceMutation.isPending}
+            >
+              📢 Post
+            </button>
+          )}
+          {(i.status === "draft" || i.status === "posted" || i.status === "overdue") &&
+            Number(i.amount_paid) === 0 && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem", color: "#dc2626" }}
+                onClick={async () => {
+                  if (confirm(`Cancel invoice ${i.invoice_number}?`)) {
+                    await cancelInvoiceMutation.mutateAsync(i.id);
+                  }
+                }}
+                disabled={cancelInvoiceMutation.isPending}
+              >
+                Cancel
+              </button>
+            )}
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
+            onClick={() => setSelectedUnitId(i.unit_id)}
+          >
+            Ledger →
+          </button>
+        </div>
       ),
     },
   ];
@@ -268,6 +487,16 @@ export default function CommunityAdminBillingPage() {
         description="Community invoice reconciliation, payment collections, resident unit ledgers, and maintenance tariff rules."
         action={
           <div style={{ display: "flex", gap: "0.5rem" }}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                resetInvoiceForm();
+                setIsCreateModalOpen(true);
+              }}
+            >
+              🧾 Generate Invoice
+            </button>
             {activeTab === "invoices" && (
               <button type="button" className="btn btn-secondary" onClick={handleExportInvoices}>
                 📥 Export Invoices CSV
@@ -421,6 +650,7 @@ export default function CommunityAdminBillingPage() {
               { label: "Partially Paid", value: "partially_paid" },
               { label: "Overdue", value: "overdue" },
               { label: "Draft", value: "draft" },
+              { label: "Cancelled", value: "cancelled" },
             ]}
           />
 
@@ -515,6 +745,325 @@ export default function CommunityAdminBillingPage() {
           </div>
         </div>
       )}
+
+      {/* Generate / Create Invoice Modal */}
+      <Modal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        title="🧾 Generate Maintenance Invoice"
+      >
+        <form onSubmit={handleCreateInvoiceSubmit}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            {formError && (
+              <div
+                style={{
+                  padding: "0.6rem 0.8rem",
+                  background: "#fee2e2",
+                  border: "1px solid #f87171",
+                  borderRadius: "6px",
+                  color: "#b91c1c",
+                  fontSize: "0.85rem",
+                }}
+              >
+                {formError}
+              </div>
+            )}
+
+            {/* Target Unit */}
+            <div>
+              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.3rem" }}>
+                Target Residential Unit <span style={{ color: "#dc2626" }}>*</span>
+              </label>
+              <select
+                className="input"
+                value={createUnitId}
+                onChange={(e) => setCreateUnitId(e.target.value)}
+                required
+                style={{ width: "100%" }}
+              >
+                <option value="">Select a unit...</option>
+                {units && units.length > 0 ? (
+                  units.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      Unit {u.unit_number} {u.unit_type ? `(${u.unit_type})` : ""} {u.sq_ft ? `• ${u.sq_ft} sqft` : ""}
+                    </option>
+                  ))
+                ) : (
+                  <option value="" disabled>
+                    No units found in community
+                  </option>
+                )}
+              </select>
+            </div>
+
+            {/* Billing Period */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.3rem" }}>
+                  Period Start
+                </label>
+                <input
+                  type="date"
+                  className="input"
+                  value={billingPeriodStart}
+                  onChange={(e) => setBillingPeriodStart(e.target.value)}
+                  style={{ width: "100%" }}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.3rem" }}>
+                  Period End
+                </label>
+                <input
+                  type="date"
+                  className="input"
+                  value={billingPeriodEnd}
+                  onChange={(e) => setBillingPeriodEnd(e.target.value)}
+                  style={{ width: "100%" }}
+                />
+              </div>
+            </div>
+
+            {/* Issue Date & Due Date */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.3rem" }}>
+                  Issue Date
+                </label>
+                <input
+                  type="date"
+                  className="input"
+                  value={issueDate}
+                  onChange={(e) => setIssueDate(e.target.value)}
+                  style={{ width: "100%" }}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.3rem" }}>
+                  Due Date
+                </label>
+                <input
+                  type="date"
+                  className="input"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  style={{ width: "100%" }}
+                />
+              </div>
+            </div>
+
+            {/* Line Items Section */}
+            <div style={{ borderTop: "1px solid var(--border)", paddingTop: "0.85rem", marginTop: "0.25rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.6rem" }}>
+                <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>Invoice Line Items</span>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}
+                  onClick={addLineItem}
+                >
+                  + Add Line Item
+                </button>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                {lineItems.map((item, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      background: "#f8fafc",
+                      border: "1px solid var(--border)",
+                      borderRadius: "6px",
+                      padding: "0.75rem",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.5rem",
+                    }}
+                  >
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
+                      <div>
+                        <label style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block", marginBottom: "0.2rem" }}>
+                          Charge Head Preset
+                        </label>
+                        <select
+                          className="input"
+                          value={item.charge_head_id}
+                          onChange={(e) => handleChargeHeadChange(idx, e.target.value)}
+                          style={{ width: "100%", fontSize: "0.8rem", padding: "0.35rem 0.5rem" }}
+                        >
+                          <option value="">Custom Charge Head</option>
+                          {chargeHeads?.map((ch) => (
+                            <option key={ch.id} value={ch.id}>
+                              {ch.name} ({formatCurrency(Number(ch.default_amount))})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block", marginBottom: "0.2rem" }}>
+                          Description *
+                        </label>
+                        <input
+                          type="text"
+                          className="input"
+                          value={item.description}
+                          onChange={(e) => updateLineItem(idx, "description", e.target.value)}
+                          placeholder="Line item description"
+                          required
+                          style={{ width: "100%", fontSize: "0.8rem", padding: "0.35rem 0.5rem" }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr auto", gap: "0.5rem", alignItems: "flex-end" }}>
+                      <div>
+                        <label style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block", marginBottom: "0.2rem" }}>
+                          Qty
+                        </label>
+                        <input
+                          type="number"
+                          step="1"
+                          min="1"
+                          className="input"
+                          value={item.quantity}
+                          onChange={(e) => updateLineItem(idx, "quantity", Number(e.target.value))}
+                          style={{ width: "100%", fontSize: "0.8rem", padding: "0.35rem 0.5rem" }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block", marginBottom: "0.2rem" }}>
+                          Unit Rate (₹)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          className="input"
+                          value={item.unit_rate}
+                          onChange={(e) => updateLineItem(idx, "unit_rate", Number(e.target.value))}
+                          style={{ width: "100%", fontSize: "0.8rem", padding: "0.35rem 0.5rem" }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block", marginBottom: "0.2rem" }}>
+                          Total Amount
+                        </label>
+                        <div style={{ fontSize: "0.85rem", fontWeight: 600, padding: "0.35rem 0", color: "var(--fg)" }}>
+                          {formatCurrency((Number(item.quantity) || 0) * (Number(item.unit_rate) || 0))}
+                        </div>
+                      </div>
+                      <div>
+                        {lineItems.length > 1 && (
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={() => removeLineItem(idx)}
+                            style={{ fontSize: "0.75rem", padding: "0.35rem 0.5rem", color: "#dc2626" }}
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Discount & Immediate Post */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", alignItems: "center" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.3rem" }}>
+                  Discount (₹)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="input"
+                  value={discount}
+                  onChange={(e) => setDiscount(Number(e.target.value))}
+                  style={{ width: "100%" }}
+                />
+              </div>
+
+              <div style={{ paddingTop: "1.2rem" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.85rem", cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={postImmediately}
+                    onChange={(e) => setPostImmediately(e.target.checked)}
+                  />
+                  <span>Post &amp; issue immediately (Active Ledger)</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Invoice Total Summary Card */}
+            <div
+              style={{
+                background: "#f1f5f9",
+                borderRadius: "6px",
+                padding: "0.85rem 1rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.35rem",
+                fontSize: "0.85rem",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: "var(--muted)" }}>Items Subtotal:</span>
+                <span style={{ fontWeight: 600 }}>{formatCurrency(itemsSubtotal)}</span>
+              </div>
+              {Number(discount) > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", color: "#059669" }}>
+                  <span>Discount Applied:</span>
+                  <span>-{formatCurrency(Number(discount))}</span>
+                </div>
+              )}
+              {estimatedTax > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "var(--muted)" }}>Tax ({taxRatePercent}%):</span>
+                  <span>+{formatCurrency(estimatedTax)}</span>
+                </div>
+              )}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  borderTop: "1px solid var(--border)",
+                  paddingTop: "0.4rem",
+                  fontSize: "1rem",
+                  fontWeight: 700,
+                  color: "var(--fg)",
+                }}
+              >
+                <span>Total Invoice Due:</span>
+                <span style={{ color: "var(--primary)" }}>{formatCurrency(totalCalculated)}</span>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "0.5rem" }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setIsCreateModalOpen(false)}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={isSubmitting || !createUnitId}
+              >
+                {isSubmitting ? "Generating..." : postImmediately ? "🧾 Generate & Post Invoice" : "💾 Save as Draft"}
+              </button>
+            </div>
+          </div>
+        </form>
+      </Modal>
 
       {/* Unit Ledger Modal */}
       <Modal
