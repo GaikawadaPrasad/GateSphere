@@ -214,12 +214,6 @@ const clientCompanies = [
 export default function TrustStrip() {
   const { ref, visible } = useReveal<HTMLElement>(0.2);
 
-  const badges = [
-    { icon: "🔒", text: "ISO 27001" },
-    { icon: "🛡️", text: "GDPR Compliant" },
-    { icon: "☁️", text: "AWS Powered" },
-  ];
-
   const marqueeItems = [...clientCompanies, ...clientCompanies];
 
   return (
@@ -284,16 +278,8 @@ export default function TrustStrip() {
               </span>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
-              {badges.map((b) => (
-                <div
-                  key={b.text}
-                  className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-xs"
-                >
-                  <span>{b.icon}</span>
-                  <span>{b.text}</span>
-                </div>
-              ))}
+            <div className="flex flex-wrap items-center gap-2 justify-center sm:justify-end">
+              {/* Badges removed per user request */}
             </div>
           </div>
 
