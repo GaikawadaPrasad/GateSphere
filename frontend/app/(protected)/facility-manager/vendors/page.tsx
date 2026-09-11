@@ -5,100 +5,139 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { SearchInput } from "@/components/forms/SearchInput";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
-import { vendorsApi, type Vendor } from "@/lib/api";
+import { vendorsApi, communitiesApi } from "@/lib/api";
+
+interface VendorUser {
+  id: string;
+  full_name: string;
+  email: string;
+  phone: string | null;
+  is_active: boolean;
+  role_slug: string;
+}
 
 export default function FacilityManagerVendorsPage() {
-  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [vendors, setVendors] = useState<VendorUser[]>([]);
+  const [communities, setCommunities] = useState<{ id: string; name: string }[]>([]);
   const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Review Completion Modal
-  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
-  const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
-  const [feedback, setFeedback] = useState("");
+  // Create vendor modal
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newCommunityId, setNewCommunityId] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
 
   const loadData = async () => {
     setIsLoading(true);
     setLoadError(null);
     try {
-      // NOTE: facility_manager does not currently hold users:view in the backend RBAC
-      // seed (backend/app/core/rbac.py), so this 403s today — see the integration report.
-      const data = await vendorsApi.list();
-      setVendors(data);
-    } catch (err: any) {
-      setLoadError(err?.message || "Failed to load vendors.");
+      const [vendorsRes, commRes] = await Promise.allSettled([
+        vendorsApi.list(),
+        communitiesApi.list(),
+      ]);
+      if (vendorsRes.status === "fulfilled") {
+        setVendors(
+          (vendorsRes.value || []).map((v: any) => ({
+            id: v.id,
+            full_name: v.full_name || v.name || "—",
+            email: v.email || "—",
+            phone: v.phone || null,
+            is_active: v.is_active !== false,
+            role_slug:
+              v.role_slug ||
+              (Array.isArray(v.roles) ? v.roles[0]?.role_slug || v.roles[0] : null) ||
+              "vendor_technician",
+          })),
+        );
+      } else {
+        setLoadError((vendorsRes as any).reason?.message || "Failed to load vendor technicians.");
+      }
+      if (commRes.status === "fulfilled") {
+        setCommunities((commRes.value || []).map((c: any) => ({ id: c.id, name: c.name })));
+      }
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   useEffect(() => {
     loadData();
   }, []);
 
-  const handleReviewWork = async (decision: "Approve" | "Request Rework") => {
-    if (!selectedVendor) return;
+  const handleToggleActive = async (v: VendorUser) => {
+    const next = !v.is_active;
+    setVendors((prev) => prev.map((x) => (x.id === v.id ? { ...x, is_active: next } : x)));
     try {
-      // NOTE: POST /users/{id}/review does not exist in the backend — there is no
-      // vendor-work-review concept implemented at all. See the integration report.
-      await vendorsApi.reviewCompletion(selectedVendor.id, decision);
-      alert(`Work submission for ${selectedVendor.name} has been: ${decision}`);
-      setIsReviewModalOpen(false);
-      setFeedback("");
-      loadData();
+      await vendorsApi.toggleActive(v.id, next);
     } catch (err: any) {
-      alert(err?.message || "Failed to submit review.");
+      setVendors((prev) => prev.map((x) => (x.id === v.id ? { ...x, is_active: v.is_active } : x)));
+      alert(err?.message || "Failed to update vendor status.");
+    }
+  };
+
+  const handleCreateVendor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newName.trim() || !newEmail.trim() || !newPassword.trim()) return;
+    setIsCreating(true);
+    try {
+      await vendorsApi.create({
+        full_name: newName.trim(),
+        email: newEmail.trim(),
+        password: newPassword,
+        phone: newPhone.trim() || undefined,
+        community_id: newCommunityId || undefined,
+      });
+      setIsCreateModalOpen(false);
+      setNewName("");
+      setNewEmail("");
+      setNewPhone("");
+      setNewPassword("");
+      setNewCommunityId("");
+      await loadData();
+    } catch (err: any) {
+      alert(err?.message || "Failed to create vendor.");
+    } finally {
+      setIsCreating(false);
     }
   };
 
   const filteredVendors = vendors.filter((v) => {
-    const matchSearch =
-      v.name.toLowerCase().includes(search.toLowerCase()) ||
-      v.contact_person.toLowerCase().includes(search.toLowerCase()) ||
-      v.email.toLowerCase().includes(search.toLowerCase());
-    const matchCategory = categoryFilter === "all" || v.category.includes(categoryFilter);
-    return matchSearch && matchCategory;
+    const q = search.toLowerCase();
+    return (
+      v.full_name.toLowerCase().includes(q) ||
+      v.email.toLowerCase().includes(q) ||
+      (v.phone || "").toLowerCase().includes(q)
+    );
   });
 
   return (
     <div>
       <PageHeader
-        title="Vendor Directory & Work Oversight"
-        subtitle="Manage service vendor profiles, active assignments, and review completed work signoffs"
+        title="Vendor & Technician Directory"
+        subtitle="Registered vendor technicians available for ticket assignment"
         breadcrumbs={[{ label: "GateSphere" }, { label: "Facility Manager" }, { label: "Vendors" }]}
+        actions={
+          <button className="btn btn-primary" onClick={() => setIsCreateModalOpen(true)}>
+            ➕ Add Vendor Technician
+          </button>
+        }
       />
 
       <div className="card">
         <div className="card-header" style={{ flexWrap: "wrap", gap: "0.75rem" }}>
           <div>
-            <h3 className="card-title">Contracted Vendors</h3>
+            <h3 className="card-title">Vendor Technicians</h3>
             <p style={{ fontSize: "0.775rem", color: "var(--muted)" }}>
-              {filteredVendors.length} active service vendors
+              {filteredVendors.length} registered technicians
             </p>
           </div>
-
-          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-            <div style={{ width: "100%", maxWidth: 220 }}>
-              <SearchInput
-                value={search}
-                onChange={setSearch}
-                placeholder="Search vendor name/contact…"
-              />
-            </div>
-
-            <select
-              className="select-field"
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              style={{ width: "auto", height: 36 }}
-            >
-              <option value="all">All Categories</option>
-              <option value="Plumbing">Plumbing</option>
-              <option value="Elevators">Elevators</option>
-              <option value="Electrical">Electrical</option>
-              <option value="Horticulture">Horticulture</option>
-            </select>
+          <div style={{ width: "100%", maxWidth: 240 }}>
+            <SearchInput value={search} onChange={setSearch} placeholder="Search name, email, phone…" />
           </div>
         </div>
 
@@ -106,13 +145,10 @@ export default function FacilityManagerVendorsPage() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Vendor / Company</th>
-                <th>Category</th>
-                <th>Contact Person</th>
-                <th>Phone / Email</th>
-                <th>Rating</th>
-                <th>Active Jobs</th>
-                <th>Completed</th>
+                <th>Full Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Role</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -120,58 +156,37 @@ export default function FacilityManagerVendorsPage() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={9} style={{ textAlign: "center", padding: "2rem" }}>
-                    Loading vendors…
-                  </td>
+                  <td colSpan={6} style={{ textAlign: "center", padding: "2rem" }}>Loading vendors…</td>
                 </tr>
               ) : loadError ? (
                 <tr>
-                  <td
-                    colSpan={9}
-                    style={{
-                      textAlign: "center",
-                      padding: "2rem",
-                      color: "var(--danger, #dc2626)",
-                    }}
-                  >
-                    {loadError}
-                  </td>
+                  <td colSpan={6} style={{ textAlign: "center", padding: "2rem", color: "var(--danger, #dc2626)" }}>{loadError}</td>
                 </tr>
               ) : filteredVendors.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={9}
-                    style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
-                  >
-                    No vendors found.
+                  <td colSpan={6} style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
+                    {search ? "No vendors match your search." : "No vendor technicians registered yet. Click \"Add Vendor Technician\" to create one."}
                   </td>
                 </tr>
               ) : (
                 filteredVendors.map((v) => (
                   <tr key={v.id}>
-                    <td style={{ fontWeight: 600, color: "var(--fg)" }}>{v.name}</td>
-                    <td>{v.category}</td>
-                    <td>{v.contact_person}</td>
-                    <td>
-                      <div>{v.phone}</div>
-                      <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>{v.email}</div>
+                    <td style={{ fontWeight: 600, color: "var(--fg)" }}>{v.full_name}</td>
+                    <td style={{ fontSize: "0.85rem" }}>{v.email}</td>
+                    <td style={{ fontSize: "0.85rem" }}>{v.phone || "—"}</td>
+                    <td style={{ fontSize: "0.8rem", textTransform: "capitalize" }}>
+                      {v.role_slug.replace(/_/g, " ")}
                     </td>
-                    <td style={{ fontWeight: 600, color: "var(--warning)" }}>{v.rating} ★</td>
-                    <td style={{ fontWeight: 600 }}>{v.active_jobs} active</td>
-                    <td>{v.completed_jobs} done</td>
                     <td>
-                      <StatusBadge status={v.status} />
+                      <StatusBadge status={v.is_active ? "active" : "inactive"} />
                     </td>
                     <td>
                       <button
-                        className="btn btn-secondary"
-                        style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}
-                        onClick={() => {
-                          setSelectedVendor(v);
-                          setIsReviewModalOpen(true);
-                        }}
+                        className={v.is_active ? "btn btn-secondary" : "btn btn-primary"}
+                        style={{ fontSize: "0.75rem", padding: "0.2rem 0.45rem" }}
+                        onClick={() => handleToggleActive(v)}
                       >
-                        Review Work
+                        {v.is_active ? "Deactivate" : "Activate"}
                       </button>
                     </td>
                   </tr>
@@ -182,53 +197,97 @@ export default function FacilityManagerVendorsPage() {
         </div>
       </div>
 
-      {/* Review Completion Modal */}
+      {/* Create Vendor Modal */}
       <Modal
-        isOpen={isReviewModalOpen}
-        onClose={() => setIsReviewModalOpen(false)}
-        title={`Review Work Completion — ${selectedVendor?.name}`}
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        title="Add Vendor Technician"
         footer={
           <>
-            <button
-              className="btn btn-danger"
-              onClick={() => handleReviewWork("Request Rework")}
-              style={{ marginRight: "auto" }}
-            >
-              🔄 Request Rework
-            </button>
-            <button className="btn btn-secondary" onClick={() => setIsReviewModalOpen(false)}>
-              Cancel
-            </button>
-            <button className="btn btn-primary" onClick={() => handleReviewWork("Approve")}>
-              ✅ Approve Completion
+            <button className="btn btn-secondary" onClick={() => setIsCreateModalOpen(false)}>Cancel</button>
+            <button className="btn btn-primary" type="submit" form="create-vendor-form" disabled={isCreating}>
+              {isCreating ? "Creating…" : "Create Vendor"}
             </button>
           </>
         }
       >
-        <div>
-          <p style={{ marginBottom: "0.85rem", fontSize: "0.875rem" }}>
-            Vendor <strong>{selectedVendor?.name}</strong> has submitted job completion proof.
-          </p>
-          <div style={{ marginBottom: "1rem" }}>
-            <label
-              style={{
-                display: "block",
-                fontWeight: 600,
-                fontSize: "0.85rem",
-                marginBottom: "0.35rem",
-              }}
-            >
-              Manager Review Notes / Rework Instructions
-            </label>
-            <textarea
-              className="input-field"
-              rows={3}
-              placeholder="e.g. Work approved. Pressure testing passed clean."
-              value={feedback}
-              onChange={(e) => setFeedback(e.target.value)}
-            />
+        <form id="create-vendor-form" onSubmit={handleCreateVendor}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+            <div>
+              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+                Full Name *
+              </label>
+              <input
+                type="text"
+                className="input-field"
+                placeholder="e.g. Ravi Kumar"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+                Email *
+              </label>
+              <input
+                type="email"
+                className="input-field"
+                placeholder="vendor@example.com"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                required
+              />
+            </div>
           </div>
-        </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+            <div>
+              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+                Password *
+              </label>
+              <input
+                type="password"
+                className="input-field"
+                placeholder="Min 10 characters"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                minLength={10}
+                required
+              />
+            </div>
+            <div>
+              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+                Phone
+              </label>
+              <input
+                type="text"
+                className="input-field"
+                placeholder="+91 98765 43210"
+                value={newPhone}
+                onChange={(e) => setNewPhone(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {communities.length > 0 && (
+            <div>
+              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+                Assign to Community
+              </label>
+              <select
+                className="select-field"
+                value={newCommunityId}
+                onChange={(e) => setNewCommunityId(e.target.value)}
+              >
+                <option value="">— All communities —</option>
+                {communities.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </form>
       </Modal>
     </div>
   );

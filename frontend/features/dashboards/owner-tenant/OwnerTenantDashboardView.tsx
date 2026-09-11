@@ -1567,6 +1567,45 @@ export function OwnerTenantDashboardView({
                 render: (i) => <StatusBadge status={i.escalation_state} />,
               },
               { key: "created_at", header: "Raised", render: (i) => formatDate(i.created_at) },
+              {
+                key: "actions",
+                header: "Action",
+                render: (i) => {
+                  if (i.status !== "resident_confirmation") return null;
+                  return (
+                    <div style={{ display: "flex", gap: "0.4rem" }}>
+                      <BrandButton
+                        size="sm"
+                        isLoading={complaints.confirmTicket.isPending}
+                        onClick={() =>
+                          complaints.confirmTicket.mutateAsync({
+                            ticketId: i.id,
+                            satisfied: true,
+                            notes: "Fix confirmed by resident",
+                          }).catch((e: any) => toast.error(e?.message || "Failed to confirm.", "Error"))
+                        }
+                      >
+                        ✓ Confirm Fix
+                      </BrandButton>
+                      <BrandButton
+                        size="sm"
+                        variant="outline"
+                        style={{ borderColor: "#FECACA", color: "#DC2626" }}
+                        isLoading={complaints.confirmTicket.isPending}
+                        onClick={() =>
+                          complaints.confirmTicket.mutateAsync({
+                            ticketId: i.id,
+                            satisfied: false,
+                            notes: "Issue not resolved — disputed by resident",
+                          }).catch((e: any) => toast.error(e?.message || "Failed to dispute.", "Error"))
+                        }
+                      >
+                        ✗ Dispute
+                      </BrandButton>
+                    </div>
+                  );
+                },
+              },
             ]}
             data={complaintControls.paginatedData}
             isLoading={complaints.isLoading}

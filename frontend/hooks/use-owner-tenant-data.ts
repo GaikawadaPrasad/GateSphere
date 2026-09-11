@@ -516,8 +516,8 @@ export function useResidentComplaints() {
       notes?: string;
     }) => {
       return await api.post(`/complaints/tickets/${ticketId}/confirm`, {
-        satisfied,
-        notes: notes || "Confirmed by resident",
+        confirmation_status: satisfied ? "confirmed" : "disputed",
+        remarks: notes || (satisfied ? "Confirmed by resident" : "Disputed by resident"),
       });
     },
     onSuccess: () => {
