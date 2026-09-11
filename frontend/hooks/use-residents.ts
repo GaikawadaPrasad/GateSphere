@@ -85,7 +85,13 @@ export function useCreateResidentProfile() {
   return useMutation({
     mutationFn: ({ data, communityId }: { data: Partial<ResidentProfile>; communityId?: string }) =>
       residentsApi.create(data, communityId),
-    onSuccess: () => {
+    onSuccess: (newResident) => {
+      queryClient.setQueriesData({ queryKey: ["residents"] }, (old: any) => {
+        if (Array.isArray(old)) {
+          return [newResident, ...old];
+        }
+        return old;
+      });
       queryClient.invalidateQueries({ queryKey: ["residents"] });
     },
   });

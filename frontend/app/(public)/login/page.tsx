@@ -9,6 +9,7 @@ import { z } from "zod";
 import GateSphereLogo from "@/components/public/GateSphereLogo";
 import { ApiError } from "@/lib/api";
 import { useLogin } from "@/hooks/use-auth";
+import { getRoleLandingRoute } from "@/lib/permissions";
 
 const schema = z.object({
   email: z.string().email("Please enter a valid work email address"),
@@ -42,27 +43,7 @@ function LoginForm() {
         return;
       }
 
-      // Role-based landing redirects according to GSE-2026 PRD
-      if (user?.is_superadmin || user?.active_role === "super_admin") {
-        router.replace("/super-admin/dashboard");
-      } else if (user?.active_role === "community_admin") {
-        router.replace("/community-admin/dashboard");
-      } else if (
-        user?.active_role === "security_guard" ||
-        user?.active_role === "security_supervisor"
-      ) {
-        router.replace("/security-guard/dashboard");
-      } else if (user?.active_role === "resident") {
-        router.replace("/owner-tenant/dashboard");
-      } else if (user?.active_role === "facility_manager") {
-        router.replace("/facility-manager/dashboard");
-      } else if (user?.active_role === "vendor_technician") {
-        router.replace("/vendor-technician/dashboard");
-      } else if (user?.active_role === "domestic_staff") {
-        router.replace("/domestic-staff/dashboard");
-      } else {
-        router.replace("/dashboard");
-      }
+      router.replace(getRoleLandingRoute(user));
     } catch (err) {
       if (err instanceof ApiError && err.fields && Object.keys(err.fields).length) {
         for (const [field, message] of Object.entries(err.fields)) {

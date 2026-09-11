@@ -67,9 +67,11 @@ export default function SecuritySupervisorDomesticStaffPage() {
   }, []);
 
   const filteredStaff = staff.filter((s) => {
+    const q = search.toLowerCase();
     return (
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.role.toLowerCase().includes(search.toLowerCase())
+      !search ||
+      (s.name && s.name.toLowerCase().includes(q)) ||
+      (s.role && s.role.toLowerCase().includes(q))
     );
   });
 

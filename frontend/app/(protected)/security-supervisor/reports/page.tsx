@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { gateApi, dashboardsApi } from "@/lib/api";
+import { gateApi } from "@/lib/api";
 
 export default function SecuritySupervisorReportsPage() {
   const [reportType, setReportType] = useState("gate_traffic");
@@ -14,13 +14,8 @@ export default function SecuritySupervisorReportsPage() {
     (async () => {
       setIsLoading(true);
       try {
-        const [eventsRes, statsRes] = await Promise.allSettled([
-          gateApi.events({ page_size: 100 }),
-          dashboardsApi.security(),
-        ]);
-
-        const events =
-          eventsRes.status === "fulfilled" && Array.isArray(eventsRes.value) ? eventsRes.value : [];
+        const eventsRes = await gateApi.events({ page_size: 100 }).catch(() => []);
+        const events = Array.isArray(eventsRes) ? eventsRes : [];
 
         if (events.length === 0) {
           setTrafficRows([]);
