@@ -10,9 +10,14 @@ export default function RequestDemo() {
   const [submitted, setSubmitted] = useState(false);
   const [ticketId, setTicketId] = useState("");
   const [errors, setErrors] = useState<{ fullName?: string; email?: string; phone?: string; community?: string }>({});
+  const [serverError, setServerError] = useState<string | null>(null);
+  const submitGuard = React.useRef(false);
+  const [submitting, setSubmitting] = useState(false);
+
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
+    countryCode: "+91",
     phone: "",
     community: "",
     units: "100 – 500",
@@ -21,15 +26,15 @@ export default function RequestDemo() {
   });
 
   const NAME_REGEX = /^[A-Za-z\s]{2,}$/;
-  const PHONE_REGEX = /^(\+91[\s-]?)?[6-9]\d{9}$/;
-
-  const isFormValid =
-    NAME_REGEX.test(formData.fullName.trim()) &&
-    formData.email.trim() !== "" &&
-    PHONE_REGEX.test(formData.phone.replace(/\s|-/g, "")) &&
-    formData.community.trim() !== "";
-
   const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  
+  const PHONE_REGEXES: Record<string, RegExp> = {
+    "+91": /^[6-9]\d{9}$/,
+    "+1": /^[2-9]\d{9}$/,
+    "+44": /^7\d{9}$/,
+    "+971": /^5\d{8}$/,
+    "+65": /^[89]\d{7}$/,
+  };
 
   const validate = () => {
     const newErrors: { fullName?: string; email?: string; phone?: string; community?: string } = {};
@@ -37,35 +42,55 @@ export default function RequestDemo() {
       newErrors.fullName = "Enter a valid name (letters and spaces only).";
     if (!EMAIL_REGEX.test(formData.email.trim()))
       newErrors.email = "Enter a valid email address.";
-    const normalizedPhone = formData.phone.replace(/\s|-/g, "");
-    if (!PHONE_REGEX.test(normalizedPhone))
-      newErrors.phone = "Enter a valid Indian mobile number starting with 6–9 (e.g. +91 98765 43210).";
+    
+    const normalizedPhone = formData.phone.replace(/[\s-]/g, "");
+    const phoneRegex = PHONE_REGEXES[formData.countryCode];
+    if (!phoneRegex || !phoneRegex.test(normalizedPhone)) {
+      newErrors.phone = "Enter a valid mobile number for the selected country.";
+    }
+
     if (!formData.community.trim())
       newErrors.community = "Community / Society Name is required.";
     return newErrors;
   };
 
+  const isFormValid = Object.keys(validate()).length === 0;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitGuard.current) return;
+
     const validationErrors = validate();
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
       return;
     }
+
     setErrors({});
-    const generatedTicket = `#GS-DEMO-${Math.floor(1000 + Math.random() * 9000)}`;
-    setTicketId(generatedTicket);
-    saveDemoRequest({
-      ticketId: generatedTicket,
-      fullName: formData.fullName,
-      email: formData.email,
-      phone: formData.phone,
-      community: formData.community,
-      units: formData.units,
-      role: formData.role,
-      product: formData.product,
-    });
-    setSubmitted(true);
+    setServerError(null);
+    submitGuard.current = true;
+    setSubmitting(true);
+
+    try {
+      const generatedTicket = `#GS-DEMO-${Math.floor(1000 + Math.random() * 9000)}`;
+      setTicketId(generatedTicket);
+      saveDemoRequest({
+        ticketId: generatedTicket,
+        fullName: formData.fullName,
+        email: formData.email,
+        phone: `${formData.countryCode} ${formData.phone.replace(/[\s-]/g, "")}`,
+        community: formData.community,
+        units: formData.units,
+        role: formData.role,
+        product: formData.product,
+      });
+      setSubmitted(true);
+    } catch (err: any) {
+      setServerError(err?.message || "Something went wrong. Please try again.");
+    } finally {
+      submitGuard.current = false;
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -133,10 +158,6 @@ export default function RequestDemo() {
                   <div className="text-[12.5px] font-bold text-white tracking-tight">
                     Multi-Gate &amp; High-Rise Township Ready
                   </div>
-                </div>
-                <div className="flex items-center gap-1.5 text-[9.5px] font-mono text-emerald-300 font-bold bg-emerald-950/80 px-2.5 py-1 rounded-lg border border-emerald-500/30">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  LIVE DEMO
                 </div>
               </div>
             </div>
@@ -249,19 +270,32 @@ export default function RequestDemo() {
                       <label className="block text-[11.5px] font-bold text-slate-800 mb-1">
                         Phone Number <span className="text-red-500">*</span>
                       </label>
-                      <input
-                        type="tel"
-                        placeholder="+91 98765 43210"
-                        required
-                        value={formData.phone}
-                        onChange={(e) => {
-                          setFormData({ ...formData, phone: e.target.value });
-                          if (errors.phone) setErrors((prev) => ({ ...prev, phone: undefined }));
-                        }}
-                        className={`w-full px-3.5 py-2.5 rounded-xl text-[13.5px] text-slate-900 bg-[#F8FAFC] border focus:bg-white focus:ring-3 focus:ring-blue-500/10 outline-none transition-all ${
-                          errors.phone ? "border-red-400 focus:border-red-500" : "border-slate-200 focus:border-blue-600"
-                        }`}
-                      />
+                      <div className="flex gap-2">
+                        <select
+                          value={formData.countryCode}
+                          onChange={(e) => setFormData({ ...formData, countryCode: e.target.value })}
+                          className="w-[85px] shrink-0 px-2.5 py-2.5 rounded-xl text-[13.5px] text-slate-900 bg-[#F8FAFC] border border-slate-200 focus:bg-white focus:border-blue-600 focus:ring-3 focus:ring-blue-500/10 outline-none transition-all"
+                        >
+                          <option value="+91">🇮🇳 +91</option>
+                          <option value="+1">🇺🇸 +1</option>
+                          <option value="+44">🇬🇧 +44</option>
+                          <option value="+971">🇦🇪 +971</option>
+                          <option value="+65">🇸🇬 +65</option>
+                        </select>
+                        <input
+                          type="tel"
+                          placeholder="98765 43210"
+                          required
+                          value={formData.phone}
+                          onChange={(e) => {
+                            setFormData({ ...formData, phone: e.target.value });
+                            if (errors.phone) setErrors((prev) => ({ ...prev, phone: undefined }));
+                          }}
+                          className={`w-full px-3.5 py-2.5 rounded-xl text-[13.5px] text-slate-900 bg-[#F8FAFC] border focus:bg-white focus:ring-3 focus:ring-blue-500/10 outline-none transition-all ${
+                            errors.phone ? "border-red-400 focus:border-red-500" : "border-slate-200 focus:border-blue-600"
+                          }`}
+                        />
+                      </div>
                       {errors.phone && (
                         <p className="mt-1 text-[11px] text-red-500 font-medium">{errors.phone}</p>
                       )}
@@ -342,19 +376,27 @@ export default function RequestDemo() {
                     </select>
                   </div>
 
+                  {serverError && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-[12.5px] font-medium text-center">
+                      {serverError}
+                    </div>
+                  )}
+
                   <button
                     type="submit"
-                    disabled={!isFormValid}
+                    disabled={!isFormValid || submitting}
                     className={`w-full flex items-center justify-center gap-2 py-3 px-6 rounded-xl text-[14.5px] font-extrabold text-white bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 shadow-lg shadow-blue-500/20 active:scale-[0.99] transition-all mt-2 ${
-                      isFormValid
+                      isFormValid && !submitting
                         ? "hover:from-blue-800 hover:to-indigo-800 cursor-pointer"
                         : "opacity-50 cursor-not-allowed"
                     }`}
                   >
-                    Submit
-                    <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2">
-                      <path d="M3 8h10M9 4l4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
+                    {submitting ? "Submitting..." : "Submit"}
+                    {!submitting && (
+                      <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2">
+                        <path d="M3 8h10M9 4l4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
                   </button>
 
                   <p className="text-[11px] text-center text-slate-500 font-medium">

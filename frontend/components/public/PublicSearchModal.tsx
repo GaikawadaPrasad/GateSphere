@@ -9,10 +9,6 @@ interface PublicSearchModalProps {
 }
 
 const SEARCH_SUGGESTIONS = [
-  { title: "Security & Gate OS", href: "/security", desc: "Gate hardware, ANPR & guard operations" },
-  { title: "Visitor Pass Management", href: "/solutions", desc: "Pre-approvals, QR passes & delivery management" },
-  { title: "Resident Experience App", href: "/solutions", desc: "Community notices, amenity booking & dues" },
-  { title: "Platform Architecture", href: "/platform", desc: "Multi-tenant township operating system" },
   { title: "Features & Modules", href: "/features", desc: "Helpdesk SLA, maintenance & finances" },
   { title: "Book Demo & Contact", href: "/demo", desc: "Schedule a customized 1-on-1 walkthrough" },
   { title: "About GateSphere", href: "/about", desc: "Mission, township proof & leadership" },
