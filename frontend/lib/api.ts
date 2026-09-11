@@ -634,6 +634,50 @@ export const residentsApi = {
       data,
       communityId ? { community_id: communityId } : undefined,
     ),
+  addResident: (
+    communityId: string,
+    data: {
+      email: string;
+      full_name: string;
+      phone?: string;
+      password?: string;
+      unit_id: string;
+      occupancy_role?: string;
+      is_primary?: boolean;
+      agreement_reference?: string;
+    },
+  ) => apiSend<any>("POST", `/communities/${communityId}/residents`, data),
+};
+
+export const onboardingApi = {
+  addResident: (
+    communityId: string,
+    data: {
+      email: string;
+      full_name: string;
+      phone?: string;
+      password?: string;
+      unit_id: string;
+      occupancy_role?: string;
+      is_primary?: boolean;
+      agreement_reference?: string;
+    },
+  ) => apiSend<any>("POST", `/communities/${communityId}/residents`, data),
+  inviteResident: (
+    communityId: string,
+    data: {
+      unit_id: string;
+      invited_email: string;
+      invited_phone?: string;
+      full_name?: string;
+      occupancy_role?: string;
+      is_primary?: boolean;
+      agreement_reference?: string;
+      message?: string;
+    },
+  ) => apiSend<any>("POST", `/communities/${communityId}/invitations`, data),
+  listInvitations: (communityId: string) =>
+    apiGet<any[]>(`/communities/${communityId}/invitations`),
 };
 
 export const domesticStaffApi = {

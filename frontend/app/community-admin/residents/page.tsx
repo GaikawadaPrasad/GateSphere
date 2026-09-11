@@ -7,7 +7,9 @@ import {
   useMoveRecords,
   useTransitionMoveRecord,
   useEmergencyContacts,
+  useAddResident,
 } from "@/hooks/use-residents";
+import { useCommunityUnits } from "@/hooks/use-communities";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { FilterPanel } from "@/components/common/FilterPanel";
@@ -23,6 +25,19 @@ export default function CommunityAdminResidentsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [selectedResident, setSelectedResident] = useState<ResidentProfile | null>(null);
 
+  // Add Resident Modal State
+  const [isAddResidentOpen, setIsAddResidentOpen] = useState(false);
+  const [targetUnitId, setTargetUnitId] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [occupancyRole, setOccupancyRole] = useState("primary_owner");
+  const [isPrimary, setIsPrimary] = useState(true);
+  const [agreementRef, setAgreementRef] = useState("");
+  const [addError, setAddError] = useState("");
+  const [isAdding, setIsAdding] = useState(false);
+
   // Queries
   const {
     data: residents,
@@ -31,6 +46,9 @@ export default function CommunityAdminResidentsPage() {
   } = useResidents({
     community_id: activeCommunityId || undefined,
   });
+
+  const { data: communityUnits } = useCommunityUnits(activeCommunityId || undefined);
+  const addResidentMutation = useAddResident();
 
   const {
     data: moveRecords,
@@ -227,11 +245,73 @@ export default function CommunityAdminResidentsPage() {
   const pendingApprovalsCount =
     moveRecords?.filter((m) => m.status === "requested" || m.status === "scheduled").length || 0;
 
+  const resetAddForm = () => {
+    setTargetUnitId(communityUnits?.[0]?.id || "");
+    setFullName("");
+    setEmail("");
+    setPhone("");
+    setPassword("");
+    setOccupancyRole("primary_owner");
+    setIsPrimary(true);
+    setAgreementRef("");
+    setAddError("");
+  };
+
+  const handleOpenAddResident = () => {
+    resetAddForm();
+    setIsAddResidentOpen(true);
+  };
+
+  const handleAddResidentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeCommunityId) {
+      setAddError("Active community required.");
+      return;
+    }
+    if (!targetUnitId) {
+      setAddError("Please select a residential unit.");
+      return;
+    }
+    if (!fullName.trim() || !email.trim()) {
+      setAddError("Full name and email are required.");
+      return;
+    }
+
+    setAddError("");
+    setIsAdding(true);
+    try {
+      await addResidentMutation.mutateAsync({
+        communityId: activeCommunityId,
+        data: {
+          full_name: fullName.trim(),
+          email: email.trim().toLowerCase(),
+          phone: phone.trim() || undefined,
+          password: password.trim() || undefined,
+          unit_id: targetUnitId,
+          occupancy_role: occupancyRole,
+          is_primary: isPrimary,
+          agreement_reference: agreementRef.trim() || undefined,
+        },
+      });
+      setIsAddResidentOpen(false);
+      refetchResidents();
+    } catch (err: any) {
+      setAddError(err?.message || "Failed to onboard resident.");
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.75rem" }}>
       <PageHeader
         title="Residents &amp; Occupancy"
         description="Resident profiles, family members, emergency contacts, and move-in/out gate approval workflows."
+        action={
+          <button type="button" className="btn btn-primary" onClick={handleOpenAddResident}>
+            👤 + Onboard Resident
+          </button>
+        }
       />
 
       {/* Tabs */}
@@ -501,6 +581,186 @@ export default function CommunityAdminResidentsPage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Onboard Resident Modal */}
+      <Modal
+        isOpen={isAddResidentOpen}
+        onClose={() => setIsAddResidentOpen(false)}
+        title="👤 Onboard New Resident"
+      >
+        <form onSubmit={handleAddResidentSubmit}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            {addError && (
+              <div
+                style={{
+                  padding: "0.6rem 0.8rem",
+                  background: "#fee2e2",
+                  border: "1px solid #f87171",
+                  borderRadius: "6px",
+                  color: "#b91c1c",
+                  fontSize: "0.85rem",
+                }}
+              >
+                {addError}
+              </div>
+            )}
+
+            {/* Unit Selection */}
+            <div>
+              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.3rem" }}>
+                Target Residential Unit <span style={{ color: "#dc2626" }}>*</span>
+              </label>
+              <select
+                className="input"
+                value={targetUnitId}
+                onChange={(e) => setTargetUnitId(e.target.value)}
+                required
+                style={{ width: "100%" }}
+              >
+                <option value="">Select Unit...</option>
+                {communityUnits && communityUnits.length > 0 ? (
+                  communityUnits.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      Unit {u.unit_number} {u.unit_type ? `(${u.unit_type})` : ""} {u.sq_ft ? `• ${u.sq_ft} sqft` : ""}
+                    </option>
+                  ))
+                ) : (
+                  <option value="" disabled>
+                    No units found in community
+                  </option>
+                )}
+              </select>
+            </div>
+
+            {/* Name & Email */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.3rem" }}>
+                  Full Name <span style={{ color: "#dc2626" }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  className="input"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="e.g. Ananya Patel"
+                  required
+                  style={{ width: "100%" }}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.3rem" }}>
+                  Email Address <span style={{ color: "#dc2626" }}>*</span>
+                </label>
+                <input
+                  type="email"
+                  className="input"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="e.g. ananya@example.com"
+                  required
+                  style={{ width: "100%" }}
+                />
+              </div>
+            </div>
+
+            {/* Phone & Password */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.3rem" }}>
+                  Phone Number
+                </label>
+                <input
+                  type="tel"
+                  className="input"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="e.g. +91 98765 43210"
+                  style={{ width: "100%" }}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.3rem" }}>
+                  Initial Password (Optional)
+                </label>
+                <input
+                  type="password"
+                  className="input"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Auto-generated if blank"
+                  style={{ width: "100%" }}
+                />
+              </div>
+            </div>
+
+            {/* Occupancy Role & Primary Status */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", alignItems: "center" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.3rem" }}>
+                  Occupancy Role
+                </label>
+                <select
+                  className="input"
+                  value={occupancyRole}
+                  onChange={(e) => setOccupancyRole(e.target.value)}
+                  style={{ width: "100%" }}
+                >
+                  <option value="primary_owner">Primary Owner</option>
+                  <option value="secondary_owner">Secondary Owner / Co-Owner</option>
+                  <option value="tenant">Tenant / Renter</option>
+                  <option value="family">Family Member</option>
+                  <option value="occupant">Occupant</option>
+                </select>
+              </div>
+              <div style={{ paddingTop: "1.2rem" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.85rem", cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={isPrimary}
+                    onChange={(e) => setIsPrimary(e.target.checked)}
+                  />
+                  <span>Primary Unit Contact</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Agreement Reference */}
+            <div>
+              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.3rem" }}>
+                Agreement Reference (Optional)
+              </label>
+              <input
+                type="text"
+                className="input"
+                value={agreementRef}
+                onChange={(e) => setAgreementRef(e.target.value)}
+                placeholder="e.g. LEASE-2026-081"
+                style={{ width: "100%" }}
+              />
+            </div>
+
+            {/* Modal Actions */}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "0.5rem" }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setIsAddResidentOpen(false)}
+                disabled={isAdding}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={isAdding || !targetUnitId}
+              >
+                {isAdding ? "Onboarding..." : "👤 Register Resident"}
+              </button>
+            </div>
+          </div>
+        </form>
       </Modal>
     </div>
   );
