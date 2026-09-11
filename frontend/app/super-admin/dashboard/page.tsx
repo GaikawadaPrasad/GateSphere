@@ -4,10 +4,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { MetricsGrid } from "@/components/dashboard/MetricsGrid";
 import { QuickActions } from "@/components/dashboard/QuickActions";
-import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
-import { CommunityTable, type CommunityWithMetrics } from "@/components/tables/CommunityTable";
 import { SearchInput } from "@/components/forms/SearchInput";
 import { Modal } from "@/components/common/Modal";
 import { StatusBadge } from "@/components/common/StatusBadge";
@@ -27,9 +24,14 @@ import {
   isValidCommunityName,
   isValidCityName,
 } from "@/constants/locations";
-import { DemoRequestsCard } from "@/components/dashboard/DemoRequestsCard";
 import type { DemoRequestLead } from "@/lib/demo-requests";
+import { MetricsGrid } from "@/components/dashboard/MetricsGrid";
+import { CommunityTable } from "@/components/tables/CommunityTable";
+import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
+import { DemoRequestsCard } from "@/components/dashboard/DemoRequestsCard";
 import type { Community, Tower, Gate } from "@/types/communities";
+import type { CommunityWithMetrics } from "@/components/tables/CommunityTable";
+
 
 export default function SuperAdminDashboardPage() {
   const router = useRouter();
@@ -162,24 +164,36 @@ export default function SuperAdminDashboardPage() {
   const isCreateFormValid = Object.keys(createErrors).length === 0;
   const isEditFormValid = Object.keys(editErrors).length === 0;
 
-  // Filter communities by search query and active status
-  const filteredCommunities = useMemo(() => {
+  // Filter communities by search query and active status, and enrich with breakdown metrics
+  const filteredCommunities: CommunityWithMetrics[] = useMemo(() => {
     if (!communities) return [];
-    return communities.filter((comm: Community) => {
-      const matchesSearch =
-        searchQuery === "" ||
-        comm.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        comm.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (comm.city && comm.city.toLowerCase().includes(searchQuery.toLowerCase()));
+    return communities
+      .filter((comm: Community) => {
+        const matchesSearch =
+          searchQuery === "" ||
+          comm.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          comm.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (comm.city && comm.city.toLowerCase().includes(searchQuery.toLowerCase()));
 
-      const matchesStatus =
-        statusFilter === "all" ||
-        (statusFilter === "active" && comm.is_active) ||
-        (statusFilter === "inactive" && !comm.is_active);
+        const matchesStatus =
+          statusFilter === "all" ||
+          (statusFilter === "active" && comm.is_active) ||
+          (statusFilter === "inactive" && !comm.is_active);
 
-      return matchesSearch && matchesStatus;
-    });
-  }, [communities, searchQuery, statusFilter]);
+        return matchesSearch && matchesStatus;
+      })
+      .map((comm: Community) => {
+        const bd = metrics?.communityBreakdown?.[comm.id];
+        return {
+          ...comm,
+          totalTowersCount: bd?.totalTowers,
+          totalUnitsCount: bd?.totalUnits,
+          totalResidentsCount: bd?.totalResidents,
+          occupancyRate: bd?.occupancyRate ?? 0,
+          financialStatus: bd?.financialStatus ?? "Good",
+        };
+      });
+  }, [communities, searchQuery, statusFilter, metrics]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);

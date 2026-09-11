@@ -137,10 +137,6 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "notifications:view",
     ],
     "resident": [
-        "residents:view",
-        "residents:create",
-        "residents:update",
-        "residents:delete",
         "visitors:view",
         "visitors:create",
         "visitors:approve",

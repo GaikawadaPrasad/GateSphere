@@ -1,5 +1,5 @@
 import { KpiCard } from "@/components/dashboard/KpiCard";
-import { KpiCardSkeleton } from "@/components/common/LoadingSkeleton";
+import { MetricsSkeleton } from "@/components/common/LoadingSkeleton";
 import { formatCurrency, formatCompactNumber } from "@/lib/utils";
 import type { SuperAdminDashboardMetrics } from "@/types/dashboards";
 
@@ -10,24 +10,10 @@ interface MetricsGridProps {
 }
 
 export function MetricsGrid({ metrics, isLoading, onCardClick }: MetricsGridProps) {
-  if (isLoading) {
-    return (
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))",
-          gap: "1rem",
-          marginBottom: "1.5rem",
-        }}
-      >
-        {Array.from({ length: 6 }).map((_, i) => (
-          <KpiCardSkeleton key={i} />
-        ))}
-      </div>
-    );
+  if (isLoading || !metrics) {
+    return <MetricsSkeleton count={6} />;
   }
 
-  if (!metrics) return null;
 
   return (
     <div

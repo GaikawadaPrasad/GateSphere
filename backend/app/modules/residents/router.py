@@ -208,6 +208,23 @@ async def list_moves(
     )
 
 
+@router.get(
+    "/moves", response_model=Envelope[list[schemas.MoveRecordRead]], dependencies=[VIEW]
+)
+async def list_moves_alias(
+    community_id: uuid.UUID | None = None,
+    move_status: str | None = None,
+    params: PageParams = Depends(page_params),
+    svc: ResidentService = Depends(resident_service),
+) -> dict:
+    rows, total = await svc.list_moves(
+        community_id=community_id, status=move_status, offset=params.offset, limit=params.page_size
+    )
+    return paginated(
+        [schemas.MoveRecordRead.model_validate(r) for r in rows], total=total, params=params
+    )
+
+
 @router.post(
     "/move-records",
     response_model=Envelope[schemas.MoveRecordRead],
@@ -236,6 +253,22 @@ async def get_move(move_id: uuid.UUID, svc: ResidentService = Depends(resident_s
     dependencies=[UPDATE],
 )
 async def transition_move(
+    move_id: uuid.UUID,
+    payload: schemas.MoveRecordTransition,
+    svc: ResidentService = Depends(resident_service),
+) -> dict:
+    return ok(
+        schemas.MoveRecordRead.model_validate(await svc.transition_move(move_id, payload)),
+        message="Updated",
+    )
+
+
+@router.patch(
+    "/moves/{move_id}",
+    response_model=Envelope[schemas.MoveRecordRead],
+    dependencies=[UPDATE],
+)
+async def transition_move_alias(
     move_id: uuid.UUID,
     payload: schemas.MoveRecordTransition,
     svc: ResidentService = Depends(resident_service),

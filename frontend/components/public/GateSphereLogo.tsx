@@ -25,6 +25,7 @@ export default function GateSphereLogo({
         alt="GateSphere"
         width={isLarge ? 56 : 40}
         height={isLarge ? 56 : 40}
+        style={{ width: "auto", height: "auto" }}
         priority
         className={`${
           isLarge

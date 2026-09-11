@@ -7,6 +7,14 @@ from decimal import Decimal
 
 from pydantic import BaseModel
 
+from app.modules.assistant.schemas import (
+    AssistantAction,
+    AssistantQueryRequest,
+    AssistantQuickActionsResponse,
+    AssistantQuickChip,
+    AssistantResponse,
+)
+
 
 class OverviewStats(BaseModel):
     community_id: uuid.UUID
@@ -57,24 +65,48 @@ class ResidentStats(BaseModel):
     published_announcements: int
 
 
-# Re-export assistant schemas for backward compatibility
-from app.modules.assistant.schemas import (
-    AssistantAction,
-    AssistantQuickChip,
-    AssistantQueryRequest,
-    AssistantResponse,
-    AssistantQuickActionsResponse,
-)
+class CommunityBreakdownItem(BaseModel):
+    totalUnits: int = 0
+    totalResidents: int = 0
+    occupancyRate: int = 0
+    totalTowers: int | None = None
+    financialStatus: str = "Good"
+    openTickets: int = 0
+
+
+class SuperAdminDashboardStats(BaseModel):
+    totalCommunities: int
+    activeCommunities: int
+    inactiveCommunities: int
+    totalUnits: int
+    totalResidents: int
+    occupancyRate: int
+    activeGateTraffic: int
+    visitorsInside: int
+    vehiclesInside: int
+    staffInside: int
+    openComplaints: int
+    criticalComplaints: int
+    activePanicAlerts: int
+    openIncidents: int
+    totalBilled: Decimal
+    totalCollected: Decimal
+    totalOutstanding: Decimal
+    collectionRate: int
+    communityBreakdown: dict[str, CommunityBreakdownItem] = {}
+
 
 __all__ = [
-    "OverviewStats",
     "AdminStats",
-    "SecurityStats",
-    "FinancialStats",
-    "ResidentStats",
     "AssistantAction",
-    "AssistantQuickChip",
     "AssistantQueryRequest",
-    "AssistantResponse",
     "AssistantQuickActionsResponse",
+    "AssistantQuickChip",
+    "AssistantResponse",
+    "CommunityBreakdownItem",
+    "FinancialStats",
+    "OverviewStats",
+    "ResidentStats",
+    "SecurityStats",
+    "SuperAdminDashboardStats",
 ]

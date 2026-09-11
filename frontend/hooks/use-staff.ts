@@ -34,6 +34,7 @@ export function useStaffAssignments(params?: {
   return useQuery({
     queryKey: ["staff-assignments", params],
     queryFn: () => domesticStaffApi.assignments(params),
+    enabled: Boolean(params?.staff_id || params?.unit_id),
     staleTime: 60_000,
   });
 }

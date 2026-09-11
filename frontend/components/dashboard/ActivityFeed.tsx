@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { formatRelativeTime } from "@/lib/utils";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { ActivityFeedSkeleton } from "@/components/common/LoadingSkeleton";
 import type { GateEvent, PanicAlert } from "@/types/gate";
 
 interface ActivityFeedProps {
@@ -10,8 +11,13 @@ interface ActivityFeedProps {
 }
 
 export function ActivityFeed({ events, alerts, isLoading }: ActivityFeedProps) {
+  if (isLoading) {
+    return <ActivityFeedSkeleton rows={5} />;
+  }
+
   const hasAlerts = alerts && alerts.length > 0;
   const recentEvents = (events || []).slice(0, 6);
+
 
   return (
     <div className="card">
@@ -25,15 +31,9 @@ export function ActivityFeed({ events, alerts, isLoading }: ActivityFeedProps) {
         </Link>
       </div>
 
-      {isLoading ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="skeleton" style={{ height: 44, width: "100%" }} />
-          ))}
-        </div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-          {/* Critical Panic Alerts */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+        {/* Critical Panic Alerts */}
+
           {alerts?.map((alert) => (
             <div
               key={alert.id}
@@ -118,7 +118,7 @@ export function ActivityFeed({ events, alerts, isLoading }: ActivityFeedProps) {
             </div>
           )}
         </div>
-      )}
     </div>
   );
 }
+

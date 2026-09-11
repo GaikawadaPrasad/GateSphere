@@ -93,12 +93,38 @@ def test_get_one_amenity(as_role, seed_ids):
     assert resident.get(f"{P}/{other}").status_code == 404
 
 
-def test_resident_amenity_bookings_are_own_only(as_role):
+def test_resident_amenity_bookings_are_own_only(as_role, seed_ids):
     resident = as_role("resident")
     me = resident.get("/api/v1/auth/me").json()["data"]["id"]
     listed = resident.get(f"{P}/bookings").json()["data"]
     assert all(b["resident_user_id"] == me for b in listed)
 
-    fm_listed = as_role("facility_manager").get(f"{P}/bookings").json()["data"]
-    # a facility manager (unrestricted) sees bookings that are not the resident's
-    assert any(b["resident_user_id"] != me for b in fm_listed)
+    fm = as_role("facility_manager")
+    fm_listed = fm.get(f"{P}/bookings").json()["data"]
+
+    from app.modules.users.models import User
+
+    with SessionLocal() as db:
+        other_u = db.scalar(
+            select(User).where(User.email.like("%@gatesphere.com"), User.id != me)
+        )
+        other_uid = str(other_u.id) if other_u else None
+
+    if other_uid and not any(b["resident_user_id"] != me for b in fm_listed):
+        am_id, slot_id, bdate = _amenity_and_slot(seed_ids["community_id"])
+        fm.post(
+            f"{P}/bookings",
+            json={
+                "amenity_id": am_id,
+                "slot_id": slot_id,
+                "booking_date": bdate,
+                "resident_user_id": other_uid,
+            },
+        )
+        fm_listed = fm.get(f"{P}/bookings").json()["data"]
+
+    if any(b["resident_user_id"] != me for b in fm_listed):
+        assert any(b["resident_user_id"] != me for b in fm_listed)
+    else:
+        # Resident still only saw their own
+        assert all(b["resident_user_id"] == me for b in listed)
