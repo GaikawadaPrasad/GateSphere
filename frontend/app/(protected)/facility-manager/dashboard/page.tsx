@@ -24,9 +24,12 @@ export default function FacilityManagerDashboardPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [tickets, setTickets] = useState<DashboardTicket[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [units, setUnits] = useState<{ id: string; unit_number: string }[]>([]);
+  const [communities, setCommunities] = useState<{ id: string; name: string }[]>([]);
+  const [selectedCommunityId, setSelectedCommunityId] = useState("");
   const [amenitiesCount, setAmenitiesCount] = useState(0);
   const [bookingsToday, setBookingsToday] = useState(0);
 
@@ -39,8 +42,11 @@ export default function FacilityManagerDashboardPage() {
   const [reqPriority, setReqPriority] = useState("medium");
   const [isSubmittingTicket, setIsSubmittingTicket] = useState(false);
 
-  const loadData = async () => {
-    const [ticketsRes, categoriesRes, amenitiesRes, bookingsRes, communitiesRes] =
+  const loadData = async (showLoadingSpinner = true) => {
+    if (showLoadingSpinner) setIsLoading(true);
+    setLoadError(null);
+    try {
+      const [ticketsRes, categoriesRes, amenitiesRes, bookingsRes, communitiesRes] =
       await Promise.allSettled([
         complaintsApi.list(),
         complaintsApi.categories(),
@@ -54,7 +60,10 @@ export default function FacilityManagerDashboardPage() {
     }
 
     if (communitiesRes.status === "fulfilled" && communitiesRes.value?.length) {
+      const comms = communitiesRes.value.map((c: any) => ({ id: c.id, name: c.name }));
+      setCommunities(comms);
       const commId = communitiesRes.value[0].id;
+      setSelectedCommunityId((prev) => prev || commId);
       try {
         const uList = await communitiesApi.communityUnits(commId);
         setUnits((uList || []).map((u: any) => ({ id: u.id, unit_number: u.unit_number })));
@@ -80,6 +89,8 @@ export default function FacilityManagerDashboardPage() {
           created_at: t.created_at,
         })),
       );
+    } else {
+      setLoadError((ticketsRes as any).reason?.message || "Failed to load tickets.");
     }
 
     if (amenitiesRes.status === "fulfilled") setAmenitiesCount((amenitiesRes.value || []).length);
@@ -95,16 +106,33 @@ export default function FacilityManagerDashboardPage() {
       );
     }
 
-    setIsLoading(false);
+    } catch (err: any) {
+      setLoadError(err?.message || "Failed to load dashboard data.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
     loadData();
   }, []);
 
+  const handleCommunityChange = async (commId: string) => {
+    setSelectedCommunityId(commId);
+    setReqUnitId("");
+    setUnits([]);
+    if (!commId) return;
+    try {
+      const uList = await communitiesApi.communityUnits(commId);
+      setUnits((uList || []).map((u: any) => ({ id: u.id, unit_number: u.unit_number })));
+    } catch {
+      setUnits([]);
+    }
+  };
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await loadData();
+    await loadData(false); // don't blank KPI cards during refresh
     setIsRefreshing(false);
   };
 
@@ -137,8 +165,9 @@ export default function FacilityManagerDashboardPage() {
       router.push("/facility-manager/service-requests");
     } catch (err: any) {
       alert(err?.message || "Failed to create ticket.");
+    } finally {
+      setIsSubmittingTicket(false);
     }
-    setIsSubmittingTicket(false);
   };
 
   const openTickets = tickets.filter(
@@ -307,19 +336,26 @@ export default function FacilityManagerDashboardPage() {
                     <th>Category</th>
                     <th>Priority</th>
                     <th>Status</th>
+                    <th>Raised</th>
                   </tr>
                 </thead>
                 <tbody>
                   {isLoading ? (
                     <tr>
-                      <td colSpan={5} style={{ textAlign: "center", padding: "1.5rem" }}>
+                      <td colSpan={6} style={{ textAlign: "center", padding: "1.5rem" }}>
                         Loading…
+                      </td>
+                    </tr>
+                  ) : loadError ? (
+                    <tr>
+                      <td colSpan={6} style={{ textAlign: "center", padding: "1.5rem", color: "var(--danger, #dc2626)" }}>
+                        {loadError}
                       </td>
                     </tr>
                   ) : openTickets.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={5}
+                        colSpan={6}
                         style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}
                       >
                         No open tickets.
@@ -331,12 +367,9 @@ export default function FacilityManagerDashboardPage() {
                         <td style={{ fontWeight: 600 }}>{t.ticket_number}</td>
                         <td>{t.subject}</td>
                         <td>{t.category_name}</td>
-                        <td>
-                          <StatusBadge status={t.priority} />
-                        </td>
-                        <td>
-                          <StatusBadge status={t.status} />
-                        </td>
+                        <td><StatusBadge status={t.priority} /></td>
+                        <td><StatusBadge status={t.status} /></td>
+                        <td style={{ fontSize: "0.78rem", color: "var(--muted)" }}>{formatDate(t.created_at)}</td>
                       </tr>
                     ))
                   )}
@@ -412,15 +445,33 @@ export default function FacilityManagerDashboardPage() {
             </button>
             <button
               className="btn btn-primary"
-              onClick={handleQuickCreateRequest}
-              disabled={isSubmittingTicket}
+              type="submit"
+              form="quick-ticket-form"
+              disabled={isSubmittingTicket || units.length === 0}
+              title={units.length === 0 ? "No units available — seed units via Super Admin first" : undefined}
             >
               {isSubmittingTicket ? "Creating…" : "Create Ticket"}
             </button>
           </>
         }
       >
-        <form onSubmit={handleQuickCreateRequest}>
+        <form id="quick-ticket-form" onSubmit={handleQuickCreateRequest}>
+          {communities.length > 1 && (
+            <div style={{ marginBottom: "1rem" }}>
+              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+                Community
+              </label>
+              <select
+                className="select-field"
+                value={selectedCommunityId}
+                onChange={(e) => handleCommunityChange(e.target.value)}
+              >
+                {communities.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div style={{ marginBottom: "1rem" }}>
             <label
               style={{
@@ -510,12 +561,18 @@ export default function FacilityManagerDashboardPage() {
                 value={reqUnitId}
                 onChange={(e) => setReqUnitId(e.target.value)}
               >
+                <option value="">Select unit…</option>
                 {units.map((u) => (
                   <option key={u.id} value={u.id}>
                     Unit {u.unit_number}
                   </option>
                 ))}
               </select>
+              {units.length === 0 && (
+                <p style={{ fontSize: "0.75rem", color: "var(--danger, #dc2626)", marginTop: "0.25rem" }}>
+                  No units found — create units via Super Admin first.
+                </p>
+              )}
             </div>
           </div>
 

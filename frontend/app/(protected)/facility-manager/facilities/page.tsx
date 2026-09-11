@@ -13,6 +13,7 @@ export default function FacilityManagerFacilitiesPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Add Facility Modal
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -23,6 +24,7 @@ export default function FacilityManagerFacilitiesPage() {
 
   const loadData = async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
       const data = await facilitiesApi.list();
       setFacilities(
@@ -39,10 +41,11 @@ export default function FacilityManagerFacilitiesPage() {
           last_maintenance: "Active",
         })),
       );
-    } catch {
-      // fallback
+    } catch (err: any) {
+      setLoadError(err?.message || "Failed to load facilities.");
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   useEffect(() => {
@@ -92,21 +95,23 @@ export default function FacilityManagerFacilitiesPage() {
       setIsAddModalOpen(false);
       setName("");
       setLocation("");
-      loadData();
+      setCapacity("50");
+      setType("Community Hall");
+      await loadData();
     } catch (err: any) {
-      alert(err?.message || "Failed to add facility (Admin approval required).");
+      alert(err?.message || "Failed to add facility.");
     }
   };
 
   const handleStatusChange = async (id: string, newStatus: string) => {
+    const prevStatus = facilities.find((f) => f.id === id)?.status;
+    setFacilities((prev) => prev.map((f) => (f.id === id ? { ...f, status: newStatus as any } : f)));
     try {
       const isActive = newStatus === "Available" || newStatus === "Occupied/Booked";
-      await facilitiesApi.updateStatus(id, isActive ? "true" : "false");
-      setFacilities((prev) =>
-        prev.map((f) => (f.id === id ? { ...f, status: newStatus as any } : f)),
-      );
-    } catch {
-      // Keep optimistic or notify
+      await facilitiesApi.updateStatus(id, isActive);
+    } catch (err: any) {
+      setFacilities((prev) => prev.map((f) => (f.id === id ? { ...f, status: prevStatus as any } : f)));
+      alert(err?.message || "Failed to update facility status.");
     }
   };
 
@@ -174,9 +179,14 @@ export default function FacilityManagerFacilitiesPage() {
               style={{ width: "auto", height: 36 }}
             >
               <option value="all">All Types</option>
-              <option value="Sports">Sports</option>
-              <option value="Community Hall">Community Hall</option>
-              <option value="Wellness">Wellness</option>
+              <option value="Pool">Pool</option>
+              <option value="Gym">Gym</option>
+              <option value="Tennis">Tennis</option>
+              <option value="Hall">Hall</option>
+              <option value="Clubhouse">Clubhouse</option>
+              <option value="Park">Park</option>
+              <option value="Guest Room">Guest Room</option>
+              <option value="Other">Other</option>
             </select>
           </div>
         </div>
@@ -199,6 +209,12 @@ export default function FacilityManagerFacilitiesPage() {
                 <tr>
                   <td colSpan={7} style={{ textAlign: "center", padding: "2rem" }}>
                     Loading facilities…
+                  </td>
+                </tr>
+              ) : loadError ? (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: "center", padding: "2rem", color: "var(--danger, #dc2626)" }}>
+                    {loadError}
                   </td>
                 </tr>
               ) : filteredFacilities.length === 0 ? (
@@ -254,13 +270,13 @@ export default function FacilityManagerFacilitiesPage() {
             <button className="btn btn-secondary" onClick={() => setIsAddModalOpen(false)}>
               Cancel
             </button>
-            <button className="btn btn-primary" onClick={handleAddFacility}>
+            <button className="btn btn-primary" type="submit" form="add-facility-form">
               Add Facility
             </button>
           </>
         }
       >
-        <form onSubmit={handleAddFacility}>
+        <form id="add-facility-form" onSubmit={handleAddFacility}>
           <div style={{ marginBottom: "1rem" }}>
             <label
               style={{

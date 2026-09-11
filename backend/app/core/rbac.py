@@ -68,6 +68,8 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
     "facility_manager": [
         "communities:view",
         "users:view",
+        "users:create",
+        "users:update",
         "amenities:view",
         "amenities:create",
         "amenities:update",

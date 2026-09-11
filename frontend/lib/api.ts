@@ -487,10 +487,12 @@ export const complaintsApi = {
       communityId ? { community_id: communityId } : undefined,
     ),
   create: (data: any) => apiSend<any>("POST", "/complaints/tickets", data),
-  assignVendor: (id: string, vendorName: string) =>
-    apiSend<any>("POST", `/complaints/tickets/${id}/assign`, { vendor_name: vendorName }),
+  assignVendor: (id: string, vendorUserId: string) =>
+    apiSend<any>("POST", `/complaints/tickets/${id}/assign`, { assigned_to_user_id: vendorUserId }),
   updateStatus: (id: string, status: string, notes?: string) =>
     apiSend<any>("POST", `/complaints/tickets/${id}/transition`, { status, remarks: notes }),
+  exportCsv: (params?: Record<string, unknown>) =>
+    apiGet<string>("/complaints/tickets.csv", params),
 };
 
 export const serviceRequestsApi = complaintsApi;
@@ -770,11 +772,14 @@ export const amenitiesApi = {
     apiSend<Record<string, unknown>>("POST", `/amenities/bookings/${id}/cancel`, {
       reason: reason || "User cancelled",
     }),
-  blockSlot: (amenityIdOrData: any, reason?: string) =>
-    typeof amenityIdOrData === "string"
-      ? apiSend<any>("POST", `/amenities/${amenityIdOrData}/blocks`, { reason })
-      : apiSend<any>("POST", "/amenities/blocks", amenityIdOrData),
-  unblockSlot: (id: string) => apiSend<void>("DELETE", `/amenities/blocks/${id}`),
+  blockSlot: (amenityIdOrData: any, reason?: string) => {
+    if (typeof amenityIdOrData === "string") {
+      return apiSend<any>("POST", `/amenities/${amenityIdOrData}/blocks`, { reason });
+    }
+    const { amenity_id, ...rest } = amenityIdOrData;
+    return apiSend<any>("POST", `/amenities/${amenity_id}/blocks`, rest);
+  },
+  unblockSlot: (amenityId: string) => apiSend<any>("PATCH", `/amenities/${amenityId}`, { is_active: true }),
 };
 
 export const facilitiesApi = {
@@ -782,26 +787,28 @@ export const facilitiesApi = {
     apiGet<any[]>("/amenities", params as Record<string, unknown>),
   get: (id: string) => apiGet<any>(`/amenities/${id}`),
   create: (data: any) => apiSend<any>("POST", "/amenities", data),
-  updateStatus: (id: string, status: string) =>
-    apiSend<any>("PATCH", `/amenities/${id}`, { status }),
+  updateStatus: (id: string, isActive: boolean) =>
+    apiSend<any>("PATCH", `/amenities/${id}`, { is_active: isActive }),
 };
 
 export const maintenanceApi = {
   list: (params?: ListQueryParams) =>
     apiGet<any[]>("/complaints/tickets", params as Record<string, unknown>),
   get: (id: string) => apiGet<any>(`/complaints/tickets/${id}`),
-  assignVendor: (id: string, vendorName: string) =>
-    apiSend<any>("POST", `/complaints/tickets/${id}/assign`, { vendor_name: vendorName }),
+  assignVendor: (id: string, vendorUserId: string) =>
+    apiSend<any>("POST", `/complaints/tickets/${id}/assign`, { assigned_to_user_id: vendorUserId }),
   updateStatus: (id: string, status: string, notes?: string) =>
     apiSend<any>("POST", `/complaints/tickets/${id}/transition`, { status, remarks: notes }),
 };
 
 export const vendorsApi = {
   list: (params?: ListQueryParams) =>
-    apiGet<any[]>("/users", { role: "vendor_technician", ...(params as any) }),
+    apiGet<any[]>("/users", { role_slug: "vendor_technician", ...(params as any) }),
   get: (id: string) => apiGet<any>(`/users/${id}`),
-  reviewCompletion: (id: string, review: any) =>
-    apiSend<any>("POST", `/users/${id}/review`, review),
+  create: (data: { email: string; full_name: string; password: string; phone?: string; community_id?: string }) =>
+    apiSend<any>("POST", "/users", { ...data, role_slug: "vendor_technician" }),
+  toggleActive: (id: string, is_active: boolean) =>
+    apiSend<any>("PATCH", `/users/${id}`, { is_active }),
 };
 
 export const visitorsApi = {

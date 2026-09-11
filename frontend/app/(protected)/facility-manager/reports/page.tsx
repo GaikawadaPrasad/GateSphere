@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { complaintsApi, amenitiesApi } from "@/lib/api";
+import { complaintsApi, amenitiesApi, incidentsApi } from "@/lib/api";
 
 interface CategoryReportRow {
   category_name: string;
@@ -17,17 +17,33 @@ export default function FacilityManagerReportsPage() {
   const [categoryRows, setCategoryRows] = useState<CategoryReportRow[]>([]);
   const [amenityBookingsTotal, setAmenityBookingsTotal] = useState(0);
   const [amenityBookingsCancelled, setAmenityBookingsCancelled] = useState(0);
+  const [amenityBookingsConfirmed, setAmenityBookingsConfirmed] = useState(0);
+  const [amenityBookingsPending, setAmenityBookingsPending] = useState(0);
+  const [incidentTotal, setIncidentTotal] = useState(0);
+  const [incidentOpen, setIncidentOpen] = useState(0);
+  const [incidentResolved, setIncidentResolved] = useState(0);
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     (async () => {
       setIsLoading(true);
       setLoadError(null);
       try {
-        const [tickets, categories, bookings] = await Promise.all([
+        const [ticketsRes, categoriesRes, bookingsRes, incidentsRes] = await Promise.allSettled([
           complaintsApi.list(),
           complaintsApi.categories(),
           amenitiesApi.bookings(),
+          incidentsApi.list(),
         ]);
+
+        const tickets = ticketsRes.status === "fulfilled" ? ticketsRes.value : [];
+        const categories = categoriesRes.status === "fulfilled" ? categoriesRes.value : [];
+        const bookings = bookingsRes.status === "fulfilled" ? bookingsRes.value : [];
+        const incidents = incidentsRes.status === "fulfilled" ? (incidentsRes.value as any[]) : [];
+
+        if (ticketsRes.status === "rejected") {
+          setLoadError((ticketsRes as PromiseRejectedResult).reason?.message || "Failed to load tickets.");
+        }
 
         const categoryMap = new Map<string, string>();
         for (const c of categories || []) if (c?.id) categoryMap.set(c.id, c.name);
@@ -55,10 +71,22 @@ export default function FacilityManagerReportsPage() {
         setAmenityBookingsCancelled(
           (bookings || []).filter((b: any) => b.status === "cancelled").length,
         );
+        setAmenityBookingsConfirmed(
+          (bookings || []).filter((b: any) => b.status === "confirmed").length,
+        );
+        setAmenityBookingsPending(
+          (bookings || []).filter((b: any) => b.status === "pending").length,
+        );
+
+        const TERMINAL = ["resolved", "closed", "false_alarm"];
+        setIncidentTotal((incidents || []).length);
+        setIncidentOpen((incidents || []).filter((i: any) => !TERMINAL.includes(i.status)).length);
+        setIncidentResolved((incidents || []).filter((i: any) => TERMINAL.includes(i.status)).length);
       } catch (err: any) {
         setLoadError(err?.message || "Failed to load report data.");
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     })();
   }, []);
 
@@ -68,6 +96,25 @@ export default function FacilityManagerReportsPage() {
         title="Facility & Operational Reports"
         subtitle="Ticket volume and SLA performance by category, and amenity booking activity"
         breadcrumbs={[{ label: "GateSphere" }, { label: "Facility Manager" }, { label: "Reports" }]}
+        actions={
+          <button
+            className="btn btn-secondary"
+            disabled={isExporting}
+            onClick={async () => {
+              setIsExporting(true);
+              try {
+                const csv = await complaintsApi.exportCsv?.() ?? await fetch("/api/v1/complaints/tickets.csv", { credentials: "include", headers: { Accept: "text/csv" } }).then(r => r.text());
+                const blob = new Blob([csv as string], { type: "text/csv" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a"); a.href = url; a.download = "facility_tickets.csv"; a.click();
+                URL.revokeObjectURL(url);
+              } catch (err: any) { alert(err?.message || "Export failed."); }
+              finally { setIsExporting(false); }
+            }}
+          >
+            {isExporting ? "Exporting…" : "↓ Export Tickets CSV"}
+          </button>
+        }
       />
 
       <div className="card" style={{ marginBottom: "1.75rem" }}>
@@ -136,6 +183,30 @@ export default function FacilityManagerReportsPage() {
         </div>
       </div>
 
+      <div className="card" style={{ marginBottom: "1.75rem" }}>
+        <div className="card-header">
+          <h3 className="card-title">Incident Summary</h3>
+        </div>
+        {isLoading ? (
+          <p style={{ padding: "1rem", color: "var(--muted)" }}>Loading…</p>
+        ) : (
+          <div style={{ padding: "0.5rem 1rem 1rem", display: "flex", gap: "2rem", fontSize: "0.875rem" }}>
+            <div>
+              <div style={{ color: "var(--muted)", fontSize: "0.75rem" }}>Total Incidents</div>
+              <div style={{ fontWeight: 700, fontSize: "1.25rem" }}>{incidentTotal}</div>
+            </div>
+            <div>
+              <div style={{ color: "var(--muted)", fontSize: "0.75rem" }}>Open / Active</div>
+              <div style={{ fontWeight: 700, fontSize: "1.25rem", color: "var(--danger)" }}>{incidentOpen}</div>
+            </div>
+            <div>
+              <div style={{ color: "var(--muted)", fontSize: "0.75rem" }}>Resolved / Closed</div>
+              <div style={{ fontWeight: 700, fontSize: "1.25rem", color: "var(--success)" }}>{incidentResolved}</div>
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="card">
         <div className="card-header">
           <h3 className="card-title">Amenity Booking Activity</h3>
@@ -156,8 +227,16 @@ export default function FacilityManagerReportsPage() {
               <div style={{ fontWeight: 700, fontSize: "1.25rem" }}>{amenityBookingsTotal}</div>
             </div>
             <div>
+              <div style={{ color: "var(--muted)", fontSize: "0.75rem" }}>Confirmed</div>
+              <div style={{ fontWeight: 700, fontSize: "1.25rem", color: "var(--success)" }}>{amenityBookingsConfirmed}</div>
+            </div>
+            <div>
+              <div style={{ color: "var(--muted)", fontSize: "0.75rem" }}>Pending</div>
+              <div style={{ fontWeight: 700, fontSize: "1.25rem", color: "var(--warning)" }}>{amenityBookingsPending}</div>
+            </div>
+            <div>
               <div style={{ color: "var(--muted)", fontSize: "0.75rem" }}>Cancelled</div>
-              <div style={{ fontWeight: 700, fontSize: "1.25rem" }}>{amenityBookingsCancelled}</div>
+              <div style={{ fontWeight: 700, fontSize: "1.25rem", color: "var(--danger)" }}>{amenityBookingsCancelled}</div>
             </div>
           </div>
         )}
