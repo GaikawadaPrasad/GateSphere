@@ -62,7 +62,11 @@ export default function FacilityManagerMaintenancePage() {
 
   const loadData = async (reset = true) => {
     const currentPage = reset ? 1 : page + 1;
-    reset ? setIsLoading(true) : setIsLoadingMore(true);
+    if (reset) {
+      setIsLoading(true);
+    } else {
+      setIsLoadingMore(true);
+    }
     setLoadError(null);
     try {
       const [ticketsRes, categoriesRes, vendorsRes] = await Promise.allSettled([
@@ -107,7 +111,11 @@ export default function FacilityManagerMaintenancePage() {
     } catch (err: any) {
       setLoadError(err?.message || "Failed to load maintenance tickets.");
     } finally {
-      reset ? setIsLoading(false) : setIsLoadingMore(false);
+      if (reset) {
+        setIsLoading(false);
+      } else {
+        setIsLoadingMore(false);
+      }
     }
   };
 

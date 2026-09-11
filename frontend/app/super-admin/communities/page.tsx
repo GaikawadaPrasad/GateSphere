@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { CommunityTable, type CommunityWithMetrics } from "@/components/tables/CommunityTable";
 import { SearchInput } from "@/components/forms/SearchInput";
 import { Modal } from "@/components/common/Modal";
 import { StatusBadge } from "@/components/common/StatusBadge";
-import { formatDate } from "@/lib/utils";
 import { communitiesApi, residentsApi } from "@/lib/api";
 import {
   useCommunities,
@@ -26,7 +25,7 @@ import {
   isValidCommunityName,
   isValidCityName,
 } from "@/constants/locations";
-import type { Community, Tower, Gate, Floor, Unit } from "@/types/communities";
+import type { Community, Tower, Gate, Floor } from "@/types/communities";
 import type { ResidentProfile } from "@/types/residents";
 
 export default function CommunitiesPage() {

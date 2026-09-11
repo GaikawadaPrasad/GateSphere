@@ -59,7 +59,11 @@ export default function FacilityManagerComplaintsPage() {
 
   const loadData = async (reset = true) => {
     const currentPage = reset ? 1 : page + 1;
-    reset ? setIsLoading(true) : setIsLoadingMore(true);
+    if (reset) {
+      setIsLoading(true);
+    } else {
+      setIsLoadingMore(true);
+    }
     setLoadError(null);
     try {
       const [ticketsRes, categoriesRes, vendorsRes] = await Promise.allSettled([
@@ -94,7 +98,11 @@ export default function FacilityManagerComplaintsPage() {
     } catch (err: any) {
       setLoadError(err?.message || "Failed to load complaints.");
     } finally {
-      reset ? setIsLoading(false) : setIsLoadingMore(false);
+      if (reset) {
+        setIsLoading(false);
+      } else {
+        setIsLoadingMore(false);
+      }
     }
   };
 

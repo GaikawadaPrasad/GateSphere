@@ -18,7 +18,11 @@ export default function FacilityManagerNotificationsPage() {
 
   const loadData = async (reset = true) => {
     const currentPage = reset ? 1 : page + 1;
-    reset ? setIsLoading(true) : setIsLoadingMore(true);
+    if (reset) {
+      setIsLoading(true);
+    } else {
+      setIsLoadingMore(true);
+    }
     setLoadError(null);
     try {
       const data = await notificationsApi.list({
@@ -33,7 +37,11 @@ export default function FacilityManagerNotificationsPage() {
     } catch (err: any) {
       setLoadError(err?.message || "Failed to load notifications.");
     } finally {
-      reset ? setIsLoading(false) : setIsLoadingMore(false);
+      if (reset) {
+        setIsLoading(false);
+      } else {
+        setIsLoadingMore(false);
+      }
     }
   };
 

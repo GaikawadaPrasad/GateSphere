@@ -28,8 +28,6 @@ export default function FacilityManagerDashboardPage() {
   const [tickets, setTickets] = useState<DashboardTicket[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [units, setUnits] = useState<{ id: string; unit_number: string }[]>([]);
-  const [communities, setCommunities] = useState<{ id: string; name: string }[]>([]);
-  const [selectedCommunityId, setSelectedCommunityId] = useState("");
   const [amenitiesCount, setAmenitiesCount] = useState(0);
   const [bookingsToday, setBookingsToday] = useState(0);
 
@@ -117,19 +115,6 @@ export default function FacilityManagerDashboardPage() {
   useEffect(() => {
     loadData();
   }, []);
-
-  const handleCommunityChange = async (commId: string) => {
-    setSelectedCommunityId(commId);
-    setReqUnitId("");
-    setUnits([]);
-    if (!commId) return;
-    try {
-      const uList = await communitiesApi.communityUnits(commId);
-      setUnits((uList || []).map((u: any) => ({ id: u.id, unit_number: u.unit_number })));
-    } catch {
-      setUnits([]);
-    }
-  };
 
   const handleRefresh = async () => {
     setIsRefreshing(true);

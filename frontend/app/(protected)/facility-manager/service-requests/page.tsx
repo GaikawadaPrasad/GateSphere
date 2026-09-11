@@ -60,7 +60,11 @@ export default function FacilityManagerServiceRequestsPage() {
 
   const loadData = async (reset = true) => {
     const currentPage = reset ? 1 : page + 1;
-    reset ? setIsLoading(true) : setIsLoadingMore(true);
+    if (reset) {
+      setIsLoading(true);
+    } else {
+      setIsLoadingMore(true);
+    }
     setLoadError(null);
     try {
       const [ticketsRes, categoriesRes, vendorsRes] = await Promise.allSettled([
@@ -104,7 +108,11 @@ export default function FacilityManagerServiceRequestsPage() {
     } catch (err: any) {
       setLoadError(err?.message || "Failed to load service requests.");
     } finally {
-      reset ? setIsLoading(false) : setIsLoadingMore(false);
+      if (reset) {
+        setIsLoading(false);
+      } else {
+        setIsLoadingMore(false);
+      }
     }
   };
 

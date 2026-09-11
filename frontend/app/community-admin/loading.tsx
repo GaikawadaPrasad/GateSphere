@@ -1,6 +1,6 @@
 "use client";
 
-import { MetricsSkeleton, TableSkeleton, CardSkeleton, Skeleton } from "@/components/common/LoadingSkeleton";
+import { MetricsSkeleton, CardSkeleton, Skeleton } from "@/components/common/LoadingSkeleton";
 
 export default function CommunityAdminLoading() {
   return (
