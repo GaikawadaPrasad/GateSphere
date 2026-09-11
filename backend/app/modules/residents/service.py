@@ -140,10 +140,76 @@ class ResidentService:
             self.scope.require(community_id)
             stmt = stmt.where(ResidentProfile.community_id == community_id)
         stmt = stmt.order_by(ResidentProfile.created_at.desc())
-        return (
-            await self.profiles.list(offset=offset, limit=limit, extra=stmt),
-            await self.profiles.count(extra=stmt),
+        raw_rows = await self.profiles.list(offset=offset, limit=limit, extra=stmt)
+        total = await self.profiles.count(extra=stmt)
+        if not raw_rows:
+            return [], total
+
+        from app.modules.communities.models import Tower, Unit
+        from app.modules.users.models import User
+
+        user_ids = [r.user_id for r in raw_rows]
+        users = {
+            u.id: u
+            for u in (await self.db.scalars(select(User).where(User.id.in_(user_ids)))).all()
+        }
+
+        profile_ids = [r.id for r in raw_rows]
+        occupancies = (
+            await self.db.scalars(
+                select(UnitOccupancy).where(
+                    UnitOccupancy.resident_profile_id.in_(profile_ids),
+                    UnitOccupancy.is_active.is_(True),
+                )
+            )
+        ).all()
+        occ_by_profile = {occ.resident_profile_id: occ for occ in occupancies}
+
+        unit_ids = [occ.unit_id for occ in occupancies]
+        units = (
+            {u.id: u for u in (await self.db.scalars(select(Unit).where(Unit.id.in_(unit_ids)))).all()}
+            if unit_ids
+            else {}
         )
+        tower_ids = [u.tower_id for u in units.values() if u.tower_id]
+        towers = (
+            {
+                t.id: t
+                for t in (await self.db.scalars(select(Tower).where(Tower.id.in_(tower_ids)))).all()
+            }
+            if tower_ids
+            else {}
+        )
+
+        enriched: list[schemas.ResidentProfileRead] = []
+        for r in raw_rows:
+            u = users.get(r.user_id)
+            occ = occ_by_profile.get(r.id)
+            unit = units.get(occ.unit_id) if occ else None
+            tower = towers.get(unit.tower_id) if (unit and unit.tower_id) else None
+
+            enriched.append(
+                schemas.ResidentProfileRead(
+                    id=r.id,
+                    community_id=r.community_id,
+                    user_id=r.user_id,
+                    profile_status=r.profile_status,
+                    kyc_status=r.kyc_status,
+                    move_in_date=r.move_in_date,
+                    move_out_date=r.move_out_date,
+                    emergency_notes=r.emergency_notes,
+                    created_at=r.created_at,
+                    updated_at=r.updated_at,
+                    full_name=u.full_name if u else "Resident",
+                    email=u.email if u else None,
+                    phone=u.phone if u else None,
+                    unit_number=unit.unit_number if unit else None,
+                    tower_name=tower.name if tower else None,
+                    resident_type=occ.occupancy_role if occ else None,
+                    is_primary=occ.is_primary if occ else None,
+                )
+            )
+        return enriched, total
 
     async def get_profile(self, profile_id: uuid.UUID) -> ResidentProfile:
         obj = await self.profiles.get(profile_id)
@@ -396,10 +462,81 @@ class ResidentService:
         if status is not None:
             stmt = stmt.where(MoveRecord.status == status)
         stmt = stmt.order_by(MoveRecord.requested_at.desc())
-        return (
-            await self.moves.list(offset=offset, limit=limit, extra=stmt),
-            await self.moves.count(extra=stmt),
+        raw_rows = await self.moves.list(offset=offset, limit=limit, extra=stmt)
+        total = await self.moves.count(extra=stmt)
+        if not raw_rows:
+            return [], total
+
+        from app.modules.communities.models import Tower, Unit
+        from app.modules.users.models import User
+
+        unit_ids = [r.unit_id for r in raw_rows]
+        units = (
+            {u.id: u for u in (await self.db.scalars(select(Unit).where(Unit.id.in_(unit_ids)))).all()}
+            if unit_ids
+            else {}
         )
+        tower_ids = [u.tower_id for u in units.values() if u.tower_id]
+        towers = (
+            {
+                t.id: t
+                for t in (await self.db.scalars(select(Tower).where(Tower.id.in_(tower_ids)))).all()
+            }
+            if tower_ids
+            else {}
+        )
+
+        profile_ids = [r.resident_profile_id for r in raw_rows]
+        profiles = (
+            {
+                p.id: p
+                for p in (
+                    await self.db.scalars(
+                        select(ResidentProfile).where(ResidentProfile.id.in_(profile_ids))
+                    )
+                ).all()
+            }
+            if profile_ids
+            else {}
+        )
+        user_ids = [p.user_id for p in profiles.values()]
+        users = (
+            {
+                u.id: u
+                for u in (await self.db.scalars(select(User).where(User.id.in_(user_ids)))).all()
+            }
+            if user_ids
+            else {}
+        )
+
+        enriched: list[schemas.MoveRecordRead] = []
+        for r in raw_rows:
+            unit = units.get(r.unit_id)
+            tower = towers.get(unit.tower_id) if (unit and unit.tower_id) else None
+            prof = profiles.get(r.resident_profile_id)
+            u = users.get(prof.user_id) if prof else None
+
+            enriched.append(
+                schemas.MoveRecordRead(
+                    id=r.id,
+                    community_id=r.community_id,
+                    unit_id=r.unit_id,
+                    resident_profile_id=r.resident_profile_id,
+                    move_type=r.move_type,
+                    status=r.status,
+                    requested_at=r.requested_at,
+                    scheduled_at=r.scheduled_at,
+                    clearance_notes=r.clearance_notes,
+                    approved_by_user_id=r.approved_by_user_id,
+                    approved_at=r.approved_at,
+                    created_at=r.created_at,
+                    updated_at=r.updated_at,
+                    unit_number=unit.unit_number if unit else None,
+                    tower_name=tower.name if tower else None,
+                    resident_name=u.full_name if u else None,
+                )
+            )
+        return enriched, total
 
     async def get_move(self, move_id: uuid.UUID) -> MoveRecord:
         obj = await self.moves.get(move_id)

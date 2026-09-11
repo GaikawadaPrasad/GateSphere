@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useUiStore } from "@/store/ui";
 import { useCommunityDetails, useTowers } from "@/hooks/use-communities";
 import { useOverviewStats, useFinancialStats } from "@/hooks/use-dashboards";
@@ -10,10 +11,49 @@ import { useMoveRecords } from "@/hooks/use-residents";
 import { useAnnouncements } from "@/hooks/use-communication";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { KpiCard } from "@/components/dashboard/KpiCard";
-import { FinancialHealthCard } from "@/components/dashboard/FinancialHealthCard";
-import { AttendanceWidget } from "@/components/dashboard/AttendanceWidget";
-import { IncidentListWidget } from "@/components/dashboard/IncidentListWidget";
+import { Skeleton } from "@/components/common/LoadingSkeleton";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
+
+// Lazy-loaded components with skeletal loading fallbacks
+const FinancialHealthCard = dynamic(
+  () => import("@/components/dashboard/FinancialHealthCard").then((mod) => mod.FinancialHealthCard),
+  {
+    loading: () => (
+      <div className="card" style={{ height: "100%", minHeight: 280 }}>
+        <Skeleton width={160} height={24} style={{ marginBottom: "1.5rem" }} />
+        <Skeleton width="100%" height={180} />
+      </div>
+    ),
+    ssr: false,
+  },
+);
+
+const AttendanceWidget = dynamic(
+  () => import("@/components/dashboard/AttendanceWidget").then((mod) => mod.AttendanceWidget),
+  {
+    loading: () => (
+      <div className="card" style={{ height: "100%", minHeight: 280 }}>
+        <Skeleton width={180} height={24} style={{ marginBottom: "1.5rem" }} />
+        <Skeleton width="100%" height={180} />
+      </div>
+    ),
+    ssr: false,
+  },
+);
+
+const IncidentListWidget = dynamic(
+  () => import("@/components/dashboard/IncidentListWidget").then((mod) => mod.IncidentListWidget),
+  {
+    loading: () => (
+      <div className="card" style={{ height: "100%", minHeight: 280 }}>
+        <Skeleton width={170} height={24} style={{ marginBottom: "1.5rem" }} />
+        <Skeleton width="100%" height={180} />
+      </div>
+    ),
+    ssr: false,
+  },
+);
+
 
 export default function CommunityAdminDashboardPage() {
   const { activeCommunityId } = useUiStore();

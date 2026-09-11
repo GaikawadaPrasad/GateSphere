@@ -102,7 +102,7 @@ export default function CommunityAdminNotificationsPage() {
                 maxWidth: 380,
               }}
             >
-              {n.body}
+              {n.body || n.message || "Notification alert"}
             </div>
           </div>
         </div>
@@ -113,7 +113,7 @@ export default function CommunityAdminNotificationsPage() {
       header: "Category",
       render: (n) => (
         <span className="badge badge-neutral" style={{ textTransform: "capitalize" }}>
-          {n.category}
+          {(n.category || (n as any).notification_type || "System")?.replace("_", " ")}
         </span>
       ),
     },
@@ -196,14 +196,30 @@ export default function CommunityAdminNotificationsPage() {
         onClose={() => setSelectedNotification(null)}
         title={
           selectedNotification
-            ? `${getCategoryIcon(selectedNotification.category)} ${selectedNotification.title}`
+            ? `${getCategoryIcon(selectedNotification.category || (selectedNotification as any).notification_type || "")} ${selectedNotification.title}`
             : "Notification Details"
         }
       >
         {selectedNotification && (
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-            <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-              Received: {formatDateTime(selectedNotification.created_at)}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                fontSize: "0.75rem",
+                color: "var(--muted)",
+              }}
+            >
+              <span>Received: {formatDateTime(selectedNotification.created_at)}</span>
+              <span
+                className="badge badge-neutral"
+                style={{ textTransform: "capitalize", fontSize: "0.7rem" }}
+              >
+                {(selectedNotification.category ||
+                  (selectedNotification as any).notification_type ||
+                  "System")?.replace("_", " ")}
+              </span>
             </div>
 
             <div
@@ -217,7 +233,9 @@ export default function CommunityAdminNotificationsPage() {
                 color: "var(--fg)",
               }}
             >
-              {selectedNotification.body}
+              {selectedNotification.body ||
+                selectedNotification.message ||
+                "No additional details provided."}
             </div>
 
             {selectedNotification.action_url && (

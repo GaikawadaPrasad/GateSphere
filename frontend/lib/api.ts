@@ -13,6 +13,7 @@ import type {
   OverviewStats,
   ResidentStats,
   SecurityStats,
+  SuperAdminDashboardMetrics,
 } from "@/types/dashboards";
 import type { GateEvent, GuardRoster, PanicAlert } from "@/types/gate";
 import type { Permission, Role } from "@/types/rbac";
@@ -360,7 +361,7 @@ export const communitiesApi = {
   get: (id: string) => apiGet<Community>(`/communities/${id}`),
   create: (data: Partial<Community>) => apiSend<Community>("POST", "/communities", data),
   update: (id: string, data: Partial<Community>) =>
-    apiSend<Community>("PUT", `/communities/${id}`, data),
+    apiSend<Community>("PATCH", `/communities/${id}`, data),
   delete: (id: string) => apiSend<void>("DELETE", `/communities/${id}`),
   towers: (communityId: string) => apiGet<Tower[]>(`/communities/${communityId}/towers`),
   gates: (communityId: string) => apiGet<Gate[]>(`/communities/${communityId}/gates`),
@@ -385,6 +386,7 @@ export const communitiesApi = {
 };
 
 export const dashboardsApi = {
+  superAdmin: () => apiGet<SuperAdminDashboardMetrics>("/dashboards/super-admin"),
   overview: (communityId?: string) =>
     apiGet<OverviewStats>(
       "/dashboards/overview",
@@ -599,11 +601,11 @@ export const residentsApi = {
     move_status?: string;
     page?: number;
     page_size?: number;
-  }) => apiGet<any[]>("/residents/moves", params as Record<string, unknown>),
+  }) => apiGet<any[]>("/residents/move-records", params as Record<string, unknown>),
   transitionMove: (
     moveId: string,
     data: { status: string; clearance_notes?: string; scheduled_at?: string },
-  ) => apiSend<any>("PATCH", `/residents/moves/${moveId}`, data),
+  ) => apiSend<any>("PATCH", `/residents/move-records/${moveId}/status`, data),
   create: (data: Partial<ResidentProfile>, communityId?: string) =>
     apiSend<ResidentProfile>(
       "POST",
@@ -831,9 +833,9 @@ export const incidentsApi = {
 export const notificationsApi = {
   list: (params?: { unread_only?: boolean; page?: number; page_size?: number }) =>
     apiGet<AppNotification[]>("/notifications", params as Record<string, unknown>),
-  markRead: (id: string) => apiSend<void>("PATCH", `/notifications/${id}/read`),
-  markAllRead: () => apiSend<void>("POST", "/notifications/mark-all-read"),
-  preferences: () => apiGet<NotificationPreference[]>("/notifications/preferences"),
+  markRead: (id: string) => apiSend<void>("POST", `/notifications/${id}/read`),
+  markAllRead: () => apiSend<void>("POST", "/notifications/read-all"),
+  preferences: () => apiGet<NotificationPreference[]>("/notifications/me/preferences"),
   setPreference: (data: Partial<NotificationPreference>) =>
-    apiSend<NotificationPreference>("PUT", "/notifications/preferences", data),
+    apiSend<NotificationPreference>("PUT", "/notifications/me/preferences", data),
 };

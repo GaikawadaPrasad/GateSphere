@@ -40,8 +40,26 @@ async def my_preferences(svc: Svc = Depends(notification_service)) -> dict:
     return ok([schemas.PreferenceRead.model_validate(p) for p in await svc.my_preferences()])
 
 
+@router.get(
+    "/preferences",
+    response_model=Envelope[list[schemas.PreferenceRead]],
+    dependencies=[VIEW],
+)
+async def my_preferences_alias(svc: Svc = Depends(notification_service)) -> dict:
+    return ok([schemas.PreferenceRead.model_validate(p) for p in await svc.my_preferences()])
+
+
 @router.put("/me/preferences", response_model=Envelope[schemas.PreferenceRead], dependencies=[VIEW])
 async def set_preference(
+    payload: schemas.PreferenceUpsert, svc: Svc = Depends(notification_service)
+) -> dict:
+    return ok(
+        schemas.PreferenceRead.model_validate(await svc.set_preference(payload)), message="Saved"
+    )
+
+
+@router.put("/preferences", response_model=Envelope[schemas.PreferenceRead], dependencies=[VIEW])
+async def set_preference_alias(
     payload: schemas.PreferenceUpsert, svc: Svc = Depends(notification_service)
 ) -> dict:
     return ok(
@@ -106,6 +124,9 @@ async def list_mine(
 
 
 @router.post("/read-all", dependencies=[VIEW])
+@router.patch("/read-all", dependencies=[VIEW])
+@router.post("/mark-all-read", dependencies=[VIEW])
+@router.patch("/mark-all-read", dependencies=[VIEW])
 async def mark_all_read(svc: Svc = Depends(notification_service)) -> dict:
     return ok({"marked": await svc.mark_all_read()}, message="Marked")
 
@@ -119,6 +140,16 @@ async def get_mine(notification_id: uuid.UUID, svc: Svc = Depends(notification_s
 
 @router.post(
     "/{notification_id}/read",
+    response_model=Envelope[schemas.NotificationRead],
+    dependencies=[VIEW],
+)
+@router.patch(
+    "/{notification_id}/read",
+    response_model=Envelope[schemas.NotificationRead],
+    dependencies=[VIEW],
+)
+@router.patch(
+    "/{notification_id}",
     response_model=Envelope[schemas.NotificationRead],
     dependencies=[VIEW],
 )

@@ -121,17 +121,17 @@ export default function CommunityAdminResidentsPage() {
       header: "Occupancy Type",
       render: (r) => (
         <span
-          className={`badge ${r.resident_type === "owner" ? "badge-primary" : "badge-neutral"}`}
+          className={`badge ${(r.resident_type || (r as any).occupancy_role || "")?.includes("owner") ? "badge-primary" : "badge-neutral"}`}
           style={{ textTransform: "capitalize" }}
         >
-          {r.resident_type?.replace("_", " ")}
+          {(r.resident_type || (r as any).occupancy_role || "Resident")?.replace("_", " ")}
         </span>
       ),
     },
     {
       key: "status",
       header: "Status",
-      render: (r) => <StatusBadge status={r.status || "active"} />,
+      render: (r) => <StatusBadge status={r.status || (r as any).profile_status || "active"} />,
     },
     {
       key: "actions",
@@ -219,7 +219,8 @@ export default function CommunityAdminResidentsPage() {
       r.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       r.unit_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       r.email?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = !statusFilter || r.status === statusFilter;
+    const status = r.status || (r as any).profile_status;
+    const matchesStatus = !statusFilter || status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
