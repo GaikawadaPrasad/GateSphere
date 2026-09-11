@@ -197,9 +197,32 @@ export function useResidentVisitors() {
       }
 
       const cleanName = (payload.visitor_name || "").trim() || "Guest Visitor";
-      const cleanPhone = (payload.phone || "").trim();
-      const cleanCategory = (payload.category || "guest").toLowerCase();
-      const cleanReason = (payload.reason || "").trim() || "Visitor Entry";
+      let rawPhone = (payload.phone || "").trim().replace(/[\s\-()]/g, "");
+      if (!rawPhone) {
+        throw new Error("Visitor mobile number is required to generate a gate pass.");
+      }
+      if (!rawPhone.startsWith("+") && rawPhone.length === 10) {
+        rawPhone = `+91${rawPhone}`;
+      } else if (!rawPhone.startsWith("+") && rawPhone.length > 10) {
+        rawPhone = `+${rawPhone}`;
+      }
+      const cleanPhone = rawPhone;
+
+      const mapCategoryToVisitorType = (cat: string): string => {
+        const c = (cat || "").toLowerCase().trim();
+        if (c.includes("deliver") || c.includes("courier")) return "delivery_exec";
+        if (c.includes("cab") || c.includes("taxi")) return "cab_taxi";
+        if (c.includes("service") || c.includes("tech") || c.includes("maint")) return "service_tech";
+        if (c.includes("contract") || c.includes("vendor") || c.includes("work")) return "vendor";
+        if (c.includes("staff") || c.includes("domestic") || c.includes("help") || c.includes("maid")) return "recurring";
+        if (c.includes("event") || c.includes("party")) return "event_guest";
+        if (c.includes("relat") || c.includes("family")) return "relative";
+        return "personal_guest";
+      };
+
+      const cleanCategory = payload.category || "Guest";
+      const visitorType = mapCategoryToVisitorType(cleanCategory);
+      const cleanReason = (payload.reason || "").trim() || `${cleanCategory} Entry`;
       const now = new Date();
       const validUntil = new Date(
         now.getTime() + (payload.valid_for_hours || 24) * 60 * 60 * 1000,
@@ -207,7 +230,7 @@ export function useResidentVisitors() {
 
       const req = await api.post<any>("/visitors/requests", {
         unit_id: unitId,
-        visitor_type: cleanCategory === "delivery" ? "delivery" : cleanCategory === "cab" ? "cab" : cleanCategory === "service" ? "service" : "personal_guest",
+        visitor_type: visitorType,
         visitor: {
           full_name: cleanName,
           phone: cleanPhone,
@@ -229,7 +252,7 @@ export function useResidentVisitors() {
         ...passRes,
         request_id: req.id,
         visitor_name: cleanName,
-        category: payload.category || "Guest",
+        category: cleanCategory,
         reason: cleanReason,
         valid_from: now.toISOString(),
         valid_to: validUntil.toISOString(),

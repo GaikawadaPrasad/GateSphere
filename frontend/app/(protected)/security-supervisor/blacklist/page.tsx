@@ -50,11 +50,35 @@ export default function SecuritySupervisorBlacklistPage() {
     }
   };
 
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+
+  const handleRemove = async (id: string, nameLabel: string) => {
+    if (!window.confirm(`Are you sure you want to remove "${nameLabel}" from the security blacklist?`)) {
+      return;
+    }
+    setIsDeleting(id);
+    try {
+      await blacklistApi.remove(id);
+      await loadData();
+    } catch (err: any) {
+      alert(err?.message || "Failed to remove from blacklist.");
+    } finally {
+      setIsDeleting(null);
+    }
+  };
+
   const filteredBlacklist = blacklist.filter((b) => {
+    const q = search.toLowerCase();
+    const nameStr = (b.name || "").toLowerCase();
+    const phoneStr = (b.phone || "").toLowerCase();
+    const vehicleStr = (b.vehicle_number || "").toLowerCase();
+    const reasonStr = (b.reason || "").toLowerCase();
     return (
-      b.name.toLowerCase().includes(search.toLowerCase()) ||
-      (b.phone && b.phone.includes(search)) ||
-      (b.vehicle_number && b.vehicle_number.toLowerCase().includes(search.toLowerCase()))
+      !search ||
+      nameStr.includes(q) ||
+      phoneStr.includes(q) ||
+      vehicleStr.includes(q) ||
+      reasonStr.includes(q)
     );
   });
 
@@ -84,11 +108,11 @@ export default function SecuritySupervisorBlacklistPage() {
             </p>
           </div>
 
-          <div style={{ width: "100%", maxWidth: 220 }}>
+          <div style={{ width: "100%", maxWidth: 240 }}>
             <SearchInput
               value={search}
               onChange={setSearch}
-              placeholder="Search name/phone/plate…"
+              placeholder="Search name/phone/reason…"
             />
           </div>
         </div>
@@ -99,47 +123,65 @@ export default function SecuritySupervisorBlacklistPage() {
               <tr>
                 <th>Blacklisted Entity / Person</th>
                 <th>Phone Number</th>
-                <th>Vehicle Plate #</th>
+                <th>Risk Level</th>
                 <th>Reason for Restriction</th>
-                <th>Added By</th>
                 <th>Date Added</th>
-                <th>Attempted Entries</th>
                 <th>Status</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: "center", padding: "2rem" }}>
+                  <td colSpan={7} style={{ textAlign: "center", padding: "2rem" }}>
                     Loading blacklist records…
                   </td>
                 </tr>
               ) : filteredBlacklist.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={7}
                     style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
                   >
                     No blacklist records found.
                   </td>
                 </tr>
               ) : (
-                filteredBlacklist.map((b) => (
-                  <tr key={b.id}>
-                    <td style={{ fontWeight: 600, color: "var(--danger)" }}>🚫 {b.name}</td>
-                    <td>{b.phone || "—"}</td>
-                    <td style={{ fontFamily: "monospace" }}>{b.vehicle_number || "—"}</td>
-                    <td style={{ maxWidth: 240 }}>{b.reason}</td>
-                    <td>{b.added_by}</td>
-                    <td>{b.date_added}</td>
-                    <td style={{ fontWeight: 600, color: "var(--danger)" }}>
-                      {b.attempts_count} attempts
-                    </td>
-                    <td>
-                      <StatusBadge status={b.status} />
-                    </td>
-                  </tr>
-                ))
+                filteredBlacklist.map((b) => {
+                  const displayName =
+                    b.name ||
+                    (b.reason && b.reason.includes(":") ? b.reason.split(":")[0] : null) ||
+                    "Restricted Visitor";
+                  const displayPhone = b.phone || (b.phone_hash ? `Hash: ${String(b.phone_hash).slice(0, 8)}…` : "—");
+                  const displayDate = b.date_added || (b.created_at ? new Date(b.created_at).toLocaleDateString() : "Active");
+                  const statusStr = b.status || (b.is_active !== false ? "Active" : "Inactive");
+                  const riskLevel = b.risk_level || "high";
+
+                  return (
+                    <tr key={b.id}>
+                      <td style={{ fontWeight: 600, color: "var(--danger)" }}>🚫 {displayName}</td>
+                      <td>{displayPhone}</td>
+                      <td>
+                        <StatusBadge status={riskLevel} />
+                      </td>
+                      <td style={{ maxWidth: 260 }}>{b.reason || "Security restriction"}</td>
+                      <td>{displayDate}</td>
+                      <td>
+                        <StatusBadge status={statusStr} />
+                      </td>
+                      <td>
+                        <button
+                          className="btn btn-secondary"
+                          style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem", color: "var(--danger)" }}
+                          onClick={() => handleRemove(b.id, displayName)}
+                          disabled={isDeleting === b.id}
+                        >
+                          {isDeleting === b.id ? "Removing…" : "Remove"}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

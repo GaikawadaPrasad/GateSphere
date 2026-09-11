@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
-import { checkpointsApi, gateApi, communitiesApi } from "@/lib/api";
+import { checkpointsApi, gateApi, communitiesApi, authApi } from "@/lib/api";
 
 interface CheckpointItem {
   id: string;
@@ -34,10 +34,11 @@ export default function SecuritySupervisorCheckpointsPage() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [commRes, assignmentsRes, rostersRes] = await Promise.allSettled([
+      const [commRes, assignmentsRes, rostersRes, meRes] = await Promise.allSettled([
         communitiesApi.list(),
         gateApi.assignments(),
         gateApi.rosters(),
+        authApi.me(),
       ]);
 
       const guards: { id: string; name: string }[] = [];
@@ -50,9 +51,13 @@ export default function SecuritySupervisorCheckpointsPage() {
       }
       setGuardsList(guards);
 
+      let cid = meRes.status === "fulfilled" && meRes.value?.community_ids?.[0] ? meRes.value.community_ids[0] : null;
+      if (!cid && commRes.status === "fulfilled" && commRes.value?.length) {
+        cid = commRes.value[0].id;
+      }
+
       let gatesList: any[] = [];
-      if (commRes.status === "fulfilled" && commRes.value?.length) {
-        const cid = commRes.value[0].id;
+      if (cid) {
         gatesList = await communitiesApi.gates(cid).catch(() => []);
       }
 

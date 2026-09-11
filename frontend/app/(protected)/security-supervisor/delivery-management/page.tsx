@@ -49,12 +49,14 @@ export default function SecuritySupervisorDeliveryManagementPage() {
   }, []);
 
   const filteredDeliveries = deliveries.filter((d) => {
+    const q = search.toLowerCase();
     const matchSearch =
-      d.company.toLowerCase().includes(search.toLowerCase()) ||
-      d.courier.toLowerCase().includes(search.toLowerCase()) ||
-      d.unit.toLowerCase().includes(search.toLowerCase());
+      !search ||
+      (d.company && d.company.toLowerCase().includes(q)) ||
+      (d.courier && d.courier.toLowerCase().includes(q)) ||
+      (d.unit && d.unit.toLowerCase().includes(q));
     const matchCategory =
-      categoryFilter === "all" || d.category.toLowerCase().includes(categoryFilter.toLowerCase());
+      categoryFilter === "all" || (d.category && d.category.toLowerCase().includes(categoryFilter.toLowerCase()));
     return matchSearch && matchCategory;
   });
 

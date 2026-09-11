@@ -10,17 +10,16 @@ export default function IntroLoader({ onReady }: { onReady?: () => void }) {
   const [removed, setRemoved] = useState(false);
 
   useEffect(() => {
-    // Check if intro has already played in this browser session
     if (typeof window !== "undefined") {
-      const alreadyShown = sessionStorage.getItem("gs_intro_shown");
-      if (alreadyShown) {
+      const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+      if (mediaQuery.matches) {
         setRemoved(true);
         if (onReady) onReady();
         return;
       }
-      sessionStorage.setItem("gs_intro_shown", "true");
-      setShouldShow(true);
     }
+
+    setShouldShow(true);
 
     // Lock scroll during loader
     document.documentElement.style.overflow = "hidden";
@@ -33,13 +32,14 @@ export default function IntroLoader({ onReady }: { onReady?: () => void }) {
     // Loader timing: 1400ms display, then exit
     const MIN_TIME = 1400;
     const EXIT_TIME = 850;
+    let removeTimer: NodeJS.Timeout;
 
     const exitTimer = setTimeout(() => {
       setExiting(true);
       document.documentElement.style.overflow = "";
       if (onReady) onReady();
 
-      setTimeout(() => {
+      removeTimer = setTimeout(() => {
         setRemoved(true);
       }, EXIT_TIME);
     }, MIN_TIME);
@@ -47,6 +47,7 @@ export default function IntroLoader({ onReady }: { onReady?: () => void }) {
     return () => {
       clearTimeout(revealTimer);
       clearTimeout(exitTimer);
+      if (removeTimer) clearTimeout(removeTimer);
       document.documentElement.style.overflow = "";
     };
   }, [onReady]);

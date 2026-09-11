@@ -31,7 +31,13 @@ export function useCreateAnnouncement() {
   return useMutation({
     mutationFn: ({ payload, communityId }: { payload: AnnouncementCreate; communityId?: string }) =>
       communicationApi.createAnnouncement(payload, communityId),
-    onSuccess: () => {
+    onSuccess: (newAnnouncement) => {
+      queryClient.setQueriesData({ queryKey: ["announcements"] }, (old: any) => {
+        if (Array.isArray(old)) {
+          return [newAnnouncement, ...old];
+        }
+        return old;
+      });
       queryClient.invalidateQueries({ queryKey: ["announcements"] });
     },
   });

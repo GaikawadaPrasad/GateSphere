@@ -106,27 +106,54 @@ const STEPS: StepData[] = [
 export default function MaintenanceTimeline() {
   const sectionRef = useRef<HTMLDivElement>(null);
   const [activeStep, setActiveStep] = useState(0);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const { ref: revealRef, visible } = useReveal();
 
   useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setPrefersReducedMotion(mediaQuery.matches);
+    const handleChange = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, []);
+
+  useEffect(() => {
+    let ticking = false;
     const handleScroll = () => {
-      if (!sectionRef.current) return;
-      const rect = sectionRef.current.getBoundingClientRect();
-      const windowH = window.innerHeight;
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          if (!sectionRef.current) {
+            ticking = false;
+            return;
+          }
+          const rect = sectionRef.current.getBoundingClientRect();
+          const windowH = window.innerHeight;
 
-      // Calculate how far through the section we have scrolled
-      const totalH = rect.height - windowH;
-      if (totalH <= 0) return;
+          // Process only if the section is in view or scrolled past
+          const totalH = rect.height - windowH;
+          if (totalH <= 0) {
+            ticking = false;
+            return;
+          }
 
-      const current = -rect.top;
-      const progress = Math.min(Math.max(current / totalH, 0), 0.999);
-      const stepIdx = Math.floor(progress * 5);
-      setActiveStep(stepIdx);
+          const current = -rect.top;
+          const progress = Math.min(Math.max(current / totalH, 0), 0.999);
+          const stepIdx = Math.floor(progress * STEPS.length);
+          
+          setActiveStep((prev) => (prev !== stepIdx ? stepIdx : prev));
+          ticking = false;
+        });
+        ticking = true;
+      }
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleScroll, { passive: true });
     handleScroll();
-    return () => window.removeEventListener("scroll", handleScroll);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
+    };
   }, []);
 
   const current = STEPS[activeStep];
@@ -135,16 +162,20 @@ export default function MaintenanceTimeline() {
     <section
       ref={sectionRef}
       className="relative bg-[#080D1A] text-white"
-      style={{ height: "320vh" }}
+      style={{ height: `${STEPS.length * 30}vh` }}
     >
       {/* ── STICKY PINNED PRESENTATION VIEWPORT ── */}
       <div className="sticky top-0 h-screen w-full flex flex-col justify-between py-8 px-6 lg:px-12 overflow-hidden">
         {/* Background Ambient Glows */}
-        <div
-          className="absolute -top-24 left-1/4 w-96 h-96 rounded-full blur-3xl pointer-events-none transition-colors duration-700 opacity-20"
-          style={{ backgroundColor: current.accent }}
-        />
-        <div className="absolute -bottom-24 right-10 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
+        {!prefersReducedMotion && (
+          <>
+            <div
+              className="absolute -top-24 left-1/4 w-96 h-96 rounded-full blur-3xl pointer-events-none transition-colors duration-700 opacity-20"
+              style={{ backgroundColor: current.accent }}
+            />
+            <div className="absolute -bottom-24 right-10 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
+          </>
+        )}
 
         {/* ── 1. HEADER AREA ── */}
         <div ref={revealRef} className={`max-w-4xl mx-auto text-center shrink-0 relative z-10 reveal ${visible ? "visible" : ""}`}>

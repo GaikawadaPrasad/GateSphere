@@ -56,7 +56,7 @@ _DEFAULT_POLICY = {
     "blacklist_mode": "block",
 }
 
-# Visitor request lifecycle (SM-2, docs/backend/STATE_MACHINES.md §1). `expired` is set by
+# Visitor request lifecycle (SM-2, docs/backend/STATE_MACHINES.md ยง1). `expired` is set by
 # the Celery sweep; every other move goes through `ensure_transition`.
 _REQUEST_TRANSITIONS: dict[str, set[str]] = {
     "pending": {"approved", "rejected", "cancelled", "expired"},
@@ -76,6 +76,20 @@ def _enum(field: str, value: str | None) -> None:
             code="INVALID_ENUM",
             fields={field: f"one of {sorted(ALLOWED[field])}"},
         )
+
+
+_CATEGORY_ALIAS_MAP: dict[str, str] = {
+    "guest": "personal_guest",
+    "delivery": "delivery_exec",
+    "cab": "cab_taxi",
+    "taxi": "cab_taxi",
+    "service": "service_tech",
+    "contractor": "vendor",
+    "domestic_staff": "recurring",
+    "staff": "recurring",
+    "family": "relative",
+    "event": "event_guest",
+}
 
 
 class VisitorService(UnitScopedAccess):
@@ -253,7 +267,8 @@ class VisitorService(UnitScopedAccess):
     async def create_request(self, payload: schemas.RequestCreate) -> VisitorRequest:
         unit = await self._unit_in_scope(payload.unit_id)
         await self._assert_unit_visible(unit.id)  # a resident invites guests to their own unit
-        visitor_type = "personal_guest" if payload.visitor_type == "guest" else payload.visitor_type
+        raw_type = (payload.visitor_type or "").lower().strip()
+        visitor_type = _CATEGORY_ALIAS_MAP.get(raw_type, payload.visitor_type)
         _enum("visitor_type", visitor_type)
         policy = await self._policy(unit.community_id)
 
@@ -498,7 +513,7 @@ class VisitorService(UnitScopedAccess):
         if obj.valid_to <= obj.valid_from:
             raise BusinessRuleError("valid_to must be after valid_from", code="INVALID_DATE_RANGE")
         self.db.add(obj)
-        # A valid pass pre-approves the request — but only when the actor is entitled to
+        # A valid pass pre-approves the request โ€” but only when the actor is entitled to
         # approve it: they hold `visitors:approve`, or they occupy the request's unit
         # (a resident pre-authorising their own guest). Otherwise the pass is issued but
         # the request stays `pending` for a proper approver (SM-1).
@@ -546,7 +561,7 @@ class VisitorService(UnitScopedAccess):
             vpass.entry_count += 1
         elif payload.pin:
             now = datetime.now(UTC)
-            # scope the PIN search to the guard's community — a 6-digit PIN can collide
+            # scope the PIN search to the guard's community โ€” a 6-digit PIN can collide
             # across communities, and only the request's community should ever match.
             pin_stmt = (
                 select(VisitorPass)
@@ -570,7 +585,7 @@ class VisitorService(UnitScopedAccess):
                 raise NotFoundError("No valid pass for that PIN")
             if len(usable) > 1:
                 raise ConflictError(
-                    "PIN matches several passes — also send request_id", code="PIN_AMBIGUOUS"
+                    "PIN matches several passes โ€” also send request_id", code="PIN_AMBIGUOUS"
                 )
             vpass = usable[0]
             vpass.entry_count += 1
