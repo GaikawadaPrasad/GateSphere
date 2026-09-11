@@ -11,7 +11,8 @@ export function Header() {
   const router = useRouter();
   const { data: user } = useMe();
   const logout = useLogout();
-  const { data: communities } = useCommunities();
+  const isSuperAdmin = Boolean(user?.is_superadmin || user?.active_role === "super_admin");
+  const { data: communities } = useCommunities(undefined, { enabled: isSuperAdmin });
   const { activeCommunityId, setActiveCommunity, toggleSidebar } = useUiStore();
 
   const handleSignOut = async () => {
@@ -96,42 +97,44 @@ export function Header() {
           {roleName}
         </div>
 
-        {/* Global Scope Selector - hidden on mobile */}
-        <div
-          className="mobile-hide"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "0.5rem",
-            background: "#F8FAFC",
-            border: "1px solid var(--border)",
-            borderRadius: "8px",
-            padding: "0.2rem 0.6rem",
-          }}
-        >
-          <span style={{ fontSize: "12px", color: "var(--muted)", fontWeight: 600 }}>Scope:</span>
-          <select
-            value={activeCommunityId || ""}
-            onChange={(e) => setActiveCommunity(e.target.value || null)}
+        {/* Global Scope Selector - only shown for super_admin */}
+        {isSuperAdmin && (
+          <div
+            className="mobile-hide"
             style={{
-              height: 28,
-              border: "none",
-              background: "transparent",
-              fontSize: "12.5px",
-              fontWeight: 600,
-              color: "var(--fg)",
-              outline: "none",
-              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              background: "#F8FAFC",
+              border: "1px solid var(--border)",
+              borderRadius: "8px",
+              padding: "0.2rem 0.6rem",
             }}
           >
-            <option value="">🌐 All Communities (Global)</option>
-            {communities?.map((comm: Community) => (
-              <option key={comm.id} value={comm.id}>
-                {comm.name} ({comm.code})
-              </option>
-            ))}
-          </select>
-        </div>
+            <span style={{ fontSize: "12px", color: "var(--muted)", fontWeight: 600 }}>Scope:</span>
+            <select
+              value={activeCommunityId || ""}
+              onChange={(e) => setActiveCommunity(e.target.value || null)}
+              style={{
+                height: 28,
+                border: "none",
+                background: "transparent",
+                fontSize: "12.5px",
+                fontWeight: 600,
+                color: "var(--fg)",
+                outline: "none",
+                cursor: "pointer",
+              }}
+            >
+              <option value="">🌐 All Communities (Global)</option>
+              {communities?.map((comm: Community) => (
+                <option key={comm.id} value={comm.id}>
+                  {comm.name} ({comm.code})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Right section: User info & Actions */}

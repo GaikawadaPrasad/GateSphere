@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { gateApi, communitiesApi } from "@/lib/api";
+import { gateApi, communitiesApi, authApi } from "@/lib/api";
 
 interface DisplayAuditLog {
   id: string;
@@ -23,8 +23,8 @@ export default function SecuritySupervisorAuditLogsPage() {
 
   const fetchLogs = async () => {
     try {
-      const comms = await communitiesApi.list().catch(() => []);
-      const cid = comms?.[0]?.id;
+      const me = await authApi.me().catch(() => null);
+      const cid = me?.community_ids?.[0];
 
       const [eventsRes, gatesRes] = await Promise.allSettled([
         gateApi.events({ page_size: 100 }),

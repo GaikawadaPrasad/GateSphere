@@ -85,6 +85,7 @@ export default function CommunitiesPage() {
   const [unitSqFt, setUnitSqFt] = useState(1200);
 
   const [isAddResidentOpen, setIsAddResidentOpen] = useState(false);
+  const [residentTowerId, setResidentTowerId] = useState("");
   const [residentUnitId, setResidentUnitId] = useState("");
   const [residentFullName, setResidentFullName] = useState("");
   const [residentEmail, setResidentEmail] = useState("");
@@ -102,6 +103,12 @@ export default function CommunitiesPage() {
   const { data: communityUnitsList, refetch: refetchUnits } = useCommunityUnits(
     viewingCommunity?.id || undefined
   );
+
+  const filteredResidentUnits = useMemo(() => {
+    if (!communityUnitsList) return [];
+    if (!residentTowerId) return communityUnitsList;
+    return communityUnitsList.filter((u) => u.tower_id === residentTowerId);
+  }, [communityUnitsList, residentTowerId]);
 
   const createMutation = useCreateCommunity();
   const updateMutation = useUpdateCommunity();
@@ -437,6 +444,8 @@ export default function CommunitiesPage() {
 
   // Handlers for creating Resident
   const handleOpenAddResident = (unitId?: string) => {
+    const targetUnit = unitId ? communityUnitsList?.find((u) => u.id === unitId) : undefined;
+    setResidentTowerId(targetUnit?.tower_id || "");
     setResidentUnitId(unitId || communityUnitsList?.[0]?.id || "");
     setResidentFullName("");
     setResidentEmail("");
@@ -1991,7 +2000,8 @@ export default function CommunitiesPage() {
       <Modal
         isOpen={isAddResidentOpen}
         onClose={() => setIsAddResidentOpen(false)}
-        title="Onboard Resident"
+        title="👤 Onboard Resident"
+        maxWidth={640}
         footer={
           <>
             <button
@@ -2007,116 +2017,186 @@ export default function CommunitiesPage() {
               className="btn btn-primary"
               disabled={addResidentMutation.isPending || !residentUnitId}
             >
-              {addResidentMutation.isPending ? "Onboarding…" : "Onboard Resident"}
+              {addResidentMutation.isPending ? "Registering…" : "👤 Register Resident"}
             </button>
           </>
         }
       >
         <form id="add-resident-form" onSubmit={handleSaveResident}>
-          <div style={{ marginBottom: "1rem" }}>
-            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
-              Target Unit <span style={{ color: "var(--danger)" }}>*</span>
-            </label>
-            <select
-              className="select-field"
-              value={residentUnitId}
-              onChange={(e) => setResidentUnitId(e.target.value)}
-              required
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            {/* SECTION 1: UNIT & TOWER ALLOCATION */}
+            <div
+              style={{
+                background: "#f8fafc",
+                border: "1px solid #e2e8f0",
+                borderRadius: "8px",
+                padding: "0.85rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.75rem",
+              }}
             >
-              <option value="">Select Unit…</option>
-              {communityUnitsList?.map((u) => (
-                <option key={u.id} value={u.id}>
-                  Unit {u.unit_number} ({u.unit_type || "Flat"})
-                </option>
-              ))}
-            </select>
-          </div>
+              <div style={{ fontWeight: 600, fontSize: "0.8rem", color: "#334155" }}>
+                🏢 Tower &amp; Unit Selection
+              </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
-            <div>
-              <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
-                Full Name <span style={{ color: "var(--danger)" }}>*</span>
-              </label>
-              <input
-                type="text"
-                className="input-field"
-                placeholder="e.g. John Doe"
-                value={residentFullName}
-                onChange={(e) => setResidentFullName(e.target.value)}
-                required
-              />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "#475569", marginBottom: "0.3rem" }}>
+                    Tower / Block
+                  </label>
+                  <select
+                    className="select-field"
+                    value={residentTowerId}
+                    onChange={(e) => {
+                      setResidentTowerId(e.target.value);
+                      setResidentUnitId("");
+                    }}
+                  >
+                    <option value="">All Towers ({communityTowers.length})</option>
+                    {communityTowers.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} ({t.code || `${t.total_floors} fl`})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "#475569", marginBottom: "0.3rem" }}>
+                    Target Unit <span style={{ color: "var(--danger)" }}>*</span>
+                  </label>
+                  <select
+                    className="select-field"
+                    value={residentUnitId}
+                    onChange={(e) => setResidentUnitId(e.target.value)}
+                    required
+                  >
+                    <option value="">Select Unit…</option>
+                    {filteredResidentUnits.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        Unit {u.unit_number} {u.unit_type ? `(${u.unit_type})` : ""} {u.sq_ft ? `• ${u.sq_ft} sqft` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
             </div>
-            <div>
-              <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
-                Occupancy Role <span style={{ color: "var(--danger)" }}>*</span>
-              </label>
-              <select
-                className="select-field"
-                value={residentRole}
-                onChange={(e) => setResidentRole(e.target.value)}
+
+            {/* SECTION 2: IDENTITY & CONTACT */}
+            <div
+              style={{
+                background: "#ffffff",
+                border: "1px solid #e2e8f0",
+                borderRadius: "8px",
+                padding: "0.85rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.75rem",
+              }}
+            >
+              <div style={{ fontWeight: 600, fontSize: "0.8rem", color: "#334155" }}>
+                👤 Resident Profile
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "#475569", marginBottom: "0.3rem" }}>
+                    Full Name <span style={{ color: "var(--danger)" }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="e.g. Ananya Patel"
+                    value={residentFullName}
+                    onChange={(e) => setResidentFullName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "#475569", marginBottom: "0.3rem" }}>
+                    Occupancy Role <span style={{ color: "var(--danger)" }}>*</span>
+                  </label>
+                  <select
+                    className="select-field"
+                    value={residentRole}
+                    onChange={(e) => setResidentRole(e.target.value)}
+                  >
+                    <option value="primary_owner">Primary Owner</option>
+                    <option value="secondary_owner">Secondary Owner</option>
+                    <option value="tenant">Tenant</option>
+                    <option value="family_member">Family Member</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "#475569", marginBottom: "0.3rem" }}>
+                    Email <span style={{ color: "var(--danger)" }}>*</span>
+                  </label>
+                  <input
+                    type="email"
+                    className="input-field"
+                    placeholder="ananya@example.com"
+                    value={residentEmail}
+                    onChange={(e) => setResidentEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "#475569", marginBottom: "0.3rem" }}>
+                    Phone <span style={{ color: "var(--danger)" }}>*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    className="input-field"
+                    placeholder="+91 98765 43210"
+                    value={residentPhone}
+                    onChange={(e) => setResidentPhone(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "#475569", marginBottom: "0.3rem" }}>
+                  Initial Password (Optional)
+                </label>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="Default: GateSphere@2026!"
+                  value={residentPassword}
+                  onChange={(e) => setResidentPassword(e.target.value)}
+                />
+              </div>
+
+              <div
+                style={{
+                  background: residentIsPrimary ? "#f0fdf4" : "#f8fafc",
+                  border: residentIsPrimary ? "1px solid #bbf7d0" : "1px solid #e2e8f0",
+                  borderRadius: "6px",
+                  padding: "0.6rem 0.85rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  cursor: "pointer",
+                }}
+                onClick={() => setResidentIsPrimary(!residentIsPrimary)}
               >
-                <option value="primary_owner">Primary Owner</option>
-                <option value="secondary_owner">Secondary Owner</option>
-                <option value="tenant">Tenant</option>
-                <option value="family_member">Family Member</option>
-              </select>
+                <input
+                  type="checkbox"
+                  checked={residentIsPrimary}
+                  onChange={(e) => setResidentIsPrimary(e.target.checked)}
+                  style={{ width: "auto", margin: 0, accentColor: "#16a34a" }}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <span style={{ fontSize: "0.8rem", fontWeight: 500, color: residentIsPrimary ? "#166534" : "#334155" }}>
+                  Primary point of contact for gate entries and invoices
+                </span>
+              </div>
             </div>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
-            <div>
-              <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
-                Email <span style={{ color: "var(--danger)" }}>*</span>
-              </label>
-              <input
-                type="email"
-                className="input-field"
-                placeholder="resident@example.com"
-                value={residentEmail}
-                onChange={(e) => setResidentEmail(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
-                Phone <span style={{ color: "var(--danger)" }}>*</span>
-              </label>
-              <input
-                type="tel"
-                className="input-field"
-                placeholder="+91 98765 43210"
-                value={residentPhone}
-                onChange={(e) => setResidentPhone(e.target.value)}
-                required
-              />
-            </div>
-          </div>
-
-          <div style={{ marginBottom: "1rem" }}>
-            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
-              Initial Password (Optional)
-            </label>
-            <input
-              type="text"
-              className="input-field"
-              placeholder="Default: GateSphere@2026!"
-              value={residentPassword}
-              onChange={(e) => setResidentPassword(e.target.value)}
-            />
-          </div>
-
-          <div style={{ marginBottom: "0.5rem" }}>
-            <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={residentIsPrimary}
-                onChange={(e) => setResidentIsPrimary(e.target.checked)}
-                style={{ width: "auto", margin: 0 }}
-              />
-              <span style={{ fontSize: "0.85rem", fontWeight: 500 }}>
-                Set as Primary Occupant of this Unit
-              </span>
-            </label>
           </div>
         </form>
       </Modal>

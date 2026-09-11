@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
-import { complaintsApi, amenitiesApi, communitiesApi } from "@/lib/api";
+import { complaintsApi, amenitiesApi, communitiesApi, authApi } from "@/lib/api";
 import { deriveTicketEscalationState, formatDate } from "@/lib/utils";
 
 interface DashboardTicket {
@@ -46,31 +46,32 @@ export default function FacilityManagerDashboardPage() {
     if (showLoadingSpinner) setIsLoading(true);
     setLoadError(null);
     try {
-      const [ticketsRes, categoriesRes, amenitiesRes, bookingsRes, communitiesRes] =
-      await Promise.allSettled([
-        complaintsApi.list(),
-        complaintsApi.categories(),
-        amenitiesApi.list(),
-        amenitiesApi.bookings(),
-        communitiesApi.list(),
-      ]);
+      const [ticketsRes, categoriesRes, amenitiesRes, bookingsRes, meRes] =
+        await Promise.allSettled([
+          complaintsApi.list(),
+          complaintsApi.categories(),
+          amenitiesApi.list(),
+          amenitiesApi.bookings(),
+          authApi.me(),
+        ]);
 
-    if (categoriesRes.status === "fulfilled") {
-      setCategories((categoriesRes.value || []).map((c: any) => ({ id: c.id, name: c.name })));
-    }
-
-    if (communitiesRes.status === "fulfilled" && communitiesRes.value?.length) {
-      const comms = communitiesRes.value.map((c: any) => ({ id: c.id, name: c.name }));
-      setCommunities(comms);
-      const commId = communitiesRes.value[0].id;
-      setSelectedCommunityId((prev) => prev || commId);
-      try {
-        const uList = await communitiesApi.communityUnits(commId);
-        setUnits((uList || []).map((u: any) => ({ id: u.id, unit_number: u.unit_number })));
-      } catch {
-        // graceful fallback
+      if (categoriesRes.status === "fulfilled") {
+        setCategories((categoriesRes.value || []).map((c: any) => ({ id: c.id, name: c.name })));
       }
-    }
+
+      const commId =
+        meRes.status === "fulfilled" && meRes.value?.community_ids?.[0]
+          ? meRes.value.community_ids[0]
+          : null;
+
+      if (commId) {
+        try {
+          const uList = await communitiesApi.communityUnits(commId);
+          setUnits((uList || []).map((u: any) => ({ id: u.id, unit_number: u.unit_number })));
+        } catch {
+          // graceful fallback
+        }
+      }
 
     if (ticketsRes.status === "fulfilled") {
       const categoryMap = new Map<string, string>();

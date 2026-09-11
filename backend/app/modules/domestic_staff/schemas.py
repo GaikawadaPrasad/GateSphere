@@ -42,6 +42,8 @@ class StaffCreate(_Write):
     full_name: str = Field(min_length=1, max_length=180)
     staff_type: str
     phone: str = _Phone
+    email: str | None = Field(default=None, max_length=255)
+    password: str | None = Field(default=None, min_length=6, max_length=128)
     user_id: uuid.UUID | None = None
     id_type: str | None = Field(default=None, max_length=30)
     id_number: str | None = Field(default=None, max_length=40)

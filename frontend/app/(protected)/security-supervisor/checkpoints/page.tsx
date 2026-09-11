@@ -34,8 +34,7 @@ export default function SecuritySupervisorCheckpointsPage() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [commRes, assignmentsRes, rostersRes, meRes] = await Promise.allSettled([
-        communitiesApi.list(),
+      const [assignmentsRes, rostersRes, meRes] = await Promise.allSettled([
         gateApi.assignments(),
         gateApi.rosters(),
         authApi.me(),
@@ -51,10 +50,10 @@ export default function SecuritySupervisorCheckpointsPage() {
       }
       setGuardsList(guards);
 
-      let cid = meRes.status === "fulfilled" && meRes.value?.community_ids?.[0] ? meRes.value.community_ids[0] : null;
-      if (!cid && commRes.status === "fulfilled" && commRes.value?.length) {
-        cid = commRes.value[0].id;
-      }
+      const cid =
+        meRes.status === "fulfilled" && meRes.value?.community_ids?.[0]
+          ? meRes.value.community_ids[0]
+          : null;
 
       let gatesList: any[] = [];
       if (cid) {

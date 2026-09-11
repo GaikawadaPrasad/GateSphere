@@ -123,10 +123,44 @@ class DomesticStaffService:
         _enum("police_verification_status", payload.police_verification_status)
         if await self.staff.by_phone(cid, payload.phone):
             raise ConflictError("A staff member with that phone exists", code="STAFF_EXISTS")
-        await ensure_confirmed_async(self.db, payload.photo_url)
+        user_id = payload.user_id
+        if payload.email:
+            email_clean = payload.email.strip().lower()
+            from app.core.security import hash_password
+            from app.modules.users.models import Role, User, UserRole
+
+            user = await self.db.scalar(select(User).where(User.email == email_clean))
+            if user is None:
+                first_name = (
+                    payload.full_name.strip().split()[0].lower() if payload.full_name else "staff"
+                )
+                raw_pwd = payload.password or f"{first_name}@Gate2026!"
+                user = User(
+                    email=email_clean,
+                    full_name=payload.full_name,
+                    phone=payload.phone,
+                    password_hash=hash_password(raw_pwd),
+                )
+                self.db.add(user)
+                await self.db.flush()
+            user_id = user.id
+
+            ds_role = await self.db.scalar(select(Role).where(Role.slug == "domestic_staff"))
+            if ds_role is not None:
+                ur = await self.db.scalar(
+                    select(UserRole).where(
+                        UserRole.user_id == user.id,
+                        UserRole.role_id == ds_role.id,
+                        UserRole.community_id == cid,
+                    )
+                )
+                if ur is None:
+                    self.db.add(UserRole(user_id=user.id, role_id=ds_role.id, community_id=cid))
+                    await self.db.flush()
+
         obj = DomesticStaff(
             community_id=cid,
-            user_id=payload.user_id,
+            user_id=user_id,
             full_name=payload.full_name,
             staff_type=payload.staff_type,
             phone=payload.phone,
@@ -150,7 +184,7 @@ class DomesticStaffService:
             stmt = stmt.where(
                 DomesticStaff.full_name.ilike(f"%{q}%") | DomesticStaff.phone.ilike(f"%{q}%")
             )
-        stmt = stmt.order_by(DomesticStaff.full_name)
+        stmt = stmt.order_by(DomesticStaff.created_at.desc(), DomesticStaff.full_name)
         return await self.staff.list(
             offset=offset, limit=limit, extra=stmt
         ), await self.staff.count(extra=stmt)

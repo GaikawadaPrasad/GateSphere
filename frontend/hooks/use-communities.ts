@@ -12,11 +12,15 @@ export const communityKeys = {
   detail: (id: string) => [...communityKeys.details(), id] as const,
 };
 
-export function useCommunities(params?: { active?: boolean }) {
+export function useCommunities(
+  params?: { active?: boolean },
+  options?: { enabled?: boolean },
+) {
   return useQuery({
     queryKey: communityKeys.list(params),
     queryFn: () => communitiesApi.list(params),
     staleTime: 60_000,
+    enabled: options?.enabled !== undefined ? options.enabled : true,
   });
 }
 

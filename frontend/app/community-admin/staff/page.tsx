@@ -39,6 +39,7 @@ export default function CommunityAdminStaffPage() {
   } = useStaffList({
     community_id: activeCommunityId || undefined,
     q: searchTerm || undefined,
+    page_size: 100,
   });
 
   const {
@@ -47,6 +48,7 @@ export default function CommunityAdminStaffPage() {
     refetch: refetchAttendance,
   } = useStaffAttendance({
     community_id: activeCommunityId || undefined,
+    page_size: 100,
   });
 
   const { data: assignments } = useStaffAssignments({ staff_id: selectedStaff?.id });
@@ -67,6 +69,8 @@ export default function CommunityAdminStaffPage() {
   const [newStaffForm, setNewStaffForm] = useState<{
     full_name: string;
     phone: string;
+    email: string;
+    password: string;
     staff_type: StaffType;
     id_type: string;
     id_number: string;
@@ -74,11 +78,14 @@ export default function CommunityAdminStaffPage() {
   }>({
     full_name: "",
     phone: "",
+    email: "",
+    password: "",
     staff_type: "maid",
     id_type: "Aadhaar",
     id_number: "",
     police_verification_status: "not_started",
   });
+  const [showStaffPassword, setShowStaffPassword] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -121,11 +128,18 @@ export default function CommunityAdminStaffPage() {
     try {
       setIsSubmitting(true);
       setErrorMessage(null);
+      const nameFirst = newStaffForm.full_name.trim().split(" ")[0].toLowerCase() || "staff";
+      const resolvedDefaultPassword = `${nameFirst}@Gate2026!`;
+
       await createStaff.mutateAsync({
         data: {
           full_name: newStaffForm.full_name.trim(),
           staff_type: newStaffForm.staff_type,
           phone: newStaffForm.phone.trim(),
+          email: newStaffForm.email.trim() || undefined,
+          password:
+            newStaffForm.password.trim() ||
+            (newStaffForm.email.trim() ? resolvedDefaultPassword : undefined),
           id_type: newStaffForm.id_type ? newStaffForm.id_type.trim() : undefined,
           id_number: newStaffForm.id_number ? newStaffForm.id_number.trim() : undefined,
           police_verification_status: newStaffForm.police_verification_status,
@@ -133,9 +147,12 @@ export default function CommunityAdminStaffPage() {
         communityId: activeCommunityId,
       });
       setIsAddStaffModalOpen(false);
+      setShowStaffPassword(true);
       setNewStaffForm({
         full_name: "",
         phone: "",
+        email: "",
+        password: "staff@Gate2026!",
         staff_type: "maid",
         id_type: "Aadhaar",
         id_number: "",
@@ -153,8 +170,9 @@ export default function CommunityAdminStaffPage() {
   // Directory Columns
   const staffColumns: Column<Staff>[] = [
     {
-      key: "name",
+      key: "full_name",
       header: "Staff Member",
+      sortable: true,
       render: (s) => (
         <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
           <div
@@ -183,6 +201,7 @@ export default function CommunityAdminStaffPage() {
     {
       key: "staff_type",
       header: "Role / Skill",
+      sortable: true,
       render: (s) => (
         <span className="badge badge-neutral" style={{ textTransform: "capitalize" }}>
           {s.staff_type}
@@ -192,6 +211,7 @@ export default function CommunityAdminStaffPage() {
     {
       key: "police_verification_status",
       header: "Police Verification",
+      sortable: true,
       render: (s) => {
         const status = s.police_verification_status;
         const isVerified = status === "verified";
@@ -210,6 +230,7 @@ export default function CommunityAdminStaffPage() {
     {
       key: "is_active",
       header: "Status",
+      sortable: true,
       render: (s) => (
         <span className={`badge ${s.is_active ? "badge-success" : "badge-danger"}`}>
           {s.is_active ? "Active" : "Inactive"}
@@ -324,6 +345,17 @@ export default function CommunityAdminStaffPage() {
               className="btn btn-primary"
               onClick={() => {
                 setErrorMessage(null);
+                setNewStaffForm({
+                  full_name: "",
+                  phone: "",
+                  email: "",
+                  password: "staff@Gate2026!",
+                  staff_type: "maid",
+                  id_type: "Aadhaar",
+                  id_number: "",
+                  police_verification_status: "not_started",
+                });
+                setShowStaffPassword(true);
                 setIsAddStaffModalOpen(true);
               }}
             >
@@ -610,144 +642,337 @@ export default function CommunityAdminStaffPage() {
       <Modal
         isOpen={isAddStaffModalOpen}
         onClose={() => setIsAddStaffModalOpen(false)}
-        title="Register New Domestic Staff"
+        title="👤 Register New Domestic Staff"
+        size="lg"
+        maxWidth={680}
       >
         <form
           onSubmit={handleAddStaff}
-          style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
+          style={{ display: "flex", flexDirection: "column", gap: "1.25rem", maxHeight: "80vh", overflowY: "auto", paddingRight: "0.25rem" }}
         >
           {errorMessage && (
             <div
               style={{
-                padding: "0.6rem 0.8rem",
+                padding: "0.75rem 1rem",
                 background: "#fef2f2",
                 border: "1px solid #fecaca",
-                borderRadius: "var(--radius-sm)",
+                borderRadius: "8px",
                 color: "#b91c1c",
                 fontSize: "0.85rem",
+                fontWeight: 500,
               }}
             >
-              {errorMessage}
+              ⚠️ {errorMessage}
             </div>
           )}
 
-          <div>
-            <label
+          {/* Section 1: Staff Identity & Dashboard Credentials */}
+          <div
+            style={{
+              padding: "1rem",
+              background: "#F8FAFC",
+              border: "1px solid var(--border)",
+              borderRadius: "10px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.85rem",
+            }}
+          >
+            <div
               style={{
-                fontSize: "0.85rem",
-                fontWeight: 600,
-                display: "block",
-                marginBottom: "0.25rem",
+                fontSize: "12px",
+                fontWeight: 700,
+                color: "var(--primary)",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem",
               }}
             >
-              Full Name
-            </label>
-            <input
-              type="text"
-              className="input-field"
-              required
-              placeholder="e.g. Ramesh Kumar"
-              value={newStaffForm.full_name}
-              onChange={(e) => setNewStaffForm({ ...newStaffForm, full_name: e.target.value })}
-            />
+              <span>👤</span> 1. Staff Identity &amp; Portal Login
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.85rem" }}>
+              <div>
+                <label
+                  style={{
+                    fontSize: "0.82rem",
+                    fontWeight: 600,
+                    display: "block",
+                    marginBottom: "0.3rem",
+                  }}
+                >
+                  Full Name <span style={{ color: "#EF4444" }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  className="input-field"
+                  required
+                  placeholder="e.g. Ramesh Kumar"
+                  value={newStaffForm.full_name}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const cleanName = val.trim().replace(/[^a-zA-Z0-9]/g, "");
+                    const firstName = cleanName.length > 0 ? cleanName.toLowerCase() : "staff";
+                    const newPwd = `${firstName}@Gate2026!`;
+
+                    setNewStaffForm((prev) => ({
+                      ...prev,
+                      full_name: val,
+                      password: newPwd,
+                    }));
+                  }}
+                />
+              </div>
+
+              <div>
+                <label
+                  style={{
+                    fontSize: "0.82rem",
+                    fontWeight: 600,
+                    display: "block",
+                    marginBottom: "0.3rem",
+                  }}
+                >
+                  Phone Number <span style={{ color: "#EF4444" }}>*</span>
+                </label>
+                <input
+                  type="tel"
+                  className="input-field"
+                  required
+                  placeholder="+91 9876543210"
+                  value={newStaffForm.phone}
+                  onChange={(e) => setNewStaffForm({ ...newStaffForm, phone: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.85rem" }}>
+              <div>
+                <label
+                  style={{
+                    fontSize: "0.82rem",
+                    fontWeight: 600,
+                    display: "block",
+                    marginBottom: "0.3rem",
+                  }}
+                >
+                  Email Address <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 400 }}>(For Dashboard Login)</span>
+                </label>
+                <input
+                  type="email"
+                  className="input-field"
+                  placeholder="e.g. ramesh.maid@gatesphere.com"
+                  value={newStaffForm.email}
+                  onChange={(e) => setNewStaffForm({ ...newStaffForm, email: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label
+                  style={{
+                    fontSize: "0.82rem",
+                    fontWeight: 600,
+                    display: "block",
+                    marginBottom: "0.3rem",
+                  }}
+                >
+                  Initial Password{" "}
+                  <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 400 }}>
+                    (Editable)
+                  </span>
+                </label>
+                <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                  <input
+                    type={showStaffPassword ? "text" : "password"}
+                    className="input-field"
+                    style={{ paddingRight: "2.5rem" }}
+                    placeholder="e.g. ramesh@Gate2026!"
+                    value={newStaffForm.password}
+                    onChange={(e) => setNewStaffForm({ ...newStaffForm, password: e.target.value })}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowStaffPassword(!showStaffPassword)}
+                    aria-label={showStaffPassword ? "Hide password" : "Show password"}
+                    style={{
+                      position: "absolute",
+                      right: "0.6rem",
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "var(--muted)",
+                      padding: "0.2rem",
+                    }}
+                  >
+                    {showStaffPassword ? (
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                        <line x1="1" y1="1" x2="23" y2="23" />
+                      </svg>
+                    ) : (
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+            <p style={{ margin: 0, fontSize: "11.5px", color: "var(--muted)" }}>
+              💡 Providing an email allows this staff member to sign in to the <strong>Domestic Staff Dashboard</strong> to view unit assignments and check-in logs.
+            </p>
           </div>
 
-          <div>
-            <label
+          {/* Section 2: Role & Government Identification */}
+          <div
+            style={{
+              padding: "1rem",
+              background: "#F8FAFC",
+              border: "1px solid var(--border)",
+              borderRadius: "10px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.85rem",
+            }}
+          >
+            <div
               style={{
-                fontSize: "0.85rem",
-                fontWeight: 600,
-                display: "block",
-                marginBottom: "0.25rem",
+                fontSize: "12px",
+                fontWeight: 700,
+                color: "var(--primary)",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem",
               }}
             >
-              Phone Number
-            </label>
-            <input
-              type="tel"
-              className="input-field"
-              required
-              placeholder="+91 9876543210"
-              value={newStaffForm.phone}
-              onChange={(e) => setNewStaffForm({ ...newStaffForm, phone: e.target.value })}
-            />
-          </div>
+              <span>🛠️</span> 2. Profession &amp; Identification
+            </div>
 
-          <div>
-            <label
-              style={{
-                fontSize: "0.85rem",
-                fontWeight: 600,
-                display: "block",
-                marginBottom: "0.25rem",
-              }}
-            >
-              Role / Profession
-            </label>
-            <select
-              className="select-field"
-              value={newStaffForm.staff_type}
-              onChange={(e) =>
-                setNewStaffForm({ ...newStaffForm, staff_type: e.target.value as StaffType })
-              }
-            >
-              <option value="maid">Maid / Housekeeper</option>
-              <option value="cook">Cook / Chef</option>
-              <option value="driver">Driver</option>
-              <option value="gardener">Gardener</option>
-              <option value="caretaker">Caretaker</option>
-              <option value="nanny">Nanny</option>
-              <option value="nurse">Nurse</option>
-              <option value="other">Other Support Staff</option>
-            </select>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: "0.75rem" }}>
             <div>
               <label
                 style={{
-                  fontSize: "0.85rem",
+                  fontSize: "0.82rem",
                   fontWeight: 600,
                   display: "block",
-                  marginBottom: "0.25rem",
+                  marginBottom: "0.3rem",
                 }}
               >
-                Govt ID Type
+                Role / Profession <span style={{ color: "#EF4444" }}>*</span>
               </label>
               <select
                 className="select-field"
-                value={newStaffForm.id_type}
-                onChange={(e) => setNewStaffForm({ ...newStaffForm, id_type: e.target.value })}
+                value={newStaffForm.staff_type}
+                onChange={(e) =>
+                  setNewStaffForm({ ...newStaffForm, staff_type: e.target.value as StaffType })
+                }
               >
-                <option value="Aadhaar">Aadhaar</option>
-                <option value="Voter ID">Voter ID</option>
-                <option value="PAN Card">PAN Card</option>
-                <option value="Driving License">Driving License</option>
-                <option value="Passport">Passport</option>
+                <option value="maid">Maid / Housekeeper</option>
+                <option value="cook">Cook / Chef</option>
+                <option value="driver">Driver</option>
+                <option value="gardener">Gardener</option>
+                <option value="caretaker">Caretaker</option>
+                <option value="nanny">Nanny</option>
+                <option value="nurse">Nurse</option>
+                <option value="other">Other Support Staff</option>
               </select>
             </div>
-            <div>
-              <label
-                style={{
-                  fontSize: "0.85rem",
-                  fontWeight: 600,
-                  display: "block",
-                  marginBottom: "0.25rem",
-                }}
-              >
-                ID Number
-              </label>
-              <input
-                type="text"
-                className="input-field"
-                placeholder="e.g. 1234-5678-9012"
-                value={newStaffForm.id_number}
-                onChange={(e) => setNewStaffForm({ ...newStaffForm, id_number: e.target.value })}
-              />
+
+            <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: "0.85rem" }}>
+              <div>
+                <label
+                  style={{
+                    fontSize: "0.82rem",
+                    fontWeight: 600,
+                    display: "block",
+                    marginBottom: "0.3rem",
+                  }}
+                >
+                  Govt ID Type
+                </label>
+                <select
+                  className="select-field"
+                  value={newStaffForm.id_type}
+                  onChange={(e) => setNewStaffForm({ ...newStaffForm, id_type: e.target.value })}
+                >
+                  <option value="Aadhaar">Aadhaar</option>
+                  <option value="Voter ID">Voter ID</option>
+                  <option value="PAN Card">PAN Card</option>
+                  <option value="Driving License">Driving License</option>
+                  <option value="Passport">Passport</option>
+                </select>
+              </div>
+              <div>
+                <label
+                  style={{
+                    fontSize: "0.82rem",
+                    fontWeight: 600,
+                    display: "block",
+                    marginBottom: "0.3rem",
+                  }}
+                >
+                  ID Number
+                </label>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder={
+                    newStaffForm.id_type === "Aadhaar"
+                      ? "e.g. 1234-5678-9012"
+                      : newStaffForm.id_type === "Voter ID"
+                        ? "e.g. ABC1234567"
+                        : newStaffForm.id_type === "PAN Card"
+                          ? "e.g. ABCDE1234F"
+                          : newStaffForm.id_type === "Driving License"
+                            ? "e.g. DL-1420110012345"
+                            : newStaffForm.id_type === "Passport"
+                              ? "e.g. A12345678"
+                              : "e.g. ID Document Number"
+                  }
+                  value={newStaffForm.id_number}
+                  onChange={(e) => setNewStaffForm({ ...newStaffForm, id_number: e.target.value })}
+                />
+              </div>
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          {/* Section 3: Verification & Security */}
+          <div
+            style={{
+              padding: "0.85rem 1rem",
+              background: "#F8FAFC",
+              border: "1px solid var(--border)",
+              borderRadius: "10px",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.6rem",
+            }}
+          >
             <input
               type="checkbox"
               id="police_verified"
@@ -758,9 +983,10 @@ export default function CommunityAdminStaffPage() {
                   police_verification_status: e.target.checked ? "verified" : "not_started",
                 })
               }
+              style={{ width: "16px", height: "16px", cursor: "pointer" }}
             />
-            <label htmlFor="police_verified" style={{ fontSize: "0.85rem", cursor: "pointer" }}>
-              Police background verification completed
+            <label htmlFor="police_verified" style={{ fontSize: "0.85rem", fontWeight: 600, cursor: "pointer", color: "var(--fg)" }}>
+              🛡️ Police background verification completed
             </label>
           </div>
 
@@ -768,8 +994,10 @@ export default function CommunityAdminStaffPage() {
             style={{
               display: "flex",
               justifyContent: "flex-end",
-              gap: "0.5rem",
-              marginTop: "1rem",
+              gap: "0.65rem",
+              marginTop: "0.5rem",
+              borderTop: "1px solid var(--border)",
+              paddingTop: "1rem",
             }}
           >
             <button

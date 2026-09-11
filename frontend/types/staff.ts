@@ -33,6 +33,8 @@ export interface StaffCreate {
   full_name: string;
   staff_type: StaffType;
   phone: string;
+  email?: string | null;
+  password?: string | null;
   id_type?: string | null;
   id_number?: string | null;
   police_verification_status?: VerificationStatus;

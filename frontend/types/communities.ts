@@ -37,9 +37,12 @@ export interface Floor {
 export interface Unit {
   id: string;
   floor_id: string;
+  tower_id?: string;
   unit_number: string;
   unit_type?: string;
+  bedrooms?: number;
   sq_ft?: number;
+  area_sqft?: number;
   is_occupied?: boolean;
   created_at: string;
 }
