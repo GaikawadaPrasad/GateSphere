@@ -11,6 +11,7 @@ import { DebouncedInput } from "@/components/forms/DebouncedInput";
 import { FilterPanel } from "@/components/forms/FilterPanel";
 import { BrandButton } from "@/components/common/BrandButton";
 import { Modal } from "@/components/common/Modal";
+import { QrCodeSvg } from "@/components/common/QrCodeSvg";
 import {
   useResidentOverview,
   useResidentVisitors,
@@ -102,9 +103,23 @@ export function OwnerTenantDashboardView({
   const [profileEmergencyNotes, setProfileEmergencyNotes] = useState("");
 
   // Visitor Pass form state
+  const [passCategory, setPassCategory] = useState("Guest");
   const [passVisitorName, setPassVisitorName] = useState("");
   const [passVisitorPhone, setPassVisitorPhone] = useState("");
+  const [passReason, setPassReason] = useState("");
   const [passDuration, setPassDuration] = useState(24);
+
+  // Generated / Active Pass Result Modal state
+  const [activePassModalOpen, setActivePassModalOpen] = useState(false);
+  const [activePassResult, setActivePassResult] = useState<{
+    token?: string;
+    pin?: string;
+    visitor_name?: string;
+    category?: string;
+    reason?: string;
+    valid_from?: string;
+    valid_to?: string;
+  } | null>(null);
 
   // Service ticket form state
   const [ticketSubject, setTicketSubject] = useState("");
@@ -202,19 +217,38 @@ export function OwnerTenantDashboardView({
 
   const handleCreatePass = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!passCategory) {
+      toast.error("Please select a visitor category.", "Category Required");
+      return;
+    }
     try {
       const activeUnitId = profile.data?.occupancies?.[0]?.unit_id;
-      await visitors.createPass.mutateAsync({
+      const res = await visitors.createPass.mutateAsync({
         visitor_name: passVisitorName,
         phone: passVisitorPhone,
+        category: passCategory,
+        reason: passReason,
         valid_for_hours: passDuration,
         unit_id: activeUnitId,
       });
       setVisitorPassModalOpen(false);
+      setActivePassResult({
+        token: res.token,
+        pin: res.pin,
+        visitor_name: res.visitor_name || passVisitorName || "Visitor",
+        category: res.category || passCategory,
+        reason: res.reason || passReason || "Visitor Entry",
+        valid_from: res.valid_from,
+        valid_to: res.valid_to,
+      });
+      setActivePassModalOpen(true);
       setPassVisitorName("");
       setPassVisitorPhone("");
+      setPassReason("");
+      setPassCategory("Guest");
+      setPassDuration(24);
       toast.success(
-        "A QR & 4-digit PIN code have been issued for your guest.",
+        "A QR & 6-digit PIN code have been issued for your visitor.",
         "Visitor Pass Generated",
       );
     } catch (err: any) {
@@ -1182,10 +1216,30 @@ export function OwnerTenantDashboardView({
                 key: "pass_code",
                 header: "Pass / PIN",
                 render: (i) =>
-                  i.pass_code ? (
-                    <code style={{ color: "var(--brand-primary)", fontWeight: 700 }}>
-                      {i.pass_code}
-                    </code>
+                  i.pass_code || i.qr_token ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <code style={{ color: "var(--brand-primary)", fontWeight: 700 }}>
+                        {i.pass_code || "QR PASS"}
+                      </code>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ padding: "0.2rem 0.5rem", fontSize: "11px", display: "inline-flex", alignItems: "center", gap: "0.25rem" }}
+                        onClick={() => {
+                          setActivePassResult({
+                            token: i.qr_token || i.pass_code,
+                            pin: i.pass_code,
+                            visitor_name: i.visitor_name,
+                            category: "Visitor",
+                            reason: i.purpose,
+                            valid_to: i.valid_until,
+                          });
+                          setActivePassModalOpen(true);
+                        }}
+                      >
+                        📱 QR
+                      </button>
+                    </div>
                   ) : (
                     "–"
                   ),
@@ -1851,14 +1905,39 @@ export function OwnerTenantDashboardView({
                 marginBottom: "0.35rem",
               }}
             >
-              Visitor Full Name
+              Visitor Category <span style={{ color: "var(--danger)" }}>*</span>
+            </label>
+            <select
+              className="select-field"
+              value={passCategory}
+              onChange={(e) => setPassCategory(e.target.value)}
+              required
+            >
+              <option value="Guest">Guest / Friend & Family</option>
+              <option value="Delivery">Delivery / Courier</option>
+              <option value="Cab">Cab / Taxi</option>
+              <option value="Service">Service / Maintenance Technician</option>
+              <option value="Domestic Staff">Domestic Staff / Daily Help</option>
+              <option value="Contractor">Contractor / Interior Worker</option>
+              <option value="Other">Other Visitor</option>
+            </select>
+          </div>
+          <div>
+            <label
+              style={{
+                display: "block",
+                fontSize: "13px",
+                fontWeight: 600,
+                marginBottom: "0.35rem",
+              }}
+            >
+              Visitor Name <span style={{ fontSize: "11.5px", color: "var(--muted)", fontWeight: 400 }}>(Optional)</span>
             </label>
             <input
               className="input-field"
               placeholder="e.g. Vikram Sharma"
               value={passVisitorName}
               onChange={(e) => setPassVisitorName(e.target.value)}
-              required
             />
           </div>
           <div>
@@ -1870,14 +1949,13 @@ export function OwnerTenantDashboardView({
                 marginBottom: "0.35rem",
               }}
             >
-              Visitor Mobile Number
+              Visitor Mobile Number <span style={{ fontSize: "11.5px", color: "var(--muted)", fontWeight: 400 }}>(Optional)</span>
             </label>
             <input
               className="input-field"
               placeholder="+91 98765 00000"
               value={passVisitorPhone}
               onChange={(e) => setPassVisitorPhone(e.target.value)}
-              required
             />
           </div>
           <div>
@@ -1889,17 +1967,36 @@ export function OwnerTenantDashboardView({
                 marginBottom: "0.35rem",
               }}
             >
-              Pass Validity (Hours)
+              Reason / Purpose <span style={{ fontSize: "11.5px", color: "var(--muted)", fontWeight: 400 }}>(Optional)</span>
+            </label>
+            <input
+              className="input-field"
+              placeholder="e.g. Dinner Guest, Package Delivery, AC Servicing..."
+              value={passReason}
+              onChange={(e) => setPassReason(e.target.value)}
+            />
+          </div>
+          <div>
+            <label
+              style={{
+                display: "block",
+                fontSize: "13px",
+                fontWeight: 600,
+                marginBottom: "0.35rem",
+              }}
+            >
+              Pass Expiration Duration <span style={{ color: "var(--danger)" }}>*</span>
             </label>
             <select
               className="select-field"
               value={passDuration}
               onChange={(e) => setPassDuration(Number(e.target.value))}
             >
-              <option value={4}>4 Hours (Short Visit)</option>
-              <option value={12}>12 Hours (Full Day)</option>
-              <option value={24}>24 Hours (Overnight)</option>
-              <option value={72}>72 Hours (Weekend Guest)</option>
+              <option value={1}>1 Hour (Quick Drop / Express Delivery)</option>
+              <option value={4}>4 Hours (Standard Short Visit)</option>
+              <option value={12}>12 Hours (Full Day Access)</option>
+              <option value={24}>24 Hours (Overnight Stay)</option>
+              <option value={72}>72 Hours (Weekend / Multi-Day Guest)</option>
             </select>
           </div>
           <div
@@ -1918,10 +2015,175 @@ export function OwnerTenantDashboardView({
               Cancel
             </BrandButton>
             <BrandButton type="submit" isLoading={visitors.createPass.isPending}>
-              Issue Gate Pass
+              Generate QR / OTP Pass
             </BrandButton>
           </div>
         </form>
+      </Modal>
+
+      {/* Generated / Active Pass Result Modal */}
+      <Modal
+        isOpen={activePassModalOpen}
+        onClose={() => setActivePassModalOpen(false)}
+        title="🎟️ Dynamic Visitor Entry Pass"
+      >
+        {activePassResult && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", alignItems: "center" }}>
+            <div
+              style={{
+                width: "100%",
+                padding: "0.75rem 1rem",
+                borderRadius: "8px",
+                background: "linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)",
+                border: "1px solid #A7F3D0",
+                textAlign: "center",
+              }}
+            >
+              <div style={{ fontSize: "13px", fontWeight: 700, color: "#065F46" }}>
+                ✓ Pass Active & Whitelisted on Security Console
+              </div>
+              <div style={{ fontSize: "11.5px", color: "#047857", marginTop: "0.2rem" }}>
+                Present the QR code to security or share the 6-digit OTP for instant verification.
+              </div>
+            </div>
+
+            {/* Dynamic Vector SVG QR Code */}
+            <div
+              style={{
+                background: "#ffffff",
+                padding: "1rem",
+                borderRadius: "12px",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
+                border: "1px solid var(--border-light)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <QrCodeSvg
+                value={
+                  activePassResult.token
+                    ? activePassResult.token
+                    : (activePassResult.pin || "GSE-PASS")
+                }
+                size={180}
+              />
+              <div style={{ fontSize: "11px", color: "var(--muted)", marginTop: "0.5rem", fontWeight: 600 }}>
+                Scan at Security Gate
+              </div>
+            </div>
+
+            {/* 6-Digit OTP / PIN Display */}
+            {activePassResult.pin && (
+              <div
+                style={{
+                  width: "100%",
+                  background: "#F8FAFC",
+                  padding: "0.85rem 1rem",
+                  borderRadius: "8px",
+                  border: "1px dashed var(--brand-primary)",
+                  textAlign: "center",
+                }}
+              >
+                <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.5px" }}>
+                  Gate Entry PIN / OTP Code
+                </div>
+                <div
+                  style={{
+                    fontSize: "24px",
+                    fontWeight: 800,
+                    letterSpacing: "4px",
+                    fontFamily: "monospace",
+                    color: "var(--brand-primary)",
+                    margin: "0.35rem 0",
+                  }}
+                >
+                  {activePassResult.pin}
+                </div>
+                <div style={{ fontSize: "11.5px", color: "var(--muted)" }}>
+                  Single-use code · Automatically expires upon gate entry
+                </div>
+              </div>
+            )}
+
+            {/* Pass Metadata Grid */}
+            <div
+              style={{
+                width: "100%",
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "0.75rem",
+                background: "#F8FAFC",
+                padding: "0.85rem 1rem",
+                borderRadius: "8px",
+                border: "1px solid var(--border-light)",
+              }}
+            >
+              <div>
+                <div style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>Category</div>
+                <div style={{ fontWeight: 700, fontSize: "13.5px", color: "var(--brand-heading)", textTransform: "capitalize" }}>
+                  {activePassResult.category || "Guest"}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>Visitor Name</div>
+                <div style={{ fontWeight: 700, fontSize: "13.5px", color: "var(--brand-heading)" }}>
+                  {activePassResult.visitor_name || "Visitor"}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>Reason / Purpose</div>
+                <div style={{ fontWeight: 600, fontSize: "13px", color: "var(--brand-heading)" }}>
+                  {activePassResult.reason || "Visitor Entry"}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>Valid Until</div>
+                <div style={{ fontWeight: 600, fontSize: "12.5px", color: "#B45309" }}>
+                  {activePassResult.valid_to ? formatDate(activePassResult.valid_to) : "Scheduled Visit"}
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ width: "100%", display: "flex", gap: "0.75rem", justifyContent: "space-between" }}>
+              <BrandButton
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  const shareText = `*GateSphere Visitor Pass*\nVisitor: ${activePassResult.visitor_name || "Guest"}\nCategory: ${activePassResult.category || "Guest"}\nPIN/OTP: ${activePassResult.pin || activePassResult.token}\nValid Until: ${activePassResult.valid_to ? new Date(activePassResult.valid_to).toLocaleString() : "Visit Duration"}`;
+                  if (typeof navigator !== "undefined" && navigator.clipboard) {
+                    navigator.clipboard.writeText(shareText);
+                    toast.success("Pass details copied to clipboard!", "Copied");
+                  }
+                }}
+              >
+                📋 Copy Pass
+              </BrandButton>
+
+              <BrandButton
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  const shareText = encodeURIComponent(`*GateSphere Visitor Pass*\nVisitor: ${activePassResult.visitor_name || "Guest"}\nCategory: ${activePassResult.category || "Guest"}\nGate PIN: ${activePassResult.pin || activePassResult.token}\nValid Until: ${activePassResult.valid_to ? new Date(activePassResult.valid_to).toLocaleString() : "Visit Duration"}`);
+                  if (typeof window !== "undefined") {
+                    window.open(`https://wa.me/?text=${shareText}`, "_blank");
+                  }
+                }}
+              >
+                💬 WhatsApp
+              </BrandButton>
+
+              <BrandButton
+                type="button"
+                onClick={() => setActivePassModalOpen(false)}
+              >
+                Done
+              </BrandButton>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* Add Family Member Modal */}

@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
+import { QrCodeSvg } from "@/components/common/QrCodeSvg";
 import { complaintsApi, authApi, type CurrentUser } from "@/lib/api";
 
 export default function VendorDashboardPage() {
@@ -298,32 +299,34 @@ export default function VendorDashboardPage() {
               </div>
               <div
                 style={{
-                  width: 120,
-                  height: 120,
                   margin: "1rem auto",
-                  background: "white",
-                  padding: "0.5rem",
-                  borderRadius: "var(--radius-sm)",
                   display: "flex",
+                  flexDirection: "column",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: "0.75rem",
-                  color: "#0f172a",
-                  fontWeight: 700,
-                  textAlign: "center",
                 }}
               >
                 {activeJob ? (
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                    <span style={{ fontSize: "1.8rem" }}>📱</span>
+                    <QrCodeSvg
+                      value={`GS-PASS-${activeJob.ticket_number || "TKT"}-${activeJob.id.slice(0, 8).toUpperCase()}`}
+                      size={130}
+                    />
                     <span
-                      style={{ fontSize: "0.65rem", fontFamily: "monospace", marginTop: "4px" }}
+                      style={{
+                        fontSize: "0.7rem",
+                        fontFamily: "monospace",
+                        marginTop: "6px",
+                        color: "#94a3b8",
+                      }}
                     >
                       {activeJob.ticket_number || "QR PASS"}
                     </span>
                   </div>
                 ) : (
-                  <span style={{ color: "#94a3b8" }}>No active job</span>
+                  <span style={{ color: "#94a3b8", fontSize: "0.85rem", padding: "1.5rem 0" }}>
+                    No active job
+                  </span>
                 )}
               </div>
               <div style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>

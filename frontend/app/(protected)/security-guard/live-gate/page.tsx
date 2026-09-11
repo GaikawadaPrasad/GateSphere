@@ -8,9 +8,12 @@ import { visitorsApi } from "@/lib/api";
 interface VerifiedEntry {
   entryId: string;
   visitorName: string;
+  category?: string;
+  reason?: string;
   unitLabel: string;
   vehicleNumber?: string | null;
   status: string;
+  enteredAt?: string;
 }
 
 export default function SecurityGuardLiveGatePage() {
@@ -21,51 +24,81 @@ export default function SecurityGuardLiveGatePage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [isExiting, setIsExiting] = useState(false);
 
-  // Real backend: verifying a pass IS recording the entry — POST /visitors/entries accepts
-  // a pass_token or pin and resolves the matching request server-side. There is no separate
-  // /gate/verify-pass endpoint.
+  // Verifying a pass records the entry and exhausts/expires the single-use QR / OTP pass.
   const handleVerifyPass = async (e: React.FormEvent) => {
     e.preventDefault();
     const raw = passInput.trim();
     if (!raw) return;
+
+    // Check if input is a JSON string from a QR code
+    let extractedPin = "";
+    let extractedToken = "";
+    let extractedCategory = "";
+    let extractedReason = "";
+
+    if (raw.startsWith("{") && raw.endsWith("}")) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed.token) extractedToken = parsed.token;
+        if (parsed.pin) extractedPin = parsed.pin;
+        if (parsed.category) extractedCategory = parsed.category;
+        if (parsed.reason) extractedReason = parsed.reason;
+      } catch {
+        // Continue with raw string
+      }
+    }
+
+    const tokenToUse = extractedToken || (raw.startsWith("QR-") ? raw.replace(/^QR-/, "") : "");
+    const pinToUse = extractedPin || (/^\d{4,12}$/.test(raw) ? raw : "");
+    const isPin = Boolean(pinToUse) && !tokenToUse;
+
     setIsVerifying(true);
     setErrorMessage("");
     setSuccessMessage("");
     setVerifiedEntry(null);
 
     try {
-      const isPin = /^\d{4,12}$/.test(raw);
-      const entry = await visitorsApi.recordEntry(isPin ? { pin: raw } : { pass_token: raw });
+      const payload = isPin ? { pin: pinToUse } : { pass_token: tokenToUse || raw };
+      const entry: any = await visitorsApi.recordEntry(payload);
 
-      let visitorName = "Visitor";
-      let unitLabel = "—";
+      let visitorName = "Guest Visitor";
+      let unitLabel = "Resident Unit";
+      let category = extractedCategory || "Guest";
+      let reason = extractedReason || "Visitor Entry";
+
       try {
-        if (entry.request_id) {
-          const request = await visitorsApi.getRequest(entry.request_id as string);
-          if (request?.visitor_id) {
-            const directory = await visitorsApi.directory({ q: undefined });
-            const match = (directory || []).find((v: any) => v.id === request.visitor_id);
-            if (match) visitorName = (match as any).full_name || visitorName;
+        if (entry?.request_id) {
+          const request: any = await visitorsApi.getRequest(String(entry.request_id));
+          if (request) {
+            if (request.purpose) reason = String(request.purpose);
+            if (request.visitor_type) category = String(request.visitor_type).replace(/_/g, " ");
+            unitLabel = (request.group_label as string) || (request.unit_id ? `Unit ${String(request.unit_id).slice(0, 6)}` : unitLabel);
+            if (request.visitor_id) {
+              const directory = await visitorsApi.directory({ q: undefined });
+              const match = (directory || []).find((v: any) => v.id === request.visitor_id);
+              if (match) visitorName = (match as any).full_name || visitorName;
+            }
           }
-          unitLabel =
-            (request?.group_label as string) ||
-            (request?.visitor_type as string)?.replace(/_/g, " ") ||
-            unitLabel;
         }
       } catch {
-        // Entry was recorded successfully even if the enrichment lookups fail — show what we have.
+        // Non-fatal if detail lookup fails
       }
 
       setVerifiedEntry({
-        entryId: entry.id as string,
+        entryId: String(entry?.id || ""),
         visitorName,
+        category,
+        reason,
         unitLabel,
-        vehicleNumber: entry.vehicle_number as string | null,
-        status: entry.status as string,
+        vehicleNumber: (entry?.vehicle_number as string | null) || null,
+        status: String(entry?.status || "admitted"),
+        enteredAt: String(entry?.entry_at || new Date().toISOString()),
       });
-      setSuccessMessage(`✅ Entry recorded for ${visitorName}`);
+      setSuccessMessage(`✅ Entry Approved & Recorded for ${visitorName} — QR/OTP is now EXPIRED.`);
+      setPassInput("");
     } catch (err: any) {
-      setErrorMessage(`❌ ${err?.message || "Invalid pass / PIN, or visitor is blacklisted"}`);
+      const msg = err?.message || "Invalid pass / PIN, or visitor is blacklisted";
+      setErrorMessage(`❌ NO ENTRY ALLOWED: ${msg}`);
     }
     setIsVerifying(false);
   };
@@ -78,7 +111,7 @@ export default function SecurityGuardLiveGatePage() {
       alert(`Exit recorded for ${verifiedEntry.visitorName}`);
       setVerifiedEntry(null);
       setPassInput("");
-      setSuccessMessage("");
+      setSuccessMessage("✓ Exit recorded successfully.");
     } catch (err: any) {
       setErrorMessage(err?.message || "Failed to record exit.");
     }
@@ -171,47 +204,92 @@ export default function SecurityGuardLiveGatePage() {
       {verifiedEntry && (
         <div
           className="card"
-          style={{ marginBottom: "1.75rem", border: "2px solid var(--primary)" }}
+          style={{ marginBottom: "1.75rem", border: "2px solid var(--success-border)", background: "#ffffff" }}
         >
-          <div className="card-header">
-            <h3 className="card-title">Entry Recorded</h3>
-            <StatusBadge status={verifiedEntry.status} />
+          <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <span style={{ fontSize: "1.25rem" }}>🎟️</span>
+              <h3 className="card-title" style={{ margin: 0 }}>Gate Entry Admitted & Pass Expired</h3>
+            </div>
+            <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+              <span style={{ padding: "0.25rem 0.6rem", borderRadius: "6px", background: "#FEF2F2", color: "#991B1B", fontWeight: 700, fontSize: "11.5px", border: "1px solid #FECACA" }}>
+                🔒 SINGLE-USE EXPIRED
+              </span>
+              <StatusBadge status={verifiedEntry.status} />
+            </div>
           </div>
 
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-              gap: "1rem",
+              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+              gap: "1.25rem",
+              marginTop: "1rem",
               marginBottom: "1.5rem",
+              padding: "1rem",
+              background: "#F8FAFC",
+              borderRadius: "8px",
             }}
           >
             <div>
-              <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Visitor Name</div>
-              <div style={{ fontWeight: 700, fontSize: "1.1rem" }}>{verifiedEntry.visitorName}</div>
+              <div style={{ fontSize: "0.75rem", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>Visitor Name</div>
+              <div style={{ fontWeight: 700, fontSize: "1.1rem", color: "var(--brand-heading)", marginTop: "0.2rem" }}>
+                {verifiedEntry.visitorName}
+              </div>
             </div>
             <div>
-              <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Purpose / Group</div>
-              <div style={{ fontWeight: 700, fontSize: "1.1rem", textTransform: "capitalize" }}>
+              <div style={{ fontSize: "0.75rem", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>Category</div>
+              <div style={{ fontWeight: 700, fontSize: "1.05rem", color: "var(--brand-primary)", marginTop: "0.2rem", textTransform: "capitalize" }}>
+                {verifiedEntry.category || "Guest"}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: "0.75rem", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>Reason / Purpose</div>
+              <div style={{ fontWeight: 600, fontSize: "0.95rem", color: "var(--brand-heading)", marginTop: "0.2rem" }}>
+                {verifiedEntry.reason || "Visitor Entry"}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: "0.75rem", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>Destination / Unit</div>
+              <div style={{ fontWeight: 700, fontSize: "1rem", color: "var(--brand-heading)", marginTop: "0.2rem" }}>
                 {verifiedEntry.unitLabel}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Vehicle Number</div>
-              <div style={{ fontWeight: 600, fontFamily: "monospace" }}>
-                {verifiedEntry.vehicleNumber || "N/A"}
+              <div style={{ fontSize: "0.75rem", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>Vehicle Number</div>
+              <div style={{ fontWeight: 600, fontFamily: "monospace", fontSize: "0.95rem", marginTop: "0.2rem" }}>
+                {verifiedEntry.vehicleNumber || "N/A (Pedestrian)"}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: "0.75rem", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>Entry Time</div>
+              <div style={{ fontWeight: 600, fontSize: "0.95rem", color: "#065F46", marginTop: "0.2rem" }}>
+                {verifiedEntry.enteredAt ? new Date(verifiedEntry.enteredAt).toLocaleTimeString() : "Just now"}
               </div>
             </div>
           </div>
 
-          <button
-            className="btn btn-secondary"
-            style={{ padding: "0.75rem 2rem", fontSize: "1rem", fontWeight: 700 }}
-            onClick={handleRecordExit}
-            disabled={isExiting}
-          >
-            🚪 {isExiting ? "Recording…" : "RECORD EXIT"}
-          </button>
+          <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", justifyContent: "flex-end" }}>
+            <button
+              className="btn btn-secondary"
+              style={{ padding: "0.6rem 1.25rem", fontSize: "0.95rem", fontWeight: 600 }}
+              onClick={() => {
+                setVerifiedEntry(null);
+                setSuccessMessage("");
+                setErrorMessage("");
+              }}
+            >
+              ✓ Next Visitor / Scan
+            </button>
+            <button
+              className="btn btn-secondary"
+              style={{ padding: "0.6rem 1.5rem", fontSize: "0.95rem", fontWeight: 700, color: "#991B1B", borderColor: "#FECACA" }}
+              onClick={handleRecordExit}
+              disabled={isExiting}
+            >
+              🚪 {isExiting ? "Recording…" : "RECORD EXIT NOW"}
+            </button>
+          </div>
         </div>
       )}
     </div>

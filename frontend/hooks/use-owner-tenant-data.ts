@@ -171,13 +171,18 @@ export function useResidentVisitors() {
 
   const createPassMutation = useMutation({
     mutationFn: async (payload: {
-      visitor_name: string;
-      phone: string;
+      visitor_name?: string;
+      phone?: string;
+      category?: string;
+      reason?: string;
       valid_for_hours: number;
       unit_id?: string;
     }) => {
+      const isUuid = (s?: string) =>
+        Boolean(s && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s));
+
       let unitId = payload.unit_id;
-      if (!unitId) {
+      if (!isUuid(unitId)) {
         try {
           const profile = await api.get<any>("/residents/me");
           unitId = profile?.occupancies?.[0]?.unit_id;
@@ -185,29 +190,52 @@ export function useResidentVisitors() {
           console.warn("Could not fetch /residents/me for unit_id", e);
         }
       }
-      if (!unitId) {
-        throw new Error("No active unit occupancy found for resident profile. Please ensure you are assigned to a unit.");
+      if (!isUuid(unitId)) {
+        throw new Error(
+          "No active unit occupancy found for resident profile. Please ensure you are assigned to an active unit.",
+        );
       }
+
+      const cleanName = (payload.visitor_name || "").trim() || "Guest Visitor";
+      const cleanPhone = (payload.phone || "").trim();
+      const cleanCategory = (payload.category || "guest").toLowerCase();
+      const cleanReason = (payload.reason || "").trim() || "Visitor Entry";
       const now = new Date();
-      const validUntil = new Date(now.getTime() + (payload.valid_for_hours || 24) * 60 * 60 * 1000);
+      const validUntil = new Date(
+        now.getTime() + (payload.valid_for_hours || 24) * 60 * 60 * 1000,
+      );
+
       const req = await api.post<any>("/visitors/requests", {
         unit_id: unitId,
-        visitor_type: "personal_guest",
+        visitor_type: cleanCategory === "delivery" ? "delivery" : cleanCategory === "cab" ? "cab" : cleanCategory === "service" ? "service" : "personal_guest",
         visitor: {
-          full_name: payload.visitor_name,
-          phone: payload.phone,
+          full_name: cleanName,
+          phone: cleanPhone,
         },
-        purpose: "Pre-approved Visitor Pass",
+        purpose: cleanReason,
         expected_at: now.toISOString(),
         valid_until: validUntil.toISOString(),
       });
-      return await api.post(`/visitors/requests/${req.id}/passes`, {
+
+      const passRes = await api.post<any>(`/visitors/requests/${req.id}/passes`, {
         pass_type: "qr",
         max_entries: 1,
         with_pin: true,
         valid_from: now.toISOString(),
         valid_to: validUntil.toISOString(),
       });
+
+      return {
+        ...passRes,
+        request_id: req.id,
+        visitor_name: cleanName,
+        category: payload.category || "Guest",
+        reason: cleanReason,
+        valid_from: now.toISOString(),
+        valid_to: validUntil.toISOString(),
+        token: passRes.token,
+        pin: passRes.pin,
+      };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["resident", "visitors"] });
