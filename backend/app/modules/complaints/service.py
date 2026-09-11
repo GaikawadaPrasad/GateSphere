@@ -133,7 +133,28 @@ class ComplaintService(UnitScopedAccess):
             .where(ServiceCategory.community_id == cid)
             .order_by(ServiceCategory.code)
         )
-        return list((await self.db.scalars(stmt)).all())
+        cats = list((await self.db.scalars(stmt)).all())
+        if not cats:
+            default_cats = [
+                ("PLUMB", "Plumbing & Water", "high"),
+                ("ELEC", "Electrical & Power", "high"),
+                ("HVAC", "Air Conditioning / HVAC", "medium"),
+                ("CARP", "Carpentry & Hardware", "medium"),
+                ("HOUSE", "Housekeeping", "low"),
+                ("LIFT", "Common Area & Lift", "critical"),
+                ("GEN", "General Maintenance", "medium"),
+            ]
+            for code, name, prio in default_cats:
+                cat = ServiceCategory(
+                    community_id=cid,
+                    code=code,
+                    name=name,
+                    default_priority=prio,
+                )
+                self.db.add(cat)
+            await self.db.flush()
+            cats = list((await self.db.scalars(stmt)).all())
+        return cats
 
     async def create_category(
         self, payload: schemas.CategoryCreate, *, community_id: uuid.UUID | None
@@ -206,7 +227,10 @@ class ComplaintService(UnitScopedAccess):
         await self._assert_unit_visible(unit.id)  # a resident raises tickets for their own unit
         cat = await self.categories.get(payload.category_id)
         if cat is None or cat.community_id != unit.community_id:
-            raise NotFoundError("Category not found")
+            cats = await self.list_categories(community_id=unit.community_id)
+            cat = cats[0] if cats else None
+            if cat is None:
+                raise NotFoundError("Category not found")
         priority = payload.priority or cat.default_priority
         _enum("priority", priority)
         sla = await self.slas.match(unit.community_id, cat.id, priority)

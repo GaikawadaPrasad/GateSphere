@@ -265,18 +265,24 @@ export function OwnerTenantDashboardView({
 
   const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!ticketSubject.trim()) {
+      toast.error("Please enter a summary of the issue.", "Subject Required");
+      return;
+    }
     try {
       await complaints.createTicket.mutateAsync({
-        subject: ticketSubject,
-        description: ticketDescription,
-        priority: ticketPriority,
+        subject: ticketSubject.trim(),
+        category: ticketCategory,
+        description: ticketDescription.trim(),
+        priority: ticketPriority || "medium",
       });
       setTicketModalOpen(false);
       setTicketSubject("");
       setTicketDescription("");
       toast.success("Facility manager and technician have been notified.", "Service Ticket Raised");
-    } catch {
-      toast.error("Failed to raise ticket.", "Error");
+    } catch (err: any) {
+      const fieldMsg = err?.fields ? Object.values(err.fields).join(" · ") : null;
+      toast.error(fieldMsg || err?.message || "Failed to raise ticket.", "Ticket Error");
     }
   };
 

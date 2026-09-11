@@ -476,26 +476,39 @@ export function useResidentComplaints() {
     mutationFn: async (payload: {
       subject: string;
       category_id?: string;
+      category?: string;
       description: string;
-      priority: string;
+      priority?: string;
     }) => {
+      const isUuid = (s?: string) =>
+        Boolean(s && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s));
+
       const profile = await api.get<any>("/residents/me");
       const unitId = profile?.occupancies?.[0]?.unit_id;
       if (!unitId) {
-        throw new Error("No active unit occupancy found for resident");
+        throw new Error("No active unit occupancy found for resident profile");
       }
       let categoryId = payload.category_id;
-      if (!categoryId) {
-        const categories = await api.get<any[]>("/complaints/categories");
-        if (Array.isArray(categories) && categories.length > 0) {
-          categoryId = categories[0].id;
+      const categories = await api.get<any[]>("/complaints/categories").catch(() => []);
+      if (!isUuid(categoryId) && Array.isArray(categories) && categories.length > 0) {
+        if (payload.category) {
+          const catLower = payload.category.toLowerCase().trim();
+          const match = categories.find(
+            (c: any) =>
+              c.name?.toLowerCase().includes(catLower) ||
+              c.code?.toLowerCase() === catLower ||
+              catLower.includes(c.name?.toLowerCase()) ||
+              catLower.includes(c.code?.toLowerCase())
+          );
+          if (match?.id) categoryId = match.id;
         }
+        if (!isUuid(categoryId)) categoryId = categories[0]?.id;
       }
       return await api.post("/complaints/tickets", {
         unit_id: unitId,
         category_id: categoryId,
-        subject: payload.subject,
-        description: payload.description,
+        subject: (payload.subject || "").trim() || "Maintenance Request",
+        description: (payload.description || "").trim() || "Reported by resident",
         priority: payload.priority || "medium",
       });
     },
