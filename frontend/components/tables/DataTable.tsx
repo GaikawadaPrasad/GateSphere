@@ -100,9 +100,13 @@ export function DataTable<T extends object = Record<string, unknown>>({
 
   // Client-side pagination if needed
   const isClientPaging = enableClientPagination && !onPageChange;
-  const currentPage = isClientPaging ? localPage : (controlledPage || 1);
-  const currentPageSize = isClientPaging ? localPageSize : (controlledPageSize || 10);
-  const currentTotal = isClientPaging ? sortedData.length : (controlledTotal !== undefined ? controlledTotal : sortedData.length);
+  const currentPage = isClientPaging ? localPage : controlledPage || 1;
+  const currentPageSize = isClientPaging ? localPageSize : controlledPageSize || 10;
+  const currentTotal = isClientPaging
+    ? sortedData.length
+    : controlledTotal !== undefined
+      ? controlledTotal
+      : sortedData.length;
 
   const paginatedData = useMemo(() => {
     if (!isClientPaging) return sortedData;
@@ -119,7 +123,7 @@ export function DataTable<T extends object = Record<string, unknown>>({
   }
 
   return (
-    <div className="table-responsive-container">
+    <div className="table-responsive-wrapper">
       <table className="data-table">
         <thead>
           <tr>
@@ -144,13 +148,24 @@ export function DataTable<T extends object = Record<string, unknown>>({
                       display: "inline-flex",
                       alignItems: "center",
                       gap: "0.35rem",
-                      justifyContent: col.align === "right" ? "flex-end" : col.align === "center" ? "center" : "flex-start",
+                      justifyContent:
+                        col.align === "right"
+                          ? "flex-end"
+                          : col.align === "center"
+                            ? "center"
+                            : "flex-start",
                       width: "100%",
                     }}
                   >
                     <span>{col.header}</span>
                     {canSort && (
-                      <span style={{ fontSize: "11px", color: isSorted ? "var(--brand-primary)" : "var(--text-muted)", opacity: isSorted ? 1 : 0.4 }}>
+                      <span
+                        style={{
+                          fontSize: "11px",
+                          color: isSorted ? "var(--brand-primary)" : "var(--text-muted)",
+                          opacity: isSorted ? 1 : 0.4,
+                        }}
+                      >
                         {isSorted ? (sortDir === "asc" ? "▲" : "▼") : "↕"}
                       </span>
                     )}
@@ -163,7 +178,9 @@ export function DataTable<T extends object = Record<string, unknown>>({
         <tbody>
           {paginatedData.map((item, index) => {
             const itemRecord = item as Record<string, unknown>;
-            const key = keyExtractor ? keyExtractor(item, index) : (itemRecord.id as string) || String(index);
+            const key = keyExtractor
+              ? keyExtractor(item, index)
+              : (itemRecord.id as string) || String(index);
             return (
               <tr
                 key={key}

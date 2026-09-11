@@ -42,7 +42,9 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
     setIsSubmitting(true);
 
     try {
-      const message = [location.trim() && `Location: ${location.trim()}`, description.trim()].filter(Boolean).join(" — ");
+      const message = [location.trim() && `Location: ${location.trim()}`, description.trim()]
+        .filter(Boolean)
+        .join(" — ");
       await gateApi.triggerEmergency({
         alert_type: alertType,
         severity: "critical",
@@ -83,7 +85,11 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
       <PageHeader
         title="Emergency Alerts Command Console"
         subtitle="Manage live panic alerts, fan out emergency security broadcasts, and coordinate responder dispatch"
-        breadcrumbs={[{ label: "GateSphere" }, { label: "Security Supervisor" }, { label: "Emergency Alerts" }]}
+        breadcrumbs={[
+          { label: "GateSphere" },
+          { label: "Security Supervisor" },
+          { label: "Emergency Alerts" },
+        ]}
         actions={
           <button className="btn btn-danger" onClick={() => setIsModalOpen(true)}>
             🚨 Broadcast Emergency Alert
@@ -111,21 +117,39 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: "center", padding: "2rem" }}>Loading…</td>
+                  <td colSpan={6} style={{ textAlign: "center", padding: "2rem" }}>
+                    Loading…
+                  </td>
                 </tr>
               ) : alerts.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
+                  <td
+                    colSpan={6}
+                    style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
+                  >
                     No emergency alerts recorded.
                   </td>
                 </tr>
               ) : (
                 alerts.map((a) => (
-                  <tr key={a.id} style={{ background: a.status === "active" ? "var(--danger-light)" : undefined }}>
+                  <tr
+                    key={a.id}
+                    style={{
+                      background: a.status === "active" ? "var(--danger-light)" : undefined,
+                    }}
+                  >
                     <td style={{ fontWeight: 700, fontFamily: "monospace", whiteSpace: "nowrap" }}>
                       SOS-{a.id.slice(0, 8).toUpperCase()}
                     </td>
-                    <td style={{ fontWeight: 700, color: "var(--danger)", textTransform: "capitalize" }}>🚨 {a.alert_type}</td>
+                    <td
+                      style={{
+                        fontWeight: 700,
+                        color: "var(--danger)",
+                        textTransform: "capitalize",
+                      }}
+                    >
+                      🚨 {a.alert_type}
+                    </td>
                     <td style={{ fontWeight: 600 }}>{a.message || "—"}</td>
                     <td>{formatDateTime(a.triggered_at)}</td>
                     <td>
@@ -134,12 +158,20 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
                     <td>
                       <div style={{ display: "flex", gap: "0.4rem" }}>
                         {a.status === "active" && (
-                          <button className="btn btn-secondary" style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }} onClick={() => handleAcknowledge(a.id)}>
+                          <button
+                            className="btn btn-secondary"
+                            style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}
+                            onClick={() => handleAcknowledge(a.id)}
+                          >
                             Acknowledge
                           </button>
                         )}
                         {(a.status === "active" || a.status === "acknowledged") && (
-                          <button className="btn btn-primary" style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }} onClick={() => handleResolve(a.id)}>
+                          <button
+                            className="btn btn-primary"
+                            style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}
+                            onClick={() => handleResolve(a.id)}
+                          >
                             Resolve
                           </button>
                         )}
@@ -160,7 +192,11 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
         title="🚨 Broadcast Emergency Security Alert"
         footer={
           <>
-            <button className="btn btn-secondary" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setIsModalOpen(false)}
+              disabled={isSubmitting}
+            >
               Cancel
             </button>
             <button className="btn btn-danger" onClick={handleTriggerAlert} disabled={isSubmitting}>
@@ -181,22 +217,43 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
               marginBottom: "1rem",
             }}
           >
-            ⚠️ Confirmation required: Triggering an emergency alert will immediately notify all guards on duty and display panic indicators on active consoles.
+            ⚠️ Confirmation required: Triggering an emergency alert will immediately notify all
+            guards on duty and display panic indicators on active consoles.
           </div>
 
           <div style={{ marginBottom: "1rem" }}>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
               Emergency Category *
             </label>
-            <select className="select-field" value={alertType} onChange={(e) => setAlertType(e.target.value)}>
+            <select
+              className="select-field"
+              value={alertType}
+              onChange={(e) => setAlertType(e.target.value)}
+            >
               {ALERT_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
               ))}
             </select>
           </div>
 
           <div style={{ marginBottom: "1rem" }}>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
               Location / Building Block
             </label>
             <input
@@ -209,8 +266,16 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
           </div>
 
           <div>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
-              Additional Description <span style={{ color: "var(--muted)", fontWeight: 400 }}>(Optional)</span>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
+              Additional Description{" "}
+              <span style={{ color: "var(--muted)", fontWeight: 400 }}>(Optional)</span>
             </label>
             <textarea
               className="input-field"

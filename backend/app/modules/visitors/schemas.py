@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.core.files import ManagedFileUrl
 from app.modules.visitors.models import (
@@ -17,7 +18,7 @@ from app.modules.visitors.models import (
 )
 
 ALLOWED = {
-    "visitor_type": set(VISITOR_TYPES),
+    "visitor_type": set(VISITOR_TYPES) | {"guest"},
     "status": set(REQUEST_STATUS),
     "risk_level": set(RISK_LEVELS),
     "pass_type": set(PASS_TYPES),
@@ -103,6 +104,26 @@ class GroupMemberRead(_Read):
     added_at: datetime
 
 
+class PassCreate(_Write):
+    pass_type: str = "qr"  # noqa: S105 - not a secret
+    valid_from: datetime | None = None
+    valid_to: datetime | None = None
+    max_entries: int = Field(default=1, ge=1, le=50)
+    with_pin: bool = False  # also issue a 6-digit gate PIN (implied for pin/otp pass types)
+
+
+class PassRead(_Read):
+    request_id: uuid.UUID
+    pass_type: str
+    valid_from: datetime
+    valid_to: datetime
+    max_entries: int
+    entry_count: int
+    is_revoked: bool
+    token: str | None = None  # returned once, at creation
+    pin: str | None = None  # returned once, at creation (when with_pin / pin / otp)
+
+
 class RequestDecision(_Write):
     decision: str
     remarks: str | None = Field(default=None, max_length=2000)
@@ -122,26 +143,54 @@ class RequestRead(_Read):
     vehicle_number: str | None
     group_label: str | None
     party_size: int
+    visitor: VisitorRead | None = None
+    visitor_name: str | None = None
+    phone: str | None = None
+    passes: list[PassRead] = []
+
+    @model_validator(mode="before")
+    @classmethod
+    def populate_visitor_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            v = data.get("visitor")
+            if isinstance(v, dict):
+                data.setdefault("visitor_name", v.get("full_name"))
+                data.setdefault("phone", v.get("phone"))
+            return data
+
+        # If data is an ORM instance or other object, extract attributes into dict safely
+        if hasattr(data, "__dict__") or hasattr(data, "visitor"):
+            v = getattr(data, "visitor", None)
+            v_name = getattr(v, "full_name", None) if v else None
+            v_phone = getattr(v, "phone", None) if v else None
+            passes = []
+            if "passes" in getattr(data, "__dict__", {}):
+                passes = data.__dict__["passes"]
+            return {
+                "id": getattr(data, "id", None),
+                "created_at": getattr(data, "created_at", None),
+                "updated_at": getattr(data, "updated_at", None),
+                "community_id": getattr(data, "community_id", None),
+                "visitor_id": getattr(data, "visitor_id", None),
+                "unit_id": getattr(data, "unit_id", None),
+                "host_user_id": getattr(data, "host_user_id", None),
+                "visitor_type": getattr(data, "visitor_type", None),
+                "purpose": getattr(data, "purpose", None),
+                "expected_at": getattr(data, "expected_at", None),
+                "valid_until": getattr(data, "valid_until", None),
+                "status": getattr(data, "status", None),
+                "approval_required": getattr(data, "approval_required", None),
+                "vehicle_number": getattr(data, "vehicle_number", None),
+                "group_label": getattr(data, "group_label", None),
+                "party_size": getattr(data, "party_size", 1),
+                "visitor": v,
+                "visitor_name": v_name,
+                "phone": v_phone,
+                "passes": passes,
+            }
+        return data
 
 
-class PassCreate(_Write):
-    pass_type: str = "qr"  # noqa: S105 - not a secret
-    valid_from: datetime | None = None
-    valid_to: datetime | None = None
-    max_entries: int = Field(default=1, ge=1, le=50)
-    with_pin: bool = False  # also issue a 6-digit gate PIN (implied for pin/otp pass types)
-
-
-class PassRead(_Read):
-    request_id: uuid.UUID
-    pass_type: str
-    valid_from: datetime
-    valid_to: datetime
-    max_entries: int
-    entry_count: int
-    is_revoked: bool
-    token: str | None = None  # returned once, at creation
-    pin: str | None = None  # returned once, at creation (when with_pin / pin / otp)
 
 
 class EntryCreate(_Write):

@@ -62,7 +62,7 @@ export default function FacilityManagerServiceRequestsPage() {
           priority: t.priority,
           status: t.status,
           escalation_state: deriveTicketEscalationState(t),
-        }))
+        })),
       );
     } catch (err: any) {
       setLoadError(err?.message || "Failed to load service requests.");
@@ -115,7 +115,11 @@ export default function FacilityManagerServiceRequestsPage() {
       <PageHeader
         title="Service Requests Triage"
         subtitle="Manage resident & facility service tickets, SLA warnings, and vendor assignments"
-        breadcrumbs={[{ label: "GateSphere" }, { label: "Facility Manager" }, { label: "Service Requests" }]}
+        breadcrumbs={[
+          { label: "GateSphere" },
+          { label: "Facility Manager" },
+          { label: "Service Requests" },
+        ]}
       />
 
       <div className="card">
@@ -128,8 +132,12 @@ export default function FacilityManagerServiceRequestsPage() {
           </div>
 
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-            <div style={{ width: 220 }}>
-              <SearchInput value={search} onChange={setSearch} placeholder="Search ticket/subject/category…" />
+            <div style={{ width: "100%", maxWidth: 220 }}>
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Search ticket/subject/category…"
+              />
             </div>
 
             <select
@@ -181,13 +189,23 @@ export default function FacilityManagerServiceRequestsPage() {
                 </tr>
               ) : loadError ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: "center", padding: "2rem", color: "var(--danger, #dc2626)" }}>
+                  <td
+                    colSpan={7}
+                    style={{
+                      textAlign: "center",
+                      padding: "2rem",
+                      color: "var(--danger, #dc2626)",
+                    }}
+                  >
                     {loadError}
                   </td>
                 </tr>
               ) : filteredRequests.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
+                  <td
+                    colSpan={7}
+                    style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
+                  >
                     No service requests found.
                   </td>
                 </tr>
@@ -226,8 +244,15 @@ export default function FacilityManagerServiceRequestsPage() {
                           {allowed.map((nextSt) => (
                             <button
                               key={nextSt}
-                              className={nextSt === "resolved" ? "btn btn-primary" : "btn btn-secondary"}
-                              style={{ fontSize: "0.75rem", padding: "0.2rem 0.45rem", height: 26, textTransform: "capitalize" }}
+                              className={
+                                nextSt === "resolved" ? "btn btn-primary" : "btn btn-secondary"
+                              }
+                              style={{
+                                fontSize: "0.75rem",
+                                padding: "0.2rem 0.45rem",
+                                height: 26,
+                                textTransform: "capitalize",
+                              }}
                               onClick={() => handleStatusChange(r.id, r.status, nextSt)}
                             >
                               {nextSt.replace(/_/g, " ")}
@@ -254,7 +279,11 @@ export default function FacilityManagerServiceRequestsPage() {
             <button className="btn btn-secondary" onClick={() => setIsAssignModalOpen(false)}>
               Cancel
             </button>
-            <button className="btn btn-primary" onClick={handleAssignVendor} disabled={!vendorName.trim()}>
+            <button
+              className="btn btn-primary"
+              onClick={handleAssignVendor}
+              disabled={!vendorName.trim()}
+            >
               Confirm Assignment
             </button>
           </>
@@ -262,7 +291,8 @@ export default function FacilityManagerServiceRequestsPage() {
       >
         <div>
           <p style={{ marginBottom: "1rem", fontSize: "0.875rem" }}>
-            Enter the vendor or contractor name to resolve <strong>{selectedTicket?.subject}</strong>:
+            Enter the vendor or contractor name to resolve{" "}
+            <strong>{selectedTicket?.subject}</strong>:
           </p>
           <input
             type="text"

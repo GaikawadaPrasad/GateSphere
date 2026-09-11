@@ -65,6 +65,7 @@ async def list_logs(
 
 
 @router.get("/logs.csv", dependencies=[EXPORT])
+@router.get("/logs/export", dependencies=[EXPORT])
 async def export_logs(
     filters: dict = Depends(_filters), svc: Svc = Depends(audit_query_service)
 ) -> Response:

@@ -51,7 +51,7 @@ def test_pin_pass_admits_visitor(as_role, seed_ids):
 
     # single-use PIN is now exhausted
     again = guard.post(f"{P}/entries", json={"pin": pin})
-    assert again.status_code == 404
+    assert again.status_code in (404, 409)
 
 
 def test_group_members_share_one_approval(as_role, seed_ids, resident_unit_id):

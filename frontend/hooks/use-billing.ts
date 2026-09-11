@@ -10,7 +10,8 @@ export const billingKeys = {
   payments: (params?: ListQueryParams) => [...billingKeys.all, "payments", params] as const,
   chargeHeads: (communityId?: string) => [...billingKeys.all, "charge-heads", communityId] as const,
   rules: (communityId?: string) => [...billingKeys.all, "rules", communityId] as const,
-  unitLedger: (unitId: string, params?: ListQueryParams) => [...billingKeys.all, "ledger", unitId, params] as const,
+  unitLedger: (unitId: string, params?: ListQueryParams) =>
+    [...billingKeys.all, "ledger", unitId, params] as const,
 };
 
 export function useInvoices(params?: ListQueryParams) {

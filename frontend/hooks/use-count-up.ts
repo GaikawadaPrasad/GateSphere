@@ -19,7 +19,7 @@ export function useCountUp(target: number, duration: number = 1800): number {
     const step = (timestamp: number) => {
       if (!startTimestamp) startTimestamp = timestamp;
       const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-      
+
       // Ease out cubic
       const easeOut = 1 - Math.pow(1 - progress, 3);
       setCount(Math.round(easeOut * target));

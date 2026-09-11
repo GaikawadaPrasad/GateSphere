@@ -8,12 +8,15 @@ interface StatusBadgeProps {
 }
 
 export function StatusBadge({ status, label, className }: StatusBadgeProps) {
-  let text = label || (typeof status === "boolean" ? (status ? "Active" : "Inactive") : String(status));
+  let text =
+    label || (typeof status === "boolean" ? (status ? "Active" : "Inactive") : String(status));
   let bg = "#F1F5F9";
   let color = "#475569";
   let border = "#E2E8F0";
 
-  const s = (typeof status === "boolean" ? (status ? "active" : "inactive") : String(status)).toLowerCase();
+  const s = (
+    typeof status === "boolean" ? (status ? "active" : "inactive") : String(status)
+  ).toLowerCase();
 
   switch (s) {
     case "active":

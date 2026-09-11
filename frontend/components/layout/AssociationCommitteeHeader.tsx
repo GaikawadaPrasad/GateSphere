@@ -64,7 +64,9 @@ export function AssociationCommitteeHeader() {
     };
   }, [isOpen]);
 
-  const rawNotifications: AppNotification[] = Array.isArray(notificationsData) ? notificationsData : [];
+  const rawNotifications: AppNotification[] = Array.isArray(notificationsData)
+    ? notificationsData
+    : [];
 
   // Fallback demo notifications for committee governance if inbox is empty
   const sampleNotifications: AppNotification[] = [
@@ -202,7 +204,10 @@ export function AssociationCommitteeHeader() {
       }}
     >
       {/* Left section: Sidebar toggle & Community Scope badge */}
-      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", minWidth: 0, flex: 1 }}>
+      <div
+        className="mobile-header-left"
+        style={{ display: "flex", alignItems: "center", gap: "0.75rem", minWidth: 0, flex: 1 }}
+      >
         <button
           type="button"
           onClick={toggleSidebar}
@@ -213,8 +218,8 @@ export function AssociationCommitteeHeader() {
           ☰
         </button>
 
-        {/* Community Scope Badge (Single Community Isolation) */}
-        <div style={{ display: "flex", alignItems: "center", minWidth: 0 }}>
+        {/* Community Scope Badge (Single Community Isolation) - hidden on mobile */}
+        <div className="mobile-hide" style={{ display: "flex", alignItems: "center", minWidth: 0 }}>
           <div
             style={{
               display: "inline-flex",
@@ -239,7 +244,12 @@ export function AssociationCommitteeHeader() {
             </span>
             <span
               title="Single Community Governance Isolation"
-              style={{ fontSize: "0.75rem", color: "#8b5cf6", marginLeft: "0.15rem", flexShrink: 0 }}
+              style={{
+                fontSize: "0.75rem",
+                color: "#8b5cf6",
+                marginLeft: "0.15rem",
+                flexShrink: 0,
+              }}
             >
               🔒
             </span>
@@ -248,7 +258,10 @@ export function AssociationCommitteeHeader() {
       </div>
 
       {/* Right section: Notification bell, User info & Actions */}
-      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexShrink: 0 }}>
+      <div
+        className="mobile-header-right"
+        style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexShrink: 0 }}
+      >
         {/* Notification Bell with Dropdown Popover */}
         <div style={{ position: "relative" }} ref={dropdownRef}>
           <button
@@ -311,7 +324,8 @@ export function AssociationCommitteeHeader() {
                 background: "#ffffff",
                 border: "1px solid var(--border)",
                 borderRadius: "var(--radius)",
-                boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
+                boxShadow:
+                  "0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
                 zIndex: 100,
                 display: "flex",
                 flexDirection: "column",
@@ -432,12 +446,21 @@ export function AssociationCommitteeHeader() {
                 }}
               >
                 {notifLoading ? (
-                  <div style={{ padding: "1.5rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                  <div
+                    style={{
+                      padding: "1.5rem",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.75rem",
+                    }}
+                  >
                     <div className="skeleton" style={{ width: "100%", height: 40 }} />
                     <div className="skeleton" style={{ width: "100%", height: 40 }} />
                   </div>
                 ) : filteredNotifications.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "2.5rem 1rem", color: "var(--muted)" }}>
+                  <div
+                    style={{ textAlign: "center", padding: "2.5rem 1rem", color: "var(--muted)" }}
+                  >
                     <div style={{ fontSize: "1.75rem", marginBottom: "0.25rem" }}>✨</div>
                     <div style={{ fontSize: "0.85rem", fontWeight: 600 }}>All caught up!</div>
                     <p style={{ fontSize: "0.75rem", marginTop: "0.15rem" }}>
@@ -483,7 +506,14 @@ export function AssociationCommitteeHeader() {
                           >
                             {n.title}
                           </span>
-                          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexShrink: 0 }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.4rem",
+                              flexShrink: 0,
+                            }}
+                          >
                             {!n.is_read && (
                               <button
                                 type="button"
@@ -596,8 +626,10 @@ export function AssociationCommitteeHeader() {
             {user?.full_name ? user.full_name.slice(0, 2).toUpperCase() : "AC"}
           </div>
 
-          <div className="hide-mobile" style={{ display: "flex", flexDirection: "column" }}>
-            <span style={{ fontSize: "0.825rem", fontWeight: 600, color: "var(--fg)", lineHeight: 1.2 }}>
+          <div className="mobile-hide-text" style={{ display: "flex", flexDirection: "column" }}>
+            <span
+              style={{ fontSize: "0.825rem", fontWeight: 600, color: "var(--fg)", lineHeight: 1.2 }}
+            >
               {user?.full_name || "Committee Member"}
             </span>
             <span style={{ fontSize: "0.7rem", color: "#7c3aed", fontWeight: 600 }}>
@@ -621,4 +653,3 @@ export function AssociationCommitteeHeader() {
     </header>
   );
 }
-

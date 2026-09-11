@@ -4,7 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import { useUiStore } from "@/store/ui";
 import { useCommunityDetails } from "@/hooks/use-communities";
-import { useSpecialAssessments, useApproveAssessment, useRejectAssessment } from "@/hooks/use-governance";
+import {
+  useSpecialAssessments,
+  useCreateAssessment,
+  useApproveAssessment,
+  useRejectAssessment,
+} from "@/hooks/use-governance";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { StatusBadge } from "@/components/common/StatusBadge";
@@ -23,13 +28,71 @@ export default function SpecialAssessmentsPage() {
   const [rejectReason, setRejectReason] = useState("");
   const [isRejectMode, setIsRejectMode] = useState(false);
 
+  // New Assessment Modal State
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newPurpose, setNewPurpose] = useState("CapEx Infrastructure");
+  const [newDescription, setNewDescription] = useState("");
+  const [newTargetAmount, setNewTargetAmount] = useState("25000");
+  const [newUnitsCount, setNewUnitsCount] = useState(120);
+  const [newEffectiveDate, setNewEffectiveDate] = useState(
+    new Date(Date.now() + 15 * 86400000).toISOString().slice(0, 10)
+  );
+  const [newDueDate, setNewDueDate] = useState(
+    new Date(Date.now() + 45 * 86400000).toISOString().slice(0, 10)
+  );
+
   const { data: assessments, isLoading } = useSpecialAssessments({
     community_id: activeCommunityId,
     status: statusFilter === "all" ? undefined : statusFilter,
   });
 
+  const createMutation = useCreateAssessment();
   const approveMutation = useApproveAssessment();
   const rejectMutation = useRejectAssessment();
+
+  const computedPerUnit = Math.max(
+    parseFloat(newTargetAmount || "0") / Math.max(newUnitsCount || 1, 1),
+    0
+  ).toFixed(2);
+
+  const handleCreateAssessment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTitle.trim()) {
+      alert("Please enter a title for the assessment project.");
+      return;
+    }
+    const cid = activeCommunityId || community?.id;
+    if (!cid) {
+      alert("Please select a community first.");
+      return;
+    }
+
+    try {
+      await createMutation.mutateAsync({
+        payload: {
+          community_id: cid,
+          title: newTitle.trim(),
+          purpose: newPurpose,
+          description: newDescription.trim(),
+          target_amount: newTargetAmount,
+          affected_units_count: newUnitsCount,
+          per_unit_amount: computedPerUnit,
+          effective_date: newEffectiveDate,
+          due_date: newDueDate,
+        },
+        communityId: cid,
+      });
+
+      setIsCreateModalOpen(false);
+      setNewTitle("");
+      setNewDescription("");
+      alert("Special assessment proposed successfully and submitted for committee review.");
+    } catch (err) {
+      console.error("Failed to create assessment", err);
+      alert("Failed to submit assessment proposal. Please try again.");
+    }
+  };
 
   const handleApprove = async () => {
     if (!selectedAssessment) return;
@@ -112,7 +175,9 @@ export default function SpecialAssessmentsPage() {
         return (
           <div>
             <span style={{ color: "#059669", fontWeight: 600 }}>{formatCurrency(collected)}</span>
-            <span style={{ fontSize: "0.725rem", color: "var(--muted)", marginLeft: "0.25rem" }}>({pct}%)</span>
+            <span style={{ fontSize: "0.725rem", color: "var(--muted)", marginLeft: "0.25rem" }}>
+              ({pct}%)
+            </span>
           </div>
         );
       },
@@ -167,6 +232,16 @@ export default function SpecialAssessmentsPage() {
           { label: "Association Committee", href: "/association-committee/governance" },
           { label: "Special Assessments" },
         ]}
+        actions={
+          <button
+            type="button"
+            onClick={() => setIsCreateModalOpen(true)}
+            className="btn btn-primary"
+            style={{ fontSize: "0.85rem", padding: "0.45rem 0.9rem" }}
+          >
+            ➕ Propose Assessment
+          </button>
+        }
       />
 
       {/* Overview Notice */}
@@ -189,7 +264,8 @@ export default function SpecialAssessmentsPage() {
             Committee Approval Authority (PRD FR-09)
           </div>
           <p style={{ fontSize: "0.775rem", color: "var(--muted)", marginTop: "0.15rem" }}>
-            The Association Committee evaluates CapEx projects, equipment overhauls, and exceptional infrastructure levies prior to unit billing.
+            The Association Committee evaluates CapEx projects, equipment overhauls, and exceptional
+            infrastructure levies prior to unit billing.
           </p>
         </div>
 
@@ -213,7 +289,9 @@ export default function SpecialAssessmentsPage() {
       {/* Assessments DataTable */}
       <div className="card">
         <DataTable<SpecialAssessment & Record<string, unknown>>
-          columns={assessmentColumns as unknown as Column<SpecialAssessment & Record<string, unknown>>[]}
+          columns={
+            assessmentColumns as unknown as Column<SpecialAssessment & Record<string, unknown>>[]
+          }
           data={filteredAssessments as unknown as (SpecialAssessment & Record<string, unknown>)[]}
           isLoading={isLoading}
           emptyTitle="No assessments found"
@@ -232,7 +310,14 @@ export default function SpecialAssessmentsPage() {
           title={isRejectMode ? "Reject Special Assessment" : "Association Committee Review"}
           maxWidth={560}
           footer={
-            <div style={{ display: "flex", gap: "0.5rem", width: "100%", justifyContent: "space-between" }}>
+            <div
+              style={{
+                display: "flex",
+                gap: "0.5rem",
+                width: "100%",
+                justifyContent: "space-between",
+              }}
+            >
               <button
                 type="button"
                 onClick={() => {
@@ -337,10 +422,18 @@ export default function SpecialAssessmentsPage() {
 
             {selectedAssessment.description && (
               <div style={{ marginBottom: "1rem" }}>
-                <label style={{ fontSize: "0.775rem", fontWeight: 600, color: "var(--fg-secondary)" }}>
+                <label
+                  style={{ fontSize: "0.775rem", fontWeight: 600, color: "var(--fg-secondary)" }}
+                >
                   Project Description & Justification
                 </label>
-                <p style={{ fontSize: "0.85rem", marginTop: "0.25rem", color: "var(--fg-secondary)" }}>
+                <p
+                  style={{
+                    fontSize: "0.85rem",
+                    marginTop: "0.25rem",
+                    color: "var(--fg-secondary)",
+                  }}
+                >
                   {selectedAssessment.description}
                 </p>
               </div>
@@ -348,7 +441,9 @@ export default function SpecialAssessmentsPage() {
 
             {!isRejectMode ? (
               <div>
-                <label style={{ fontSize: "0.775rem", fontWeight: 600, color: "var(--fg-secondary)" }}>
+                <label
+                  style={{ fontSize: "0.775rem", fontWeight: 600, color: "var(--fg-secondary)" }}
+                >
                   Committee Approval Notes (Optional)
                 </label>
                 <textarea
@@ -369,11 +464,175 @@ export default function SpecialAssessmentsPage() {
                   onChange={(e) => setRejectReason(e.target.value)}
                   placeholder="Specify why this proposal is returned (e.g. Requires revised contractor quotes)."
                   className="input-field"
-                  style={{ minHeight: 80, marginTop: "0.25rem", width: "100%", borderColor: "#fca5a5" }}
+                  style={{
+                    minHeight: 80,
+                    marginTop: "0.25rem",
+                    width: "100%",
+                    borderColor: "#fca5a5",
+                  }}
                 />
               </div>
             )}
           </div>
+        </Modal>
+      )}
+
+      {/* Propose Special Assessment Modal */}
+      {isCreateModalOpen && (
+        <Modal
+          isOpen={isCreateModalOpen}
+          onClose={() => setIsCreateModalOpen(false)}
+          title="Propose Special Assessment"
+          maxWidth={600}
+        >
+          <form onSubmit={handleCreateAssessment}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <div>
+                <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--fg-secondary)", display: "block", marginBottom: "0.35rem" }}>
+                  Assessment Project Title *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  placeholder="e.g. Clubhouse Solar Panel Infrastructure"
+                  className="input-field"
+                />
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                <div>
+                  <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--fg-secondary)", display: "block", marginBottom: "0.35rem" }}>
+                    Category / Purpose *
+                  </label>
+                  <select
+                    value={newPurpose}
+                    onChange={(e) => setNewPurpose(e.target.value)}
+                    className="select-field"
+                  >
+                    <option value="CapEx Infrastructure">CapEx Infrastructure</option>
+                    <option value="Equipment Overhaul">Equipment Overhaul</option>
+                    <option value="Security & Surveillance Upgrade">Security Upgrade</option>
+                    <option value="Landscaping & Amenities">Amenities & Landscaping</option>
+                    <option value="Structural & Safety Repairs">Structural & Safety</option>
+                    <option value="Emergency Reserve Replenishment">Emergency Reserve</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--fg-secondary)", display: "block", marginBottom: "0.35rem" }}>
+                    Target Budget ($) *
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    step="0.01"
+                    value={newTargetAmount}
+                    onChange={(e) => setNewTargetAmount(e.target.value)}
+                    placeholder="e.g. 48000"
+                    className="input-field"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                <div>
+                  <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--fg-secondary)", display: "block", marginBottom: "0.35rem" }}>
+                    Participating Units Count *
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    value={newUnitsCount}
+                    onChange={(e) => setNewUnitsCount(parseInt(e.target.value, 10) || 1)}
+                    className="input-field"
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--fg-secondary)", display: "block", marginBottom: "0.35rem" }}>
+                    Per Unit Assessment
+                  </label>
+                  <div
+                    style={{
+                      height: 38,
+                      padding: "0.6rem 0.85rem",
+                      background: "#f1f5f9",
+                      borderRadius: "var(--radius-sm)",
+                      border: "1px solid var(--border)",
+                      fontWeight: 700,
+                      color: "#2563eb",
+                      display: "flex",
+                      alignItems: "center",
+                    }}
+                  >
+                    {formatCurrency(parseFloat(computedPerUnit))} / unit
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                <div>
+                  <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--fg-secondary)", display: "block", marginBottom: "0.35rem" }}>
+                    Effective Start Date *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={newEffectiveDate}
+                    onChange={(e) => setNewEffectiveDate(e.target.value)}
+                    className="input-field"
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--fg-secondary)", display: "block", marginBottom: "0.35rem" }}>
+                    Payment Due Date
+                  </label>
+                  <input
+                    type="date"
+                    value={newDueDate}
+                    onChange={(e) => setNewDueDate(e.target.value)}
+                    className="input-field"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--fg-secondary)", display: "block", marginBottom: "0.35rem" }}>
+                  Project Description & Scope Justification
+                </label>
+                <textarea
+                  rows={3}
+                  value={newDescription}
+                  onChange={(e) => setNewDescription(e.target.value)}
+                  placeholder="Provide background, vendor quotation summaries, and AGM resolution context..."
+                  className="input-field"
+                  style={{ minHeight: 80, width: "100%" }}
+                />
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "0.5rem" }}>
+                <button
+                  type="button"
+                  onClick={() => setIsCreateModalOpen(false)}
+                  className="btn btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={createMutation.isPending}
+                  className="btn btn-primary"
+                >
+                  {createMutation.isPending ? "Submitting..." : "Submit for Committee Review"}
+                </button>
+              </div>
+            </div>
+          </form>
         </Modal>
       )}
     </div>

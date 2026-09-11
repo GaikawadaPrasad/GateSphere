@@ -4,7 +4,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { domesticStaffApi } from "@/lib/api";
 import type { CheckInPayload, Staff, StaffCreate } from "@/types/staff";
 
-export function useStaffList(params?: { community_id?: string; q?: string; page?: number; page_size?: number }) {
+export function useStaffList(params?: {
+  community_id?: string;
+  q?: string;
+  page?: number;
+  page_size?: number;
+}) {
   return useQuery({
     queryKey: ["staff", params],
     queryFn: () => domesticStaffApi.list(params),
@@ -21,15 +26,26 @@ export function useStaffDetails(id?: string) {
   });
 }
 
-export function useStaffAssignments(params?: { staff_id?: string; unit_id?: string; active_only?: boolean }) {
+export function useStaffAssignments(params?: {
+  staff_id?: string;
+  unit_id?: string;
+  active_only?: boolean;
+}) {
   return useQuery({
     queryKey: ["staff-assignments", params],
     queryFn: () => domesticStaffApi.assignments(params),
+    enabled: Boolean(params?.staff_id || params?.unit_id),
     staleTime: 60_000,
   });
 }
 
-export function useStaffAttendance(params?: { community_id?: string; staff_id?: string; open_only?: boolean; page?: number; page_size?: number }) {
+export function useStaffAttendance(params?: {
+  community_id?: string;
+  staff_id?: string;
+  open_only?: boolean;
+  page?: number;
+  page_size?: number;
+}) {
   return useQuery({
     queryKey: ["staff-attendance", params],
     queryFn: () => domesticStaffApi.attendance(params),

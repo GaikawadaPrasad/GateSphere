@@ -40,13 +40,14 @@ export default function FacilityManagerDashboardPage() {
   const [isSubmittingTicket, setIsSubmittingTicket] = useState(false);
 
   const loadData = async () => {
-    const [ticketsRes, categoriesRes, amenitiesRes, bookingsRes, communitiesRes] = await Promise.allSettled([
-      complaintsApi.list(),
-      complaintsApi.categories(),
-      amenitiesApi.list(),
-      amenitiesApi.bookings(),
-      communitiesApi.list(),
-    ]);
+    const [ticketsRes, categoriesRes, amenitiesRes, bookingsRes, communitiesRes] =
+      await Promise.allSettled([
+        complaintsApi.list(),
+        complaintsApi.categories(),
+        amenitiesApi.list(),
+        amenitiesApi.bookings(),
+        communitiesApi.list(),
+      ]);
 
     if (categoriesRes.status === "fulfilled") {
       setCategories((categoriesRes.value || []).map((c: any) => ({ id: c.id, name: c.name })));
@@ -77,7 +78,7 @@ export default function FacilityManagerDashboardPage() {
           status: t.status,
           escalation_state: deriveTicketEscalationState(t),
           created_at: t.created_at,
-        }))
+        })),
       );
     }
 
@@ -87,9 +88,10 @@ export default function FacilityManagerDashboardPage() {
       const today = new Date().toISOString().split("T")[0];
       setBookingsToday(
         (bookingsRes.value || []).filter((b: any) => {
-          const bookingDate = b.booking_date || (b.start_at ? String(b.start_at).split("T")[0] : "");
+          const bookingDate =
+            b.booking_date || (b.start_at ? String(b.start_at).split("T")[0] : "");
           return bookingDate === today;
-        }).length
+        }).length,
       );
     }
 
@@ -109,12 +111,12 @@ export default function FacilityManagerDashboardPage() {
   const handleQuickCreateRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reqSubject.trim()) return;
-    const effectiveUnitId = reqUnitId || (units[0]?.id);
+    const effectiveUnitId = reqUnitId || units[0]?.id;
     if (!effectiveUnitId) {
       alert("No unit available for this ticket.");
       return;
     }
-    const effectiveCatId = reqCategoryId || (categories[0]?.id);
+    const effectiveCatId = reqCategoryId || categories[0]?.id;
     if (!effectiveCatId) {
       alert("Please select a category.");
       return;
@@ -139,19 +141,34 @@ export default function FacilityManagerDashboardPage() {
     setIsSubmittingTicket(false);
   };
 
-  const openTickets = tickets.filter((t) => !["resolved", "closed", "cancelled"].includes(t.status));
-  const slaWarnings = tickets.filter((t) => t.escalation_state === "at_risk" || t.escalation_state === "breached");
-  const highPriorityOpen = openTickets.filter((t) => t.priority === "high" || t.priority === "critical");
+  const openTickets = tickets.filter(
+    (t) => !["resolved", "closed", "cancelled"].includes(t.status),
+  );
+  const slaWarnings = tickets.filter(
+    (t) => t.escalation_state === "at_risk" || t.escalation_state === "breached",
+  );
+  const highPriorityOpen = openTickets.filter(
+    (t) => t.priority === "high" || t.priority === "critical",
+  );
 
   return (
     <div>
       <PageHeader
         title="Facility Manager Dashboard"
         subtitle="Operational facilities oversight, service tickets & SLA warnings"
-        breadcrumbs={[{ label: "GateSphere" }, { label: "Facility Manager" }, { label: "Dashboard" }]}
+        breadcrumbs={[
+          { label: "GateSphere" },
+          { label: "Facility Manager" },
+          { label: "Dashboard" },
+        ]}
         actions={
           <div style={{ display: "flex", gap: "0.75rem" }}>
-            <button type="button" className="btn btn-secondary" onClick={handleRefresh} disabled={isRefreshing}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+            >
               🔄 {isRefreshing ? "Refreshing…" : "Refresh"}
             </button>
             <button type="button" className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
@@ -183,7 +200,9 @@ export default function FacilityManagerDashboardPage() {
           subtext={`${highPriorityOpen.length} high/critical priority`}
           icon="📋"
           trend={highPriorityOpen.length > 0 ? "warning" : undefined}
-          trendValue={highPriorityOpen.length > 0 ? `${highPriorityOpen.length} needs triage` : undefined}
+          trendValue={
+            highPriorityOpen.length > 0 ? `${highPriorityOpen.length} needs triage` : undefined
+          }
           onClick={() => router.push("/facility-manager/service-requests")}
         />
         <KpiCard
@@ -213,23 +232,45 @@ export default function FacilityManagerDashboardPage() {
           background: "linear-gradient(135deg, #ffffff, #f8fafc)",
         }}
       >
-        <div style={{ fontWeight: 600, fontSize: "0.875rem", color: "var(--fg)", marginBottom: "0.75rem" }}>
+        <div
+          style={{
+            fontWeight: 600,
+            fontSize: "0.875rem",
+            color: "var(--fg)",
+            marginBottom: "0.75rem",
+          }}
+        >
           ⚡ Quick Management Actions
         </div>
         <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-          <button className="btn btn-secondary" onClick={() => router.push("/facility-manager/facilities")}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => router.push("/facility-manager/facilities")}
+          >
             🏢 Add / Edit Facility
           </button>
-          <button className="btn btn-secondary" onClick={() => router.push("/facility-manager/maintenance")}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => router.push("/facility-manager/maintenance")}
+          >
             🔧 Maintenance Tickets
           </button>
-          <button className="btn btn-secondary" onClick={() => router.push("/facility-manager/service-requests")}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => router.push("/facility-manager/service-requests")}
+          >
             📋 Service Requests
           </button>
-          <button className="btn btn-secondary" onClick={() => router.push("/facility-manager/amenities")}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => router.push("/facility-manager/amenities")}
+          >
             🏊 Manage Amenity Bookings
           </button>
-          <button className="btn btn-secondary" onClick={() => router.push("/facility-manager/complaints")}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => router.push("/facility-manager/complaints")}
+          >
             🎫 View Complaints
           </button>
         </div>
@@ -239,7 +280,7 @@ export default function FacilityManagerDashboardPage() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 360px), 1fr))",
           gap: "1.75rem",
           alignItems: "start",
         }}
@@ -277,7 +318,10 @@ export default function FacilityManagerDashboardPage() {
                     </tr>
                   ) : openTickets.length === 0 ? (
                     <tr>
-                      <td colSpan={5} style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}>
+                      <td
+                        colSpan={5}
+                        style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}
+                      >
                         No open tickets.
                       </td>
                     </tr>
@@ -287,8 +331,12 @@ export default function FacilityManagerDashboardPage() {
                         <td style={{ fontWeight: 600 }}>{t.ticket_number}</td>
                         <td>{t.subject}</td>
                         <td>{t.category_name}</td>
-                        <td><StatusBadge status={t.priority} /></td>
-                        <td><StatusBadge status={t.status} /></td>
+                        <td>
+                          <StatusBadge status={t.priority} />
+                        </td>
+                        <td>
+                          <StatusBadge status={t.status} />
+                        </td>
                       </tr>
                     ))
                   )}
@@ -307,7 +355,9 @@ export default function FacilityManagerDashboardPage() {
             {isLoading ? (
               <p style={{ fontSize: "0.85rem", color: "var(--muted)" }}>Loading…</p>
             ) : slaWarnings.length === 0 ? (
-              <p style={{ fontSize: "0.85rem", color: "var(--muted)" }}>No tickets at risk or breached right now.</p>
+              <p style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
+                No tickets at risk or breached right now.
+              </p>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
                 {slaWarnings.slice(0, 5).map((t) => (
@@ -316,14 +366,30 @@ export default function FacilityManagerDashboardPage() {
                     style={{
                       padding: "0.75rem",
                       borderRadius: "var(--radius-sm)",
-                      background: t.escalation_state === "breached" ? "var(--danger-light)" : "var(--warning-light)",
+                      background:
+                        t.escalation_state === "breached"
+                          ? "var(--danger-light)"
+                          : "var(--warning-light)",
                       border: `1px solid ${t.escalation_state === "breached" ? "var(--danger-border)" : "var(--warning-border)"}`,
                     }}
                   >
-                    <div style={{ fontWeight: 600, fontSize: "0.85rem", color: t.escalation_state === "breached" ? "#991b1b" : "#92400e" }}>
-                      {t.escalation_state === "breached" ? "🚨 SLA Breached" : "⚠️ SLA At Risk"}: {t.subject} ({t.ticket_number})
+                    <div
+                      style={{
+                        fontWeight: 600,
+                        fontSize: "0.85rem",
+                        color: t.escalation_state === "breached" ? "#991b1b" : "#92400e",
+                      }}
+                    >
+                      {t.escalation_state === "breached" ? "🚨 SLA Breached" : "⚠️ SLA At Risk"}:{" "}
+                      {t.subject} ({t.ticket_number})
                     </div>
-                    <div style={{ fontSize: "0.75rem", color: t.escalation_state === "breached" ? "#b91c1c" : "#b45309", marginTop: "0.25rem" }}>
+                    <div
+                      style={{
+                        fontSize: "0.75rem",
+                        color: t.escalation_state === "breached" ? "#b91c1c" : "#b45309",
+                        marginTop: "0.25rem",
+                      }}
+                    >
                       {t.category_name} · Raised {formatDate(t.created_at)}
                     </div>
                   </div>
@@ -344,7 +410,11 @@ export default function FacilityManagerDashboardPage() {
             <button className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>
               Cancel
             </button>
-            <button className="btn btn-primary" onClick={handleQuickCreateRequest} disabled={isSubmittingTicket}>
+            <button
+              className="btn btn-primary"
+              onClick={handleQuickCreateRequest}
+              disabled={isSubmittingTicket}
+            >
               {isSubmittingTicket ? "Creating…" : "Create Ticket"}
             </button>
           </>
@@ -352,7 +422,14 @@ export default function FacilityManagerDashboardPage() {
       >
         <form onSubmit={handleQuickCreateRequest}>
           <div style={{ marginBottom: "1rem" }}>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
               Subject / Issue *
             </label>
             <input
@@ -366,7 +443,14 @@ export default function FacilityManagerDashboardPage() {
           </div>
 
           <div style={{ marginBottom: "1rem" }}>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
               Description
             </label>
             <textarea
@@ -377,9 +461,23 @@ export default function FacilityManagerDashboardPage() {
             />
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "1rem",
+              marginBottom: "1rem",
+            }}
+          >
             <div>
-              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Category *
               </label>
               <select
@@ -397,7 +495,14 @@ export default function FacilityManagerDashboardPage() {
             </div>
 
             <div>
-              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Target Unit / Common Area *
               </label>
               <select
@@ -415,7 +520,14 @@ export default function FacilityManagerDashboardPage() {
           </div>
 
           <div>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
               Priority
             </label>
             <select

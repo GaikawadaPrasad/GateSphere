@@ -8,12 +8,30 @@ import type { AuditLog, AuditQueryParams } from "@/types/audit";
 import type { MaintenanceInvoice, Payment } from "@/types/billing";
 import type { Community, Gate, Tower, Floor, Unit } from "@/types/communities";
 import type { ServiceCategory, ServiceTicket } from "@/types/complaints";
-import type { FinancialStats, OverviewStats, ResidentStats, SecurityStats } from "@/types/dashboards";
+import type {
+  FinancialStats,
+  OverviewStats,
+  ResidentStats,
+  SecurityStats,
+  SuperAdminDashboardMetrics,
+} from "@/types/dashboards";
 import type { GateEvent, GuardRoster, PanicAlert } from "@/types/gate";
 import type { Permission, Role } from "@/types/rbac";
 import type { ResidentProfile } from "@/types/residents";
-import type { Staff, StaffAssignment, StaffAttendance, StaffCreate, CheckInPayload } from "@/types/staff";
-import type { Incident, IncidentAction, IncidentCreate, IncidentHistory, IncidentTransition } from "@/types/incidents";
+import type {
+  Staff,
+  StaffAssignment,
+  StaffAttendance,
+  StaffCreate,
+  CheckInPayload,
+} from "@/types/staff";
+import type {
+  Incident,
+  IncidentAction,
+  IncidentCreate,
+  IncidentHistory,
+  IncidentTransition,
+} from "@/types/incidents";
 import type { AppNotification, NotificationPreference } from "@/types/notifications";
 import type { AssistantQuickActionsResponse, AssistantResponse } from "@/types/assistant";
 
@@ -34,7 +52,12 @@ export class ApiError extends Error {
   code?: string;
   fields?: Record<string, string | string[]>;
 
-  constructor(status: number, message: string, code?: string, fields?: Record<string, string | string[]>) {
+  constructor(
+    status: number,
+    message: string,
+    code?: string,
+    fields?: Record<string, string | string[]>,
+  ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
@@ -62,20 +85,16 @@ export class ApiError extends Error {
 export function getActiveRole(): string | null {
   if (typeof window !== "undefined") {
     const pathname = window.location.pathname;
-    if (pathname.startsWith("/super-admin")) return "super_admin";
-    if (pathname.startsWith("/owner-tenant") || pathname.startsWith("/resident")) return "resident";
-    if (pathname.startsWith("/auditor")) return "auditor";
-    if (pathname.startsWith("/domestic-staff")) return "domestic_staff";
+    if (pathname.startsWith("/super-admin") || pathname.startsWith("/dashboard/super-admin")) return "super_admin";
+    if (pathname.startsWith("/owner-tenant") || pathname.startsWith("/resident") || pathname.startsWith("/dashboard/owner-tenant")) return "resident";
+    if (pathname.startsWith("/auditor") || pathname.startsWith("/dashboard/auditor")) return "auditor";
+    if (pathname.startsWith("/domestic-staff") || pathname.startsWith("/dashboard/domestic-staff")) return "domestic_staff";
     if (pathname.startsWith("/community-admin") || pathname.startsWith("/dashboard/community-admin")) return "community_admin";
     if (pathname.startsWith("/security-guard") || pathname.startsWith("/dashboard/security-guard")) return "security_guard";
     if (pathname.startsWith("/security-supervisor") || pathname.startsWith("/dashboard/security-supervisor")) return "security_supervisor";
-    if (pathname.startsWith("/dashboard/facility-manager")) return "facility_manager";
-    if (pathname.startsWith("/dashboard/association-committee")) return "association_committee";
-    if (pathname.startsWith("/dashboard/vendor-technician")) return "vendor_technician";
-    if (pathname.startsWith("/dashboard/super-admin")) return "super_admin";
-    if (pathname.startsWith("/dashboard/auditor")) return "auditor";
-    if (pathname.startsWith("/dashboard/domestic-staff")) return "domestic_staff";
-    if (pathname.startsWith("/dashboard/owner-tenant")) return "resident";
+    if (pathname.startsWith("/facility-manager") || pathname.startsWith("/dashboard/facility-manager")) return "facility_manager";
+    if (pathname.startsWith("/association-committee") || pathname.startsWith("/dashboard/association-committee")) return "association_committee";
+    if (pathname.startsWith("/vendor-technician") || pathname.startsWith("/dashboard/vendor-technician")) return "vendor_technician";
 
     const saved = localStorage.getItem("gatesphere_active_role");
     if (saved) return saved;
@@ -122,7 +141,12 @@ export function getCsrfToken(role?: string): string | null {
   // 1. If a role is explicitly given or found in context, search for that bucket
   const targetRole = role || getActiveRole();
   if (targetRole) {
-    const bucket = targetRole === "super_admin" ? "superadmin" : targetRole.includes("security") ? "security" : targetRole;
+    const bucket =
+      targetRole === "super_admin"
+        ? "superadmin"
+        : targetRole.includes("security")
+          ? "security"
+          : targetRole;
     if (cookies[`gatesphere_${bucket}_csrf`]) return cookies[`gatesphere_${bucket}_csrf`];
     if (cookies[`gatesphere_${targetRole}_csrf`]) return cookies[`gatesphere_${targetRole}_csrf`];
   }
@@ -149,7 +173,9 @@ export function getCsrfToken(role?: string): string | null {
 }
 
 function buildUrl(path: string, params?: Record<string, unknown>): string {
-  const normalizedPath = path.startsWith("/api") ? path : `/api/v1${path.startsWith("/") ? path : `/${path}`}`;
+  const normalizedPath = path.startsWith("/api")
+    ? path
+    : `/api/v1${path.startsWith("/") ? path : `/${path}`}`;
   if (!params || Object.keys(params).length === 0) return normalizedPath;
 
   const hasQuery = normalizedPath.includes("?");
@@ -196,7 +222,11 @@ async function handleResponse<T>(res: Response): Promise<T> {
   return json as unknown as T;
 }
 
-export async function apiGet<T>(path: string, params?: Record<string, unknown>, role?: string): Promise<T> {
+export async function apiGet<T>(
+  path: string,
+  params?: Record<string, unknown>,
+  role?: string,
+): Promise<T> {
   const url = buildUrl(path, params);
   const activeRole = role || getActiveRole();
   const headers: Record<string, string> = {
@@ -219,7 +249,7 @@ export async function apiSend<T>(
   path: string,
   body?: unknown,
   params?: Record<string, unknown>,
-  role?: string
+  role?: string,
 ): Promise<T> {
   const url = buildUrl(path, params);
   const activeRole = role || getActiveRole();
@@ -257,7 +287,7 @@ export async function apiSend<T>(
 export async function apiList<T>(
   path: string,
   params?: Record<string, unknown>,
-  role?: string
+  role?: string,
 ): Promise<{ items: T[]; meta?: PaginationMeta }> {
   const url = buildUrl(path, params);
   const activeRole = role || getActiveRole();
@@ -289,16 +319,27 @@ export async function apiList<T>(
 }
 
 export const api = {
-  get: <T>(path: string, params?: Record<string, unknown>, role?: string) => apiGet<T>(path, params, role),
-  post: <T>(path: string, body?: unknown, role?: string) => apiSend<T>("POST", path, body, undefined, role),
-  put: <T>(path: string, body?: unknown, role?: string) => apiSend<T>("PUT", path, body, undefined, role),
-  patch: <T>(path: string, body?: unknown, role?: string) => apiSend<T>("PATCH", path, body, undefined, role),
-  delete: <T>(path: string, params?: Record<string, unknown>, role?: string) => apiSend<T>("DELETE", path, undefined, params, role),
+  get: <T>(path: string, params?: Record<string, unknown>, role?: string) =>
+    apiGet<T>(path, params, role),
+  post: <T>(path: string, body?: unknown, role?: string) =>
+    apiSend<T>("POST", path, body, undefined, role),
+  put: <T>(path: string, body?: unknown, role?: string) =>
+    apiSend<T>("PUT", path, body, undefined, role),
+  patch: <T>(path: string, body?: unknown, role?: string) =>
+    apiSend<T>("PATCH", path, body, undefined, role),
+  delete: <T>(path: string, params?: Record<string, unknown>, role?: string) =>
+    apiSend<T>("DELETE", path, undefined, params, role),
 };
 
 export const authApi = {
   login: async (email: string, password: string, role?: string) => {
-    const user = await apiSend<CurrentUser>("POST", "/auth/login", { email, password, role }, undefined, role);
+    const user = await apiSend<CurrentUser>(
+      "POST",
+      "/auth/login",
+      { email, password, role },
+      undefined,
+      role,
+    );
     if (user?.active_role || user?.is_superadmin) {
       setActiveRole(user.active_role || (user.is_superadmin ? "super_admin" : null));
     }
@@ -319,16 +360,24 @@ export const communitiesApi = {
   list: (params?: { active?: boolean }) => apiGet<Community[]>("/communities", params),
   get: (id: string) => apiGet<Community>(`/communities/${id}`),
   create: (data: Partial<Community>) => apiSend<Community>("POST", "/communities", data),
-  update: (id: string, data: Partial<Community>) => apiSend<Community>("PUT", `/communities/${id}`, data),
+  update: (id: string, data: Partial<Community>) =>
+    apiSend<Community>("PATCH", `/communities/${id}`, data),
   delete: (id: string) => apiSend<void>("DELETE", `/communities/${id}`),
   towers: (communityId: string) => apiGet<Tower[]>(`/communities/${communityId}/towers`),
   gates: (communityId: string) => apiGet<Gate[]>(`/communities/${communityId}/gates`),
-  createTower: (communityId: string, data: { name: string; code: string; structure_type?: string; total_floors?: number }) =>
-    apiSend<Tower>("POST", `/communities/${communityId}/towers`, data),
+  createTower: (
+    communityId: string,
+    data: { name: string; code: string; structure_type?: string; total_floors?: number },
+  ) => apiSend<Tower>("POST", `/communities/${communityId}/towers`, data),
   createFloor: (data: { tower_id: string; floor_number: number; label?: string }) =>
     apiSend<Floor>("POST", "/communities/floors", data),
-  createUnit: (data: { floor_id: string; unit_number: string; unit_type?: string; bedrooms?: number; area_sqft?: number }) =>
-    apiSend<Unit>("POST", "/communities/units", data),
+  createUnit: (data: {
+    floor_id: string;
+    unit_number: string;
+    unit_type?: string;
+    bedrooms?: number;
+    area_sqft?: number;
+  }) => apiSend<Unit>("POST", "/communities/units", data),
   createGate: (communityId: string, data: { name: string; code: string; gate_type: string }) =>
     apiSend<Gate>("POST", `/communities/${communityId}/gates`, data),
   floors: (towerId: string) => apiGet<Floor[]>(`/communities/towers/${towerId}/floors`),
@@ -337,51 +386,94 @@ export const communitiesApi = {
 };
 
 export const dashboardsApi = {
+  superAdmin: () => apiGet<SuperAdminDashboardMetrics>("/dashboards/super-admin"),
   overview: (communityId?: string) =>
-    apiGet<OverviewStats>("/dashboards/overview", communityId ? { community_id: communityId } : undefined),
+    apiGet<OverviewStats>(
+      "/dashboards/overview",
+      communityId ? { community_id: communityId } : undefined,
+    ),
   security: (communityId?: string) =>
-    apiGet<SecurityStats>("/dashboards/security", communityId ? { community_id: communityId } : undefined),
+    apiGet<SecurityStats>(
+      "/dashboards/security",
+      communityId ? { community_id: communityId } : undefined,
+    ),
   financial: (communityId?: string) =>
-    apiGet<FinancialStats>("/dashboards/financial", communityId ? { community_id: communityId } : undefined),
+    apiGet<FinancialStats>(
+      "/dashboards/financial",
+      communityId ? { community_id: communityId } : undefined,
+    ),
   resident: (communityId?: string) =>
-    apiGet<ResidentStats>("/dashboards/resident", communityId ? { community_id: communityId } : undefined),
+    apiGet<ResidentStats>(
+      "/dashboards/resident",
+      communityId ? { community_id: communityId } : undefined,
+    ),
 };
 
 export const assistantApi = {
   quickActions: (communityId?: string) =>
-    apiGet<AssistantQuickActionsResponse>("/assistant/quick-actions", communityId ? { community_id: communityId } : undefined),
+    apiGet<AssistantQuickActionsResponse>(
+      "/assistant/quick-actions",
+      communityId ? { community_id: communityId } : undefined,
+    ),
   query: (query: string, communityId?: string) =>
     apiSend<AssistantResponse>("POST", "/assistant/query", { query, community_id: communityId }),
 };
 
 export const gateApi = {
-  events: (params?: ListQueryParams) => apiGet<GateEvent[]>("/gate/events", params as Record<string, unknown>),
-  alerts: (params?: ListQueryParams) => apiGet<PanicAlert[]>("/gate/alerts", params as Record<string, unknown>),
-  rosters: (params?: ListQueryParams) => apiGet<GuardRoster[]>("/gate/rosters", params as Record<string, unknown>),
-  triggerEmergency: (data: { alert_type: string; severity?: string; gate_id?: string; message?: string }) =>
-    apiSend<any>("POST", "/gate/alerts", data),
-  verifyPass: (tokenOrPin: string) => apiSend<any>("POST", "/gate/verify-pass", { token: tokenOrPin }),
-  recordEntry: (data: any) => apiSend<any>("POST", "/gate/events", { ...data, event_type: "entry" }),
+  events: (params?: ListQueryParams) =>
+    apiGet<GateEvent[]>("/gate/events", params as Record<string, unknown>),
+  alerts: (params?: ListQueryParams) =>
+    apiGet<PanicAlert[]>("/gate/alerts", params as Record<string, unknown>),
+  rosters: (params?: ListQueryParams) =>
+    apiGet<GuardRoster[]>("/gate/rosters", params as Record<string, unknown>),
+  triggerEmergency: (data: {
+    alert_type: string;
+    severity?: string;
+    gate_id?: string;
+    message?: string;
+  }) => apiSend<any>("POST", "/gate/alerts", data),
+  verifyPass: (tokenOrPin: string) =>
+    apiSend<any>("POST", "/gate/verify-pass", { token: tokenOrPin }),
+  recordEntry: (data: any) =>
+    apiSend<any>("POST", "/gate/events", { ...data, event_type: "entry" }),
   recordExit: (data: any) => apiSend<any>("POST", "/gate/events", { ...data, event_type: "exit" }),
-  acknowledgeAlert: (alertId: string) => apiSend<any>("POST", `/gate/alerts/${alertId}/acknowledge`),
+  acknowledgeAlert: (alertId: string) =>
+    apiSend<any>("POST", `/gate/alerts/${alertId}/acknowledge`),
   resolveAlert: (alertId: string, resolutionSummary?: string) =>
-    apiSend<any>("POST", `/gate/alerts/${alertId}/resolve`, { resolution_summary: resolutionSummary }),
+    apiSend<any>("POST", `/gate/alerts/${alertId}/resolve`, {
+      resolution_summary: resolutionSummary,
+    }),
   assignments: (params?: { gate_id?: string; active_only?: boolean }) =>
     apiGet<any[]>("/gate/assignments", params as Record<string, unknown>),
-  createAssignment: (data: { guard_user_id: string; gate_id: string; roster_id?: string; assigned_from?: string; assigned_to?: string }) =>
-    apiSend<any>("POST", "/gate/assignments", data),
+  createAssignment: (data: {
+    guard_user_id: string;
+    gate_id: string;
+    roster_id?: string;
+    assigned_from?: string;
+    assigned_to?: string;
+  }) => apiSend<any>("POST", "/gate/assignments", data),
   endAssignment: (assignmentId: string) =>
     apiSend<any>("POST", `/gate/assignments/${assignmentId}/end`),
-  createRoster: (data: { guard_user_id: string; shift_date: string; shift_start: string; shift_end: string; notes?: string }) =>
-    apiSend<any>("POST", "/gate/rosters", data),
+  createRoster: (data: {
+    guard_user_id: string;
+    shift_date: string;
+    shift_start: string;
+    shift_end: string;
+    notes?: string;
+  }) => apiSend<any>("POST", "/gate/rosters", data),
   transitionRoster: (rosterId: string, status: string, reason?: string) =>
     apiSend<any>("POST", `/gate/rosters/${rosterId}/status`, { status, reason }),
 };
 
 export const checkpointsApi = {
-  list: (params?: ListQueryParams) => apiGet<Record<string, unknown>[]>("/gate/assignments", params as Record<string, unknown>),
-  override: (data: { gate_id: string; reason: string; reference_type?: string; reference_id?: string }) =>
-    apiSend<Record<string, unknown>>("POST", "/gate/checkpoint-override", data),
+  list: (params?: ListQueryParams) =>
+    apiGet<Record<string, unknown>[]>("/gate/assignments", params as Record<string, unknown>),
+  override: (data: {
+    gate_id: string;
+    reason: string;
+    reference_type?: string;
+    reference_id?: string;
+  }) => apiSend<Record<string, unknown>>("POST", "/gate/checkpoint-override", data),
 };
 
 export const complaintsApi = {
@@ -390,9 +482,11 @@ export const complaintsApi = {
   list: (params?: ListQueryParams) =>
     apiGet<ServiceTicket[]>("/complaints/tickets", params as Record<string, unknown>),
   categories: (communityId?: string) =>
-    apiGet<ServiceCategory[]>("/complaints/categories", communityId ? { community_id: communityId } : undefined),
-  create: (data: any) =>
-    apiSend<any>("POST", "/complaints/tickets", data),
+    apiGet<ServiceCategory[]>(
+      "/complaints/categories",
+      communityId ? { community_id: communityId } : undefined,
+    ),
+  create: (data: any) => apiSend<any>("POST", "/complaints/tickets", data),
   assignVendor: (id: string, vendorName: string) =>
     apiSend<any>("POST", `/complaints/tickets/${id}/assign`, { vendor_name: vendorName }),
   updateStatus: (id: string, status: string, notes?: string) =>
@@ -412,10 +506,20 @@ export const billingApi = {
     apiGet<any>("/billing/rules", communityId ? { community_id: communityId } : undefined),
   unitLedger: (unitId: string, params?: ListQueryParams) =>
     apiGet<any[]>(`/billing/units/${unitId}/ledger`, params as Record<string, unknown>),
-  exportInvoicesCsv: (params?: string | Record<string, unknown> | { community_id?: string; invoice_status?: string }) =>
-    apiGet<string>("/billing/invoices/export", typeof params === "string" ? { community_id: params } : params as Record<string, unknown>),
+  exportInvoicesCsv: (params?: string | Record<string, unknown> | { community_id?: string; invoice_status?: string; status?: string }) => {
+    let queryParams: Record<string, unknown> = {};
+    if (typeof params === "string") {
+      queryParams = { community_id: params };
+    } else if (params && typeof params === "object") {
+      queryParams = { ...params };
+      if ("status" in queryParams && !("invoice_status" in queryParams)) {
+        queryParams.invoice_status = queryParams.status;
+      }
+    }
+    return apiGet<string>("/billing/invoices.csv", queryParams);
+  },
   exportPaymentsCsv: (params?: string | Record<string, unknown> | { community_id?: string }) =>
-    apiGet<string>("/billing/payments/export", typeof params === "string" ? { community_id: params } : params as Record<string, unknown>),
+    apiGet<string>("/billing/payments.csv", typeof params === "string" ? { community_id: params } : (params as Record<string, unknown>)),
 };
 
 export const assessmentsApi = {
@@ -423,7 +527,12 @@ export const assessmentsApi = {
     apiGet<any[]>("/billing/assessments", params as Record<string, unknown>),
   get: (id: string) => apiGet<any>(`/billing/assessments/${id}`),
   create: (payload: any, communityId?: string) =>
-    apiSend<any>("POST", "/billing/assessments", payload, communityId ? { community_id: communityId } : undefined),
+    apiSend<any>(
+      "POST",
+      "/billing/assessments",
+      payload,
+      communityId ? { community_id: communityId } : undefined,
+    ),
   approve: (id: string, notes?: string) =>
     apiSend<any>("POST", `/billing/assessments/${id}/approve`, { notes }),
   reject: (id: string, reason?: string) =>
@@ -432,34 +541,44 @@ export const assessmentsApi = {
 
 export const communicationApi = {
   announcements: (params?: any) =>
-    apiGet<any[]>("/communication/announcements", typeof params === "string" ? { community_id: params } : (params as Record<string, unknown>)),
-  getAnnouncement: (id: string) =>
-    apiGet<any>(`/communication/announcements/${id}`),
+    apiGet<any[]>(
+      "/communication/announcements",
+      typeof params === "string" ? { community_id: params } : (params as Record<string, unknown>),
+    ),
+  getAnnouncement: (id: string) => apiGet<any>(`/communication/announcements/${id}`),
   createAnnouncement: (data: any, communityId?: string) =>
-    apiSend<any>("POST", "/communication/announcements", data, communityId ? { community_id: communityId } : undefined),
+    apiSend<any>(
+      "POST",
+      "/communication/announcements",
+      data,
+      communityId ? { community_id: communityId } : undefined,
+    ),
   publishAnnouncement: (id: string) =>
     apiSend<any>("POST", `/communication/announcements/${id}/publish`),
   expireAnnouncement: (id: string) =>
     apiSend<any>("POST", `/communication/announcements/${id}/expire`),
   polls: (communityId?: string) =>
     apiGet<any[]>("/communication/polls", communityId ? { community_id: communityId } : undefined),
-  pollResults: (pollId: string) =>
-    apiGet<any>(`/communication/polls/${pollId}/results`),
-  createPoll: (data: any) =>
-    apiSend<any>("POST", "/communication/polls", data),
+  pollResults: (pollId: string) => apiGet<any>(`/communication/polls/${pollId}/results`),
+  createPoll: (data: any) => apiSend<any>("POST", "/communication/polls", data),
   votePoll: (pollId: string, optionId: string) =>
     apiSend<any>("POST", `/communication/polls/${pollId}/vote`, { option_id: optionId }),
   groups: (communityId?: string) =>
     apiGet<any[]>("/communication/groups", communityId ? { community_id: communityId } : undefined),
   createGroup: (data: any, communityId?: string) =>
-    apiSend<any>("POST", "/communication/groups", data, communityId ? { community_id: communityId } : undefined),
+    apiSend<any>(
+      "POST",
+      "/communication/groups",
+      data,
+      communityId ? { community_id: communityId } : undefined,
+    ),
 };
 
 export const auditApi = {
   logs: (params?: AuditQueryParams) =>
     apiGet<AuditLog[]>("/audit/logs", params as Record<string, unknown>),
   exportCsv: (params?: AuditQueryParams) =>
-    apiGet<string>("/audit/logs/export", params as Record<string, unknown>),
+    apiGet<string>("/audit/logs.csv", params as Record<string, unknown>),
 };
 
 export const rbacApi = {
@@ -472,62 +591,120 @@ export const residentsApi = {
     apiGet<ResidentProfile[]>("/residents", params as Record<string, unknown>),
   get: (id: string) => apiGet<ResidentProfile>(`/residents/${id}`),
   me: () => apiGet<Record<string, unknown>>("/residents/me"),
-  updateMe: (data: Record<string, unknown>) => apiSend<Record<string, unknown>>("PATCH", "/residents/me", data),
+  updateMe: (data: Record<string, unknown>) =>
+    apiSend<Record<string, unknown>>("PATCH", "/residents/me", data),
   occupancies: (unitId: string) => apiGet<any[]>(`/communities/units/${unitId}/occupancies`),
   family: (unitId: string) => apiGet<any[]>("/residents/family-members", { unit_id: unitId }),
   contacts: (profileId: string) => apiGet<any[]>(`/residents/${profileId}/emergency-contacts`),
-  moveRecords: (params?: { community_id?: string; move_status?: string; page?: number; page_size?: number }) =>
-    apiGet<any[]>("/residents/moves", params as Record<string, unknown>),
-  transitionMove: (moveId: string, data: { status: string; clearance_notes?: string; scheduled_at?: string }) =>
-    apiSend<any>("PATCH", `/residents/moves/${moveId}`, data),
+  moveRecords: (params?: {
+    community_id?: string;
+    move_status?: string;
+    page?: number;
+    page_size?: number;
+  }) => apiGet<any[]>("/residents/move-records", params as Record<string, unknown>),
+  transitionMove: (
+    moveId: string,
+    data: { status: string; clearance_notes?: string; scheduled_at?: string },
+  ) => apiSend<any>("PATCH", `/residents/move-records/${moveId}/status`, data),
   create: (data: Partial<ResidentProfile>, communityId?: string) =>
-    apiSend<ResidentProfile>("POST", "/residents", data, communityId ? { community_id: communityId } : undefined),
+    apiSend<ResidentProfile>(
+      "POST",
+      "/residents",
+      data,
+      communityId ? { community_id: communityId } : undefined,
+    ),
 };
 
 export const domesticStaffApi = {
   me: () => apiGet<Record<string, unknown>>("/domestic-staff/me"),
-  updateMe: (data: Record<string, unknown>) => apiSend<Record<string, unknown>>("PATCH", "/domestic-staff/me", data),
-  myAssignments: (params?: ListQueryParams) => apiGet<Record<string, unknown>[]>("/domestic-staff/me/assignments", params as Record<string, unknown>),
-  myAttendance: (params?: ListQueryParams) => apiGet<Record<string, unknown>[]>("/domestic-staff/me/attendance", params as Record<string, unknown>),
-  myVisits: (params?: ListQueryParams) => apiGet<Record<string, unknown>[]>("/domestic-staff/me/visits", params as Record<string, unknown>),
+  updateMe: (data: Record<string, unknown>) =>
+    apiSend<Record<string, unknown>>("PATCH", "/domestic-staff/me", data),
+  myAssignments: (params?: ListQueryParams) =>
+    apiGet<Record<string, unknown>[]>(
+      "/domestic-staff/me/assignments",
+      params as Record<string, unknown>,
+    ),
+  myAttendance: (params?: ListQueryParams) =>
+    apiGet<Record<string, unknown>[]>(
+      "/domestic-staff/me/attendance",
+      params as Record<string, unknown>,
+    ),
+  myVisits: (params?: ListQueryParams) =>
+    apiGet<Record<string, unknown>[]>(
+      "/domestic-staff/me/visits",
+      params as Record<string, unknown>,
+    ),
   list: (params?: { community_id?: string; q?: string; page?: number; page_size?: number }) =>
     apiGet<Staff[]>("/domestic-staff", params as Record<string, unknown>),
   get: (id: string) => apiGet<Staff>(`/domestic-staff/${id}`),
   assignments: (params?: { staff_id?: string; unit_id?: string; active_only?: boolean }) =>
     apiGet<StaffAssignment[]>("/domestic-staff/assignments", params as Record<string, unknown>),
-  attendance: (params?: { community_id?: string; staff_id?: string; open_only?: boolean; page?: number; page_size?: number }) =>
-    apiGet<StaffAttendance[]>("/domestic-staff/attendance", params as Record<string, unknown>),
+  attendance: (params?: {
+    community_id?: string;
+    staff_id?: string;
+    open_only?: boolean;
+    page?: number;
+    page_size?: number;
+  }) => apiGet<StaffAttendance[]>("/domestic-staff/attendance", params as Record<string, unknown>),
   create: (data: StaffCreate, communityId?: string) =>
-    apiSend<Staff>("POST", "/domestic-staff", data, communityId ? { community_id: communityId } : undefined),
+    apiSend<Staff>(
+      "POST",
+      "/domestic-staff",
+      data,
+      communityId ? { community_id: communityId } : undefined,
+    ),
   checkIn: (data: CheckInPayload | string) => {
     const payload = typeof data === "string" ? { staff_id: data } : data;
-    return apiSend<any>("POST", "/domestic-staff/attendance/check-in", payload as unknown as Record<string, unknown>);
+    return apiSend<any>(
+      "POST",
+      "/domestic-staff/attendance/check-in",
+      payload as unknown as Record<string, unknown>,
+    );
   },
-  checkOut: (attendanceId: string) => apiSend<any>("PATCH", `/domestic-staff/attendance/${attendanceId}/check-out`),
+  checkOut: (attendanceId: string) =>
+    apiSend<any>("PATCH", `/domestic-staff/attendance/${attendanceId}/check-out`),
 };
 
 export const staffApi = domesticStaffApi;
 
 export const blacklistApi = {
-  list: (params?: ListQueryParams) => apiGet<Record<string, unknown>[]>("/visitors/blacklist", params as Record<string, unknown>),
-  add: (data: Record<string, unknown>) => apiSend<Record<string, unknown>>("POST", "/visitors/blacklist", data),
+  list: (params?: ListQueryParams) =>
+    apiGet<Record<string, unknown>[]>("/visitors/blacklist", params as Record<string, unknown>),
+  add: (data: Record<string, unknown>) =>
+    apiSend<Record<string, unknown>>("POST", "/visitors/blacklist", data),
   remove: (id: string) => apiSend<void>("DELETE", `/visitors/blacklist/${id}`),
   check: (identifier: string) => apiGet<any>("/visitors/blacklist", { q: identifier }),
 };
 
 export const vendorTicketsApi = {
-  list: (params?: ListQueryParams) => apiGet<Record<string, unknown>[]>("/complaints/tickets", params as Record<string, unknown>),
+  list: (params?: ListQueryParams) =>
+    apiGet<Record<string, unknown>[]>("/complaints/tickets", params as Record<string, unknown>),
   get: (id: string) => apiGet<Record<string, unknown>>(`/complaints/tickets/${id}`),
-  updateStatus: (id: string, status: string, notes?: string) => apiSend<Record<string, unknown>>("POST", `/complaints/tickets/${id}/transition`, { status, remarks: notes }),
-  submitCompletion: (id: string, notes?: string) => apiSend<Record<string, unknown>>("POST", `/complaints/tickets/${id}/transition`, { status: "resolved", remarks: notes }),
-  getEntryPass: (id: string) => apiGet<Record<string, unknown>>(`/complaints/tickets/${id}/entry-pass`),
+  updateStatus: (id: string, status: string, notes?: string) =>
+    apiSend<Record<string, unknown>>("POST", `/complaints/tickets/${id}/transition`, {
+      status,
+      remarks: notes,
+    }),
+  submitCompletion: (id: string, notes?: string) =>
+    apiSend<Record<string, unknown>>("POST", `/complaints/tickets/${id}/transition`, {
+      status: "resolved",
+      remarks: notes,
+    }),
+  getEntryPass: (id: string) =>
+    apiGet<Record<string, unknown>>(`/complaints/tickets/${id}/entry-pass`),
 };
 
 export const amenitiesApi = {
-  list: (params?: ListQueryParams) => apiGet<Record<string, unknown>[]>("/amenities", params as Record<string, unknown>),
-  bookings: (params?: ListQueryParams) => apiGet<Record<string, unknown>[]>("/amenities/bookings", params as Record<string, unknown>),
-  book: (data: Record<string, unknown>) => apiSend<Record<string, unknown>>("POST", "/amenities/bookings", data),
-  cancelBooking: (id: string, reason?: string) => apiSend<Record<string, unknown>>("POST", `/amenities/bookings/${id}/cancel`, { reason: reason || "User cancelled" }),
+  list: (params?: ListQueryParams) =>
+    apiGet<Record<string, unknown>[]>("/amenities", params as Record<string, unknown>),
+  bookings: (params?: ListQueryParams) =>
+    apiGet<Record<string, unknown>[]>("/amenities/bookings", params as Record<string, unknown>),
+  book: (data: Record<string, unknown>) =>
+    apiSend<Record<string, unknown>>("POST", "/amenities/bookings", data),
+  cancelBooking: (id: string, reason?: string) =>
+    apiSend<Record<string, unknown>>("POST", `/amenities/bookings/${id}/cancel`, {
+      reason: reason || "User cancelled",
+    }),
   blockSlot: (amenityIdOrData: any, reason?: string) =>
     typeof amenityIdOrData === "string"
       ? apiSend<any>("POST", `/amenities/${amenityIdOrData}/blocks`, { reason })
@@ -536,65 +713,111 @@ export const amenitiesApi = {
 };
 
 export const facilitiesApi = {
-  list: (params?: ListQueryParams) => apiGet<any[]>("/amenities", params as Record<string, unknown>),
+  list: (params?: ListQueryParams) =>
+    apiGet<any[]>("/amenities", params as Record<string, unknown>),
   get: (id: string) => apiGet<any>(`/amenities/${id}`),
   create: (data: any) => apiSend<any>("POST", "/amenities", data),
-  updateStatus: (id: string, status: string) => apiSend<any>("PATCH", `/amenities/${id}`, { status }),
+  updateStatus: (id: string, status: string) =>
+    apiSend<any>("PATCH", `/amenities/${id}`, { status }),
 };
 
 export const maintenanceApi = {
-  list: (params?: ListQueryParams) => apiGet<any[]>("/complaints/tickets", params as Record<string, unknown>),
+  list: (params?: ListQueryParams) =>
+    apiGet<any[]>("/complaints/tickets", params as Record<string, unknown>),
   get: (id: string) => apiGet<any>(`/complaints/tickets/${id}`),
-  assignVendor: (id: string, vendorName: string) => apiSend<any>("POST", `/complaints/tickets/${id}/assign`, { vendor_name: vendorName }),
-  updateStatus: (id: string, status: string, notes?: string) => apiSend<any>("POST", `/complaints/tickets/${id}/transition`, { status, remarks: notes }),
+  assignVendor: (id: string, vendorName: string) =>
+    apiSend<any>("POST", `/complaints/tickets/${id}/assign`, { vendor_name: vendorName }),
+  updateStatus: (id: string, status: string, notes?: string) =>
+    apiSend<any>("POST", `/complaints/tickets/${id}/transition`, { status, remarks: notes }),
 };
 
 export const vendorsApi = {
-  list: (params?: ListQueryParams) => apiGet<any[]>("/users", { role: "vendor_technician", ...(params as any) }),
+  list: (params?: ListQueryParams) =>
+    apiGet<any[]>("/users", { role: "vendor_technician", ...(params as any) }),
   get: (id: string) => apiGet<any>(`/users/${id}`),
-  reviewCompletion: (id: string, review: any) => apiSend<any>("POST", `/users/${id}/review`, review),
+  reviewCompletion: (id: string, review: any) =>
+    apiSend<any>("POST", `/users/${id}/review`, review),
 };
 
 export const visitorsApi = {
-  list: (params?: ListQueryParams) => apiGet<Record<string, unknown>[]>("/visitors/entries", params as Record<string, unknown>),
-  requests: (params?: ListQueryParams) => apiGet<Record<string, unknown>[]>("/visitors/requests", params as Record<string, unknown>),
-  getRequest: (requestId: string) => apiGet<Record<string, unknown>>(`/visitors/requests/${requestId}`),
-  createRequest: (data: Record<string, unknown>) => apiSend<Record<string, unknown>>("POST", "/visitors/requests", data),
+  list: (params?: ListQueryParams) =>
+    apiGet<Record<string, unknown>[]>("/visitors/entries", params as Record<string, unknown>),
+  requests: (params?: ListQueryParams) =>
+    apiGet<Record<string, unknown>[]>("/visitors/requests", params as Record<string, unknown>),
+  getRequest: (requestId: string) =>
+    apiGet<Record<string, unknown>>(`/visitors/requests/${requestId}`),
+  createRequest: (data: Record<string, unknown>) =>
+    apiSend<Record<string, unknown>>("POST", "/visitors/requests", data),
   decideRequest: (requestId: string, decision: string, remarks?: string) =>
-    apiSend<Record<string, unknown>>("POST", `/visitors/requests/${requestId}/decision`, { decision, remarks }),
-  approve: (requestId: string, remarks?: string) => visitorsApi.decideRequest(requestId, "approved", remarks),
-  reject: (requestId: string, remarks?: string) => visitorsApi.decideRequest(requestId, "rejected", remarks),
-  createPass: (requestId: string, data?: Record<string, unknown>) => apiSend<Record<string, unknown>>("POST", `/visitors/requests/${requestId}/passes`, data || {}),
-  entries: (params?: ListQueryParams) => apiGet<Record<string, unknown>[]>("/visitors/entries", params as Record<string, unknown>),
+    apiSend<Record<string, unknown>>("POST", `/visitors/requests/${requestId}/decision`, {
+      decision,
+      remarks,
+    }),
+  approve: (requestId: string, remarks?: string) =>
+    visitorsApi.decideRequest(requestId, "approved", remarks),
+  reject: (requestId: string, remarks?: string) =>
+    visitorsApi.decideRequest(requestId, "rejected", remarks),
+  createPass: (requestId: string, data?: Record<string, unknown>) =>
+    apiSend<Record<string, unknown>>("POST", `/visitors/requests/${requestId}/passes`, data || {}),
+  entries: (params?: ListQueryParams) =>
+    apiGet<Record<string, unknown>[]>("/visitors/entries", params as Record<string, unknown>),
   // Recording an entry (by pass_token, pin, request_id, or visitor_id) IS the pass-verification step —
   // there is no separate /gate/verify-pass endpoint in the backend.
-  recordEntry: (data: { pass_token?: string; pin?: string; request_id?: string; visitor_id?: string; gate_id?: string; vehicle_number?: string }) =>
-    apiSend<Record<string, unknown>>("POST", "/visitors/entries", data),
-  recordExit: (entryId: string) => apiSend<Record<string, unknown>>("PATCH", `/visitors/entries/${entryId}/exit`),
+  recordEntry: (data: {
+    pass_token?: string;
+    pin?: string;
+    request_id?: string;
+    visitor_id?: string;
+    gate_id?: string;
+    vehicle_number?: string;
+  }) => apiSend<Record<string, unknown>>("POST", "/visitors/entries", data),
+  recordExit: (entryId: string) =>
+    apiSend<Record<string, unknown>>("PATCH", `/visitors/entries/${entryId}/exit`),
   directory: (params?: { community_id?: string; q?: string; page_size?: number }) =>
     apiGet<Record<string, unknown>[]>("/visitors", params as Record<string, unknown>),
 };
 
 export const deliveriesApi = {
-  list: (params?: ListQueryParams) => apiGet<Record<string, unknown>[]>("/deliveries", params as Record<string, unknown>),
-  create: (data: Record<string, unknown>) => apiSend<Record<string, unknown>>("POST", "/deliveries", data),
+  list: (params?: ListQueryParams) =>
+    apiGet<Record<string, unknown>[]>("/deliveries", params as Record<string, unknown>),
+  create: (data: Record<string, unknown>) =>
+    apiSend<Record<string, unknown>>("POST", "/deliveries", data),
   protocols: () => apiGet<Record<string, unknown>[]>("/deliveries/protocols"),
-  updateProtocol: (data: Record<string, unknown>) => apiSend<Record<string, unknown>>("PUT", "/deliveries/protocols", data),
-  recordArrival: (id: string, data?: { gate_id?: string; executive_name?: string; executive_phone?: string }) =>
-    apiSend<Record<string, unknown>>("POST", `/deliveries/${id}/arrival`, data || {}),
-  markDelivered: (id: string) => apiSend<Record<string, unknown>>("POST", `/deliveries/${id}/delivered`),
+  updateProtocol: (data: Record<string, unknown>) =>
+    apiSend<Record<string, unknown>>("PUT", "/deliveries/protocols", data),
+  recordArrival: (
+    id: string,
+    data?: { gate_id?: string; executive_name?: string; executive_phone?: string },
+  ) => apiSend<Record<string, unknown>>("POST", `/deliveries/${id}/arrival`, data || {}),
+  markDelivered: (id: string) =>
+    apiSend<Record<string, unknown>>("POST", `/deliveries/${id}/delivered`),
   cancel: (id: string) => apiSend<Record<string, unknown>>("POST", `/deliveries/${id}/cancel`),
 };
 
 export const vehiclesApi = {
-  list: (params?: ListQueryParams) => apiGet<Record<string, unknown>[]>("/vehicles", params as Record<string, unknown>),
-  allocations: (params?: ListQueryParams) => apiGet<Record<string, unknown>[]>("/vehicles/parking/allocations", params as Record<string, unknown>),
-  violations: (params?: ListQueryParams) => apiGet<Record<string, unknown>[]>("/vehicles/parking/violations", params as Record<string, unknown>),
+  list: (params?: ListQueryParams) =>
+    apiGet<Record<string, unknown>[]>("/vehicles", params as Record<string, unknown>),
+  allocations: (params?: ListQueryParams) =>
+    apiGet<Record<string, unknown>[]>(
+      "/vehicles/parking/allocations",
+      params as Record<string, unknown>,
+    ),
+  violations: (params?: ListQueryParams) =>
+    apiGet<Record<string, unknown>[]>(
+      "/vehicles/parking/violations",
+      params as Record<string, unknown>,
+    ),
 };
 
 export const incidentsApi = {
-  list: (params?: { community_id?: string; incident_status?: string; severity?: string; q?: string; page?: number; page_size?: number }) =>
-    apiGet<Incident[]>("/incidents", params as Record<string, unknown>),
+  list: (params?: {
+    community_id?: string;
+    incident_status?: string;
+    severity?: string;
+    q?: string;
+    page?: number;
+    page_size?: number;
+  }) => apiGet<Incident[]>("/incidents", params as Record<string, unknown>),
   get: (id: string) => apiGet<Incident>(`/incidents/${id}`),
   history: (id: string) => apiGet<IncidentHistory[]>(`/incidents/${id}/history`),
   actions: (id: string) => apiGet<IncidentAction[]>(`/incidents/${id}/actions`),
@@ -603,17 +826,16 @@ export const incidentsApi = {
     apiSend<Incident>("POST", `/incidents/${id}/transition`, payload),
   addAction: (id: string, payload: { action_type: string; details?: string }) =>
     apiSend<IncidentAction>("POST", `/incidents/${id}/actions`, payload),
-  resolve: (id: string, data: Record<string, unknown>) => apiSend<Incident>("PATCH", `/incidents/${id}/resolve`, data),
+  resolve: (id: string, data: Record<string, unknown>) =>
+    apiSend<Incident>("PATCH", `/incidents/${id}/resolve`, data),
 };
 
 export const notificationsApi = {
   list: (params?: { unread_only?: boolean; page?: number; page_size?: number }) =>
     apiGet<AppNotification[]>("/notifications", params as Record<string, unknown>),
-  markRead: (id: string) => apiSend<void>("PATCH", `/notifications/${id}/read`),
-  markAllRead: () => apiSend<void>("POST", "/notifications/mark-all-read"),
-  preferences: () => apiGet<NotificationPreference[]>("/notifications/preferences"),
-  setPreference: (data: Partial<NotificationPreference>) => apiSend<NotificationPreference>("PUT", "/notifications/preferences", data),
+  markRead: (id: string) => apiSend<void>("POST", `/notifications/${id}/read`),
+  markAllRead: () => apiSend<void>("POST", "/notifications/read-all"),
+  preferences: () => apiGet<NotificationPreference[]>("/notifications/me/preferences"),
+  setPreference: (data: Partial<NotificationPreference>) =>
+    apiSend<NotificationPreference>("PUT", "/notifications/me/preferences", data),
 };
-
-
-

@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, time
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from app.modules.notifications.models import CHANNELS, DELIVERY_STATUS
 
@@ -93,8 +93,18 @@ class NotificationRead(_Read):
     notification_type: str
     title: str
     message: str
-    reference_type: str | None
-    reference_id: uuid.UUID | None
+    reference_type: str | None = None
+    reference_id: uuid.UUID | None = None
     is_read: bool
-    read_at: datetime | None
+    read_at: datetime | None = None
     deliveries: list[DeliveryRead] = []
+
+    @computed_field
+    @property
+    def body(self) -> str:
+        return self.message
+
+    @computed_field
+    @property
+    def category(self) -> str:
+        return self.notification_type

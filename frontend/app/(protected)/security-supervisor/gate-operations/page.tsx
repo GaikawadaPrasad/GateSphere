@@ -28,7 +28,10 @@ export default function SecuritySupervisorGateOperationsPage() {
 
   const filteredEvents = events.filter((e) => {
     const ref = ((e as any).reference_type || "").toLowerCase();
-    const matchSearch = !search || ref.includes(search.toLowerCase()) || e.event_type.toLowerCase().includes(search.toLowerCase());
+    const matchSearch =
+      !search ||
+      ref.includes(search.toLowerCase()) ||
+      e.event_type.toLowerCase().includes(search.toLowerCase());
     const matchType = typeFilter === "all" || e.event_type === typeFilter;
     return matchSearch && matchType;
   });
@@ -38,7 +41,11 @@ export default function SecuritySupervisorGateOperationsPage() {
       <PageHeader
         title="Gate Operations Supervision"
         subtitle="Real-time monitoring of all recorded gate events across every gate"
-        breadcrumbs={[{ label: "GateSphere" }, { label: "Security Supervisor" }, { label: "Gate Operations" }]}
+        breadcrumbs={[
+          { label: "GateSphere" },
+          { label: "Security Supervisor" },
+          { label: "Gate Operations" },
+        ]}
       />
 
       <div className="card">
@@ -51,8 +58,12 @@ export default function SecuritySupervisorGateOperationsPage() {
           </div>
 
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-            <div style={{ width: 220 }}>
-              <SearchInput value={search} onChange={setSearch} placeholder="Search event/reference…" />
+            <div style={{ width: "100%", maxWidth: 220 }}>
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Search event/reference…"
+              />
             </div>
 
             <select
@@ -63,7 +74,9 @@ export default function SecuritySupervisorGateOperationsPage() {
             >
               <option value="all">All Event Types</option>
               {eventTypes.map((t) => (
-                <option key={t} value={t}>{t.replace(/_/g, " ")}</option>
+                <option key={t} value={t}>
+                  {t.replace(/_/g, " ")}
+                </option>
               ))}
             </select>
           </div>
@@ -88,7 +101,10 @@ export default function SecuritySupervisorGateOperationsPage() {
                 </tr>
               ) : filteredEvents.length === 0 ? (
                 <tr>
-                  <td colSpan={4} style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
+                  <td
+                    colSpan={4}
+                    style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
+                  >
                     No gate events matching filter.
                   </td>
                 </tr>

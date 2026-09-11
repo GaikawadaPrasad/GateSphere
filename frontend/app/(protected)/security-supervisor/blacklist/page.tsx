@@ -63,7 +63,11 @@ export default function SecuritySupervisorBlacklistPage() {
       <PageHeader
         title="Blacklist Registry & Restricted Entry"
         subtitle="Manage authorized security blacklist entries, monitor blocked entry attempts, and edit restriction reasons"
-        breadcrumbs={[{ label: "GateSphere" }, { label: "Security Supervisor" }, { label: "Blacklist" }]}
+        breadcrumbs={[
+          { label: "GateSphere" },
+          { label: "Security Supervisor" },
+          { label: "Blacklist" },
+        ]}
         actions={
           <button className="btn btn-danger" onClick={() => setIsAddModalOpen(true)}>
             🚫 Add to Blacklist
@@ -80,8 +84,12 @@ export default function SecuritySupervisorBlacklistPage() {
             </p>
           </div>
 
-          <div style={{ width: 220 }}>
-            <SearchInput value={search} onChange={setSearch} placeholder="Search name/phone/plate…" />
+          <div style={{ width: "100%", maxWidth: 220 }}>
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Search name/phone/plate…"
+            />
           </div>
         </div>
 
@@ -108,7 +116,10 @@ export default function SecuritySupervisorBlacklistPage() {
                 </tr>
               ) : filteredBlacklist.length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
+                  <td
+                    colSpan={8}
+                    style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
+                  >
                     No blacklist records found.
                   </td>
                 </tr>
@@ -121,7 +132,9 @@ export default function SecuritySupervisorBlacklistPage() {
                     <td style={{ maxWidth: 240 }}>{b.reason}</td>
                     <td>{b.added_by}</td>
                     <td>{b.date_added}</td>
-                    <td style={{ fontWeight: 600, color: "var(--danger)" }}>{b.attempts_count} attempts</td>
+                    <td style={{ fontWeight: 600, color: "var(--danger)" }}>
+                      {b.attempts_count} attempts
+                    </td>
                     <td>
                       <StatusBadge status={b.status} />
                     </td>
@@ -151,7 +164,14 @@ export default function SecuritySupervisorBlacklistPage() {
       >
         <form onSubmit={handleAddBlacklist}>
           <div style={{ marginBottom: "1rem" }}>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
               Full Name / Identifier *
             </label>
             <input
@@ -164,9 +184,23 @@ export default function SecuritySupervisorBlacklistPage() {
             />
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "1rem",
+              marginBottom: "1rem",
+            }}
+          >
             <div>
-              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Phone Number
               </label>
               <input
@@ -179,7 +213,14 @@ export default function SecuritySupervisorBlacklistPage() {
             </div>
 
             <div>
-              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Vehicle Plate Number
               </label>
               <input
@@ -193,7 +234,14 @@ export default function SecuritySupervisorBlacklistPage() {
           </div>
 
           <div>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
               Detailed Security Reason *
             </label>
             <textarea

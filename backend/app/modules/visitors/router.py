@@ -105,6 +105,7 @@ async def list_entries(
 
 
 @router.get("/entries.csv", dependencies=[EXPORT])
+@router.get("/entries/export", dependencies=[EXPORT])
 async def export_entries(
     community_id: uuid.UUID | None = None,
     entry_status: str | None = None,

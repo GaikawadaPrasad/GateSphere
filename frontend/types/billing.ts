@@ -1,4 +1,10 @@
-export type InvoiceStatus = "draft" | "posted" | "partially_paid" | "paid" | "overdue" | "cancelled";
+export type InvoiceStatus =
+  | "draft"
+  | "posted"
+  | "partially_paid"
+  | "paid"
+  | "overdue"
+  | "cancelled";
 
 export interface InvoiceItem {
   id: string;

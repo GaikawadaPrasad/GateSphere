@@ -9,8 +9,23 @@ import { formatDateTime } from "@/lib/utils";
 import type { Incident, IncidentType, IncidentSeverity, IncidentStatus } from "@/types/incidents";
 
 // Real backend enum (backend/app/modules/incidents/models.py)
-const INCIDENT_TYPES: IncidentType[] = ["medical", "fire", "theft", "suspicious", "breach", "other"];
-const INCIDENT_STATUSES: IncidentStatus[] = ["reported", "acknowledged", "responding", "contained", "resolved", "closed", "false_alarm"];
+const INCIDENT_TYPES: IncidentType[] = [
+  "medical",
+  "fire",
+  "theft",
+  "suspicious",
+  "breach",
+  "other",
+];
+const INCIDENT_STATUSES: IncidentStatus[] = [
+  "reported",
+  "acknowledged",
+  "responding",
+  "contained",
+  "resolved",
+  "closed",
+  "false_alarm",
+];
 
 export default function FacilityManagerIncidentsPage() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
@@ -78,7 +93,11 @@ export default function FacilityManagerIncidentsPage() {
       <PageHeader
         title="Facility Incidents"
         subtitle="Log operational incidents, record corrective actions, track severity and resolution"
-        breadcrumbs={[{ label: "GateSphere" }, { label: "Facility Manager" }, { label: "Incidents" }]}
+        breadcrumbs={[
+          { label: "GateSphere" },
+          { label: "Facility Manager" },
+          { label: "Incidents" },
+        ]}
         actions={
           <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
             ⚠️ Log Facility Incident
@@ -113,13 +132,23 @@ export default function FacilityManagerIncidentsPage() {
                 </tr>
               ) : loadError ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: "center", padding: "2rem", color: "var(--danger, #dc2626)" }}>
+                  <td
+                    colSpan={7}
+                    style={{
+                      textAlign: "center",
+                      padding: "2rem",
+                      color: "var(--danger, #dc2626)",
+                    }}
+                  >
                     {loadError}
                   </td>
                 </tr>
               ) : incidents.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
+                  <td
+                    colSpan={7}
+                    style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
+                  >
                     No incidents logged.
                   </td>
                 </tr>
@@ -127,7 +156,9 @@ export default function FacilityManagerIncidentsPage() {
                 incidents.map((inc) => (
                   <tr key={inc.id}>
                     <td style={{ fontWeight: 600 }}>{inc.incident_number}</td>
-                    <td style={{ textTransform: "capitalize" }}>{inc.incident_type.replace(/_/g, " ")}</td>
+                    <td style={{ textTransform: "capitalize" }}>
+                      {inc.incident_type.replace(/_/g, " ")}
+                    </td>
                     <td>
                       <StatusBadge status={inc.severity} />
                     </td>
@@ -140,7 +171,9 @@ export default function FacilityManagerIncidentsPage() {
                       <select
                         className="select-field"
                         value={inc.status}
-                        onChange={(e) => handleStatusChange(inc.id, e.target.value as IncidentStatus)}
+                        onChange={(e) =>
+                          handleStatusChange(inc.id, e.target.value as IncidentStatus)
+                        }
                         style={{ height: 28, fontSize: "0.75rem" }}
                       >
                         {INCIDENT_STATUSES.map((s) => (
@@ -168,7 +201,11 @@ export default function FacilityManagerIncidentsPage() {
             <button className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>
               Cancel
             </button>
-            <button className="btn btn-primary" onClick={handleCreateIncident} disabled={isSubmitting}>
+            <button
+              className="btn btn-primary"
+              onClick={handleCreateIncident}
+              disabled={isSubmitting}
+            >
               {isSubmitting ? "Logging…" : "Log Incident"}
             </button>
           </>
@@ -176,7 +213,14 @@ export default function FacilityManagerIncidentsPage() {
       >
         <form onSubmit={handleCreateIncident}>
           <div style={{ marginBottom: "1rem" }}>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
               Description *
             </label>
             <textarea
@@ -191,7 +235,14 @@ export default function FacilityManagerIncidentsPage() {
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
             <div>
-              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Type
               </label>
               <select
@@ -208,7 +259,14 @@ export default function FacilityManagerIncidentsPage() {
             </div>
 
             <div>
-              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Severity
               </label>
               <select
@@ -225,7 +283,14 @@ export default function FacilityManagerIncidentsPage() {
           </div>
 
           <div style={{ marginTop: "1rem" }}>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
               Specific Location
             </label>
             <input

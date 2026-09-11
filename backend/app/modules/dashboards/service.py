@@ -20,14 +20,16 @@ from app.core.tenancy import TenantScope
 from app.modules.amenities.models import AmenityBooking
 from app.modules.billing.models import MaintenanceInvoice, Payment
 from app.modules.communication.models import Announcement
-from app.modules.communities.models import Unit
+from app.modules.communities.models import Community, Tower, Unit
 from app.modules.complaints.models import ServiceTicket
+from app.modules.dashboards import schemas
 from app.modules.deliveries.models import Delivery
 from app.modules.domestic_staff.models import StaffAttendance
 from app.modules.gate.models import GateAssignment, PanicAlert
 from app.modules.incidents.models import SecurityIncident
+from app.modules.residents.access import actor_unit_scope
 from app.modules.residents.models import ResidentProfile, UnitOccupancy
-from app.modules.users.models import User
+from app.modules.users.models import Role, User, UserRole
 from app.modules.vehicles.models import VehicleEntry
 from app.modules.visitors.models import VisitorEntry, VisitorRequest
 
@@ -262,20 +264,173 @@ class DashboardService:
             return "security"
         return "admin"
 
+    async def super_admin_stats(self) -> schemas.SuperAdminDashboardStats:
+        communities = (
+            await self.db.scalars(select(Community).order_by(Community.created_at.desc()))
+        ).all()
+        total_comm = len(communities)
+        active_comm = [c for c in communities if c.is_active]
+        active_comm_count = len(active_comm)
+        inactive_comm_count = total_comm - active_comm_count
+
+        # 1. Total units and units per community
+        unit_counts_res = (
+            await self.db.execute(
+                select(Unit.community_id, func.count()).group_by(Unit.community_id)
+            )
+        ).all()
+        units_by_comm = {str(cid): cnt for cid, cnt in unit_counts_res if cid}
+        total_units = sum(units_by_comm.values())
+
+        # 2. Total residents and residents per community
+        res_counts_res = (
+            await self.db.execute(
+                select(ResidentProfile.community_id, func.count()).group_by(
+                    ResidentProfile.community_id
+                )
+            )
+        ).all()
+        res_by_comm = {str(cid): cnt for cid, cnt in res_counts_res if cid}
+        total_residents = sum(res_by_comm.values())
+
+        # 3. Towers per community
+        tower_counts_res = (
+            await self.db.execute(
+                select(Tower.community_id, func.count()).group_by(Tower.community_id)
+            )
+        ).all()
+        towers_by_comm = {str(cid): cnt for cid, cnt in tower_counts_res if cid}
+
+        # 4. Open complaints / tickets per community
+        ticket_counts_res = (
+            await self.db.execute(
+                select(ServiceTicket.community_id, func.count())
+                .where(ServiceTicket.status.in_(_OPEN_TICKET))
+                .group_by(ServiceTicket.community_id)
+            )
+        ).all()
+        tickets_by_comm = {str(cid): cnt for cid, cnt in ticket_counts_res if cid}
+        total_open_tickets = sum(tickets_by_comm.values())
+
+        # 5. Critical complaints
+        critical_complaints = await self._count(
+            ServiceTicket,
+            ServiceTicket.status.in_(_OPEN_TICKET),
+            ServiceTicket.priority == "critical",
+        )
+
+        # 6. Active gate traffic
+        visitors_inside = await self._count(VisitorEntry, VisitorEntry.status == "inside")
+        vehicles_inside = await self._count(VehicleEntry, VehicleEntry.status == "inside")
+        staff_inside = await self._count(StaffAttendance, StaffAttendance.check_out_at.is_(None))
+        active_gate_traffic = visitors_inside + vehicles_inside + staff_inside
+
+        # 7. Open incidents and panic alerts
+        open_incidents = await self._count(
+            SecurityIncident, SecurityIncident.status.in_(_OPEN_INCIDENT)
+        )
+        active_panic_alerts = await self._count(PanicAlert, PanicAlert.status == "active")
+
+        # 8. Financials
+        billed_by_comm_res = (
+            await self.db.execute(
+                select(
+                    MaintenanceInvoice.community_id,
+                    func.coalesce(func.sum(MaintenanceInvoice.total_amount), 0),
+                )
+                .where(MaintenanceInvoice.status != "draft")
+                .group_by(MaintenanceInvoice.community_id)
+            )
+        ).all()
+        billed_by_comm = {str(cid): val for cid, val in billed_by_comm_res if cid}
+        total_billed = sum(billed_by_comm.values()) if billed_by_comm else Decimal(0)
+
+        collected_by_comm_res = (
+            await self.db.execute(
+                select(Payment.community_id, func.coalesce(func.sum(Payment.amount), 0))
+                .where(Payment.payment_status == "success")
+                .group_by(Payment.community_id)
+            )
+        ).all()
+        collected_by_comm = {str(cid): val for cid, val in collected_by_comm_res if cid}
+        total_collected = sum(collected_by_comm.values()) if collected_by_comm else Decimal(0)
+
+        outstanding_by_comm_res = (
+            await self.db.execute(
+                select(
+                    MaintenanceInvoice.community_id,
+                    func.coalesce(func.sum(MaintenanceInvoice.balance_due), 0),
+                )
+                .where(MaintenanceInvoice.status.in_(("posted", "partially_paid", "overdue")))
+                .group_by(MaintenanceInvoice.community_id)
+            )
+        ).all()
+        outstanding_by_comm = {str(cid): val for cid, val in outstanding_by_comm_res if cid}
+        total_outstanding = sum(outstanding_by_comm.values()) if outstanding_by_comm else Decimal(0)
+
+        community_breakdown: dict[str, schemas.CommunityBreakdownItem] = {}
+        for c in communities:
+            cid_str = str(c.id)
+            c_units = units_by_comm.get(cid_str, 0)
+            c_res = res_by_comm.get(cid_str, 0)
+            c_occ = round((c_res / c_units) * 100) if c_units > 0 else 0
+            c_towers = towers_by_comm.get(cid_str, 0)
+            c_tickets = tickets_by_comm.get(cid_str, 0)
+            c_billed = float(billed_by_comm.get(cid_str, 0))
+            c_out = float(outstanding_by_comm.get(cid_str, 0))
+            fin_status = "Good"
+            if c_billed > 0:
+                ratio = c_out / c_billed
+                if ratio > 0.4:
+                    fin_status = "Critical"
+                elif ratio > 0.15:
+                    fin_status = "Attention"
+
+            community_breakdown[cid_str] = schemas.CommunityBreakdownItem(
+                totalUnits=c_units,
+                totalResidents=c_res,
+                occupancyRate=c_occ,
+                totalTowers=c_towers,
+                financialStatus=fin_status,
+                openTickets=c_tickets,
+            )
+
+        occupancy_rate = round((total_residents / total_units) * 100) if total_units > 0 else 0
+        collection_rate = (
+            round((float(total_collected) / float(total_billed)) * 100) if total_billed > 0 else 0
+        )
+
+        return schemas.SuperAdminDashboardStats(
+            totalCommunities=total_comm,
+            activeCommunities=active_comm_count,
+            inactiveCommunities=inactive_comm_count,
+            totalUnits=total_units,
+            totalResidents=total_residents,
+            occupancyRate=occupancy_rate,
+            activeGateTraffic=active_gate_traffic,
+            visitorsInside=visitors_inside,
+            vehiclesInside=vehicles_inside,
+            staffInside=staff_inside,
+            openComplaints=total_open_tickets,
+            criticalComplaints=critical_complaints,
+            activePanicAlerts=active_panic_alerts,
+            openIncidents=open_incidents,
+            totalBilled=Decimal(total_billed),
+            totalCollected=Decimal(total_collected),
+            totalOutstanding=Decimal(total_outstanding),
+            collectionRate=collection_rate,
+            communityBreakdown=community_breakdown,
+        )
+
     # -- assistant / chatbot (backward-compatible delegate) --- #
-    async def assistant_quick_actions(
-        self, community_id: uuid.UUID | None
-    ):
+    async def assistant_quick_actions(self, community_id: uuid.UUID | None):
         from app.modules.assistant.service import AssistantService
 
         svc = AssistantService(self.db, self.scope, self.actor, self.ctx)
         return await svc.quick_actions(community_id)
 
-    async def assistant_query(
-        self, community_id: uuid.UUID | None, query: str
-    ):
+    async def assistant_query(self, community_id: uuid.UUID | None, query: str):
         from app.modules.assistant.service import AssistantService
 
         svc = AssistantService(self.db, self.scope, self.actor, self.ctx)
         return await svc.query(community_id, query)
-

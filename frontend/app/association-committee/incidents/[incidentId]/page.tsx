@@ -31,7 +31,11 @@ export default function SecurityIncidentDetailPage() {
         <p style={{ marginTop: "0.5rem", color: "var(--muted)" }}>
           The requested security incident record could not be found.
         </p>
-        <Link href="/association-committee/incidents" className="btn btn-primary" style={{ marginTop: "1rem" }}>
+        <Link
+          href="/association-committee/incidents"
+          className="btn btn-primary"
+          style={{ marginTop: "1rem" }}
+        >
           ← Back to Incident List
         </Link>
       </div>
@@ -57,20 +61,33 @@ export default function SecurityIncidentDetailPage() {
         }
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "1.5rem" }} className="responsive-grid">
+      <div className="responsive-grid">
         {/* Left Column: Incident Details, Description, Actions Log */}
         <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
           {/* Main Info Card */}
           <div className="card">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "1rem",
+              }}
+            >
               <div style={{ fontSize: "1rem", fontWeight: 700, color: "var(--fg)" }}>
                 Incident Classification & Status
               </div>
               <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
                 <span
                   style={{
-                    background: incident.severity === "critical" || incident.severity === "high" ? "#fee2e2" : "#f1f5f9",
-                    color: incident.severity === "critical" || incident.severity === "high" ? "#991b1b" : "#475569",
+                    background:
+                      incident.severity === "critical" || incident.severity === "high"
+                        ? "#fee2e2"
+                        : "#f1f5f9",
+                    color:
+                      incident.severity === "critical" || incident.severity === "high"
+                        ? "#991b1b"
+                        : "#475569",
                     fontSize: "0.75rem",
                     fontWeight: 700,
                     padding: "0.2rem 0.6rem",
@@ -84,30 +101,68 @@ export default function SecurityIncidentDetailPage() {
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "1rem", fontSize: "0.875rem", marginBottom: "1rem" }}>
-              <div style={{ padding: "0.75rem", background: "#f8fafc", borderRadius: "var(--radius-sm)" }}>
-                <span style={{ color: "var(--muted)", fontSize: "0.775rem" }}>Incident Category</span>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(2, 1fr)",
+                gap: "1rem",
+                fontSize: "0.875rem",
+                marginBottom: "1rem",
+              }}
+            >
+              <div
+                style={{
+                  padding: "0.75rem",
+                  background: "#f8fafc",
+                  borderRadius: "var(--radius-sm)",
+                }}
+              >
+                <span style={{ color: "var(--muted)", fontSize: "0.775rem" }}>
+                  Incident Category
+                </span>
                 <div style={{ fontWeight: 600, textTransform: "capitalize", marginTop: "0.2rem" }}>
                   {incident.incident_type}
                 </div>
               </div>
 
-              <div style={{ padding: "0.75rem", background: "#f8fafc", borderRadius: "var(--radius-sm)" }}>
+              <div
+                style={{
+                  padding: "0.75rem",
+                  background: "#f8fafc",
+                  borderRadius: "var(--radius-sm)",
+                }}
+              >
                 <span style={{ color: "var(--muted)", fontSize: "0.775rem" }}>Location</span>
                 <div style={{ fontWeight: 600, marginTop: "0.2rem" }}>
                   {incident.location_text || "Community Common Area"}
                 </div>
               </div>
 
-              <div style={{ padding: "0.75rem", background: "#f8fafc", borderRadius: "var(--radius-sm)" }}>
-                <span style={{ color: "var(--muted)", fontSize: "0.775rem" }}>Reported Timestamp</span>
+              <div
+                style={{
+                  padding: "0.75rem",
+                  background: "#f8fafc",
+                  borderRadius: "var(--radius-sm)",
+                }}
+              >
+                <span style={{ color: "var(--muted)", fontSize: "0.775rem" }}>
+                  Reported Timestamp
+                </span>
                 <div style={{ fontWeight: 600, marginTop: "0.2rem" }}>
                   {formatDate(incident.reported_at)}
                 </div>
               </div>
 
-              <div style={{ padding: "0.75rem", background: "#f8fafc", borderRadius: "var(--radius-sm)" }}>
-                <span style={{ color: "var(--muted)", fontSize: "0.775rem" }}>Resolution Timestamp</span>
+              <div
+                style={{
+                  padding: "0.75rem",
+                  background: "#f8fafc",
+                  borderRadius: "var(--radius-sm)",
+                }}
+              >
+                <span style={{ color: "var(--muted)", fontSize: "0.775rem" }}>
+                  Resolution Timestamp
+                </span>
                 <div style={{ fontWeight: 600, marginTop: "0.2rem" }}>
                   {incident.resolved_at ? formatDate(incident.resolved_at) : "Pending Resolution"}
                 </div>
@@ -116,7 +171,14 @@ export default function SecurityIncidentDetailPage() {
 
             {/* Description */}
             <div style={{ borderTop: "1px solid var(--border)", paddingTop: "1rem" }}>
-              <h3 style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--fg)", marginBottom: "0.4rem" }}>
+              <h3
+                style={{
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  color: "var(--fg)",
+                  marginBottom: "0.4rem",
+                }}
+              >
                 Incident Description & Details
               </h3>
               <p style={{ fontSize: "0.875rem", lineHeight: 1.6, color: "var(--fg-secondary)" }}>
@@ -126,8 +188,21 @@ export default function SecurityIncidentDetailPage() {
 
             {/* Resolution Summary */}
             {incident.resolution_summary && (
-              <div style={{ borderTop: "1px solid var(--border)", paddingTop: "1rem", marginTop: "1rem" }}>
-                <h3 style={{ fontSize: "0.85rem", fontWeight: 600, color: "#059669", marginBottom: "0.4rem" }}>
+              <div
+                style={{
+                  borderTop: "1px solid var(--border)",
+                  paddingTop: "1rem",
+                  marginTop: "1rem",
+                }}
+              >
+                <h3
+                  style={{
+                    fontSize: "0.85rem",
+                    fontWeight: 600,
+                    color: "#059669",
+                    marginBottom: "0.4rem",
+                  }}
+                >
                   Resolution Summary
                 </h3>
                 <p style={{ fontSize: "0.875rem", lineHeight: 1.6, color: "var(--fg-secondary)" }}>
@@ -161,8 +236,21 @@ export default function SecurityIncidentDetailPage() {
                       borderRadius: "var(--radius-sm)",
                     }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontWeight: 600, fontSize: "0.825rem", color: "var(--fg)", textTransform: "capitalize" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontWeight: 600,
+                          fontSize: "0.825rem",
+                          color: "var(--fg)",
+                          textTransform: "capitalize",
+                        }}
+                      >
                         Action: {act.action_type.replace(/_/g, " ")}
                       </span>
                       <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
@@ -170,7 +258,13 @@ export default function SecurityIncidentDetailPage() {
                       </span>
                     </div>
                     {act.details && (
-                      <div style={{ fontSize: "0.825rem", color: "var(--fg-secondary)", marginTop: "0.35rem" }}>
+                      <div
+                        style={{
+                          fontSize: "0.825rem",
+                          color: "var(--fg-secondary)",
+                          marginTop: "0.35rem",
+                        }}
+                      >
                         {act.details}
                       </div>
                     )}
@@ -196,9 +290,19 @@ export default function SecurityIncidentDetailPage() {
                 Initial status: <StatusBadge status={incident.status} />
               </div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "1rem", position: "relative" }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "1rem",
+                  position: "relative",
+                }}
+              >
                 {history.map((h, i) => (
-                  <div key={h.id || i} style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start" }}>
+                  <div
+                    key={h.id || i}
+                    style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start" }}
+                  >
                     <div
                       style={{
                         width: 10,
@@ -211,13 +315,26 @@ export default function SecurityIncidentDetailPage() {
                     />
                     <div>
                       <div style={{ fontSize: "0.825rem", fontWeight: 600, color: "var(--fg)" }}>
-                        Status changed to <span style={{ textTransform: "capitalize" }}>{h.new_status}</span>
+                        Status changed to{" "}
+                        <span style={{ textTransform: "capitalize" }}>{h.new_status}</span>
                       </div>
-                      <div style={{ fontSize: "0.725rem", color: "var(--muted)", marginTop: "0.15rem" }}>
+                      <div
+                        style={{
+                          fontSize: "0.725rem",
+                          color: "var(--muted)",
+                          marginTop: "0.15rem",
+                        }}
+                      >
                         {formatDate(h.changed_at || h.created_at)}
                       </div>
                       {h.reason && (
-                        <div style={{ fontSize: "0.775rem", color: "var(--fg-secondary)", marginTop: "0.2rem" }}>
+                        <div
+                          style={{
+                            fontSize: "0.775rem",
+                            color: "var(--fg-secondary)",
+                            marginTop: "0.2rem",
+                          }}
+                        >
                           Reason: {h.reason}
                         </div>
                       )}
@@ -230,11 +347,19 @@ export default function SecurityIncidentDetailPage() {
 
           {/* Governance Oversight Note */}
           <div className="card" style={{ background: "#f5f3ff", border: "1px solid #ddd6fe" }}>
-            <h3 style={{ fontSize: "0.875rem", fontWeight: 700, color: "#6d28d9", marginBottom: "0.4rem" }}>
+            <h3
+              style={{
+                fontSize: "0.875rem",
+                fontWeight: 700,
+                color: "#6d28d9",
+                marginBottom: "0.4rem",
+              }}
+            >
               ⚖️ Committee Audit Note
             </h3>
             <p style={{ fontSize: "0.8rem", color: "#5b21b6", lineHeight: 1.5 }}>
-              Security incident reviews are retained for statutory community reporting, insurance claims, and annual security audits (NFR-COMP-02).
+              Security incident reviews are retained for statutory community reporting, insurance
+              claims, and annual security audits (NFR-COMP-02).
             </p>
           </div>
         </div>

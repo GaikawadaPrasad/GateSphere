@@ -33,10 +33,18 @@ export function useAuditorOverview(communityId?: string | null) {
     queryKey: ["auditor", "overview", communityId],
     queryFn: async () => {
       const [overview, financial, logs, incidents] = await Promise.all([
-        api.get<any>(`/dashboards/overview${communityId ? `?community_id=${communityId}` : ""}`).catch(() => ({})),
-        api.get<any>(`/dashboards/financial${communityId ? `?community_id=${communityId}` : ""}`).catch(() => ({})),
-        api.get<any[]>(`/audit/logs${communityId ? `?community_id=${communityId}` : ""}`).catch(() => []),
-        api.get<any[]>(`/incidents${communityId ? `?community_id=${communityId}` : ""}`).catch(() => []),
+        api
+          .get<any>(`/dashboards/overview${communityId ? `?community_id=${communityId}` : ""}`)
+          .catch(() => ({})),
+        api
+          .get<any>(`/dashboards/financial${communityId ? `?community_id=${communityId}` : ""}`)
+          .catch(() => ({})),
+        api
+          .get<any[]>(`/audit/logs${communityId ? `?community_id=${communityId}` : ""}`)
+          .catch(() => []),
+        api
+          .get<any[]>(`/incidents${communityId ? `?community_id=${communityId}` : ""}`)
+          .catch(() => []),
       ]);
 
       const totalActions = Array.isArray(logs) ? logs.length : 0;
@@ -86,7 +94,9 @@ export function useAuditorLogs(filters: {
         entity_type: l.entity_type || "record",
         entity_id: l.entity_id || l.id,
         actor_user_id: l.user_id,
-        actor_email: l.actor_email || (l.role_slug ? `${l.role_slug}@gatesphere.com` : "system@gatesphere.com"),
+        actor_email:
+          l.actor_email ||
+          (l.role_slug ? `${l.role_slug}@gatesphere.com` : "system@gatesphere.com"),
         actor_role: l.role_slug || "system",
         community_id: l.community_id,
         changes: l.new_values || l.changes || {},
@@ -100,18 +110,27 @@ export function useAuditorGateActivity(communityId?: string | null) {
   return useQuery({
     queryKey: ["auditor", "gate-activity", communityId],
     queryFn: async () => {
-      const res = await api.get<any[]>(`/gate/events${communityId ? `?community_id=${communityId}` : ""}`);
+      const res = await api.get<any[]>(
+        `/gate/events${communityId ? `?community_id=${communityId}` : ""}`,
+      );
       if (!Array.isArray(res)) return [];
       return res.map((e: any) => ({
         id: e.id,
         occurred_at: e.occurred_at || e.created_at,
         event_type: e.event_type || "GATE_EVENT",
-        gate_name: e.gate_id ? `Gate Checkpoint (${e.gate_id.slice(0, 4)})` : "Main Gate Checkpoint",
+        gate_name: e.gate_id
+          ? `Gate Checkpoint (${e.gate_id.slice(0, 4)})`
+          : "Main Gate Checkpoint",
         actor_name: e.actor_user_id ? "On-Duty Guard" : "Automated Sensor",
-        person_type: e.reference_type ? e.reference_type.replace('_', ' ').toUpperCase() : "Visitor / Vehicle",
-        reference_code: e.reference_id ? `REF-${e.reference_id.slice(0, 6)}` : `EV-${e.id.slice(0, 6)}`,
+        person_type: e.reference_type
+          ? e.reference_type.replace("_", " ").toUpperCase()
+          : "Visitor / Vehicle",
+        reference_code: e.reference_id
+          ? `REF-${e.reference_id.slice(0, 6)}`
+          : `EV-${e.id.slice(0, 6)}`,
         status: "Normal",
-        anomaly_flag: e.event_type?.includes("override") || e.event_type?.includes("denied") || false,
+        anomaly_flag:
+          e.event_type?.includes("override") || e.event_type?.includes("denied") || false,
       }));
     },
   });
@@ -121,7 +140,9 @@ export function useAuditorVisitorRecords(communityId?: string | null) {
   return useQuery({
     queryKey: ["auditor", "visitor-records", communityId],
     queryFn: async () => {
-      const res = await api.get<any[]>(`/visitors/requests${communityId ? `?community_id=${communityId}` : ""}`);
+      const res = await api.get<any[]>(
+        `/visitors/requests${communityId ? `?community_id=${communityId}` : ""}`,
+      );
       if (!Array.isArray(res)) return [];
       return res.map((r: any) => ({
         id: r.id,
@@ -143,7 +164,9 @@ export function useAuditorFinancialLedger(communityId?: string | null) {
   return useQuery({
     queryKey: ["auditor", "financial", communityId],
     queryFn: async () => {
-      const invoices = await api.get<any[]>(`/billing/invoices${communityId ? `?community_id=${communityId}` : ""}`);
+      const invoices = await api.get<any[]>(
+        `/billing/invoices${communityId ? `?community_id=${communityId}` : ""}`,
+      );
       if (!Array.isArray(invoices)) return [];
       return invoices.map((inv: any) => ({
         id: inv.id,
@@ -165,7 +188,9 @@ export function useAuditorComplaints(communityId?: string | null) {
   return useQuery({
     queryKey: ["auditor", "complaints", communityId],
     queryFn: async () => {
-      const res = await api.get<any[]>(`/complaints/tickets${communityId ? `?community_id=${communityId}` : ""}`);
+      const res = await api.get<any[]>(
+        `/complaints/tickets${communityId ? `?community_id=${communityId}` : ""}`,
+      );
       if (!Array.isArray(res)) return [];
       return res.map((t: any) => ({
         id: t.id,
@@ -184,12 +209,16 @@ export function useAuditorVendors(communityId?: string | null) {
   return useQuery({
     queryKey: ["auditor", "vendors", communityId],
     queryFn: async () => {
-      const res = await api.get<any[]>(`/domestic-staff${communityId ? `?community_id=${communityId}` : ""}`);
+      const res = await api.get<any[]>(
+        `/domestic-staff${communityId ? `?community_id=${communityId}` : ""}`,
+      );
       if (!Array.isArray(res)) return [];
       return res.map((s: any) => ({
         id: s.id,
         vendor_name: s.full_name,
-        contract_scope: s.staff_type ? `${s.staff_type.toUpperCase()} Operations` : "General Services",
+        contract_scope: s.staff_type
+          ? `${s.staff_type.toUpperCase()} Operations`
+          : "General Services",
         technician: s.phone,
         passes_issued: `STF-${s.id.slice(0, 6)}`,
         verification_status: s.police_verification_status || "verified",
@@ -202,7 +231,9 @@ export function useAuditorIncidents(communityId?: string | null) {
   return useQuery({
     queryKey: ["auditor", "incidents", communityId],
     queryFn: async () => {
-      const res = await api.get<any[]>(`/incidents${communityId ? `?community_id=${communityId}` : ""}`);
+      const res = await api.get<any[]>(
+        `/incidents${communityId ? `?community_id=${communityId}` : ""}`,
+      );
       if (!Array.isArray(res)) return [];
       return res.map((inc: any) => ({
         id: inc.incident_number || `INC-${inc.id.slice(0, 6)}`,

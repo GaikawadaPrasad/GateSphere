@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 import { useUiStore } from "@/store/ui";
-import { useResidents, useMoveRecords, useTransitionMoveRecord, useEmergencyContacts } from "@/hooks/use-residents";
+import {
+  useResidents,
+  useMoveRecords,
+  useTransitionMoveRecord,
+  useEmergencyContacts,
+} from "@/hooks/use-residents";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { FilterPanel } from "@/components/common/FilterPanel";
@@ -19,11 +24,19 @@ export default function CommunityAdminResidentsPage() {
   const [selectedResident, setSelectedResident] = useState<ResidentProfile | null>(null);
 
   // Queries
-  const { data: residents, isLoading: residentsLoading, refetch: refetchResidents } = useResidents({
+  const {
+    data: residents,
+    isLoading: residentsLoading,
+    refetch: refetchResidents,
+  } = useResidents({
     community_id: activeCommunityId || undefined,
   });
 
-  const { data: moveRecords, isLoading: movesLoading, refetch: refetchMoves } = useMoveRecords({
+  const {
+    data: moveRecords,
+    isLoading: movesLoading,
+    refetch: refetchMoves,
+  } = useMoveRecords({
     community_id: activeCommunityId || undefined,
   });
 
@@ -87,7 +100,9 @@ export default function CommunityAdminResidentsPage() {
       render: (r) => (
         <div>
           <strong>{r.full_name}</strong>
-          <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>{r.email || r.phone || "–"}</div>
+          <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+            {r.email || r.phone || "–"}
+          </div>
         </div>
       ),
     },
@@ -105,15 +120,18 @@ export default function CommunityAdminResidentsPage() {
       key: "resident_type",
       header: "Occupancy Type",
       render: (r) => (
-        <span className={`badge ${r.resident_type === "owner" ? "badge-primary" : "badge-neutral"}`} style={{ textTransform: "capitalize" }}>
-          {r.resident_type?.replace("_", " ")}
+        <span
+          className={`badge ${(r.resident_type || (r as any).occupancy_role || "")?.includes("owner") ? "badge-primary" : "badge-neutral"}`}
+          style={{ textTransform: "capitalize" }}
+        >
+          {(r.resident_type || (r as any).occupancy_role || "Resident")?.replace("_", " ")}
         </span>
       ),
     },
     {
       key: "status",
       header: "Status",
-      render: (r) => <StatusBadge status={r.status || "active"} />,
+      render: (r) => <StatusBadge status={r.status || (r as any).profile_status || "active"} />,
     },
     {
       key: "actions",
@@ -144,13 +162,20 @@ export default function CommunityAdminResidentsPage() {
     {
       key: "unit",
       header: "Unit",
-      render: (m) => <span>Unit {m.unit_number || "–"} ({m.tower_name || "Tower"})</span>,
+      render: (m) => (
+        <span>
+          Unit {m.unit_number || "–"} ({m.tower_name || "Tower"})
+        </span>
+      ),
     },
     {
       key: "move_type",
       header: "Move Type",
       render: (m) => (
-        <span className={`badge ${m.move_type === "move_in" ? "badge-success" : "badge-warning"}`} style={{ textTransform: "uppercase", fontSize: "0.7rem" }}>
+        <span
+          className={`badge ${m.move_type === "move_in" ? "badge-success" : "badge-warning"}`}
+          style={{ textTransform: "uppercase", fontSize: "0.7rem" }}
+        >
           {m.move_type === "move_in" ? "📥 Move-In" : "📤 Move-Out"}
         </span>
       ),
@@ -194,11 +219,13 @@ export default function CommunityAdminResidentsPage() {
       r.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       r.unit_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       r.email?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = !statusFilter || r.status === statusFilter;
+    const status = r.status || (r as any).profile_status;
+    const matchesStatus = !statusFilter || status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
-  const pendingApprovalsCount = moveRecords?.filter((m) => m.status === "requested" || m.status === "scheduled").length || 0;
+  const pendingApprovalsCount =
+    moveRecords?.filter((m) => m.status === "requested" || m.status === "scheduled").length || 0;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.75rem" }}>
@@ -219,7 +246,8 @@ export default function CommunityAdminResidentsPage() {
             fontSize: "0.95rem",
             fontWeight: activeTab === "directory" ? 700 : 500,
             color: activeTab === "directory" ? "var(--primary)" : "var(--muted)",
-            borderBottom: activeTab === "directory" ? "2px solid var(--primary)" : "2px solid transparent",
+            borderBottom:
+              activeTab === "directory" ? "2px solid var(--primary)" : "2px solid transparent",
             cursor: "pointer",
           }}
         >
@@ -236,7 +264,8 @@ export default function CommunityAdminResidentsPage() {
             fontSize: "0.95rem",
             fontWeight: activeTab === "approvals" ? 700 : 500,
             color: activeTab === "approvals" ? "var(--primary)" : "var(--muted)",
-            borderBottom: activeTab === "approvals" ? "2px solid var(--primary)" : "2px solid transparent",
+            borderBottom:
+              activeTab === "approvals" ? "2px solid var(--primary)" : "2px solid transparent",
             cursor: "pointer",
             display: "flex",
             alignItems: "center",
@@ -245,7 +274,16 @@ export default function CommunityAdminResidentsPage() {
         >
           <span>📦 Move Approvals</span>
           {pendingApprovalsCount > 0 && (
-            <span style={{ background: "#f59e0b", color: "white", fontSize: "0.7rem", padding: "0.1rem 0.45rem", borderRadius: "var(--radius-full)", fontWeight: 700 }}>
+            <span
+              style={{
+                background: "#f59e0b",
+                color: "white",
+                fontSize: "0.7rem",
+                padding: "0.1rem 0.45rem",
+                borderRadius: "var(--radius-full)",
+                fontWeight: 700,
+              }}
+            >
               {pendingApprovalsCount}
             </span>
           )}
@@ -294,11 +332,23 @@ export default function CommunityAdminResidentsPage() {
       <Modal
         isOpen={Boolean(selectedResident)}
         onClose={() => setSelectedResident(null)}
-        title={selectedResident ? `Resident Profile: ${selectedResident.full_name}` : "Resident Details"}
+        title={
+          selectedResident ? `Resident Profile: ${selectedResident.full_name}` : "Resident Details"
+        }
       >
         {selectedResident && (
           <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", background: "#f8fafc", padding: "1rem", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "1rem",
+                background: "#f8fafc",
+                padding: "1rem",
+                borderRadius: "var(--radius-sm)",
+                border: "1px solid var(--border)",
+              }}
+            >
               <div>
                 <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Occupancy Type</div>
                 <div style={{ fontWeight: 600, textTransform: "capitalize", marginTop: "0.2rem" }}>
@@ -313,28 +363,48 @@ export default function CommunityAdminResidentsPage() {
               </div>
               <div>
                 <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Email</div>
-                <div style={{ fontWeight: 500, marginTop: "0.2rem" }}>{selectedResident.email || "–"}</div>
+                <div style={{ fontWeight: 500, marginTop: "0.2rem" }}>
+                  {selectedResident.email || "–"}
+                </div>
               </div>
               <div>
                 <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Phone</div>
-                <div style={{ fontWeight: 500, marginTop: "0.2rem" }}>{selectedResident.phone || "–"}</div>
+                <div style={{ fontWeight: 500, marginTop: "0.2rem" }}>
+                  {selectedResident.phone || "–"}
+                </div>
               </div>
             </div>
 
             {/* Emergency Contacts */}
             <div>
-              <h4 style={{ fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.5rem" }}>🚨 Emergency Contacts</h4>
+              <h4 style={{ fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.5rem" }}>
+                🚨 Emergency Contacts
+              </h4>
               {contacts && contacts.length > 0 ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
                   {contacts.map((c) => (
-                    <div key={c.id} style={{ padding: "0.5rem 0.75rem", background: "#ffffff", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", display: "flex", justifyContent: "space-between" }}>
-                      <span><strong>{c.name}</strong> ({c.relationship})</span>
+                    <div
+                      key={c.id}
+                      style={{
+                        padding: "0.5rem 0.75rem",
+                        background: "#ffffff",
+                        border: "1px solid var(--border)",
+                        borderRadius: "var(--radius-sm)",
+                        display: "flex",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <span>
+                        <strong>{c.name}</strong> ({c.relationship})
+                      </span>
                       <span style={{ color: "var(--primary)" }}>📞 {c.phone}</span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div style={{ fontSize: "0.8rem", color: "var(--muted)", fontStyle: "italic" }}>No emergency contacts registered.</div>
+                <div style={{ fontSize: "0.8rem", color: "var(--muted)", fontStyle: "italic" }}>
+                  No emergency contacts registered.
+                </div>
               )}
             </div>
           </div>
@@ -349,18 +419,49 @@ export default function CommunityAdminResidentsPage() {
       >
         {selectedMove && (
           <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-            <div style={{ background: "#f8fafc", padding: "1rem", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
-                <span><strong>Applicant:</strong> {selectedMove.resident_name || "Resident"}</span>
+            <div
+              style={{
+                background: "#f8fafc",
+                padding: "1rem",
+                borderRadius: "var(--radius-sm)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              <div
+                style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}
+              >
+                <span>
+                  <strong>Applicant:</strong> {selectedMove.resident_name || "Resident"}
+                </span>
                 <StatusBadge status={selectedMove.status} />
               </div>
-              <div><strong>Unit:</strong> Unit {selectedMove.unit_number || "—"} ({selectedMove.tower_name || "Tower"})</div>
-              <div style={{ marginTop: "0.25rem" }}><strong>Move Type:</strong> {selectedMove.move_type === "move_in" ? "Move-In" : "Move-Out"}</div>
-              <div style={{ marginTop: "0.25rem" }}><strong>Scheduled Date:</strong> {formatDateTime(selectedMove.scheduled_at || selectedMove.scheduled_date || selectedMove.created_at)}</div>
+              <div>
+                <strong>Unit:</strong> Unit {selectedMove.unit_number || "—"} (
+                {selectedMove.tower_name || "Tower"})
+              </div>
+              <div style={{ marginTop: "0.25rem" }}>
+                <strong>Move Type:</strong>{" "}
+                {selectedMove.move_type === "move_in" ? "Move-In" : "Move-Out"}
+              </div>
+              <div style={{ marginTop: "0.25rem" }}>
+                <strong>Scheduled Date:</strong>{" "}
+                {formatDateTime(
+                  selectedMove.scheduled_at ||
+                    selectedMove.scheduled_date ||
+                    selectedMove.created_at,
+                )}
+              </div>
             </div>
 
             <div>
-              <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  display: "block",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Administrative Remarks / Clearance Notes
               </label>
               <textarea

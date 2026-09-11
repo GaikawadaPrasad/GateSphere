@@ -31,6 +31,15 @@ async def module_health() -> dict:
     return ok({"module": "dashboards", "status": "ok"})
 
 
+@router.get(
+    "/super-admin",
+    response_model=Envelope[schemas.SuperAdminDashboardStats],
+    dependencies=[VIEW],
+)
+async def super_admin_stats(svc: Svc = Depends(dashboard_service)) -> dict:
+    return ok(await svc.super_admin_stats())
+
+
 @router.get("/overview", response_model=Envelope[schemas.OverviewStats], dependencies=[VIEW])
 async def overview(
     community_id: uuid.UUID | None = None, svc: Svc = Depends(dashboard_service)
@@ -66,6 +75,7 @@ async def resident(
     summary="[Legacy] Query the assistant — superseded by POST /assistant/query",
 )
 async def legacy_assistant_query(
-    payload: assistant_schemas.AssistantQueryRequest, svc: AssistantService = Depends(assistant_service)
+    payload: assistant_schemas.AssistantQueryRequest,
+    svc: AssistantService = Depends(assistant_service),
 ) -> dict:
     return ok(await svc.query(payload.community_id, payload.query))

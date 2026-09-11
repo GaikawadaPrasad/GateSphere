@@ -30,7 +30,11 @@ export default function SecurityGuardNotificationsPage() {
       <PageHeader
         title="Gate Notifications & Approval Updates"
         subtitle="Real-time alerts, resident approvals, and supervisor broadcasts"
-        breadcrumbs={[{ label: "GateSphere" }, { label: "Security Guard" }, { label: "Notifications" }]}
+        breadcrumbs={[
+          { label: "GateSphere" },
+          { label: "Security Guard" },
+          { label: "Notifications" },
+        ]}
       />
 
       <div className="card">

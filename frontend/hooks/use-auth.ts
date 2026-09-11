@@ -38,8 +38,7 @@ export function useLogin() {
       qc.setQueryData(authKeys.me, user);
       // Remove all queries except the auth/me key we just set
       qc.removeQueries({
-        predicate: (query) =>
-          JSON.stringify(query.queryKey) !== JSON.stringify(authKeys.me),
+        predicate: (query) => JSON.stringify(query.queryKey) !== JSON.stringify(authKeys.me),
       });
     },
   });

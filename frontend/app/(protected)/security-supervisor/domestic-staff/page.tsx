@@ -36,13 +36,25 @@ export default function SecuritySupervisorDomesticStaffPage() {
           return {
             id: s.id,
             name: s.full_name || "Domestic Staff",
-            role: s.service_type ? s.service_type.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) : "Housekeeping",
+            role: s.service_type
+              ? s.service_type.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
+              : "Housekeeping",
             assigned_units: ["Verified Staff"],
-            check_in_time: att?.check_in_at ? new Date(att.check_in_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : null,
-            check_out_time: att?.check_out_at ? new Date(att.check_out_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : null,
+            check_in_time: att?.check_in_at
+              ? new Date(att.check_in_at).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : null,
+            check_out_time: att?.check_out_at
+              ? new Date(att.check_out_at).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : null,
             status: isInside ? "Inside Premises" : "Checked Out",
           };
-        })
+        }),
       );
     } catch {
       // fallback
@@ -66,7 +78,11 @@ export default function SecuritySupervisorDomesticStaffPage() {
       <PageHeader
         title="Domestic Staff Attendance & Monitoring"
         subtitle="Monitor daily housekeeping, cooks, drivers, unit access permissions, and check-in/out timestamps"
-        breadcrumbs={[{ label: "GateSphere" }, { label: "Security Supervisor" }, { label: "Domestic Staff" }]}
+        breadcrumbs={[
+          { label: "GateSphere" },
+          { label: "Security Supervisor" },
+          { label: "Domestic Staff" },
+        ]}
       />
 
       <div className="card">
@@ -78,8 +94,12 @@ export default function SecuritySupervisorDomesticStaffPage() {
             </p>
           </div>
 
-          <div style={{ width: 220 }}>
-            <SearchInput value={search} onChange={setSearch} placeholder="Search staff name/role…" />
+          <div style={{ width: "100%", maxWidth: 220 }}>
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Search staff name/role…"
+            />
           </div>
         </div>
 
@@ -104,7 +124,10 @@ export default function SecuritySupervisorDomesticStaffPage() {
                 </tr>
               ) : filteredStaff.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
+                  <td
+                    colSpan={6}
+                    style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
+                  >
                     No domestic staff records found.
                   </td>
                 </tr>

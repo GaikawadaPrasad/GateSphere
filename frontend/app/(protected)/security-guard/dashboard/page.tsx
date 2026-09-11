@@ -6,7 +6,14 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
-import { gateApi, dashboardsApi, visitorsApi, deliveriesApi, type PanicAlert, type GuardRoster } from "@/lib/api";
+import {
+  gateApi,
+  dashboardsApi,
+  visitorsApi,
+  deliveriesApi,
+  type PanicAlert,
+  type GuardRoster,
+} from "@/lib/api";
 import type { SecurityStats } from "@/types/dashboards";
 import { formatDateTime } from "@/lib/utils";
 
@@ -49,12 +56,15 @@ export default function SecurityGuardDashboardPage() {
   // Fetch initial active emergency alert + operational KPIs
   useEffect(() => {
     let mounted = true;
-    gateApi.alerts().then((alerts) => {
-      if (mounted && alerts && alerts.length > 0) {
-        const live = alerts.find((a) => a.status === "active" || a.status === "acknowledged");
-        if (live) setActiveSos(live);
-      }
-    }).catch(() => {});
+    gateApi
+      .alerts()
+      .then((alerts) => {
+        if (mounted && alerts && alerts.length > 0) {
+          const live = alerts.find((a) => a.status === "active" || a.status === "acknowledged");
+          if (live) setActiveSos(live);
+        }
+      })
+      .catch(() => {});
 
     Promise.allSettled([
       dashboardsApi.security(),
@@ -69,7 +79,9 @@ export default function SecurityGuardDashboardPage() {
       }
       if (deliveriesRes.status === "fulfilled") {
         setPendingDeliveryCount(
-          (deliveriesRes.value || []).filter((d: any) => d.status === "expected" || d.status === "at_gate").length
+          (deliveriesRes.value || []).filter(
+            (d: any) => d.status === "expected" || d.status === "at_gate",
+          ).length,
         );
       }
       if (rostersRes.status === "fulfilled") {
@@ -106,7 +118,9 @@ export default function SecurityGuardDashboardPage() {
     setErrorMessage(null);
 
     try {
-      const message = [location.trim() && `Location: ${location.trim()}`, description.trim()].filter(Boolean).join(" — ");
+      const message = [location.trim() && `Location: ${location.trim()}`, description.trim()]
+        .filter(Boolean)
+        .join(" — ");
       const sosRecord = await gateApi.triggerEmergency({
         alert_type: emergencyType,
         severity: "critical",
@@ -116,13 +130,16 @@ export default function SecurityGuardDashboardPage() {
       setActiveSos(sosRecord);
       setIsConfirmModalOpen(false);
       setSuccessMessage(
-        `SOS Emergency Alert (${sosRecord.id.slice(0, 8).toUpperCase()}) dispatched successfully. Security Supervisor notified.`
+        `SOS Emergency Alert (${sosRecord.id.slice(0, 8).toUpperCase()}) dispatched successfully. Security Supervisor notified.`,
       );
-      
+
       // Reset optional fields
       setDescription("");
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to dispatch SOS alert. Please check connection and retry.";
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Failed to dispatch SOS alert. Please check connection and retry.";
       setErrorMessage(msg);
     } finally {
       setIsSubmitting(false);
@@ -134,11 +151,20 @@ export default function SecurityGuardDashboardPage() {
       <PageHeader
         title="Security Guard Gate Console"
         subtitle="High-speed gate verification, instant pass checks, domestic staff logging, and SOS emergency alert escalation"
-        breadcrumbs={[{ label: "GateSphere" }, { label: "Security Guard" }, { label: "Gate Console" }]}
+        breadcrumbs={[
+          { label: "GateSphere" },
+          { label: "Security Guard" },
+          { label: "Gate Console" },
+        ]}
         actions={
           <button
             className="btn btn-danger"
-            style={{ fontWeight: 700, padding: "0.6rem 1.25rem", fontSize: "0.95rem", boxShadow: "0 2px 8px rgba(239, 68, 68, 0.3)" }}
+            style={{
+              fontWeight: 700,
+              padding: "0.6rem 1.25rem",
+              fontSize: "0.95rem",
+              boxShadow: "0 2px 8px rgba(239, 68, 68, 0.3)",
+            }}
             onClick={handleOpenForm}
           >
             🚨 SOS / EMERGENCY ALERT
@@ -161,13 +187,17 @@ export default function SecurityGuardDashboardPage() {
             justifyContent: "space-between",
           }}
         >
-          <div style={{ fontWeight: 600, fontSize: "0.9rem" }}>
-            ✅ {successMessage}
-          </div>
+          <div style={{ fontWeight: 600, fontSize: "0.9rem" }}>✅ {successMessage}</div>
           <button
             type="button"
             onClick={() => setSuccessMessage(null)}
-            style={{ background: "none", border: "none", color: "#065f46", cursor: "pointer", fontWeight: 700 }}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#065f46",
+              cursor: "pointer",
+              fontWeight: 700,
+            }}
           >
             ✕
           </button>
@@ -255,20 +285,32 @@ export default function SecurityGuardDashboardPage() {
             }}
           >
             <div>
-              <span style={{ opacity: 0.8, fontSize: "0.75rem", display: "block" }}>Emergency Type</span>
-              <strong style={{ fontSize: "1rem", color: "#fef2f2", textTransform: "capitalize" }}>🚨 {activeSos.alert_type}</strong>
+              <span style={{ opacity: 0.8, fontSize: "0.75rem", display: "block" }}>
+                Emergency Type
+              </span>
+              <strong style={{ fontSize: "1rem", color: "#fef2f2", textTransform: "capitalize" }}>
+                🚨 {activeSos.alert_type}
+              </strong>
             </div>
             <div>
               <span style={{ opacity: 0.8, fontSize: "0.75rem", display: "block" }}>Details</span>
-              <strong style={{ fontSize: "1rem", color: "#fef2f2" }}>{(activeSos as any).message || "—"}</strong>
+              <strong style={{ fontSize: "1rem", color: "#fef2f2" }}>
+                {(activeSos as any).message || "—"}
+              </strong>
             </div>
             <div>
               <span style={{ opacity: 0.8, fontSize: "0.75rem", display: "block" }}>Time Sent</span>
-              <strong style={{ fontSize: "0.95rem", color: "#fef2f2" }}>⏱️ {formatDateTime((activeSos as any).triggered_at)}</strong>
+              <strong style={{ fontSize: "0.95rem", color: "#fef2f2" }}>
+                ⏱️ {formatDateTime((activeSos as any).triggered_at)}
+              </strong>
             </div>
             <div>
-              <span style={{ opacity: 0.8, fontSize: "0.75rem", display: "block" }}>Current Escalation / Response</span>
-              <strong style={{ fontSize: "0.95rem", color: "#fecaca", textTransform: "capitalize" }}>
+              <span style={{ opacity: 0.8, fontSize: "0.75rem", display: "block" }}>
+                Current Escalation / Response
+              </span>
+              <strong
+                style={{ fontSize: "0.95rem", color: "#fecaca", textTransform: "capitalize" }}
+              >
                 🛡️ {activeSos.status}
               </strong>
             </div>
@@ -336,7 +378,17 @@ export default function SecurityGuardDashboardPage() {
           color: "white",
         }}
       >
-        <div style={{ fontWeight: 700, fontSize: "1rem", color: "#60a5fa", marginBottom: "1rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div
+          style={{
+            fontWeight: 700,
+            fontSize: "1rem",
+            color: "#60a5fa",
+            marginBottom: "1rem",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
           <span>⚡ HIGH-SPEED GATE ACTIONS</span>
           <button
             type="button"
@@ -356,42 +408,72 @@ export default function SecurityGuardDashboardPage() {
         >
           <button
             className="btn btn-primary"
-            style={{ padding: "0.85rem 1rem", fontSize: "0.95rem", fontWeight: 700, borderRadius: "var(--radius)" }}
+            style={{
+              padding: "0.85rem 1rem",
+              fontSize: "0.95rem",
+              fontWeight: 700,
+              borderRadius: "var(--radius)",
+            }}
             onClick={() => router.push("/security-guard/live-gate")}
           >
             🚪 Live Pass / PIN Verify
           </button>
           <button
             className="btn btn-secondary"
-            style={{ padding: "0.85rem 1rem", fontSize: "0.95rem", fontWeight: 700, borderRadius: "var(--radius)" }}
+            style={{
+              padding: "0.85rem 1rem",
+              fontSize: "0.95rem",
+              fontWeight: 700,
+              borderRadius: "var(--radius)",
+            }}
             onClick={() => router.push("/security-guard/visitors")}
           >
             👤 Visitor Entry / Exit
           </button>
           <button
             className="btn btn-secondary"
-            style={{ padding: "0.85rem 1rem", fontSize: "0.95rem", fontWeight: 700, borderRadius: "var(--radius)" }}
+            style={{
+              padding: "0.85rem 1rem",
+              fontSize: "0.95rem",
+              fontWeight: 700,
+              borderRadius: "var(--radius)",
+            }}
             onClick={() => router.push("/security-guard/deliveries")}
           >
             📦 Verify Delivery
           </button>
           <button
             className="btn btn-secondary"
-            style={{ padding: "0.85rem 1rem", fontSize: "0.95rem", fontWeight: 700, borderRadius: "var(--radius)" }}
+            style={{
+              padding: "0.85rem 1rem",
+              fontSize: "0.95rem",
+              fontWeight: 700,
+              borderRadius: "var(--radius)",
+            }}
             onClick={() => router.push("/security-guard/cab-taxi")}
           >
             🚖 Cab / Taxi Verify
           </button>
           <button
             className="btn btn-secondary"
-            style={{ padding: "0.85rem 1rem", fontSize: "0.95rem", fontWeight: 700, borderRadius: "var(--radius)" }}
+            style={{
+              padding: "0.85rem 1rem",
+              fontSize: "0.95rem",
+              fontWeight: 700,
+              borderRadius: "var(--radius)",
+            }}
             onClick={() => router.push("/security-guard/staff-attendance")}
           >
             🪪 Staff Check-in / Out
           </button>
           <button
             className="btn btn-secondary"
-            style={{ padding: "0.85rem 1rem", fontSize: "0.95rem", fontWeight: 700, borderRadius: "var(--radius)" }}
+            style={{
+              padding: "0.85rem 1rem",
+              fontSize: "0.95rem",
+              fontWeight: 700,
+              borderRadius: "var(--radius)",
+            }}
             onClick={() => router.push("/security-guard/blacklist-check")}
           >
             🔍 Blacklist Lookup
@@ -400,7 +482,13 @@ export default function SecurityGuardDashboardPage() {
       </div>
 
       {/* Main Grid: Pending Gate Approvals & History */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: "1.75rem" }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 340px), 1fr))",
+          gap: "1.75rem",
+        }}
+      >
         <div className="card">
           <div className="card-header">
             <h3 className="card-title">Pending Gate Verification Queue</h3>
@@ -417,20 +505,29 @@ export default function SecurityGuardDashboardPage() {
               <tbody>
                 {isLoadingStats ? (
                   <tr>
-                    <td colSpan={3} style={{ textAlign: "center", padding: "1.5rem" }}>Loading…</td>
+                    <td colSpan={3} style={{ textAlign: "center", padding: "1.5rem" }}>
+                      Loading…
+                    </td>
                   </tr>
                 ) : pendingVisitors.length === 0 ? (
                   <tr>
-                    <td colSpan={3} style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}>
+                    <td
+                      colSpan={3}
+                      style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}
+                    >
                       No pending gate approvals.
                     </td>
                   </tr>
                 ) : (
                   pendingVisitors.slice(0, 5).map((v) => (
                     <tr key={v.id}>
-                      <td style={{ fontWeight: 700 }}>{v.visitor?.full_name || v.visitor_name || "Visitor"}</td>
+                      <td style={{ fontWeight: 700 }}>
+                        {v.visitor?.full_name || v.visitor_name || "Visitor"}
+                      </td>
                       <td>{v.purpose || "—"}</td>
-                      <td><StatusBadge status={v.status} /></td>
+                      <td>
+                        <StatusBadge status={v.status} />
+                      </td>
                     </tr>
                   ))
                 )}
@@ -446,18 +543,28 @@ export default function SecurityGuardDashboardPage() {
           {isLoadingStats ? (
             <p style={{ padding: "0.5rem 0", color: "var(--muted)" }}>Loading…</p>
           ) : !activeRoster ? (
-            <p style={{ padding: "0.5rem 0", color: "var(--muted)" }}>No active shift assignment found on today&apos;s roster.</p>
+            <p style={{ padding: "0.5rem 0", color: "var(--muted)" }}>
+              No active shift assignment found on today&apos;s roster.
+            </p>
           ) : (
-          <div style={{ padding: "0.5rem 0" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.75rem" }}>
-              <span style={{ color: "var(--muted)" }}>Shift Date:</span>
-              <span style={{ fontWeight: 600 }}>{activeRoster.shift_date}</span>
+            <div style={{ padding: "0.5rem 0" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: "0.75rem",
+                }}
+              >
+                <span style={{ color: "var(--muted)" }}>Shift Date:</span>
+                <span style={{ fontWeight: 600 }}>{activeRoster.shift_date}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: "var(--muted)" }}>Time:</span>
+                <span style={{ fontWeight: 600 }}>
+                  {activeRoster.shift_start} – {activeRoster.shift_end}
+                </span>
+              </div>
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <span style={{ color: "var(--muted)" }}>Time:</span>
-              <span style={{ fontWeight: 600 }}>{activeRoster.shift_start} – {activeRoster.shift_end}</span>
-            </div>
-          </div>
           )}
         </div>
       </div>
@@ -489,10 +596,23 @@ export default function SecurityGuardDashboardPage() {
 
           {/* Required Field: Emergency Type */}
           <div style={{ marginBottom: "1.25rem" }}>
-            <label style={{ display: "block", fontWeight: 700, fontSize: "0.9rem", marginBottom: "0.5rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 700,
+                fontSize: "0.9rem",
+                marginBottom: "0.5rem",
+              }}
+            >
               Select Emergency Type *
             </label>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "0.6rem" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                gap: "0.6rem",
+              }}
+            >
               {EMERGENCY_TYPES.map((item) => {
                 const isSelected = emergencyType === item.value;
                 return (
@@ -526,7 +646,14 @@ export default function SecurityGuardDashboardPage() {
 
           {/* Required Field: Location */}
           <div style={{ marginBottom: "1.25rem" }}>
-            <label style={{ display: "block", fontWeight: 700, fontSize: "0.875rem", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 700,
+                fontSize: "0.875rem",
+                marginBottom: "0.35rem",
+              }}
+            >
               Location *
             </label>
             <input
@@ -541,7 +668,14 @@ export default function SecurityGuardDashboardPage() {
 
           {/* Optional Field: Description */}
           <div style={{ marginBottom: "1.5rem" }}>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.875rem", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.875rem",
+                marginBottom: "0.35rem",
+              }}
+            >
               Description <span style={{ color: "var(--muted)", fontWeight: 400 }}>(Optional)</span>
             </label>
             <textarea
@@ -553,7 +687,15 @@ export default function SecurityGuardDashboardPage() {
             />
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", borderTop: "1px solid var(--border)", paddingTop: "1rem" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: "0.75rem",
+              borderTop: "1px solid var(--border)",
+              paddingTop: "1rem",
+            }}
+          >
             <button
               type="button"
               className="btn btn-secondary"
@@ -611,11 +753,19 @@ export default function SecurityGuardDashboardPage() {
               marginBottom: "1.25rem",
             }}
           >
-            <p style={{ fontWeight: 700, fontSize: "1rem", marginBottom: "0.5rem", color: "#991b1b" }}>
+            <p
+              style={{
+                fontWeight: 700,
+                fontSize: "1rem",
+                marginBottom: "0.5rem",
+                color: "#991b1b",
+              }}
+            >
               Are you sure you want to send an SOS emergency alert?
             </p>
             <p style={{ fontSize: "0.85rem", color: "#b91c1c" }}>
-              This will immediately escalate a critical alert to the Security Supervisor, Gate Command Center, and all active duty guards.
+              This will immediately escalate a critical alert to the Security Supervisor, Gate
+              Command Center, and all active duty guards.
             </p>
           </div>
 
@@ -628,17 +778,31 @@ export default function SecurityGuardDashboardPage() {
               fontSize: "0.875rem",
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+            <div
+              style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}
+            >
               <span style={{ color: "var(--muted)" }}>Emergency Type:</span>
-              <strong style={{ color: "var(--danger)" }}>🚨 {EMERGENCY_TYPES.find((t) => t.value === emergencyType)?.label || emergencyType}</strong>
+              <strong style={{ color: "var(--danger)" }}>
+                🚨 {EMERGENCY_TYPES.find((t) => t.value === emergencyType)?.label || emergencyType}
+              </strong>
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+            <div
+              style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}
+            >
               <span style={{ color: "var(--muted)" }}>Location:</span>
               <strong>📍 {location}</strong>
             </div>
             {description && (
-              <div style={{ borderTop: "1px solid var(--border)", paddingTop: "0.5rem", marginTop: "0.5rem" }}>
-                <span style={{ color: "var(--muted)", display: "block", marginBottom: "0.25rem" }}>Description:</span>
+              <div
+                style={{
+                  borderTop: "1px solid var(--border)",
+                  paddingTop: "0.5rem",
+                  marginTop: "0.5rem",
+                }}
+              >
+                <span style={{ color: "var(--muted)", display: "block", marginBottom: "0.25rem" }}>
+                  Description:
+                </span>
                 <span style={{ color: "var(--fg)" }}>{description}</span>
               </div>
             )}
@@ -665,4 +829,3 @@ export default function SecurityGuardDashboardPage() {
     </div>
   );
 }
-

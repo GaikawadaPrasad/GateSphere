@@ -13,7 +13,10 @@ interface IncidentSummaryCardProps {
 export function IncidentSummaryCard({ incidents, isLoading }: IncidentSummaryCardProps) {
   if (isLoading) {
     return (
-      <div className="card" style={{ height: "100%", display: "flex", flexDirection: "column", gap: "1rem" }}>
+      <div
+        className="card"
+        style={{ height: "100%", display: "flex", flexDirection: "column", gap: "1rem" }}
+      >
         <div className="skeleton" style={{ width: "45%", height: 20 }} />
         <div className="skeleton" style={{ width: "100%", height: 60 }} />
         <div className="skeleton" style={{ width: "100%", height: 60 }} />
@@ -27,7 +30,10 @@ export function IncidentSummaryCard({ incidents, isLoading }: IncidentSummaryCar
     <div className="card" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <div className="card-header">
         <div>
-          <h2 className="card-title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <h2
+            className="card-title"
+            style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
+          >
             <span>🚨</span> Security Incident Oversight
           </h2>
           <p style={{ fontSize: "0.775rem", color: "var(--muted)", marginTop: "0.15rem" }}>
@@ -44,7 +50,17 @@ export function IncidentSummaryCard({ incidents, isLoading }: IncidentSummaryCar
       </div>
 
       {list.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "2rem 1rem", color: "var(--muted)", flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+        <div
+          style={{
+            textAlign: "center",
+            padding: "2rem 1rem",
+            color: "var(--muted)",
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+          }}
+        >
           <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>🛡️</div>
           <div style={{ fontWeight: 600, fontSize: "0.875rem" }}>No Incidents Reported</div>
           <p style={{ fontSize: "0.775rem", marginTop: "0.25rem" }}>
@@ -71,7 +87,9 @@ export function IncidentSummaryCard({ incidents, isLoading }: IncidentSummaryCar
               className="hover-panel"
             >
               <div style={{ minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}
+                >
                   <span style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--fg)" }}>
                     #{inc.incident_number || inc.id.slice(0, 8)}
                   </span>
@@ -81,15 +99,31 @@ export function IncidentSummaryCard({ incidents, isLoading }: IncidentSummaryCar
                       padding: "0.1rem 0.4rem",
                       borderRadius: 4,
                       fontWeight: 600,
-                      background: inc.severity === "critical" || inc.severity === "high" ? "#fee2e2" : "#f1f5f9",
-                      color: inc.severity === "critical" || inc.severity === "high" ? "#b91c1c" : "#475569",
+                      background:
+                        inc.severity === "critical" || inc.severity === "high"
+                          ? "#fee2e2"
+                          : "#f1f5f9",
+                      color:
+                        inc.severity === "critical" || inc.severity === "high"
+                          ? "#b91c1c"
+                          : "#475569",
                     }}
                   >
                     {inc.severity.toUpperCase()}
                   </span>
                 </div>
-                <div style={{ fontSize: "0.775rem", color: "var(--muted)", marginTop: "0.2rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {inc.incident_type.toUpperCase()} · {inc.location_text || "Premises"} · {formatDate(inc.reported_at)}
+                <div
+                  style={{
+                    fontSize: "0.775rem",
+                    color: "var(--muted)",
+                    marginTop: "0.2rem",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {inc.incident_type.toUpperCase()} · {inc.location_text || "Premises"} ·{" "}
+                  {formatDate(inc.reported_at)}
                 </div>
               </div>
 

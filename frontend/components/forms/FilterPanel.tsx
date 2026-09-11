@@ -20,7 +20,11 @@ export function FilterPanel({ children, onReset, className = "" }: FilterPanelPr
         background: "#ffffff",
       }}
     >
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", flex: 1, alignItems: "center" }}>{children}</div>
+      <div
+        style={{ display: "flex", flexWrap: "wrap", gap: "1rem", flex: 1, alignItems: "center" }}
+      >
+        {children}
+      </div>
       {onReset && (
         <button
           type="button"

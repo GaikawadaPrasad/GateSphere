@@ -37,7 +37,10 @@ export default function AuditLogsPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.setAttribute("href", url);
-      link.setAttribute("download", `gatesphere_audit_logs_${new Date().toISOString().slice(0, 10)}.csv`);
+      link.setAttribute(
+        "download",
+        `gatesphere_audit_logs_${new Date().toISOString().slice(0, 10)}.csv`,
+      );
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -85,7 +88,10 @@ export default function AuditLogsPage() {
       <PageHeader
         title="Audit Logs"
         subtitle="Immutable security trail and administrative activity tracking"
-        breadcrumbs={[{ label: "Super Admin", href: "/super-admin/dashboard" }, { label: "Audit Logs" }]}
+        breadcrumbs={[
+          { label: "Super Admin", href: "/super-admin/dashboard" },
+          { label: "Audit Logs" },
+        ]}
         actions={
           <button
             type="button"

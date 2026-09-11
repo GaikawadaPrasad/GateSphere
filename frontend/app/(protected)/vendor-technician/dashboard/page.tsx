@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
+import { QrCodeSvg } from "@/components/common/QrCodeSvg";
 import { complaintsApi, authApi, type CurrentUser } from "@/lib/api";
 
 export default function VendorDashboardPage() {
@@ -51,11 +52,11 @@ export default function VendorDashboardPage() {
   };
 
   const assignedTickets = tickets.filter(
-    (t) => t.status === "assigned" || t.status === "acknowledged" || t.status === "created"
+    (t) => t.status === "assigned" || t.status === "acknowledged" || t.status === "created",
   );
   const inProgressTickets = tickets.filter((t) => t.status === "in_progress");
   const completedTickets = tickets.filter(
-    (t) => t.status === "resolved" || t.status === "resident_confirmation" || t.status === "closed"
+    (t) => t.status === "resolved" || t.status === "resident_confirmation" || t.status === "closed",
   );
 
   const activeJob = inProgressTickets[0] || assignedTickets[0] || null;
@@ -64,7 +65,7 @@ export default function VendorDashboardPage() {
     : "NO-ACTIVE-JOB";
 
   const highPriorityCount = assignedTickets.filter(
-    (t) => t.priority === "high" || t.priority === "critical"
+    (t) => t.priority === "high" || t.priority === "critical",
   ).length;
 
   return (
@@ -104,7 +105,10 @@ export default function VendorDashboardPage() {
         <KpiCard
           title="Jobs In Progress"
           value={isLoading ? "…" : String(inProgressTickets.length)}
-          subtext={inProgressTickets[0]?.subject || (inProgressTickets.length === 0 ? "None active" : "Multiple active")}
+          subtext={
+            inProgressTickets[0]?.subject ||
+            (inProgressTickets.length === 0 ? "None active" : "Multiple active")
+          }
           icon="⏳"
           trend={inProgressTickets.length > 0 ? "primary" : undefined}
           trendValue={inProgressTickets.length > 0 ? "Active Now" : "Idle"}
@@ -113,7 +117,9 @@ export default function VendorDashboardPage() {
         <KpiCard
           title="Active Gate Pass"
           value={activeJob ? passCode : "None"}
-          subtext={activeJob ? `Valid for ${activeJob.ticket_number || "Active Job"}` : "No pass generated"}
+          subtext={
+            activeJob ? `Valid for ${activeJob.ticket_number || "Active Job"}` : "No pass generated"
+          }
           icon="🪪"
           onClick={() => router.push("/vendor-technician/entry-pass")}
         />
@@ -135,23 +141,45 @@ export default function VendorDashboardPage() {
           background: "linear-gradient(135deg, #ffffff, #f8fafc)",
         }}
       >
-        <div style={{ fontWeight: 600, fontSize: "0.875rem", color: "var(--fg)", marginBottom: "0.75rem" }}>
+        <div
+          style={{
+            fontWeight: 600,
+            fontSize: "0.875rem",
+            color: "var(--fg)",
+            marginBottom: "0.75rem",
+          }}
+        >
           ⚡ Technician Quick Actions
         </div>
         <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-          <button className="btn btn-primary" onClick={() => router.push("/vendor-technician/assigned-tickets")}>
+          <button
+            className="btn btn-primary"
+            onClick={() => router.push("/vendor-technician/assigned-tickets")}
+          >
             🎫 View Assigned Tickets
           </button>
-          <button className="btn btn-secondary" onClick={() => router.push("/vendor-technician/work-progress")}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => router.push("/vendor-technician/work-progress")}
+          >
             ⏳ Update Work Status
           </button>
-          <button className="btn btn-secondary" onClick={() => router.push("/vendor-technician/entry-pass")}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => router.push("/vendor-technician/entry-pass")}
+          >
             🪪 Show Digital Entry Pass
           </button>
-          <button className="btn btn-secondary" onClick={() => router.push("/vendor-technician/work-completion")}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => router.push("/vendor-technician/work-completion")}
+          >
             ✅ Submit Work Completion
           </button>
-          <button className="btn btn-secondary" onClick={() => router.push("/vendor-technician/profile")}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => router.push("/vendor-technician/profile")}
+          >
             👤 Manage Technician Profile
           </button>
         </div>
@@ -161,7 +189,7 @@ export default function VendorDashboardPage() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 360px), 1fr))",
           gap: "1.75rem",
           alignItems: "start",
         }}
@@ -192,26 +220,42 @@ export default function VendorDashboardPage() {
                 <tbody>
                   {isLoading ? (
                     <tr>
-                      <td colSpan={4} style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}>
+                      <td
+                        colSpan={4}
+                        style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}
+                      >
                         Loading tickets from backend…
                       </td>
                     </tr>
                   ) : tickets.length === 0 ? (
                     <tr>
-                      <td colSpan={4} style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}>
+                      <td
+                        colSpan={4}
+                        style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}
+                      >
                         No service tickets assigned at present.
                       </td>
                     </tr>
                   ) : (
                     tickets.slice(0, 5).map((t) => (
-                      <tr key={t.id} style={{ cursor: "pointer" }} onClick={() => router.push("/vendor-technician/work-progress")}>
-                        <td style={{ fontWeight: 600, fontFamily: "monospace" }}>{t.ticket_number || `TKT-${t.id.slice(0, 6)}`}</td>
-                        <td style={{ fontWeight: 500, color: "var(--fg)" }}>{t.subject || "Service Ticket"}</td>
+                      <tr
+                        key={t.id}
+                        style={{ cursor: "pointer" }}
+                        onClick={() => router.push("/vendor-technician/work-progress")}
+                      >
+                        <td style={{ fontWeight: 600, fontFamily: "monospace" }}>
+                          {t.ticket_number || `TKT-${t.id.slice(0, 6)}`}
+                        </td>
+                        <td style={{ fontWeight: 500, color: "var(--fg)" }}>
+                          {t.subject || "Service Ticket"}
+                        </td>
                         <td>
                           <StatusBadge status={(t.priority || "medium").toUpperCase()} />
                         </td>
                         <td>
-                          <StatusBadge status={(t.status || "created").replace(/_/g, " ").toUpperCase()} />
+                          <StatusBadge
+                            status={(t.status || "created").replace(/_/g, " ").toUpperCase()}
+                          />
                         </td>
                       </tr>
                     ))
@@ -233,41 +277,56 @@ export default function VendorDashboardPage() {
             }}
           >
             <div className="card-header" style={{ borderBottom: "1px solid #1e293b" }}>
-              <h3 className="card-title" style={{ color: "white" }}>🪪 Active Gate Entry Pass</h3>
+              <h3 className="card-title" style={{ color: "white" }}>
+                🪪 Active Gate Entry Pass
+              </h3>
               <StatusBadge status={activeJob ? "Active" : "Inactive"} />
             </div>
 
             <div style={{ textAlign: "center", padding: "1rem 0" }}>
-              <div style={{ fontSize: "0.75rem", color: "#94a3b8", textTransform: "uppercase" }}>Pass Code</div>
-              <div style={{ fontSize: "1.5rem", fontWeight: 700, fontFamily: "monospace", color: "#60a5fa" }}>
+              <div style={{ fontSize: "0.75rem", color: "#94a3b8", textTransform: "uppercase" }}>
+                Pass Code
+              </div>
+              <div
+                style={{
+                  fontSize: "1.5rem",
+                  fontWeight: 700,
+                  fontFamily: "monospace",
+                  color: "#60a5fa",
+                }}
+              >
                 {passCode}
               </div>
               <div
                 style={{
-                  width: 120,
-                  height: 120,
                   margin: "1rem auto",
-                  background: "white",
-                  padding: "0.5rem",
-                  borderRadius: "var(--radius-sm)",
                   display: "flex",
+                  flexDirection: "column",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: "0.75rem",
-                  color: "#0f172a",
-                  fontWeight: 700,
-                  textAlign: "center",
                 }}
               >
                 {activeJob ? (
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                    <span style={{ fontSize: "1.8rem" }}>📱</span>
-                    <span style={{ fontSize: "0.65rem", fontFamily: "monospace", marginTop: "4px" }}>
+                    <QrCodeSvg
+                      value={`GS-PASS-${activeJob.ticket_number || "TKT"}-${activeJob.id.slice(0, 8).toUpperCase()}`}
+                      size={130}
+                    />
+                    <span
+                      style={{
+                        fontSize: "0.7rem",
+                        fontFamily: "monospace",
+                        marginTop: "6px",
+                        color: "#94a3b8",
+                      }}
+                    >
                       {activeJob.ticket_number || "QR PASS"}
                     </span>
                   </div>
                 ) : (
-                  <span style={{ color: "#94a3b8" }}>No active job</span>
+                  <span style={{ color: "#94a3b8", fontSize: "0.85rem", padding: "1.5rem 0" }}>
+                    No active job
+                  </span>
                 )}
               </div>
               <div style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>
@@ -292,17 +351,34 @@ export default function VendorDashboardPage() {
         }
       >
         <div style={{ textAlign: "center", padding: "1rem 0" }}>
-          <div style={{ fontSize: "0.85rem", color: "var(--muted)" }}>Authorized Vendor Technician</div>
+          <div style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
+            Authorized Vendor Technician
+          </div>
           <div style={{ fontSize: "1.2rem", fontWeight: 700, color: "var(--fg)" }}>
             {currentUser?.full_name || "Vendor Technician"}
           </div>
           <div style={{ fontSize: "0.85rem", color: "var(--muted)", marginTop: "0.25rem" }}>
             {currentUser?.email || "technician@gatesphere.com"}
           </div>
-          <div style={{ fontSize: "1.4rem", fontWeight: 700, fontFamily: "monospace", color: "var(--primary)", marginTop: "0.75rem" }}>
+          <div
+            style={{
+              fontSize: "1.4rem",
+              fontWeight: 700,
+              fontFamily: "monospace",
+              color: "var(--primary)",
+              marginTop: "0.75rem",
+            }}
+          >
             {passCode}
           </div>
-          <div style={{ fontSize: "0.8rem", color: activeJob ? "var(--success)" : "var(--muted)", fontWeight: 600, marginTop: "0.2rem" }}>
+          <div
+            style={{
+              fontSize: "0.8rem",
+              color: activeJob ? "var(--success)" : "var(--muted)",
+              fontWeight: 600,
+              marginTop: "0.2rem",
+            }}
+          >
             {activeJob ? "● Valid Today — Single Work Entry" : "○ Inactive — No Active Job"}
           </div>
         </div>

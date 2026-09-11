@@ -34,7 +34,8 @@ export default function SecurityGuardVisitorsPage() {
       for (const v of directory || []) if ((v as any)?.id) visitorMap.set((v as any).id, v);
       const openEntryByRequest = new Map<string, any>();
       for (const e of entries || []) {
-        if ((e as any).request_id && !(e as any).exit_at) openEntryByRequest.set((e as any).request_id, e);
+        if ((e as any).request_id && !(e as any).exit_at)
+          openEntryByRequest.set((e as any).request_id, e);
       }
 
       setVisitors(
@@ -49,7 +50,7 @@ export default function SecurityGuardVisitorsPage() {
             status: r.status,
             entryId: openEntry?.id,
           };
-        })
+        }),
       );
     } catch (err: any) {
       setLoadError(err?.message || "Failed to load visitors.");
@@ -102,7 +103,7 @@ export default function SecurityGuardVisitorsPage() {
             </p>
           </div>
 
-          <div style={{ width: 220 }}>
+          <div style={{ width: "100%", maxWidth: 220 }}>
             <SearchInput value={search} onChange={setSearch} placeholder="Search name/type…" />
           </div>
         </div>
@@ -127,13 +128,23 @@ export default function SecurityGuardVisitorsPage() {
                 </tr>
               ) : loadError ? (
                 <tr>
-                  <td colSpan={5} style={{ textAlign: "center", padding: "2rem", color: "var(--danger, #dc2626)" }}>
+                  <td
+                    colSpan={5}
+                    style={{
+                      textAlign: "center",
+                      padding: "2rem",
+                      color: "var(--danger, #dc2626)",
+                    }}
+                  >
                     {loadError}
                   </td>
                 </tr>
               ) : filteredVisitors.length === 0 ? (
                 <tr>
-                  <td colSpan={5} style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
+                  <td
+                    colSpan={5}
+                    style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
+                  >
                     No visitor requests found.
                   </td>
                 </tr>

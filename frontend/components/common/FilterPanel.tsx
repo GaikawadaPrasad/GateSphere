@@ -50,11 +50,21 @@ export function FilterPanel({
         borderRadius: "var(--radius)",
         border: "1px solid var(--border)",
         boxShadow: "var(--shadow-sm)",
+        overflow: "hidden",
       }}
     >
-      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.75rem", flex: 1, minWidth: 260 }}>
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: "0.75rem",
+          flex: 1,
+          minWidth: 0,
+        }}
+      >
         {onSearchChange && (
-          <div style={{ position: "relative", minWidth: 220, maxWidth: 360, flex: 1 }}>
+          <div style={{ position: "relative", minWidth: 160, flex: "1 1 200px" }}>
             <span
               style={{
                 position: "absolute",
@@ -79,13 +89,32 @@ export function FilterPanel({
         )}
 
         {filterOptions && onFilterChange && (
-          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-            {filterLabel && <span style={{ fontSize: "0.8rem", color: "var(--muted)", fontWeight: 500 }}>{filterLabel}:</span>}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.4rem",
+              minWidth: 0,
+              flex: "0 1 auto",
+            }}
+          >
+            {filterLabel && (
+              <span
+                style={{
+                  fontSize: "0.8rem",
+                  color: "var(--muted)",
+                  fontWeight: 500,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {filterLabel}:
+              </span>
+            )}
             <select
               className="select-field"
               value={filterValue || ""}
               onChange={(e) => onFilterChange(e.target.value)}
-              style={{ height: 38, width: "auto", minWidth: 140 }}
+              style={{ height: 38, width: "auto", minWidth: 110 }}
             >
               <option value="">All</option>
               {filterOptions.map((opt) => (
@@ -98,13 +127,32 @@ export function FilterPanel({
         )}
 
         {secondaryFilterOptions && onSecondaryFilterChange && (
-          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-            {secondaryFilterLabel && <span style={{ fontSize: "0.8rem", color: "var(--muted)", fontWeight: 500 }}>{secondaryFilterLabel}:</span>}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.4rem",
+              minWidth: 0,
+              flex: "0 1 auto",
+            }}
+          >
+            {secondaryFilterLabel && (
+              <span
+                style={{
+                  fontSize: "0.8rem",
+                  color: "var(--muted)",
+                  fontWeight: 500,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {secondaryFilterLabel}:
+              </span>
+            )}
             <select
               className="select-field"
               value={secondaryFilterValue || ""}
               onChange={(e) => onSecondaryFilterChange(e.target.value)}
-              style={{ height: 38, width: "auto", minWidth: 140 }}
+              style={{ height: 38, width: "auto", minWidth: 110 }}
             >
               <option value="">All</option>
               {secondaryFilterOptions.map((opt) => (
@@ -117,7 +165,11 @@ export function FilterPanel({
         )}
       </div>
 
-      {actions && <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>{actions}</div>}
+      {actions && (
+        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexShrink: 0 }}>
+          {actions}
+        </div>
+      )}
     </div>
   );
 }
