@@ -442,22 +442,6 @@ export default function FacilityManagerDashboardPage() {
         }
       >
         <form id="quick-ticket-form" onSubmit={handleQuickCreateRequest}>
-          {communities.length > 1 && (
-            <div style={{ marginBottom: "1rem" }}>
-              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
-                Community
-              </label>
-              <select
-                className="select-field"
-                value={selectedCommunityId}
-                onChange={(e) => handleCommunityChange(e.target.value)}
-              >
-                {communities.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
-          )}
           <div style={{ marginBottom: "1rem" }}>
             <label
               style={{
