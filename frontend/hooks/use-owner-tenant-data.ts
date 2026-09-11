@@ -77,7 +77,7 @@ export interface ComplaintTicket {
   category_name: string;
   description: string;
   priority: "low" | "medium" | "high" | "emergency";
-  status: "open" | "assigned" | "in_progress" | "resolved" | "closed";
+  status: "open" | "created" | "assigned" | "acknowledged" | "in_progress" | "resolved" | "resident_confirmation" | "closed" | "reopened" | "cancelled";
   escalation_state: "on_track" | "at_risk" | "breached" | "escalated";
   created_at: string;
   assigned_to?: string;
