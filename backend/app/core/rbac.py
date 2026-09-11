@@ -43,7 +43,7 @@ PERMISSIONS: dict[str, str] = {
     f"{m}:{a}": f"{a.title()} {m.replace('_', ' ')}" for m in _MODULES for a in _ACTIONS
 }
 
-# Starter grants — refine per docs/security/roles-permissions.md.
+
 ROLE_PERMISSIONS: dict[str, list[str]] = {
     "super_admin": ["*"],
     "community_admin": [p for p in PERMISSIONS if not p.startswith("audit:")],
