@@ -177,6 +177,9 @@ export function useResidentVisitors() {
       reason?: string;
       valid_for_hours: number;
       unit_id?: string;
+      vehicle_number?: string;
+      party_size?: number;
+      group_label?: string;
     }) => {
       const isUuid = (s?: string) =>
         Boolean(s && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s));
@@ -214,7 +217,8 @@ export function useResidentVisitors() {
         if (c.includes("cab") || c.includes("taxi")) return "cab_taxi";
         if (c.includes("service") || c.includes("tech") || c.includes("maint")) return "service_tech";
         if (c.includes("contract") || c.includes("vendor") || c.includes("work")) return "vendor";
-        if (c.includes("staff") || c.includes("domestic") || c.includes("help") || c.includes("maid")) return "recurring";
+        if (c.includes("interview")) return "interviewee";
+        if (c.includes("staff") || c.includes("domestic") || c.includes("help") || c.includes("maid") || c.includes("recurr")) return "recurring";
         if (c.includes("event") || c.includes("party")) return "event_guest";
         if (c.includes("relat") || c.includes("family")) return "relative";
         return "personal_guest";
@@ -234,15 +238,19 @@ export function useResidentVisitors() {
         visitor: {
           full_name: cleanName,
           phone: cleanPhone,
+          vehicle_number: payload.vehicle_number || undefined,
         },
         purpose: cleanReason,
         expected_at: now.toISOString(),
         valid_until: validUntil.toISOString(),
+        vehicle_number: payload.vehicle_number || undefined,
+        party_size: payload.party_size || 1,
+        group_label: payload.group_label || undefined,
       });
 
       const passRes = await api.post<any>(`/visitors/requests/${req.id}/passes`, {
         pass_type: "qr",
-        max_entries: 1,
+        max_entries: payload.party_size && payload.party_size > 1 ? payload.party_size : 1,
         with_pin: true,
         valid_from: now.toISOString(),
         valid_to: validUntil.toISOString(),

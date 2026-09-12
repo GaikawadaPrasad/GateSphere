@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { DashboardShell } from "@/components/layout/DashboardShell";
 import { StatMetric } from "@/components/common/StatMetric";
@@ -11,7 +12,25 @@ import { DebouncedInput } from "@/components/forms/DebouncedInput";
 import { FilterPanel } from "@/components/forms/FilterPanel";
 import { BrandButton } from "@/components/common/BrandButton";
 import { Modal } from "@/components/common/Modal";
-import { QrCodeSvg } from "@/components/common/QrCodeSvg";
+import { Skeleton, KpiCardSkeleton, TableSkeleton, CardSkeleton } from "@/components/common/LoadingSkeleton";
+import { ErrorState } from "@/components/common/ErrorState";
+
+const QrCodeSvg = dynamic(
+  () => import("@/components/common/QrCodeSvg").then((m) => m.QrCodeSvg),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="skeleton"
+        style={{
+          width: 180,
+          height: 180,
+          borderRadius: 12,
+        }}
+      />
+    ),
+  },
+);
 import {
   useResidentOverview,
   useResidentVisitors,
@@ -103,11 +122,14 @@ export function OwnerTenantDashboardView({
   const [profileEmergencyNotes, setProfileEmergencyNotes] = useState("");
 
   // Visitor Pass form state
-  const [passCategory, setPassCategory] = useState("Guest");
+  const [passCategory, setPassCategory] = useState("Personal Guest");
   const [passVisitorName, setPassVisitorName] = useState("");
   const [passVisitorPhone, setPassVisitorPhone] = useState("");
   const [passReason, setPassReason] = useState("");
   const [passDuration, setPassDuration] = useState(24);
+  const [passVehicleNumber, setPassVehicleNumber] = useState("");
+  const [passPartySize, setPassPartySize] = useState(1);
+  const [passGroupLabel, setPassGroupLabel] = useState("");
 
   // Generated / Active Pass Result Modal state
   const [activePassModalOpen, setActivePassModalOpen] = useState(false);
@@ -119,6 +141,9 @@ export function OwnerTenantDashboardView({
     reason?: string;
     valid_from?: string;
     valid_to?: string;
+    vehicle_number?: string;
+    party_size?: number;
+    group_label?: string;
   } | null>(null);
 
   // Service ticket form state
@@ -140,7 +165,7 @@ export function OwnerTenantDashboardView({
   }, []);
 
   // Data queries
-  const { data: stats, isLoading: statsLoading } = useResidentOverview(activeCommunityId);
+  const { data: stats, isLoading: statsLoading, isError: statsError, refetch: refetchStats } = useResidentOverview(activeCommunityId);
   const visitors = useResidentVisitors();
   const deliveries = useResidentDeliveries();
   const amenities = useResidentAmenities();
@@ -193,6 +218,30 @@ export function OwnerTenantDashboardView({
     initialPageSize: 10,
   });
 
+  const vehicleControls = useTableControls<any>({
+    data: vehicles.data || [],
+    searchKeys: ["plate", "make_model", "slot", "rfid_tag"],
+    initialPageSize: 10,
+  });
+
+  const staffControls = useTableControls<any>({
+    data: domesticStaff.data || [],
+    searchKeys: ["name", "role", "phone"],
+    initialPageSize: 10,
+  });
+
+  const bookingControls = useTableControls<AmenityBooking>({
+    data: amenities.bookings.data || [],
+    searchKeys: ["amenity_name", "status", "date"],
+    initialPageSize: 10,
+  });
+
+  const familyControls = useTableControls<FamilyMember>({
+    data: family.familyMembers,
+    searchKeys: ["name", "relation", "phone"],
+    initialPageSize: 10,
+  });
+
   const handleVisitorDecision = async (requestId: string, approved: boolean) => {
     try {
       const isUuid =
@@ -236,6 +285,9 @@ export function OwnerTenantDashboardView({
         reason: passReason.trim(),
         valid_for_hours: passDuration,
         unit_id: activeUnitId,
+        vehicle_number: passVehicleNumber.trim() || undefined,
+        party_size: passPartySize,
+        group_label: passGroupLabel.trim() || undefined,
       });
       setVisitorPassModalOpen(false);
       setActivePassResult({
@@ -246,13 +298,19 @@ export function OwnerTenantDashboardView({
         reason: res.reason || passReason.trim() || "Visitor Entry",
         valid_from: res.valid_from,
         valid_to: res.valid_to,
+        vehicle_number: passVehicleNumber.trim() || undefined,
+        party_size: passPartySize,
+        group_label: passGroupLabel.trim() || undefined,
       });
       setActivePassModalOpen(true);
       setPassVisitorName("");
       setPassVisitorPhone("");
       setPassReason("");
-      setPassCategory("Guest");
+      setPassCategory("Personal Guest");
       setPassDuration(24);
+      setPassVehicleNumber("");
+      setPassPartySize(1);
+      setPassGroupLabel("");
       toast.success(
         "A QR & 6-digit PIN code have been issued for your visitor.",
         "Visitor Pass Generated",
@@ -746,69 +804,93 @@ export function OwnerTenantDashboardView({
             </div>
           )}
           {/* KPI Stats */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-              gap: "1.25rem",
-              marginBottom: "2rem",
-            }}
-          >
-            <StatMetric
-              label="Outstanding Dues"
-              value={formatCurrency(stats?.pending_dues_amount ?? 0)}
-              accentColor="#D97706"
-              icon="💳"
-              description={
-                nextDueInvoice
-                  ? `Due by ${formatDate(nextDueInvoice.due_date)}`
-                  : "No outstanding dues"
-              }
-              onClick={() => router.push("/owner-tenant/payments")}
-            />
-            <StatMetric
-              label="Open Service Tickets"
-              value={stats?.open_service_tickets ?? 0}
-              accentColor="#DC2626"
-              icon="🎫"
-              description={
-                openTicket
-                  ? `${openTicket.category_name} (${openTicket.status.replace(/_/g, " ")})`
-                  : "No open tickets"
-              }
-              onClick={() => router.push("/owner-tenant/complaints")}
-            />
-            <StatMetric
-              label="Domestic Staff Assigned"
-              value={activeStaffCount}
-              accentColor="#0D9488"
-              icon="🧹"
-              description={
-                activeStaffCount > 0
-                  ? `${activeStaffCount} active assignment(s)`
-                  : "No staff assigned"
-              }
-              onClick={() => router.push("/owner-tenant/domestic-staff")}
-            />
-            <StatMetric
-              label="Booked Amenities"
-              value={stats?.upcoming_amenity_bookings ?? 0}
-              accentColor="#9333EA"
-              icon="🏊"
-              description={
-                nextBooking
-                  ? `${nextBooking.amenity_name} (${formatDate(nextBooking.date)})`
-                  : "No upcoming bookings"
-              }
-              onClick={() => router.push("/owner-tenant/amenities")}
-            />
-          </div>
+          {statsError ? (
+            <div style={{ marginBottom: "2rem" }}>
+              <ErrorState
+                title="Failed to load resident overview metrics"
+                message="Unable to fetch current dues, tickets, and facility status from the server."
+                onRetry={() => refetchStats()}
+              />
+            </div>
+          ) : statsLoading ? (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))",
+                gap: "1.25rem",
+                marginBottom: "2rem",
+              }}
+            >
+              <KpiCardSkeleton borderTop="3px solid #D97706" />
+              <KpiCardSkeleton borderTop="3px solid #DC2626" />
+              <KpiCardSkeleton borderTop="3px solid #0D9488" />
+              <KpiCardSkeleton borderTop="3px solid #9333EA" />
+            </div>
+          ) : (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))",
+                gap: "1.25rem",
+                marginBottom: "2rem",
+              }}
+            >
+              <StatMetric
+                label="Outstanding Dues"
+                value={formatCurrency(stats?.pending_dues_amount ?? 0)}
+                accentColor="#D97706"
+                icon="💳"
+                description={
+                  nextDueInvoice
+                    ? `Due by ${formatDate(nextDueInvoice.due_date)}`
+                    : "No outstanding dues"
+                }
+                onClick={() => router.push("/owner-tenant/payments")}
+              />
+              <StatMetric
+                label="Open Service Tickets"
+                value={stats?.open_service_tickets ?? 0}
+                accentColor="#DC2626"
+                icon="🎫"
+                description={
+                  openTicket
+                    ? `${openTicket.category_name} (${openTicket.status.replace(/_/g, " ")})`
+                    : "No open tickets"
+                }
+                onClick={() => router.push("/owner-tenant/complaints")}
+              />
+              <StatMetric
+                label="Domestic Staff Assigned"
+                value={activeStaffCount}
+                accentColor="#0D9488"
+                icon="🧹"
+                description={
+                  activeStaffCount > 0
+                    ? `${activeStaffCount} active assignment(s)`
+                    : "No staff assigned"
+                }
+                onClick={() => router.push("/owner-tenant/domestic-staff")}
+              />
+              <StatMetric
+                label="Booked Amenities"
+                value={stats?.upcoming_amenity_bookings ?? 0}
+                accentColor="#9333EA"
+                icon="🏊"
+                description={
+                  nextBooking
+                    ? `${nextBooking.amenity_name} (${formatDate(nextBooking.date)})`
+                    : "No upcoming bookings"
+                }
+                onClick={() => router.push("/owner-tenant/amenities")}
+              />
+            </div>
+          )}
 
           {/* Action Quick Links & Activity */}
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 400px), 1fr))",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 340px), 1fr))",
               gap: "1.5rem",
             }}
           >
@@ -818,24 +900,28 @@ export function OwnerTenantDashboardView({
                 ⚡ Quick Resident Actions
               </h3>
               <div
-                style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "0.75rem" }}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))",
+                  gap: "0.75rem",
+                }}
               >
                 <BrandButton
                   variant="outline"
                   size="sm"
                   onClick={() => setVisitorPassModalOpen(true)}
                 >
-                  🎟️ Pre-Approve Guest Pass
+                  🎟️ Pre-Approve Pass
                 </BrandButton>
                 <BrandButton
                   variant="outline"
                   size="sm"
                   onClick={() => router.push("/owner-tenant/deliveries")}
                 >
-                  📦 Delivery Protocol
+                  📦 Gate Protocols
                 </BrandButton>
                 <BrandButton variant="outline" size="sm" onClick={() => setTicketModalOpen(true)}>
-                  🔧 Raise Maintenance Ticket
+                  🔧 Raise Ticket
                 </BrandButton>
                 <BrandButton
                   variant="outline"
@@ -845,7 +931,7 @@ export function OwnerTenantDashboardView({
                     setPaymentModalOpen(true);
                   }}
                 >
-                  💳 Pay Maintenance Dues
+                  💳 Pay Dues
                 </BrandButton>
               </div>
             </div>
@@ -858,9 +944,11 @@ export function OwnerTenantDashboardView({
                   justifyContent: "space-between",
                   alignItems: "center",
                   marginBottom: "1rem",
+                  flexWrap: "wrap",
+                  gap: "0.5rem",
                 }}
               >
-                <h3 className="card-h3" style={{ fontSize: "1.1rem" }}>
+                <h3 className="card-h3" style={{ fontSize: "1.1rem", margin: 0 }}>
                   📦 Recent Deliveries
                 </h3>
                 <BrandButton
@@ -872,28 +960,57 @@ export function OwnerTenantDashboardView({
                 </BrandButton>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                {deliveryList.map((del) => (
-                  <div
-                    key={del.id}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      padding: "0.75rem",
-                      borderRadius: "6px",
-                      background: "#F8FAFC",
-                      border: "1px solid var(--border-light)",
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: "14px" }}>{del.courier_company}</div>
-                      <div style={{ fontSize: "12px", color: "var(--brand-body)" }}>
-                        {del.package_type} · {del.tracking_id}
+                {deliveries.isLoading ? (
+                  Array.from({ length: 2 }).map((_, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        padding: "0.75rem",
+                        borderRadius: "6px",
+                        background: "#F8FAFC",
+                        border: "1px solid var(--border-light)",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <div style={{ width: "60%" }}>
+                        <Skeleton width="80%" height="1rem" borderRadius={4} />
+                        <div style={{ marginTop: "0.3rem" }}>
+                          <Skeleton width="50%" height="0.75rem" borderRadius={4} />
+                        </div>
                       </div>
+                      <Skeleton width={70} height={22} borderRadius={999} />
                     </div>
-                    <StatusBadge status={del.status} />
-                  </div>
-                ))}
+                  ))
+                ) : deliveryList.length === 0 ? (
+                  <p style={{ color: "var(--brand-body)", fontSize: "13px", margin: 0, fontStyle: "italic", padding: "0.5rem 0" }}>
+                    No recent parcel deliveries at the security gate.
+                  </p>
+                ) : (
+                  deliveryList.slice(0, 3).map((del) => (
+                    <div
+                      key={del.id}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        padding: "0.75rem",
+                        borderRadius: "6px",
+                        background: "#F8FAFC",
+                        border: "1px solid var(--border-light)",
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: "14px" }}>{del.courier_company}</div>
+                        <div style={{ fontSize: "12px", color: "var(--brand-body)" }}>
+                          {del.package_type} · {del.tracking_id}
+                        </div>
+                      </div>
+                      <StatusBadge status={del.status} />
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -903,7 +1020,7 @@ export function OwnerTenantDashboardView({
       {/* TAB 2: MY PROFILE */}
       {activeTab === "profile" && (
         <div className="gs-card" style={{ maxWidth: 750 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", flexWrap: "wrap", gap: "0.75rem" }}>
             <div>
               <h3 className="card-h3" style={{ margin: 0 }}>Resident Profile & Emergency Contacts</h3>
               <p style={{ color: "var(--brand-body)", fontSize: "13px", marginTop: "0.25rem", margin: 0 }}>
@@ -917,11 +1034,26 @@ export function OwnerTenantDashboardView({
               ✏️ Edit Profile
             </BrandButton>
           </div>
-          {profile.isLoading ? (
-            <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>Loading profile…</p>
+          {profile.isError ? (
+            <ErrorState
+              title="Failed to load resident profile"
+              message="Unable to fetch profile information from the server."
+              onRetry={() => profile.refetch()}
+            />
+          ) : profile.isLoading ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: "1rem", marginBottom: "1.5rem" }}>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
+                  <Skeleton width="40%" height="0.75rem" borderRadius={4} />
+                  <div style={{ marginTop: "0.4rem" }}>
+                    <Skeleton width="70%" height="1.1rem" borderRadius={4} />
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
             <>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "1rem", marginBottom: "1.5rem" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: "1rem", marginBottom: "1.5rem" }}>
                 <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
                   <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>Full Name</div>
                   <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>{profile.data?.full_name || "—"}</div>
@@ -974,10 +1106,23 @@ export function OwnerTenantDashboardView({
           <h3 className="card-h3" style={{ marginBottom: "1.5rem" }}>
             Property & Tenancy Information
           </h3>
-          {profile.isLoading ? (
-            <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>
-              Loading property details…
-            </p>
+          {profile.isError ? (
+            <ErrorState
+              title="Failed to load property details"
+              message="Unable to fetch tenancy records from the server."
+              onRetry={() => profile.refetch()}
+            />
+          ) : profile.isLoading ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: "1rem", marginBottom: "1.5rem" }}>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
+                  <Skeleton width="40%" height="0.75rem" borderRadius={4} />
+                  <div style={{ marginTop: "0.4rem" }}>
+                    <Skeleton width="70%" height="1.1rem" borderRadius={4} />
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : !myOccupancy ? (
             <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>
               No active unit occupancy found for this profile.
@@ -986,7 +1131,7 @@ export function OwnerTenantDashboardView({
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(2, 1fr)",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
                 gap: "1rem",
                 marginBottom: "1.5rem",
               }}
@@ -1078,11 +1223,13 @@ export function OwnerTenantDashboardView({
               justifyContent: "space-between",
               alignItems: "center",
               marginBottom: "1.25rem",
+              flexWrap: "wrap",
+              gap: "0.75rem",
             }}
           >
             <div>
-              <h3 className="card-h3">Family Members (Gate Pre-Approved)</h3>
-              <p style={{ color: "var(--brand-body)", fontSize: "13.5px" }}>
+              <h3 className="card-h3" style={{ margin: 0 }}>Family Members (Gate Pre-Approved)</h3>
+              <p style={{ color: "var(--brand-body)", fontSize: "13.5px", margin: "0.25rem 0 0 0" }}>
                 Family members listed here feed the gate recognition system and automatically bypass
                 manual guard approval upon entry.
               </p>
@@ -1101,95 +1248,110 @@ export function OwnerTenantDashboardView({
             </BrandButton>
           </div>
 
-          <DataTable<FamilyMember>
-            columns={[
-              {
-                key: "name",
-                header: "Member Name",
-                sortable: true,
-                render: (m) => (
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-                    <div
-                      style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: "50%",
-                        background: "linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)",
-                        color: "#fff",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: "13px",
-                        fontWeight: 700,
-                      }}
-                    >
-                      {m.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 600, color: "var(--brand-heading)" }}>{m.name}</div>
-                      <div style={{ fontSize: "11.5px", color: "var(--brand-body)" }}>
-                        {m.phone}
+          {family.isError ? (
+            <ErrorState
+              title="Failed to load family members"
+              message="Unable to fetch registered household members."
+              onRetry={() => family.refetch()}
+            />
+          ) : (
+            <DataTable<FamilyMember>
+              columns={[
+                {
+                  key: "name",
+                  header: "Member Name",
+                  sortable: true,
+                  render: (m) => (
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                      <div
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: "50%",
+                          background: "linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)",
+                          color: "#fff",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "13px",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {m.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 600, color: "var(--brand-heading)" }}>{m.name}</div>
+                        <div style={{ fontSize: "11.5px", color: "var(--brand-body)" }}>
+                          {m.phone}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ),
-              },
-              {
-                key: "relation",
-                header: "Relationship",
-                render: (m) => (
-                  <span
-                    style={{
-                      padding: "0.2rem 0.55rem",
-                      borderRadius: "6px",
-                      background: "#F1F5F9",
-                      fontSize: "12px",
-                      fontWeight: 600,
-                      color: "#334155",
-                    }}
-                  >
-                    {m.relation}
-                  </span>
-                ),
-              },
-              {
-                key: "access_enabled",
-                header: "Gate Recognition Whitelist",
-                render: (m) =>
-                  m.access_enabled ? (
-                    <StatusBadge status="approved" label="✓ Pre-Approved (Auto-Pass)" />
-                  ) : (
-                    <StatusBadge status="rejected" label="🔒 Manual Approval Required" />
                   ),
-              },
-              {
-                key: "actions",
-                header: "Actions",
-                render: (m) => (
-                  <div style={{ display: "flex", gap: "0.5rem" }}>
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      style={{ padding: "0.25rem 0.6rem", fontSize: "12px" }}
-                      onClick={() => setEditingMember(m)}
+                },
+                {
+                  key: "relation",
+                  header: "Relationship",
+                  render: (m) => (
+                    <span
+                      style={{
+                        padding: "0.2rem 0.55rem",
+                        borderRadius: "6px",
+                        background: "#F1F5F9",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        color: "#334155",
+                      }}
                     >
-                      ✏️ Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      style={{ padding: "0.25rem 0.6rem", fontSize: "12px", color: "#DC2626" }}
-                      onClick={() => setMemberToDelete(m)}
-                    >
-                      🗑️ Remove
-                    </button>
-                  </div>
-                ),
-              },
-            ]}
-            data={family.familyMembers}
-            isLoading={family.isLoading}
-          />
+                      {m.relation}
+                    </span>
+                  ),
+                },
+                {
+                  key: "access_enabled",
+                  header: "Gate Recognition Whitelist",
+                  render: (m) =>
+                    m.access_enabled ? (
+                      <StatusBadge status="approved" label="✓ Pre-Approved (Auto-Pass)" />
+                    ) : (
+                      <StatusBadge status="rejected" label="🔒 Manual Approval Required" />
+                    ),
+                },
+                {
+                  key: "actions",
+                  header: "Actions",
+                  render: (m) => (
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ padding: "0.25rem 0.6rem", fontSize: "12px" }}
+                        onClick={() => setEditingMember(m)}
+                      >
+                        ✏️ Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ padding: "0.25rem 0.6rem", fontSize: "12px", color: "#DC2626" }}
+                        onClick={() => setMemberToDelete(m)}
+                      >
+                        🗑️ Remove
+                      </button>
+                    </div>
+                  ),
+                },
+              ]}
+              data={familyControls.paginatedData}
+              isLoading={family.isLoading}
+              page={familyControls.page}
+              pageSize={familyControls.pageSize}
+              total={familyControls.total}
+              onPageChange={familyControls.setPage}
+              onPageSizeChange={familyControls.setPageSize}
+              emptyTitle="No family members registered"
+              emptyDescription="Add family members to enable automated gate whitelist pass generation."
+            />
+          )}
         </div>
       )}
 
@@ -1202,10 +1364,12 @@ export function OwnerTenantDashboardView({
               justifyContent: "space-between",
               alignItems: "center",
               marginBottom: "1rem",
+              flexWrap: "wrap",
+              gap: "0.75rem",
             }}
           >
             <FilterPanel onReset={visitorControls.clearFilters}>
-              <div style={{ width: 280 }}>
+              <div style={{ width: "min(100%, 280px)" }}>
                 <DebouncedInput
                   value={visitorControls.searchTerm}
                   onChange={visitorControls.setSearchTerm}
@@ -1219,57 +1383,68 @@ export function OwnerTenantDashboardView({
             </BrandButton>
           </div>
 
-          <DataTable<VisitorRequest>
-            columns={[
-              { key: "visitor_name", header: "Visitor Name", sortable: true },
-              { key: "phone", header: "Phone" },
-              { key: "purpose", header: "Purpose" },
-              { key: "status", header: "Status", render: (i) => <StatusBadge status={i.status} /> },
-              {
-                key: "pass_code",
-                header: "Pass / PIN",
-                render: (i) =>
-                  i.pass_code || i.qr_token ? (
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                      <code style={{ color: "var(--brand-primary)", fontWeight: 700 }}>
-                        {i.pass_code || "QR PASS"}
-                      </code>
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        style={{ padding: "0.2rem 0.5rem", fontSize: "11px", display: "inline-flex", alignItems: "center", gap: "0.25rem" }}
-                        onClick={() => {
-                          setActivePassResult({
-                            token: i.qr_token || i.pass_code,
-                            pin: i.pass_code,
-                            visitor_name: i.visitor_name,
-                            category: "Visitor",
-                            reason: i.purpose,
-                            valid_to: i.valid_until,
-                          });
-                          setActivePassModalOpen(true);
-                        }}
-                      >
-                        📱 QR
-                      </button>
-                    </div>
-                  ) : (
-                    "–"
-                  ),
-              },
-              {
-                key: "created_at",
-                header: "Requested / Entry",
-                render: (i) => formatDate(i.entry_time || i.created_at),
-              },
-            ]}
-            data={visitorControls.paginatedData}
-            isLoading={visitors.isLoading}
-            page={visitorControls.page}
-            pageSize={visitorControls.pageSize}
-            total={visitorControls.total}
-            onPageChange={visitorControls.setPage}
-          />
+          {visitors.isError ? (
+            <ErrorState
+              title="Failed to Load Visitor Requests"
+              message={visitors.error?.message || "Could not retrieve visitor list from server."}
+              onRetry={() => visitors.refetch()}
+            />
+          ) : (
+            <DataTable<VisitorRequest>
+              columns={[
+                { key: "visitor_name", header: "Visitor Name", sortable: true },
+                { key: "phone", header: "Phone" },
+                { key: "purpose", header: "Purpose" },
+                { key: "status", header: "Status", render: (i) => <StatusBadge status={i.status} /> },
+                {
+                  key: "pass_code",
+                  header: "Pass / PIN",
+                  render: (i) =>
+                    i.pass_code || i.qr_token ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <code style={{ color: "var(--brand-primary)", fontWeight: 700 }}>
+                          {i.pass_code || "QR PASS"}
+                        </code>
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          style={{ padding: "0.2rem 0.5rem", fontSize: "11px", display: "inline-flex", alignItems: "center", gap: "0.25rem" }}
+                          onClick={() => {
+                            setActivePassResult({
+                              token: i.qr_token || i.pass_code,
+                              pin: i.pass_code,
+                              visitor_name: i.visitor_name,
+                              category: "Visitor",
+                              reason: i.purpose,
+                              valid_to: i.valid_until,
+                            });
+                            setActivePassModalOpen(true);
+                          }}
+                        >
+                          📱 QR
+                        </button>
+                      </div>
+                    ) : (
+                      "–"
+                    ),
+                },
+                {
+                  key: "created_at",
+                  header: "Requested / Entry",
+                  render: (i) => formatDate(i.entry_time || i.created_at),
+                },
+              ]}
+              data={visitorControls.paginatedData}
+              isLoading={visitors.isLoading}
+              page={visitorControls.page}
+              pageSize={visitorControls.pageSize}
+              total={visitorControls.total}
+              onPageChange={visitorControls.setPage}
+              onPageSizeChange={visitorControls.setPageSize}
+              emptyTitle="No visitor requests"
+              emptyDescription="Create pre-approved passes or monitor incoming guest requests."
+            />
+          )}
         </div>
       )}
 
@@ -1286,7 +1461,17 @@ export function OwnerTenantDashboardView({
               intercom.
             </p>
             {deliveryProtocols.isLoading ? (
-              <p style={{ color: "var(--brand-body)", fontSize: "13px" }}>Loading protocols…</p>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
+                  gap: "1rem",
+                }}
+              >
+                {[1, 2, 3].map((n) => (
+                  <CardSkeleton key={n} lines={2} />
+                ))}
+              </div>
             ) : (deliveryProtocols.data || []).length === 0 ? (
               <p style={{ color: "var(--brand-body)", fontSize: "13px" }}>
                 No delivery protocols configured for this community yet.
@@ -1295,7 +1480,7 @@ export function OwnerTenantDashboardView({
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
                   gap: "1rem",
                 }}
               >
@@ -1331,29 +1516,40 @@ export function OwnerTenantDashboardView({
             )}
           </div>
 
-          <DataTable
-            columns={[
-              { key: "courier_company", header: "Courier / Platform", sortable: true },
-              { key: "package_type", header: "Package Content" },
-              { key: "tracking_id", header: "Tracking ID" },
-              {
-                key: "status",
-                header: "Delivery Status",
-                render: (i) => <StatusBadge status={i.status} />,
-              },
-              {
-                key: "arrived_at",
-                header: "Arrival / Delivery",
-                render: (i) => formatDate(i.delivered_at || i.arrived_at),
-              },
-            ]}
-            data={deliveryControls.paginatedData}
-            isLoading={deliveries.isLoading}
-            page={deliveryControls.page}
-            pageSize={deliveryControls.pageSize}
-            total={deliveryControls.total}
-            onPageChange={deliveryControls.setPage}
-          />
+          {deliveries.isError ? (
+            <ErrorState
+              title="Failed to Load Deliveries"
+              message={deliveries.error?.message || "Could not retrieve delivery history."}
+              onRetry={() => deliveries.refetch()}
+            />
+          ) : (
+            <DataTable<DeliveryItem>
+              columns={[
+                { key: "courier_company", header: "Courier / Platform", sortable: true },
+                { key: "package_type", header: "Package Content" },
+                { key: "tracking_id", header: "Tracking ID" },
+                {
+                  key: "status",
+                  header: "Delivery Status",
+                  render: (i) => <StatusBadge status={i.status} />,
+                },
+                {
+                  key: "arrived_at",
+                  header: "Arrival / Delivery",
+                  render: (i) => formatDate(i.delivered_at || i.arrived_at),
+                },
+              ]}
+              data={deliveryControls.paginatedData}
+              isLoading={deliveries.isLoading}
+              page={deliveryControls.page}
+              pageSize={deliveryControls.pageSize}
+              total={deliveryControls.total}
+              onPageChange={deliveryControls.setPage}
+              onPageSizeChange={deliveryControls.setPageSize}
+              emptyTitle="No deliveries recorded"
+              emptyDescription="Parcels logged at the gate will appear here in real-time."
+            />
+          )}
         </div>
       )}
 
@@ -1365,65 +1561,81 @@ export function OwnerTenantDashboardView({
             <h3 className="card-h3" style={{ marginBottom: "1rem" }}>
               My Active Facility Bookings
             </h3>
-            <DataTable
-              columns={[
-                { key: "amenity_name", header: "Facility Name" },
-                { key: "date", header: "Reserved Date" },
-                {
-                  key: "start_time",
-                  header: "Time Slot",
-                  render: (i) => `${i.start_time} – ${i.end_time}`,
-                },
-                {
-                  key: "guests_count",
-                  header: "Guests",
-                  render: (i) => `${i.guests_count || 1} Person(s)`,
-                },
-                {
-                  key: "status",
-                  header: "Status",
-                  render: (i) => <StatusBadge status={i.status} />,
-                },
-                {
-                  key: "actions",
-                  header: "Action",
-                  render: (i) => {
-                    if (i.status === "cancelled") {
-                      return (
-                        <span
-                          style={{
-                            fontSize: "12px",
-                            color: "var(--brand-muted)",
-                            fontStyle: "italic",
-                          }}
-                        >
-                          Cancelled
-                        </span>
-                      );
-                    }
-                    if (i.status === "completed") {
-                      return (
-                        <span style={{ fontSize: "12px", color: "#059669", fontWeight: 600 }}>
-                          Completed
-                        </span>
-                      );
-                    }
-                    return (
-                      <BrandButton
-                        variant="outline"
-                        size="sm"
-                        style={{ borderColor: "#FECACA", color: "#DC2626" }}
-                        isLoading={amenities.cancelBooking.isPending}
-                        onClick={() => handleCancelBooking(i)}
-                      >
-                        Cancel Booking
-                      </BrandButton>
-                    );
+            {amenities.bookings.isError ? (
+              <ErrorState
+                title="Failed to Load Bookings"
+                message={amenities.bookings.error?.message || "Could not load reservations."}
+                onRetry={() => amenities.bookings.refetch()}
+              />
+            ) : (
+              <DataTable<AmenityBooking>
+                columns={[
+                  { key: "amenity_name", header: "Facility Name" },
+                  { key: "date", header: "Reserved Date" },
+                  {
+                    key: "start_time",
+                    header: "Time Slot",
+                    render: (i) => `${i.start_time} – ${i.end_time}`,
                   },
-                },
-              ]}
-              data={amenities.bookings.data || []}
-            />
+                  {
+                    key: "guests_count",
+                    header: "Guests",
+                    render: (i) => `${i.guests_count || 1} Person(s)`,
+                  },
+                  {
+                    key: "status",
+                    header: "Status",
+                    render: (i) => <StatusBadge status={i.status} />,
+                  },
+                  {
+                    key: "actions",
+                    header: "Action",
+                    render: (i) => {
+                      if (i.status === "cancelled") {
+                        return (
+                          <span
+                            style={{
+                              fontSize: "12px",
+                              color: "var(--brand-muted)",
+                              fontStyle: "italic",
+                            }}
+                          >
+                            Cancelled
+                          </span>
+                        );
+                      }
+                      if (i.status === "completed") {
+                        return (
+                          <span style={{ fontSize: "12px", color: "#059669", fontWeight: 600 }}>
+                            Completed
+                          </span>
+                        );
+                      }
+                      return (
+                        <BrandButton
+                          variant="outline"
+                          size="sm"
+                          style={{ borderColor: "#FECACA", color: "#DC2626" }}
+                          isLoading={amenities.cancelBooking.isPending}
+                          onClick={() => handleCancelBooking(i)}
+                        >
+                          Cancel Booking
+                        </BrandButton>
+                      );
+                    },
+                  },
+                ]}
+                data={bookingControls.paginatedData}
+                isLoading={amenities.bookings.isLoading}
+                page={bookingControls.page}
+                pageSize={bookingControls.pageSize}
+                total={bookingControls.total}
+                onPageChange={bookingControls.setPage}
+                onPageSizeChange={bookingControls.setPageSize}
+                emptyTitle="No active bookings"
+                emptyDescription="Reserve slots for clubhouse, pool, court, and other amenities."
+              />
+            )}
           </div>
 
           {/* Browse Available Amenities Grid */}
@@ -1431,53 +1643,77 @@ export function OwnerTenantDashboardView({
             <h3 className="card-h3" style={{ marginBottom: "1rem" }}>
               Browse Community Amenities
             </h3>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-                gap: "1.25rem",
-              }}
-            >
-              {(amenities.amenities.data || []).map((amenity) => (
-                <div key={amenity.id} className="gs-card card-hover">
-                  <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>🏊</div>
-                  <h4 style={{ fontWeight: 800, fontSize: "16px" }}>{amenity.name}</h4>
-                  <p
-                    style={{
-                      fontSize: "13px",
-                      color: "var(--brand-body)",
-                      margin: "0.5rem 0 1rem 0",
-                    }}
-                  >
-                    {amenity.description}
-                  </p>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <span
-                      style={{ fontSize: "13px", fontWeight: 700, color: "var(--brand-primary)" }}
-                    >
-                      {amenity.price_per_hour > 0
-                        ? `$${amenity.price_per_hour}/hr`
-                        : "Free for Residents"}
-                    </span>
-                    <BrandButton
-                      size="sm"
-                      onClick={() => {
-                        setSelectedAmenity(amenity);
-                        setAmenityBookingModalOpen(true);
+            {amenities.amenities.isLoading ? (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
+                  gap: "1.25rem",
+                }}
+              >
+                {[1, 2, 3, 4].map((n) => (
+                  <CardSkeleton key={n} lines={4} />
+                ))}
+              </div>
+            ) : amenities.amenities.isError ? (
+              <ErrorState
+                title="Failed to Load Amenities"
+                message={amenities.amenities.error?.message || "Could not retrieve community amenities."}
+                onRetry={() => amenities.amenities.refetch()}
+              />
+            ) : (amenities.amenities.data || []).length === 0 ? (
+              <div className="gs-card" style={{ textAlign: "center", padding: "2rem" }}>
+                <p style={{ color: "var(--brand-body)", margin: 0 }}>No amenities configured for this community.</p>
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
+                  gap: "1.25rem",
+                }}
+              >
+                {(amenities.amenities.data || []).map((amenity) => (
+                  <div key={amenity.id} className="gs-card card-hover">
+                    <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>🏊</div>
+                    <h4 style={{ fontWeight: 800, fontSize: "16px" }}>{amenity.name}</h4>
+                    <p
+                      style={{
+                        fontSize: "13px",
+                        color: "var(--brand-body)",
+                        margin: "0.5rem 0 1rem 0",
                       }}
                     >
-                      Reserve Slot
-                    </BrandButton>
+                      {amenity.description}
+                    </p>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <span
+                        style={{ fontSize: "13px", fontWeight: 700, color: "var(--brand-primary)" }}
+                      >
+                        {amenity.price_per_hour > 0
+                          ? `$${amenity.price_per_hour}/hr`
+                          : "Free for Residents"}
+                      </span>
+                      <BrandButton
+                        size="sm"
+                        onClick={() => {
+                          setSelectedAmenity(amenity);
+                          setAmenityBookingModalOpen(true);
+                        }}
+                      >
+                        Reserve Slot
+                      </BrandButton>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1492,7 +1728,17 @@ export function OwnerTenantDashboardView({
             Scheduled maintenance affecting water, power, elevators, and clubhouse areas.
           </p>
           {announcements.isLoading ? (
-            <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>Loading notices…</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              {[1, 2, 3].map((n) => (
+                <CardSkeleton key={n} lines={2} />
+              ))}
+            </div>
+          ) : announcements.isError ? (
+            <ErrorState
+              title="Failed to Load Notices"
+              message={announcements.error?.message || "Could not retrieve announcements."}
+              onRetry={() => announcements.refetch()}
+            />
           ) : (announcements.data || []).length === 0 ? (
             <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>
               No community notices published yet.
@@ -1539,10 +1785,12 @@ export function OwnerTenantDashboardView({
               justifyContent: "space-between",
               alignItems: "center",
               marginBottom: "1rem",
+              flexWrap: "wrap",
+              gap: "0.75rem",
             }}
           >
             <FilterPanel onReset={complaintControls.clearFilters}>
-              <div style={{ width: 280 }}>
+              <div style={{ width: "min(100%, 280px)" }}>
                 <DebouncedInput
                   value={complaintControls.searchTerm}
                   onChange={complaintControls.setSearchTerm}
@@ -1556,70 +1804,81 @@ export function OwnerTenantDashboardView({
             </BrandButton>
           </div>
 
-          <DataTable<ComplaintTicket>
-            columns={[
-              { key: "ticket_number", header: "Ticket #", sortable: true },
-              { key: "subject", header: "Subject", sortable: true },
-              { key: "category_name", header: "Category" },
-              {
-                key: "priority",
-                header: "Priority",
-                render: (i) => <StatusBadge status={i.priority} />,
-              },
-              { key: "status", header: "Status", render: (i) => <StatusBadge status={i.status} /> },
-              {
-                key: "escalation_state",
-                header: "SLA Tracker",
-                render: (i) => <StatusBadge status={i.escalation_state} />,
-              },
-              { key: "created_at", header: "Raised", render: (i) => formatDate(i.created_at) },
-              {
-                key: "actions",
-                header: "Action",
-                render: (i) => {
-                  if (i.status !== "resident_confirmation") return null;
-                  return (
-                    <div style={{ display: "flex", gap: "0.4rem" }}>
-                      <BrandButton
-                        size="sm"
-                        isLoading={complaints.confirmTicket.isPending}
-                        onClick={() =>
-                          complaints.confirmTicket.mutateAsync({
-                            ticketId: i.id,
-                            satisfied: true,
-                            notes: "Fix confirmed by resident",
-                          }).catch((e: any) => toast.error(e?.message || "Failed to confirm.", "Error"))
-                        }
-                      >
-                        ✓ Confirm Fix
-                      </BrandButton>
-                      <BrandButton
-                        size="sm"
-                        variant="outline"
-                        style={{ borderColor: "#FECACA", color: "#DC2626" }}
-                        isLoading={complaints.confirmTicket.isPending}
-                        onClick={() =>
-                          complaints.confirmTicket.mutateAsync({
-                            ticketId: i.id,
-                            satisfied: false,
-                            notes: "Issue not resolved — disputed by resident",
-                          }).catch((e: any) => toast.error(e?.message || "Failed to dispute.", "Error"))
-                        }
-                      >
-                        ✗ Dispute
-                      </BrandButton>
-                    </div>
-                  );
+          {complaints.isError ? (
+            <ErrorState
+              title="Failed to Load Service Tickets"
+              message={complaints.error?.message || "Could not retrieve maintenance complaints."}
+              onRetry={() => complaints.refetch()}
+            />
+          ) : (
+            <DataTable<ComplaintTicket>
+              columns={[
+                { key: "ticket_number", header: "Ticket #", sortable: true },
+                { key: "subject", header: "Subject", sortable: true },
+                { key: "category_name", header: "Category" },
+                {
+                  key: "priority",
+                  header: "Priority",
+                  render: (i) => <StatusBadge status={i.priority} />,
                 },
-              },
-            ]}
-            data={complaintControls.paginatedData}
-            isLoading={complaints.isLoading}
-            page={complaintControls.page}
-            pageSize={complaintControls.pageSize}
-            total={complaintControls.total}
-            onPageChange={complaintControls.setPage}
-          />
+                { key: "status", header: "Status", render: (i) => <StatusBadge status={i.status} /> },
+                {
+                  key: "escalation_state",
+                  header: "SLA Tracker",
+                  render: (i) => <StatusBadge status={i.escalation_state} />,
+                },
+                { key: "created_at", header: "Raised", render: (i) => formatDate(i.created_at) },
+                {
+                  key: "actions",
+                  header: "Action",
+                  render: (i) => {
+                    if (i.status !== "resident_confirmation") return null;
+                    return (
+                      <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+                        <BrandButton
+                          size="sm"
+                          isLoading={complaints.confirmTicket.isPending}
+                          onClick={() =>
+                            complaints.confirmTicket.mutateAsync({
+                              ticketId: i.id,
+                              satisfied: true,
+                              notes: "Fix confirmed by resident",
+                            }).catch((e: any) => toast.error(e?.message || "Failed to confirm.", "Error"))
+                          }
+                        >
+                          ✓ Confirm Fix
+                        </BrandButton>
+                        <BrandButton
+                          size="sm"
+                          variant="outline"
+                          style={{ borderColor: "#FECACA", color: "#DC2626" }}
+                          isLoading={complaints.confirmTicket.isPending}
+                          onClick={() =>
+                            complaints.confirmTicket.mutateAsync({
+                              ticketId: i.id,
+                              satisfied: false,
+                              notes: "Issue not resolved — disputed by resident",
+                            }).catch((e: any) => toast.error(e?.message || "Failed to dispute.", "Error"))
+                          }
+                        >
+                          ✗ Dispute
+                        </BrandButton>
+                      </div>
+                    );
+                  },
+                },
+              ]}
+              data={complaintControls.paginatedData}
+              isLoading={complaints.isLoading}
+              page={complaintControls.page}
+              pageSize={complaintControls.pageSize}
+              total={complaintControls.total}
+              onPageChange={complaintControls.setPage}
+              onPageSizeChange={complaintControls.setPageSize}
+              emptyTitle="No service tickets"
+              emptyDescription="Raise a maintenance ticket to get assistance from society facility technicians."
+            />
+          )}
         </div>
       )}
 
@@ -1630,36 +1889,51 @@ export function OwnerTenantDashboardView({
             <h3 className="card-h3" style={{ marginBottom: "1rem" }}>
               Registered Vehicles & Parking Allocation
             </h3>
-            <DataTable
-              columns={[
-                {
-                  key: "plate",
-                  header: "License Plate",
-                  render: (i) => <code style={{ fontWeight: 800 }}>{i.plate}</code>,
-                },
-                { key: "make_model", header: "Make & Model" },
-                {
-                  key: "slot",
-                  header: "Allocated Slot",
-                  render: (i) => (
-                    <span style={{ fontWeight: 700, color: "var(--brand-primary)" }}>{i.slot}</span>
-                  ),
-                },
-                { key: "rfid_tag", header: "Gate FastTag / RFID" },
-                {
-                  key: "violations",
-                  header: "Recorded Violations",
-                  render: (i) =>
-                    i.violations === 0 ? (
-                      <StatusBadge status="active" label="0 Violations" />
-                    ) : (
-                      <StatusBadge status="warning" label={`${i.violations} Warning`} />
+            {vehicles.isError ? (
+              <ErrorState
+                title="Failed to Load Vehicles"
+                message={vehicles.error?.message || "Could not retrieve registered vehicles."}
+                onRetry={() => vehicles.refetch()}
+              />
+            ) : (
+              <DataTable
+                columns={[
+                  {
+                    key: "plate",
+                    header: "License Plate",
+                    render: (i) => <code style={{ fontWeight: 800 }}>{i.plate}</code>,
+                  },
+                  { key: "make_model", header: "Make & Model" },
+                  {
+                    key: "slot",
+                    header: "Allocated Slot",
+                    render: (i) => (
+                      <span style={{ fontWeight: 700, color: "var(--brand-primary)" }}>{i.slot}</span>
                     ),
-                },
-              ]}
-              data={vehicles.data || []}
-              isLoading={vehicles.isLoading}
-            />
+                  },
+                  { key: "rfid_tag", header: "Gate FastTag / RFID" },
+                  {
+                    key: "violations",
+                    header: "Recorded Violations",
+                    render: (i) =>
+                      i.violations === 0 ? (
+                        <StatusBadge status="active" label="0 Violations" />
+                      ) : (
+                        <StatusBadge status="warning" label={`${i.violations} Warning`} />
+                      ),
+                  },
+                ]}
+                data={vehicleControls.paginatedData}
+                isLoading={vehicles.isLoading}
+                page={vehicleControls.page}
+                pageSize={vehicleControls.pageSize}
+                total={vehicleControls.total}
+                onPageChange={vehicleControls.setPage}
+                onPageSizeChange={vehicleControls.setPageSize}
+                emptyTitle="No vehicles registered"
+                emptyDescription="Contact your facility office or community admin to link registered vehicles."
+              />
+            )}
           </div>
         </div>
       )}
@@ -1673,6 +1947,8 @@ export function OwnerTenantDashboardView({
               justifyContent: "space-between",
               alignItems: "center",
               marginBottom: "1.25rem",
+              flexWrap: "wrap",
+              gap: "0.75rem",
             }}
           >
             <div>
@@ -1684,30 +1960,45 @@ export function OwnerTenantDashboardView({
             </div>
           </div>
 
-          <DataTable
-            columns={[
-              { key: "name", header: "Staff Member", sortable: true },
-              { key: "role", header: "Service Type" },
-              { key: "phone", header: "Phone" },
-              {
-                key: "police_verified",
-                header: "Verification",
-                render: (i) =>
-                  i.police_verified ? (
-                    <StatusBadge status="verified" label="✓ Police Verified" />
-                  ) : (
-                    <StatusBadge status="pending" label="Verification Pending" />
-                  ),
-              },
-              {
-                key: "is_active",
-                header: "Assignment Status",
-                render: (i) => <StatusBadge status={i.is_active ? "active" : "inactive"} />,
-              },
-            ]}
-            data={domesticStaff.data || []}
-            isLoading={domesticStaff.isLoading}
-          />
+          {domesticStaff.isError ? (
+            <ErrorState
+              title="Failed to Load Domestic Staff"
+              message={domesticStaff.error?.message || "Could not retrieve assigned domestic staff."}
+              onRetry={() => domesticStaff.refetch()}
+            />
+          ) : (
+            <DataTable
+              columns={[
+                { key: "name", header: "Staff Member", sortable: true },
+                { key: "role", header: "Service Type" },
+                { key: "phone", header: "Phone" },
+                {
+                  key: "police_verified",
+                  header: "Verification",
+                  render: (i) =>
+                    i.police_verified ? (
+                      <StatusBadge status="verified" label="✓ Police Verified" />
+                    ) : (
+                      <StatusBadge status="pending" label="Verification Pending" />
+                    ),
+                },
+                {
+                  key: "is_active",
+                  header: "Assignment Status",
+                  render: (i) => <StatusBadge status={i.is_active ? "active" : "inactive"} />,
+                },
+              ]}
+              data={staffControls.paginatedData}
+              isLoading={domesticStaff.isLoading}
+              page={staffControls.page}
+              pageSize={staffControls.pageSize}
+              total={staffControls.total}
+              onPageChange={staffControls.setPage}
+              onPageSizeChange={staffControls.setPageSize}
+              emptyTitle="No domestic staff assigned"
+              emptyDescription="Staff assignments are registered and managed through your community management."
+            />
+          )}
         </div>
       )}
 
@@ -1751,55 +2042,71 @@ export function OwnerTenantDashboardView({
             <h3 className="card-h3" style={{ marginBottom: "1rem" }}>
               Invoices & Dues Ledger
             </h3>
-            <DataTable
-              columns={[
-                { key: "invoice_number", header: "Invoice #", sortable: true },
-                { key: "title", header: "Billing Item" },
-                {
-                  key: "total_amount",
-                  header: "Total Amount",
-                  render: (i) => formatCurrency(i.total_amount),
-                },
-                {
-                  key: "balance_due",
-                  header: "Balance Due",
-                  render: (i) => formatCurrency(i.balance_due),
-                },
-                {
-                  key: "status",
-                  header: "Status",
-                  render: (i) => <StatusBadge status={i.status} />,
-                },
-                {
-                  key: "actions",
-                  header: "Action",
-                  render: (i) =>
-                    i.status !== "paid" ? (
-                      <BrandButton
-                        size="sm"
-                        onClick={() => {
-                          setSelectedInvoice(i);
-                          setPaymentModalOpen(true);
-                        }}
-                      >
-                        Pay Now
-                      </BrandButton>
-                    ) : (
-                      <BrandButton
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setCurrentReceiptNumber(`RCP-${i.invoice_number}`);
-                          setReceiptModalOpen(true);
-                        }}
-                      >
-                        Receipt
-                      </BrandButton>
-                    ),
-                },
-              ]}
-              data={invoiceList}
-            />
+            {payments.isError ? (
+              <ErrorState
+                title="Failed to Load Invoices"
+                message={payments.error?.message || "Could not retrieve billing ledger."}
+                onRetry={() => payments.refetch()}
+              />
+            ) : (
+              <DataTable<InvoiceItem>
+                columns={[
+                  { key: "invoice_number", header: "Invoice #", sortable: true },
+                  { key: "title", header: "Billing Item" },
+                  {
+                    key: "total_amount",
+                    header: "Total Amount",
+                    render: (i) => formatCurrency(i.total_amount),
+                  },
+                  {
+                    key: "balance_due",
+                    header: "Balance Due",
+                    render: (i) => formatCurrency(i.balance_due),
+                  },
+                  {
+                    key: "status",
+                    header: "Status",
+                    render: (i) => <StatusBadge status={i.status} />,
+                  },
+                  {
+                    key: "actions",
+                    header: "Action",
+                    render: (i) =>
+                      i.status !== "paid" ? (
+                        <BrandButton
+                          size="sm"
+                          onClick={() => {
+                            setSelectedInvoice(i);
+                            setPaymentModalOpen(true);
+                          }}
+                        >
+                          Pay Now
+                        </BrandButton>
+                      ) : (
+                        <BrandButton
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setCurrentReceiptNumber(`RCP-${i.invoice_number}`);
+                            setReceiptModalOpen(true);
+                          }}
+                        >
+                          Receipt
+                        </BrandButton>
+                      ),
+                  },
+                ]}
+                data={invoiceControls.paginatedData}
+                isLoading={payments.isLoading}
+                page={invoiceControls.page}
+                pageSize={invoiceControls.pageSize}
+                total={invoiceControls.total}
+                onPageChange={invoiceControls.setPage}
+                onPageSizeChange={invoiceControls.setPageSize}
+                emptyTitle="No invoices or dues"
+                emptyDescription="All maintenance and amenity dues have been settled."
+              />
+            )}
           </div>
         </div>
       )}
@@ -1811,7 +2118,17 @@ export function OwnerTenantDashboardView({
             Notifications & Gate Alerts
           </h3>
           {myNotifications.isLoading ? (
-            <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>Loading notifications…</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+              {[1, 2, 3, 4].map((n) => (
+                <CardSkeleton key={n} lines={2} />
+              ))}
+            </div>
+          ) : myNotifications.isError ? (
+            <ErrorState
+              title="Failed to Load Notifications"
+              message={myNotifications.error?.message || "Could not retrieve notifications."}
+              onRetry={() => myNotifications.refetch()}
+            />
           ) : (myNotifications.data || []).length === 0 ? (
             <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>No notifications yet.</p>
           ) : (
@@ -1833,10 +2150,12 @@ export function OwnerTenantDashboardView({
                       display: "flex",
                       justifyContent: "space-between",
                       marginBottom: "0.25rem",
+                      flexWrap: "wrap",
+                      gap: "0.5rem",
                     }}
                   >
                     <h4
-                      style={{ fontWeight: 700, fontSize: "14px", color: "var(--brand-heading)" }}
+                      style={{ fontWeight: 700, fontSize: "14px", color: "var(--brand-heading)", margin: 0 }}
                     >
                       {n.title}
                     </h4>
@@ -1877,7 +2196,7 @@ export function OwnerTenantDashboardView({
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(2, 1fr)",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))",
               gap: "0.75rem",
               marginBottom: "1.5rem",
             }}
@@ -1965,12 +2284,15 @@ export function OwnerTenantDashboardView({
               onChange={(e) => setPassCategory(e.target.value)}
               required
             >
-              <option value="Guest">Guest / Friend & Family</option>
-              <option value="Delivery">Delivery / Courier</option>
-              <option value="Cab">Cab / Taxi</option>
-              <option value="Service">Service / Maintenance Technician</option>
-              <option value="Domestic Staff">Domestic Staff / Daily Help</option>
-              <option value="Contractor">Contractor / Interior Worker</option>
+              <option value="Personal Guest">Personal Guest / Family & Friends</option>
+              <option value="Relative">Relative / Extended Family</option>
+              <option value="Cab / Taxi">Cab / Taxi Driver (Uber / Ola)</option>
+              <option value="Delivery Executive">Delivery Executive (Amazon / Swiggy / Zomato)</option>
+              <option value="Service Technician">Service Technician (Plumbing / Electrical / AC)</option>
+              <option value="Vendor / Contractor">Vendor / Contractor / Interior Worker</option>
+              <option value="Interviewee">Interviewee / Applicant</option>
+              <option value="Event Guest">Event Guest / Party Invite</option>
+              <option value="Recurring / Daily Help">Recurring Visitor / Daily Help</option>
               <option value="Other">Other Visitor</option>
             </select>
           </div>
@@ -2015,6 +2337,66 @@ export function OwnerTenantDashboardView({
               10-digit mobile number required for gate security & pass delivery
             </span>
           </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  marginBottom: "0.35rem",
+                }}
+              >
+                Vehicle Number <span style={{ fontSize: "11px", color: "var(--muted)" }}>(Optional)</span>
+              </label>
+              <input
+                className="input-field"
+                placeholder="e.g. MH12AB1234"
+                value={passVehicleNumber}
+                onChange={(e) => setPassVehicleNumber(e.target.value)}
+              />
+            </div>
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  marginBottom: "0.35rem",
+                }}
+              >
+                Party Size (Visitors)
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={50}
+                className="input-field"
+                value={passPartySize}
+                onChange={(e) => setPassPartySize(Math.max(1, parseInt(e.target.value, 10) || 1))}
+              />
+            </div>
+          </div>
+          {passPartySize > 1 && (
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  marginBottom: "0.35rem",
+                }}
+              >
+                Group Label / Occasion
+              </label>
+              <input
+                className="input-field"
+                placeholder="e.g. Birthday Party Group / Dinner Guests"
+                value={passGroupLabel}
+                onChange={(e) => setPassGroupLabel(e.target.value)}
+              />
+            </div>
+          )}
           <div>
             <label
               style={{
@@ -2051,8 +2433,10 @@ export function OwnerTenantDashboardView({
             >
               <option value={1}>1 Hour (Quick Drop / Express Delivery)</option>
               <option value={4}>4 Hours (Standard Short Visit)</option>
+              <option value={8}>8 Hours (Half Day)</option>
               <option value={12}>12 Hours (Full Day Access)</option>
               <option value={24}>24 Hours (Overnight Stay)</option>
+              <option value={48}>48 Hours (2 Days)</option>
               <option value={72}>72 Hours (Weekend / Multi-Day Guest)</option>
             </select>
           </div>
@@ -2201,6 +2585,22 @@ export function OwnerTenantDashboardView({
                   {activePassResult.valid_to ? formatDate(activePassResult.valid_to) : "Scheduled Visit"}
                 </div>
               </div>
+              {activePassResult.vehicle_number && (
+                <div>
+                  <div style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>Vehicle Plate</div>
+                  <div style={{ fontWeight: 700, fontSize: "13px", color: "var(--brand-heading)" }}>
+                    🚗 {activePassResult.vehicle_number}
+                  </div>
+                </div>
+              )}
+              {activePassResult.party_size && activePassResult.party_size > 1 && (
+                <div>
+                  <div style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>Party Size / Group</div>
+                  <div style={{ fontWeight: 700, fontSize: "13px", color: "var(--brand-primary)" }}>
+                    👥 {activePassResult.party_size} Persons {activePassResult.group_label ? `(${activePassResult.group_label})` : ""}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Action Buttons */}
@@ -2209,7 +2609,7 @@ export function OwnerTenantDashboardView({
                 type="button"
                 variant="outline"
                 onClick={() => {
-                  const shareText = `*GateSphere Visitor Pass*\nVisitor: ${activePassResult.visitor_name || "Guest"}\nCategory: ${activePassResult.category || "Guest"}\nPIN/OTP: ${activePassResult.pin || activePassResult.token}\nValid Until: ${activePassResult.valid_to ? new Date(activePassResult.valid_to).toLocaleString() : "Visit Duration"}`;
+                  const shareText = `*GateSphere Visitor Pass*\nVisitor: ${activePassResult.visitor_name || "Guest"}\nCategory: ${activePassResult.category || "Guest"}\nPIN/OTP: ${activePassResult.pin || activePassResult.token}${activePassResult.vehicle_number ? `\nVehicle: ${activePassResult.vehicle_number}` : ""}${activePassResult.party_size && activePassResult.party_size > 1 ? `\nParty Size: ${activePassResult.party_size} Persons` : ""}\nValid Until: ${activePassResult.valid_to ? new Date(activePassResult.valid_to).toLocaleString() : "Visit Duration"}`;
                   if (typeof navigator !== "undefined" && navigator.clipboard) {
                     navigator.clipboard.writeText(shareText);
                     toast.success("Pass details copied to clipboard!", "Copied");
@@ -2223,7 +2623,7 @@ export function OwnerTenantDashboardView({
                 type="button"
                 variant="outline"
                 onClick={() => {
-                  const shareText = encodeURIComponent(`*GateSphere Visitor Pass*\nVisitor: ${activePassResult.visitor_name || "Guest"}\nCategory: ${activePassResult.category || "Guest"}\nGate PIN: ${activePassResult.pin || activePassResult.token}\nValid Until: ${activePassResult.valid_to ? new Date(activePassResult.valid_to).toLocaleString() : "Visit Duration"}`);
+                  const shareText = encodeURIComponent(`*GateSphere Visitor Pass*\nVisitor: ${activePassResult.visitor_name || "Guest"}\nCategory: ${activePassResult.category || "Guest"}\nGate PIN: ${activePassResult.pin || activePassResult.token}${activePassResult.vehicle_number ? `\nVehicle: ${activePassResult.vehicle_number}` : ""}${activePassResult.party_size && activePassResult.party_size > 1 ? `\nParty Size: ${activePassResult.party_size} Persons` : ""}\nValid Until: ${activePassResult.valid_to ? new Date(activePassResult.valid_to).toLocaleString() : "Visit Duration"}`);
                   if (typeof window !== "undefined") {
                     window.open(`https://wa.me/?text=${shareText}`, "_blank");
                   }
