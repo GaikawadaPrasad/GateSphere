@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { SearchInput } from "@/components/forms/SearchInput";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
+import { DataTable } from "@/components/tables/DataTable";
 import { facilitiesApi, type Facility } from "@/lib/api";
 
 export default function FacilityManagerFacilitiesPage() {
@@ -191,73 +192,62 @@ export default function FacilityManagerFacilitiesPage() {
           </div>
         </div>
 
-        <div className="table-container">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Facility Name</th>
-                <th>Type</th>
-                <th>Location</th>
-                <th>Capacity</th>
-                <th>Status</th>
-                <th>Last Maintenance</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <tr>
-                  <td colSpan={7} style={{ textAlign: "center", padding: "2rem" }}>
-                    Loading facilities…
-                  </td>
-                </tr>
-              ) : loadError ? (
-                <tr>
-                  <td colSpan={7} style={{ textAlign: "center", padding: "2rem", color: "var(--danger, #dc2626)" }}>
-                    {loadError}
-                  </td>
-                </tr>
-              ) : filteredFacilities.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={7}
-                    style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
+        <DataTable
+          columns={[
+            {
+              key: "name",
+              header: "Facility Name",
+              sortable: true,
+              render: (f: Facility) => <span style={{ fontWeight: 600, color: "var(--fg)" }}>{f.name}</span>,
+            },
+            { key: "type", header: "Type", sortable: true },
+            { key: "location", header: "Location", sortable: true },
+            {
+              key: "capacity",
+              header: "Capacity",
+              sortable: true,
+              render: (f: Facility) => <span>{f.capacity || "N/A"} persons</span>,
+            },
+            {
+              key: "status",
+              header: "Status",
+              sortable: true,
+              render: (f: Facility) => <StatusBadge status={f.status} />,
+            },
+            {
+              key: "last_maintenance",
+              header: "Last Maintenance",
+              sortable: true,
+              render: (f: Facility) => <span>{f.last_maintenance || "N/A"}</span>,
+            },
+            {
+              key: "actions",
+              header: "Actions",
+              render: (f: Facility) => (
+                <div style={{ display: "flex", gap: "0.4rem" }}>
+                  <select
+                    className="select-field"
+                    value={f.status}
+                    onChange={(e) => handleStatusChange(f.id, e.target.value)}
+                    style={{ height: 28, fontSize: "0.75rem", padding: "0 0.3rem" }}
                   >
-                    No facilities found.
-                  </td>
-                </tr>
-              ) : (
-                filteredFacilities.map((f) => (
-                  <tr key={f.id}>
-                    <td style={{ fontWeight: 600, color: "var(--fg)" }}>{f.name}</td>
-                    <td>{f.type}</td>
-                    <td>{f.location}</td>
-                    <td>{f.capacity || "N/A"} persons</td>
-                    <td>
-                      <StatusBadge status={f.status} />
-                    </td>
-                    <td>{f.last_maintenance || "N/A"}</td>
-                    <td>
-                      <div style={{ display: "flex", gap: "0.4rem" }}>
-                        <select
-                          className="select-field"
-                          value={f.status}
-                          onChange={(e) => handleStatusChange(f.id, e.target.value)}
-                          style={{ height: 28, fontSize: "0.75rem", padding: "0 0.3rem" }}
-                        >
-                          <option value="Available">Available</option>
-                          <option value="Occupied/Booked">Booked</option>
-                          <option value="Under Maintenance">Under Maintenance</option>
-                          <option value="Unavailable">Unavailable</option>
-                        </select>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                    <option value="Available">Available</option>
+                    <option value="Occupied/Booked">Booked</option>
+                    <option value="Under Maintenance">Under Maintenance</option>
+                    <option value="Unavailable">Unavailable</option>
+                  </select>
+                </div>
+              ),
+            },
+          ]}
+          data={filteredFacilities as (Facility & Record<string, unknown>)[]}
+          isLoading={isLoading}
+          emptyTitle="No facilities found"
+          emptyDescription="No managed facilities match your filter criteria."
+          enableClientPagination={true}
+          enableClientSort={true}
+          pageSize={10}
+        />
       </div>
 
       {/* Add Facility Modal */}

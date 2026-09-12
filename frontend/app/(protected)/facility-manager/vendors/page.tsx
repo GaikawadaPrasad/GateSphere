@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { SearchInput } from "@/components/forms/SearchInput";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
+import { DataTable } from "@/components/tables/DataTable";
 import { vendorsApi, communitiesApi } from "@/lib/api";
 
 interface VendorUser {
@@ -141,60 +142,65 @@ export default function FacilityManagerVendorsPage() {
           </div>
         </div>
 
-        <div className="table-container">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Full Name</th>
-                <th>Email</th>
-                <th>Phone</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: "center", padding: "2rem" }}>Loading vendors…</td>
-                </tr>
-              ) : loadError ? (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: "center", padding: "2rem", color: "var(--danger, #dc2626)" }}>{loadError}</td>
-                </tr>
-              ) : filteredVendors.length === 0 ? (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
-                    {search ? "No vendors match your search." : "No vendor technicians registered yet. Click \"Add Vendor Technician\" to create one."}
-                  </td>
-                </tr>
-              ) : (
-                filteredVendors.map((v) => (
-                  <tr key={v.id}>
-                    <td style={{ fontWeight: 600, color: "var(--fg)" }}>{v.full_name}</td>
-                    <td style={{ fontSize: "0.85rem" }}>{v.email}</td>
-                    <td style={{ fontSize: "0.85rem" }}>{v.phone || "—"}</td>
-                    <td style={{ fontSize: "0.8rem", textTransform: "capitalize" }}>
-                      {v.role_slug.replace(/_/g, " ")}
-                    </td>
-                    <td>
-                      <StatusBadge status={v.is_active ? "active" : "inactive"} />
-                    </td>
-                    <td>
-                      <button
-                        className={v.is_active ? "btn btn-secondary" : "btn btn-primary"}
-                        style={{ fontSize: "0.75rem", padding: "0.2rem 0.45rem" }}
-                        onClick={() => handleToggleActive(v)}
-                      >
-                        {v.is_active ? "Deactivate" : "Activate"}
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          columns={[
+            {
+              key: "full_name",
+              header: "Full Name",
+              sortable: true,
+              render: (v: VendorUser) => <span style={{ fontWeight: 600, color: "var(--fg)" }}>{v.full_name}</span>,
+            },
+            {
+              key: "email",
+              header: "Email",
+              sortable: true,
+              render: (v: VendorUser) => <span style={{ fontSize: "0.85rem" }}>{v.email}</span>,
+            },
+            {
+              key: "phone",
+              header: "Phone",
+              sortable: true,
+              render: (v: VendorUser) => <span style={{ fontSize: "0.85rem" }}>{v.phone || "—"}</span>,
+            },
+            {
+              key: "role_slug",
+              header: "Role",
+              sortable: true,
+              render: (v: VendorUser) => (
+                <span style={{ fontSize: "0.8rem", textTransform: "capitalize" }}>
+                  {v.role_slug.replace(/_/g, " ")}
+                </span>
+              ),
+            },
+            {
+              key: "status",
+              header: "Status",
+              sortable: true,
+              render: (v: VendorUser) => <StatusBadge status={v.is_active ? "active" : "inactive"} />,
+            },
+            {
+              key: "actions",
+              header: "Actions",
+              render: (v: VendorUser) => (
+                <button
+                  type="button"
+                  className={v.is_active ? "btn btn-secondary" : "btn btn-primary"}
+                  style={{ fontSize: "0.75rem", padding: "0.2rem 0.45rem" }}
+                  onClick={() => handleToggleActive(v)}
+                >
+                  {v.is_active ? "Deactivate" : "Activate"}
+                </button>
+              ),
+            },
+          ]}
+          data={filteredVendors as (VendorUser & Record<string, unknown>)[]}
+          isLoading={isLoading}
+          emptyTitle="No vendors match your search"
+          emptyDescription={search ? "Try adjusting your search criteria." : "No vendor technicians registered yet. Click 'Add Vendor Technician' to create one."}
+          enableClientPagination={true}
+          enableClientSort={true}
+          pageSize={10}
+        />
       </div>
 
       {/* Create Vendor Modal */}

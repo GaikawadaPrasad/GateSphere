@@ -59,7 +59,7 @@ export function DataTable<T extends object = Record<string, unknown>>({
   const [sortKey, setSortKey] = useState<string | null>(defaultSortKey || null);
   const [sortDir, setSortDir] = useState<SortDirection>(defaultSortKey ? defaultSortDir : null);
   const [localPage, setLocalPage] = useState<number>(1);
-  const [localPageSize, setLocalPageSize] = useState<number>(10);
+  const [localPageSize, setLocalPageSize] = useState<number>(controlledPageSize || 10);
 
   const handleSort = (colKey: string, sortable?: boolean) => {
     if (!sortable && !enableClientSort) return;

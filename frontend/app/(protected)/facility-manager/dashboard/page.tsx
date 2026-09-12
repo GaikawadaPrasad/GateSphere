@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
+import { DataTable, type Column } from "@/components/tables/DataTable";
+import { Skeleton } from "@/components/common/LoadingSkeleton";
+import { EmptyState } from "@/components/common/EmptyState";
 import { complaintsApi, amenitiesApi, communitiesApi, authApi } from "@/lib/api";
 import { deriveTicketEscalationState, formatDate } from "@/lib/utils";
 
@@ -71,40 +74,39 @@ export default function FacilityManagerDashboardPage() {
         }
       }
 
-    if (ticketsRes.status === "fulfilled") {
-      const categoryMap = new Map<string, string>();
-      if (categoriesRes.status === "fulfilled") {
-        for (const c of categoriesRes.value || []) if (c?.id) categoryMap.set(c.id, c.name);
+      if (ticketsRes.status === "fulfilled") {
+        const categoryMap = new Map<string, string>();
+        if (categoriesRes.status === "fulfilled") {
+          for (const c of categoriesRes.value || []) if (c?.id) categoryMap.set(c.id, c.name);
+        }
+        setTickets(
+          (ticketsRes.value || []).map((t: any) => ({
+            id: t.id,
+            ticket_number: t.ticket_number,
+            subject: t.subject,
+            category_name: categoryMap.get(t.category_id) || "Uncategorized",
+            priority: t.priority,
+            status: t.status,
+            escalation_state: deriveTicketEscalationState(t),
+            created_at: t.created_at,
+          })),
+        );
+      } else {
+        setLoadError((ticketsRes as any).reason?.message || "Failed to load tickets.");
       }
-      setTickets(
-        (ticketsRes.value || []).map((t: any) => ({
-          id: t.id,
-          ticket_number: t.ticket_number,
-          subject: t.subject,
-          category_name: categoryMap.get(t.category_id) || "Uncategorized",
-          priority: t.priority,
-          status: t.status,
-          escalation_state: deriveTicketEscalationState(t),
-          created_at: t.created_at,
-        })),
-      );
-    } else {
-      setLoadError((ticketsRes as any).reason?.message || "Failed to load tickets.");
-    }
 
-    if (amenitiesRes.status === "fulfilled") setAmenitiesCount((amenitiesRes.value || []).length);
+      if (amenitiesRes.status === "fulfilled") setAmenitiesCount((amenitiesRes.value || []).length);
 
-    if (bookingsRes.status === "fulfilled") {
-      const today = new Date().toISOString().split("T")[0];
-      setBookingsToday(
-        (bookingsRes.value || []).filter((b: any) => {
-          const bookingDate =
-            b.booking_date || (b.start_at ? String(b.start_at).split("T")[0] : "");
-          return bookingDate === today;
-        }).length,
-      );
-    }
-
+      if (bookingsRes.status === "fulfilled") {
+        const today = new Date().toISOString().split("T")[0];
+        setBookingsToday(
+          (bookingsRes.value || []).filter((b: any) => {
+            const bookingDate =
+              b.booking_date || (b.start_at ? String(b.start_at).split("T")[0] : "");
+            return bookingDate === today;
+          }).length,
+        );
+      }
     } catch (err: any) {
       setLoadError(err?.message || "Failed to load dashboard data.");
     } finally {
@@ -156,18 +158,81 @@ export default function FacilityManagerDashboardPage() {
     }
   };
 
-  const openTickets = tickets.filter(
-    (t) => !["resolved", "closed", "cancelled"].includes(t.status),
+  const openTickets = useMemo(
+    () => tickets.filter((t) => !["resolved", "closed", "cancelled"].includes(t.status)),
+    [tickets],
   );
-  const slaWarnings = tickets.filter(
-    (t) => t.escalation_state === "at_risk" || t.escalation_state === "breached",
+  const slaWarnings = useMemo(
+    () => tickets.filter((t) => t.escalation_state === "at_risk" || t.escalation_state === "breached"),
+    [tickets],
   );
-  const highPriorityOpen = openTickets.filter(
-    (t) => t.priority === "high" || t.priority === "critical",
+  const highPriorityOpen = useMemo(
+    () => openTickets.filter((t) => t.priority === "high" || t.priority === "critical"),
+    [openTickets],
   );
 
+  const ticketColumns: Column<DashboardTicket>[] = [
+    {
+      key: "ticket_number",
+      header: "Ticket #",
+      sortable: true,
+      render: (t) => (
+        <span style={{ fontWeight: 600, color: "var(--primary, #2563eb)" }}>
+          {t.ticket_number}
+        </span>
+      ),
+    },
+    {
+      key: "subject",
+      header: "Subject",
+      sortable: true,
+      render: (t) => (
+        <span
+          style={{
+            maxWidth: 220,
+            display: "inline-block",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            verticalAlign: "middle",
+          }}
+          title={t.subject}
+        >
+          {t.subject}
+        </span>
+      ),
+    },
+    {
+      key: "category_name",
+      header: "Category",
+      sortable: true,
+    },
+    {
+      key: "priority",
+      header: "Priority",
+      sortable: true,
+      render: (t) => <StatusBadge status={t.priority} />,
+    },
+    {
+      key: "status",
+      header: "Status",
+      sortable: true,
+      render: (t) => <StatusBadge status={t.status} />,
+    },
+    {
+      key: "created_at",
+      header: "Raised",
+      sortable: true,
+      render: (t) => (
+        <span style={{ fontSize: "0.78rem", color: "var(--muted)" }}>
+          {formatDate(t.created_at)}
+        </span>
+      ),
+    },
+  ];
+
   return (
-    <div>
+    <div style={{ maxWidth: 1600, margin: "0 auto", paddingBottom: "2rem" }}>
       <PageHeader
         title="Facility Manager Dashboard"
         subtitle="Operational facilities oversight, service tickets & SLA warnings"
@@ -177,7 +242,7 @@ export default function FacilityManagerDashboardPage() {
           { label: "Dashboard" },
         ]}
         actions={
-          <div style={{ display: "flex", gap: "0.75rem" }}>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
             <button
               type="button"
               className="btn btn-secondary"
@@ -193,6 +258,37 @@ export default function FacilityManagerDashboardPage() {
         }
       />
 
+      {loadError && (
+        <div
+          className="card"
+          style={{
+            marginBottom: "1.5rem",
+            padding: "1rem 1.25rem",
+            background: "var(--danger-light, #fef2f2)",
+            border: "1px solid var(--danger-border, #fecaca)",
+            color: "var(--danger-text, #991b1b)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: "0.75rem",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <span>⚠️</span>
+            <span>{loadError}</span>
+          </div>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ fontSize: "0.8rem", padding: "0.25rem 0.5rem" }}
+            onClick={() => loadData(true)}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* KPI Cards Grid */}
       <div
         style={{
@@ -204,36 +300,44 @@ export default function FacilityManagerDashboardPage() {
       >
         <KpiCard
           title="Total Facilities"
-          value={isLoading ? "…" : String(amenitiesCount)}
+          value={String(amenitiesCount)}
           subtext="Managed amenities & common areas"
           icon="🏢"
+          accent="primary"
+          isLoading={isLoading}
           onClick={() => router.push("/facility-manager/facilities")}
         />
         <KpiCard
           title="Open Service Tickets"
-          value={isLoading ? "…" : String(openTickets.length)}
+          value={String(openTickets.length)}
           subtext={`${highPriorityOpen.length} high/critical priority`}
           icon="📋"
+          accent="warning"
           trend={highPriorityOpen.length > 0 ? "warning" : undefined}
           trendValue={
             highPriorityOpen.length > 0 ? `${highPriorityOpen.length} needs triage` : undefined
           }
+          isLoading={isLoading}
           onClick={() => router.push("/facility-manager/service-requests")}
         />
         <KpiCard
           title="SLA At Risk / Breached"
-          value={isLoading ? "…" : String(slaWarnings.length)}
+          value={String(slaWarnings.length)}
           subtext="Tickets needing attention"
           icon="⚠️"
+          accent="danger"
           trend={slaWarnings.length > 0 ? "danger" : undefined}
           trendValue={slaWarnings.length > 0 ? "Review now" : undefined}
+          isLoading={isLoading}
           onClick={() => router.push("/facility-manager/maintenance")}
         />
         <KpiCard
           title="Amenity Bookings Today"
-          value={isLoading ? "…" : String(bookingsToday)}
+          value={String(bookingsToday)}
           subtext="Slots reserved for today"
           icon="🏊"
+          accent="success"
+          isLoading={isLoading}
           onClick={() => router.push("/facility-manager/amenities")}
         />
       </div>
@@ -259,39 +363,58 @@ export default function FacilityManagerDashboardPage() {
         </div>
         <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
           <button
+            type="button"
             className="btn btn-secondary"
             onClick={() => router.push("/facility-manager/facilities")}
           >
             🏢 Add / Edit Facility
           </button>
           <button
+            type="button"
             className="btn btn-secondary"
             onClick={() => router.push("/facility-manager/maintenance")}
           >
             🔧 Maintenance Tickets
           </button>
           <button
+            type="button"
             className="btn btn-secondary"
             onClick={() => router.push("/facility-manager/service-requests")}
           >
             📋 Service Requests
           </button>
           <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => router.push("/facility-manager/vendors")}
+          >
+            🛠️ Manage Vendors
+          </button>
+          <button
+            type="button"
             className="btn btn-secondary"
             onClick={() => router.push("/facility-manager/amenities")}
           >
             🏊 Manage Amenity Bookings
           </button>
           <button
+            type="button"
             className="btn btn-secondary"
             onClick={() => router.push("/facility-manager/complaints")}
           >
             🎫 View Complaints
           </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => router.push("/facility-manager/reports")}
+          >
+            📈 Operational Reports
+          </button>
         </div>
       </div>
 
-      {/* Grid Layout matching Super Admin */}
+      {/* Split Grid Layout */}
       <div
         style={{
           display: "grid",
@@ -300,121 +423,153 @@ export default function FacilityManagerDashboardPage() {
           alignItems: "start",
         }}
       >
-        {/* Left Side: Open Tickets */}
+        {/* Left Side: Open Tickets Table with Pagination */}
         <div style={{ minWidth: 0 }}>
           <div className="card" style={{ marginBottom: "1.5rem" }}>
-            <div className="card-header">
-              <h3 className="card-title">Open Service Tickets</h3>
+            <div
+              className="card-header"
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "0.5rem",
+              }}
+            >
+              <div>
+                <h3 className="card-title">Open Service Tickets</h3>
+                <p style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.15rem" }}>
+                  Active complaints & maintenance requests across the community
+                </p>
+              </div>
               <button
+                type="button"
                 className="btn btn-secondary"
                 style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
                 onClick={() => router.push("/facility-manager/service-requests")}
               >
-                View All
+                View Full Queue ({openTickets.length}) →
               </button>
             </div>
-            <div className="table-container">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Ticket #</th>
-                    <th>Subject</th>
-                    <th>Category</th>
-                    <th>Priority</th>
-                    <th>Status</th>
-                    <th>Raised</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {isLoading ? (
-                    <tr>
-                      <td colSpan={6} style={{ textAlign: "center", padding: "1.5rem" }}>
-                        Loading…
-                      </td>
-                    </tr>
-                  ) : loadError ? (
-                    <tr>
-                      <td colSpan={6} style={{ textAlign: "center", padding: "1.5rem", color: "var(--danger, #dc2626)" }}>
-                        {loadError}
-                      </td>
-                    </tr>
-                  ) : openTickets.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={6}
-                        style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}
-                      >
-                        No open tickets.
-                      </td>
-                    </tr>
-                  ) : (
-                    openTickets.slice(0, 5).map((t) => (
-                      <tr key={t.id}>
-                        <td style={{ fontWeight: 600 }}>{t.ticket_number}</td>
-                        <td>{t.subject}</td>
-                        <td>{t.category_name}</td>
-                        <td><StatusBadge status={t.priority} /></td>
-                        <td><StatusBadge status={t.status} /></td>
-                        <td style={{ fontSize: "0.78rem", color: "var(--muted)" }}>{formatDate(t.created_at)}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+
+            <div style={{ padding: "0.5rem 0 0 0" }}>
+              <DataTable
+                columns={ticketColumns}
+                data={openTickets as (DashboardTicket & Record<string, unknown>)[]}
+                isLoading={isLoading}
+                emptyTitle="No open service tickets"
+                emptyDescription="All service and maintenance requests have been resolved."
+                enableClientPagination={true}
+                enableClientSort={true}
+                pageSize={5}
+              />
             </div>
           </div>
         </div>
 
-        {/* Right Side: SLA Warnings */}
-        <div style={{ maxWidth: 460, width: "100%" }}>
-          <div className="card">
-            <div className="card-header">
-              <h3 className="card-title">⚠️ SLA Warnings & Action Items</h3>
-            </div>
-            {isLoading ? (
-              <p style={{ fontSize: "0.85rem", color: "var(--muted)" }}>Loading…</p>
-            ) : slaWarnings.length === 0 ? (
-              <p style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
-                No tickets at risk or breached right now.
-              </p>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
-                {slaWarnings.slice(0, 5).map((t) => (
-                  <div
-                    key={t.id}
-                    style={{
-                      padding: "0.75rem",
-                      borderRadius: "var(--radius-sm)",
-                      background:
-                        t.escalation_state === "breached"
-                          ? "var(--danger-light)"
-                          : "var(--warning-light)",
-                      border: `1px solid ${t.escalation_state === "breached" ? "var(--danger-border)" : "var(--warning-border)"}`,
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontWeight: 600,
-                        fontSize: "0.85rem",
-                        color: t.escalation_state === "breached" ? "#991b1b" : "#92400e",
-                      }}
-                    >
-                      {t.escalation_state === "breached" ? "🚨 SLA Breached" : "⚠️ SLA At Risk"}:{" "}
-                      {t.subject} ({t.ticket_number})
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "0.75rem",
-                        color: t.escalation_state === "breached" ? "#b91c1c" : "#b45309",
-                        marginTop: "0.25rem",
-                      }}
-                    >
-                      {t.category_name} · Raised {formatDate(t.created_at)}
-                    </div>
-                  </div>
-                ))}
+        {/* Right Side: SLA Warnings & Action Items */}
+        <div style={{ minWidth: 0 }}>
+          <div className="card" style={{ height: "100%" }}>
+            <div
+              className="card-header"
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "0.5rem",
+              }}
+            >
+              <div>
+                <h3 className="card-title">⚠️ SLA Warnings & Escalations</h3>
+                <p style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.15rem" }}>
+                  Tickets exceeding or approaching response/resolution limits
+                </p>
               </div>
-            )}
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
+                onClick={() => router.push("/facility-manager/maintenance")}
+              >
+                Manage SLAs →
+              </button>
+            </div>
+
+            <div style={{ padding: "0.75rem 0" }}>
+              {isLoading ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                  <Skeleton width="100%" height={68} borderRadius={6} />
+                  <Skeleton width="100%" height={68} borderRadius={6} />
+                  <Skeleton width="100%" height={68} borderRadius={6} />
+                </div>
+              ) : slaWarnings.length === 0 ? (
+                <EmptyState
+                  icon="🛡️"
+                  title="SLA performance is optimal"
+                  description="All service tickets and maintenance tasks are well within SLA clocks."
+                />
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+                  {slaWarnings.slice(0, 5).map((t) => (
+                    <div
+                      key={t.id}
+                      style={{
+                        padding: "0.85rem 1rem",
+                        borderRadius: "var(--radius-sm)",
+                        background:
+                          t.escalation_state === "breached"
+                            ? "var(--danger-light, #fef2f2)"
+                            : "var(--warning-light, #fffbeb)",
+                        border: `1px solid ${
+                          t.escalation_state === "breached"
+                            ? "var(--danger-border, #fecaca)"
+                            : "var(--warning-border, #fde68a)"
+                        }`,
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                        gap: "0.5rem",
+                      }}
+                    >
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div
+                          style={{
+                            fontWeight: 600,
+                            fontSize: "0.85rem",
+                            color: t.escalation_state === "breached" ? "#991b1b" : "#92400e",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          {t.escalation_state === "breached" ? "🚨 SLA Breached" : "⚠️ SLA At Risk"}
+                          : {t.subject}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: "0.75rem",
+                            color: t.escalation_state === "breached" ? "#b91c1c" : "#b45309",
+                            marginTop: "0.2rem",
+                          }}
+                        >
+                          {t.ticket_number} · {t.category_name} · Raised {formatDate(t.created_at)}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem", flexShrink: 0 }}
+                        onClick={() => router.push("/facility-manager/service-requests")}
+                      >
+                        Triage →
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -426,7 +581,11 @@ export default function FacilityManagerDashboardPage() {
         title="Create Service Ticket"
         footer={
           <>
-            <button className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setIsModalOpen(false)}
+            >
               Cancel
             </button>
             <button
@@ -434,7 +593,11 @@ export default function FacilityManagerDashboardPage() {
               type="submit"
               form="quick-ticket-form"
               disabled={isSubmittingTicket || units.length === 0}
-              title={units.length === 0 ? "No units available — seed units via Super Admin first" : undefined}
+              title={
+                units.length === 0
+                  ? "No units available — seed units via Super Admin first"
+                  : undefined
+              }
             >
               {isSubmittingTicket ? "Creating…" : "Create Ticket"}
             </button>
@@ -485,7 +648,7 @@ export default function FacilityManagerDashboardPage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 1fr",
+              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
               gap: "1rem",
               marginBottom: "1rem",
             }}
@@ -539,7 +702,13 @@ export default function FacilityManagerDashboardPage() {
                 ))}
               </select>
               {units.length === 0 && (
-                <p style={{ fontSize: "0.75rem", color: "var(--danger, #dc2626)", marginTop: "0.25rem" }}>
+                <p
+                  style={{
+                    fontSize: "0.75rem",
+                    color: "var(--danger, #dc2626)",
+                    marginTop: "0.25rem",
+                  }}
+                >
                   No units found — create units via Super Admin first.
                 </p>
               )}
@@ -573,3 +742,4 @@ export default function FacilityManagerDashboardPage() {
     </div>
   );
 }
+
