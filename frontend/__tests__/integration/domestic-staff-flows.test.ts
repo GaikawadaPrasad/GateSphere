@@ -36,4 +36,45 @@ describe("Domestic Staff 9 Modules Operational Verification", () => {
     expect(panicPayload.priority).toBe("high");
     expect(panicPayload.unit_id).toBeDefined();
   });
+
+  it("handles multi-apartment assignments mapping for security gate verification", () => {
+    const assignments = [
+      { staff_id: "s1", unit: { unit_number: "A-101" } },
+      { staff_id: "s1", unit: { unit_number: "B-204" } },
+      { staff_id: "s2", unit: { unit_number: "C-305" } },
+    ];
+    const unitMap: Record<string, string[]> = {};
+    assignments.forEach((a) => {
+      const sid = a.staff_id;
+      const unitLabel = a.unit?.unit_number || "Assigned";
+      if (!unitMap[sid]) unitMap[sid] = [];
+      if (!unitMap[sid].includes(unitLabel)) unitMap[sid].push(unitLabel);
+    });
+
+    expect(unitMap["s1"]).toEqual(["A-101", "B-204"]);
+    expect(unitMap["s2"]).toEqual(["C-305"]);
+  });
+
+  it("accurately correlates open and closed attendance for guard console", () => {
+    const attendanceRecords = [
+      { id: "att-1", staff_id: "s1", check_in_at: "2026-09-12T08:00:00Z", check_out_at: null },
+      { id: "att-2", staff_id: "s2", check_in_at: "2026-09-12T07:00:00Z", check_out_at: "2026-09-12T11:00:00Z" },
+    ];
+
+    const openAttendanceMap: Record<string, any> = {};
+    const latestClosedMap: Record<string, any> = {};
+    attendanceRecords.forEach((att) => {
+      const sid = att.staff_id;
+      if (!att.check_out_at && !openAttendanceMap[sid]) {
+        openAttendanceMap[sid] = att;
+      } else if (att.check_out_at && !latestClosedMap[sid]) {
+        latestClosedMap[sid] = att;
+      }
+    });
+
+    expect(openAttendanceMap["s1"]).toBeDefined();
+    expect(openAttendanceMap["s1"].id).toBe("att-1");
+    expect(openAttendanceMap["s2"]).toBeUndefined();
+    expect(latestClosedMap["s2"]).toBeDefined();
+  });
 });

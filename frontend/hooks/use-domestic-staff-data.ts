@@ -215,10 +215,11 @@ export function useStaffCheckOut() {
 export function useSendStaffPanic() {
   return useMutation({
     mutationFn: async (payload: { location?: string; note?: string }) => {
+      const locationText = payload.location ? ` [Location: ${payload.location}]` : "";
       return await api.post("/gate/alerts", {
         alert_type: "medical",
         severity: "high",
-        message: payload.note || "Domestic staff SOS emergency trigger",
+        message: `${payload.note || "Domestic staff SOS emergency trigger"}${locationText}`,
       });
     },
   });

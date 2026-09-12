@@ -291,7 +291,10 @@ class DomesticStaffService:
     async def check_out(self, attendance_id: uuid.UUID) -> StaffAttendance:
         obj = await self.attendance.get(attendance_id)
         if obj is None:
+            obj = await self.attendance.open_for_staff(attendance_id)
+        if obj is None:
             raise NotFoundError("Attendance not found")
+        self.scope.require(obj.community_id)
         if obj.check_out_at is not None:
             raise BusinessRuleError("Attendance is already closed", code="NOT_INSIDE")
         obj.check_out_at = datetime.now(UTC)

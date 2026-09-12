@@ -9,8 +9,10 @@ import { staffApi } from "@/lib/api";
 
 interface StaffRow {
   id: string;
+  attendance_id?: string;
   name: string;
   role: string;
+  phone?: string;
   assigned_units?: string[];
   check_in_time?: string;
   check_out_time?: string;
@@ -28,17 +30,57 @@ export default function SecurityGuardStaffAttendancePage() {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const data = await staffApi.list();
+      const [staffList, assignments, attendanceList] = await Promise.all([
+        staffApi.list({ page_size: 100 }),
+        staffApi.assignments({ active_only: true }).catch(() => []),
+        staffApi.attendance({ page_size: 100 }).catch(() => []),
+      ]);
+
+      // Map assignments to staff
+      const unitMap: Record<string, string[]> = {};
+      (assignments || []).forEach((a: any) => {
+        const sid = a.staff_id;
+        const unitLabel = a.unit?.unit_number || a.unit_id ? `Unit ${a.unit?.unit_number || a.unit_id.slice(0, 6)}` : "Assigned";
+        if (!unitMap[sid]) unitMap[sid] = [];
+        if (!unitMap[sid].includes(unitLabel)) unitMap[sid].push(unitLabel);
+      });
+
+      // Map latest open attendance to staff
+      const openAttendanceMap: Record<string, any> = {};
+      const latestClosedMap: Record<string, any> = {};
+      (attendanceList || []).forEach((att: any) => {
+        const sid = att.staff_id;
+        if (!att.check_out_at && !openAttendanceMap[sid]) {
+          openAttendanceMap[sid] = att;
+        } else if (att.check_out_at && !latestClosedMap[sid]) {
+          latestClosedMap[sid] = att;
+        }
+      });
+
       setStaff(
-        (data || []).map((s: any) => ({
-          id: s.id,
-          name: s.full_name || s.name || "Domestic Staff",
-          role: (s.staff_type || s.role || "Staff").replace(/_/g, " "),
-          assigned_units: s.assigned_units || [],
-          check_in_time: s.check_in_time || s.last_check_in,
-          check_out_time: s.check_out_time || s.last_check_out,
-          status: s.status || "Checked Out",
-        })),
+        (staffList || []).map((s: any) => {
+          const openAtt = openAttendanceMap[s.id];
+          const closedAtt = latestClosedMap[s.id];
+          const isInside = Boolean(openAtt);
+
+          return {
+            id: s.id,
+            attendance_id: openAtt?.id,
+            name: s.full_name || s.name || "Domestic Staff",
+            role: (s.staff_type || s.role || "Staff").replace(/_/g, " "),
+            phone: s.phone,
+            assigned_units: unitMap[s.id] || [],
+            check_in_time: openAtt
+              ? new Date(openAtt.check_in_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+              : closedAtt
+              ? new Date(closedAtt.check_in_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+              : undefined,
+            check_out_time: closedAtt?.check_out_at
+              ? new Date(closedAtt.check_out_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+              : undefined,
+            status: isInside ? "Checked In" : "Checked Out",
+          };
+        }),
       );
     } catch (err: any) {
       setLoadError(err?.message || "Failed to load staff attendance.");
@@ -53,10 +95,14 @@ export default function SecurityGuardStaffAttendancePage() {
   const handleCheckIn = async (id: string, name: string) => {
     setActionMessage(null);
     try {
-      await staffApi.checkIn(id);
+      const res = await staffApi.checkIn(id);
       const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
       setStaff((prev) =>
-        prev.map((s) => (s.id === id ? { ...s, status: "Checked In", check_in_time: now } : s)),
+        prev.map((s) =>
+          s.id === id
+            ? { ...s, status: "Checked In", attendance_id: res?.id, check_in_time: now, check_out_time: undefined }
+            : s,
+        ),
       );
       setActionMessage({ type: "success", text: `Check-in recorded for ${name} at ${now}` });
     } catch (err: any) {
@@ -64,15 +110,20 @@ export default function SecurityGuardStaffAttendancePage() {
     }
   };
 
-  const handleCheckOut = async (id: string, name: string) => {
+  const handleCheckOut = async (s: StaffRow) => {
     setActionMessage(null);
     try {
-      await staffApi.checkOut(id);
+      const targetId = s.attendance_id || s.id;
+      await staffApi.checkOut(targetId);
       const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
       setStaff((prev) =>
-        prev.map((s) => (s.id === id ? { ...s, status: "Checked Out", check_out_time: now } : s)),
+        prev.map((item) =>
+          item.id === s.id
+            ? { ...item, status: "Checked Out", attendance_id: undefined, check_out_time: now }
+            : item,
+        ),
       );
-      setActionMessage({ type: "success", text: `Check-out recorded for ${name} at ${now}` });
+      setActionMessage({ type: "success", text: `Check-out recorded for ${s.name} at ${now}` });
     } catch (err: any) {
       setActionMessage({ type: "error", text: err?.message || "Failed to check out staff." });
     }
@@ -81,7 +132,8 @@ export default function SecurityGuardStaffAttendancePage() {
   const filteredStaff = staff.filter(
     (s) =>
       s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.role.toLowerCase().includes(search.toLowerCase()),
+      s.role.toLowerCase().includes(search.toLowerCase()) ||
+      (s.phone && s.phone.includes(search)),
   );
 
   const columns: Column<StaffRow>[] = [
@@ -89,18 +141,29 @@ export default function SecurityGuardStaffAttendancePage() {
       key: "name",
       header: "Staff Name",
       sortable: true,
-      render: (s) => <span style={{ fontWeight: 600, color: "var(--fg)" }}>🪪 {s.name}</span>,
+      render: (s) => (
+        <div>
+          <div style={{ fontWeight: 600, color: "var(--fg)" }}>🪪 {s.name}</div>
+          {s.phone && <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>📞 {s.phone}</div>}
+        </div>
+      ),
     },
     {
       key: "role",
       header: "Role / Service",
       sortable: true,
-      render: (s) => <span>{s.role}</span>,
+      render: (s) => <span className="capitalize">{s.role}</span>,
     },
     {
       key: "assigned_units",
       header: "Assigned Units",
-      render: (s) => <span>{s.assigned_units ? s.assigned_units.join(", ") : "Unassigned"}</span>,
+      render: (s) => (
+        <span>
+          {s.assigned_units && s.assigned_units.length > 0
+            ? s.assigned_units.join(", ")
+            : "No Assigned Units"}
+        </span>
+      ),
     },
     {
       key: "check_in_time",
@@ -118,7 +181,12 @@ export default function SecurityGuardStaffAttendancePage() {
       key: "status",
       header: "Status",
       sortable: true,
-      render: (s) => <StatusBadge status={s.status} />,
+      render: (s) => (
+        <StatusBadge
+          status={s.status === "Checked In" ? "approved" : "completed"}
+          label={s.status}
+        />
+      ),
     },
     {
       key: "actions",
@@ -138,7 +206,7 @@ export default function SecurityGuardStaffAttendancePage() {
             <button
               className="btn btn-secondary"
               style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem" }}
-              onClick={() => handleCheckOut(s.id, s.name)}
+              onClick={() => handleCheckOut(s)}
             >
               Check Out
             </button>
