@@ -1,13 +1,38 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
-import { QrCodeSvg } from "@/components/common/QrCodeSvg";
+import { DataTable, type Column } from "@/components/tables/DataTable";
 import { complaintsApi, authApi, type CurrentUser } from "@/lib/api";
+
+const QrCodeSvg = dynamic(
+  () => import("@/components/common/QrCodeSvg").then((mod) => mod.QrCodeSvg),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        style={{
+          width: 130,
+          height: 130,
+          background: "rgba(255,255,255,0.05)",
+          borderRadius: "var(--radius-sm)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#94a3b8",
+          fontSize: "0.75rem",
+        }}
+      >
+        Loading QR…
+      </div>
+    ),
+  },
+);
 
 export default function VendorDashboardPage() {
   const router = useRouter();
@@ -50,6 +75,44 @@ export default function VendorDashboardPage() {
     setIsRefreshing(true);
     loadData();
   };
+
+  const previewColumns: Column<any>[] = useMemo(
+    () => [
+      {
+        key: "ticket_number",
+        header: "Ticket #",
+        render: (t) => (
+          <span style={{ fontWeight: 600, fontFamily: "monospace" }}>
+            {t.ticket_number || `TKT-${t.id.slice(0, 6)}`}
+          </span>
+        ),
+      },
+      {
+        key: "subject",
+        header: "Task Summary",
+        render: (t) => (
+          <span style={{ fontWeight: 500, color: "var(--fg)" }}>
+            {t.subject || "Service Ticket"}
+          </span>
+        ),
+      },
+      {
+        key: "priority",
+        header: "Priority",
+        render: (t) => <StatusBadge status={(t.priority || "medium").toUpperCase()} />,
+      },
+      {
+        key: "status",
+        header: "Status",
+        render: (t) => (
+          <StatusBadge
+            status={(t.status || "created").replace(/_/g, " ").toUpperCase()}
+          />
+        ),
+      },
+    ],
+    [],
+  );
 
   const assignedTickets = tickets.filter(
     (t) => t.status === "assigned" || t.status === "acknowledged" || t.status === "created",
@@ -207,62 +270,16 @@ export default function VendorDashboardPage() {
                 View All
               </button>
             </div>
-            <div className="table-container">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Ticket #</th>
-                    <th>Task Summary</th>
-                    <th>Priority</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {isLoading ? (
-                    <tr>
-                      <td
-                        colSpan={4}
-                        style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}
-                      >
-                        Loading tickets from backend…
-                      </td>
-                    </tr>
-                  ) : tickets.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={4}
-                        style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}
-                      >
-                        No service tickets assigned at present.
-                      </td>
-                    </tr>
-                  ) : (
-                    tickets.slice(0, 5).map((t) => (
-                      <tr
-                        key={t.id}
-                        style={{ cursor: "pointer" }}
-                        onClick={() => router.push("/vendor-technician/work-progress")}
-                      >
-                        <td style={{ fontWeight: 600, fontFamily: "monospace" }}>
-                          {t.ticket_number || `TKT-${t.id.slice(0, 6)}`}
-                        </td>
-                        <td style={{ fontWeight: 500, color: "var(--fg)" }}>
-                          {t.subject || "Service Ticket"}
-                        </td>
-                        <td>
-                          <StatusBadge status={(t.priority || "medium").toUpperCase()} />
-                        </td>
-                        <td>
-                          <StatusBadge
-                            status={(t.status || "created").replace(/_/g, " ").toUpperCase()}
-                          />
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <DataTable<any>
+              columns={previewColumns}
+              data={tickets.slice(0, 5)}
+              isLoading={isLoading}
+              onRowClick={() => router.push("/vendor-technician/work-progress")}
+              emptyTitle="No service tickets assigned"
+              emptyDescription="No service tickets assigned at present."
+              emptyIcon="🎫"
+              keyExtractor={(t) => t.id}
+            />
           </div>
         </div>
 

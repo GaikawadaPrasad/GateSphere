@@ -119,6 +119,8 @@ export function useTableControls<T extends Record<string, any>>({
     setSortKey,
     setSortDir,
     total: sortedData.length,
+    totalPages: Math.ceil(sortedData.length / pageSize) || 1,
+    startIndex: (page - 1) * pageSize,
     filteredCount: filteredData.length,
     paginatedData,
     processedData: sortedData,

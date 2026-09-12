@@ -1,10 +1,34 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
-import { QrCodeSvg } from "@/components/common/QrCodeSvg";
 import { complaintsApi, authApi, type CurrentUser, type ServiceTicket } from "@/lib/api";
+
+const QrCodeSvg = dynamic(
+  () => import("@/components/common/QrCodeSvg").then((mod) => mod.QrCodeSvg),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        style={{
+          width: 180,
+          height: 180,
+          background: "#f1f5f9",
+          borderRadius: "var(--radius-sm)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "var(--muted)",
+          fontSize: "0.85rem",
+        }}
+      >
+        Loading Gate Pass QR…
+      </div>
+    ),
+  },
+);
 
 export default function VendorEntryPassPage() {
   const [activeTicket, setActiveTicket] = useState<ServiceTicket | null>(null);

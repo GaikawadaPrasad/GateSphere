@@ -416,15 +416,91 @@ export const SECURITY_GUARD_NAV: DashboardNavConfig = {
   ],
 };
 
+export const VENDOR_TECHNICIAN_NAV: DashboardNavConfig = {
+  role: "vendor_technician",
+  title: "Vendor / Technician",
+  subtitle: "Service Operations & Digital Passes",
+  basePath: "/vendor-technician",
+  color: "#D97706",
+  navItems: [
+    {
+      id: "dashboard",
+      label: "Dashboard",
+      href: "/vendor-technician/dashboard",
+      icon: "📊",
+      accentColor: "#2563EB",
+      description: "Work console, active job & KPI metrics",
+    },
+    {
+      id: "assigned-tickets",
+      label: "Assigned Tickets",
+      href: "/vendor-technician/assigned-tickets",
+      icon: "🎫",
+      accentColor: "#F59E0B",
+      description: "Assigned work orders & job acceptance",
+    },
+    {
+      id: "work-progress",
+      label: "Work Progress",
+      href: "/vendor-technician/work-progress",
+      icon: "⏳",
+      accentColor: "#3B82F6",
+      description: "Update step-by-step job execution status",
+    },
+    {
+      id: "entry-pass",
+      label: "Entry Pass",
+      href: "/vendor-technician/entry-pass",
+      icon: "🪪",
+      accentColor: "#10B981",
+      description: "Digital QR gate pass for security scanning",
+    },
+    {
+      id: "work-completion",
+      label: "Work Completion",
+      href: "/vendor-technician/work-completion",
+      icon: "✅",
+      accentColor: "#059669",
+      description: "Submit materials, remarks & completion proof",
+    },
+    {
+      id: "service-history",
+      label: "Service History",
+      href: "/vendor-technician/service-history",
+      icon: "📜",
+      accentColor: "#6B7280",
+      description: "Historical archive of completed work orders",
+    },
+    {
+      id: "notifications",
+      label: "Notifications",
+      href: "/vendor-technician/notifications",
+      icon: "🔔",
+      accentColor: "#8B5CF6",
+      description: "Assignment alerts & signoff updates",
+    },
+    {
+      id: "profile",
+      label: "Profile",
+      href: "/vendor-technician/profile",
+      icon: "👤",
+      accentColor: "#4B5563",
+      description: "Technician credentials & service details",
+    },
+  ],
+};
+
 export const AUDITOR_NAV_ITEMS = AUDITOR_NAV.navItems;
 export const DOMESTIC_STAFF_NAV_ITEMS = DOMESTIC_STAFF_NAV.navItems;
 export const RESIDENT_NAV_ITEMS = OWNER_TENANT_NAV.navItems;
 export const SECURITY_GUARD_NAV_ITEMS = SECURITY_GUARD_NAV.navItems;
+export const VENDOR_TECHNICIAN_NAV_ITEMS = VENDOR_TECHNICIAN_NAV.navItems;
 
 export function getDashboardNavForRole(roleSlug: string): DashboardNavConfig {
   if (roleSlug === "auditor") return AUDITOR_NAV;
   if (roleSlug === "domestic_staff") return DOMESTIC_STAFF_NAV;
   if (roleSlug === "security_guard") return SECURITY_GUARD_NAV;
+  if (roleSlug === "vendor_technician") return VENDOR_TECHNICIAN_NAV;
   return OWNER_TENANT_NAV;
 }
 
