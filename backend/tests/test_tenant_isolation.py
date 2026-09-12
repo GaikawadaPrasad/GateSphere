@@ -73,7 +73,13 @@ def restricted_conn():
 @pytest.fixture(scope="module")
 def two_communities():
     with SessionLocal() as db:
-        rows = db.scalars(select(Community).order_by(Community.code)).all()
+        rows = db.scalars(
+            select(Community)
+            .where(Community.code.in_(("gs-01", "gs-02")))
+            .order_by(Community.code)
+        ).all()
+        if len(rows) < 2:
+            rows = db.scalars(select(Community).order_by(Community.code)).all()
         return str(rows[0].id), str(rows[1].id)
 
 

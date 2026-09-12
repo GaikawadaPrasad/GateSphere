@@ -15,7 +15,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.context import RequestContext
-from app.core.errors import BusinessRuleError
+from app.core.errors import BusinessRuleError, ForbiddenError
 from app.core.tenancy import TenantScope
 from app.modules.amenities.models import AmenityBooking
 from app.modules.billing.models import MaintenanceInvoice, Payment
@@ -265,6 +265,11 @@ class DashboardService:
         return "admin"
 
     async def super_admin_stats(self) -> schemas.SuperAdminDashboardStats:
+        if not (self.actor.is_superadmin or self.scope.is_global):
+            raise ForbiddenError(
+                "Only a platform Super Admin can access global platform statistics",
+                code="GLOBAL_ONLY",
+            )
         communities = (
             await self.db.scalars(select(Community).order_by(Community.created_at.desc()))
         ).all()

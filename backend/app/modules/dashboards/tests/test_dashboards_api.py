@@ -65,5 +65,13 @@ def test_super_admin_dashboard(as_role):
     assert d["totalCommunities"] >= 1
 
 
+def test_super_admin_dashboard_forbidden_for_non_superadmin(as_role, client):
+    assert client.get(f"{P}/super-admin").status_code == 401
+    assert as_role("community_admin").get(f"{P}/super-admin").status_code == 403
+    assert as_role("facility_manager").get(f"{P}/super-admin").status_code == 403
+    assert as_role("resident").get(f"{P}/super-admin").status_code == 403
+
+
 def test_vendor_has_no_dashboard_access(as_role):
     assert as_role("vendor_technician").get(f"{P}/overview").status_code == 403
+

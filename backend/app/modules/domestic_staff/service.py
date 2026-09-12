@@ -377,6 +377,15 @@ class DomesticStaffService:
         staff = await self.db.scalar(stmt)
         if staff is not None:
             return staff
+        if self.actor.phone:
+            stmt_phone = select(DomesticStaff).where(DomesticStaff.phone == self.actor.phone)
+            if not self.scope.is_global and self.scope.community_ids:
+                stmt_phone = stmt_phone.where(DomesticStaff.community_id.in_(self.scope.community_ids))
+            staff_phone = await self.db.scalar(stmt_phone)
+            if staff_phone is not None:
+                staff_phone.user_id = self.actor.id
+                await self.db.flush()
+                return staff_phone
         if not self.scope.is_global and self.scope.community_ids:
             cid = next(iter(self.scope.community_ids))
             staff = await self.db.scalar(

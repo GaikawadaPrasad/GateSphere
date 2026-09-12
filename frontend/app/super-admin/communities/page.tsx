@@ -18,6 +18,7 @@ import {
   useCreateGate,
   useCommunityUnits,
 } from "@/hooks/use-communities";
+import { useSuperAdminDashboardMetrics } from "@/hooks/use-dashboards";
 import { useAddResident } from "@/hooks/use-residents";
 import {
   INDIAN_STATES_AND_UTS,
@@ -99,6 +100,7 @@ export default function CommunitiesPage() {
   const [gateType, setGateType] = useState<"entry" | "exit" | "both" | "pedestrian">("both");
 
   const { data: communities, isLoading, refetch } = useCommunities();
+  const { data: metrics } = useSuperAdminDashboardMetrics();
   const { data: communityUnitsList, refetch: refetchUnits } = useCommunityUnits(
     viewingCommunity?.id || undefined
   );
@@ -195,23 +197,35 @@ export default function CommunitiesPage() {
   const isCreateFormValid = Object.keys(createErrors).length === 0;
   const isEditFormValid = Object.keys(editErrors).length === 0;
 
-  const filteredCommunities = useMemo(() => {
+  const filteredCommunities: CommunityWithMetrics[] = useMemo(() => {
     if (!communities) return [];
-    return communities.filter((comm: Community) => {
-      const matchesSearch =
-        searchQuery === "" ||
-        comm.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        comm.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (comm.city && comm.city.toLowerCase().includes(searchQuery.toLowerCase()));
+    return communities
+      .filter((comm: Community) => {
+        const matchesSearch =
+          searchQuery === "" ||
+          comm.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          comm.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (comm.city && comm.city.toLowerCase().includes(searchQuery.toLowerCase()));
 
-      const matchesStatus =
-        statusFilter === "all" ||
-        (statusFilter === "active" && comm.is_active) ||
-        (statusFilter === "inactive" && !comm.is_active);
+        const matchesStatus =
+          statusFilter === "all" ||
+          (statusFilter === "active" && comm.is_active) ||
+          (statusFilter === "inactive" && !comm.is_active);
 
-      return matchesSearch && matchesStatus;
-    });
-  }, [communities, searchQuery, statusFilter]);
+        return matchesSearch && matchesStatus;
+      })
+      .map((comm: Community) => {
+        const bd = metrics?.communityBreakdown?.[comm.id];
+        return {
+          ...comm,
+          totalTowersCount: bd?.totalTowers,
+          totalUnitsCount: bd?.totalUnits,
+          totalResidentsCount: bd?.totalResidents,
+          occupancyRate: bd?.occupancyRate ?? 0,
+          financialStatus: bd?.financialStatus ?? "Good",
+        };
+      });
+  }, [communities, searchQuery, statusFilter, metrics]);
 
   const handleOpenCreate = () => {
     setName("");
@@ -601,8 +615,8 @@ export default function CommunitiesPage() {
             </p>
           </div>
 
-          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-            <div style={{ width: 260 }}>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
+            <div style={{ maxWidth: 260, width: "100%", minWidth: 160 }}>
               <SearchInput
                 value={searchQuery}
                 onChange={setSearchQuery}

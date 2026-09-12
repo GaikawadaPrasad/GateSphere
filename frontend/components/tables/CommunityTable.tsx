@@ -18,13 +18,31 @@ interface CommunityTableProps {
   isLoading?: boolean;
   onView?: (community: CommunityWithMetrics) => void;
   onEdit?: (community: CommunityWithMetrics) => void;
+  page?: number;
+  pageSize?: number;
+  total?: number;
+  onPageChange?: (page: number) => void;
+  onPageSizeChange?: (size: number) => void;
+  enableClientPagination?: boolean;
 }
 
-export function CommunityTable({ communities, isLoading, onView, onEdit }: CommunityTableProps) {
+export function CommunityTable({
+  communities,
+  isLoading,
+  onView,
+  onEdit,
+  page,
+  pageSize,
+  total,
+  onPageChange,
+  onPageSizeChange,
+  enableClientPagination = true,
+}: CommunityTableProps) {
   const columns: Column<CommunityWithMetrics>[] = [
     {
       key: "name",
       header: "Community Name",
+      sortable: true,
       render: (comm) => (
         <div>
           <div style={{ fontWeight: 600, color: "var(--fg)" }}>{comm.name}</div>
@@ -35,6 +53,7 @@ export function CommunityTable({ communities, isLoading, onView, onEdit }: Commu
     {
       key: "location",
       header: "Location",
+      sortable: true,
       render: (comm) => {
         const parts = [comm.city, comm.state].filter(Boolean);
         return <span>{parts.length > 0 ? parts.join(", ") : "–"}</span>;
@@ -44,24 +63,28 @@ export function CommunityTable({ communities, isLoading, onView, onEdit }: Commu
       key: "towers",
       header: "Towers",
       align: "center",
+      sortable: true,
       render: (comm) => <span>{comm.totalTowersCount ?? comm.total_towers ?? "–"}</span>,
     },
     {
       key: "units",
       header: "Units",
       align: "center",
+      sortable: true,
       render: (comm) => <span>{comm.totalUnitsCount ?? comm.total_units ?? "–"}</span>,
     },
     {
       key: "residents",
       header: "Residents",
       align: "center",
+      sortable: true,
       render: (comm) => <span>{comm.totalResidentsCount ?? comm.total_residents ?? "–"}</span>,
     },
     {
       key: "occupancy",
       header: "Occupancy",
       align: "center",
+      sortable: true,
       render: (comm) => {
         const occ = comm.occupancyRate ?? 0;
         return (
@@ -93,6 +116,7 @@ export function CommunityTable({ communities, isLoading, onView, onEdit }: Commu
       key: "financialStatus",
       header: "Financial Status",
       align: "center",
+      sortable: true,
       render: (comm) => {
         const status = comm.financialStatus || "Good";
         return (
@@ -107,6 +131,7 @@ export function CommunityTable({ communities, isLoading, onView, onEdit }: Commu
       key: "is_active",
       header: "Status",
       align: "center",
+      sortable: true,
       render: (comm) => <StatusBadge status={comm.is_active} />,
     },
     {
@@ -163,6 +188,12 @@ export function CommunityTable({ communities, isLoading, onView, onEdit }: Commu
       isLoading={isLoading}
       emptyTitle="No communities found"
       emptyDescription="No communities have been created yet or none match your search."
+      page={page}
+      pageSize={pageSize}
+      total={total}
+      onPageChange={onPageChange}
+      onPageSizeChange={onPageSizeChange}
+      enableClientPagination={enableClientPagination}
     />
   );
 }

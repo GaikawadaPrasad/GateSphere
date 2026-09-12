@@ -82,12 +82,12 @@ export function useStaffProfile() {
 export function useUpdateStaffProfile() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ staffId, data }: { staffId?: string; data: Partial<StaffProfile> }) => {
-      return await api.patch<any>("/domestic-staff/me", {
-        phone: data.phone,
-        emergency_address: data.emergency_contact,
-        photo_url: data.avatar_url,
-      });
+    mutationFn: async ({ data }: { staffId?: string; data: Partial<StaffProfile> }) => {
+      const payload: Record<string, any> = {};
+      if (data.phone && data.phone.trim()) payload.phone = data.phone.trim();
+      if (data.emergency_contact !== undefined) payload.emergency_address = data.emergency_contact;
+      if (data.avatar_url) payload.photo_url = data.avatar_url;
+      return await api.patch<any>("/domestic-staff/me", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["staff", "profile"] });
