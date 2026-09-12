@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
+import { DataTable, type Column } from "@/components/tables/DataTable";
 import { gateApi } from "@/lib/api";
 
 interface GuardRosterItem {
@@ -142,8 +143,61 @@ export default function SecuritySupervisorGuardManagementPage() {
     }
   };
 
+  const columns: Column<GuardRosterItem>[] = [
+    {
+      key: "guard_name",
+      header: "Guard Name",
+      sortable: true,
+      render: (g) => <span style={{ fontWeight: 600, color: "var(--fg)" }}>👮 {g.guard_name}</span>,
+    },
+    {
+      key: "shift_date",
+      header: "Shift Date",
+      sortable: true,
+      render: (g) => <span>{g.shift_date}</span>,
+    },
+    {
+      key: "shift",
+      header: "Duty Hours",
+      sortable: true,
+      render: (g) => <span>{g.shift}</span>,
+    },
+    {
+      key: "assigned_gate",
+      header: "Assigned Post",
+      sortable: true,
+      render: (g) => <span>{g.assigned_gate}</span>,
+    },
+    {
+      key: "status",
+      header: "Duty Status",
+      sortable: true,
+      render: (g) => <StatusBadge status={g.status} />,
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      align: "right",
+      render: (g) => (
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <button
+            className="btn btn-secondary"
+            style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}
+            onClick={() => {
+              setSelectedGuard(g);
+              setNewStatus(g.status.toLowerCase().replace(/\s+/g, "_"));
+              setIsStatusModalOpen(true);
+            }}
+          >
+            Update Status
+          </button>
+        </div>
+      ),
+    },
+  ];
+
   return (
-    <div>
+    <div style={{ maxWidth: 1600, margin: "0 auto" }}>
       <PageHeader
         title="Guard Management & Duty Roster"
         subtitle="Schedule security personnel shifts, assign duty checkpoints, and monitor active duty roster transitions"
@@ -169,63 +223,16 @@ export default function SecuritySupervisorGuardManagementPage() {
           </div>
         </div>
 
-        <div className="table-container">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Guard Name</th>
-                <th>Shift Date</th>
-                <th>Duty Hours</th>
-                <th>Assigned Post</th>
-                <th>Duty Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: "center", padding: "2rem" }}>
-                    Loading security duty roster…
-                  </td>
-                </tr>
-              ) : roster.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
-                  >
-                    No guard shifts scheduled. Click &quot;Schedule Guard Shift&quot; above.
-                  </td>
-                </tr>
-              ) : (
-                roster.map((g) => (
-                  <tr key={g.id}>
-                    <td style={{ fontWeight: 600, color: "var(--fg)" }}>👮 {g.guard_name}</td>
-                    <td>{g.shift_date}</td>
-                    <td>{g.shift}</td>
-                    <td>{g.assigned_gate}</td>
-                    <td>
-                      <StatusBadge status={g.status} />
-                    </td>
-                    <td>
-                      <button
-                        className="btn btn-secondary"
-                        style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}
-                        onClick={() => {
-                          setSelectedGuard(g);
-                          setNewStatus(g.status.toLowerCase().replace(/\s+/g, "_"));
-                          setIsStatusModalOpen(true);
-                        }}
-                      >
-                        Update Shift Status
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          columns={columns}
+          data={roster}
+          isLoading={isLoading}
+          enableClientPagination={true}
+          pageSize={10}
+          emptyTitle="No Guard Shifts Scheduled"
+          emptyDescription="Click 'Schedule Guard Shift' above to assign guard duty rosters."
+          emptyIcon="👮"
+        />
       </div>
 
       {/* Schedule Shift Modal */}

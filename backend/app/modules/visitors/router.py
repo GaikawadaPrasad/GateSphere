@@ -88,6 +88,19 @@ async def add_blacklist(
     )
 
 
+@router.delete(
+    "/blacklist/{blacklist_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    dependencies=[UPDATE],
+)
+async def remove_blacklist(
+    blacklist_id: uuid.UUID, svc: VisitorService = Depends(visitor_service)
+) -> Response:
+    await svc.remove_blacklist(blacklist_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 # --- entries -------------------------------------------------------- #
 @router.get("/entries", response_model=Envelope[list[schemas.EntryRead]], dependencies=[VIEW])
 async def list_entries(

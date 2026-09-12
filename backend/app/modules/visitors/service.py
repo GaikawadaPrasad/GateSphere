@@ -222,6 +222,16 @@ class VisitorService(UnitScopedAccess):
         )
         return obj
 
+    async def remove_blacklist(self, blacklist_id: uuid.UUID) -> None:
+        obj = await self.blacklist.get(blacklist_id)
+        if obj is None:
+            raise NotFoundError("Blacklist entry not found")
+        cid = obj.community_id
+        await self.blacklist.delete(obj)
+        await self._audit(
+            "blacklist.remove", cid, "visitor_blacklist", blacklist_id, old={"reason": obj.reason}
+        )
+
     async def _blacklist_hit(
         self, community_id: uuid.UUID, phone: str, id_number: str | None
     ) -> VisitorBlacklist | None:

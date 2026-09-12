@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SearchInput } from "@/components/forms/SearchInput";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { DataTable, type Column } from "@/components/tables/DataTable";
 import { visitorsApi } from "@/lib/api";
 
 interface CabMovement {
@@ -20,6 +21,7 @@ export default function SecurityGuardCabTaxiPage() {
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -39,7 +41,6 @@ export default function SecurityGuardCabTaxiPage() {
           openEntryByRequest.set((e as any).request_id as string, e);
       }
 
-      // Real backend: "cab_taxi" is a visitor_type on /visitors/requests (backend/app/modules/visitors/models.py VISITOR_TYPES).
       const cabRequests = (requests || []).filter((r: any) => r.visitor_type === "cab_taxi");
       setCabs(
         cabRequests.map((r: any) => {
@@ -66,21 +67,25 @@ export default function SecurityGuardCabTaxiPage() {
   }, []);
 
   const handleAllowEntry = async (cab: CabMovement) => {
+    setActionMessage(null);
     try {
       await visitorsApi.recordEntry({ request_id: cab.id });
+      setActionMessage({ type: "success", text: `Cab entry recorded for ${cab.vehicleNumber}` });
       loadData();
     } catch (err: any) {
-      alert(err?.message || "Failed to record entry.");
+      setActionMessage({ type: "error", text: err?.message || "Failed to record cab entry." });
     }
   };
 
   const handleMarkExit = async (cab: CabMovement) => {
     if (!cab.entryId) return;
+    setActionMessage(null);
     try {
       await visitorsApi.recordExit(cab.entryId);
+      setActionMessage({ type: "success", text: `Cab exit recorded for ${cab.vehicleNumber}` });
       loadData();
     } catch (err: any) {
-      alert(err?.message || "Failed to record exit.");
+      setActionMessage({ type: "error", text: err?.message || "Failed to record cab exit." });
     }
   };
 
@@ -90,8 +95,67 @@ export default function SecurityGuardCabTaxiPage() {
       c.visitorName.toLowerCase().includes(search.toLowerCase()),
   );
 
+  const columns: Column<CabMovement>[] = [
+    {
+      key: "vehicleNumber",
+      header: "Vehicle Plate #",
+      sortable: true,
+      render: (c) => (
+        <span style={{ fontFamily: "monospace", fontWeight: 700, color: "var(--fg)" }}>
+          🚖 {c.vehicleNumber}
+        </span>
+      ),
+    },
+    {
+      key: "visitorName",
+      header: "Driver / Passenger",
+      sortable: true,
+      render: (c) => <span>{c.visitorName}</span>,
+    },
+    {
+      key: "purpose",
+      header: "Purpose / Destination",
+      sortable: true,
+      render: (c) => <span>{c.purpose}</span>,
+    },
+    {
+      key: "status",
+      header: "Status",
+      sortable: true,
+      render: (c) => <StatusBadge status={c.status} />,
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      align: "right",
+      render: (c) => (
+        <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+          {c.status === "approved" ? (
+            <button
+              className="btn btn-primary"
+              style={{ fontSize: "0.75rem", padding: "0.25rem 0.55rem" }}
+              onClick={() => handleAllowEntry(c)}
+            >
+              Allow Entry
+            </button>
+          ) : c.status === "entered" && c.entryId ? (
+            <button
+              className="btn btn-secondary"
+              style={{ fontSize: "0.75rem", padding: "0.25rem 0.55rem" }}
+              onClick={() => handleMarkExit(c)}
+            >
+              Mark Exit
+            </button>
+          ) : (
+            <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>—</span>
+          )}
+        </div>
+      ),
+    },
+  ];
+
   return (
-    <div>
+    <div style={{ maxWidth: 1600, margin: "0 auto" }}>
       <PageHeader
         title="Cab & Taxi Verification"
         subtitle="Verify cab arrivals against resident-approved requests, and log gate entry/exit timestamps"
@@ -102,12 +166,69 @@ export default function SecurityGuardCabTaxiPage() {
         ]}
       />
 
+      {actionMessage && (
+        <div
+          style={{
+            padding: "0.75rem 1rem",
+            marginBottom: "1.25rem",
+            borderRadius: "var(--radius)",
+            background: actionMessage.type === "success" ? "var(--success-light)" : "var(--danger-light)",
+            border: `1px solid ${actionMessage.type === "success" ? "var(--success-border)" : "var(--danger-border)"}`,
+            color: actionMessage.type === "success" ? "#065f46" : "#991b1b",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>
+            {actionMessage.type === "success" ? "✅" : "⚠️"} {actionMessage.text}
+          </span>
+          <button
+            type="button"
+            onClick={() => setActionMessage(null)}
+            style={{ background: "none", border: "none", cursor: "pointer", fontWeight: 700 }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {loadError && (
+        <div
+          style={{
+            padding: "0.75rem 1rem",
+            marginBottom: "1.25rem",
+            borderRadius: "var(--radius)",
+            background: "var(--danger-light)",
+            border: "1px solid var(--danger-border)",
+            color: "#991b1b",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>⚠️ {loadError}</span>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}
+            onClick={loadData}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       <div className="card">
         <div className="card-header" style={{ flexWrap: "wrap", gap: "0.75rem" }}>
           <div>
             <h3 className="card-title">Commercial Cab Movements</h3>
+            <p style={{ fontSize: "0.775rem", color: "var(--muted)" }}>
+              {filteredCabs.length} cabs registered
+            </p>
           </div>
-          <div style={{ width: "100%", maxWidth: 220 }}>
+
+          <div style={{ width: "100%", maxWidth: 240 }}>
             <SearchInput
               value={search}
               onChange={setSearch}
@@ -116,84 +237,16 @@ export default function SecurityGuardCabTaxiPage() {
           </div>
         </div>
 
-        <div className="table-container">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Vehicle Plate #</th>
-                <th>Driver / Passenger</th>
-                <th>Purpose</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <tr>
-                  <td colSpan={5} style={{ textAlign: "center", padding: "2rem" }}>
-                    Loading…
-                  </td>
-                </tr>
-              ) : loadError ? (
-                <tr>
-                  <td
-                    colSpan={5}
-                    style={{
-                      textAlign: "center",
-                      padding: "2rem",
-                      color: "var(--danger, #dc2626)",
-                    }}
-                  >
-                    {loadError}
-                  </td>
-                </tr>
-              ) : filteredCabs.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={5}
-                    style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
-                  >
-                    No cab/taxi requests found.
-                  </td>
-                </tr>
-              ) : (
-                filteredCabs.map((c) => (
-                  <tr key={c.id}>
-                    <td style={{ fontFamily: "monospace", fontWeight: 700 }}>
-                      🚖 {c.vehicleNumber}
-                    </td>
-                    <td>{c.visitorName}</td>
-                    <td>{c.purpose}</td>
-                    <td>
-                      <StatusBadge status={c.status} />
-                    </td>
-                    <td>
-                      {c.status === "approved" ? (
-                        <button
-                          className="btn btn-primary"
-                          style={{ fontSize: "0.75rem", padding: "0.2rem 0.45rem" }}
-                          onClick={() => handleAllowEntry(c)}
-                        >
-                          Allow Entry
-                        </button>
-                      ) : c.status === "entered" && c.entryId ? (
-                        <button
-                          className="btn btn-secondary"
-                          style={{ fontSize: "0.75rem", padding: "0.2rem 0.45rem" }}
-                          onClick={() => handleMarkExit(c)}
-                        >
-                          Mark Exit
-                        </button>
-                      ) : (
-                        <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          columns={columns}
+          data={filteredCabs}
+          isLoading={isLoading}
+          enableClientPagination={true}
+          pageSize={10}
+          emptyTitle="No Cab / Taxi Records"
+          emptyDescription="No cab or taxi entries currently match your search criteria."
+          emptyIcon="🚖"
+        />
       </div>
     </div>
   );

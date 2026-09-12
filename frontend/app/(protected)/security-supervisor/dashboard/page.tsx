@@ -6,6 +6,8 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
+import { DataTable, type Column } from "@/components/tables/DataTable";
+import { EmptyState } from "@/components/common/EmptyState";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   gateApi,
@@ -119,8 +121,34 @@ export default function SecuritySupervisorDashboardPage() {
     router.push("/security-supervisor/emergency-alerts");
   };
 
+  const eventColumns: Column<GateEvent>[] = [
+    {
+      key: "occurred_at",
+      header: "Timestamp",
+      render: (ev) => (
+        <span style={{ fontSize: "0.85rem", whiteSpace: "nowrap" }}>
+          {formatDateTime(ev.occurred_at)}
+        </span>
+      ),
+    },
+    {
+      key: "event_type",
+      header: "Event Type",
+      render: (ev) => <StatusBadge status={ev.event_type} />,
+    },
+    {
+      key: "gate_id",
+      header: "Gate Checkpoint",
+      render: (ev) => (
+        <span style={{ fontSize: "0.85rem", fontFamily: "monospace" }}>
+          {ev.gate_id ? `Gate #${ev.gate_id.slice(0, 8)}` : "Perimeter Checkpoint"}
+        </span>
+      ),
+    },
+  ];
+
   return (
-    <div>
+    <div style={{ maxWidth: "1600px", margin: "0 auto" }}>
       <PageHeader
         title="Security Supervisor Dashboard"
         subtitle="Real-time gate traffic monitoring, guard roster management, panic alert command & blacklist oversight"
@@ -130,7 +158,7 @@ export default function SecuritySupervisorDashboardPage() {
           { label: "Dashboard" },
         ]}
         actions={
-          <div style={{ display: "flex", gap: "0.75rem" }}>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
             <button className="btn btn-secondary" onClick={handleRefresh} disabled={isRefreshing}>
               🔄 {isRefreshing ? "Refreshing…" : "Refresh"}
             </button>
@@ -152,52 +180,54 @@ export default function SecuritySupervisorDashboardPage() {
       >
         <KpiCard
           title="Guards On Active Shift"
-          value={isLoading ? "…" : String(activeRosters.length)}
+          value={String(activeRosters.length)}
           subtext="Currently on duty"
           icon="👮"
+          isLoading={isLoading}
           onClick={() => router.push("/security-supervisor/guard-management")}
         />
         <KpiCard
           title="Live Gate Traffic"
-          value={
-            isLoading
-              ? "…"
-              : String(
-                  (securityStats?.visitors_inside ?? 0) + (securityStats?.vehicles_inside ?? 0),
-                )
-          }
+          value={String(
+            (securityStats?.visitors_inside ?? 0) + (securityStats?.vehicles_inside ?? 0),
+          )}
           subtext={`${securityStats?.visitors_inside ?? 0} Visitors Inside`}
           icon="🛡️"
+          isLoading={isLoading}
           onClick={() => router.push("/security-supervisor/gate-operations")}
         />
         <KpiCard
           title="Pending Approvals"
-          value={isLoading ? "…" : String(pendingVisitorCount)}
+          value={String(pendingVisitorCount)}
           subtext="Requires resident signoff"
           icon="👥"
+          isLoading={isLoading}
           trend={pendingVisitorCount > 0 ? "warning" : undefined}
           trendValue={pendingVisitorCount > 0 ? "Action Needed" : undefined}
           onClick={() => router.push("/security-supervisor/visitor-management")}
         />
         <KpiCard
           title="Deliveries Today"
-          value={isLoading ? "…" : String(deliveriesTodayCount)}
+          value={String(deliveriesTodayCount)}
           subtext={`${deliveriesAtGateCount} at gate desk`}
           icon="📦"
+          isLoading={isLoading}
           onClick={() => router.push("/security-supervisor/delivery-management")}
         />
         <KpiCard
           title="Domestic Staff Inside"
-          value={isLoading ? "…" : String(staffInsideCount)}
+          value={String(staffInsideCount)}
           subtext="Open gate attendance"
           icon="👔"
+          isLoading={isLoading}
           onClick={() => router.push("/security-supervisor/domestic-staff")}
         />
         <KpiCard
           title="Active Blacklist Entries"
-          value={isLoading ? "…" : String(blacklistCount)}
+          value={String(blacklistCount)}
           subtext="Currently enforced"
           icon="🚫"
+          isLoading={isLoading}
           trend={blacklistCount > 0 ? "danger" : undefined}
           onClick={() => router.push("/security-supervisor/blacklist")}
         />
@@ -263,7 +293,7 @@ export default function SecuritySupervisorDashboardPage() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 360px), 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 400px), 1fr))",
           gap: "1.75rem",
           alignItems: "start",
         }}
@@ -272,7 +302,12 @@ export default function SecuritySupervisorDashboardPage() {
         <div style={{ minWidth: 0 }}>
           <div className="card">
             <div className="card-header">
-              <h3 className="card-title">Supervised Gate Traffic Feed</h3>
+              <div>
+                <h3 className="card-title">Supervised Gate Traffic Feed</h3>
+                <p style={{ fontSize: "0.775rem", color: "var(--muted)" }}>
+                  Live gate ingress and egress events stream
+                </p>
+              </div>
               <button
                 className="btn btn-secondary"
                 style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
@@ -281,45 +316,16 @@ export default function SecuritySupervisorDashboardPage() {
                 View Live Feed
               </button>
             </div>
-            <div className="table-container">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Time</th>
-                    <th>Event Type</th>
-                    <th>Gate</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {isLoading ? (
-                    <tr>
-                      <td colSpan={3} style={{ textAlign: "center", padding: "1.5rem" }}>
-                        Loading…
-                      </td>
-                    </tr>
-                  ) : recentEvents.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={3}
-                        style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}
-                      >
-                        No recent gate events.
-                      </td>
-                    </tr>
-                  ) : (
-                    recentEvents.map((ev) => (
-                      <tr key={ev.id}>
-                        <td>{formatDateTime(ev.occurred_at)}</td>
-                        <td style={{ fontWeight: 600 }}>
-                          <StatusBadge status={ev.event_type} />
-                        </td>
-                        <td>{ev.gate_id ? `Gate #${ev.gate_id.slice(0, 8)}` : "—"}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              columns={eventColumns}
+              data={recentEvents}
+              isLoading={isLoading}
+              emptyTitle="No Recent Gate Events"
+              emptyDescription="Gate entry and exit events will appear here in real-time."
+              emptyIcon="🛡️"
+              enableClientPagination={true}
+              pageSize={5}
+            />
           </div>
         </div>
 
@@ -327,7 +333,12 @@ export default function SecuritySupervisorDashboardPage() {
         <div style={{ maxWidth: 460, width: "100%" }}>
           <div className="card" style={{ marginBottom: "1.5rem" }}>
             <div className="card-header">
-              <h3 className="card-title">Active Guard Roster</h3>
+              <div>
+                <h3 className="card-title">Active Guard Roster</h3>
+                <p style={{ fontSize: "0.775rem", color: "var(--muted)" }}>
+                  {activeRosters.length} guards currently on shift
+                </p>
+              </div>
               <button
                 className="btn btn-secondary"
                 style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
@@ -338,11 +349,21 @@ export default function SecuritySupervisorDashboardPage() {
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
               {isLoading ? (
-                <p style={{ fontSize: "0.85rem", color: "var(--muted)" }}>Loading…</p>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                  {[1, 2, 3].map((i) => (
+                    <div
+                      key={i}
+                      className="skeleton"
+                      style={{ height: 48, borderRadius: "var(--radius-sm)" }}
+                    />
+                  ))}
+                </div>
               ) : activeRosters.length === 0 ? (
-                <p style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
-                  No guards currently on an active shift.
-                </p>
+                <EmptyState
+                  title="No Active Guard Shifts"
+                  description="No security guards are currently clocked into an active shift."
+                  icon="👮"
+                />
               ) : (
                 activeRosters.map((r) => (
                   <div
@@ -371,14 +392,29 @@ export default function SecuritySupervisorDashboardPage() {
 
           <div className="card">
             <div className="card-header">
-              <h3 className="card-title">🚨 Active Emergency Alerts</h3>
+              <div>
+                <h3 className="card-title">🚨 Active Emergency Alerts</h3>
+                <p style={{ fontSize: "0.775rem", color: "var(--muted)" }}>
+                  Live SOS broadcasts and perimeter alarms
+                </p>
+              </div>
             </div>
             {isLoading ? (
-              <p style={{ fontSize: "0.85rem", color: "var(--muted)" }}>Loading…</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                {[1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className="skeleton"
+                    style={{ height: 56, borderRadius: "var(--radius-sm)" }}
+                  />
+                ))}
+              </div>
             ) : activeAlerts.length === 0 ? (
-              <p style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
-                No active emergency alerts.
-              </p>
+              <EmptyState
+                title="All Clear — No Active Panic Alerts"
+                description="No active emergency broadcasts or panic alarms recorded."
+                icon="🚨"
+              />
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
                 {activeAlerts.map((a) => (

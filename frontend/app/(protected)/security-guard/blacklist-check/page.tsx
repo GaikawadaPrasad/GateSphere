@@ -13,13 +13,17 @@ export default function SecurityGuardBlacklistCheckPage() {
     e.preventDefault();
     if (!query.trim()) return;
     setIsChecking(true);
-    const res = await blacklistApi.check(query.trim());
-    setResult(res);
+    try {
+      const res = await blacklistApi.check(query.trim());
+      setResult(res);
+    } catch {
+      setResult(null);
+    }
     setIsChecking(false);
   };
 
   return (
-    <div>
+    <div style={{ maxWidth: 1600, margin: "0 auto" }}>
       <PageHeader
         title="Instant Blacklist Lookup Console"
         subtitle="Perform high-speed identity and vehicle plate checks against the security blacklist registry"

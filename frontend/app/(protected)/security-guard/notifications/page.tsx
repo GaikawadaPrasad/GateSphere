@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { EmptyState } from "@/components/common/EmptyState";
 import { notificationsApi, type NotificationItem } from "@/lib/api";
 
 export default function SecurityGuardNotificationsPage() {
@@ -11,8 +12,12 @@ export default function SecurityGuardNotificationsPage() {
 
   const loadData = async () => {
     setIsLoading(true);
-    const data = await notificationsApi.list();
-    setNotifications(data);
+    try {
+      const data = await notificationsApi.list();
+      setNotifications(data || []);
+    } catch {
+      setNotifications([]);
+    }
     setIsLoading(false);
   };
 
@@ -26,7 +31,7 @@ export default function SecurityGuardNotificationsPage() {
   };
 
   return (
-    <div>
+    <div style={{ maxWidth: 1600, margin: "0 auto" }}>
       <PageHeader
         title="Gate Notifications & Approval Updates"
         subtitle="Real-time alerts, resident approvals, and supervisor broadcasts"
@@ -44,7 +49,35 @@ export default function SecurityGuardNotificationsPage() {
 
         <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
           {isLoading ? (
-            <div style={{ padding: "2rem", textAlign: "center" }}>Loading notifications…</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", padding: "0.5rem" }}>
+              {[1, 2, 3, 4].map((i) => (
+                <div
+                  key={i}
+                  className="card"
+                  style={{
+                    padding: "1rem",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <div style={{ display: "flex", gap: "1rem", alignItems: "center", width: "80%" }}>
+                    <div className="skeleton" style={{ width: 60, height: 24, borderRadius: "var(--radius-sm)" }} />
+                    <div style={{ flex: 1 }}>
+                      <div className="skeleton" style={{ width: "40%", height: 16, marginBottom: "0.4rem" }} />
+                      <div className="skeleton" style={{ width: "70%", height: 12 }} />
+                    </div>
+                  </div>
+                  <div className="skeleton" style={{ width: 80, height: 28, borderRadius: "var(--radius-sm)" }} />
+                </div>
+              ))}
+            </div>
+          ) : notifications.length === 0 ? (
+            <EmptyState
+              title="No Notifications"
+              description="Your gate console inbox has no unread broadcasts or alerts."
+              icon="🔔"
+            />
           ) : (
             notifications.map((n) => (
               <div

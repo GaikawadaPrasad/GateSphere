@@ -119,7 +119,7 @@ export default function SecurityGuardLiveGatePage() {
   };
 
   return (
-    <div>
+    <div style={{ maxWidth: 1600, margin: "0 auto" }}>
       <PageHeader
         title="Live Security Gate Verification Console"
         subtitle="Pass / PIN verification doubles as entry recording, with blacklist screening enforced server-side"

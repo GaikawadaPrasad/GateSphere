@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
+import { DataTable, type Column } from "@/components/tables/DataTable";
 import {
   gateApi,
   dashboardsApi,
@@ -146,8 +147,34 @@ export default function SecurityGuardDashboardPage() {
     }
   };
 
+  // Columns for Pending Gate Verification Queue
+  const pendingVisitorColumns: Column<any>[] = [
+    {
+      key: "visitor",
+      header: "Visitor",
+      sortable: true,
+      render: (v: any) => (
+        <span style={{ fontWeight: 700 }}>
+          {v.visitor?.full_name || v.visitor_name || "Visitor"}
+        </span>
+      ),
+    },
+    {
+      key: "purpose",
+      header: "Purpose",
+      sortable: true,
+      render: (v: any) => <span>{v.purpose || "—"}</span>,
+    },
+    {
+      key: "status",
+      header: "Status",
+      sortable: true,
+      render: (v: any) => <StatusBadge status={v.status} />,
+    },
+  ];
+
   return (
-    <div>
+    <div style={{ maxWidth: 1600, margin: "0 auto" }}>
       <PageHeader
         title="Security Guard Gate Console"
         subtitle="High-speed gate verification, instant pass checks, domestic staff logging, and SOS emergency alert escalation"
@@ -329,32 +356,36 @@ export default function SecurityGuardDashboardPage() {
       >
         <KpiCard
           title="Active Visitors Inside"
-          value={isLoadingStats ? "…" : String(securityStats?.visitors_inside ?? 0)}
+          value={securityStats?.visitors_inside ?? 0}
           subtext={`${securityStats?.expected_visitors ?? 0} Expected Today`}
           icon="👥"
+          isLoading={isLoadingStats}
           onClick={() => router.push("/security-guard/visitors")}
         />
         <KpiCard
           title="Pending Approvals"
-          value={isLoadingStats ? "…" : String(pendingVisitors.length)}
+          value={pendingVisitors.length}
           subtext="Awaiting Resident Confirmation"
           icon="⏳"
+          isLoading={isLoadingStats}
           trend={pendingVisitors.length > 0 ? "warning" : undefined}
           trendValue={pendingVisitors.length > 0 ? "Check Desk" : undefined}
           onClick={() => router.push("/security-guard/live-gate")}
         />
         <KpiCard
           title="Pending Deliveries"
-          value={isLoadingStats ? "…" : String(pendingDeliveryCount)}
+          value={pendingDeliveryCount}
           subtext="Expected or at gate desk"
           icon="📦"
+          isLoading={isLoadingStats}
           onClick={() => router.push("/security-guard/deliveries")}
         />
         <KpiCard
           title="Staff Inside"
-          value={isLoadingStats ? "…" : String(securityStats?.staff_inside ?? 0)}
+          value={securityStats?.staff_inside ?? 0}
           subtext="Domestic staff currently on-site"
           icon="🪪"
+          isLoading={isLoadingStats}
           onClick={() => router.push("/security-guard/staff-attendance")}
         />
         <KpiCard
@@ -362,6 +393,7 @@ export default function SecurityGuardDashboardPage() {
           value={activeSos ? "ACTIVE SOS" : "NORMAL"}
           subtext={activeSos ? `${activeSos.alert_type} Reported` : "No Active Gate Alarms"}
           icon="🛡️"
+          isLoading={isLoadingStats}
           trend={activeSos ? "danger" : "success"}
           trendValue={activeSos ? "ALERT" : "All Secure"}
           onClick={() => router.push("/security-guard/emergency")}
@@ -493,47 +525,16 @@ export default function SecurityGuardDashboardPage() {
           <div className="card-header">
             <h3 className="card-title">Pending Gate Verification Queue</h3>
           </div>
-          <div className="table-container">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Visitor</th>
-                  <th>Purpose</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {isLoadingStats ? (
-                  <tr>
-                    <td colSpan={3} style={{ textAlign: "center", padding: "1.5rem" }}>
-                      Loading…
-                    </td>
-                  </tr>
-                ) : pendingVisitors.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={3}
-                      style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}
-                    >
-                      No pending gate approvals.
-                    </td>
-                  </tr>
-                ) : (
-                  pendingVisitors.slice(0, 5).map((v) => (
-                    <tr key={v.id}>
-                      <td style={{ fontWeight: 700 }}>
-                        {v.visitor?.full_name || v.visitor_name || "Visitor"}
-                      </td>
-                      <td>{v.purpose || "—"}</td>
-                      <td>
-                        <StatusBadge status={v.status} />
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            columns={pendingVisitorColumns}
+            data={pendingVisitors}
+            isLoading={isLoadingStats}
+            enableClientPagination={true}
+            pageSize={5}
+            emptyTitle="No Pending Approvals"
+            emptyDescription="All visitors have been cleared or there are no pending gate entry requests."
+            emptyIcon="🚪"
+          />
         </div>
 
         <div className="card">

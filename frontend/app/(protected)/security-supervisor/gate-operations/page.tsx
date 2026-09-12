@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SearchInput } from "@/components/forms/SearchInput";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { DataTable, type Column } from "@/components/tables/DataTable";
 import { gateApi, type GateEvent } from "@/lib/api";
 import { formatDateTime } from "@/lib/utils";
 
@@ -15,8 +16,12 @@ export default function SecuritySupervisorGateOperationsPage() {
 
   const loadData = async () => {
     setIsLoading(true);
-    const data = await gateApi.events({ page_size: 50 });
-    setEvents(data);
+    try {
+      const data = await gateApi.events({ page_size: 50 });
+      setEvents(data || []);
+    } catch {
+      setEvents([]);
+    }
     setIsLoading(false);
   };
 
@@ -40,8 +45,45 @@ export default function SecuritySupervisorGateOperationsPage() {
     return matchSearch && matchType;
   });
 
+  const columns: Column<GateEvent>[] = [
+    {
+      key: "occurred_at",
+      header: "Timestamp",
+      sortable: true,
+      render: (e) => <span>⏱️ {formatDateTime(e.occurred_at)}</span>,
+    },
+    {
+      key: "event_type",
+      header: "Event Type",
+      sortable: true,
+      render: (e) => (
+        <span style={{ fontWeight: 600, textTransform: "capitalize" }}>
+          <StatusBadge status={e.event_type} />
+        </span>
+      ),
+    },
+    {
+      key: "reference",
+      header: "Reference",
+      sortable: true,
+      render: (e) => (
+        <span>
+          {(e as any).reference_type
+            ? `${(e as any).reference_type.replace(/_/g, " ")} (#${((e as any).reference_id || "").slice(0, 8)})`
+            : "—"}
+        </span>
+      ),
+    },
+    {
+      key: "gate_id",
+      header: "Gate",
+      sortable: true,
+      render: (e) => <span>{e.gate_id ? `Gate #${e.gate_id.slice(0, 8)}` : "Main Gate"}</span>,
+    },
+  ];
+
   return (
-    <div>
+    <div style={{ maxWidth: 1600, margin: "0 auto" }}>
       <PageHeader
         title="Gate Operations Supervision"
         subtitle="Real-time monitoring of all recorded gate events across every gate"
@@ -86,51 +128,16 @@ export default function SecuritySupervisorGateOperationsPage() {
           </div>
         </div>
 
-        <div className="table-container">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Timestamp</th>
-                <th>Event Type</th>
-                <th>Reference</th>
-                <th>Gate</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <tr>
-                  <td colSpan={4} style={{ textAlign: "center", padding: "2rem" }}>
-                    Loading gate traffic stream…
-                  </td>
-                </tr>
-              ) : filteredEvents.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={4}
-                    style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
-                  >
-                    No gate events matching filter.
-                  </td>
-                </tr>
-              ) : (
-                filteredEvents.map((ev) => (
-                  <tr key={ev.id}>
-                    <td>{formatDateTime(ev.occurred_at)}</td>
-                    <td style={{ fontWeight: 600, color: "var(--fg)" }}>
-                      <StatusBadge status={ev.event_type} />
-                    </td>
-                    <td>
-                      {(ev as any).reference_type
-                        ? `${(ev as any).reference_type.replace(/_/g, " ")} (#${((ev as any).reference_id || "").slice(0, 8)})`
-                        : "—"}
-                    </td>
-                    <td>{ev.gate_id ? `Gate #${ev.gate_id.slice(0, 8)}` : "—"}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          columns={columns}
+          data={filteredEvents}
+          isLoading={isLoading}
+          enableClientPagination={true}
+          pageSize={10}
+          emptyTitle="No Gate Events Recorded"
+          emptyDescription="No gate movement events match your search or filter selection."
+          emptyIcon="🛡️"
+        />
       </div>
     </div>
   );

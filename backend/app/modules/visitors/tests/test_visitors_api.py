@@ -149,3 +149,23 @@ def test_resident_cannot_act_on_other_units_request(as_role, seed_ids, resident_
     assert all(x["id"] != req["id"] for x in resident.get(f"{P}/requests").json()["data"])
     # a community admin is unrestricted
     assert admin.get(f"{P}/requests/{req['id']}").status_code == 200
+
+
+def test_supervisor_can_remove_blacklist(as_role):
+    sup = as_role("security_supervisor")
+    phone = _phone()
+    r = sup.post(
+        "/api/v1/visitors/blacklist",
+        json={"phone": phone, "reason": "temporary ban", "risk_level": "medium"},
+    )
+    assert r.status_code == 201
+    bl_id = r.json()["data"]["id"]
+
+    # resident cannot delete
+    assert as_role("resident").delete(f"/api/v1/visitors/blacklist/{bl_id}").status_code == 403
+
+    # supervisor can delete
+    assert sup.delete(f"/api/v1/visitors/blacklist/{bl_id}").status_code == 204
+
+    # subsequent delete is 404
+    assert sup.delete(f"/api/v1/visitors/blacklist/{bl_id}").status_code == 404
