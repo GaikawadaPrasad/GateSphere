@@ -431,6 +431,7 @@ export default function CommunityAdminStaffPage() {
             isLoading={staffLoading}
             emptyTitle="No staff registered"
             emptyDescription="Register domestic helpers and support technicians for this community."
+            enableClientPagination={true}
           />
         </div>
       )}
@@ -442,6 +443,7 @@ export default function CommunityAdminStaffPage() {
           isLoading={attendanceLoading}
           emptyTitle="No attendance records"
           emptyDescription="Daily check-ins recorded at security gates will appear here."
+          enableClientPagination={true}
         />
       )}
 

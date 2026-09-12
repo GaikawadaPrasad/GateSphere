@@ -19,9 +19,26 @@ const FinancialHealthCard = dynamic(
   () => import("@/components/dashboard/FinancialHealthCard").then((mod) => mod.FinancialHealthCard),
   {
     loading: () => (
-      <div className="card" style={{ height: "100%", minHeight: 280 }}>
-        <Skeleton width={160} height={24} style={{ marginBottom: "1.5rem" }} />
-        <Skeleton width="100%" height={180} />
+      <div className="card" style={{ height: "100%", minHeight: 280, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1.25rem" }}>
+            <Skeleton width={180} height={20} borderRadius={4} />
+            <Skeleton width={80} height={20} borderRadius={4} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 110px), 1fr))", gap: "0.75rem", marginBottom: "1rem" }}>
+            <Skeleton height={68} borderRadius={6} />
+            <Skeleton height={68} borderRadius={6} />
+            <Skeleton height={68} borderRadius={6} />
+          </div>
+        </div>
+        <div>
+          <Skeleton width="100%" height={10} borderRadius={4} style={{ marginBottom: "0.75rem" }} />
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            <Skeleton width={70} height={22} borderRadius={999} />
+            <Skeleton width={70} height={22} borderRadius={999} />
+            <Skeleton width={70} height={22} borderRadius={999} />
+          </div>
+        </div>
       </div>
     ),
     ssr: false,
@@ -32,9 +49,18 @@ const AttendanceWidget = dynamic(
   () => import("@/components/dashboard/AttendanceWidget").then((mod) => mod.AttendanceWidget),
   {
     loading: () => (
-      <div className="card" style={{ height: "100%", minHeight: 280 }}>
-        <Skeleton width={180} height={24} style={{ marginBottom: "1.5rem" }} />
-        <Skeleton width="100%" height={180} />
+      <div className="card" style={{ height: "100%", minHeight: 280, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1.25rem" }}>
+            <Skeleton width={190} height={20} borderRadius={4} />
+            <Skeleton width={90} height={20} borderRadius={4} />
+          </div>
+          <Skeleton width="100%" height={68} borderRadius={6} style={{ marginBottom: "1rem" }} />
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            <Skeleton width="100%" height={40} borderRadius={6} />
+            <Skeleton width="100%" height={40} borderRadius={6} />
+          </div>
+        </div>
       </div>
     ),
     ssr: false,
@@ -45,15 +71,23 @@ const IncidentListWidget = dynamic(
   () => import("@/components/dashboard/IncidentListWidget").then((mod) => mod.IncidentListWidget),
   {
     loading: () => (
-      <div className="card" style={{ height: "100%", minHeight: 280 }}>
-        <Skeleton width={170} height={24} style={{ marginBottom: "1.5rem" }} />
-        <Skeleton width="100%" height={180} />
+      <div className="card" style={{ height: "100%", minHeight: 280, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1.25rem" }}>
+            <Skeleton width={190} height={20} borderRadius={4} />
+            <Skeleton width={90} height={20} borderRadius={4} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+            <Skeleton width="100%" height={54} borderRadius={6} />
+            <Skeleton width="100%" height={54} borderRadius={6} />
+            <Skeleton width="100%" height={54} borderRadius={6} />
+          </div>
+        </div>
       </div>
     ),
     ssr: false,
   },
 );
-
 
 export default function CommunityAdminDashboardPage() {
   const { activeCommunityId } = useUiStore();
@@ -61,14 +95,16 @@ export default function CommunityAdminDashboardPage() {
   const { data: community, isLoading: communityLoading } = useCommunityDetails(
     activeCommunityId || undefined,
   );
-  const { data: towers } = useTowers(activeCommunityId || undefined);
+  const { data: towers, isLoading: towersLoading } = useTowers(activeCommunityId || undefined);
   const { data: overview, isLoading: overviewLoading } = useOverviewStats(
     activeCommunityId || undefined,
   );
   const { data: financial, isLoading: financialLoading } = useFinancialStats(
     activeCommunityId || undefined,
   );
-  const { data: staffList } = useStaffList({ community_id: activeCommunityId || undefined });
+  const { data: staffList, isLoading: staffListLoading } = useStaffList({
+    community_id: activeCommunityId || undefined,
+  });
   const { data: attendance, isLoading: attendanceLoading } = useStaffAttendance({
     community_id: activeCommunityId || undefined,
     open_only: false,
@@ -76,11 +112,11 @@ export default function CommunityAdminDashboardPage() {
   const { data: incidents, isLoading: incidentsLoading } = useIncidents({
     community_id: activeCommunityId || undefined,
   });
-  const { data: pendingMoves } = useMoveRecords({
+  const { data: pendingMoves, isLoading: movesLoading } = useMoveRecords({
     community_id: activeCommunityId || undefined,
     move_status: "requested",
   });
-  const { data: announcements } = useAnnouncements({
+  const { data: announcements, isLoading: announcementsLoading } = useAnnouncements({
     community_id: activeCommunityId || undefined,
     published_only: true,
   });
@@ -104,18 +140,19 @@ export default function CommunityAdminDashboardPage() {
       (i) => i.status !== "resolved" && i.status !== "closed" && i.status !== "false_alarm",
     ).length ??
     0;
+
   const financialScore =
     Number(financial?.total_billed || 0) > 0
       ? `${Math.round((Number(financial?.total_collected || 0) / Number(financial?.total_billed || 1)) * 100)}%`
       : "100%";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1.75rem" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "1.75rem", maxWidth: 1600, margin: "0 auto" }}>
       <PageHeader
         title="Community Overview"
         description={`Live operations, property health, and resident management for ${community?.name || "your community"}.`}
         action={
-          <div style={{ display: "flex", gap: "0.5rem" }}>
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
             <Link href="/community-admin/communication" className="btn btn-primary">
               📢 Broadcast Announcement
             </Link>
@@ -123,7 +160,7 @@ export default function CommunityAdminDashboardPage() {
         }
       />
 
-      {/* KPI Grid */}
+      {/* KPI Grid with Responsive Auto-fit & Shimmer Skeletons */}
       <div
         style={{
           display: "grid",
@@ -136,7 +173,7 @@ export default function CommunityAdminDashboardPage() {
           value={totalTowers}
           icon="🏢"
           subtitle="Registered residential blocks"
-          isLoading={overviewLoading || communityLoading}
+          isLoading={overviewLoading || communityLoading || towersLoading}
         />
         <KpiCard
           title="Total Units"
@@ -165,7 +202,7 @@ export default function CommunityAdminDashboardPage() {
             text: `${staffAttendanceRate}% Active`,
             variant: staffAttendanceRate >= 75 ? "success" : "warning",
           }}
-          isLoading={attendanceLoading}
+          isLoading={attendanceLoading || staffListLoading}
         />
         <KpiCard
           title="Open Incidents"
@@ -189,6 +226,7 @@ export default function CommunityAdminDashboardPage() {
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 340px), 1fr))",
           gap: "1.25rem",
+          alignItems: "stretch",
         }}
       >
         <FinancialHealthCard data={financial} isLoading={financialLoading} />
@@ -205,13 +243,14 @@ export default function CommunityAdminDashboardPage() {
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 340px), 1fr))",
           gap: "1.25rem",
+          alignItems: "start",
         }}
       >
         <IncidentListWidget incidents={incidents} isLoading={incidentsLoading} />
 
         {/* Action Center: Pending Approvals & Live Broadcasts */}
         <div className="card" style={{ display: "flex", flexDirection: "column" }}>
-          <div className="card-header">
+          <div className="card-header" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
             <div>
               <h3 className="card-title">⚡ Action Center &amp; Broadcasts</h3>
               <p style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.15rem" }}>
@@ -231,7 +270,9 @@ export default function CommunityAdminDashboardPage() {
             style={{ display: "flex", flexDirection: "column", gap: "1rem", marginTop: "0.5rem" }}
           >
             {/* Pending Move In/Out Alert */}
-            {pendingMoves && pendingMoves.length > 0 ? (
+            {movesLoading ? (
+              <Skeleton width="100%" height={74} borderRadius={6} />
+            ) : pendingMoves && pendingMoves.length > 0 ? (
               <div
                 style={{
                   background: "#fffbeb",
@@ -241,7 +282,7 @@ export default function CommunityAdminDashboardPage() {
                 }}
               >
                 <div
-                  style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                  style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                     <span>📦</span>
@@ -289,7 +330,12 @@ export default function CommunityAdminDashboardPage() {
               >
                 Latest Community Announcements
               </div>
-              {announcements && announcements.length > 0 ? (
+              {announcementsLoading ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                  <Skeleton width="100%" height={56} borderRadius={6} />
+                  <Skeleton width="100%" height={56} borderRadius={6} />
+                </div>
+              ) : announcements && announcements.length > 0 ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                   {announcements.slice(0, 3).map((a: any) => (
                     <div
@@ -307,10 +353,13 @@ export default function CommunityAdminDashboardPage() {
                           display: "flex",
                           justifyContent: "space-between",
                           alignItems: "center",
+                          gap: "0.5rem",
                         }}
                       >
-                        <strong style={{ color: "var(--fg)" }}>{a.title}</strong>
-                        <span style={{ fontSize: "0.7rem", color: "var(--muted)" }}>
+                        <strong style={{ color: "var(--fg)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {a.title}
+                        </strong>
+                        <span style={{ fontSize: "0.7rem", color: "var(--muted)", flexShrink: 0 }}>
                           {formatDateTime(a.published_at || a.created_at)}
                         </span>
                       </div>

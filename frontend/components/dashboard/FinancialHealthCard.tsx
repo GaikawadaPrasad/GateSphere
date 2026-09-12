@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { FinancialStats } from "@/types/dashboards";
 import { formatCurrency } from "@/lib/utils";
+import { Skeleton } from "@/components/common/LoadingSkeleton";
 
 interface FinancialHealthCardProps {
   data?: FinancialStats | null;
@@ -12,9 +13,33 @@ interface FinancialHealthCardProps {
 export function FinancialHealthCard({ data, isLoading }: FinancialHealthCardProps) {
   if (isLoading) {
     return (
-      <div className="card" style={{ height: "100%", minHeight: 280 }}>
-        <div className="skeleton" style={{ width: 160, height: 24, marginBottom: "1.5rem" }} />
-        <div className="skeleton" style={{ width: "100%", height: 180 }} />
+      <div className="card" style={{ height: "100%", minHeight: 280, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1.25rem" }}>
+            <Skeleton width={180} height={20} borderRadius={4} />
+            <Skeleton width={80} height={20} borderRadius={4} />
+          </div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 110px), 1fr))",
+              gap: "0.75rem",
+              marginBottom: "1rem",
+            }}
+          >
+            <Skeleton height={68} borderRadius={6} />
+            <Skeleton height={68} borderRadius={6} />
+            <Skeleton height={68} borderRadius={6} />
+          </div>
+        </div>
+        <div>
+          <Skeleton width="100%" height={10} borderRadius={4} style={{ marginBottom: "0.75rem" }} />
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            <Skeleton width={70} height={22} borderRadius={999} />
+            <Skeleton width={70} height={22} borderRadius={999} />
+            <Skeleton width={70} height={22} borderRadius={999} />
+          </div>
+        </div>
       </div>
     );
   }
@@ -33,7 +58,7 @@ export function FinancialHealthCard({ data, isLoading }: FinancialHealthCardProp
 
   return (
     <div className="card" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <div className="card-header">
+      <div className="card-header" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
         <div>
           <h3 className="card-title">💳 Financial Health &amp; Billing</h3>
           <p style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.15rem" }}>
@@ -52,7 +77,7 @@ export function FinancialHealthCard({ data, isLoading }: FinancialHealthCardProp
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 110px), 1fr))",
           gap: "0.75rem",
           margin: "1rem 0",
         }}
@@ -63,6 +88,7 @@ export function FinancialHealthCard({ data, isLoading }: FinancialHealthCardProp
             padding: "0.75rem",
             borderRadius: "var(--radius-sm)",
             border: "1px solid var(--border)",
+            minWidth: 0,
           }}
         >
           <div style={{ fontSize: "0.75rem", color: "var(--muted)", fontWeight: 500 }}>
@@ -70,10 +96,13 @@ export function FinancialHealthCard({ data, isLoading }: FinancialHealthCardProp
           </div>
           <div
             style={{
-              fontSize: "1.1rem",
+              fontSize: "1.05rem",
               fontWeight: 700,
               color: "var(--fg)",
               marginTop: "0.25rem",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
             }}
           >
             {formatCurrency(billed)}
@@ -86,11 +115,20 @@ export function FinancialHealthCard({ data, isLoading }: FinancialHealthCardProp
             padding: "0.75rem",
             borderRadius: "var(--radius-sm)",
             border: "1px solid #a7f3d0",
+            minWidth: 0,
           }}
         >
           <div style={{ fontSize: "0.75rem", color: "#065f46", fontWeight: 500 }}>Collected</div>
           <div
-            style={{ fontSize: "1.1rem", fontWeight: 700, color: "#059669", marginTop: "0.25rem" }}
+            style={{
+              fontSize: "1.05rem",
+              fontWeight: 700,
+              color: "#059669",
+              marginTop: "0.25rem",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
           >
             {formatCurrency(collected)}
           </div>
@@ -102,6 +140,7 @@ export function FinancialHealthCard({ data, isLoading }: FinancialHealthCardProp
             padding: "0.75rem",
             borderRadius: "var(--radius-sm)",
             border: `1px solid ${outstanding > 0 ? "#fecaca" : "var(--border)"}`,
+            minWidth: 0,
           }}
         >
           <div
@@ -115,10 +154,13 @@ export function FinancialHealthCard({ data, isLoading }: FinancialHealthCardProp
           </div>
           <div
             style={{
-              fontSize: "1.1rem",
+              fontSize: "1.05rem",
               fontWeight: 700,
               color: outstanding > 0 ? "#dc2626" : "var(--fg)",
               marginTop: "0.25rem",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
             }}
           >
             {formatCurrency(outstanding)}
@@ -167,7 +209,7 @@ export function FinancialHealthCard({ data, isLoading }: FinancialHealthCardProp
         </div>
 
         {/* Invoice status pills */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginTop: "1rem" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem", marginTop: "1rem" }}>
           {Object.entries(invoiceBreakdown).map(([statusKey, count]) => (
             <div
               key={statusKey}

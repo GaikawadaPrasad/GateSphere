@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { StaffAttendance } from "@/types/staff";
 import { formatDateTime } from "@/lib/utils";
+import { Skeleton } from "@/components/common/LoadingSkeleton";
 
 interface AttendanceWidgetProps {
   attendance?: StaffAttendance[];
@@ -13,9 +14,18 @@ interface AttendanceWidgetProps {
 export function AttendanceWidget({ attendance, totalStaff = 0, isLoading }: AttendanceWidgetProps) {
   if (isLoading) {
     return (
-      <div className="card" style={{ height: "100%", minHeight: 280 }}>
-        <div className="skeleton" style={{ width: 180, height: 24, marginBottom: "1.5rem" }} />
-        <div className="skeleton" style={{ width: "100%", height: 180 }} />
+      <div className="card" style={{ height: "100%", minHeight: 280, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1.25rem" }}>
+            <Skeleton width={190} height={20} borderRadius={4} />
+            <Skeleton width={90} height={20} borderRadius={4} />
+          </div>
+          <Skeleton width="100%" height={68} borderRadius={6} style={{ marginBottom: "1rem" }} />
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            <Skeleton width="100%" height={40} borderRadius={6} />
+            <Skeleton width="100%" height={40} borderRadius={6} />
+          </div>
+        </div>
       </div>
     );
   }
@@ -27,7 +37,7 @@ export function AttendanceWidget({ attendance, totalStaff = 0, isLoading }: Atte
 
   return (
     <div className="card" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <div className="card-header">
+      <div className="card-header" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
         <div>
           <h3 className="card-title">🛠️ Staff Presence &amp; Attendance</h3>
           <p style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.15rem" }}>
@@ -53,6 +63,8 @@ export function AttendanceWidget({ attendance, totalStaff = 0, isLoading }: Atte
           padding: "0.85rem 1rem",
           borderRadius: "var(--radius-sm)",
           border: "1px solid var(--border)",
+          flexWrap: "wrap",
+          gap: "0.5rem",
         }}
       >
         <div>
@@ -112,9 +124,10 @@ export function AttendanceWidget({ attendance, totalStaff = 0, isLoading }: Atte
                   border: "1px solid var(--border)",
                   borderRadius: "var(--radius-sm)",
                   fontSize: "0.825rem",
+                  gap: "0.5rem",
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", minWidth: 0, flex: 1 }}>
                   <div
                     style={{
                       width: 28,
@@ -127,12 +140,21 @@ export function AttendanceWidget({ attendance, totalStaff = 0, isLoading }: Atte
                       justifyContent: "center",
                       fontWeight: 600,
                       fontSize: "0.75rem",
+                      flexShrink: 0,
                     }}
                   >
                     👤
                   </div>
-                  <div>
-                    <div style={{ fontWeight: 600, color: "var(--fg)" }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontWeight: 600,
+                        color: "var(--fg)",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
                       {staff.staff_name || "Domestic Staff"}
                     </div>
                     <div
@@ -147,14 +169,15 @@ export function AttendanceWidget({ attendance, totalStaff = 0, isLoading }: Atte
                   </div>
                 </div>
 
-                <div style={{ textAlign: "right", fontSize: "0.7rem", color: "var(--muted)" }}>
-                  <span
-                    className="badge badge-success"
-                    style={{ fontSize: "0.65rem", padding: "0.1rem 0.4rem" }}
-                  >
-                    In
-                  </span>
-                  <div style={{ marginTop: "0.15rem" }}>{formatDateTime(staff.check_in_at)}</div>
+                <div
+                  style={{
+                    textAlign: "right",
+                    fontSize: "0.7rem",
+                    color: "var(--muted)",
+                    flexShrink: 0,
+                  }}
+                >
+                  In: {formatDateTime(staff.check_in_at)}
                 </div>
               </div>
             ))}

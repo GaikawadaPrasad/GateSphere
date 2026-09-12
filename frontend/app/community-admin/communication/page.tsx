@@ -393,6 +393,7 @@ export default function CommunityAdminCommunicationPage() {
             isLoading={announcementsLoading}
             emptyTitle="No announcements found"
             emptyDescription="Create a notice to broadcast updates to residents."
+            enableClientPagination={true}
           />
         </div>
       )}
@@ -460,6 +461,7 @@ export default function CommunityAdminCommunicationPage() {
             isLoading={groupsLoading}
             emptyTitle="No resident groups"
             emptyDescription="Group residents by committees, interest clubs, or specific blocks."
+            enableClientPagination={true}
           />
         </div>
       )}

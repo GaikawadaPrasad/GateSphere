@@ -401,6 +401,7 @@ export default function CommunityAdminResidentsPage() {
             isLoading={residentsLoading}
             emptyTitle="No residents found"
             emptyDescription="No resident profiles matching your filter criteria."
+            enableClientPagination={true}
           />
         </div>
       )}
@@ -413,6 +414,7 @@ export default function CommunityAdminResidentsPage() {
             isLoading={movesLoading}
             emptyTitle="No move records"
             emptyDescription="All resident move-in and move-out applications have been processed."
+            enableClientPagination={true}
           />
         </div>
       )}
