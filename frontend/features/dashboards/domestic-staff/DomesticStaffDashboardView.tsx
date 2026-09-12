@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { DashboardShell } from "@/components/layout/DashboardShell";
 import { StatMetric } from "@/components/common/StatMetric";
@@ -11,6 +12,19 @@ import { BrandButton } from "@/components/common/BrandButton";
 import { Modal } from "@/components/common/Modal";
 import { KpiCardSkeleton, CardSkeleton, TableSkeleton } from "@/components/common/LoadingSkeleton";
 import { ErrorState } from "@/components/common/ErrorState";
+
+const QrCodeSvg = dynamic(
+  () => import("@/components/common/QrCodeSvg").then((m) => m.QrCodeSvg),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="skeleton"
+        style={{ width: 150, height: 150, borderRadius: 12, margin: "0 auto" }}
+      />
+    ),
+  },
+);
 import {
   useStaffProfile,
   useUpdateStaffProfile,
@@ -565,62 +579,98 @@ export function DomesticStaffDashboardView({
             </p>
           </div>
         ) : (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
-              gap: "1.25rem",
-            }}
-          >
-            {homes.map((home) => (
-              <div key={home.id} className="gs-card card-hover">
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "flex-start",
-                    marginBottom: "0.75rem",
-                  }}
-                >
-                  <div>
-                    <h4 style={{ fontSize: "1.1rem", fontWeight: 800 }}>{home.unit_number}</h4>
-                    <p style={{ fontSize: "13px", color: "var(--brand-body)" }}>
-                      {home.tower_name} · Floor {home.floor}
-                    </p>
-                  </div>
-                  <StatusBadge status="active" label="Assigned" />
-                </div>
-
-                <div
-                  style={{
-                    margin: "0.75rem 0",
-                    padding: "0.75rem",
-                    background: "#F8FAFC",
-                    borderRadius: "6px",
-                    fontSize: "13px",
-                  }}
-                >
-                  <div>
-                    <strong>Resident:</strong> {home.resident_name}
-                  </div>
-                  <div>
-                    <strong>Phone:</strong>{" "}
-                    <a href={`tel:${home.resident_phone}`}>{home.resident_phone}</a>
-                  </div>
-                  <div>
-                    <strong>Shift:</strong> {home.expected_hours}
-                  </div>
-                </div>
-
-                {home.special_instructions && (
-                  <p
-                    style={{ fontSize: "12px", color: "var(--brand-body)", marginBottom: "0.75rem" }}
+          <div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
+                gap: "1.25rem",
+              }}
+            >
+              {homeControls.paginatedData.map((home) => (
+                <div key={home.id} className="gs-card card-hover">
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      marginBottom: "0.75rem",
+                    }}
                   >
-                    💡 <em>{home.special_instructions}</em>
-                  </p>
-                )}
+                    <div>
+                      <h4 style={{ fontSize: "1.1rem", fontWeight: 800 }}>{home.unit_number}</h4>
+                      <p style={{ fontSize: "13px", color: "var(--brand-body)" }}>
+                        {home.tower_name} · Floor {home.floor}
+                      </p>
+                    </div>
+                    <StatusBadge status="active" label="Assigned" />
+                  </div>
+
+                  <div
+                    style={{
+                      margin: "0.75rem 0",
+                      padding: "0.75rem",
+                      background: "#F8FAFC",
+                      borderRadius: "6px",
+                      fontSize: "13px",
+                    }}
+                  >
+                    <div>
+                      <strong>Resident:</strong> {home.resident_name}
+                    </div>
+                    <div>
+                      <strong>Phone:</strong>{" "}
+                      <a href={`tel:${home.resident_phone}`}>{home.resident_phone}</a>
+                    </div>
+                    <div>
+                      <strong>Shift:</strong> {home.expected_hours}
+                    </div>
+                  </div>
+
+                  {home.special_instructions && (
+                    <p
+                      style={{ fontSize: "12px", color: "var(--brand-body)", marginBottom: "0.75rem" }}
+                    >
+                      💡 <em>{home.special_instructions}</em>
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {homeControls.totalPages > 1 && (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginTop: "1.25rem",
+                  padding: "0.75rem 0",
+                }}
+              >
+                <span style={{ fontSize: "13px", color: "var(--brand-body)" }}>
+                  Showing {homeControls.startIndex + 1}–{Math.min(homeControls.startIndex + homeControls.pageSize, homeControls.total)} of {homeControls.total} assigned homes
+                </span>
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <BrandButton
+                    size="sm"
+                    variant="outline"
+                    disabled={homeControls.page <= 1}
+                    onClick={() => homeControls.setPage(homeControls.page - 1)}
+                  >
+                    Previous
+                  </BrandButton>
+                  <BrandButton
+                    size="sm"
+                    variant="outline"
+                    disabled={homeControls.page >= homeControls.totalPages}
+                    onClick={() => homeControls.setPage(homeControls.page + 1)}
+                  >
+                    Next
+                  </BrandButton>
+                </div>
               </div>
-            ))}
+            )}
           </div>
         )
       )}
@@ -632,7 +682,11 @@ export function DomesticStaffDashboardView({
             Weekly Duty & Shift Schedule
           </h3>
           {homesLoading ? (
-            <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>Loading schedule…</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+              <CardSkeleton height={56} />
+              <CardSkeleton height={56} />
+              <CardSkeleton height={56} />
+            </div>
           ) : homes.length === 0 ? (
             <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>
               No active unit assignments found.
@@ -773,7 +827,7 @@ export function DomesticStaffDashboardView({
           <div
             style={{
               width: 220,
-              height: 220,
+              minHeight: 220,
               margin: "0 auto 1.5rem auto",
               padding: "1rem",
               background: "#FFFFFF",
@@ -783,9 +837,17 @@ export function DomesticStaffDashboardView({
               alignItems: "center",
               justifyContent: "center",
               flexDirection: "column",
+              gap: "0.5rem",
             }}
           >
-            <div style={{ fontSize: "5rem" }}>📱</div>
+            <QrCodeSvg
+              value={
+                profile?.id
+                  ? `GSE:STAFF:${profile.id}:${profile.verification_id || "VERIFIED"}`
+                  : "GSE:STAFF:PASS"
+              }
+              size={150}
+            />
             <span
               style={{
                 fontSize: "11px",
@@ -883,7 +945,11 @@ export function DomesticStaffDashboardView({
             Staff Notice Board & Alerts
           </h3>
           {myNotifications.isLoading ? (
-            <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>Loading notifications…</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              <CardSkeleton height={68} />
+              <CardSkeleton height={68} />
+              <CardSkeleton height={68} />
+            </div>
           ) : (myNotifications.data || []).length === 0 ? (
             <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>No notifications yet.</p>
           ) : (

@@ -6,6 +6,8 @@ import { SearchInput } from "@/components/forms/SearchInput";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { staffApi } from "@/lib/api";
 
+import { DataTable, type Column } from "@/components/tables/DataTable";
+
 export default function SecuritySupervisorDomesticStaffPage() {
   const [staff, setStaff] = useState<any[]>([]);
   const [search, setSearch] = useState("");
@@ -15,8 +17,8 @@ export default function SecuritySupervisorDomesticStaffPage() {
     setIsLoading(true);
     try {
       const [staffRes, attendanceRes] = await Promise.allSettled([
-        staffApi.list(),
-        staffApi.attendance({ page_size: 50 }),
+        staffApi.list({ page_size: 100 }),
+        staffApi.attendance({ page_size: 100 }),
       ]);
 
       const staffList = staffRes.status === "fulfilled" ? staffRes.value : [];
@@ -36,10 +38,10 @@ export default function SecuritySupervisorDomesticStaffPage() {
           return {
             id: s.id,
             name: s.full_name || "Domestic Staff",
-            role: s.service_type
-              ? s.service_type.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
+            role: s.service_type || s.staff_type
+              ? (s.service_type || s.staff_type).replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
               : "Housekeeping",
-            assigned_units: ["Verified Staff"],
+            assigned_units: s.assigned_units && s.assigned_units.length > 0 ? s.assigned_units : ["Verified Staff"],
             check_in_time: att?.check_in_at
               ? new Date(att.check_in_at).toLocaleTimeString([], {
                   hour: "2-digit",
@@ -75,6 +77,44 @@ export default function SecuritySupervisorDomesticStaffPage() {
     );
   });
 
+  const columns: Column<any>[] = [
+    {
+      key: "name",
+      header: "Staff Name",
+      sortable: true,
+      render: (s) => <span style={{ fontWeight: 600, color: "var(--fg)" }}>🪪 {s.name}</span>,
+    },
+    {
+      key: "role",
+      header: "Role / Service",
+      sortable: true,
+      render: (s) => <span>{s.role}</span>,
+    },
+    {
+      key: "assigned_units",
+      header: "Assigned Units",
+      render: (s) => <span>{s.assigned_units ? s.assigned_units.join(", ") : "Unassigned"}</span>,
+    },
+    {
+      key: "check_in_time",
+      header: "Check-In Time",
+      sortable: true,
+      render: (s) => <span>{s.check_in_time || "—"}</span>,
+    },
+    {
+      key: "check_out_time",
+      header: "Check-Out Time",
+      sortable: true,
+      render: (s) => <span>{s.check_out_time || "—"}</span>,
+    },
+    {
+      key: "status",
+      header: "Attendance Status",
+      sortable: true,
+      render: (s) => <StatusBadge status={s.status === "Inside Premises" ? "approved" : "completed"} label={s.status} />,
+    },
+  ];
+
   return (
     <div>
       <PageHeader
@@ -105,51 +145,16 @@ export default function SecuritySupervisorDomesticStaffPage() {
           </div>
         </div>
 
-        <div className="table-container">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Staff Name</th>
-                <th>Role / Service</th>
-                <th>Assigned Units</th>
-                <th>Check-In Time</th>
-                <th>Check-Out Time</th>
-                <th>Attendance Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: "center", padding: "2rem" }}>
-                    Loading domestic staff…
-                  </td>
-                </tr>
-              ) : filteredStaff.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
-                  >
-                    No domestic staff records found.
-                  </td>
-                </tr>
-              ) : (
-                filteredStaff.map((s) => (
-                  <tr key={s.id}>
-                    <td style={{ fontWeight: 600, color: "var(--fg)" }}>{s.name}</td>
-                    <td>{s.role}</td>
-                    <td>{s.assigned_units ? s.assigned_units.join(", ") : "Unassigned"}</td>
-                    <td>{s.check_in_time || "—"}</td>
-                    <td>{s.check_out_time || "—"}</td>
-                    <td>
-                      <StatusBadge status={s.status} />
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          columns={columns}
+          data={filteredStaff}
+          isLoading={isLoading}
+          enableClientPagination={true}
+          pageSize={10}
+          emptyTitle="No Domestic Staff Records Found"
+          emptyDescription="There are no registered domestic staff members matching your search query."
+          emptyIcon="🪪"
+        />
       </div>
     </div>
   );
