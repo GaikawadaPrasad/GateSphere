@@ -117,6 +117,28 @@ export default function MaintenanceTimeline() {
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
+  const lastStepTime = useRef<number>(0);
+  const activeStepRef = useRef<number>(activeStep);
+  activeStepRef.current = activeStep;
+  const touchStartY = useRef<number | null>(null);
+
+  const scrollToStep = (idx: number) => {
+    if (!sectionRef.current) {
+      setActiveStep(idx);
+      return;
+    }
+    const rect = sectionRef.current.getBoundingClientRect();
+    const windowH = window.innerHeight;
+    const topOffset = window.innerWidth < 640 ? 56 : 0;
+    const totalH = rect.height - windowH;
+    if (totalH <= 0) {
+      setActiveStep(idx);
+      return;
+    }
+    const targetScrollY = window.scrollY + rect.top - topOffset + (idx / (STEPS.length - 1)) * totalH;
+    window.scrollTo({ top: targetScrollY, behavior: "smooth" });
+  };
+
   useEffect(() => {
     let ticking = false;
     const handleScroll = () => {
@@ -128,6 +150,7 @@ export default function MaintenanceTimeline() {
           }
           const rect = sectionRef.current.getBoundingClientRect();
           const windowH = window.innerHeight;
+          const topOffset = window.innerWidth < 640 ? 56 : 0;
 
           // Process only if the section is in view or scrolled past
           const totalH = rect.height - windowH;
@@ -136,23 +159,127 @@ export default function MaintenanceTimeline() {
             return;
           }
 
-          const current = -rect.top;
+          const current = topOffset - rect.top;
           const progress = Math.min(Math.max(current / totalH, 0), 0.999);
-          const stepIdx = Math.floor(progress * STEPS.length);
+          const stepIdx = Math.min(
+            STEPS.length - 1,
+            Math.max(0, Math.floor(progress * STEPS.length))
+          );
           
-          setActiveStep((prev) => (prev !== stepIdx ? stepIdx : prev));
+          if (Date.now() - lastStepTime.current > 500) {
+            setActiveStep((prev) => (prev !== stepIdx ? stepIdx : prev));
+          }
           ticking = false;
         });
         ticking = true;
       }
     };
 
+    const handleWheel = (e: WheelEvent) => {
+      if (!sectionRef.current) return;
+      const rect = sectionRef.current.getBoundingClientRect();
+      const windowH = window.innerHeight;
+      const topOffset = window.innerWidth < 640 ? 56 : 0;
+      const isPinned = rect.top <= topOffset + 15 && rect.bottom >= windowH - 15;
+
+      if (!isPinned) return;
+
+      const now = Date.now();
+      const currentStep = activeStepRef.current;
+
+      if (e.deltaY > 15) {
+        // Scrolling down
+        if (currentStep < STEPS.length - 1) {
+          e.preventDefault();
+          if (now - lastStepTime.current > 380) {
+            lastStepTime.current = now;
+            const nextStep = currentStep + 1;
+            setActiveStep(nextStep);
+            scrollToStep(nextStep);
+          }
+        }
+      } else if (e.deltaY < -15) {
+        // Scrolling up
+        if (currentStep > 0) {
+          e.preventDefault();
+          if (now - lastStepTime.current > 380) {
+            lastStepTime.current = now;
+            const prevStep = currentStep - 1;
+            setActiveStep(prevStep);
+            scrollToStep(prevStep);
+          }
+        }
+      }
+    };
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        touchStartY.current = e.touches[0].clientY;
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (touchStartY.current === null || e.touches.length !== 1) return;
+      if (!sectionRef.current) return;
+
+      const rect = sectionRef.current.getBoundingClientRect();
+      const windowH = window.innerHeight;
+      const topOffset = window.innerWidth < 640 ? 56 : 0;
+      const isPinned = rect.top <= topOffset + 20 && rect.bottom >= windowH - 20;
+
+      if (!isPinned) return;
+
+      const currentY = e.touches[0].clientY;
+      const deltaY = touchStartY.current - currentY; // positive = swipe up = scroll down
+      const currentStep = activeStepRef.current;
+      const now = Date.now();
+
+      if (deltaY > 25) {
+        // Swiping up (scrolling down)
+        if (currentStep < STEPS.length - 1) {
+          if (e.cancelable) e.preventDefault();
+          if (now - lastStepTime.current > 380) {
+            lastStepTime.current = now;
+            const nextStep = currentStep + 1;
+            setActiveStep(nextStep);
+            scrollToStep(nextStep);
+            touchStartY.current = currentY;
+          }
+        }
+      } else if (deltaY < -25) {
+        // Swiping down (scrolling up)
+        if (currentStep > 0) {
+          if (e.cancelable) e.preventDefault();
+          if (now - lastStepTime.current > 380) {
+            lastStepTime.current = now;
+            const prevStep = currentStep - 1;
+            setActiveStep(prevStep);
+            scrollToStep(prevStep);
+            touchStartY.current = currentY;
+          }
+        }
+      }
+    };
+
+    const handleTouchEnd = () => {
+      touchStartY.current = null;
+    };
+
     window.addEventListener("scroll", handleScroll, { passive: true });
     window.addEventListener("resize", handleScroll, { passive: true });
+    window.addEventListener("wheel", handleWheel, { passive: false });
+    window.addEventListener("touchstart", handleTouchStart, { passive: true });
+    window.addEventListener("touchmove", handleTouchMove, { passive: false });
+    window.addEventListener("touchend", handleTouchEnd, { passive: true });
+
     handleScroll();
     return () => {
       window.removeEventListener("scroll", handleScroll);
       window.removeEventListener("resize", handleScroll);
+      window.removeEventListener("wheel", handleWheel);
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", handleTouchEnd);
     };
   }, []);
 
@@ -162,10 +289,10 @@ export default function MaintenanceTimeline() {
     <section
       ref={sectionRef}
       className="relative bg-[#080D1A] text-white"
-      style={{ height: `${STEPS.length * 30}vh` }}
+      style={{ height: `${STEPS.length * 45}vh` }}
     >
       {/* ── STICKY PINNED PRESENTATION VIEWPORT ── */}
-      <div className="sticky top-0 h-screen w-full flex flex-col justify-between py-8 px-6 lg:px-12 overflow-hidden">
+      <div className="sticky top-14 sm:top-0 h-[calc(100dvh-3.5rem)] sm:h-screen w-full flex flex-col justify-between py-2 sm:py-6 lg:py-8 px-3 sm:px-6 lg:px-12 overflow-y-auto sm:overflow-hidden scrollbar-none">
         {/* Background Ambient Glows */}
         {!prefersReducedMotion && (
           <>
@@ -179,13 +306,13 @@ export default function MaintenanceTimeline() {
 
         {/* ── 1. HEADER AREA ── */}
         <div ref={revealRef} className={`max-w-4xl mx-auto text-center shrink-0 relative z-10 reveal ${visible ? "visible" : ""}`}>
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[11px] font-semibold tracking-wider uppercase mb-3 shadow-xs">
+          <div className="inline-flex items-center gap-1.5 px-3 py-0.5 sm:px-3.5 sm:py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] sm:text-[11px] font-semibold tracking-wider uppercase mb-1 sm:mb-3 shadow-xs">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
             Maintenance
           </div>
 
           <h2
-            className="text-3xl sm:text-4xl lg:text-[42px] font-bold text-white tracking-tight leading-tight"
+            className="text-xl sm:text-3xl lg:text-[42px] font-bold text-white tracking-tight leading-tight"
             style={{ fontFamily: "'Outfit', 'Plus Jakarta Sans', sans-serif" }}
           >
             From complaint to{" "}
@@ -195,7 +322,7 @@ export default function MaintenanceTimeline() {
           </h2>
 
           <p
-            className="mt-2 text-sm sm:text-base text-slate-400 max-w-xl mx-auto hidden sm:block"
+            className="mt-1 sm:mt-2 text-xs sm:text-base text-slate-400 max-w-xl mx-auto hidden sm:block"
             style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
           >
             Every maintenance request tracked end-to-end with full accountability at every step.
@@ -203,7 +330,7 @@ export default function MaintenanceTimeline() {
         </div>
 
         {/* ── 2. PROCESS TIMELINE BAR (Horizontal with glowing progress) ── */}
-        <div className="max-w-5xl mx-auto w-full relative z-20 my-auto shrink-0 py-2">
+        <div className="max-w-5xl mx-auto w-full relative z-20 my-1 sm:my-auto shrink-0 py-1 sm:py-2">
           <div className="relative">
             {/* Background Rail */}
             <div className="absolute top-1/2 -translate-y-1/2 left-6 right-6 h-[2px] bg-slate-800" />
@@ -227,12 +354,12 @@ export default function MaintenanceTimeline() {
                 return (
                   <button
                     key={step.id}
-                    onClick={() => setActiveStep(idx)}
+                    onClick={() => scrollToStep(idx)}
                     className="group flex flex-col items-center cursor-pointer transition-all duration-300 focus:outline-none"
                   >
                     {/* Circle Node */}
                     <div
-                      className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center transition-all duration-300 border ${
+                      className={`w-8 h-8 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl flex items-center justify-center transition-all duration-300 border ${
                         isActive
                           ? "bg-[#151F33] text-white scale-110 shadow-lg"
                           : isCompleted
@@ -245,18 +372,18 @@ export default function MaintenanceTimeline() {
                       }}
                     >
                       {isCompleted ? (
-                        <svg className="w-5 h-5 text-emerald-400" viewBox="0 0 20 20" fill="currentColor">
+                        <svg className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" viewBox="0 0 20 20" fill="currentColor">
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
                       ) : (
-                        <span style={{ color: isActive ? step.accent : undefined }}>
+                        <span className="text-xs sm:text-base" style={{ color: isActive ? step.accent : undefined }}>
                           {step.icon}
                         </span>
                       )}
                     </div>
 
                     {/* Node Text */}
-                    <div className="mt-2 text-center hidden sm:block">
+                    <div className="mt-1 sm:mt-2 text-center hidden sm:block">
                       <div
                         className={`text-[12px] transition-colors ${
                           isActive ? "font-bold text-white" : isCompleted ? "font-semibold text-slate-300" : "font-medium text-slate-500"
@@ -280,19 +407,19 @@ export default function MaintenanceTimeline() {
         </div>
 
         {/* ── 3. MAIN WORKFLOW VISUAL & DEVICE SHOWCASE ── */}
-        <div className="max-w-5xl mx-auto w-full relative z-10 my-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-center bg-[#0D1424]/80 backdrop-blur-xl border border-slate-800/90 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
+        <div className="max-w-5xl mx-auto w-full relative z-10 my-1 sm:my-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-8 items-center bg-[#0D1424]/80 backdrop-blur-xl border border-slate-800/90 rounded-2xl sm:rounded-3xl p-3.5 sm:p-8 shadow-2xl relative overflow-hidden">
             {/* ── LEFT: Stage Narrative & Action Card ── */}
             <div className="lg:col-span-6 flex flex-col justify-center">
               {/* Active Step Badge */}
-              <div className="flex items-center gap-2.5 mb-3.5">
+              <div className="flex items-center gap-2 mb-2 sm:mb-3.5">
                 <span
-                  className="px-3 py-1 rounded-md text-[11px] font-bold tracking-wider uppercase text-white shadow-xs"
+                  className="px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-md text-[10px] sm:text-[11px] font-bold tracking-wider uppercase text-white shadow-xs"
                   style={{ backgroundColor: current.accent }}
                 >
                   Step {activeStep + 1} of 5
                 </span>
-                <span className="text-xs font-mono text-slate-400 flex items-center gap-1.5">
+                <span className="text-[11px] sm:text-xs font-mono text-slate-400 flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   {current.time}
                 </span>
@@ -300,7 +427,7 @@ export default function MaintenanceTimeline() {
 
               {/* Title */}
               <h3
-                className="text-2xl sm:text-3xl font-bold text-white tracking-tight"
+                className="text-lg sm:text-2xl lg:text-3xl font-bold text-white tracking-tight"
                 style={{ fontFamily: "'Outfit', 'Plus Jakarta Sans', sans-serif" }}
               >
                 {current.title}
@@ -308,64 +435,64 @@ export default function MaintenanceTimeline() {
 
               {/* Description */}
               <p
-                className="mt-2 text-slate-300 text-sm leading-relaxed"
+                className="mt-1 sm:mt-2 text-slate-300 text-xs sm:text-sm leading-relaxed line-clamp-2 sm:line-clamp-none"
                 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
               >
                 {current.desc}
               </p>
 
               {/* Live Context Card */}
-              <div className="mt-5 space-y-2.5">
+              <div className="mt-2 sm:mt-5 space-y-1.5 sm:space-y-2.5">
                 {activeStep === 0 && (
-                  <div className="p-3.5 rounded-xl bg-[#131C31] border border-cyan-500/30 text-xs text-slate-300 space-y-1">
+                  <div className="p-2.5 sm:p-3.5 rounded-lg sm:rounded-xl bg-[#131C31] border border-cyan-500/30 text-[11px] sm:text-xs text-slate-300 space-y-0.5 sm:space-y-1">
                     <div className="font-semibold text-cyan-400 flex items-center gap-1.5">
                       <span>✓</span> Resident App • Unit A-204
                     </div>
-                    <div className="text-slate-400 text-[11.5px]">
+                    <div className="text-slate-400 text-[10.5px] sm:text-[11.5px]">
                       Photo captured with AI issue tagging • Priority set to <strong>Standard Plumbing</strong>.
                     </div>
                   </div>
                 )}
 
                 {activeStep === 1 && (
-                  <div className="p-3.5 rounded-xl bg-[#131C31] border border-teal-500/30 text-xs text-slate-300 space-y-1">
+                  <div className="p-2.5 sm:p-3.5 rounded-lg sm:rounded-xl bg-[#131C31] border border-teal-500/30 text-[11px] sm:text-xs text-slate-300 space-y-0.5 sm:space-y-1">
                     <div className="font-semibold text-teal-400 flex items-center gap-1.5">
                       <span>✓</span> Manager Dispatch Hub
                     </div>
-                    <div className="text-slate-400 text-[11.5px]">
+                    <div className="text-slate-400 text-[10.5px] sm:text-[11.5px]">
                       Auto-matched to Arun Kumar (Certified Plumber • 4.9★). SLA assigned: <strong>&lt; 2 Hours</strong>.
                     </div>
                   </div>
                 )}
 
                 {activeStep === 2 && (
-                  <div className="p-3.5 rounded-xl bg-[#131C31] border border-amber-500/30 text-xs text-slate-300 space-y-1">
+                  <div className="p-2.5 sm:p-3.5 rounded-lg sm:rounded-xl bg-[#131C31] border border-amber-500/30 text-[11px] sm:text-xs text-slate-300 space-y-0.5 sm:space-y-1">
                     <div className="font-semibold text-amber-400 flex items-center gap-1.5">
                       <span>✓</span> Field Technician On-Site
                     </div>
-                    <div className="text-slate-400 text-[11.5px]">
+                    <div className="text-slate-400 text-[10.5px] sm:text-[11.5px]">
                       Cartridge valve replaced, pressure testing completed. Digital proof uploaded.
                     </div>
                   </div>
                 )}
 
                 {activeStep === 3 && (
-                  <div className="p-3.5 rounded-xl bg-[#131C31] border border-emerald-500/30 text-xs text-slate-300 space-y-1">
+                  <div className="p-2.5 sm:p-3.5 rounded-lg sm:rounded-xl bg-[#131C31] border border-emerald-500/30 text-[11px] sm:text-xs text-slate-300 space-y-0.5 sm:space-y-1">
                     <div className="font-semibold text-emerald-400 flex items-center gap-1.5">
                       <span>✓</span> Resident Verification
                     </div>
-                    <div className="text-slate-400 text-[11.5px]">
+                    <div className="text-slate-400 text-[10.5px] sm:text-[11.5px]">
                       Resident Rahul signed off digitally with <strong>5.0 / 5.0 Star Rating</strong>.
                     </div>
                   </div>
                 )}
 
                 {activeStep === 4 && (
-                  <div className="p-3.5 rounded-xl bg-[#131C31] border border-purple-500/30 text-xs text-slate-300 space-y-1">
+                  <div className="p-2.5 sm:p-3.5 rounded-lg sm:rounded-xl bg-[#131C31] border border-purple-500/30 text-[11px] sm:text-xs text-slate-300 space-y-0.5 sm:space-y-1">
                     <div className="font-semibold text-purple-400 flex items-center gap-1.5">
                       <span>✓</span> Society Ledger Stored
                     </div>
-                    <div className="text-slate-400 text-[11.5px]">
+                    <div className="text-slate-400 text-[10.5px] sm:text-[11.5px]">
                       Cryptographic audit hash generated. Zero paper receipts required.
                     </div>
                   </div>
@@ -373,7 +500,7 @@ export default function MaintenanceTimeline() {
               </div>
 
               {/* Scroll / Action Hint */}
-              <div className="mt-4 flex items-center gap-2 text-[11.5px] text-slate-400">
+              <div className="mt-1.5 sm:mt-4 flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-[11.5px] text-slate-400">
                 <span className="text-cyan-400 animate-bounce">↓</span>
                 <span>Scroll to scrub through the 5-step maintenance lifecycle</span>
               </div>
@@ -381,41 +508,41 @@ export default function MaintenanceTimeline() {
 
             {/* ── RIGHT: High-End GateSphere Device Preview ── */}
             <div className="lg:col-span-6 flex justify-center">
-              <div className="w-full max-w-[340px] bg-[#0A0F1D] border border-slate-700/80 rounded-2xl p-4 shadow-2xl relative">
+              <div className="w-full max-w-[320px] sm:max-w-[340px] bg-[#0A0F1D] border border-slate-700/80 rounded-xl sm:rounded-2xl p-2.5 sm:p-4 shadow-2xl relative">
                 {/* Device Header */}
-                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center justify-between pb-1.5 sm:pb-3 border-b border-slate-800">
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-md bg-blue-600 flex items-center justify-center text-white text-[10px] font-bold">
+                    <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-md bg-blue-600 flex items-center justify-center text-white text-[9px] sm:text-[10px] font-bold">
                       GS
                     </div>
-                    <span className="text-xs font-bold text-white tracking-tight">GateSphere Operations</span>
+                    <span className="text-[11px] sm:text-xs font-bold text-white tracking-tight">GateSphere Operations</span>
                   </div>
-                  <span className="text-[10px] font-mono text-cyan-400 font-semibold">{current.time}</span>
+                  <span className="text-[9px] sm:text-[10px] font-mono text-cyan-400 font-semibold">{current.time}</span>
                 </div>
 
                 {/* Dynamic Screen Content */}
-                <div className="py-4 min-h-[220px] flex flex-col justify-center">
+                <div className="py-2 sm:py-4 min-h-0 sm:min-h-[220px] flex flex-col justify-center">
                   {/* Step 1 Screen */}
                   {activeStep === 0 && (
-                    <div className="space-y-3 animate-in fade-in duration-300">
-                      <div className="flex items-center justify-between text-[11px]">
+                    <div className="space-y-2 sm:space-y-3 animate-in fade-in duration-300">
+                      <div className="flex items-center justify-between text-[10.5px] sm:text-[11px]">
                         <span className="font-bold text-white">Ticket #GS-9402</span>
-                        <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 text-[10px] font-semibold">
+                        <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 text-[9px] sm:text-[10px] font-semibold">
                           PLUMBING
                         </span>
                       </div>
 
-                      <div className="p-3 rounded-xl bg-[#111A2E] border border-slate-800 space-y-1.5">
-                        <div className="text-xs font-bold text-white">Kitchen Tap Cartridge Leak</div>
-                        <div className="text-[11px] text-slate-400">Unit A-204 • Rahul Mehta</div>
-                        <div className="flex items-center gap-2 pt-1">
-                          <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] text-emerald-400 font-semibold">
+                      <div className="p-2 sm:p-3 rounded-lg sm:rounded-xl bg-[#111A2E] border border-slate-800 space-y-1 sm:space-y-1.5">
+                        <div className="text-[11px] sm:text-xs font-bold text-white">Kitchen Tap Cartridge Leak</div>
+                        <div className="text-[10px] sm:text-[11px] text-slate-400">Unit A-204 • Rahul Mehta</div>
+                        <div className="flex items-center gap-2 pt-0.5 sm:pt-1">
+                          <span className="px-1.5 sm:px-2 py-0.5 rounded bg-slate-800 text-[9px] sm:text-[10px] text-emerald-400 font-semibold">
                             📷 photo_attached.webp
                           </span>
                         </div>
                       </div>
 
-                      <div className="w-full py-2 rounded-xl bg-blue-600 text-white font-bold text-xs text-center shadow-md">
+                      <div className="w-full py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-blue-600 text-white font-bold text-[11px] sm:text-xs text-center shadow-md">
                         ✓ Ticket Raised (10:00 AM)
                       </div>
                     </div>
@@ -423,23 +550,23 @@ export default function MaintenanceTimeline() {
 
                   {/* Step 2 Screen */}
                   {activeStep === 1 && (
-                    <div className="space-y-3 animate-in fade-in duration-300">
-                      <div className="p-2.5 rounded-xl bg-teal-950/40 border border-teal-500/30 flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-full bg-teal-500/20 text-teal-400 flex items-center justify-center text-xs font-bold">
+                    <div className="space-y-2 sm:space-y-3 animate-in fade-in duration-300">
+                      <div className="p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-teal-950/40 border border-teal-500/30 flex items-center gap-2 sm:gap-2.5">
+                        <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-teal-500/20 text-teal-400 flex items-center justify-center text-[10px] sm:text-xs font-bold">
                           AK
                         </div>
                         <div>
-                          <div className="text-xs font-bold text-white">Arun Kumar</div>
-                          <div className="text-[10px] text-teal-300">Master Plumber • 4.9★</div>
+                          <div className="text-[11px] sm:text-xs font-bold text-white">Arun Kumar</div>
+                          <div className="text-[9px] sm:text-[10px] text-teal-300">Master Plumber • 4.9★</div>
                         </div>
                       </div>
 
-                      <div className="p-2.5 rounded-xl bg-[#111A2E] border border-slate-800 text-[11px] space-y-1">
+                      <div className="p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-[#111A2E] border border-slate-800 text-[10px] sm:text-[11px] space-y-0.5 sm:space-y-1">
                         <div className="text-slate-400">Assigned by: <strong className="text-white">Deepak Sharma (Manager)</strong></div>
                         <div className="text-slate-400">Gate Entry: <strong className="text-emerald-400">Pre-Approved ✓</strong></div>
                       </div>
 
-                      <div className="w-full py-2 rounded-xl bg-teal-600 text-white font-bold text-xs text-center shadow-md">
+                      <div className="w-full py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-teal-600 text-white font-bold text-[11px] sm:text-xs text-center shadow-md">
                         ✓ Technician Dispatched (10:08 AM)
                       </div>
                     </div>
@@ -447,14 +574,14 @@ export default function MaintenanceTimeline() {
 
                   {/* Step 3 Screen */}
                   {activeStep === 2 && (
-                    <div className="space-y-3 animate-in fade-in duration-300">
-                      <div className="p-3 rounded-xl bg-amber-950/30 border border-amber-500/30 text-center space-y-1">
-                        <div className="text-amber-400 text-lg">🔧 ➔ ✨</div>
-                        <div className="text-xs font-bold text-white">Cartridge Replaced &amp; Leak Sealed</div>
-                        <div className="text-[10px] text-slate-400">Pressure Test: 3.2 Bar Passed</div>
+                    <div className="space-y-2 sm:space-y-3 animate-in fade-in duration-300">
+                      <div className="p-2 sm:p-3 rounded-lg sm:rounded-xl bg-amber-950/30 border border-amber-500/30 text-center space-y-1">
+                        <div className="text-amber-400 text-base sm:text-lg">🔧 ➔ ✨</div>
+                        <div className="text-[11px] sm:text-xs font-bold text-white">Cartridge Replaced &amp; Leak Sealed</div>
+                        <div className="text-[9.5px] sm:text-[10px] text-slate-400">Pressure Test: 3.2 Bar Passed</div>
                       </div>
 
-                      <div className="w-full py-2 rounded-xl bg-amber-600 text-white font-bold text-xs text-center shadow-md">
+                      <div className="w-full py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-amber-600 text-white font-bold text-[11px] sm:text-xs text-center shadow-md">
                         ✓ Work Completed (11:30 AM)
                       </div>
                     </div>
@@ -462,14 +589,14 @@ export default function MaintenanceTimeline() {
 
                   {/* Step 4 Screen */}
                   {activeStep === 3 && (
-                    <div className="space-y-3 animate-in fade-in duration-300 text-center">
-                      <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30 space-y-1">
-                        <div className="text-[11px] font-bold text-slate-300">Resident Rating</div>
-                        <div className="text-amber-400 text-base tracking-widest">★★★★★</div>
-                        <div className="text-[10.5px] text-emerald-400 font-semibold">5.0 / 5.0 — &quot;Fast &amp; clean fix&quot;</div>
+                    <div className="space-y-2 sm:space-y-3 animate-in fade-in duration-300 text-center">
+                      <div className="p-2 sm:p-3 rounded-lg sm:rounded-xl bg-emerald-950/30 border border-emerald-500/30 space-y-0.5 sm:space-y-1">
+                        <div className="text-[10px] sm:text-[11px] font-bold text-slate-300">Resident Rating</div>
+                        <div className="text-amber-400 text-sm sm:text-base tracking-widest">★★★★★</div>
+                        <div className="text-[9.5px] sm:text-[10.5px] text-emerald-400 font-semibold">5.0 / 5.0 — &quot;Fast &amp; clean fix&quot;</div>
                       </div>
 
-                      <div className="w-full py-2 rounded-xl bg-emerald-600 text-white font-bold text-xs text-center shadow-md">
+                      <div className="w-full py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-emerald-600 text-white font-bold text-[11px] sm:text-xs text-center shadow-md">
                         ✓ Resident Confirmed (2:15 PM)
                       </div>
                     </div>
@@ -477,12 +604,12 @@ export default function MaintenanceTimeline() {
 
                   {/* Step 5 Screen */}
                   {activeStep === 4 && (
-                    <div className="space-y-2.5 animate-in fade-in duration-300">
-                      <div className="p-2.5 rounded-xl bg-purple-950/40 border border-purple-500/30 text-center">
-                        <div className="text-xs font-bold text-purple-300">STATUS: CLOSED ✓</div>
+                    <div className="space-y-1.5 sm:space-y-2.5 animate-in fade-in duration-300">
+                      <div className="p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl bg-purple-950/40 border border-purple-500/30 text-center">
+                        <div className="text-[10.5px] sm:text-xs font-bold text-purple-300">STATUS: CLOSED ✓</div>
                       </div>
 
-                      <div className="p-2.5 rounded-xl bg-[#111A2E] border border-slate-800 text-[10px] space-y-1 font-mono text-slate-400">
+                      <div className="p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl bg-[#111A2E] border border-slate-800 text-[9px] sm:text-[10px] space-y-0.5 sm:space-y-1 font-mono text-slate-400">
                         <div className="flex justify-between"><span>10:00 AM</span><span className="text-white">Reported</span></div>
                         <div className="flex justify-between"><span>10:08 AM</span><span className="text-white">Assigned</span></div>
                         <div className="flex justify-between"><span>11:30 AM</span><span className="text-white">Repaired</span></div>
@@ -494,7 +621,7 @@ export default function MaintenanceTimeline() {
                 </div>
 
                 {/* Device Footer status */}
-                <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400 font-mono">
+                <div className="pt-1.5 sm:pt-2 border-t border-slate-800/80 flex items-center justify-between text-[9px] sm:text-[10px] text-slate-400 font-mono">
                   <span>SLA Met: 100%</span>
                   <span className="text-emerald-400">Encrypted Log ✓</span>
                 </div>
@@ -504,20 +631,20 @@ export default function MaintenanceTimeline() {
         </div>
 
         {/* ── 4. BOTTOM THREE METRIC STATS ── */}
-        <div className="max-w-5xl mx-auto w-full grid grid-cols-3 gap-3 sm:gap-4 shrink-0">
-          <div className="bg-[#0D1424]/90 border border-slate-800 rounded-2xl p-3 sm:p-4 text-center shadow-lg">
-            <div className="text-lg sm:text-2xl font-black text-cyan-400 leading-none" style={{ fontFamily: "'Outfit', sans-serif" }}>&lt; 4hr</div>
-            <div className="text-[10px] sm:text-[12px] font-medium text-slate-400 mt-1">Avg Resolution Time</div>
+        <div className="max-w-5xl mx-auto w-full grid grid-cols-3 gap-2 sm:gap-4 shrink-0 mt-1 sm:mt-0">
+          <div className="bg-[#0D1424]/90 border border-slate-800 rounded-xl sm:rounded-2xl p-2 sm:p-4 text-center shadow-lg">
+            <div className="text-sm sm:text-2xl font-black text-cyan-400 leading-none" style={{ fontFamily: "'Outfit', sans-serif" }}>&lt; 4hr</div>
+            <div className="text-[8.5px] sm:text-[12px] font-medium text-slate-400 mt-0.5 sm:mt-1 truncate">Avg Resolution</div>
           </div>
 
-          <div className="bg-[#0D1424]/90 border border-slate-800 rounded-2xl p-3 sm:p-4 text-center shadow-lg">
-            <div className="text-lg sm:text-2xl font-black text-emerald-400 leading-none" style={{ fontFamily: "'Outfit', sans-serif" }}>98%</div>
-            <div className="text-[10px] sm:text-[12px] font-medium text-slate-400 mt-1">Ticket Closure Rate</div>
+          <div className="bg-[#0D1424]/90 border border-slate-800 rounded-xl sm:rounded-2xl p-2 sm:p-4 text-center shadow-lg">
+            <div className="text-sm sm:text-2xl font-black text-emerald-400 leading-none" style={{ fontFamily: "'Outfit', sans-serif" }}>98%</div>
+            <div className="text-[8.5px] sm:text-[12px] font-medium text-slate-400 mt-0.5 sm:mt-1 truncate">Closure Rate</div>
           </div>
 
-          <div className="bg-[#0D1424]/90 border border-slate-800 rounded-2xl p-3 sm:p-4 text-center shadow-lg">
-            <div className="text-lg sm:text-2xl font-black text-amber-400 leading-none" style={{ fontFamily: "'Outfit', sans-serif" }}>4.9★</div>
-            <div className="text-[10px] sm:text-[12px] font-medium text-slate-400 mt-1">Resident Satisfaction</div>
+          <div className="bg-[#0D1424]/90 border border-slate-800 rounded-xl sm:rounded-2xl p-2 sm:p-4 text-center shadow-lg">
+            <div className="text-sm sm:text-2xl font-black text-amber-400 leading-none" style={{ fontFamily: "'Outfit', sans-serif" }}>4.9★</div>
+            <div className="text-[8.5px] sm:text-[12px] font-medium text-slate-400 mt-0.5 sm:mt-1 truncate">Satisfaction</div>
           </div>
         </div>
       </div>
