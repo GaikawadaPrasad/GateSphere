@@ -123,3 +123,15 @@ export function useAddResident() {
     },
   });
 }
+
+export function useDeleteResident() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (residentId: string) => residentsApi.delete(residentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["residents"] });
+      queryClient.invalidateQueries({ queryKey: ["community-units"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboards"] });
+    },
+  });
+}

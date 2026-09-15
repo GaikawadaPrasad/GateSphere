@@ -688,6 +688,7 @@ export const residentsApi = {
       agreement_reference?: string;
     },
   ) => apiSend<any>("POST", `/communities/${communityId}/residents`, data),
+  delete: (id: string) => apiSend<void>("DELETE", `/residents/${id}`),
 };
 
 export const onboardingApi = {
@@ -805,6 +806,7 @@ export const domesticStaffApi = {
     gate_id?: string;
     action?: "check_in" | "check_out";
   }) => apiSend<any>("POST", "/domestic-staff/passes/verify", data),
+  delete: (id: string) => apiSend<void>("DELETE", `/domestic-staff/${id}`),
 };
 
 export const staffApi = domesticStaffApi;
