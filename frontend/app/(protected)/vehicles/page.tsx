@@ -45,12 +45,20 @@ export default function VehiclesPage() {
     fetchVehicles();
   }, []);
 
+  const [plateError, setPlateError] = useState<string | null>(null);
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    const cleanPlate = plateNumber.toUpperCase().trim();
+    if (!cleanPlate || !/^[A-Z0-9\-\s]{4,16}$/.test(cleanPlate)) {
+      setPlateError("Please enter a valid license plate number (4-16 alphanumeric characters).");
+      return;
+    }
+    setPlateError(null);
     setSubmitting(true);
     try {
       await vehiclesApi.register({
-        plate_number: plateNumber.toUpperCase().trim(),
+        plate_number: cleanPlate,
         make_model: makeModel.trim(),
         vehicle_type: vehicleType,
         sticker_number: stickerNumber.trim() || undefined,
@@ -60,6 +68,7 @@ export default function VehiclesPage() {
       setMakeModel("");
       setStickerNumber("");
       toast.success("Vehicle registered successfully.");
+      await fetchVehicles();
     } catch (err: any) {
       toast.error(err?.message || "Registration failed.");
     } finally {
@@ -123,8 +132,11 @@ export default function VehiclesPage() {
                 value={plateNumber}
                 onChange={(e) => setPlateNumber(e.target.value)}
                 placeholder="e.g. KA01AB1234"
-                className="w-full mt-1 p-2 border rounded-md uppercase font-mono"
+                className={`w-full mt-1 p-2 border rounded-md uppercase font-mono ${plateError ? "border-red-500" : ""}`}
               />
+              {plateError && (
+                <span className="text-xs text-red-600 mt-1 block">{plateError}</span>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Make & Model</label>

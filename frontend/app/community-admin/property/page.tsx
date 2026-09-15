@@ -86,10 +86,29 @@ export default function CommunityAdminPropertyPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const [propertyFieldErrors, setPropertyFieldErrors] = useState<Record<string, string>>({});
+
   // Handle Add Tower
   const handleCreateTower = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeCommunityId) return;
+
+    const errors: Record<string, string> = {};
+    if (!towerForm.name.trim() || towerForm.name.trim().length < 2) {
+      errors.tower_name = "Tower name must be at least 2 characters long.";
+    }
+    if (!towerForm.code.trim() || !/^[A-Z0-9_\-]{2,32}$/i.test(towerForm.code.trim())) {
+      errors.tower_code = "Code must be 2-32 alphanumeric characters or hyphens.";
+    }
+    if (!towerForm.total_floors || Number(towerForm.total_floors) < 1) {
+      errors.total_floors = "Total floors must be at least 1.";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setPropertyFieldErrors(errors);
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setErrorMessage(null);
@@ -103,6 +122,7 @@ export default function CommunityAdminPropertyPage() {
         },
       });
       setIsAddTowerOpen(false);
+      setPropertyFieldErrors({});
       setTowerForm({ name: "", code: "", structure_type: "tower", total_floors: 10 });
       refetchTowers();
     } catch (err: unknown) {
@@ -117,7 +137,20 @@ export default function CommunityAdminPropertyPage() {
   const handleCreateFloor = async (e: React.FormEvent) => {
     e.preventDefault();
     const towerId = floorForm.tower_id || currentTowerId;
-    if (!towerId) return;
+    if (!towerId) {
+      setErrorMessage("Please select a target tower.");
+      return;
+    }
+
+    const errors: Record<string, string> = {};
+    if (floorForm.floor_number === undefined || isNaN(Number(floorForm.floor_number))) {
+      errors.floor_number = "Valid floor number is required.";
+    }
+    if (Object.keys(errors).length > 0) {
+      setPropertyFieldErrors(errors);
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setErrorMessage(null);
@@ -127,6 +160,7 @@ export default function CommunityAdminPropertyPage() {
         label: floorForm.label ? floorForm.label.trim() : undefined,
       });
       setIsAddFloorOpen(false);
+      setPropertyFieldErrors({});
       setFloorForm({ tower_id: "", floor_number: 1, label: "" });
       refetchFloors();
     } catch (err: unknown) {
@@ -141,7 +175,23 @@ export default function CommunityAdminPropertyPage() {
   const handleCreateUnit = async (e: React.FormEvent) => {
     e.preventDefault();
     const floorId = unitForm.floor_id || currentFloorId;
-    if (!floorId) return;
+    if (!floorId) {
+      setErrorMessage("Please select a target floor.");
+      return;
+    }
+
+    const errors: Record<string, string> = {};
+    if (!unitForm.unit_number.trim()) {
+      errors.unit_number = "Unit number is required.";
+    }
+    if (unitForm.area_sqft !== undefined && Number(unitForm.area_sqft) <= 0) {
+      errors.area_sqft = "Area must be a positive number.";
+    }
+    if (Object.keys(errors).length > 0) {
+      setPropertyFieldErrors(errors);
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setErrorMessage(null);
@@ -153,6 +203,7 @@ export default function CommunityAdminPropertyPage() {
         area_sqft: unitForm.area_sqft ? Number(unitForm.area_sqft) : undefined,
       });
       setIsAddUnitOpen(false);
+      setPropertyFieldErrors({});
       setUnitForm({
         floor_id: "",
         unit_number: "",
@@ -173,6 +224,19 @@ export default function CommunityAdminPropertyPage() {
   const handleCreateGate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeCommunityId) return;
+
+    const errors: Record<string, string> = {};
+    if (!gateForm.name.trim() || gateForm.name.trim().length < 2) {
+      errors.gate_name = "Gate name must be at least 2 characters.";
+    }
+    if (!gateForm.code.trim() || !/^[A-Z0-9_\-]{2,32}$/i.test(gateForm.code.trim())) {
+      errors.gate_code = "Gate code must be 2-32 alphanumeric characters.";
+    }
+    if (Object.keys(errors).length > 0) {
+      setPropertyFieldErrors(errors);
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setErrorMessage(null);
@@ -185,6 +249,7 @@ export default function CommunityAdminPropertyPage() {
         },
       });
       setIsAddGateOpen(false);
+      setPropertyFieldErrors({});
       setGateForm({ name: "", code: "", gate_type: "both" });
       refetchGates();
     } catch (err: unknown) {

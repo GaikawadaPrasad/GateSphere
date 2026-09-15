@@ -66,15 +66,35 @@ export function EditUserModal({
 
   if (!user || !isOpen) return null;
 
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const validateProfile = () => {
+    const errors: Record<string, string> = {};
+    if (!fullName.trim() || fullName.trim().length < 2) {
+      errors.fullName = "Full name must be at least 2 characters long.";
+    }
+    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      errors.email = "Please enter a valid email address.";
+    }
+    if (phone.trim() && !/^\+?[0-9\s\-()]{7,20}$/.test(phone.trim())) {
+      errors.phone = "Invalid phone number format.";
+    }
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
     setErrorMessage(null);
+
+    if (!validateProfile()) return;
+
+    setIsSubmitting(true);
     try {
       await usersApi.update(user.id, {
-        full_name: fullName,
-        email: email,
-        phone: phone || undefined,
+        full_name: fullName.trim(),
+        email: email.trim().toLowerCase(),
+        phone: phone.trim() || undefined,
         is_active: isActive,
       });
       onSuccess();
@@ -212,8 +232,18 @@ export function EditUserModal({
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
-                style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: "var(--radius-input)", border: "1px solid var(--border-standard)" }}
+                style={{
+                  width: "100%",
+                  padding: "0.5rem 0.75rem",
+                  borderRadius: "var(--radius-input)",
+                  border: `1px solid ${fieldErrors.fullName ? "#ef4444" : "var(--border-standard)"}`,
+                }}
               />
+              {fieldErrors.fullName && (
+                <span style={{ fontSize: "0.75rem", color: "#ef4444", marginTop: "0.25rem", display: "block" }}>
+                  {fieldErrors.fullName}
+                </span>
+              )}
             </div>
 
             <div>
@@ -226,8 +256,18 @@ export function EditUserModal({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: "var(--radius-input)", border: "1px solid var(--border-standard)" }}
+                style={{
+                  width: "100%",
+                  padding: "0.5rem 0.75rem",
+                  borderRadius: "var(--radius-input)",
+                  border: `1px solid ${fieldErrors.email ? "#ef4444" : "var(--border-standard)"}`,
+                }}
               />
+              {fieldErrors.email && (
+                <span style={{ fontSize: "0.75rem", color: "#ef4444", marginTop: "0.25rem", display: "block" }}>
+                  {fieldErrors.email}
+                </span>
+              )}
             </div>
 
             <div>
@@ -240,8 +280,18 @@ export function EditUserModal({
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="+91 98765 43210"
-                style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: "var(--radius-input)", border: "1px solid var(--border-standard)" }}
+                style={{
+                  width: "100%",
+                  padding: "0.5rem 0.75rem",
+                  borderRadius: "var(--radius-input)",
+                  border: `1px solid ${fieldErrors.phone ? "#ef4444" : "var(--border-standard)"}`,
+                }}
               />
+              {fieldErrors.phone && (
+                <span style={{ fontSize: "0.75rem", color: "#ef4444", marginTop: "0.25rem", display: "block" }}>
+                  {fieldErrors.phone}
+                </span>
+              )}
             </div>
 
             <div>

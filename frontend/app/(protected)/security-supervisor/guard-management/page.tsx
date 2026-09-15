@@ -61,12 +61,33 @@ export default function SecuritySupervisorGuardManagementPage() {
     setIsRegisterGuardOpen(true);
   };
 
+  const [guardFieldErrors, setGuardFieldErrors] = useState<Record<string, string>>({});
+
+  const validateGuardForm = () => {
+    const errors: Record<string, string> = {};
+    const nameTrim = guardFullName.trim();
+    if (!nameTrim || nameTrim.length < 2) {
+      errors.fullName = "Guard full name must be at least 2 characters long.";
+    }
+    const emailTrim = guardEmail.trim();
+    if (!emailTrim || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrim)) {
+      errors.email = "Please enter a valid email address.";
+    }
+    if (guardPhone.trim() && !/^\+?[0-9\s\-()]{7,20}$/.test(guardPhone.trim())) {
+      errors.phone = "Invalid phone number format.";
+    }
+    const pwd = guardPassword.trim();
+    if (pwd && pwd.length < 8) {
+      errors.password = "Password must be at least 8 characters long.";
+    }
+    setGuardFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleRegisterGuard = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!guardFullName.trim() || !guardEmail.trim()) {
-      setRegisterError("Guard full name and email are required.");
-      return;
-    }
+    if (!validateGuardForm()) return;
+
     const finalPassword = guardPassword.trim() || generateInitialPassword(guardFullName, "guard");
     setIsRegistering(true);
     setRegisterError("");
@@ -78,6 +99,7 @@ export default function SecuritySupervisorGuardManagementPage() {
         phone: guardPhone.trim() || undefined,
       });
       setIsRegisterGuardOpen(false);
+      setGuardFieldErrors({});
       await loadData();
     } catch (err: any) {
       setRegisterError(err?.message || "Failed to register security guard.");

@@ -75,10 +75,29 @@ export default function CommunityAdminCommunicationPage() {
   const [groupForm, setGroupForm] = useState({ name: "", description: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [commFieldErrors, setCommFieldErrors] = useState<Record<string, string>>({});
+
   // Handle Create Announcement — build targets[] to match backend AnnouncementCreate schema
   const handleCreateAnnouncement = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeCommunityId) return;
+
+    const errors: Record<string, string> = {};
+    if (!form.title.trim() || form.title.trim().length < 3) {
+      errors.title = "Announcement title must be at least 3 characters long.";
+    }
+    if (!form.body.trim() || form.body.trim().length < 5) {
+      errors.body = "Announcement body must be at least 5 characters long.";
+    }
+    if (form.target_type !== "all" && !form.target_id) {
+      errors.target_id = "Please select a target for this announcement.";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setCommFieldErrors(errors);
+      return;
+    }
+
     try {
       setIsSubmitting(true);
 
@@ -97,14 +116,15 @@ export default function CommunityAdminCommunicationPage() {
       await createAnnouncement.mutateAsync({
         payload: {
           announcement_type: form.announcement_type,
-          title: form.title,
-          body: form.body,
+          title: form.title.trim(),
+          body: form.body.trim(),
           priority: form.priority,
           targets,
         },
         communityId: activeCommunityId,
       });
       setIsCreateOpen(false);
+      setCommFieldErrors({});
       setForm({
         title: "",
         body: "",
@@ -145,13 +165,23 @@ export default function CommunityAdminCommunicationPage() {
   const handleCreateGroup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeCommunityId) return;
+
+    if (!groupForm.name.trim() || groupForm.name.trim().length < 2) {
+      setCommFieldErrors({ group_name: "Group name must be at least 2 characters long." });
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       await createGroup.mutateAsync({
-        payload: groupForm,
+        payload: {
+          name: groupForm.name.trim(),
+          description: groupForm.description.trim() || undefined,
+        },
         communityId: activeCommunityId,
       });
       setIsGroupModalOpen(false);
+      setCommFieldErrors({});
       setGroupForm({ name: "", description: "" });
       refetchGroups();
     } catch (err) {

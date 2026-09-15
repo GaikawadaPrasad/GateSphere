@@ -38,10 +38,45 @@ export function CreateUserModal({
 
   if (!isOpen) return null;
 
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+    const trimmedName = fullName.trim();
+    if (!trimmedName || trimmedName.length < 2) {
+      errors.fullName = "Full name must be at least 2 characters long.";
+    }
+
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      errors.email = "Please enter a valid email address.";
+    }
+
+    if (!password || password.length < 8) {
+      errors.password = "Password must be at least 8 characters long.";
+    } else if (!/^(?=.*[A-Za-z])(?=.*\d)/.test(password)) {
+      errors.password = "Password must contain at least one letter and one digit.";
+    }
+
+    if (phone.trim() && !/^\+?[0-9\s\-()]{7,20}$/.test(phone.trim())) {
+      errors.phone = "Invalid phone number format.";
+    }
+
+    if (roleSlug === "community_admin" && !communityId) {
+      errors.communityId = "A community must be assigned for Community Admin role.";
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
     setErrorMessage(null);
+
+    if (!validateForm()) return;
+
+    setIsSubmitting(true);
 
     try {
       if (roleSlug === "community_admin" && communityId) {
@@ -72,6 +107,7 @@ export function CreateUserModal({
       setEmail("");
       setPhone("");
       setCommunityId("");
+      setFieldErrors({});
     } catch (err: any) {
       setErrorMessage(err?.message || "Failed to create admin / user");
     } finally {
@@ -134,8 +170,18 @@ export function CreateUserModal({
               onChange={(e) => setFullName(e.target.value)}
               placeholder="e.g. Rajesh Kumar"
               required
-              style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: "var(--radius-input)", border: "1px solid var(--border-standard)" }}
+              style={{
+                width: "100%",
+                padding: "0.5rem 0.75rem",
+                borderRadius: "var(--radius-input)",
+                border: `1px solid ${fieldErrors.fullName ? "#ef4444" : "var(--border-standard)"}`,
+              }}
             />
+            {fieldErrors.fullName && (
+              <span style={{ fontSize: "0.75rem", color: "#ef4444", marginTop: "0.25rem", display: "block" }}>
+                {fieldErrors.fullName}
+              </span>
+            )}
           </div>
 
           <div>
@@ -149,8 +195,18 @@ export function CreateUserModal({
               onChange={(e) => setEmail(e.target.value)}
               placeholder="admin@community.com"
               required
-              style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: "var(--radius-input)", border: "1px solid var(--border-standard)" }}
+              style={{
+                width: "100%",
+                padding: "0.5rem 0.75rem",
+                borderRadius: "var(--radius-input)",
+                border: `1px solid ${fieldErrors.email ? "#ef4444" : "var(--border-standard)"}`,
+              }}
             />
+            {fieldErrors.email && (
+              <span style={{ fontSize: "0.75rem", color: "#ef4444", marginTop: "0.25rem", display: "block" }}>
+                {fieldErrors.email}
+              </span>
+            )}
           </div>
 
           <div>
@@ -163,8 +219,18 @@ export function CreateUserModal({
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: "var(--radius-input)", border: "1px solid var(--border-standard)" }}
+              style={{
+                width: "100%",
+                padding: "0.5rem 0.75rem",
+                borderRadius: "var(--radius-input)",
+                border: `1px solid ${fieldErrors.password ? "#ef4444" : "var(--border-standard)"}`,
+              }}
             />
+            {fieldErrors.password && (
+              <span style={{ fontSize: "0.75rem", color: "#ef4444", marginTop: "0.25rem", display: "block" }}>
+                {fieldErrors.password}
+              </span>
+            )}
           </div>
 
           <div>
@@ -177,8 +243,18 @@ export function CreateUserModal({
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="+91 98765 43210"
-              style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: "var(--radius-input)", border: "1px solid var(--border-standard)" }}
+              style={{
+                width: "100%",
+                padding: "0.5rem 0.75rem",
+                borderRadius: "var(--radius-input)",
+                border: `1px solid ${fieldErrors.phone ? "#ef4444" : "var(--border-standard)"}`,
+              }}
             />
+            {fieldErrors.phone && (
+              <span style={{ fontSize: "0.75rem", color: "#ef4444", marginTop: "0.25rem", display: "block" }}>
+                {fieldErrors.phone}
+              </span>
+            )}
           </div>
 
           <div>
@@ -216,7 +292,12 @@ export function CreateUserModal({
               className="form-control"
               value={communityId}
               onChange={(e) => setCommunityId(e.target.value)}
-              style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: "var(--radius-input)", border: "1px solid var(--border-standard)" }}
+              style={{
+                width: "100%",
+                padding: "0.5rem 0.75rem",
+                borderRadius: "var(--radius-input)",
+                border: `1px solid ${fieldErrors.communityId ? "#ef4444" : "var(--border-standard)"}`,
+              }}
             >
               <option value="">-- Platform-Global / Select Community --</option>
               {(communities || []).map((c) => (
@@ -225,6 +306,11 @@ export function CreateUserModal({
                 </option>
               ))}
             </select>
+            {fieldErrors.communityId && (
+              <span style={{ fontSize: "0.75rem", color: "#ef4444", marginTop: "0.25rem", display: "block" }}>
+                {fieldErrors.communityId}
+              </span>
+            )}
           </div>
         </div>
       </form>
