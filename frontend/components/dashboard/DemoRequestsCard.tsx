@@ -132,7 +132,7 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
         </div>
 
         {/* Filters */}
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center", width: "100%", minWidth: 0 }}>
           <input
             type="text"
             placeholder="Search leads, email, society…"
@@ -143,7 +143,9 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
               fontSize: "0.825rem",
               borderRadius: "var(--radius-sm)",
               border: "1px solid var(--border)",
-              minWidth: 200,
+              flex: "1 1 160px",
+              minWidth: 0,
+              width: "100%",
             }}
           />
           <select
@@ -155,6 +157,7 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
               borderRadius: "var(--radius-sm)",
               border: "1px solid var(--border)",
               background: "white",
+              minWidth: 0,
             }}
           >
             <option value="all">All Statuses</option>

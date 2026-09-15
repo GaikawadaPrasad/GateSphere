@@ -1908,11 +1908,16 @@ export default function CommunitiesPage() {
                       </div>
                     ) : communityUnitsList && communityUnitsList.length > 0 ? (
                       <div
+                        className="table-responsive-wrapper"
                         style={{
                           maxHeight: "360px",
-                          overflowY: "auto",
+                          overflow: "auto",
+                          width: "100%",
+                          maxWidth: "100%",
+                          minWidth: 0,
                           border: "1px solid var(--border)",
                           borderRadius: "var(--radius-sm)",
+                          WebkitOverflowScrolling: "touch",
                         }}
                       >
                         <table className="data-table" style={{ width: "100%", fontSize: "0.825rem" }}>
@@ -2018,11 +2023,16 @@ export default function CommunitiesPage() {
                       </div>
                     ) : communityResidents && communityResidents.length > 0 ? (
                       <div
+                        className="table-responsive-wrapper"
                         style={{
                           maxHeight: "360px",
-                          overflowY: "auto",
+                          overflow: "auto",
+                          width: "100%",
+                          maxWidth: "100%",
+                          minWidth: 0,
                           border: "1px solid var(--border)",
                           borderRadius: "var(--radius-sm)",
+                          WebkitOverflowScrolling: "touch",
                         }}
                       >
                         <table className="data-table" style={{ width: "100%", fontSize: "0.825rem" }}>

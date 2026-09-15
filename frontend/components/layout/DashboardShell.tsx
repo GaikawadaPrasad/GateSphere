@@ -21,7 +21,7 @@ export function DashboardShell({
   accentColor,
 }: DashboardShellProps) {
   return (
-    <div className="dashboard-content-wrapper" style={{ width: "100%" }}>
+    <div className="dashboard-content-wrapper" style={{ width: "100%", minWidth: 0, maxWidth: "100%" }}>
       {(title || eyebrow || headerActions) && (
         <div
           style={{
@@ -30,29 +30,52 @@ export function DashboardShell({
             alignItems: "flex-start",
             flexWrap: "wrap",
             gap: "1rem",
-            marginBottom: "1.75rem",
+            marginBottom: "1.5rem",
+            minWidth: 0,
+            width: "100%",
           }}
         >
-          <div>
+          <div style={{ flex: "1 1 240px", minWidth: 0 }}>
             {eyebrow && (
               <div style={{ marginBottom: "0.5rem" }}>
                 <Eyebrow accentColor={accentColor}>{eyebrow}</Eyebrow>
               </div>
             )}
             {title && (
-              <h1 className="hero-h1" style={{ fontSize: "2rem" }}>
+              <h1
+                className="hero-h1"
+                style={{
+                  fontSize: "clamp(1.35rem, 4vw, 2rem)",
+                  wordBreak: "break-word",
+                  lineHeight: 1.25,
+                }}
+              >
                 {title}
               </h1>
             )}
             {description && (
-              <p style={{ color: "var(--brand-body)", marginTop: "0.25rem", fontSize: "15px" }}>
+              <p
+                style={{
+                  color: "var(--brand-body)",
+                  marginTop: "0.25rem",
+                  fontSize: "14px",
+                  wordBreak: "break-word",
+                }}
+              >
                 {description}
               </p>
             )}
           </div>
           {headerActions && (
             <div
-              style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}
+              className="dashboard-header-actions"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                flexWrap: "wrap",
+                minWidth: 0,
+              }}
             >
               {headerActions}
             </div>

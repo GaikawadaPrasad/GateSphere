@@ -133,13 +133,21 @@ export function ChatbotWidget() {
   if (!canUseAssistant) return null;
 
   return (
-    <div style={{ position: "fixed", right: "1.5rem", bottom: "1.5rem", zIndex: 60 }}>
+    <div
+      style={{
+        position: "fixed",
+        right: "clamp(0.75rem, 3vw, 1.5rem)",
+        bottom: "clamp(0.75rem, 3vw, 1.5rem)",
+        zIndex: 60,
+        maxWidth: "calc(100vw - 1.5rem)",
+      }}
+    >
       {isOpen && (
         <div
           style={{
-            width: "min(380px, calc(100vw - 3rem))",
-            height: "min(560px, calc(100vh - 8rem))",
-            marginBottom: "0.85rem",
+            width: "min(380px, calc(100vw - 1.5rem))",
+            height: "min(560px, calc(100vh - 6rem))",
+            marginBottom: "0.75rem",
             display: "flex",
             flexDirection: "column",
             background: "var(--brand-surface, #fff)",

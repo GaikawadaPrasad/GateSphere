@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, type ReactNode } from "react";
+import React, { useState, useEffect, useMemo, type ReactNode } from "react";
 import { TableSkeleton } from "@/components/common/LoadingSkeleton";
 import { EmptyState } from "@/components/common/EmptyState";
 import { Pagination } from "@/components/tables/Pagination";
@@ -17,7 +17,7 @@ export interface Column<T> {
   align?: "left" | "center" | "right";
 }
 
-interface DataTableProps<T> {
+export interface DataTableProps<T> {
   columns: Column<T>[];
   data: T[] | undefined;
   isLoading?: boolean;
@@ -41,6 +41,10 @@ interface DataTableProps<T> {
   sortPreset?: SortPreset;
   onSortPresetChange?: (preset: SortPreset) => void;
   toolbarActions?: ReactNode;
+  // Mobile Card View customization
+  renderCard?: (item: T, index: number) => ReactNode;
+  viewMode?: "auto" | "table" | "cards";
+  showViewToggle?: boolean;
 }
 
 const COMMON_DATE_KEYS = [
@@ -75,6 +79,27 @@ const COMMON_TEXT_KEYS = [
   "code",
 ];
 
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia(`(max-width: ${breakpoint}px)`);
+    const update = () => setIsMobile(mq.matches);
+    update();
+    try {
+      mq.addEventListener("change", update);
+      return () => mq.removeEventListener("change", update);
+    } catch {
+      // Fallback for older browsers
+      mq.addListener?.(update);
+      return () => mq.removeListener?.(update);
+    }
+  }, [breakpoint]);
+
+  return isMobile;
+}
+
 export function DataTable<T extends object = Record<string, unknown>>({
   columns,
   data = [],
@@ -97,7 +122,22 @@ export function DataTable<T extends object = Record<string, unknown>>({
   sortPreset: controlledSortPreset,
   onSortPresetChange,
   toolbarActions,
+  renderCard,
+  viewMode: controlledViewMode = "auto",
+  showViewToggle = false,
 }: DataTableProps<T>) {
+  const isMobile = useIsMobile(768);
+  const [manualViewMode, setManualViewMode] = useState<"table" | "cards" | null>(null);
+
+  const effectiveViewMode =
+    controlledViewMode !== "auto"
+      ? controlledViewMode
+      : manualViewMode !== null
+        ? manualViewMode
+        : isMobile
+          ? "cards"
+          : "table";
+
   const [internalSortPreset, setInternalSortPreset] = useState<SortPreset>("newest");
   const activeSortPreset = controlledSortPreset || internalSortPreset;
 
@@ -245,6 +285,28 @@ export function DataTable<T extends object = Record<string, unknown>>({
     return sortedData.slice(start, start + currentPageSize);
   }, [sortedData, isClientPaging, currentPage, currentPageSize]);
 
+  // Derive column categorization for automatic mobile card rendering
+  const primaryCol = columns[0];
+  const statusCol = columns.find(
+    (c) =>
+      c !== primaryCol &&
+      (c.key === "status" ||
+        c.key === "is_active" ||
+        c.key === "occupancy" ||
+        c.key === "financialStatus" ||
+        c.header.toLowerCase().includes("status")),
+  );
+  const actionsCol = columns.find(
+    (c) =>
+      c.key === "actions" ||
+      c.key === "action" ||
+      c.header.toLowerCase() === "actions" ||
+      c.header.toLowerCase() === "action",
+  );
+  const secondaryCols = columns.filter(
+    (c) => c !== primaryCol && c !== statusCol && c !== actionsCol,
+  );
+
   if (isLoading) {
     return <TableSkeleton rows={currentPageSize || 5} cols={columns.length} />;
   }
@@ -255,123 +317,275 @@ export function DataTable<T extends object = Record<string, unknown>>({
 
   return (
     <div className="table-responsive-container">
-      {(showSortDropdown || toolbarActions) && (
+      {(showSortDropdown || toolbarActions || showViewToggle) && (
         <div
+          className="data-table-toolbar"
           style={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
             flexWrap: "wrap",
-            gap: "0.75rem",
-            marginBottom: "0.85rem",
-            padding: "0 0.15rem",
+            gap: "0.5rem",
+            padding: "0.75rem 0.85rem",
+            borderBottom: "1px solid var(--border-light)",
+            background: "#fcfdfe",
+            minWidth: 0,
+            width: "100%",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              flexWrap: "wrap",
+              minWidth: 0,
+            }}
+          >
             {toolbarActions}
           </div>
-          {showSortDropdown && (
-            <div style={{ marginLeft: "auto" }}>
+
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              marginLeft: "auto",
+              flexWrap: "wrap",
+              minWidth: 0,
+            }}
+          >
+            {showViewToggle && (
+              <div
+                style={{
+                  display: "inline-flex",
+                  background: "#f1f5f9",
+                  padding: "2px",
+                  borderRadius: "6px",
+                  border: "1px solid var(--border)",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setManualViewMode("cards")}
+                  style={{
+                    height: 28,
+                    padding: "0 0.5rem",
+                    fontSize: "11px",
+                    fontWeight: 600,
+                    borderRadius: "4px",
+                    border: "none",
+                    cursor: "pointer",
+                    background: effectiveViewMode === "cards" ? "#ffffff" : "transparent",
+                    color: effectiveViewMode === "cards" ? "var(--primary)" : "var(--muted)",
+                    boxShadow: effectiveViewMode === "cards" ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
+                  }}
+                  title="Card View"
+                >
+                  📱 Cards
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setManualViewMode("table")}
+                  style={{
+                    height: 28,
+                    padding: "0 0.5rem",
+                    fontSize: "11px",
+                    fontWeight: 600,
+                    borderRadius: "4px",
+                    border: "none",
+                    cursor: "pointer",
+                    background: effectiveViewMode === "table" ? "#ffffff" : "transparent",
+                    color: effectiveViewMode === "table" ? "var(--primary)" : "var(--muted)",
+                    boxShadow: effectiveViewMode === "table" ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
+                  }}
+                  title="Table View"
+                >
+                  📊 Table
+                </button>
+              </div>
+            )}
+
+            {showSortDropdown && (
               <SortDropdown
                 value={activeSortPreset}
                 onChange={handleSortPresetChange}
                 size="sm"
               />
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
 
-      <div className="table-responsive-wrapper">
-        <table className="data-table">
-          <thead>
-            <tr>
-              {columns.map((col) => {
-                const isSorted = sortKey === col.key;
-                const canSort = col.sortable ?? enableClientSort;
+      {/* View Mode Switching: Mobile Cards (Option 1) vs Desktop Scroller Table (Option 2) */}
+      {effectiveViewMode === "cards" ? (
+        <div className="data-table-cards-list">
+          {paginatedData.map((item, index) => {
+            const itemRecord = item as Record<string, unknown>;
+            const key = keyExtractor
+              ? keyExtractor(item, index)
+              : (itemRecord.id as string) || String(index);
 
-                return (
-                  <th
-                    key={col.key}
-                    onClick={() => canSort && handleSort(col.key, col.sortable)}
-                    style={{
-                      width: col.width,
-                      textAlign: col.align || "left",
-                      cursor: canSort ? "pointer" : "default",
-                      userSelect: "none",
-                    }}
-                    title={canSort ? `Sort by ${col.header}` : undefined}
-                  >
+            if (renderCard) {
+              return (
+                <div
+                  key={key}
+                  className={`data-table-mobile-card ${onRowClick ? "is-clickable" : ""}`}
+                  onClick={() => onRowClick?.(item)}
+                >
+                  {renderCard(item, index)}
+                </div>
+              );
+            }
+
+            return (
+              <div
+                key={key}
+                className={`data-table-mobile-card ${onRowClick ? "is-clickable" : ""}`}
+                onClick={() => onRowClick?.(item)}
+              >
+                {/* Card Top: Primary Title & Status */}
+                <div className="data-table-card-top">
+                  <div className="data-table-card-main-title">
+                    {primaryCol?.render
+                      ? primaryCol.render(item, index)
+                      : String(itemRecord[primaryCol?.key || ""] ?? "–")}
+                  </div>
+                  {statusCol && (
                     <div
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "0.35rem",
-                        justifyContent:
-                          col.align === "right"
-                            ? "flex-end"
-                            : col.align === "center"
-                              ? "center"
-                              : "flex-start",
-                        width: "100%",
-                      }}
+                      className="data-table-card-badge"
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      <span>{col.header}</span>
-                      {canSort && (
-                        <span
-                          style={{
-                            fontSize: "11px",
-                            color: isSorted ? "var(--brand-primary)" : "var(--text-muted)",
-                            opacity: isSorted ? 1 : 0.4,
-                          }}
-                        >
-                          {isSorted ? (sortDir === "asc" ? "▲" : "▼") : "↕"}
-                        </span>
-                      )}
+                      {statusCol.render
+                        ? statusCol.render(item, index)
+                        : String(itemRecord[statusCol.key] ?? "")}
                     </div>
-                  </th>
+                  )}
+                </div>
+
+                {/* Card Body: Attributes grid */}
+                {secondaryCols.length > 0 && (
+                  <div className="data-table-card-grid">
+                    {secondaryCols.map((col) => {
+                      const renderedVal = col.render
+                        ? col.render(item, index)
+                        : String(itemRecord[col.key] ?? "–");
+                      return (
+                        <div key={col.key} className="data-table-card-field">
+                          <span className="data-table-card-label">{col.header}</span>
+                          <div className="data-table-card-value">{renderedVal}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Card Footer Actions */}
+                {actionsCol && (
+                  <div
+                    className="data-table-card-footer-actions"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {actionsCol.render ? actionsCol.render(item, index) : null}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="table-responsive-wrapper">
+          <table className="data-table">
+            <thead>
+              <tr>
+                {columns.map((col) => {
+                  const isSorted = sortKey === col.key;
+                  const canSort = col.sortable ?? enableClientSort;
+
+                  return (
+                    <th
+                      key={col.key}
+                      onClick={() => canSort && handleSort(col.key, col.sortable)}
+                      style={{
+                        width: col.width,
+                        textAlign: col.align || "left",
+                        cursor: canSort ? "pointer" : "default",
+                        userSelect: "none",
+                      }}
+                      title={canSort ? `Sort by ${col.header}` : undefined}
+                    >
+                      <div
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "0.35rem",
+                          justifyContent:
+                            col.align === "right"
+                              ? "flex-end"
+                              : col.align === "center"
+                                ? "center"
+                                : "flex-start",
+                          width: "100%",
+                        }}
+                      >
+                        <span>{col.header}</span>
+                        {canSort && (
+                          <span
+                            style={{
+                              fontSize: "11px",
+                              color: isSorted ? "var(--brand-primary)" : "var(--text-muted)",
+                              opacity: isSorted ? 1 : 0.4,
+                            }}
+                          >
+                            {isSorted ? (sortDir === "asc" ? "▲" : "▼") : "↕"}
+                          </span>
+                        )}
+                      </div>
+                    </th>
+                  );
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedData.map((item, index) => {
+                const itemRecord = item as Record<string, unknown>;
+                const key = keyExtractor
+                  ? keyExtractor(item, index)
+                  : (itemRecord.id as string) || String(index);
+                return (
+                  <tr
+                    key={key}
+                    onClick={() => onRowClick?.(item)}
+                    style={{ cursor: onRowClick ? "pointer" : "default" }}
+                  >
+                    {columns.map((col) => (
+                      <td
+                        key={col.key}
+                        style={{
+                          textAlign: col.align || "left",
+                        }}
+                      >
+                        {col.render ? col.render(item, index) : String(itemRecord[col.key] ?? "–")}
+                      </td>
+                    ))}
+                  </tr>
                 );
               })}
-            </tr>
-          </thead>
-          <tbody>
-            {paginatedData.map((item, index) => {
-              const itemRecord = item as Record<string, unknown>;
-              const key = keyExtractor
-                ? keyExtractor(item, index)
-                : (itemRecord.id as string) || String(index);
-              return (
-                <tr
-                  key={key}
-                  onClick={() => onRowClick?.(item)}
-                  style={{ cursor: onRowClick ? "pointer" : "default" }}
-                >
-                  {columns.map((col) => (
-                    <td
-                      key={col.key}
-                      style={{
-                        textAlign: col.align || "left",
-                      }}
-                    >
-                      {col.render ? col.render(item, index) : String(itemRecord[col.key] ?? "–")}
-                    </td>
-                  ))}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
+      )}
 
-        {(onPageChange || isClientPaging) && (
-          <Pagination
-            page={currentPage}
-            pageSize={currentPageSize}
-            total={currentTotal}
-            onPageChange={isClientPaging ? setLocalPage : onPageChange!}
-            onPageSizeChange={isClientPaging ? setLocalPageSize : onPageSizeChange}
-          />
-        )}
-      </div>
+      {/* Pagination - spans full container width outside horizontal scroller */}
+      {(onPageChange || isClientPaging) && (
+        <Pagination
+          page={currentPage}
+          pageSize={currentPageSize}
+          total={currentTotal}
+          onPageChange={isClientPaging ? setLocalPage : onPageChange!}
+          onPageSizeChange={isClientPaging ? setLocalPageSize : onPageSizeChange}
+        />
+      )}
     </div>
   );
 }

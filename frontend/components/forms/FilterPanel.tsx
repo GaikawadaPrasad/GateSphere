@@ -13,15 +13,27 @@ export function FilterPanel({ children, onReset, className = "" }: FilterPanelPr
       style={{
         display: "flex",
         flexWrap: "wrap",
-        gap: "1rem",
-        alignItems: "flex-end",
-        padding: "1rem 1.25rem",
-        marginBottom: "1.25rem",
+        gap: "0.75rem",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "0.75rem 1rem",
+        marginBottom: "1rem",
         background: "#ffffff",
+        width: "100%",
+        maxWidth: "100%",
+        minWidth: 0,
+        boxSizing: "border-box",
       }}
     >
       <div
-        style={{ display: "flex", flexWrap: "wrap", gap: "1rem", flex: 1, alignItems: "center" }}
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "0.75rem",
+          flex: "1 1 auto",
+          alignItems: "center",
+          minWidth: 0,
+        }}
       >
         {children}
       </div>
@@ -30,7 +42,7 @@ export function FilterPanel({ children, onReset, className = "" }: FilterPanelPr
           type="button"
           className="btn btn-secondary"
           onClick={onReset}
-          style={{ height: "36px", fontSize: "0.8rem", padding: "0 0.75rem" }}
+          style={{ height: "34px", fontSize: "0.785rem", padding: "0 0.75rem" }}
         >
           Reset Filters
         </button>

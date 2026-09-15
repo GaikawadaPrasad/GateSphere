@@ -140,7 +140,7 @@ export function Header() {
       {/* Right section: User info & Actions */}
       <div
         className="mobile-header-right"
-        style={{ display: "flex", alignItems: "center", gap: "1rem" }}
+        style={{ display: "flex", alignItems: "center", gap: "0.75rem", minWidth: 0, flexShrink: 0 }}
       >
         {/* User Profile Pill - text hidden on mobile, avatar stays */}
         <div

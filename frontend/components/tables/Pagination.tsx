@@ -19,35 +19,60 @@ export function Pagination({
 
   return (
     <div
+      className="pagination-container"
       style={{
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "0.75rem 1rem",
+        padding: "0.65rem 0.85rem",
         borderTop: "1px solid var(--border)",
         background: "#ffffff",
         flexWrap: "wrap",
-        gap: "0.75rem",
-        fontSize: "0.875rem",
+        gap: "0.5rem",
+        fontSize: "0.85rem",
+        width: "100%",
+        minWidth: 0,
+        boxSizing: "border-box",
       }}
     >
-      <div style={{ color: "var(--muted)" }}>
-        Showing <strong style={{ color: "var(--fg)" }}>{startItem}</strong> to{" "}
+      <div className="pagination-info" style={{ color: "var(--muted)", fontSize: "0.8rem", minWidth: 0 }}>
+        Showing <strong style={{ color: "var(--fg)" }}>{startItem}</strong>–
         <strong style={{ color: "var(--fg)" }}>{endItem}</strong> of{" "}
-        <strong style={{ color: "var(--fg)" }}>{total}</strong> results
+        <strong style={{ color: "var(--fg)" }}>{total}</strong>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+      <div
+        className="pagination-controls"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "0.35rem",
+          flexWrap: "wrap",
+          minWidth: 0,
+        }}
+      >
         {onPageSizeChange && (
           <div
-            style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginRight: "1rem" }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.25rem",
+              marginRight: "0.35rem",
+            }}
           >
-            <span style={{ color: "var(--muted)", fontSize: "0.8rem" }}>Per page:</span>
+            <span style={{ color: "var(--muted)", fontSize: "0.75rem" }}>Per page:</span>
             <select
               className="select-field"
               value={pageSize}
               onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              style={{ width: "auto", padding: "0.25rem 0.5rem", height: 32 }}
+              style={{
+                width: "auto",
+                padding: "0.15rem 0.4rem",
+                height: 30,
+                fontSize: "0.75rem",
+                minHeight: 30,
+              }}
+              aria-label="Items per page"
             >
               <option value={10}>10</option>
               <option value={20}>20</option>
@@ -62,12 +87,19 @@ export function Pagination({
           className="btn btn-secondary"
           disabled={page <= 1}
           onClick={() => onPageChange(page - 1)}
-          style={{ padding: "0.35rem 0.75rem", height: 32, fontSize: "0.8rem" }}
+          style={{ padding: "0.25rem 0.6rem", height: 30, fontSize: "0.775rem" }}
         >
           Previous
         </button>
 
-        <span style={{ padding: "0 0.5rem", color: "var(--muted)", fontSize: "0.85rem" }}>
+        <span
+          style={{
+            padding: "0 0.35rem",
+            color: "var(--muted)",
+            fontSize: "0.8rem",
+            whiteSpace: "nowrap",
+          }}
+        >
           Page {page} of {totalPages}
         </span>
 
@@ -76,7 +108,7 @@ export function Pagination({
           className="btn btn-secondary"
           disabled={page >= totalPages}
           onClick={() => onPageChange(page + 1)}
-          style={{ padding: "0.35rem 0.75rem", height: 32, fontSize: "0.8rem" }}
+          style={{ padding: "0.25rem 0.6rem", height: 30, fontSize: "0.775rem" }}
         >
           Next
         </button>

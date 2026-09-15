@@ -38,19 +38,23 @@ export function FilterPanel({
 }: FilterPanelProps) {
   return (
     <div
+      className="filter-panel-container"
       style={{
         display: "flex",
         flexWrap: "wrap",
         alignItems: "center",
         justifyContent: "space-between",
-        gap: "1rem",
-        marginBottom: "1.25rem",
+        gap: "0.75rem",
+        marginBottom: "1rem",
         background: "#ffffff",
-        padding: "0.85rem 1.25rem",
+        padding: "0.75rem 1rem",
         borderRadius: "var(--radius)",
         border: "1px solid var(--border)",
         boxShadow: "var(--shadow-sm)",
-        overflow: "hidden",
+        width: "100%",
+        maxWidth: "100%",
+        minWidth: 0,
+        boxSizing: "border-box",
       }}
     >
       <div
@@ -58,13 +62,14 @@ export function FilterPanel({
           display: "flex",
           flexWrap: "wrap",
           alignItems: "center",
-          gap: "0.75rem",
-          flex: 1,
+          gap: "0.5rem",
+          flex: "1 1 auto",
           minWidth: 0,
+          width: "100%",
         }}
       >
         {onSearchChange && (
-          <div style={{ position: "relative", minWidth: 160, flex: "1 1 200px" }}>
+          <div style={{ position: "relative", minWidth: 0, flex: "1 1 160px", width: "100%" }}>
             <span
               style={{
                 position: "absolute",
@@ -83,7 +88,7 @@ export function FilterPanel({
               value={searchValue || ""}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder={searchPlaceholder}
-              style={{ paddingLeft: "2.25rem", height: 38 }}
+              style={{ paddingLeft: "2.25rem", height: 36, width: "100%" }}
             />
           </div>
         )}
@@ -93,7 +98,7 @@ export function FilterPanel({
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "0.4rem",
+              gap: "0.35rem",
               minWidth: 0,
               flex: "0 1 auto",
             }}
@@ -101,7 +106,7 @@ export function FilterPanel({
             {filterLabel && (
               <span
                 style={{
-                  fontSize: "0.8rem",
+                  fontSize: "0.75rem",
                   color: "var(--muted)",
                   fontWeight: 500,
                   whiteSpace: "nowrap",
@@ -114,7 +119,7 @@ export function FilterPanel({
               className="select-field"
               value={filterValue || ""}
               onChange={(e) => onFilterChange(e.target.value)}
-              style={{ height: 38, width: "auto", minWidth: 110 }}
+              style={{ height: 36, width: "auto", minWidth: 0 }}
             >
               <option value="">All</option>
               {filterOptions.map((opt) => (
@@ -131,7 +136,7 @@ export function FilterPanel({
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "0.4rem",
+              gap: "0.35rem",
               minWidth: 0,
               flex: "0 1 auto",
             }}
@@ -139,7 +144,7 @@ export function FilterPanel({
             {secondaryFilterLabel && (
               <span
                 style={{
-                  fontSize: "0.8rem",
+                  fontSize: "0.75rem",
                   color: "var(--muted)",
                   fontWeight: 500,
                   whiteSpace: "nowrap",
@@ -152,7 +157,7 @@ export function FilterPanel({
               className="select-field"
               value={secondaryFilterValue || ""}
               onChange={(e) => onSecondaryFilterChange(e.target.value)}
-              style={{ height: 38, width: "auto", minWidth: 110 }}
+              style={{ height: 36, width: "auto", minWidth: 0 }}
             >
               <option value="">All</option>
               {secondaryFilterOptions.map((opt) => (
@@ -166,7 +171,15 @@ export function FilterPanel({
       </div>
 
       {actions && (
-        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexShrink: 0 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            flexWrap: "wrap",
+            minWidth: 0,
+          }}
+        >
           {actions}
         </div>
       )}

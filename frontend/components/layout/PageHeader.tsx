@@ -25,25 +25,26 @@ export function PageHeader({
   const sub = subtitle || description;
   const acts = actions || action;
   return (
-    <div style={{ marginBottom: "1.75rem" }}>
+    <div style={{ marginBottom: "1.25rem", width: "100%", maxWidth: "100%", minWidth: 0 }}>
       {breadcrumbs && breadcrumbs.length > 0 && (
         <div
           className="breadcrumb-responsive"
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "0.5rem",
+            gap: "0.4rem",
             fontSize: "0.75rem",
             color: "var(--muted)",
-            marginBottom: "0.4rem",
+            marginBottom: "0.35rem",
             flexWrap: "wrap",
+            minWidth: 0,
           }}
         >
           {breadcrumbs.map((b, i) => (
             <span
               key={i}
               className="breadcrumb-item"
-              style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
+              style={{ display: "flex", alignItems: "center", gap: "0.4rem", minWidth: 0 }}
             >
               {i > 0 && <span>/</span>}
               {b.href ? (
@@ -65,17 +66,21 @@ export function PageHeader({
           alignItems: "center",
           justifyContent: "space-between",
           flexWrap: "wrap",
-          gap: "1rem",
+          gap: "0.75rem",
+          minWidth: 0,
+          width: "100%",
         }}
       >
-        <div>
+        <div style={{ flex: "1 1 200px", minWidth: 0 }}>
           <h1
             className="page-title-responsive"
             style={{
-              fontSize: "1.5rem",
+              fontSize: "clamp(1.2rem, 3.5vw, 1.5rem)",
               fontWeight: 700,
               color: "var(--fg)",
               letterSpacing: "-0.02em",
+              wordBreak: "break-word",
+              lineHeight: 1.25,
             }}
           >
             {title}
@@ -83,7 +88,12 @@ export function PageHeader({
           {sub && (
             <p
               className="page-subtitle-responsive"
-              style={{ fontSize: "0.875rem", color: "var(--muted)", marginTop: "0.2rem" }}
+              style={{
+                fontSize: "0.85rem",
+                color: "var(--muted)",
+                marginTop: "0.2rem",
+                wordBreak: "break-word",
+              }}
             >
               {sub}
             </p>
@@ -91,7 +101,15 @@ export function PageHeader({
         </div>
 
         {acts && (
-          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              flexWrap: "wrap",
+              minWidth: 0,
+            }}
+          >
             {acts}
           </div>
         )}

@@ -39,6 +39,10 @@ export function CommunityAdminHeader() {
         top: 0,
         zIndex: 30,
         gap: "0.75rem",
+        width: "100%",
+        maxWidth: "100%",
+        minWidth: 0,
+        boxSizing: "border-box",
       }}
     >
       {/* Left section: Sidebar toggle & Community Scope badge */}
