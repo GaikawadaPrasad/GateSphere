@@ -397,7 +397,7 @@ export function useResidentAmenities() {
         name: a.name,
         category: a.amenity_type ? a.amenity_type.toUpperCase() : "Facility",
         description:
-          a.description || `Community ${a.name} access. Capacity: ${a.capacity || 20} persons.`,
+          a.description || `Community ${a.name} — open for booking.`,
         capacity: a.capacity || 20,
         pricing_type: a.pricing_type || "free",
         price_per_hour: Number(a.price_per_hour ?? 0),
