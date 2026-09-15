@@ -56,14 +56,35 @@ export default function AcceptInvitationPage() {
       .finally(() => setLoading(false));
   }, [token]);
 
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+    if (!fullName.trim() || fullName.trim().length < 2) {
+      errors.fullName = "Full name must be at least 2 characters long.";
+    }
+    if (phone && !/^\+?[0-9\s\-()]{7,20}$/.test(phone)) {
+      errors.phone = "Invalid phone number format.";
+    }
+    if (password) {
+      if (password.length < 8) {
+        errors.password = "Password must be at least 8 characters long.";
+      } else if (!/^(?=.*[A-Za-z])(?=.*\d)/.test(password)) {
+        errors.password = "Password must contain at least one letter and one digit.";
+      }
+      if (password !== confirmPassword) {
+        errors.confirmPassword = "Passwords do not match.";
+      }
+    }
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmittingRef.current) return;
 
-    if (password && password !== confirmPassword) {
-      setError("Passwords do not match");
-      return;
-    }
+    if (!validateForm()) return;
 
     try {
       isSubmittingRef.current = true;
@@ -71,8 +92,8 @@ export default function AcceptInvitationPage() {
       setError(null);
 
       await onboardingApi.acceptInvitation(token, {
-        full_name: fullName,
-        phone: phone || undefined,
+        full_name: fullName.trim(),
+        phone: phone.trim() || undefined,
         password: password || undefined,
       });
 
@@ -221,9 +242,14 @@ export default function AcceptInvitationPage() {
                     width: "100%",
                     padding: "0.5rem 0.75rem",
                     borderRadius: "6px",
-                    border: "1px solid #cbd5e1",
+                    border: `1px solid ${fieldErrors.fullName ? "#ef4444" : "#cbd5e1"}`,
                   }}
                 />
+                {fieldErrors.fullName && (
+                  <span style={{ fontSize: "0.75rem", color: "#ef4444", marginTop: "0.25rem", display: "block" }}>
+                    {fieldErrors.fullName}
+                  </span>
+                )}
               </div>
 
               <div>
@@ -246,9 +272,14 @@ export default function AcceptInvitationPage() {
                     width: "100%",
                     padding: "0.5rem 0.75rem",
                     borderRadius: "6px",
-                    border: "1px solid #cbd5e1",
+                    border: `1px solid ${fieldErrors.phone ? "#ef4444" : "#cbd5e1"}`,
                   }}
                 />
+                {fieldErrors.phone && (
+                  <span style={{ fontSize: "0.75rem", color: "#ef4444", marginTop: "0.25rem", display: "block" }}>
+                    {fieldErrors.phone}
+                  </span>
+                )}
               </div>
 
               <div>
@@ -271,9 +302,14 @@ export default function AcceptInvitationPage() {
                     width: "100%",
                     padding: "0.5rem 0.75rem",
                     borderRadius: "6px",
-                    border: "1px solid #cbd5e1",
+                    border: `1px solid ${fieldErrors.password ? "#ef4444" : "#cbd5e1"}`,
                   }}
                 />
+                {fieldErrors.password && (
+                  <span style={{ fontSize: "0.75rem", color: "#ef4444", marginTop: "0.25rem", display: "block" }}>
+                    {fieldErrors.password}
+                  </span>
+                )}
               </div>
 
               {password && (
@@ -297,9 +333,14 @@ export default function AcceptInvitationPage() {
                       width: "100%",
                       padding: "0.5rem 0.75rem",
                       borderRadius: "6px",
-                      border: "1px solid #cbd5e1",
+                      border: `1px solid ${fieldErrors.confirmPassword ? "#ef4444" : "#cbd5e1"}`,
                     }}
                   />
+                  {fieldErrors.confirmPassword && (
+                    <span style={{ fontSize: "0.75rem", color: "#ef4444", marginTop: "0.25rem", display: "block" }}>
+                      {fieldErrors.confirmPassword}
+                    </span>
+                  )}
                 </div>
               )}
 

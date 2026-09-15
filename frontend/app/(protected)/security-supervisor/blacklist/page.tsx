@@ -32,18 +32,30 @@ export default function SecuritySupervisorBlacklistPage() {
     loadData();
   }, []);
 
+  const [blacklistFieldErrors, setBlacklistFieldErrors] = useState<Record<string, string>>({});
+
   const handleAddBlacklist = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanPhone = phone.trim();
     const cleanId = idNumber.trim().toUpperCase();
+    const errors: Record<string, string> = {};
+
     if (!cleanPhone && !cleanId) {
-      alert("Please provide either a mobile number or Government ID number to blacklist.");
+      errors.phone = "Provide either a mobile number or Government ID number to blacklist.";
+      errors.idNumber = "Provide either a mobile number or Government ID number to blacklist.";
+    }
+    if (cleanPhone && !/^\+?[0-9\s\-()]{7,20}$/.test(cleanPhone)) {
+      errors.phone = "Invalid phone number format.";
+    }
+    if (!reason.trim() || reason.trim().length < 5) {
+      errors.reason = "Please provide a detailed restriction reason (min 5 characters).";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setBlacklistFieldErrors(errors);
       return;
     }
-    if (!reason.trim()) {
-      alert("Please provide a reason for the restriction.");
-      return;
-    }
+
     try {
       let formattedPhone: string | undefined = undefined;
       if (cleanPhone) {
@@ -59,6 +71,7 @@ export default function SecuritySupervisorBlacklistPage() {
         risk_level: "high",
       });
       setIsAddModalOpen(false);
+      setBlacklistFieldErrors({});
       setName("");
       setPhone("");
       setIdType("aadhaar");

@@ -101,9 +101,14 @@ export default function SecuritySupervisorIncidentsPage() {
     loadData();
   }, []);
 
+  const [incidentFieldErrors, setIncidentFieldErrors] = useState<Record<string, string>>({});
+
   const handleCreateIncident = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!title.trim() || title.trim().length < 5) {
+      setIncidentFieldErrors({ title: "Incident summary must be at least 5 characters long." });
+      return;
+    }
     setIsSubmitting(true);
     try {
       await incidentsApi.create({
@@ -113,6 +118,7 @@ export default function SecuritySupervisorIncidentsPage() {
         description: title.trim(),
       });
       setIsModalOpen(false);
+      setIncidentFieldErrors({});
       setTitle("");
       setLocationText("Main Gate Perimeter");
       await loadData();
@@ -148,8 +154,8 @@ export default function SecuritySupervisorIncidentsPage() {
 
   const handleConfirmResolve = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!resolvingIncident || !resolutionSummary.trim()) {
-      alert("Please provide a resolution summary.");
+    if (!resolvingIncident || !resolutionSummary.trim() || resolutionSummary.trim().length < 5) {
+      setIncidentFieldErrors({ resolution: "Resolution summary must be at least 5 characters long." });
       return;
     }
     setIsResolving(true);
@@ -160,6 +166,7 @@ export default function SecuritySupervisorIncidentsPage() {
         reason: "Supervisor incident resolution",
       });
       setIsResolveModalOpen(false);
+      setIncidentFieldErrors({});
       setResolvingIncident(null);
       setResolutionSummary("");
       await loadData();

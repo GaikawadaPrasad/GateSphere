@@ -53,9 +53,24 @@ export default function FacilityManagerFacilitiesPage() {
     loadData();
   }, []);
 
+  const [facilityFieldErrors, setFacilityFieldErrors] = useState<Record<string, string>>({});
+
   const handleAddFacility = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    const errors: Record<string, string> = {};
+    if (!name.trim() || name.trim().length < 2) {
+      errors.name = "Facility name must be at least 2 characters long.";
+    }
+    const cap = parseInt(capacity);
+    if (isNaN(cap) || cap < 1) {
+      errors.capacity = "Capacity must be a positive number.";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFacilityFieldErrors(errors);
+      return;
+    }
+
     try {
       const generatedCode =
         name

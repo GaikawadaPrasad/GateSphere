@@ -130,10 +130,36 @@ export default function CommunityAdminStaffPage() {
     }
   };
 
+  const [staffFieldErrors, setStaffFieldErrors] = useState<Record<string, string>>({});
+
+  const validateStaffForm = () => {
+    const errors: Record<string, string> = {};
+    const trimmedName = newStaffForm.full_name.trim();
+    if (!trimmedName || trimmedName.length < 2) {
+      errors.full_name = "Staff member name must be at least 2 characters.";
+    }
+
+    const trimmedPhone = newStaffForm.phone.trim();
+    if (!trimmedPhone || !/^\+?[0-9\s\-()]{7,20}$/.test(trimmedPhone)) {
+      errors.phone = "Please enter a valid phone number.";
+    }
+
+    const trimmedEmail = newStaffForm.email.trim();
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      errors.email = "Please enter a valid email address.";
+    }
+
+    setStaffFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   // Handle Add Staff
   const handleAddStaff = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeCommunityId) return;
+
+    if (!validateStaffForm()) return;
+
     try {
       setIsSubmitting(true);
       setErrorMessage(null);
@@ -157,6 +183,7 @@ export default function CommunityAdminStaffPage() {
       });
       setIsAddStaffModalOpen(false);
       setShowStaffPassword(true);
+      setStaffFieldErrors({});
       setNewStaffForm({
         full_name: "",
         phone: "",
@@ -900,7 +927,15 @@ export default function CommunityAdminStaffPage() {
                       password: newPwd,
                     }));
                   }}
+                  style={{
+                    borderColor: staffFieldErrors.full_name ? "#EF4444" : undefined,
+                  }}
                 />
+                {staffFieldErrors.full_name && (
+                  <span style={{ fontSize: "0.75rem", color: "#EF4444", marginTop: "0.25rem", display: "block" }}>
+                    {staffFieldErrors.full_name}
+                  </span>
+                )}
               </div>
 
               <div>
@@ -921,7 +956,15 @@ export default function CommunityAdminStaffPage() {
                   placeholder="+91 9876543210"
                   value={newStaffForm.phone}
                   onChange={(e) => setNewStaffForm({ ...newStaffForm, phone: e.target.value })}
+                  style={{
+                    borderColor: staffFieldErrors.phone ? "#EF4444" : undefined,
+                  }}
                 />
+                {staffFieldErrors.phone && (
+                  <span style={{ fontSize: "0.75rem", color: "#EF4444", marginTop: "0.25rem", display: "block" }}>
+                    {staffFieldErrors.phone}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -943,7 +986,15 @@ export default function CommunityAdminStaffPage() {
                   placeholder="e.g. ramesh.maid@gatesphere.com"
                   value={newStaffForm.email}
                   onChange={(e) => setNewStaffForm({ ...newStaffForm, email: e.target.value })}
+                  style={{
+                    borderColor: staffFieldErrors.email ? "#EF4444" : undefined,
+                  }}
                 />
+                {staffFieldErrors.email && (
+                  <span style={{ fontSize: "0.75rem", color: "#EF4444", marginTop: "0.25rem", display: "block" }}>
+                    {staffFieldErrors.email}
+                  </span>
+                )}
               </div>
 
               <div>

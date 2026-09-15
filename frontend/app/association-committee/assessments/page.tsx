@@ -56,17 +56,36 @@ export default function SpecialAssessmentsPage() {
     0
   ).toFixed(2);
 
+  const [assessmentFieldErrors, setAssessmentFieldErrors] = useState<Record<string, string>>({});
+
+  const validateAssessmentForm = () => {
+    const errors: Record<string, string> = {};
+    if (!newTitle.trim() || newTitle.trim().length < 3) {
+      errors.title = "Project title must be at least 3 characters long.";
+    }
+    const amt = parseFloat(newTargetAmount || "0");
+    if (isNaN(amt) || amt <= 0) {
+      errors.targetAmount = "Target budget must be a positive number.";
+    }
+    if (!newUnitsCount || newUnitsCount < 1) {
+      errors.unitsCount = "Units count must be at least 1.";
+    }
+    if (newEffectiveDate && newDueDate && new Date(newDueDate) < new Date(newEffectiveDate)) {
+      errors.dueDate = "Due date cannot be earlier than effective start date.";
+    }
+    setAssessmentFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleCreateAssessment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim()) {
-      alert("Please enter a title for the assessment project.");
-      return;
-    }
     const cid = activeCommunityId || community?.id;
     if (!cid) {
       alert("Please select a community first.");
       return;
     }
+
+    if (!validateAssessmentForm()) return;
 
     try {
       await createMutation.mutateAsync({
@@ -85,6 +104,7 @@ export default function SpecialAssessmentsPage() {
       });
 
       setIsCreateModalOpen(false);
+      setAssessmentFieldErrors({});
       setNewTitle("");
       setNewDescription("");
       alert("Special assessment proposed successfully and submitted for committee review.");

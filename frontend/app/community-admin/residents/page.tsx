@@ -272,20 +272,36 @@ export default function CommunityAdminResidentsPage() {
     setIsAddResidentOpen(true);
   };
 
+  const [residentFieldErrors, setResidentFieldErrors] = useState<Record<string, string>>({});
+
+  const validateResidentForm = () => {
+    const errors: Record<string, string> = {};
+    if (!targetUnitId) {
+      errors.targetUnitId = "Please select a residential unit.";
+    }
+    const trimmedName = fullName.trim();
+    if (!trimmedName || trimmedName.length < 2) {
+      errors.fullName = "Resident full name must be at least 2 characters long.";
+    }
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      errors.email = "Please enter a valid email address.";
+    }
+    if (phone.trim() && !/^\+?[0-9\s\-()]{7,20}$/.test(phone.trim())) {
+      errors.phone = "Invalid phone number format.";
+    }
+    setResidentFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleAddResidentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeCommunityId) {
       setAddError("Active community required.");
       return;
     }
-    if (!targetUnitId) {
-      setAddError("Please select a residential unit.");
-      return;
-    }
-    if (!fullName.trim() || !email.trim()) {
-      setAddError("Full name and email are required.");
-      return;
-    }
+
+    if (!validateResidentForm()) return;
 
     setAddError("");
     setIsAdding(true);
@@ -305,6 +321,7 @@ export default function CommunityAdminResidentsPage() {
         },
       });
       setIsAddResidentOpen(false);
+      setResidentFieldErrors({});
       refetchResidents();
     } catch (err: any) {
       setAddError(err?.message || "Failed to onboard resident.");
@@ -691,11 +708,11 @@ export default function CommunityAdminResidentsPage() {
                       padding: "0.5rem 0.75rem",
                       fontSize: "0.85rem",
                       borderRadius: "6px",
-                      border: "1px solid #cbd5e1",
+                      border: `1px solid ${residentFieldErrors.targetUnitId ? "#dc2626" : "#cbd5e1"}`,
                       backgroundColor: "#ffffff",
                     }}
                   >
-                    <option value="">Select Target Unit...</option>
+                    <option value="">-- Choose Unit --</option>
                     {filteredUnits && filteredUnits.length > 0 ? (
                       filteredUnits.map((u) => (
                         <option key={u.id} value={u.id}>
@@ -708,6 +725,11 @@ export default function CommunityAdminResidentsPage() {
                       </option>
                     )}
                   </select>
+                  {residentFieldErrors.targetUnitId && (
+                    <span style={{ fontSize: "0.75rem", color: "#dc2626", marginTop: "0.25rem", display: "block" }}>
+                      {residentFieldErrors.targetUnitId}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -750,9 +772,14 @@ export default function CommunityAdminResidentsPage() {
                       padding: "0.5rem 0.75rem",
                       fontSize: "0.85rem",
                       borderRadius: "6px",
-                      border: "1px solid #cbd5e1",
+                      border: `1px solid ${residentFieldErrors.fullName ? "#dc2626" : "#cbd5e1"}`,
                     }}
                   />
+                  {residentFieldErrors.fullName && (
+                    <span style={{ fontSize: "0.75rem", color: "#dc2626", marginTop: "0.25rem", display: "block" }}>
+                      {residentFieldErrors.fullName}
+                    </span>
+                  )}
                 </div>
                 <div>
                   <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#475569", marginBottom: "0.35rem" }}>
@@ -770,9 +797,14 @@ export default function CommunityAdminResidentsPage() {
                       padding: "0.5rem 0.75rem",
                       fontSize: "0.85rem",
                       borderRadius: "6px",
-                      border: "1px solid #cbd5e1",
+                      border: `1px solid ${residentFieldErrors.email ? "#dc2626" : "#cbd5e1"}`,
                     }}
                   />
+                  {residentFieldErrors.email && (
+                    <span style={{ fontSize: "0.75rem", color: "#dc2626", marginTop: "0.25rem", display: "block" }}>
+                      {residentFieldErrors.email}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -793,9 +825,14 @@ export default function CommunityAdminResidentsPage() {
                       padding: "0.5rem 0.75rem",
                       fontSize: "0.85rem",
                       borderRadius: "6px",
-                      border: "1px solid #cbd5e1",
+                      border: `1px solid ${residentFieldErrors.phone ? "#dc2626" : "#cbd5e1"}`,
                     }}
                   />
+                  {residentFieldErrors.phone && (
+                    <span style={{ fontSize: "0.75rem", color: "#dc2626", marginTop: "0.25rem", display: "block" }}>
+                      {residentFieldErrors.phone}
+                    </span>
+                  )}
                 </div>
                 <div>
                   <PasswordField

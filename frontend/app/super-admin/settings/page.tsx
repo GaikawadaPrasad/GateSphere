@@ -6,7 +6,6 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { Modal } from "@/components/common/Modal";
 import { EditUserModal, type UserRecord } from "@/components/super-admin/EditUserModal";
-import { CreateUserModal } from "@/components/super-admin/CreateUserModal";
 import { rbacApi, usersApi } from "@/lib/api";
 import type { Role, Permission } from "@/types/rbac";
 
@@ -18,9 +17,6 @@ export default function SettingsPage() {
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
   const [deletingUser, setDeletingUser] = useState<UserRecord | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-
-  const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
-  const [createUserRoleSlug, setCreateUserRoleSlug] = useState("community_admin");
 
   const { data: roles, isLoading: isRolesLoading } = useQuery({
     queryKey: ["rbac", "roles"],
@@ -97,42 +93,9 @@ export default function SettingsPage() {
     },
     {
       key: "default_permissions",
-      header: "Default Permissions",
+      header: "Default Permissions Count",
       align: "center",
       render: (r) => <span>{r.default_permissions?.length ?? r.permissions?.length ?? 0}</span>,
-    },
-    {
-      key: "assigned_users",
-      header: "Assigned Accounts",
-      align: "center",
-      render: (r) => {
-        const count = ((usersData || []) as any[]).filter((u: any) =>
-          u.roles?.some((grant: any) => grant.role_slug === r.slug)
-        ).length;
-        return (
-          <span className={`badge ${count > 0 ? "badge-primary" : "badge-neutral"}`}>
-            {count} {count === 1 ? "User" : "Users"}
-          </span>
-        );
-      },
-    },
-    {
-      key: "actions",
-      header: "Action",
-      align: "right",
-      render: (r) => (
-        <button
-          type="button"
-          className="btn btn-secondary btn-sm"
-          style={{ fontSize: "0.75rem", padding: "0.25rem 0.65rem" }}
-          onClick={() => {
-            setCreateUserRoleSlug(r.slug);
-            setIsCreateUserOpen(true);
-          }}
-        >
-          + Add {r.slug === "community_admin" ? "Admin" : "User"}
-        </button>
-      ),
     },
   ];
 
@@ -249,11 +212,11 @@ export default function SettingsPage() {
 
   const modalMod = editingPermission
     ? editingPermission.module ||
-      (editingPermission.code.includes(":") ? editingPermission.code.split(":")[0] : editingPermission.code)
+    (editingPermission.code.includes(":") ? editingPermission.code.split(":")[0] : editingPermission.code)
     : "";
   const modalAct = editingPermission
     ? editingPermission.action ||
-      (editingPermission.code.includes(":") ? editingPermission.code.split(":")[1] : "")
+    (editingPermission.code.includes(":") ? editingPermission.code.split(":")[1] : "")
     : "";
 
   return (
@@ -270,24 +233,11 @@ export default function SettingsPage() {
       <div style={{ display: "flex", flexDirection: "column", gap: "1.75rem" }}>
         {/* User Access & RBAC Assignments Matrix */}
         <div className="card">
-          <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div>
-              <h3 className="card-title">User Access & RBAC Assignments Matrix</h3>
-              <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-                {usersData?.length || 0} Registered Users
-              </span>
-            </div>
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              style={{ fontSize: "0.8rem", padding: "0.4rem 0.85rem" }}
-              onClick={() => {
-                setCreateUserRoleSlug("community_admin");
-                setIsCreateUserOpen(true);
-              }}
-            >
-              + Create Community Admin
-            </button>
+          <div className="card-header">
+            <h3 className="card-title">User Access & RBAC Assignments Matrix</h3>
+            <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+              {usersData?.length || 0} Registered Users
+            </span>
           </div>
 
           <DataTable
@@ -303,24 +253,11 @@ export default function SettingsPage() {
 
         {/* Roles Table */}
         <div className="card">
-          <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div>
-              <h3 className="card-title">Configured System Roles</h3>
-              <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-                {roles?.length || 10} Roles
-              </span>
-            </div>
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              style={{ fontSize: "0.8rem", padding: "0.4rem 0.85rem" }}
-              onClick={() => {
-                setCreateUserRoleSlug("community_admin");
-                setIsCreateUserOpen(true);
-              }}
-            >
-              + Add Community Admin
-            </button>
+          <div className="card-header">
+            <h3 className="card-title">Configured System Roles</h3>
+            <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+              {roles?.length || 10} Roles
+            </span>
           </div>
 
           <DataTable
@@ -354,18 +291,6 @@ export default function SettingsPage() {
           />
         </div>
       </div>
-
-      {/* Create User / Admin Modal */}
-      <CreateUserModal
-        isOpen={isCreateUserOpen}
-        onClose={() => setIsCreateUserOpen(false)}
-        defaultRoleSlug={createUserRoleSlug}
-        availableRoles={roles}
-        onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ["users"] });
-          queryClient.invalidateQueries({ queryKey: ["rbac", "roles"] });
-        }}
-      />
 
       {/* Edit Permission Modal */}
       {editingPermission && (
@@ -495,6 +420,5 @@ export default function SettingsPage() {
     </div>
   );
 }
-
 
 

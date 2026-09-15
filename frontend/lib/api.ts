@@ -1006,3 +1006,27 @@ export const notificationsApi = {
   setPreference: (data: Partial<NotificationPreference>) =>
     apiSend<NotificationPreference>("PUT", "/notifications/me/preferences", data),
 };
+
+export interface PresignResponseData {
+  file_id: string;
+  upload_url: string;
+  method?: string;
+  headers?: Record<string, string>;
+  public_url?: string;
+}
+
+export interface ConfirmResponseData {
+  url: string;
+  file_id: string;
+  status: string;
+}
+
+export const uploadsApi = {
+  presign: (data: { kind: string; filename: string; content_type: string; size_bytes: number }) =>
+    apiSend<PresignResponseData>("POST", "/uploads", data),
+  confirm: (fileId: string) =>
+    apiSend<ConfirmResponseData>("POST", `/uploads/${fileId}/confirm`),
+  kinds: () => apiGet<Record<string, unknown>>("/uploads/kinds"),
+};
+
+

@@ -36,10 +36,19 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
     fetchAlerts();
   }, []);
 
+  const [alertFieldError, setAlertFieldError] = useState<string | null>(null);
+
   const handleTriggerAlert = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
+
+    if (!location.trim() && !description.trim()) {
+      setAlertFieldError("Please specify either a location or description for the alert.");
+      return;
+    }
+
     setIsSubmitting(true);
+    setAlertFieldError(null);
 
     try {
       const message = [location.trim() && `Location: ${location.trim()}`, description.trim()]
