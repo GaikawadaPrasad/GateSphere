@@ -28,3 +28,11 @@ class CurrentUser(BaseModel):
     # bumps when the caller's effective permissions may have changed; the frontend
     # polls `/auth/me` and refreshes its permission cache when this value moves.
     permission_version: int = 0
+
+
+class PasswordChangeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    current_password: str = Field(min_length=1, max_length=256)
+    new_password: str = Field(min_length=8, max_length=256)
+

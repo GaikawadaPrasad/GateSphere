@@ -101,3 +101,19 @@ async def revoke_role(
 ) -> Response:
     await svc.revoke_role(user_id, grant_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+DELETE_PERM = Depends(require_permission_async("users:delete"))
+
+
+@router.delete(
+    "/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    dependencies=[DELETE_PERM],
+)
+async def delete_user(user_id: uuid.UUID, svc: Svc = Depends(user_service)) -> Response:
+    await svc.delete_user(user_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+

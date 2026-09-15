@@ -223,7 +223,7 @@ async def ticket_messages(ticket_id: uuid.UUID, svc: Svc = Depends(complaint_ser
     "/tickets/{ticket_id}/messages",
     response_model=Envelope[schemas.MessageRead],
     status_code=status.HTTP_201_CREATED,
-    dependencies=[VIEW],
+    dependencies=[CREATE],
 )
 async def add_message(
     ticket_id: uuid.UUID,
@@ -271,7 +271,7 @@ async def transition_ticket(
 @router.post(
     "/tickets/{ticket_id}/confirm",
     response_model=Envelope[schemas.TicketRead],
-    dependencies=[VIEW],
+    dependencies=[UPDATE],
 )
 async def confirm_ticket(
     ticket_id: uuid.UUID,
@@ -288,7 +288,7 @@ async def confirm_ticket(
     "/tickets/{ticket_id}/feedback",
     response_model=Envelope[schemas.FeedbackRead],
     status_code=status.HTTP_201_CREATED,
-    dependencies=[VIEW],
+    dependencies=[CREATE],
 )
 async def add_feedback(
     ticket_id: uuid.UUID,
@@ -316,7 +316,7 @@ async def list_attachments(ticket_id: uuid.UUID, svc: Svc = Depends(complaint_se
     "/tickets/{ticket_id}/attachments",
     response_model=Envelope[schemas.AttachmentRead],
     status_code=status.HTTP_201_CREATED,
-    dependencies=[VIEW],
+    dependencies=[CREATE],
 )
 async def add_attachment(
     ticket_id: uuid.UUID,

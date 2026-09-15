@@ -162,6 +162,11 @@ class DashboardService:
     # -- financial --------------------------------------- #
     async def financial(self, community_id: uuid.UUID | None):
         cid = self._community(community_id)
+        unit_scope = await actor_unit_scope(self.db, self.actor)
+        if unit_scope is not None:
+            raise ForbiddenError(
+                "Residents cannot access community financial totals", code="PERMISSION_DENIED"
+            )
         from app.modules.dashboards import schemas
 
         by_status = {
