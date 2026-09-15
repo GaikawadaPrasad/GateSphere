@@ -29,17 +29,17 @@ export default function GateSphereLogo({
         priority
         className={`${
           isLarge
-            ? "h-9 sm:h-12 md:h-14 w-auto object-contain drop-shadow-xl transition-all duration-300"
+            ? "h-7 sm:h-12 md:h-14 w-auto object-contain drop-shadow-xl transition-all duration-300"
             : "h-7 sm:h-8 md:h-10 w-auto object-contain drop-shadow-lg transition-all duration-300"
         }`}
       />
       {variant !== "compact" && (
         <span
-          className={`${
+          className={`font-bold text-base tracking-tight whitespace-nowrap transition-all duration-300 ease-in-out ${
             isLarge
-              ? "font-extrabold text-lg sm:text-2xl md:text-3xl"
-              : "font-bold text-base sm:text-xl md:text-2xl"
-          } tracking-tight whitespace-nowrap transition-all duration-300 ease-in-out ${
+              ? "sm:font-extrabold sm:text-2xl md:text-3xl"
+              : "sm:text-xl md:text-2xl"
+          } ${
             showText ? "opacity-100" : "opacity-0 w-0"
           } ${variant === "light" ? "text-white" : "text-slate-900"}`}
           style={{ fontFamily: "'Outfit', sans-serif" }}

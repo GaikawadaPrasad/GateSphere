@@ -3,22 +3,34 @@
 import React, { useState, useEffect } from "react";
 import GateSphereLogo from "./GateSphereLogo";
 
+// In-memory flag: only plays on initial site open or browser refresh (F5).
+// Client-side navigations (e.g. side menu / navbar clicks) will NOT replay the loader.
+let hasIntroShown = false;
+
 export default function IntroLoader({ onReady }: { onReady?: () => void }) {
   const [shouldShow, setShouldShow] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [exiting, setExiting] = useState(false);
-  const [removed, setRemoved] = useState(false);
+  const [removed, setRemoved] = useState(() => hasIntroShown);
 
   useEffect(() => {
+    // If intro has already been shown during this browser session, skip immediately
+    if (hasIntroShown) {
+      if (onReady) onReady();
+      return;
+    }
+
     if (typeof window !== "undefined") {
       const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
       if (mediaQuery.matches) {
+        hasIntroShown = true;
         setRemoved(true);
         if (onReady) onReady();
         return;
       }
     }
 
+    hasIntroShown = true;
     setShouldShow(true);
 
     // Lock scroll during loader
