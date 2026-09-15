@@ -202,18 +202,17 @@ export default function SuperAdminDashboardPage() {
       {/* Quick Actions Bar */}
       <QuickActions onNewCommunity={handleOpenCreate} />
 
-      {/* Main Grid: Communities Table (Left / Full) + Live Activity Feed (Right / Collapsible) */}
+      {/* Main Grid: Communities Table (Top) + Live Activity Feed (Bottom) — stacked vertically */}
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 480px), 1fr))",
+          display: "flex",
+          flexDirection: "column",
           gap: "1.75rem",
-          alignItems: "start",
           marginBottom: "1.75rem",
         }}
       >
-        {/* Left Side: Communities Table with Built-in Search & Pagination */}
-        <div style={{ flex: 1, minWidth: 0 }}>
+        {/* Top: Communities Table with Built-in Search & Pagination */}
+        <div style={{ width: "100%", minWidth: 0 }}>
           <div className="card" style={{ marginBottom: "1rem" }}>
             <div
               className="card-header"
@@ -278,7 +277,7 @@ export default function SuperAdminDashboardPage() {
           </div>
         </div>
 
-        {/* Right Side: Live Security Activity Feed */}
+        {/* Bottom: Live Security Activity Feed */}
         <div style={{ width: "100%", minWidth: 0 }}>
           <ActivityFeed events={gateEvents} alerts={panicAlerts} isLoading={isEventsLoading} />
         </div>
