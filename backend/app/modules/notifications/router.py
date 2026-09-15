@@ -44,6 +44,7 @@ async def my_preferences(svc: Svc = Depends(notification_service)) -> dict:
     "/preferences",
     response_model=Envelope[list[schemas.PreferenceRead]],
     dependencies=[VIEW],
+    deprecated=True,
 )
 async def my_preferences_alias(svc: Svc = Depends(notification_service)) -> dict:
     return ok([schemas.PreferenceRead.model_validate(p) for p in await svc.my_preferences()])
@@ -58,7 +59,12 @@ async def set_preference(
     )
 
 
-@router.put("/preferences", response_model=Envelope[schemas.PreferenceRead], dependencies=[VIEW])
+@router.put(
+    "/preferences",
+    response_model=Envelope[schemas.PreferenceRead],
+    dependencies=[VIEW],
+    deprecated=True,
+)
 async def set_preference_alias(
     payload: schemas.PreferenceUpsert, svc: Svc = Depends(notification_service)
 ) -> dict:

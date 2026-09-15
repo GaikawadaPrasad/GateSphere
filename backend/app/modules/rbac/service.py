@@ -91,7 +91,37 @@ class RbacService:
     # -- reads -------------------------------------------------- #
     async def list_permissions(self) -> list[schemas.PermissionRead]:
         rows = (await self.db.scalars(select(Permission).order_by(Permission.code))).all()
-        return [schemas.PermissionRead(code=p.code, description=p.description) for p in rows]
+        out = []
+        for p in rows:
+            parts = p.code.split(":", 1)
+            mod = parts[0] if len(parts) > 1 else p.code
+            act = parts[1] if len(parts) > 1 else ""
+            out.append(
+                schemas.PermissionRead(
+                    code=p.code, module=mod, action=act, description=p.description
+                )
+            )
+        return out
+
+    async def update_permission(
+        self, code: str, payload: schemas.PermissionUpdate
+    ) -> schemas.PermissionRead:
+        perm = await self.db.scalar(select(Permission).where(Permission.code == code))
+        if perm is None:
+            raise NotFoundError("Permission not found")
+        if payload.description is not None:
+            perm.description = payload.description
+        await self.db.flush()
+        await self._audit(
+            "permission.update", perm.id, new={"code": code, "description": perm.description}
+        )
+        parts = perm.code.split(":", 1)
+        mod = parts[0] if len(parts) > 1 else perm.code
+        act = parts[1] if len(parts) > 1 else ""
+        return schemas.PermissionRead(
+            code=perm.code, module=mod, action=act, description=perm.description
+        )
+
 
     async def list_roles(self) -> list[schemas.RolePermsRead]:
         roles = (await self.db.scalars(select(Role).order_by(Role.slug))).all()

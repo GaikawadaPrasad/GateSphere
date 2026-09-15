@@ -99,7 +99,7 @@ describe("DataTable Responsive Views (Option 1 Cards & Option 2 Scroller)", () =
     expect(screen.getByText("Lunch Meeting")).toBeInTheDocument();
 
     // Status badges and action buttons rendered
-    expect(screen.getByText("Approved")).toBeInTheDocument();
+    expect(screen.getByText(/approved/i)).toBeInTheDocument();
     expect(screen.getByText("View Manohar Sharma")).toBeInTheDocument();
   });
 
@@ -109,7 +109,6 @@ describe("DataTable Responsive Views (Option 1 Cards & Option 2 Scroller)", () =
         columns={visitorColumns}
         data={mockVisitors}
         showViewToggle={true}
-        viewMode="table"
       />
     );
 

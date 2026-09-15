@@ -14,7 +14,14 @@ class _Write(BaseModel):
 
 class PermissionRead(BaseModel):
     code: str
+    module: str | None = None
+    action: str | None = None
     description: str | None = None
+
+
+class PermissionUpdate(_Write):
+    description: str | None = Field(default=None, max_length=512)
+
 
 
 class RolePermsRead(BaseModel):

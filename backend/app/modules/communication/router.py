@@ -132,6 +132,24 @@ async def expire_announcement(
 
 
 # --- polls ------------------------------------------------------- #
+@router.get(
+    "/polls",
+    response_model=Envelope[list[schemas.PollRead]],
+    dependencies=[VIEW],
+)
+async def list_polls(
+    community_id: uuid.UUID | None = None,
+    params: PageParams = Depends(page_params),
+    svc: Svc = Depends(communication_service),
+) -> dict:
+    rows, total = await svc.list_polls(
+        community_id=community_id, offset=params.offset, limit=params.page_size
+    )
+    return paginated(
+        [schemas.PollRead.model_validate(r) for r in rows], total=total, params=params
+    )
+
+
 @router.post(
     "/polls",
     response_model=Envelope[schemas.PollRead],
@@ -155,7 +173,7 @@ async def get_poll(poll_id: uuid.UUID, svc: Svc = Depends(communication_service)
 @router.post(
     "/announcements/{announcement_id}/rsvp",
     response_model=Envelope[schemas.RsvpRead],
-    dependencies=[VIEW],
+    dependencies=[CREATE],
 )
 async def rsvp_event(
     announcement_id: uuid.UUID,
@@ -202,7 +220,7 @@ async def set_poll_status(
     "/polls/{poll_id}/vote",
     response_model=Envelope[schemas.PollResults],
     status_code=status.HTTP_201_CREATED,
-    dependencies=[VIEW],
+    dependencies=[CREATE],
 )
 async def vote(
     poll_id: uuid.UUID, payload: schemas.VoteIn, svc: Svc = Depends(communication_service)

@@ -247,3 +247,13 @@ class UserService:
         await self.db.flush()
         await invalidate_user_permissions_async(self.db, [user.id])
         await self._audit("role.revoke", str(user.id), community_id=ur.community_id)
+
+    async def delete_user(self, user_id: uuid.UUID) -> None:
+        user = await self._get_visible(user_id)
+        if user.id == self.actor.id:
+            raise BusinessRuleError("Cannot delete yourself", code="CANNOT_DELETE_SELF")
+        await revoke_all_user_sessions_async(self.db, user.id)
+        await self.db.delete(user)
+        await self.db.flush()
+        await self._audit("user.delete", str(user_id))
+

@@ -627,7 +627,26 @@ export const auditApi = {
 export const rbacApi = {
   roles: () => apiGet<Role[]>("/rbac/roles"),
   permissions: () => apiGet<Permission[]>("/rbac/permissions"),
+  updatePermission: (code: string, data: { description?: string }) =>
+    apiSend<Permission>("PATCH", `/rbac/permissions/${encodeURIComponent(code)}`, data),
 };
+
+export const usersApi = {
+  list: (params?: { q?: string; role_slug?: string; community_id?: string; active?: boolean; page?: number; page_size?: number }) =>
+    apiGet<Record<string, unknown>[]>("/users", params as Record<string, unknown>),
+  get: (id: string) => apiGet<Record<string, unknown>>(`/users/${id}`),
+  create: (data: { email: string; full_name: string; password: string; phone?: string; role_slug?: string; community_id?: string }) =>
+    apiSend<Record<string, unknown>>("POST", "/users", data),
+  update: (id: string, data: { full_name?: string; email?: string; phone?: string; is_active?: boolean }) =>
+    apiSend<Record<string, unknown>>("PATCH", `/users/${id}`, data),
+  delete: (id: string) => apiSend<void>("DELETE", `/users/${id}`),
+  grantRole: (userId: string, data: { role_slug: string; community_id?: string }) =>
+    apiSend<Record<string, unknown>>("POST", `/users/${userId}/roles`, data),
+  revokeRole: (userId: string, grantId: string) =>
+    apiSend<void>("DELETE", `/users/${userId}/roles/${grantId}`),
+};
+
+
 
 export const residentsApi = {
   list: (params?: ListQueryParams) =>
@@ -636,7 +655,7 @@ export const residentsApi = {
   me: () => apiGet<Record<string, unknown>>("/residents/me"),
   updateMe: (data: Record<string, unknown>) =>
     apiSend<Record<string, unknown>>("PATCH", "/residents/me", data),
-  occupancies: (unitId: string) => apiGet<any[]>(`/communities/units/${unitId}/occupancies`),
+  occupancies: (unitId: string) => apiGet<any[]>(`/residents/units/${unitId}/occupancies`),
   family: (unitId: string) => apiGet<any[]>("/residents/family-members", { unit_id: unitId }),
   contacts: (profileId: string) => apiGet<any[]>(`/residents/${profileId}/emergency-contacts`),
   moveRecords: (params?: {
@@ -700,6 +719,11 @@ export const onboardingApi = {
   ) => apiSend<any>("POST", `/communities/${communityId}/invitations`, data),
   listInvitations: (communityId: string) =>
     apiGet<any[]>(`/communities/${communityId}/invitations`),
+  revokeInvitation: (communityId: string, invitationId: string) =>
+    apiSend<any>("POST", `/communities/${communityId}/invitations/${invitationId}/revoke`),
+  viewInvitation: (token: string) => apiGet<any>(`/invitations/${token}`),
+  acceptInvitation: (token: string, payload: { full_name: string; phone?: string; password?: string }) =>
+    apiSend<any>("POST", `/invitations/${token}/accept`, payload),
 };
 
 export const domesticStaffApi = {
@@ -938,6 +962,8 @@ export const deliveriesApi = {
 export const vehiclesApi = {
   list: (params?: ListQueryParams) =>
     apiGet<Record<string, unknown>[]>("/vehicles", params as Record<string, unknown>),
+  register: (data: { plate_number: string; make_model?: string; vehicle_type?: string; sticker_number?: string }) =>
+    apiSend<Record<string, unknown>>("POST", "/vehicles", data),
   allocations: (params?: ListQueryParams) =>
     apiGet<Record<string, unknown>[]>(
       "/vehicles/parking/allocations",

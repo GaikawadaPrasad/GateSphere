@@ -40,6 +40,29 @@ async def list_permissions(svc: Svc = Depends(rbac_service)) -> dict:
     return ok(await svc.list_permissions())
 
 
+@router.patch(
+    "/permissions/{code}",
+    response_model=Envelope[schemas.PermissionRead],
+    dependencies=[ADMIN],
+)
+async def update_permission(
+    code: str, payload: schemas.PermissionUpdate, svc: Svc = Depends(rbac_service)
+) -> dict:
+    return ok(await svc.update_permission(code, payload), message="Permission updated")
+
+
+@router.put(
+    "/permissions/{code}",
+    response_model=Envelope[schemas.PermissionRead],
+    dependencies=[ADMIN],
+)
+async def update_permission_put(
+    code: str, payload: schemas.PermissionUpdate, svc: Svc = Depends(rbac_service)
+) -> dict:
+    return ok(await svc.update_permission(code, payload), message="Permission updated")
+
+
+
 @router.get("/roles", response_model=Envelope[list[schemas.RolePermsRead]], dependencies=[VIEW])
 async def list_roles(svc: Svc = Depends(rbac_service)) -> dict:
     return ok(await svc.list_roles())

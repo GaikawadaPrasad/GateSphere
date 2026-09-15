@@ -11,6 +11,7 @@ import {
 } from "@/lib/qr-decoder";
 import { visitorsApi, domesticStaffApi, gateApi } from "@/lib/api";
 import { WalkInVisitorModal } from "@/components/common/WalkInVisitorModal";
+import { toast } from "@/store/toast";
 
 interface VerifiedEntry {
   entryId: string;
@@ -419,7 +420,7 @@ export default function SecurityGuardLiveGatePage() {
       } else {
         await visitorsApi.recordExit(verifiedEntry.entryId);
       }
-      alert(`Exit recorded for ${verifiedEntry.visitorName}`);
+      toast.success(`Exit recorded for ${verifiedEntry.visitorName}`);
       setVerifiedEntry(null);
       setPassInput("");
       setScannedBadge(null);

@@ -118,3 +118,19 @@ def test_community_deny_override_actually_blocks_the_endpoint(auth_client, as_ro
 
     guard3 = as_role("security_guard")
     assert guard3.post("/api/v1/visitors/requests", json=payload).status_code == 201
+
+
+def test_update_permission_description(auth_client, as_role):
+    # Non-admin rejected
+    ca = as_role("community_admin")
+    assert ca.patch(f"{P}/permissions/amenities:approve", json={"description": "Updated desc"}).status_code == 403
+
+    # Super admin success
+    res = auth_client.patch(f"{P}/permissions/amenities:approve", json={"description": "Updated amenity approval permission"})
+    assert res.status_code == 200, res.text
+    data = res.json()["data"]
+    assert data["code"] == "amenities:approve"
+    assert data["module"] == "amenities"
+    assert data["action"] == "approve"
+    assert data["description"] == "Updated amenity approval permission"
+

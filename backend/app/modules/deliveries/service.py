@@ -210,6 +210,16 @@ class DeliveryService(UnitScopedAccess):
             unit.community_id, payload.delivery_type, unit_id=unit.id
         )
         auto = protocol.allow_direct_entry and not protocol.requires_otp
+        if protocol.protocol_type == "direct_rejection":
+            app_status = "rejected"
+            del_status = "cancelled"
+        elif auto:
+            app_status = "auto_approved"
+            del_status = "expected"
+        else:
+            app_status = "pending"
+            del_status = "expected"
+
         obj = Delivery(
             community_id=unit.community_id,
             unit_id=unit.id,
@@ -223,8 +233,8 @@ class DeliveryService(UnitScopedAccess):
             expected_at=payload.expected_at,
             parcel_count=payload.parcel_count,
             notes=payload.notes,
-            approval_status="auto_approved" if auto else "pending",
-            status="expected",
+            approval_status=app_status,
+            status=del_status,
         )
         await self.deliveries.add(obj)
         await self._event(obj, "logged")

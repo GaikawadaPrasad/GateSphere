@@ -217,7 +217,7 @@ async def verify_pass(
     "/ratings",
     response_model=Envelope[schemas.RatingRead],
     status_code=status.HTTP_201_CREATED,
-    dependencies=[VIEW],
+    dependencies=[CREATE],
 )
 async def rate_staff(
     payload: schemas.RatingCreate, svc: Svc = Depends(domestic_staff_service)
