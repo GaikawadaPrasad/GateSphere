@@ -37,6 +37,6 @@ describe("Resident / Owner-Tenant 14 Modules Flow Verification", () => {
     ];
     const total = lineItems.reduce((acc, item) => acc + item.amount, 0);
     expect(total).toBe(350.0);
-    expect(formatCurrency(total)).toBe("$350.00");
+    expect(formatCurrency(total)).toBe("₹350.00");
   });
 });

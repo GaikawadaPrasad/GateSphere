@@ -7,6 +7,7 @@ import { DataTable, type Column } from "@/components/tables/DataTable";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { ErrorState } from "@/components/common/ErrorState";
 import { KpiCardSkeleton, CardSkeleton, TableSkeleton } from "@/components/common/LoadingSkeleton";
+import { formatCurrency } from "@/lib/utils";
 import type { VisitorRequest, InvoiceItem } from "@/hooks/use-owner-tenant-data";
 
 describe("Resident Dashboard Components & Architecture", () => {
@@ -158,7 +159,7 @@ describe("Resident Dashboard Components & Architecture", () => {
           columns={[
             { key: "invoice_number", header: "Invoice #" },
             { key: "title", header: "Billing Item" },
-            { key: "balance_due", header: "Balance Due", render: (i) => `$${i.balance_due.toFixed(2)}` },
+            { key: "balance_due", header: "Balance Due", render: (i) => formatCurrency(i.balance_due) },
             { key: "status", header: "Status", render: (i) => <StatusBadge status={i.status} /> },
           ]}
           data={mockInvoices}
@@ -167,7 +168,7 @@ describe("Resident Dashboard Components & Architecture", () => {
 
       expect(screen.getByText("INV-2026-001")).toBeInTheDocument();
       expect(screen.getByText("September 2026 Society Maintenance")).toBeInTheDocument();
-      expect(screen.getByText("$350.00")).toBeInTheDocument();
+      expect(screen.getByText("₹350.00")).toBeInTheDocument();
       expect(screen.getByText("INV-2026-002")).toBeInTheDocument();
     });
   });

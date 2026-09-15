@@ -522,7 +522,7 @@ export default function SpecialAssessmentsPage() {
 
                 <div>
                   <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--fg-secondary)", display: "block", marginBottom: "0.35rem" }}>
-                    Target Budget ($) *
+                    Target Budget (₹) *
                   </label>
                   <input
                     type="number"
