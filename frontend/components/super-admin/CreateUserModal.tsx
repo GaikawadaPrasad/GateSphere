@@ -30,6 +30,8 @@ export function CreateUserModal({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
 
   const { data: communities } = useQuery({
     queryKey: ["communities"],

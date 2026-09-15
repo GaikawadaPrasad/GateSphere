@@ -10,6 +10,7 @@ const navItems = [
   { label: "Property", href: "/community-admin/property", icon: "🏢" },
   { label: "Residents", href: "/community-admin/residents", icon: "👥" },
   { label: "Staff", href: "/community-admin/staff", icon: "🛠️" },
+  { label: "Facility & Security", href: "/community-admin/security-staff", icon: "🛡️" },
   { label: "Communication", href: "/community-admin/communication", icon: "📢" },
   { label: "Billing & Finance", href: "/community-admin/billing", icon: "💳" },
   { label: "Incidents", href: "/community-admin/incidents", icon: "🚨" },

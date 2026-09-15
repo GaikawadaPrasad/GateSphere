@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useUiStore } from "@/store/ui";
 import {
   useStaffList,
@@ -18,6 +18,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { FilterPanel } from "@/components/common/FilterPanel";
 import { Modal } from "@/components/common/Modal";
+import { OperationalStaffView } from "@/components/community-admin/OperationalStaffView";
 import type {
   Staff,
   StaffAttendance,
@@ -29,7 +30,18 @@ import { formatDateTime } from "@/lib/utils";
 
 export default function CommunityAdminStaffPage() {
   const { activeCommunityId } = useUiStore();
-  const [activeTab, setActiveTab] = useState<"directory" | "attendance">("directory");
+  const [activeTab, setActiveTab] = useState<"directory" | "security" | "attendance">("directory");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get("tab");
+      if (tab === "security" || tab === "operational" || tab === "facility") {
+        setActiveTab("security");
+      }
+    }
+  }, []);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
@@ -441,7 +453,25 @@ export default function CommunityAdminStaffPage() {
             cursor: "pointer",
           }}
         >
-          🛠️ Staff Directory ({staffList?.length || 0})
+          🛠️ Domestic Staff ({staffList?.length || 0})
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("security")}
+          style={{
+            padding: "0.75rem 0",
+            border: "none",
+            background: "transparent",
+            fontSize: "0.95rem",
+            fontWeight: activeTab === "security" ? 700 : 500,
+            color: activeTab === "security" ? "var(--primary)" : "var(--muted)",
+            borderBottom:
+              activeTab === "security" ? "2px solid var(--primary)" : "2px solid transparent",
+            cursor: "pointer",
+          }}
+        >
+          🛡️ Facility &amp; Security Personnel
         </button>
 
         <button
@@ -492,6 +522,12 @@ export default function CommunityAdminStaffPage() {
             emptyDescription="Register domestic helpers and support technicians for this community."
             enableClientPagination={true}
           />
+        </div>
+      )}
+
+      {activeTab === "security" && (
+        <div style={{ marginTop: "1rem" }}>
+          <OperationalStaffView embeddedInTab={true} />
         </div>
       )}
 
