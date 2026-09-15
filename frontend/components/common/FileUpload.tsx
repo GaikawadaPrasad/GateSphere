@@ -38,12 +38,20 @@ export const FileUpload: React.FC<FileUploadProps> = ({
         size_bytes: file.size,
       });
 
-      const presignData = presignRes.data || presignRes;
-      const { file_id, upload_url, method = "PUT", headers = {}, public_url } = presignData;
+      const presignData = (presignRes as any)?.data || presignRes;
+      const {
+        file_id,
+        upload_url,
+        method = "PUT",
+        headers = {},
+        required_headers = {},
+        public_url,
+        file_url,
+      } = presignData;
 
       // 2. Upload file content to presigned destination or backend endpoint
       if (upload_url) {
-        const uploadHeaders: Record<string, string> = { ...headers };
+        const uploadHeaders: Record<string, string> = { ...headers, ...required_headers };
         if (!uploadHeaders["Content-Type"]) {
           uploadHeaders["Content-Type"] = file.type || "application/octet-stream";
         }
@@ -56,8 +64,8 @@ export const FileUpload: React.FC<FileUploadProps> = ({
 
       // 3. Confirm upload
       const confirmRes = await uploadsApi.confirm(file_id);
-      const confirmData = confirmRes.data || confirmRes;
-      const finalUrl = confirmData.url || public_url;
+      const confirmData = (confirmRes as any)?.data || confirmRes;
+      const finalUrl = confirmData.file_url || confirmData.url || file_url || public_url;
 
       setPreviewUrl(finalUrl);
       onUploadComplete(finalUrl);
