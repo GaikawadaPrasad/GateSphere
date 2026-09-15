@@ -6,37 +6,108 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { SearchInput } from "@/components/forms/SearchInput";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DataTable, type Column } from "@/components/tables/DataTable";
-import { visitorsApi, type VisitorRecord } from "@/lib/api";
+import { visitorsApi, communitiesApi, authApi, type VisitorRecord } from "@/lib/api";
+import { Modal } from "@/components/common/Modal";
+import { formatDateTime } from "@/lib/utils";
+
+interface SupervisorVisitorRow {
+  id: string;
+  pass_code: string;
+  name: string;
+  phone: string;
+  type: string;
+  unit: string;
+  status: string;
+  rawStatus: string;
+  vehicle_number?: string;
+  purpose?: string;
+  party_size?: number;
+  expected_at?: string;
+  valid_until?: string;
+  created_at?: string;
+}
 
 export default function SecuritySupervisorVisitorManagementPage() {
-  const [visitors, setVisitors] = useState<VisitorRecord[]>([]);
+  const [visitors, setVisitors] = useState<SupervisorVisitorRow[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
   const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [selectedVisitor, setSelectedVisitor] = useState<SupervisorVisitorRow | null>(null);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const res: any = await visitorsApi.requests({ page_size: 100 });
-      const data = Array.isArray(res) ? res : res?.data || [];
+      const [res, directoryRes, me] = await Promise.all([
+        visitorsApi.requests({ page_size: 100 }),
+        visitorsApi.directory({ page_size: 100 }).catch(() => []),
+        authApi.me().catch(() => null),
+      ]);
+      const data = Array.isArray(res) ? res : (res as any)?.data || [];
+      const directory = Array.isArray(directoryRes) ? directoryRes : (directoryRes as any)?.data || [];
+
+      let cid = me?.community_ids?.[0] || (me as any)?.community_id;
+      if (!cid && me?.roles && Array.isArray(me.roles)) {
+        cid = me.roles.find((r: any) => r.community_id)?.community_id;
+      }
+
+      const unitMap = new Map<string, string>();
+      if (cid) {
+        try {
+          const uRes: any = await communitiesApi.communityUnits(cid, { page_size: 100 });
+          const uList = Array.isArray(uRes) ? uRes : uRes?.data || uRes?.items || [];
+          for (const u of uList) {
+            if (u?.id) unitMap.set(u.id, u.unit_number);
+          }
+        } catch {
+          // unit fallback
+        }
+      }
+
+      const visitorMap = new Map<string, any>();
+      for (const v of directory || []) if ((v as any)?.id) visitorMap.set((v as any).id, v);
+
       setVisitors(
-        (data || []).map((v: any) => ({
-          id: v.id,
-          pass_code: v.id ? `REQ-${v.id.slice(0, 6).toUpperCase()}` : "PASS",
-          name: v.visitor_name || v.visitor?.full_name || v.full_name || "Visitor",
-          phone: v.phone || v.visitor?.phone || v.visitor_phone || "—",
-          type: v.visitor_type
-            ? v.visitor_type.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
-            : "Guest",
-          unit: `Unit ${v.unit_id ? v.unit_id.slice(0, 6) : "Direct"}`,
-          status:
-            v.status === "pending"
-              ? "Pending Approval"
-              : v.status
-                ? v.status.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
-                : "Expected",
-        })),
+        (data || []).map((v: any) => {
+          const directoryVisitor = visitorMap.get(v.visitor_id);
+          const name =
+            v.visitor_name ||
+            v.visitor?.full_name ||
+            v.full_name ||
+            directoryVisitor?.full_name ||
+            "Visitor";
+          const phone =
+            v.phone ||
+            v.visitor?.phone ||
+            v.visitor_phone ||
+            directoryVisitor?.phone ||
+            "—";
+          const unit = unitMap.get(v.unit_id) || (v.unit_id ? `Unit #${v.unit_id.slice(0, 6)}` : "—");
+
+          return {
+            id: v.id,
+            pass_code: v.id ? `REQ-${v.id.slice(0, 6).toUpperCase()}` : "PASS",
+            name,
+            phone,
+            type: v.visitor_type
+              ? v.visitor_type.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
+              : "Guest",
+            unit,
+            status:
+              v.status === "pending"
+                ? "Pending Approval"
+                : v.status
+                  ? v.status.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
+                  : "Expected",
+            rawStatus: v.status || "pending",
+            vehicle_number: v.vehicle_number || v.visitor?.vehicle_number || "—",
+            purpose: v.purpose || "—",
+            party_size: v.party_size || 1,
+            expected_at: v.expected_at ? formatDateTime(v.expected_at) : "—",
+            valid_until: v.valid_until ? formatDateTime(v.valid_until) : "—",
+            created_at: v.created_at ? formatDateTime(v.created_at) : "—",
+          };
+        }),
       );
     } catch {
       setVisitors([]);
@@ -52,7 +123,7 @@ export default function SecuritySupervisorVisitorManagementPage() {
     setActionMessage(null);
     try {
       await visitorsApi.approve(id, "Approved by Security Supervisor");
-      setVisitors((prev) => prev.map((v) => (v.id === id ? { ...v, status: "Approved" } : v)));
+      setVisitors((prev) => prev.map((v) => (v.id === id ? { ...v, status: "Approved", rawStatus: "approved" } : v)));
       setActionMessage({ type: "success", text: `Visitor request approved for ${name}.` });
     } catch (err: any) {
       setActionMessage({ type: "error", text: err?.message || "Failed to approve visitor request." });
@@ -63,7 +134,7 @@ export default function SecuritySupervisorVisitorManagementPage() {
     setActionMessage(null);
     try {
       await visitorsApi.reject(id, "Rejected by Security Supervisor");
-      setVisitors((prev) => prev.map((v) => (v.id === id ? { ...v, status: "Rejected" } : v)));
+      setVisitors((prev) => prev.map((v) => (v.id === id ? { ...v, status: "Rejected", rawStatus: "rejected" } : v)));
       setActionMessage({ type: "success", text: `Visitor request rejected for ${name}.` });
     } catch (err: any) {
       setActionMessage({ type: "error", text: err?.message || "Failed to reject visitor request." });
@@ -83,24 +154,48 @@ export default function SecuritySupervisorVisitorManagementPage() {
     return matchSearch && matchStatus;
   });
 
-  const columns: Column<VisitorRecord>[] = [
+  const columns: Column<SupervisorVisitorRow>[] = [
     {
       key: "pass_code",
       header: "Pass Code",
       sortable: true,
-      render: (v) => <span style={{ fontWeight: 600, fontFamily: "monospace" }}>{v.pass_code}</span>,
+      render: (v) => (
+        <span style={{ fontWeight: 600, fontFamily: "monospace", color: "var(--primary, #2563eb)" }}>
+          {v.pass_code}
+        </span>
+      ),
     },
     {
       key: "name",
       header: "Visitor Name",
       sortable: true,
-      render: (v) => <span style={{ fontWeight: 600, color: "var(--fg)" }}>👤 {v.name}</span>,
+      render: (v) => (
+        <button
+          type="button"
+          onClick={() => setSelectedVisitor(v)}
+          style={{
+            background: "none",
+            border: "none",
+            padding: 0,
+            cursor: "pointer",
+            fontWeight: 600,
+            color: "var(--primary, #2563eb)",
+            textAlign: "left",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.25rem",
+          }}
+          title="Click to view full visitor details"
+        >
+          👤 {v.name}
+        </button>
+      ),
     },
     {
       key: "phone",
       header: "Contact Phone",
       sortable: true,
-      render: (v) => <span>{v.phone}</span>,
+      render: (v) => <span style={{ fontFamily: "monospace", fontWeight: 500 }}>{v.phone}</span>,
     },
     {
       key: "type",
@@ -112,40 +207,49 @@ export default function SecuritySupervisorVisitorManagementPage() {
       key: "unit",
       header: "Destination Unit",
       sortable: true,
-      render: (v) => <span>{v.unit}</span>,
+      render: (v) => <span style={{ fontWeight: 600, color: "var(--fg)" }}>🏢 {v.unit}</span>,
     },
     {
       key: "status",
       header: "Status",
       sortable: true,
-      render: (v) => <StatusBadge status={v.status} />,
+      render: (v) => <StatusBadge status={v.rawStatus || v.status} />,
     },
     {
       key: "actions",
       header: "Actions",
       align: "right",
       render: (v) => (
-        <div style={{ display: "flex", gap: "0.4rem", justifyContent: "flex-end" }}>
+        <div style={{ display: "flex", gap: "0.4rem", justifyContent: "flex-end", alignItems: "center" }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem", display: "inline-flex", alignItems: "center", gap: "0.2rem" }}
+            onClick={() => setSelectedVisitor(v)}
+            title="View full visitor details"
+          >
+            👁️ View
+          </button>
           {v.status === "Pending Approval" ? (
             <>
               <button
+                type="button"
                 className="btn btn-primary"
-                style={{ fontSize: "0.75rem", padding: "0.2rem 0.45rem" }}
+                style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
                 onClick={() => handleApprove(v.id, v.name)}
               >
                 Approve
               </button>
               <button
+                type="button"
                 className="btn btn-danger"
-                style={{ fontSize: "0.75rem", padding: "0.2rem 0.45rem" }}
+                style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
                 onClick={() => handleReject(v.id, v.name)}
               >
                 Reject
               </button>
             </>
-          ) : (
-            <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>—</span>
-          )}
+          ) : null}
         </div>
       ),
     },
@@ -241,6 +345,165 @@ export default function SecuritySupervisorVisitorManagementPage() {
           emptyIcon="👥"
         />
       </div>
+
+      {/* Supervisor Visitor Details Modal */}
+      {selectedVisitor && (
+        <Modal
+          isOpen={true}
+          onClose={() => setSelectedVisitor(null)}
+          title="Visitor Pass & Entry Details"
+          size="md"
+          footer={
+            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", width: "100%" }}>
+              {selectedVisitor.status === "Pending Approval" && (
+                <>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => {
+                      handleApprove(selectedVisitor.id, selectedVisitor.name);
+                      setSelectedVisitor(null);
+                    }}
+                  >
+                    Approve Request
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-danger"
+                    onClick={() => {
+                      handleReject(selectedVisitor.id, selectedVisitor.name);
+                      setSelectedVisitor(null);
+                    }}
+                  >
+                    Reject Request
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setSelectedVisitor(null)}
+              >
+                Close
+              </button>
+            </div>
+          }
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "0.75rem",
+                background: "var(--bg-subtle, #f8fafc)",
+                borderRadius: "var(--radius)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              <div>
+                <h4 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700, color: "var(--fg)" }}>
+                  👤 {selectedVisitor.name}
+                </h4>
+                <p style={{ margin: "0.2rem 0 0", fontSize: "0.85rem", color: "var(--muted)", fontFamily: "monospace" }}>
+                  {selectedVisitor.phone}
+                </p>
+              </div>
+              <StatusBadge status={selectedVisitor.rawStatus || selectedVisitor.status} />
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "0.75rem",
+                fontSize: "0.85rem",
+              }}
+            >
+              <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                  Destination Unit
+                </div>
+                <div style={{ fontWeight: 600, color: "var(--fg)", marginTop: "0.15rem" }}>
+                  🏢 {selectedVisitor.unit}
+                </div>
+              </div>
+
+              <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                  Visitor Type
+                </div>
+                <div style={{ fontWeight: 600, color: "var(--fg)", marginTop: "0.15rem", textTransform: "capitalize" }}>
+                  {selectedVisitor.type}
+                </div>
+              </div>
+
+              <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                  Pass Code
+                </div>
+                <div style={{ fontWeight: 600, color: "var(--primary, #2563eb)", marginTop: "0.15rem", fontFamily: "monospace" }}>
+                  {selectedVisitor.pass_code}
+                </div>
+              </div>
+
+              <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                  Vehicle Number
+                </div>
+                <div style={{ fontWeight: 600, color: "var(--fg)", marginTop: "0.15rem", fontFamily: "monospace" }}>
+                  🚗 {selectedVisitor.vehicle_number}
+                </div>
+              </div>
+
+              <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                  Party Size
+                </div>
+                <div style={{ fontWeight: 600, color: "var(--fg)", marginTop: "0.15rem" }}>
+                  👥 {selectedVisitor.party_size} person(s)
+                </div>
+              </div>
+
+              <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                  Expected At
+                </div>
+                <div style={{ fontWeight: 500, color: "var(--fg)", marginTop: "0.15rem", fontSize: "0.8rem" }}>
+                  {selectedVisitor.expected_at}
+                </div>
+              </div>
+
+              <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px", gridColumn: "span 2" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                  Purpose of Visit
+                </div>
+                <div style={{ fontWeight: 500, color: "var(--fg)", marginTop: "0.15rem" }}>
+                  {selectedVisitor.purpose}
+                </div>
+              </div>
+
+              <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                  Valid Until
+                </div>
+                <div style={{ fontWeight: 500, color: "var(--fg)", marginTop: "0.15rem", fontSize: "0.8rem" }}>
+                  {selectedVisitor.valid_until}
+                </div>
+              </div>
+
+              <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                  Pass Created
+                </div>
+                <div style={{ fontWeight: 500, color: "var(--fg)", marginTop: "0.15rem", fontSize: "0.8rem" }}>
+                  {selectedVisitor.created_at}
+                </div>
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

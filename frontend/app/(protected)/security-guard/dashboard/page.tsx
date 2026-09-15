@@ -155,7 +155,7 @@ export default function SecurityGuardDashboardPage() {
       sortable: true,
       render: (v: any) => (
         <span style={{ fontWeight: 700 }}>
-          {v.visitor?.full_name || v.visitor_name || "Visitor"}
+          {v.visitor_name || v.visitor?.full_name || v.full_name || "Visitor"}
         </span>
       ),
     },

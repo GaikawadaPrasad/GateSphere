@@ -48,8 +48,8 @@ export default function SecurityGuardCabTaxiPage() {
           const openEntry = openEntryByRequest.get(r.id);
           return {
             id: r.id,
-            visitorName: visitor?.full_name || "Cab / Taxi Driver",
-            vehicleNumber: r.vehicle_number || visitor?.vehicle_number || "—",
+            visitorName: r.visitor_name || r.visitor?.full_name || visitor?.full_name || "Cab / Taxi Driver",
+            vehicleNumber: r.vehicle_number || r.visitor?.vehicle_number || visitor?.vehicle_number || "—",
             purpose: r.purpose || "Cab / Taxi",
             status: r.status,
             entryId: openEntry?.id,

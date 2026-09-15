@@ -526,44 +526,10 @@ export function OwnerTenantDashboardView({
     (s) => s.is_active && s.day_of_week === currentDayOfWeek
   );
 
-  // If backend returns only 1 wide monolithic slot (>=6 hrs) or no slots, provide standard 2-hr slots
+  // Real database slots filtered for the selected reservation day of week
   const availableDaySlots: AmenitySlot[] = React.useMemo(() => {
-    const isMonolithic = rawDaySlots.length === 1 && (() => {
-      const s = rawDaySlots[0];
-      const startH = parseInt((s.start_time || "06:00").split(":")[0], 10);
-      const endH = parseInt((s.end_time || "22:00").split(":")[0], 10);
-      return (endH - startH) >= 6;
-    })();
-
-    if (rawDaySlots.length > 1 && !isMonolithic) {
-      return rawDaySlots;
-    }
-
-    // Standard 2-hour slots from 06:00 to 22:00
-    const standardIntervals = [
-      { start: "06:00", end: "08:00" },
-      { start: "08:00", end: "10:00" },
-      { start: "10:00", end: "12:00" },
-      { start: "12:00", end: "14:00" },
-      { start: "14:00", end: "16:00" },
-      { start: "16:00", end: "18:00" },
-      { start: "18:00", end: "20:00" },
-      { start: "20:00", end: "22:00" },
-    ];
-
-    const baseSlot = rawDaySlots[0];
-    return standardIntervals.map((interval, idx) => ({
-      id: baseSlot?.id && idx === 0 ? baseSlot.id : (baseSlot ? `${baseSlot.id}_slot_${idx}` : `slot_${currentDayOfWeek}_${idx}`),
-      community_id: baseSlot?.community_id || activeCommunityId || "",
-      amenity_id: selectedAmenity?.id || "",
-      day_of_week: currentDayOfWeek,
-      start_time: interval.start,
-      end_time: interval.end,
-      capacity: baseSlot?.capacity || selectedAmenity?.capacity || 20,
-      fee: baseSlot?.fee || "0",
-      is_active: true,
-    }));
-  }, [rawDaySlots, selectedAmenity, currentDayOfWeek, activeCommunityId]);
+    return rawDaySlots;
+  }, [rawDaySlots]);
 
   useEffect(() => {
     if (availableDaySlots.length > 0) {

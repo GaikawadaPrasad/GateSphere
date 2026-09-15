@@ -189,7 +189,7 @@ export default function SecurityGuardVisitorsPage() {
       key: "phone",
       header: "Phone",
       sortable: true,
-      render: (v) => <span style={{ fontFamily: "monospace" }}>{v.phone}</span>,
+      render: (v) => <span style={{ fontFamily: "monospace", fontWeight: 500 }}>{v.phone}</span>,
     },
     {
       key: "unitNumber",
@@ -222,16 +222,17 @@ export default function SecurityGuardVisitorsPage() {
           <button
             type="button"
             className="btn btn-secondary"
-            style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem" }}
+            style={{ fontSize: "0.8rem", padding: "0.3rem 0.65rem", display: "inline-flex", alignItems: "center", gap: "0.25rem" }}
             onClick={() => setSelectedVisitor(v)}
+            title="View full visitor details"
           >
-            Details
+            👁️ View
           </button>
           {v.status === "approved" ? (
             <button
               type="button"
               className="btn btn-primary"
-              style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem" }}
+              style={{ fontSize: "0.8rem", padding: "0.3rem 0.65rem" }}
               onClick={() => handleMarkEntry(v)}
             >
               Mark Entry
@@ -240,7 +241,7 @@ export default function SecurityGuardVisitorsPage() {
             <button
               type="button"
               className="btn btn-secondary"
-              style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem" }}
+              style={{ fontSize: "0.8rem", padding: "0.3rem 0.65rem" }}
               onClick={() => handleMarkExit(v)}
             >
               Mark Exit
