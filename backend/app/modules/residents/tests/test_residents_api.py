@@ -126,8 +126,12 @@ def test_community_admin_full_resident_flow(as_role, seed_ids, unique_code):
 
         # unknown field -> 422
         assert ca.post(P, json={"user_id": user_id, "nope": 1}).status_code == 422
+
+        # delete profile -> 204, then GET -> 404
+        assert ca.delete(f"{P}/{profile_id}").status_code == 204
+        assert ca.get(f"{P}/{profile_id}").status_code == 404
     finally:
-        # deleting the user cascades the profile + its children
+        # deleting the user cascades the profile + its children (if not already deleted above)
         with SessionLocal() as db:
             obj = db.get(User, user_id)
             if obj:

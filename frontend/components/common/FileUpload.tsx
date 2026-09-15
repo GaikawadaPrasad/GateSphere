@@ -38,13 +38,20 @@ export const FileUpload: React.FC<FileUploadProps> = ({
         size_bytes: file.size,
       });
 
-      const presignData: any = presignRes;
-      const payload = presignData?.data || presignData || {};
-      const { file_id, upload_url, method = "PUT", headers = {}, public_url } = payload;
+      const presignData = (presignRes as any)?.data || presignRes;
+      const {
+        file_id,
+        upload_url,
+        method = "PUT",
+        headers = {},
+        required_headers = {},
+        public_url,
+        file_url,
+      } = presignData;
 
       // 2. Upload file content to presigned destination or backend endpoint
       if (upload_url) {
-        const uploadHeaders: Record<string, string> = { ...headers };
+        const uploadHeaders: Record<string, string> = { ...headers, ...required_headers };
         if (!uploadHeaders["Content-Type"]) {
           uploadHeaders["Content-Type"] = file.type || "application/octet-stream";
         }

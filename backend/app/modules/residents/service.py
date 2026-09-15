@@ -475,6 +475,14 @@ class ResidentService(UnitScopedAccess):
         await self.db.flush()
         await self._audit("contact.delete", cid, "emergency_contact", contact_id)
 
+    # -- profile deletion ---------------------------------- #
+    async def delete_profile(self, profile_id: uuid.UUID) -> None:
+        obj = await self.get_profile(profile_id)
+        cid = obj.community_id
+        await self.db.delete(obj)
+        await self.db.flush()
+        await self._audit("profile.delete", cid, "resident_profile", profile_id)
+
     # -- move records ------------------------------------- #
     async def list_moves(
         self, *, community_id: uuid.UUID | None, status: str | None, offset: int, limit: int

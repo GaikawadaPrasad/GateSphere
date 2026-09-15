@@ -688,6 +688,7 @@ export const residentsApi = {
       agreement_reference?: string;
     },
   ) => apiSend<any>("POST", `/communities/${communityId}/residents`, data),
+  delete: (id: string) => apiSend<void>("DELETE", `/residents/${id}`),
 };
 
 export const onboardingApi = {
@@ -805,6 +806,7 @@ export const domesticStaffApi = {
     gate_id?: string;
     action?: "check_in" | "check_out";
   }) => apiSend<any>("POST", "/domestic-staff/passes/verify", data),
+  delete: (id: string) => apiSend<void>("DELETE", `/domestic-staff/${id}`),
 };
 
 export const staffApi = domesticStaffApi;
@@ -1007,26 +1009,47 @@ export const notificationsApi = {
     apiSend<NotificationPreference>("PUT", "/notifications/me/preferences", data),
 };
 
-export interface PresignResponseData {
-  file_id: string;
-  upload_url: string;
-  method?: string;
-  headers?: Record<string, string>;
-  public_url?: string;
+export interface PresignUploadPayload {
+  kind: string;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  community_id?: string;
 }
 
-export interface ConfirmResponseData {
-  url: string;
+export interface PresignUploadResponse {
+  file_id: string;
+  kind: string;
+  key: string;
+  upload_url: string;
+  method?: string;
+  required_headers?: Record<string, string>;
+  headers?: Record<string, string>;
+  file_url: string;
+  public_url?: string;
+  max_bytes: number;
+  expires_in: number;
+  confirm_url: string;
+}
+
+export interface ConfirmUploadResponse {
   file_id: string;
   status: string;
+  file_url?: string | null;
+  url?: string | null;
+  detected_content_type?: string | null;
+  size_bytes?: number | null;
+  reject_reason?: string | null;
 }
 
 export const uploadsApi = {
-  presign: (data: { kind: string; filename: string; content_type: string; size_bytes: number }) =>
-    apiSend<PresignResponseData>("POST", "/uploads", data),
+  presign: (data: PresignUploadPayload) =>
+    apiSend<PresignUploadResponse>("POST", "/uploads", data),
   confirm: (fileId: string) =>
-    apiSend<ConfirmResponseData>("POST", `/uploads/${fileId}/confirm`),
-  kinds: () => apiGet<Record<string, unknown>>("/uploads/kinds"),
+    apiSend<ConfirmUploadResponse>("POST", `/uploads/${fileId}/confirm`),
+  kinds: () =>
+    apiGet<Record<string, { content_types: string[]; max_bytes: number; scope: string }>>("/uploads/kinds"),
+  download: (key: string) =>
+    apiGet<{ key: string; url: string; expires_in: number }>("/uploads/download", { key }),
 };
-
 

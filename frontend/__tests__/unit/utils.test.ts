@@ -9,11 +9,11 @@ import {
 } from "@/lib/utils";
 
 describe("UI and Data Formatting Utilities", () => {
-  it("formats currencies in standard USD localized format", () => {
-    expect(formatCurrency(350)).toBe("$350.00");
-    expect(formatCurrency("1250.50")).toBe("$1,250.50");
-    expect(formatCurrency(0)).toBe("$0.00");
-    expect(formatCurrency(null)).toBe("$0.00");
+  it("formats currencies in standard INR localized format", () => {
+    expect(formatCurrency(350)).toBe("₹350.00");
+    expect(formatCurrency("1250.50")).toBe("₹1,250.50");
+    expect(formatCurrency(0)).toBe("₹0.00");
+    expect(formatCurrency(null)).toBe("₹0.00");
   });
 
   it("formats durations into hours and minutes strings", () => {

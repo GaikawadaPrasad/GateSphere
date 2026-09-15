@@ -2027,7 +2027,27 @@ export function OwnerTenantDashboardView({
                   gap: "1.25rem",
                 }}
               >
-                {(amenities.amenities.data || []).map((amenity) => (
+                {(amenities.amenities.data || []).map((amenity) => {
+                  // Dynamic capacity: count today's confirmed bookings for this amenity
+                  const todayStr = new Date().toISOString().split("T")[0];
+                  const todayBooked = (amenities.bookings.data || [])
+                    .filter(
+                      (b) =>
+                        b.amenity_id === amenity.id &&
+                        b.date === todayStr &&
+                        b.status !== "cancelled"
+                    )
+                    .reduce((sum, b) => sum + (b.guests_count || 1), 0);
+                  const totalCap = amenity.capacity || 20;
+                  const remaining = Math.max(0, totalCap - todayBooked);
+                  const capColor =
+                    remaining === 0
+                      ? "#dc2626"
+                      : remaining <= Math.ceil(totalCap * 0.25)
+                        ? "#f59e0b"
+                        : "#16a34a";
+
+                  return (
                   <div key={amenity.id} className="gs-card card-hover">
                     <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>🏊</div>
                     <h4 style={{ fontWeight: 800, fontSize: "16px" }}>{amenity.name}</h4>
@@ -2035,11 +2055,39 @@ export function OwnerTenantDashboardView({
                       style={{
                         fontSize: "13px",
                         color: "var(--brand-body)",
-                        margin: "0.5rem 0 1rem 0",
+                        margin: "0.5rem 0 0.5rem 0",
                       }}
                     >
                       {amenity.description}
                     </p>
+                    {/* Dynamic remaining capacity badge */}
+                    <div
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "0.35rem",
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        color: capColor,
+                        background: `${capColor}14`,
+                        borderRadius: "6px",
+                        padding: "3px 8px",
+                        marginBottom: "0.75rem",
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: "7px",
+                          height: "7px",
+                          borderRadius: "50%",
+                          background: capColor,
+                          display: "inline-block",
+                        }}
+                      />
+                      {remaining === 0
+                        ? "Fully Booked Today"
+                        : `${remaining} of ${totalCap} spots available today`}
+                    </div>
                     <div
                       style={{
                         display: "flex",
@@ -2051,21 +2099,23 @@ export function OwnerTenantDashboardView({
                         style={{ fontSize: "13px", fontWeight: 700, color: "var(--brand-primary)" }}
                       >
                         {amenity.price_per_hour > 0
-                          ? `$${amenity.price_per_hour}/hr`
+                          ? `${formatCurrency(amenity.price_per_hour)}/hr`
                           : "Free for Residents"}
                       </span>
                       <BrandButton
                         size="sm"
+                        disabled={remaining === 0}
                         onClick={() => {
                           setSelectedAmenity(amenity);
                           setAmenityBookingModalOpen(true);
                         }}
                       >
-                        Reserve Slot
+                        {remaining === 0 ? "Fully Booked" : "Reserve Slot"}
                       </BrandButton>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -3951,7 +4001,7 @@ export function OwnerTenantDashboardView({
                 style={{ background: "#DBEAFE", color: "#1E40AF", fontWeight: 700 }}
               >
                 {selectedAmenity.price_per_hour > 0
-                  ? `$${selectedAmenity.price_per_hour}/hr`
+                  ? `${formatCurrency(selectedAmenity.price_per_hour)}/hr`
                   : "Free Access"}
               </span>
             </div>
@@ -4072,7 +4122,7 @@ export function OwnerTenantDashboardView({
                     const isFull = spotsLeft <= 0;
                     const startHour = parseInt((s.start_time || "06:00").split(":")[0], 10);
                     const periodName = startHour < 12 ? "Morning" : startHour < 17 ? "Afternoon" : "Evening";
-                    const feeText = s.fee && Number(s.fee) > 0 ? ` • $${s.fee}` : "";
+                    const feeText = s.fee && Number(s.fee) > 0 ? ` • ${formatCurrency(s.fee)}` : "";
                     const capacityStatus = isFull ? " (🔴 Fully Booked)" : ` (${spotsLeft} of ${slotCap} spots left)`;
 
                     return (
@@ -4119,7 +4169,7 @@ export function OwnerTenantDashboardView({
                       </div>
                       {activeSelectedSlot.fee && Number(activeSelectedSlot.fee) > 0 && (
                         <div style={{ fontSize: "12px", color: "#2563EB", marginTop: "0.15rem" }}>
-                          Slot Fee: ${activeSelectedSlot.fee}
+                          Slot Fee: {formatCurrency(activeSelectedSlot.fee)}
                         </div>
                       )}
                     </div>

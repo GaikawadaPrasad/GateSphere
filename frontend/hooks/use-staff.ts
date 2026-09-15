@@ -117,3 +117,13 @@ export function useEndStaffAssignment() {
   });
 }
 
+export function useDeleteStaff() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (staffId: string) => domesticStaffApi.delete(staffId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["staff"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboards"] });
+    },
+  });
+}

@@ -752,7 +752,7 @@ export default function CommunityAdminPropertyPage() {
                 <option value="tower">Tower</option>
                 <option value="block">Block</option>
                 <option value="villa_cluster">Villa Cluster</option>
-                <option value="row_house">Row House</option>
+                <option value="wing">Wing</option>
               </select>
             </div>
           </div>
