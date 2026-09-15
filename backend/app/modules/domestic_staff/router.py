@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response, status
 
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
@@ -22,6 +22,7 @@ router = APIRouter(prefix="/domestic-staff", tags=["Domestic Staff"])
 VIEW = Depends(require_permission_async("domestic_staff:view"))
 CREATE = Depends(require_permission_async("domestic_staff:create"))
 UPDATE = Depends(require_permission_async("domestic_staff:update"))
+DELETE = Depends(require_permission_async("domestic_staff:delete"))
 APPROVE = Depends(require_permission_async("domestic_staff:approve"))
 
 Svc = DomesticStaffService
@@ -291,3 +292,16 @@ async def update_staff(
         schemas.StaffRead.model_validate(await svc.update_staff(staff_id, payload)),
         message="Updated",
     )
+
+
+@router.delete(
+    "/{staff_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    dependencies=[DELETE],
+)
+async def delete_staff(
+    staff_id: uuid.UUID, svc: Svc = Depends(domestic_staff_service)
+) -> Response:
+    await svc.delete_staff(staff_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

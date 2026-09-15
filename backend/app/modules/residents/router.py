@@ -314,6 +314,19 @@ async def update_profile(
     )
 
 
+@router.delete(
+    "/{profile_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    dependencies=[DELETE],
+)
+async def delete_profile(
+    profile_id: uuid.UUID, svc: ResidentService = Depends(resident_service)
+) -> Response:
+    await svc.delete_profile(profile_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get(
     "/{profile_id}/emergency-contacts",
     response_model=Envelope[list[schemas.EmergencyContactRead]],

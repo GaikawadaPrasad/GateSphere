@@ -11,6 +11,7 @@ import {
   useCreateStaff,
   useCreateStaffAssignment,
   useEndStaffAssignment,
+  useDeleteStaff,
 } from "@/hooks/use-staff";
 import { useGates, useCommunityUnits } from "@/hooks/use-communities";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -62,6 +63,7 @@ export default function CommunityAdminStaffPage() {
   const createStaff = useCreateStaff();
   const createAssignment = useCreateStaffAssignment();
   const endAssignment = useEndStaffAssignment();
+  const deleteStaff = useDeleteStaff();
   const { data: communityUnits } = useCommunityUnits(activeCommunityId || undefined);
 
   // Modals state
@@ -97,6 +99,11 @@ export default function CommunityAdminStaffPage() {
   const [showStaffPassword, setShowStaffPassword] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Delete Staff State
+  const [staffToDelete, setStaffToDelete] = useState<Staff | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   // Handle Check-in
   const handleCheckIn = async (e: React.FormEvent) => {
@@ -173,6 +180,22 @@ export default function CommunityAdminStaffPage() {
       setErrorMessage(err instanceof Error ? err.message : "Failed to register staff");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteStaff = async () => {
+    if (!staffToDelete) return;
+    setIsDeleting(true);
+    setDeleteError("");
+    try {
+      await deleteStaff.mutateAsync(staffToDelete.id);
+      setStaffToDelete(null);
+      setSelectedStaff(null);
+      refetchStaff();
+    } catch (err: any) {
+      setDeleteError(err?.message || "Failed to delete staff profile.");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -574,6 +597,107 @@ export default function CommunityAdminStaffPage() {
                   No residential units currently assigned.
                 </div>
               )}
+            </div>
+
+            {/* Danger Zone — Delete Profile */}
+            <div
+              style={{
+                borderTop: "1px solid #fecaca",
+                paddingTop: "1rem",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "0.75rem",
+              }}
+            >
+              <div style={{ fontSize: "0.775rem", color: "#b91c1c" }}>
+                ⚠️ Permanently removes this staff profile and all associated access records.
+              </div>
+              <button
+                type="button"
+                className="btn btn-danger"
+                style={{ fontSize: "0.8rem", padding: "0.35rem 0.85rem", flexShrink: 0 }}
+                onClick={() => setStaffToDelete(selectedStaff)}
+              >
+                🗑️ Delete Profile
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Delete Staff Confirmation Modal */}
+      <Modal
+        isOpen={Boolean(staffToDelete)}
+        onClose={() => {
+          setStaffToDelete(null);
+          setDeleteError("");
+        }}
+        title="⚠️ Delete Staff Profile"
+      >
+        {staffToDelete && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+            <div
+              style={{
+                background: "#fef2f2",
+                border: "1px solid #fecaca",
+                borderRadius: "var(--radius-sm)",
+                padding: "1rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <span style={{ fontSize: "1.5rem" }}>🗑️</span>
+                <strong style={{ fontSize: "0.95rem", color: "#991b1b" }}>
+                  This action is permanent and cannot be undone.
+                </strong>
+              </div>
+              <p style={{ fontSize: "0.85rem", color: "#7f1d1d", margin: 0, lineHeight: 1.5 }}>
+                You are about to permanently delete the profile of{" "}
+                <strong>{staffToDelete.full_name}</strong> ({staffToDelete.staff_type}).
+              </p>
+              <p style={{ fontSize: "0.8rem", color: "#991b1b", margin: 0 }}>
+                This will remove their gate access, attendance records, and all unit assignments.
+              </p>
+            </div>
+
+            {deleteError && (
+              <div
+                style={{
+                  padding: "0.6rem 0.85rem",
+                  background: "#fef2f2",
+                  border: "1px solid #fecaca",
+                  borderRadius: "var(--radius-sm)",
+                  color: "#b91c1c",
+                  fontSize: "0.85rem",
+                }}
+              >
+                {deleteError}
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setStaffToDelete(null);
+                  setDeleteError("");
+                }}
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={handleDeleteStaff}
+                disabled={isDeleting}
+              >
+                {isDeleting ? "Deleting…" : "Yes, Delete Permanently"}
+              </button>
             </div>
           </div>
         )}

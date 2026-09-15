@@ -220,6 +220,13 @@ class DomesticStaffService(UnitScopedAccess):
         await self._audit("staff.update", obj.community_id, "domestic_staff", obj.id, new=patch)
         return obj
 
+    async def delete_staff(self, staff_id: uuid.UUID) -> None:
+        obj = await self._staff_in_scope(staff_id)
+        cid = obj.community_id
+        await self.db.delete(obj)
+        await self.db.flush()
+        await self._audit("staff.delete", cid, "domestic_staff", staff_id)
+
     # -- assignments ------------------------------------------ #
     async def assign_unit(self, payload: schemas.AssignmentCreate) -> StaffUnitAssignment:
         staff = await self._staff_in_scope(payload.staff_id)
