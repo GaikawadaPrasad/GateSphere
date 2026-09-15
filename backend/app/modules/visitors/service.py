@@ -308,8 +308,16 @@ class VisitorService(UnitScopedAccess):
         offset: int,
         limit: int,
     ):
+        from sqlalchemy.orm import selectinload
+
         _enum("status", status)
-        stmt = select(VisitorRequest)
+        stmt = (
+            select(VisitorRequest)
+            .options(
+                selectinload(VisitorRequest.visitor),
+                selectinload(VisitorRequest.passes),
+            )
+        )
         if community_id is not None:
             self.scope.require(community_id)
             stmt = stmt.where(VisitorRequest.community_id == community_id)
@@ -329,7 +337,19 @@ class VisitorService(UnitScopedAccess):
         ), await self.requests.count(extra=stmt)
 
     async def get_request(self, request_id: uuid.UUID) -> VisitorRequest:
-        obj = await self.requests.get(request_id)
+        from sqlalchemy.orm import selectinload
+
+        stmt = (
+            select(VisitorRequest)
+            .where(VisitorRequest.id == request_id)
+            .options(
+                selectinload(VisitorRequest.visitor),
+                selectinload(VisitorRequest.passes),
+            )
+        )
+        if not self.scope.is_global:
+            stmt = stmt.where(VisitorRequest.community_id.in_(self.scope.community_ids))
+        obj = await self.db.scalar(stmt)
         if obj is None:
             raise NotFoundError("Visitor request not found")
         await self._assert_unit_visible(obj.unit_id)
@@ -394,6 +414,7 @@ class VisitorService(UnitScopedAccess):
         )
         await self.requests.add(obj)
         await self.db.flush()
+        obj.visitor = visitor
         # the request's own visitor is always the primary group member
         await self._add_member(obj, visitor.id, is_primary=True)
         for extra_id in dict.fromkeys(payload.additional_visitor_ids or []):

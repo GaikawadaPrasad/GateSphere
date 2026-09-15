@@ -119,7 +119,7 @@ class VisitorRequest(Base, TimestampMixin, TenantMixin):
         "Visitor",
         foreign_keys=[visitor_id],
         primaryjoin="VisitorRequest.visitor_id == Visitor.id",
-        lazy="joined",
+        lazy="selectin",
     )
     approvals: Mapped[list[VisitorApproval]] = relationship(
         back_populates="request", cascade="all, delete-orphan"

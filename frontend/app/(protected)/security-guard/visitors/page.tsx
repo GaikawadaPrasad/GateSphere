@@ -42,12 +42,16 @@ export default function SecurityGuardVisitorsPage() {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const [requests, directory, entries, me] = await Promise.all([
-        visitorsApi.requests(),
+      const [requestsRes, directoryRes, entriesRes, me] = await Promise.all([
+        visitorsApi.requests({ page_size: 100 }),
         visitorsApi.directory({ page_size: 100 }),
-        visitorsApi.entries(),
+        visitorsApi.entries({ page_size: 100 }),
         authApi.me().catch(() => null),
       ]);
+
+      const requests = Array.isArray(requestsRes) ? requestsRes : (requestsRes as any)?.data || [];
+      const directory = Array.isArray(directoryRes) ? directoryRes : (directoryRes as any)?.data || [];
+      const entries = Array.isArray(entriesRes) ? entriesRes : (entriesRes as any)?.data || [];
 
       let cid = me?.community_ids?.[0] || (me as any)?.community_id;
       if (!cid && me?.roles && Array.isArray(me.roles)) {
@@ -79,8 +83,18 @@ export default function SecurityGuardVisitorsPage() {
         (requests || []).map((r: any) => {
           const directoryVisitor = visitorMap.get(r.visitor_id);
           const openEntry = openEntryByRequest.get(r.id);
-          const name = r.visitor?.full_name || r.visitor_name || directoryVisitor?.full_name || "Visitor";
-          const phone = r.visitor?.phone || r.phone || directoryVisitor?.phone || "—";
+          const name =
+            r.visitor_name ||
+            r.visitor?.full_name ||
+            r.full_name ||
+            directoryVisitor?.full_name ||
+            "Visitor";
+          const phone =
+            r.phone ||
+            r.visitor?.phone ||
+            r.visitor_phone ||
+            directoryVisitor?.phone ||
+            "—";
           const unit = unitMap.get(r.unit_id) || (r.unit_id ? `Unit #${r.unit_id.slice(0, 6)}` : "—");
 
           return {
@@ -336,7 +350,10 @@ export default function SecurityGuardVisitorsPage() {
 
       <WalkInVisitorModal
         isOpen={isWalkInModalOpen}
-        onClose={() => setIsWalkInModalOpen(false)}
+        onClose={() => {
+          setIsWalkInModalOpen(false);
+          loadData();
+        }}
         onEntryAdmitted={() => {
           setIsWalkInModalOpen(false);
           setActionMessage({ type: "success", text: "Walk-in visitor entry admitted & recorded." });

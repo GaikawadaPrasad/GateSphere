@@ -18,13 +18,14 @@ export default function SecuritySupervisorVisitorManagementPage() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const data = await visitorsApi.requests();
+      const res: any = await visitorsApi.requests({ page_size: 100 });
+      const data = Array.isArray(res) ? res : res?.data || [];
       setVisitors(
         (data || []).map((v: any) => ({
           id: v.id,
           pass_code: v.id ? `REQ-${v.id.slice(0, 6).toUpperCase()}` : "PASS",
-          name: v.visitor?.full_name || v.visitor_name || "Visitor",
-          phone: v.visitor?.phone || v.phone || "—",
+          name: v.visitor_name || v.visitor?.full_name || v.full_name || "Visitor",
+          phone: v.phone || v.visitor?.phone || v.visitor_phone || "—",
           type: v.visitor_type
             ? v.visitor_type.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
             : "Guest",

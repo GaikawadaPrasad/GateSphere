@@ -191,6 +191,9 @@ class RequestRead(_Read):
             if isinstance(v, dict):
                 data.setdefault("visitor_name", v.get("full_name"))
                 data.setdefault("phone", v.get("phone"))
+            elif v is not None:
+                data.setdefault("visitor_name", getattr(v, "full_name", None))
+                data.setdefault("phone", getattr(v, "phone", None))
             return data
 
         # If data is an ORM instance or other object, extract attributes into dict safely
@@ -199,8 +202,11 @@ class RequestRead(_Read):
             v_name = getattr(v, "full_name", None) if v else None
             v_phone = getattr(v, "phone", None) if v else None
             passes = []
-            if "passes" in getattr(data, "__dict__", {}):
-                passes = data.__dict__["passes"]
+            try:
+                raw_passes = getattr(data, "passes", [])
+                passes = list(raw_passes) if raw_passes else []
+            except Exception:
+                passes = []
             return {
                 "id": getattr(data, "id", None),
                 "created_at": getattr(data, "created_at", None),
