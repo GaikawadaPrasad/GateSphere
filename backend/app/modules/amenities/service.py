@@ -11,7 +11,8 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, time
+from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -128,6 +129,20 @@ class AmenityService(UnitScopedAccess):
             raise ConflictError("That code exists", code="AMENITY_EXISTS")
         obj = Amenity(community_id=cid, **payload.model_dump())
         await self.amenities.add(obj)
+        # Auto-provision standard daily slots so the amenity is immediately bookable
+        for day in range(7):
+            slot = AmenitySlot(
+                community_id=cid,
+                amenity_id=obj.id,
+                day_of_week=day,
+                start_time=time(6, 0),
+                end_time=time(22, 0),
+                capacity=obj.capacity or 20,
+                fee=Decimal("0"),
+                is_active=True,
+            )
+            self.db.add(slot)
+        await self.db.flush()
         await self._audit("amenity.create", cid, "amenity", obj.id)
         return obj
 
@@ -143,8 +158,8 @@ class AmenityService(UnitScopedAccess):
 
     # -- slots ------------------------------------------- #
     async def list_slots(self, amenity_id: uuid.UUID):
-        amenity = await self._amenity_in_scope(amenity_id)
-        existing = list(
+        await self._amenity_in_scope(amenity_id)
+        return list(
             (
                 await self.db.scalars(
                     select(AmenitySlot)
@@ -153,49 +168,6 @@ class AmenityService(UnitScopedAccess):
                 )
             ).all()
         )
-        # If no slots exist or only a single wide block exists (e.g. 6:00 to 22:00), populate standard 2-hour slots
-        has_only_monolithic = len(existing) > 0 and all(
-            (s.end_time.hour - s.start_time.hour) >= 6 for s in existing
-        )
-        if len(existing) == 0 or has_only_monolithic:
-            from datetime import time
-
-            for s in existing:
-                await self.db.delete(s)
-            standard_slot_times = [
-                (time(6, 0), time(8, 0)),
-                (time(8, 0), time(10, 0)),
-                (time(10, 0), time(12, 0)),
-                (time(12, 0), time(14, 0)),
-                (time(14, 0), time(16, 0)),
-                (time(16, 0), time(18, 0)),
-                (time(18, 0), time(20, 0)),
-                (time(20, 0), time(22, 0)),
-            ]
-            for dow in range(0, 7):
-                for st, et in standard_slot_times:
-                    slot = AmenitySlot(
-                        community_id=amenity.community_id,
-                        amenity_id=amenity.id,
-                        day_of_week=dow,
-                        start_time=st,
-                        end_time=et,
-                        capacity=amenity.capacity or 20,
-                    )
-                    self.db.add(slot)
-            await self.db.flush()
-            existing = list(
-                (
-                    await self.db.scalars(
-                        select(AmenitySlot)
-                        .where(
-                            AmenitySlot.amenity_id == amenity_id, AmenitySlot.is_active.is_(True)
-                        )
-                        .order_by(AmenitySlot.day_of_week, AmenitySlot.start_time)
-                    )
-                ).all()
-            )
-        return existing
 
     async def create_slot(self, amenity_id: uuid.UUID, payload: schemas.SlotCreate):
         amenity = await self._amenity_in_scope(amenity_id)
@@ -290,6 +262,15 @@ class AmenityService(UnitScopedAccess):
         await self.blocks.add(obj)
         await self._audit("block.create", amenity.community_id, "amenity_block", obj.id)
         return obj
+
+    async def delete_block(self, block_id: uuid.UUID) -> None:
+        obj = await self.blocks.get(block_id)
+        if obj is None:
+            raise NotFoundError("Block not found")
+        cid = obj.community_id
+        await self.db.delete(obj)
+        await self.db.flush()
+        await self._audit("block.delete", cid, "amenity_block", block_id)
 
     # -- bookings ------------------------------------- #
     async def list_bookings(

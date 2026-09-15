@@ -85,6 +85,7 @@ async def list_occupancies(
 @router.get(
     "/units/{unit_id}/family-members",
     response_model=Envelope[list[schemas.FamilyMemberRead]],
+    dependencies=[VIEW],
 )
 async def list_family(
     unit_id: uuid.UUID,
@@ -135,6 +136,7 @@ async def end_occupancy(
     "/family-members",
     response_model=Envelope[schemas.FamilyMemberRead],
     status_code=status.HTTP_201_CREATED,
+    dependencies=[CREATE],
 )
 async def create_family(
     payload: schemas.FamilyMemberCreate, svc: ResidentService = Depends(resident_service)
@@ -148,6 +150,7 @@ async def create_family(
 @router.patch(
     "/family-members/{member_id}",
     response_model=Envelope[schemas.FamilyMemberRead],
+    dependencies=[UPDATE],
 )
 async def update_family(
     member_id: uuid.UUID,
@@ -164,6 +167,7 @@ async def update_family(
     "/family-members/{member_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     response_class=Response,
+    dependencies=[DELETE],
 )
 async def delete_family(
     member_id: uuid.UUID, svc: ResidentService = Depends(resident_service)

@@ -119,7 +119,7 @@ async def list_amenities(
     "",
     response_model=Envelope[schemas.AmenityRead],
     status_code=status.HTTP_201_CREATED,
-    dependencies=[CREATE],
+    dependencies=[APPROVE],
 )
 async def create_amenity(
     payload: schemas.AmenityCreate,
@@ -222,3 +222,14 @@ async def create_block(
         schemas.BlockRead.model_validate(await svc.create_block(amenity_id, payload)),
         message="Blocked",
     )
+
+
+@router.delete(
+    "/blocks/{block_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    dependencies=[UPDATE],
+)
+async def delete_block(block_id: uuid.UUID, svc: Svc = Depends(amenity_service)) -> Response:
+    await svc.delete_block(block_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

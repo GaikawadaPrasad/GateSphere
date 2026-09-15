@@ -837,7 +837,8 @@ export const amenitiesApi = {
     const { amenity_id, ...rest } = amenityIdOrData;
     return apiSend<any>("POST", `/amenities/${amenity_id}/blocks`, rest);
   },
-  unblockSlot: (amenityId: string) => apiSend<any>("PATCH", `/amenities/${amenityId}`, { is_active: true }),
+  unblockSlot: (blockId: string) =>
+    apiSend<any>("DELETE", `/amenities/blocks/${blockId}`, undefined),
 };
 
 export const facilitiesApi = {

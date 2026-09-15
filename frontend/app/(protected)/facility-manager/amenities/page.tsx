@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
-import { amenitiesApi, getCsrfToken, type Amenity, type AmenityBooking } from "@/lib/api";
+import { amenitiesApi, type Amenity, type AmenityBooking } from "@/lib/api";
 
 export default function FacilityManagerAmenitiesPage() {
   const [amenities, setAmenities] = useState<Amenity[]>([]);
@@ -93,24 +93,10 @@ export default function FacilityManagerAmenitiesPage() {
 
   const handleUnblockSlot = async (amenity: any) => {
     try {
-      const csrf = getCsrfToken();
-      const res = await fetch(`/api/v1/amenities/${amenity.id}`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          "X-Session-Role": "facility_manager",
-          ...(csrf ? { "X-CSRF-Token": csrf } : {}),
-        },
-        body: JSON.stringify({ is_active: true }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.message || `Failed to unblock (${res.status})`);
-      }
+      if (!amenity.block_id) return;
+      await amenitiesApi.unblockSlot(amenity.block_id);
       setAmenities((prev) =>
-        prev.map((a: any) => (a.id === amenity.id ? { ...a, is_active: true, block_id: null } : a)),
+        prev.map((a: any) => (a.id === amenity.id ? { ...a, block_id: null } : a)),
       );
     } catch (err: any) {
       alert(err?.message || "Failed to unblock slot.");

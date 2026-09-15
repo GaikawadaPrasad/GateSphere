@@ -415,6 +415,11 @@ class ComplaintService(UnitScopedAccess):
         self, ticket_id: uuid.UUID, payload: schemas.TicketConfirm
     ) -> ServiceTicket:
         ticket = await self.get_ticket(ticket_id)
+        if ticket.raised_by_user_id != self.actor.id:
+            raise ForbiddenError(
+                "Only the resident who raised the ticket may confirm",
+                code="NOT_TICKET_RAISER",
+            )
         _enum("confirmation_status", payload.confirmation_status)
         if ticket.status != "resident_confirmation":
             raise BusinessRuleError(
@@ -484,6 +489,11 @@ class ComplaintService(UnitScopedAccess):
         self, ticket_id: uuid.UUID, payload: schemas.FeedbackCreate
     ) -> TicketFeedback:
         ticket = await self.get_ticket(ticket_id)
+        if ticket.raised_by_user_id != self.actor.id:
+            raise ForbiddenError(
+                "Only the resident who raised the ticket may submit feedback",
+                code="NOT_TICKET_RAISER",
+            )
         if ticket.status != "closed":
             raise BusinessRuleError("Ticket is not closed", code="TICKET_NOT_CLOSED")
         existing = await self.db.scalar(
