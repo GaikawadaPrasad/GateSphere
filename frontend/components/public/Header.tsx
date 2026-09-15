@@ -58,13 +58,13 @@ export default function Header() {
             : "bg-[#090E1A]/95 backdrop-blur-xl border-b border-white/10 py-3.5 shadow-2xl"
         }`}
       >
-        <div className="w-full max-w-7xl mx-auto px-3.5 sm:px-8 flex items-center justify-between">
+        <div className="w-full max-w-7xl mx-auto px-3 sm:px-8 flex items-center justify-between gap-2 sm:gap-4">
           {/* ── LEFT: MENU Trigger & Compact Logo ── */}
-          <div className="flex items-center gap-3 sm:gap-7 min-w-0">
+          <div className="flex items-center gap-2 sm:gap-6 min-w-0">
             {/* MENU Trigger (Staggered 3-Bar Hamburger) */}
             <button
               onClick={() => setMenuOpen(true)}
-              className="group flex items-center gap-2 sm:gap-3 text-white hover:text-sky-300 transition-colors cursor-pointer select-none bg-transparent border-0 shrink-0"
+              className="group flex items-center gap-1.5 sm:gap-3 text-white hover:text-sky-300 transition-colors cursor-pointer select-none bg-transparent border-0 shrink-0"
               aria-label="Open navigation menu"
             >
               <span className="text-[12px] sm:text-[14px] font-normal tracking-[0.04em] text-white leading-none">
@@ -91,7 +91,7 @@ export default function Header() {
           </div>
 
           {/* ── RIGHT: Minimal Search Icon & Sign In Button ── */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             <button
               onClick={() => setSearchOpen(true)}
               className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 transition-all cursor-pointer bg-transparent border-0 shrink-0"
