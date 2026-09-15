@@ -269,6 +269,26 @@ class ComplaintService(UnitScopedAccess):
         await self._assert_unit_visible(obj.unit_id)
         return obj
 
+    async def get_entry_pass(self, ticket_id: uuid.UUID) -> schemas.TicketEntryPassRead:
+        ticket = await self.get_ticket(ticket_id)
+        assignment = await active_assignment(self.db, ticket.id)
+        vendor_name = assignment.vendor_name if assignment else None
+        assigned_user = assignment.assigned_to_user_id if assignment else None
+        return schemas.TicketEntryPassRead(
+            ticket_id=ticket.id,
+            ticket_number=ticket.ticket_number,
+            community_id=ticket.community_id,
+            unit_id=ticket.unit_id,
+            subject=ticket.subject,
+            priority=ticket.priority,
+            status=ticket.status,
+            vendor_name=vendor_name,
+            assigned_to_user_id=assigned_user,
+            pass_code=f"VP-{ticket.ticket_number}",
+            valid_until=ticket.resolution_due_at,
+            qr_payload=f"GS:VENDOR:{ticket.id}:{ticket.community_id}",
+        )
+
     async def list_tickets(
         self,
         *,

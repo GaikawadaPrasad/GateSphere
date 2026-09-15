@@ -8,6 +8,10 @@ import { DataTable, type Column } from "@/components/tables/DataTable";
 import { visitorsApi } from "@/lib/api";
 import { WalkInVisitorModal } from "@/components/common/WalkInVisitorModal";
 
+import { Modal } from "@/components/common/Modal";
+import { formatDateTime } from "@/lib/utils";
+import { communitiesApi, authApi } from "@/lib/api";
+
 interface VisitorRow {
   id: string;
   name: string;
@@ -15,6 +19,14 @@ interface VisitorRow {
   visitorType: string;
   status: string;
   entryId?: string;
+  unitNumber?: string;
+  vehicleNumber?: string;
+  purpose?: string;
+  expectedAt?: string;
+  validUntil?: string;
+  partySize?: number;
+  groupLabel?: string;
+  createdAt?: string;
 }
 
 export default function SecurityGuardVisitorsPage() {
@@ -24,16 +36,41 @@ export default function SecurityGuardVisitorsPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isWalkInModalOpen, setIsWalkInModalOpen] = useState(false);
+  const [selectedVisitor, setSelectedVisitor] = useState<VisitorRow | null>(null);
 
   const loadData = async () => {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const [requests, directory, entries] = await Promise.all([
-        visitorsApi.requests(),
-        visitorsApi.directory(),
-        visitorsApi.entries(),
+      const [requestsRes, directoryRes, entriesRes, me] = await Promise.all([
+        visitorsApi.requests({ page_size: 100 }),
+        visitorsApi.directory({ page_size: 100 }),
+        visitorsApi.entries({ page_size: 100 }),
+        authApi.me().catch(() => null),
       ]);
+
+      const requests = Array.isArray(requestsRes) ? requestsRes : (requestsRes as any)?.data || [];
+      const directory = Array.isArray(directoryRes) ? directoryRes : (directoryRes as any)?.data || [];
+      const entries = Array.isArray(entriesRes) ? entriesRes : (entriesRes as any)?.data || [];
+
+      let cid = me?.community_ids?.[0] || (me as any)?.community_id;
+      if (!cid && me?.roles && Array.isArray(me.roles)) {
+        cid = me.roles.find((r: any) => r.community_id)?.community_id;
+      }
+
+      const unitMap = new Map<string, string>();
+      if (cid) {
+        try {
+          const uRes: any = await communitiesApi.communityUnits(cid, { page_size: 100 });
+          const uList = Array.isArray(uRes) ? uRes : uRes?.data || uRes?.items || [];
+          for (const u of uList) {
+            if (u?.id) unitMap.set(u.id, u.unit_number);
+          }
+        } catch {
+          // units lookup fallback
+        }
+      }
+
       const visitorMap = new Map<string, any>();
       for (const v of directory || []) if ((v as any)?.id) visitorMap.set((v as any).id, v);
       const openEntryByRequest = new Map<string, any>();
@@ -44,15 +81,37 @@ export default function SecurityGuardVisitorsPage() {
 
       setVisitors(
         (requests || []).map((r: any) => {
-          const visitor = visitorMap.get(r.visitor_id);
+          const directoryVisitor = visitorMap.get(r.visitor_id);
           const openEntry = openEntryByRequest.get(r.id);
+          const name =
+            r.visitor_name ||
+            r.visitor?.full_name ||
+            r.full_name ||
+            directoryVisitor?.full_name ||
+            "Visitor";
+          const phone =
+            r.phone ||
+            r.visitor?.phone ||
+            r.visitor_phone ||
+            directoryVisitor?.phone ||
+            "—";
+          const unit = unitMap.get(r.unit_id) || (r.unit_id ? `Unit #${r.unit_id.slice(0, 6)}` : "—");
+
           return {
             id: r.id,
-            name: visitor?.full_name || "Visitor",
-            phone: visitor?.phone || "—",
+            name,
+            phone,
             visitorType: (r.visitor_type as string)?.replace(/_/g, " ") || "guest",
             status: r.status,
             entryId: openEntry?.id,
+            unitNumber: unit,
+            vehicleNumber: r.vehicle_number || r.visitor?.vehicle_number || "—",
+            purpose: r.purpose || "—",
+            expectedAt: r.expected_at ? formatDateTime(r.expected_at) : "—",
+            validUntil: r.valid_until ? formatDateTime(r.valid_until) : "—",
+            partySize: r.party_size || 1,
+            groupLabel: r.group_label || "—",
+            createdAt: r.created_at ? formatDateTime(r.created_at) : "—",
           };
         }),
       );
@@ -91,7 +150,12 @@ export default function SecurityGuardVisitorsPage() {
 
   const filteredVisitors = visitors.filter((v) => {
     const q = search.toLowerCase();
-    return v.name.toLowerCase().includes(q) || v.visitorType.toLowerCase().includes(q) || v.phone.includes(q);
+    return (
+      v.name.toLowerCase().includes(q) ||
+      v.visitorType.toLowerCase().includes(q) ||
+      v.phone.includes(q) ||
+      (v.unitNumber && v.unitNumber.toLowerCase().includes(q))
+    );
   });
 
   const columns: Column<VisitorRow>[] = [
@@ -99,13 +163,43 @@ export default function SecurityGuardVisitorsPage() {
       key: "name",
       header: "Visitor Name",
       sortable: true,
-      render: (v) => <span style={{ fontWeight: 600, color: "var(--fg)" }}>👤 {v.name}</span>,
+      render: (v) => (
+        <button
+          type="button"
+          onClick={() => setSelectedVisitor(v)}
+          style={{
+            background: "none",
+            border: "none",
+            padding: 0,
+            cursor: "pointer",
+            fontWeight: 600,
+            color: "var(--primary, #2563eb)",
+            textAlign: "left",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.25rem",
+          }}
+          title="Click to view full visitor details"
+        >
+          👤 {v.name}
+        </button>
+      ),
     },
     {
       key: "phone",
       header: "Phone",
       sortable: true,
       render: (v) => <span style={{ fontFamily: "monospace" }}>{v.phone}</span>,
+    },
+    {
+      key: "unitNumber",
+      header: "Destination Unit",
+      sortable: true,
+      render: (v) => (
+        <span style={{ fontWeight: 600, color: "var(--fg)" }}>
+          🏢 {v.unitNumber}
+        </span>
+      ),
     },
     {
       key: "visitorType",
@@ -124,9 +218,18 @@ export default function SecurityGuardVisitorsPage() {
       header: "Actions",
       align: "right",
       render: (v) => (
-        <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+        <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", alignItems: "center" }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem" }}
+            onClick={() => setSelectedVisitor(v)}
+          >
+            Details
+          </button>
           {v.status === "approved" ? (
             <button
+              type="button"
               className="btn btn-primary"
               style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem" }}
               onClick={() => handleMarkEntry(v)}
@@ -135,15 +238,14 @@ export default function SecurityGuardVisitorsPage() {
             </button>
           ) : v.status === "entered" && v.entryId ? (
             <button
+              type="button"
               className="btn btn-secondary"
               style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem" }}
               onClick={() => handleMarkExit(v)}
             >
               Mark Exit
             </button>
-          ) : (
-            <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>—</span>
-          )}
+          ) : null}
         </div>
       ),
     },
@@ -248,13 +350,166 @@ export default function SecurityGuardVisitorsPage() {
 
       <WalkInVisitorModal
         isOpen={isWalkInModalOpen}
-        onClose={() => setIsWalkInModalOpen(false)}
+        onClose={() => {
+          setIsWalkInModalOpen(false);
+          loadData();
+        }}
         onEntryAdmitted={() => {
           setIsWalkInModalOpen(false);
           setActionMessage({ type: "success", text: "Walk-in visitor entry admitted & recorded." });
           loadData();
         }}
       />
+
+      {/* Visitor Detail Modal */}
+      {selectedVisitor && (
+        <Modal
+          isOpen={true}
+          onClose={() => setSelectedVisitor(null)}
+          title="Visitor Pass & Entry Details"
+          size="md"
+          footer={
+            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", width: "100%" }}>
+              {selectedVisitor.status === "approved" && (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    handleMarkEntry(selectedVisitor);
+                    setSelectedVisitor(null);
+                  }}
+                >
+                  Mark Gate Entry
+                </button>
+              )}
+              {selectedVisitor.status === "entered" && selectedVisitor.entryId && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    handleMarkExit(selectedVisitor);
+                    setSelectedVisitor(null);
+                  }}
+                >
+                  Mark Gate Exit
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setSelectedVisitor(null)}
+              >
+                Close
+              </button>
+            </div>
+          }
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "0.75rem",
+                background: "var(--bg-subtle, #f8fafc)",
+                borderRadius: "var(--radius)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              <div>
+                <h4 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700, color: "var(--fg)" }}>
+                  👤 {selectedVisitor.name}
+                </h4>
+                <p style={{ margin: "0.2rem 0 0", fontSize: "0.85rem", color: "var(--muted)", fontFamily: "monospace" }}>
+                  {selectedVisitor.phone}
+                </p>
+              </div>
+              <StatusBadge status={selectedVisitor.status} />
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "0.75rem",
+                fontSize: "0.85rem",
+              }}
+            >
+              <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                  Destination Unit
+                </div>
+                <div style={{ fontWeight: 600, color: "var(--fg)", marginTop: "0.15rem" }}>
+                  🏢 {selectedVisitor.unitNumber}
+                </div>
+              </div>
+
+              <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                  Visitor Type
+                </div>
+                <div style={{ fontWeight: 600, color: "var(--fg)", marginTop: "0.15rem", textTransform: "capitalize" }}>
+                  {selectedVisitor.visitorType}
+                </div>
+              </div>
+
+              <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                  Vehicle Number
+                </div>
+                <div style={{ fontWeight: 600, color: "var(--fg)", marginTop: "0.15rem", fontFamily: "monospace" }}>
+                  🚗 {selectedVisitor.vehicleNumber}
+                </div>
+              </div>
+
+              <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                  Party Size
+                </div>
+                <div style={{ fontWeight: 600, color: "var(--fg)", marginTop: "0.15rem" }}>
+                  👥 {selectedVisitor.partySize} person(s)
+                </div>
+              </div>
+
+              <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px", gridColumn: "span 2" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                  Purpose of Visit
+                </div>
+                <div style={{ fontWeight: 500, color: "var(--fg)", marginTop: "0.15rem" }}>
+                  {selectedVisitor.purpose}
+                </div>
+              </div>
+
+              <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                  Expected At
+                </div>
+                <div style={{ fontWeight: 500, color: "var(--fg)", marginTop: "0.15rem", fontSize: "0.8rem" }}>
+                  {selectedVisitor.expectedAt}
+                </div>
+              </div>
+
+              <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                  Valid Until
+                </div>
+                <div style={{ fontWeight: 500, color: "var(--fg)", marginTop: "0.15rem", fontSize: "0.8rem" }}>
+                  {selectedVisitor.validUntil}
+                </div>
+              </div>
+
+              <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px", gridColumn: "span 2" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                  Pass Created
+                </div>
+                <div style={{ fontWeight: 500, color: "var(--fg)", marginTop: "0.15rem", fontSize: "0.8rem" }}>
+                  {selectedVisitor.createdAt}
+                </div>
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

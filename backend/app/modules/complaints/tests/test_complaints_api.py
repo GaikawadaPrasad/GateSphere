@@ -173,3 +173,18 @@ def test_resident_ticket_access_is_own_unit_and_hides_internal_notes(
     )
     assert bad.status_code == 403
     assert bad.json()["error"]["code"] == "INTERNAL_NOTE_FORBIDDEN"
+
+
+def test_ticket_entry_pass(as_role, seed_ids, resident_unit_id):
+    cid = seed_ids["community_id"]
+    cat = _category_in(cid)
+    admin = as_role("community_admin")
+    t = admin.post(
+        f"{P}/tickets", json={"unit_id": resident_unit_id, "category_id": cat, "subject": "Pass Test"}
+    ).json()["data"]
+    r = admin.get(f"{P}/tickets/{t['id']}/entry-pass")
+    assert r.status_code == 200, r.text
+    pass_data = r.json()["data"]
+    assert pass_data["ticket_id"] == t["id"]
+    assert pass_data["pass_code"].startswith("VP-")
+    assert "GS:VENDOR" in pass_data["qr_payload"]

@@ -285,13 +285,21 @@ export function DomesticStaffDashboardView({
                 />
                 <StatMetric
                   label="Police Verification"
-                  value={profile?.police_verified ? "Verified" : "Pending"}
+                  value={
+                    profile?.police_verified
+                      ? profile?.verification_id
+                        ? "Verified"
+                        : "Verified (Pending ID)"
+                      : "Pending"
+                  }
                   accentColor={profile?.police_verified ? "#1D4ED8" : "#D97706"}
                   icon="🛡️"
                   description={
                     profile?.verification_id
                       ? `ID: ${profile.verification_id}`
-                      : "No verification ID on file"
+                      : profile?.police_verified
+                        ? "Police verification recorded on file"
+                        : "Verification in progress"
                   }
                   onClick={() => router.push("/domestic-staff/profile")}
                 />

@@ -180,3 +180,18 @@ class TicketRead(_Read):
     sla_breached_at: datetime | None
     resolved_at: datetime | None
     closed_at: datetime | None
+
+
+class TicketEntryPassRead(BaseModel):
+    ticket_id: uuid.UUID
+    ticket_number: str
+    community_id: uuid.UUID
+    unit_id: uuid.UUID
+    subject: str
+    priority: str
+    status: str
+    vendor_name: str | None = None
+    assigned_to_user_id: uuid.UUID | None = None
+    pass_code: str
+    valid_until: datetime | None = None
+    qr_payload: str

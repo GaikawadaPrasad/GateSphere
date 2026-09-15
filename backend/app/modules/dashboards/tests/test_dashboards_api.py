@@ -74,3 +74,13 @@ def test_super_admin_dashboard_forbidden_for_non_superadmin(as_role, client):
 
 def test_vendor_has_no_dashboard_access(as_role):
     assert as_role("vendor_technician").get(f"{P}/overview").status_code == 403
+
+
+def test_financial_dashboard_forbidden_for_resident(as_role):
+    # D-1: Resident has dashboards:view, but does NOT have billing:view -> 403
+    assert as_role("resident").get(f"{P}/financial").status_code == 403
+
+
+def test_security_dashboard_forbidden_for_resident(as_role):
+    # D-1: Resident has dashboards:view, but does NOT have gate:view -> 403
+    assert as_role("resident").get(f"{P}/security").status_code == 403

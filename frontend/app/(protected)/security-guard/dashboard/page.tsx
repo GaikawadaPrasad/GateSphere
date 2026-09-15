@@ -163,7 +163,14 @@ export default function SecurityGuardDashboardPage() {
       key: "purpose",
       header: "Purpose",
       sortable: true,
-      render: (v: any) => <span>{v.purpose || "—"}</span>,
+      render: (v: any) => {
+        const displayPurpose =
+          v.purpose ||
+          (v.visitor_type
+            ? v.visitor_type.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
+            : "General Visit");
+        return <span>{displayPurpose}</span>;
+      },
     },
     {
       key: "status",

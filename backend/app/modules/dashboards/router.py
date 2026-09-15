@@ -26,6 +26,8 @@ from app.modules.dashboards.service import DashboardService
 router = APIRouter(prefix="/dashboards", tags=["Dashboards"])
 
 VIEW = Depends(require_permission_async("dashboards:view"))
+GATE_VIEW = Depends(require_permission_async("gate:view"))
+BILLING_VIEW = Depends(require_permission_async("billing:view"))
 PLATFORM_ADMIN = Depends(require_platform_admin)
 Svc = DashboardService
 
@@ -63,7 +65,7 @@ async def overview(
     return ok(data)
 
 
-@router.get("/security", response_model=Envelope[schemas.SecurityStats], dependencies=[VIEW])
+@router.get("/security", response_model=Envelope[schemas.SecurityStats], dependencies=[GATE_VIEW])
 async def security(
     community_id: uuid.UUID | None = None, svc: Svc = Depends(dashboard_service)
 ) -> dict:
@@ -76,7 +78,7 @@ async def security(
     return ok(data)
 
 
-@router.get("/financial", response_model=Envelope[schemas.FinancialStats], dependencies=[VIEW])
+@router.get("/financial", response_model=Envelope[schemas.FinancialStats], dependencies=[BILLING_VIEW])
 async def financial(
     community_id: uuid.UUID | None = None, svc: Svc = Depends(dashboard_service)
 ) -> dict:
