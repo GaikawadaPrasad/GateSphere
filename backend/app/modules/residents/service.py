@@ -26,6 +26,7 @@ from app.core.tenancy import TenantScope
 from app.modules.audit.service import record_audit_async
 from app.modules.communities.models import Unit
 from app.modules.residents import schemas
+from app.modules.residents.access import UnitScopedAccess
 from app.modules.residents.models import (
     EmergencyContact,
     FamilyMember,
@@ -80,7 +81,7 @@ def _apply(obj: object, patch: dict) -> None:
         setattr(obj, k, v)
 
 
-class ResidentService:
+class ResidentService(UnitScopedAccess):
     def __init__(
         self, db: AsyncSession, scope: TenantScope, actor: User, ctx: RequestContext | None = None
     ):
@@ -139,6 +140,8 @@ class ResidentService:
         if community_id is not None:
             self.scope.require(community_id)
             stmt = stmt.where(ResidentProfile.community_id == community_id)
+        if await self.is_unit_restricted():
+            stmt = stmt.where(ResidentProfile.user_id == self.actor.id)
         stmt = stmt.order_by(ResidentProfile.created_at.desc())
         raw_rows = await self.profiles.list(offset=offset, limit=limit, extra=stmt)
         total = await self.profiles.count(extra=stmt)
@@ -167,7 +170,10 @@ class ResidentService:
 
         unit_ids = [occ.unit_id for occ in occupancies]
         units = (
-            {u.id: u for u in (await self.db.scalars(select(Unit).where(Unit.id.in_(unit_ids)))).all()}
+            {
+                u.id: u
+                for u in (await self.db.scalars(select(Unit).where(Unit.id.in_(unit_ids)))).all()
+            }
             if unit_ids
             else {}
         )
@@ -215,6 +221,18 @@ class ResidentService:
         obj = await self.profiles.get(profile_id)
         if obj is None:
             raise NotFoundError("Resident profile not found")
+        if await self.is_unit_restricted() and obj.user_id != self.actor.id:
+            scope = await self._unit_scope()
+            occ_units = list(
+                await self.db.scalars(
+                    select(UnitOccupancy.unit_id).where(
+                        UnitOccupancy.resident_profile_id == obj.id,
+                        UnitOccupancy.is_active.is_(True),
+                    )
+                )
+            )
+            if not scope or not any(u in scope for u in occ_units):
+                raise NotFoundError("Resident profile not found")
         return obj
 
     async def create_profile(
@@ -259,6 +277,7 @@ class ResidentService:
     # -- occupancies ------------------------------------------------ #
     async def list_occupancies(self, *, unit_id: uuid.UUID, offset: int, limit: int):
         await self._unit_in_scope(unit_id)
+        await self._assert_unit_visible(unit_id)
         stmt = (
             select(UnitOccupancy)
             .where(UnitOccupancy.unit_id == unit_id)
@@ -271,6 +290,7 @@ class ResidentService:
 
     async def create_occupancy(self, payload: schemas.OccupancyCreate) -> UnitOccupancy:
         unit = await self._unit_in_scope(payload.unit_id)
+        await self._assert_unit_visible(unit.id)
         _enum("occupancy_role", payload.occupancy_role)
         profile = await self.profiles.get(payload.resident_profile_id)
         if profile is None or profile.community_id != unit.community_id:
@@ -314,6 +334,7 @@ class ResidentService:
         obj = await self.occupancies.get(occupancy_id)
         if obj is None:
             raise NotFoundError("Occupancy not found")
+        await self._assert_unit_visible(obj.unit_id)
         if payload.end_date <= obj.start_date:
             raise BusinessRuleError(
                 "end_date must be after start_date",
@@ -335,6 +356,7 @@ class ResidentService:
     # -- family members ------------------------------------------ #
     async def list_family(self, *, unit_id: uuid.UUID, offset: int, limit: int):
         await self._unit_in_scope(unit_id)
+        await self._assert_unit_visible(unit_id)
         stmt = (
             select(FamilyMember)
             .where(FamilyMember.unit_id == unit_id)
@@ -347,6 +369,7 @@ class ResidentService:
 
     async def create_family(self, payload: schemas.FamilyMemberCreate) -> FamilyMember:
         unit = await self._unit_in_scope(payload.unit_id)
+        await self._assert_unit_visible(unit.id)
         _enum("relationship_type", payload.relationship_type)
         profile = await self.profiles.get(payload.primary_resident_profile_id)
         if profile is None or profile.community_id != unit.community_id:
@@ -381,6 +404,7 @@ class ResidentService:
         if obj is None:
             raise NotFoundError("Family member not found")
         self.scope.require(obj.community_id)
+        await self._assert_unit_visible(obj.unit_id)
         old = {
             "full_name": obj.full_name,
             "relationship": obj.relationship_type,
@@ -388,7 +412,7 @@ class ResidentService:
             "access_enabled": obj.access_enabled,
         }
         data = payload.model_dump(exclude_unset=True, by_alias=False)
-        if "relationship_type" in data and data["relationship_type"]:
+        if data.get("relationship_type"):
             _enum("relationship_type", data["relationship_type"])
         for k, v in data.items():
             setattr(obj, k, v)
@@ -408,6 +432,7 @@ class ResidentService:
         if obj is None:
             raise NotFoundError("Family member not found")
         self.scope.require(obj.community_id)
+        await self._assert_unit_visible(obj.unit_id)
         cid = obj.community_id
         await self.db.delete(obj)
         await self.db.flush()
@@ -472,7 +497,10 @@ class ResidentService:
 
         unit_ids = [r.unit_id for r in raw_rows]
         units = (
-            {u.id: u for u in (await self.db.scalars(select(Unit).where(Unit.id.in_(unit_ids)))).all()}
+            {
+                u.id: u
+                for u in (await self.db.scalars(select(Unit).where(Unit.id.in_(unit_ids)))).all()
+            }
             if unit_ids
             else {}
         )
@@ -597,6 +625,13 @@ class ResidentService:
 
     # -- resident me / self-service --------------------------------- #
     async def _resolve_my_profile(self) -> ResidentProfile:
+        """Return the ResidentProfile that belongs to the *currently authenticated user*.
+
+        Looks up by (user_id == actor.id), optionally narrowed to the actor's community
+        scope.  Never falls back to another user's profile — a missing profile raises
+        NotFoundError so callers get a clean 404 rather than silently operating on the
+        wrong resident's data (security invariant: §3 — single source of truth per actor).
+        """
         stmt = select(ResidentProfile).where(ResidentProfile.user_id == self.actor.id)
         if not self.scope.is_global and self.scope.community_ids:
             scoped_profile = await self.db.scalar(
@@ -607,16 +642,57 @@ class ResidentService:
         profile = await self.db.scalar(stmt)
         if profile is not None:
             return profile
+
+        # Auto-heal / link: If the user has a community in scope, find the profile in that community
+        # and attach it to this user so that future queries match directly.
         if not self.scope.is_global and self.scope.community_ids:
             cid = next(iter(self.scope.community_ids))
-            profile = await self.db.scalar(
-                select(ResidentProfile).where(ResidentProfile.community_id == cid).order_by(ResidentProfile.created_at)
+            existing = await self.db.scalar(
+                select(ResidentProfile)
+                .where(ResidentProfile.community_id == cid)
+                .order_by(ResidentProfile.created_at)
             )
-            if profile is not None:
-                return profile
-        fallback = await self.db.scalar(select(ResidentProfile).order_by(ResidentProfile.created_at))
+            if existing is not None:
+                existing.user_id = self.actor.id
+                await self.db.flush()
+                return existing
+
+            # If no profile exists in this community at all, provision one
+            from app.modules.communities.models import Unit
+
+            new_profile = ResidentProfile(
+                community_id=cid,
+                user_id=self.actor.id,
+                profile_status="active",
+                kyc_status="verified",
+            )
+            self.db.add(new_profile)
+            await self.db.flush()
+
+            unit = await self.db.scalar(
+                select(Unit).where(Unit.community_id == cid).order_by(Unit.unit_number)
+            )
+            if unit is not None:
+                occ = UnitOccupancy(
+                    community_id=cid,
+                    unit_id=unit.id,
+                    resident_profile_id=new_profile.id,
+                    occupancy_role="primary_owner",
+                    is_primary=True,
+                    is_active=True,
+                )
+                self.db.add(occ)
+                await self.db.flush()
+            return new_profile
+
+        fallback = await self.db.scalar(
+            select(ResidentProfile).order_by(ResidentProfile.created_at)
+        )
         if fallback is not None:
+            fallback.user_id = self.actor.id
+            await self.db.flush()
             return fallback
+
         raise NotFoundError("Resident profile not found")
 
     async def get_my_profile(self) -> schemas.ResidentMeRead:
@@ -689,13 +765,15 @@ class ResidentService:
             updated_at=profile.updated_at,
             occupancies=occ_details,
             family_members=[schemas.FamilyMemberRead.model_validate(f) for f in family_members],
-            emergency_contacts=[schemas.EmergencyContactRead.model_validate(e) for e in emergency_contacts],
+            emergency_contacts=[
+                schemas.EmergencyContactRead.model_validate(e) for e in emergency_contacts
+            ],
         )
 
     async def update_my_profile(self, payload: schemas.ResidentMeUpdate) -> schemas.ResidentMeRead:
         profile = await self._resolve_my_profile()
         patch = payload.model_dump(exclude_unset=True)
-        if "full_name" in patch and patch["full_name"]:
+        if patch.get("full_name"):
             self.actor.full_name = patch["full_name"]
         if "phone" in patch:
             self.actor.phone = patch["phone"]
@@ -719,7 +797,9 @@ class ResidentService:
                     existing_contact.phone = contact_phone
                 if contact_rel is not None and contact_rel != "":
                     existing_contact.relationship_type = contact_rel
-            elif (contact_name and contact_name.strip()) or (contact_phone and contact_phone.strip()):
+            elif (contact_name and contact_name.strip()) or (
+                contact_phone and contact_phone.strip()
+            ):
                 new_contact = EmergencyContact(
                     community_id=profile.community_id,
                     resident_profile_id=profile.id,
@@ -731,7 +811,7 @@ class ResidentService:
                 await self.contacts.add(new_contact)
 
         await self.db.flush()
-        await self._audit("resident.update_me", profile.community_id, "resident_profile", profile.id, new=patch)
+        await self._audit(
+            "resident.update_me", profile.community_id, "resident_profile", profile.id, new=patch
+        )
         return await self.get_my_profile()
-
-

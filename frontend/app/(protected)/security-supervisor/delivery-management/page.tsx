@@ -4,10 +4,22 @@ import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SearchInput } from "@/components/forms/SearchInput";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { DataTable, type Column } from "@/components/tables/DataTable";
 import { deliveriesApi } from "@/lib/api";
 
+interface DeliveryItem {
+  id: string;
+  gate_time: string;
+  company: string;
+  courier: string;
+  category: string;
+  unit: string;
+  protocol: string;
+  status: string;
+}
+
 export default function SecuritySupervisorDeliveryManagementPage() {
-  const [deliveries, setDeliveries] = useState<any[]>([]);
+  const [deliveries, setDeliveries] = useState<DeliveryItem[]>([]);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
@@ -39,7 +51,7 @@ export default function SecuritySupervisorDeliveryManagementPage() {
         })),
       );
     } catch {
-      // fallback
+      setDeliveries([]);
     }
     setIsLoading(false);
   };
@@ -60,8 +72,57 @@ export default function SecuritySupervisorDeliveryManagementPage() {
     return matchSearch && matchCategory;
   });
 
+  const columns: Column<DeliveryItem>[] = [
+    {
+      key: "gate_time",
+      header: "Gate Time",
+      sortable: true,
+      render: (d) => <span>⏱️ {d.gate_time}</span>,
+    },
+    {
+      key: "company",
+      header: "Delivery Provider",
+      sortable: true,
+      render: (d) => <span style={{ fontWeight: 600, color: "var(--fg)" }}>📦 {d.company}</span>,
+    },
+    {
+      key: "courier",
+      header: "Courier Personnel",
+      sortable: true,
+      render: (d) => <span>{d.courier}</span>,
+    },
+    {
+      key: "category",
+      header: "Category",
+      sortable: true,
+      render: (d) => <span>{d.category}</span>,
+    },
+    {
+      key: "unit",
+      header: "Destination Unit",
+      sortable: true,
+      render: (d) => <span>{d.unit}</span>,
+    },
+    {
+      key: "protocol",
+      header: "Protocol Decision",
+      sortable: true,
+      render: (d) => (
+        <span style={{ fontSize: "0.75rem", fontWeight: 700, fontFamily: "monospace" }}>
+          {d.protocol}
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      sortable: true,
+      render: (d) => <StatusBadge status={d.status} />,
+    },
+  ];
+
   return (
-    <div>
+    <div style={{ maxWidth: 1600, margin: "0 auto" }}>
       <PageHeader
         title="Delivery Management & Protocol Oversight"
         subtitle="Monitor commercial delivery gate activity, courier verification, and resident delivery protocol decisions"
@@ -98,63 +159,23 @@ export default function SecuritySupervisorDeliveryManagementPage() {
             >
               <option value="all">All Categories</option>
               <option value="Food">Food (Swiggy/Zomato)</option>
-              <option value="Grocery">Grocery (Blinkit/Zepto)</option>
-              <option value="E-commerce">E-commerce (Amazon/Flipkart)</option>
-              <option value="Courier">Courier (FedEx/DHL)</option>
-              <option value="Pharmacy">Pharmacy</option>
+              <option value="E-Commerce">E-Commerce (Amazon/Flipkart)</option>
+              <option value="Grocery">Grocery (Blinkit/Instamart)</option>
+              <option value="Courier">Courier / Package</option>
             </select>
           </div>
         </div>
 
-        <div className="table-container">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>Company / Platform</th>
-                <th>Courier Name</th>
-                <th>Category</th>
-                <th>Destination Unit</th>
-                <th>Protocol Decision</th>
-                <th>Gate Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <tr>
-                  <td colSpan={7} style={{ textAlign: "center", padding: "2rem" }}>
-                    Loading delivery logs…
-                  </td>
-                </tr>
-              ) : filteredDeliveries.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={7}
-                    style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
-                  >
-                    No delivery records found.
-                  </td>
-                </tr>
-              ) : (
-                filteredDeliveries.map((d) => (
-                  <tr key={d.id}>
-                    <td>{d.gate_time}</td>
-                    <td style={{ fontWeight: 600, color: "var(--fg)" }}>{d.company}</td>
-                    <td>{d.courier}</td>
-                    <td>{d.category}</td>
-                    <td>{d.unit}</td>
-                    <td>
-                      <StatusBadge status={d.protocol} />
-                    </td>
-                    <td>
-                      <StatusBadge status={d.status} />
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          columns={columns}
+          data={filteredDeliveries}
+          isLoading={isLoading}
+          enableClientPagination={true}
+          pageSize={10}
+          emptyTitle="No Delivery Records Found"
+          emptyDescription="There are no delivery gate logs matching your search or category filter."
+          emptyIcon="📦"
+        />
       </div>
     </div>
   );

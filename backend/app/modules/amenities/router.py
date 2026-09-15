@@ -119,7 +119,7 @@ async def list_amenities(
     "",
     response_model=Envelope[schemas.AmenityRead],
     status_code=status.HTTP_201_CREATED,
-    dependencies=[APPROVE],
+    dependencies=[CREATE],
 )
 async def create_amenity(
     payload: schemas.AmenityCreate,
@@ -139,7 +139,7 @@ async def get_amenity(amenity_id: uuid.UUID, svc: Svc = Depends(amenity_service)
     return ok(schemas.AmenityRead.model_validate(await svc.get_amenity(amenity_id)))
 
 
-@router.patch("/{amenity_id}", response_model=Envelope[schemas.AmenityRead], dependencies=[APPROVE])
+@router.patch("/{amenity_id}", response_model=Envelope[schemas.AmenityRead], dependencies=[UPDATE])
 async def update_amenity(
     amenity_id: uuid.UUID,
     payload: schemas.AmenityUpdate,

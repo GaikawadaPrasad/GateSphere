@@ -12,6 +12,8 @@ import { useCommunities, useCommunityUnits, useTowers } from "@/hooks/use-commun
 import { useAddResident } from "@/hooks/use-residents";
 import type { ResidentProfile } from "@/types/residents";
 import type { Community } from "@/types/communities";
+import { PasswordField } from "@/components/forms/PasswordField";
+import { generateInitialPassword } from "@/lib/utils";
 
 export default function ResidentsPage() {
   const [search, setSearch] = useState("");
@@ -59,7 +61,7 @@ export default function ResidentsPage() {
     setFullName("");
     setEmail("");
     setPhone("");
-    setPassword("");
+    setPassword("resident@Gate2026!");
     setOccupancyRole("primary_owner");
     setIsPrimary(true);
     setAgreementRef("");
@@ -95,7 +97,7 @@ export default function ResidentsPage() {
           full_name: fullName.trim(),
           email: email.trim().toLowerCase(),
           phone: phone.trim() || undefined,
-          password: password.trim() || undefined,
+          password: password.trim() || generateInitialPassword(fullName, "resident"),
           unit_id: targetUnitId,
           occupancy_role: occupancyRole,
           is_primary: isPrimary,
@@ -402,7 +404,11 @@ export default function ResidentsPage() {
                     type="text"
                     className="input-field"
                     value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFullName(val);
+                      setPassword(generateInitialPassword(val, "resident"));
+                    }}
                     placeholder="e.g. Rahul Sharma"
                     required
                     style={{
@@ -458,25 +464,16 @@ export default function ResidentsPage() {
                   />
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#475569", marginBottom: "0.35rem" }}>
-                    Initial Password (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    className="input-field"
+                  <PasswordField
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Auto: GateSphere@2026!"
-                    style={{
-                      width: "100%",
-                      padding: "0.5rem 0.75rem",
-                      fontSize: "0.85rem",
-                      borderRadius: "6px",
-                      border: "1px solid #cbd5e1",
-                    }}
+                    onChange={(val) => setPassword(val)}
+                    placeholder="e.g. rahul@Gate2026!"
                   />
                 </div>
               </div>
+              <p style={{ margin: 0, fontSize: "11.5px", color: "var(--muted)" }}>
+                💡 Providing credentials allows this resident to sign in to the <strong>Resident Portal</strong> to approve visitors, receive delivery alerts, and book amenities.
+              </p>
             </div>
 
             {/* SECTION 3: OCCUPANCY & ROLES */}

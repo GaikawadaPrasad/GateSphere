@@ -85,3 +85,35 @@ export function useCheckOutStaff() {
     },
   });
 }
+
+export function useCreateStaffAssignment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: {
+      staff_id: string;
+      unit_id: string;
+      work_type?: string;
+      start_date?: string;
+      end_date?: string;
+      time_from?: string;
+      time_to?: string;
+      days_of_week?: string[];
+    }) => domesticStaffApi.createAssignment(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["staff-assignments"] });
+      queryClient.invalidateQueries({ queryKey: ["staff"] });
+    },
+  });
+}
+
+export function useEndStaffAssignment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (assignmentId: string) => domesticStaffApi.endAssignment(assignmentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["staff-assignments"] });
+      queryClient.invalidateQueries({ queryKey: ["staff"] });
+    },
+  });
+}
+

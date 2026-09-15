@@ -90,7 +90,31 @@ async def actor_unit_scope(db: AsyncSession, actor: User) -> frozenset[uuid.UUID
             UnitOccupancy.is_active.is_(True),
         )
     )
-    return frozenset(rows.all())
+    direct_units = frozenset(rows.all())
+    if direct_units:
+        return direct_units
+
+    # Fallback: if actor has an active role in a community, check active occupancies in that community
+    comm_ids = (
+        await db.scalars(
+            select(UserRole.community_id).where(
+                UserRole.user_id == actor.id,
+                UserRole.community_id.is_not(None),
+            )
+        )
+    ).all()
+    if comm_ids:
+        fallback_rows = await db.scalars(
+            select(UnitOccupancy.unit_id)
+            .join(ResidentProfile, ResidentProfile.id == UnitOccupancy.resident_profile_id)
+            .where(
+                ResidentProfile.community_id.in_(comm_ids),
+                UnitOccupancy.is_active.is_(True),
+            )
+        )
+        return frozenset(fallback_rows.all())
+
+    return frozenset()
 
 
 class UnitScopedAccess:

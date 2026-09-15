@@ -146,6 +146,26 @@ class IncidentService:
             inc.id,
             new={"type": payload.incident_type, "severity": payload.severity},
         )
+        await notif_events.emit_to_roles(
+            self.db,
+            self.scope,
+            self.actor,
+            self.ctx,
+            community_id=cid,
+            role_slugs=[
+                "security_supervisor",
+                "community_admin",
+                "facility_manager",
+                "security_guard",
+            ],
+            notification_type="incident.emergency",
+            title=f"🚨 EMERGENCY: {payload.incident_type.upper()} ({payload.severity.upper()})",
+            message=payload.description
+            or f"Security incident {inc.incident_number} reported at {payload.location_text or 'Premises'}.",
+            reference_type="security_incident",
+            reference_id=inc.id,
+            channels=["in_app", "push", "sms", "whatsapp"],
+        )
         return inc
 
     async def get_incident(self, incident_id: uuid.UUID) -> SecurityIncident:

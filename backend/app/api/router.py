@@ -51,4 +51,3 @@ for r in (
     onboarding_router,
 ):
     api_router.include_router(r)
-

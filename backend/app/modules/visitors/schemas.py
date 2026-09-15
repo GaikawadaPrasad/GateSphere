@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
-from typing import Any
+from datetime import date, datetime
+from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -73,12 +73,18 @@ class VisitorRead(_Read):
 
 
 class BlacklistCreate(_Write):
-    phone: str = _Phone
+    phone: str | None = Field(default=None, max_length=20, pattern=r"^[+0-9][0-9 \-]{4,19}$")
     id_number: str | None = Field(default=None, max_length=40)
     visitor_id: uuid.UUID | None = None
     reason: str = Field(min_length=1, max_length=2000)
     risk_level: str = "medium"
     active_until: datetime | None = None
+
+    @model_validator(mode="after")
+    def _require_identifier(self) -> Self:
+        if not self.phone and not self.id_number and not self.visitor_id:
+            raise ValueError("Provide at least a phone number, ID number, or visitor ID")
+        return self
 
 
 class BlacklistRead(_Read):
@@ -87,6 +93,23 @@ class BlacklistRead(_Read):
     reason: str
     risk_level: str
     is_active: bool
+    phone_hash: str | None = None
+    id_number_hash: str | None = None
+    active_from: date | None = None
+    active_until: date | None = None
+
+
+class BlacklistCheckRequest(_Write):
+    query: str | None = None
+    phone: str | None = None
+    id_number: str | None = None
+
+
+class BlacklistCheckResponse(BaseModel):
+    blacklisted: bool
+    reason: str | None = None
+    risk_level: str | None = None
+    active_since: str | None = None
 
 
 class RequestCreate(_Write):
@@ -201,8 +224,6 @@ class RequestRead(_Read):
                 "passes": passes,
             }
         return data
-
-
 
 
 class EntryCreate(_Write):

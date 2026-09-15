@@ -11,11 +11,19 @@ export function useMyNotifications(params?: {
 }) {
   return useQuery({
     queryKey: ["notifications", params],
-    queryFn: () => notificationsApi.list(params),
+    queryFn: async () => {
+      try {
+        return await notificationsApi.list(params);
+      } catch {
+        return [];
+      }
+    },
     staleTime: 10_000,
     refetchInterval: 30_000,
+    retry: false,
   });
 }
+
 
 export function useMarkNotificationRead() {
   const queryClient = useQueryClient();

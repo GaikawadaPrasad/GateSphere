@@ -133,7 +133,9 @@ def test_property_full_crud_and_community_units_list(auth_client, unique_code):
         assert r.json()["data"]["name"] == "Tower Alpha"
 
         # 4. Floor CRUD
-        r = auth_client.post(f"{P}/floors", json={"tower_id": tid, "floor_number": 2, "label": "2nd Floor"})
+        r = auth_client.post(
+            f"{P}/floors", json={"tower_id": tid, "floor_number": 2, "label": "2nd Floor"}
+        )
         assert r.status_code == 201
         fid = r.json()["data"]["id"]
 
@@ -145,7 +147,9 @@ def test_property_full_crud_and_community_units_list(auth_client, unique_code):
         assert r.json()["data"]["label"] == "Level 2"
 
         # 5. Unit CRUD & Community-wide listing
-        r = auth_client.post(f"{P}/units", json={"floor_id": fid, "unit_number": "A-201", "bedrooms": 2})
+        r = auth_client.post(
+            f"{P}/units", json={"floor_id": fid, "unit_number": "A-201", "bedrooms": 2}
+        )
         assert r.status_code == 201
         uid = r.json()["data"]["id"]
 
@@ -187,3 +191,43 @@ def test_property_full_crud_and_community_units_list(auth_client, unique_code):
 
     finally:
         auth_client.delete(f"{P}/{cid}")
+
+
+def test_create_community_with_admin_credentials_and_login(auth_client, client, unique_code):
+    import random
+
+    phone_digits = "".join(random.choices("0123456789", k=8))
+    admin_phone = f"+9198{phone_digits}"
+    admin_email = f"admin_{unique_code.lower()}@gatesphere.com"
+    admin_password = "AdminPassword123!"
+    r = auth_client.post(
+        P,
+        json={
+            "code": unique_code,
+            "name": f"Community {unique_code}",
+            "city": "Bengaluru",
+            "state": "Karnataka",
+            "admin_name": "Test Admin Name",
+            "admin_email": admin_email,
+            "admin_password": admin_password,
+            "admin_phone": admin_phone,
+        },
+    )
+    assert r.status_code == 201, r.text
+    body = r.json()
+    community_id = body["data"]["id"]
+    assert body["data"]["admin_email"] == admin_email
+
+    try:
+        # Verify Community Admin can log in with new credentials
+        login_res = client.post(
+            "/api/v1/auth/login",
+            json={"email": admin_email, "password": admin_password},
+        )
+        assert login_res.status_code == 200, login_res.text
+        login_data = login_res.json()["data"]
+        assert login_data["email"] == admin_email
+        assert login_data["active_role"] == "community_admin"
+        assert community_id in login_data["community_ids"]
+    finally:
+        auth_client.delete(f"{P}/{community_id}")

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import uuid
 from datetime import date, datetime, time
-import datetime as dt
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -86,6 +86,7 @@ class AssignmentCreate(_Write):
     end_date: date | None = None
     time_from: time | None = None
     time_to: time | None = None
+    days_of_week: list[str] | None = None
 
 
 class AssignmentRead(_Read):
@@ -98,6 +99,7 @@ class AssignmentRead(_Read):
     end_date: date | None
     time_from: time | None
     time_to: time | None
+    days_of_week: list[str] | None = None
     is_active: bool
 
 
@@ -156,6 +158,9 @@ class StaffMeRead(_Read):
     ratings_count: int = 0
     current_status: str = "outside"
     active_assignment_count: int = 0
+    hours_worked_today: float = 0.0
+    hours_worked_this_week: float = 0.0
+    hours_worked_this_month: float = 0.0
 
 
 class AssignmentDetailRead(_Read):
@@ -172,6 +177,7 @@ class AssignmentDetailRead(_Read):
     end_date: date | None = None
     time_from: time | None = None
     time_to: time | None = None
+    days_of_week: list[str] | None = None
     is_active: bool
 
 
@@ -186,3 +192,32 @@ class StaffVisitRead(BaseModel):
     tasks_performed: str | None = None
     rating: int | None = None
     feedback: str | None = None
+
+
+# -- digital gate pass & verification ----------------------- #
+class StaffPassRead(BaseModel):
+    staff_id: uuid.UUID
+    full_name: str
+    staff_type: str
+    phone: str
+    photo_url: str | None = None
+    pass_code: str
+    community_name: str
+    police_verification_status: str
+    active_assignments: list[AssignmentDetailRead] = []
+    generated_at: datetime
+    expires_at: datetime
+
+
+class StaffPassVerifyIn(_Write):
+    pass_code: str
+    gate_id: uuid.UUID | None = None
+    action: str = Field(default="check_in", pattern=r"^(check_in|check_out)$")
+
+
+class StaffPassVerifyOut(BaseModel):
+    success: bool
+    action: str
+    staff: StaffRead
+    attendance: AttendanceRead
+    message: str

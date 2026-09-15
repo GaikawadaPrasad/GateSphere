@@ -24,6 +24,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base_class import Base, TenantMixin, TimestampMixin, pk
@@ -99,6 +100,9 @@ class StaffUnitAssignment(Base, TimestampMixin, TenantMixin):
     end_date: Mapped[date | None] = mapped_column(Date)
     time_from: Mapped[time | None] = mapped_column(Time)
     time_to: Mapped[time | None] = mapped_column(Time)
+    days_of_week: Mapped[list[str] | None] = mapped_column(
+        JSONB, default=lambda: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 

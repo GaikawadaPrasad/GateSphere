@@ -103,3 +103,27 @@ async def test_revoked_pass_rejected(db, scope_for, community, unit, superadmin)
     with pytest.raises(BusinessRuleError) as exc:
         await svc.record_entry(schemas.EntryCreate(pass_token=token))
     assert exc.value.code == "PASS_REVOKED"
+
+
+async def test_blacklisted_by_government_id_blocked_at_request(
+    db, scope_for, community, unit, superadmin
+):
+    svc = _svc(db, scope_for(community.id), superadmin)
+    await svc.add_blacklist(
+        schemas.BlacklistCreate(id_number="1234-5678-9012", reason="security threat"),
+        community_id=community.id,
+    )
+    # Different phone, but matching Aadhaar number (with or without spaces/dashes)
+    with pytest.raises(ForbiddenError) as exc:
+        payload = schemas.RequestCreate(
+            unit_id=unit.id,
+            visitor=schemas.VisitorCreate(
+                full_name="Malicious Actor",
+                phone="+919899999999",
+                id_type="aadhaar",
+                id_number="1234 5678 9012",
+            ),
+            visitor_type="personal_guest",
+        )
+        await svc.create_request(payload)
+    assert exc.value.code == "VISITOR_BLACKLISTED"

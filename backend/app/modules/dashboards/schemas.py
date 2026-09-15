@@ -63,6 +63,12 @@ class ResidentStats(BaseModel):
     my_upcoming_bookings: int
     my_outstanding_balance: Decimal
     published_announcements: int
+    pending_dues_amount: Decimal = Decimal(0)
+    pending_visitor_count: int = 0
+    open_tickets_count: int = 0
+    staff_on_duty_count: int = 0
+    upcoming_amenity_bookings: int = 0
+    active_deliveries_count: int = 0
 
 
 class CommunityBreakdownItem(BaseModel):

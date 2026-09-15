@@ -15,7 +15,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.context import RequestContext
-from app.core.errors import BusinessRuleError
+from app.core.errors import BusinessRuleError, ForbiddenError
 from app.core.tenancy import TenantScope
 from app.modules.amenities.models import AmenityBooking
 from app.modules.billing.models import MaintenanceInvoice, Payment
@@ -24,7 +24,7 @@ from app.modules.communities.models import Community, Tower, Unit
 from app.modules.complaints.models import ServiceTicket
 from app.modules.dashboards import schemas
 from app.modules.deliveries.models import Delivery
-from app.modules.domestic_staff.models import StaffAttendance
+from app.modules.domestic_staff.models import StaffAttendance, StaffUnitAssignment
 from app.modules.gate.models import GateAssignment, PanicAlert
 from app.modules.incidents.models import SecurityIncident
 from app.modules.residents.access import actor_unit_scope
@@ -212,10 +212,16 @@ class DashboardService:
             ServiceTicket.raised_by_user_id == self.actor.id,
             ServiceTicket.status.in_(_OPEN_TICKET),
         )
+        if unit_id:
+            visitor_filter = (VisitorRequest.unit_id == unit_id) | (
+                VisitorRequest.created_by_user_id == self.actor.id
+            )
+        else:
+            visitor_filter = VisitorRequest.created_by_user_id == self.actor.id
         my_reqs = await self._count(
             VisitorRequest,
             VisitorRequest.community_id == cid,
-            VisitorRequest.created_by_user_id == self.actor.id,
+            visitor_filter,
             VisitorRequest.status == "pending",
         )
         my_bookings = await self._count(
@@ -225,22 +231,59 @@ class DashboardService:
             AmenityBooking.status == "confirmed",
             AmenityBooking.start_at >= now,
         )
+        my_active_deliveries = await self._count(
+            Delivery,
+            Delivery.community_id == cid,
+            (
+                (Delivery.unit_id == unit_id)
+                if unit_id
+                else (Delivery.resident_user_id == self.actor.id)
+            ),
+            Delivery.status.in_(("expected", "at_gate", "in_transit")),
+        )
+        staff_on_duty = 0
+        if unit_id:
+            staff_on_duty = (
+                await self.db.scalar(
+                    select(func.count(func.distinct(StaffAttendance.staff_id)))
+                    .join(
+                        StaffUnitAssignment,
+                        StaffUnitAssignment.staff_id == StaffAttendance.staff_id,
+                    )
+                    .where(
+                        StaffAttendance.community_id == cid,
+                        StaffAttendance.check_out_at.is_(None),
+                        StaffUnitAssignment.unit_id == unit_id,
+                        StaffUnitAssignment.is_active.is_(True),
+                    )
+                )
+                or 0
+            )
+
+        balance = (
+            await self._outstanding(cid, MaintenanceInvoice.unit_id == unit_id)
+            if unit_id
+            else Decimal(0)
+        )
+        announcements = await self._count(
+            Announcement,
+            Announcement.community_id == cid,
+            Announcement.is_published.is_(True),
+        )
         return schemas.ResidentStats(
             community_id=cid,
             unit_id=unit_id,
             my_open_tickets=my_tickets,
             my_pending_visitor_requests=my_reqs,
             my_upcoming_bookings=my_bookings,
-            my_outstanding_balance=(
-                await self._outstanding(cid, MaintenanceInvoice.unit_id == unit_id)
-                if unit_id
-                else Decimal(0)
-            ),
-            published_announcements=await self._count(
-                Announcement,
-                Announcement.community_id == cid,
-                Announcement.is_published.is_(True),
-            ),
+            my_outstanding_balance=balance,
+            published_announcements=announcements,
+            pending_dues_amount=balance,
+            pending_visitor_count=my_reqs,
+            open_tickets_count=my_tickets,
+            staff_on_duty_count=int(staff_on_duty),
+            upcoming_amenity_bookings=my_bookings,
+            active_deliveries_count=my_active_deliveries,
         )
 
     async def _resolve_role_category(self) -> str:
@@ -265,6 +308,11 @@ class DashboardService:
         return "admin"
 
     async def super_admin_stats(self) -> schemas.SuperAdminDashboardStats:
+        if not (self.actor.is_superadmin or self.scope.is_global):
+            raise ForbiddenError(
+                "Only a platform Super Admin can access global platform statistics",
+                code="GLOBAL_ONLY",
+            )
         communities = (
             await self.db.scalars(select(Community).order_by(Community.created_at.desc()))
         ).all()

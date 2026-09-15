@@ -9,6 +9,7 @@ import {
 } from "@/lib/demo-requests";
 import { formatRelativeTime } from "@/lib/utils";
 import { Modal } from "@/components/common/Modal";
+import { Pagination } from "@/components/tables/Pagination";
 
 interface DemoRequestsCardProps {
   onOnboardCommunity?: (lead: DemoRequestLead) => void;
@@ -19,6 +20,8 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedLead, setSelectedLead] = useState<DemoRequestLead | null>(null);
+  const [page, setPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(5);
 
   const loadLeads = () => {
     setLeads(getStoredDemoRequests());
@@ -30,6 +33,11 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
     window.addEventListener("demo-requests-updated", handleUpdate);
     return () => window.removeEventListener("demo-requests-updated", handleUpdate);
   }, []);
+
+  // Reset to page 1 whenever filters change
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter]);
 
   const filteredLeads = useMemo(() => {
     return leads.filter((item) => {
@@ -45,6 +53,11 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
       return matchesSearch && matchesStatus;
     });
   }, [leads, search, statusFilter]);
+
+  const paginatedLeads = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredLeads.slice(start, start + pageSize);
+  }, [filteredLeads, page, pageSize]);
 
   const handleStatusChange = (id: string, newStatus: DemoRequestLead["status"], e: React.MouseEvent) => {
     e.stopPropagation();
@@ -153,14 +166,14 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
         </div>
       </div>
 
-      {/* Table Container */}
-      <div style={{ overflowX: "auto", borderTop: "1px solid var(--border)" }}>
+      {/* Table Container with touch scrolling */}
+      <div className="table-responsive-wrapper" style={{ borderTop: "1px solid var(--border)" }}>
         {filteredLeads.length === 0 ? (
           <div style={{ padding: "2.5rem 1rem", textAlign: "center", color: "var(--muted)", fontSize: "0.875rem" }}>
             No demo requests found matching your filters.
           </div>
         ) : (
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+          <table className="data-table" style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem", minWidth: 600 }}>
             <thead>
               <tr style={{ background: "var(--surface-subtle, #f8fafc)", borderBottom: "1px solid var(--border)", textAlign: "left" }}>
                 <th style={{ padding: "0.75rem 1rem", fontWeight: 600, color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
@@ -184,7 +197,7 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
               </tr>
             </thead>
             <tbody>
-              {filteredLeads.map((item) => {
+              {paginatedLeads.map((item) => {
                 const badge = getStatusBadgeStyle(item.status);
                 return (
                   <tr
@@ -204,7 +217,7 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
                         <span style={{ fontFamily: "monospace", fontWeight: 700, fontSize: "0.75rem", color: "#2563eb" }}>
                           {item.ticketId}
                         </span>
-                        <span style={{ fontWeight: 600, color: "var(--foreground)", fontSize: "0.875rem" }}>
+                        <span style={{ fontWeight: 600, color: "var(--fg, #0f172a)", fontSize: "0.875rem" }}>
                           {item.fullName}
                         </span>
                         <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
@@ -215,7 +228,7 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
 
                     {/* Society & Units */}
                     <td style={{ padding: "0.75rem 1rem" }}>
-                      <div style={{ fontWeight: 600, color: "var(--foreground)" }}>{item.community}</div>
+                      <div style={{ fontWeight: 600, color: "var(--fg, #0f172a)" }}>{item.community}</div>
                       <span
                         style={{
                           display: "inline-block",
@@ -245,7 +258,7 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
                         <a
                           href={`tel:${item.phone}`}
                           onClick={(e) => e.stopPropagation()}
-                          style={{ color: "var(--foreground)", textDecoration: "none", fontSize: "0.8rem" }}
+                          style={{ color: "var(--fg, #0f172a)", textDecoration: "none", fontSize: "0.8rem" }}
                         >
                           📞 {item.phone}
                         </a>
@@ -257,7 +270,7 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
                       <span
                         style={{
                           fontSize: "0.775rem",
-                          color: "var(--foreground)",
+                          color: "var(--fg, #0f172a)",
                           display: "-webkit-box",
                           WebkitLineClamp: 2,
                           WebkitBoxOrient: "vertical",
@@ -277,15 +290,15 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
                       <select
                         value={item.status}
                         onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => handleStatusChange(item.id, e.target.value as DemoRequestLead["status"], e as any)}
+                        onChange={(e) => handleStatusChange(item.id, e.target.value as DemoRequestLead["status"], e as unknown as React.MouseEvent)}
                         style={{
                           fontSize: "0.75rem",
                           fontWeight: 600,
-                          padding: "0.25rem 0.5rem",
-                          borderRadius: "var(--radius-sm)",
-                          border: `1px solid ${badge.border}`,
+                          padding: "0.2rem 0.45rem",
+                          borderRadius: "999px",
                           background: badge.bg,
                           color: badge.color,
+                          border: `1px solid ${badge.border}`,
                           cursor: "pointer",
                         }}
                       >
@@ -337,6 +350,19 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
             </tbody>
           </table>
         )}
+
+        {filteredLeads.length > 0 && (
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            total={filteredLeads.length}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+          />
+        )}
       </div>
 
       {/* Lead Details Modal */}
@@ -345,7 +371,7 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
         onClose={() => setSelectedLead(null)}
         title="Demo Request & Prospect Details"
         footer={
-          <div style={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "center" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
             <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
               Received: {selectedLead?.createdAt ? new Date(selectedLead.createdAt).toLocaleString() : ""}
             </span>
@@ -387,6 +413,8 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
                 background: "#f8fafc",
                 borderRadius: "var(--radius-sm)",
                 border: "1px solid var(--border)",
+                flexWrap: "wrap",
+                gap: "0.5rem",
               }}
             >
               <div>
@@ -402,7 +430,7 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
                 <select
                   value={selectedLead.status}
                   onChange={(e) =>
-                    handleStatusChange(selectedLead.id, e.target.value as DemoRequestLead["status"], e as any)
+                    handleStatusChange(selectedLead.id, e.target.value as DemoRequestLead["status"], e as unknown as React.MouseEvent)
                   }
                   style={{
                     fontSize: "0.8rem",
@@ -420,7 +448,7 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))", gap: "1rem" }}>
               <div>
                 <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Prospect Name</span>
                 <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>{selectedLead.fullName}</div>
@@ -440,7 +468,7 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
               <div>
                 <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Phone Number</span>
                 <div>
-                  <a href={`tel:${selectedLead.phone}`} style={{ color: "var(--foreground)", fontWeight: 500 }}>
+                  <a href={`tel:${selectedLead.phone}`} style={{ color: "var(--fg, #0f172a)", fontWeight: 500 }}>
                     {selectedLead.phone}
                   </a>
                 </div>

@@ -322,6 +322,7 @@ export default function CommunityAdminIncidentsPage() {
         isLoading={incidentsLoading}
         emptyTitle="No incidents found"
         emptyDescription="No safety, security, or facility incidents reported matching your query."
+        enableClientPagination={true}
       />
 
       {/* Incident Detail & Timeline Modal */}

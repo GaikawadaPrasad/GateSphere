@@ -328,6 +328,7 @@ class BillingService(UnitScopedAccess):
             + (f" by {inv.due_date}." if inv.due_date else "."),
             reference_type="invoice",
             reference_id=inv.id,
+            channels=["in_app", "email", "sms", "whatsapp", "push"],
         )
         return await self.get_invoice(inv.id)
 

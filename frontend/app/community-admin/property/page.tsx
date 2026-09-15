@@ -491,6 +491,7 @@ export default function CommunityAdminPropertyPage() {
             isLoading={towersLoading}
             emptyTitle="No towers found"
             emptyDescription="No residential towers registered for this community."
+            enableClientPagination={true}
           />
         </div>
       )}
@@ -527,6 +528,7 @@ export default function CommunityAdminPropertyPage() {
             isLoading={floorsLoading}
             emptyTitle="No floors registered"
             emptyDescription="Add floors to this tower to configure residential units."
+            enableClientPagination={true}
           />
         </div>
       )}
@@ -581,6 +583,7 @@ export default function CommunityAdminPropertyPage() {
             isLoading={unitsLoading}
             emptyTitle="No units on this floor"
             emptyDescription="Add residential apartments or commercial units to this floor."
+            enableClientPagination={true}
           />
         </div>
       )}
@@ -591,8 +594,9 @@ export default function CommunityAdminPropertyPage() {
           columns={gateColumns}
           data={gates as (Gate & Record<string, unknown>)[]}
           isLoading={gatesLoading}
-          emptyTitle="No gates configured"
-          emptyDescription="Security entry and exit gates registered for the community."
+          emptyTitle="No security gates configured"
+          emptyDescription="Register vehicle and pedestrian entry/exit checkpoints."
+          enableClientPagination={true}
         />
       )}
 

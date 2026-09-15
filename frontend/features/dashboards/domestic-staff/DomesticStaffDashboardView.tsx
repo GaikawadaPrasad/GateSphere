@@ -1,14 +1,32 @@
 "use client";
 
 import React, { useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { DashboardShell } from "@/components/layout/DashboardShell";
 import { StatMetric } from "@/components/common/StatMetric";
 import { LiveDot } from "@/components/common/LiveDot";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DataTable, Column } from "@/components/tables/DataTable";
+import { DebouncedInput } from "@/components/forms/DebouncedInput";
+import { SortDropdown } from "@/components/common/SortDropdown";
 import { BrandButton } from "@/components/common/BrandButton";
 import { Modal } from "@/components/common/Modal";
+import { KpiCardSkeleton, CardSkeleton, TableSkeleton } from "@/components/common/LoadingSkeleton";
+import { ErrorState } from "@/components/common/ErrorState";
+
+const QrCodeSvg = dynamic(
+  () => import("@/components/common/QrCodeSvg").then((m) => m.QrCodeSvg),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="skeleton"
+        style={{ width: 150, height: 150, borderRadius: 12, margin: "0 auto" }}
+      />
+    ),
+  },
+);
 import {
   useStaffProfile,
   useUpdateStaffProfile,
@@ -16,6 +34,7 @@ import {
   useStaffAttendance,
   useStaffVisits,
   useSendStaffPanic,
+  useStaffPass,
   AssignedHome,
   AttendanceRecord,
   StaffVisit,
@@ -51,13 +70,34 @@ export function DomesticStaffDashboardView({
   const [phoneInput, setPhoneInput] = useState("");
   const [emergencyInput, setEmergencyInput] = useState("");
 
-  const { data: profile, isLoading: profileLoading } = useStaffProfile();
-  const { data: homes = [], isLoading: homesLoading } = useAssignedHomes();
-  const { data: attendance = [], isLoading: attLoading } = useStaffAttendance();
-  const { data: visits = [], isLoading: visitsLoading } = useStaffVisits();
+  const {
+    data: profile,
+    isLoading: profileLoading,
+    isError: profileError,
+    refetch: refetchProfile,
+  } = useStaffProfile();
+  const {
+    data: homes = [],
+    isLoading: homesLoading,
+    isError: homesError,
+    refetch: refetchHomes,
+  } = useAssignedHomes();
+  const {
+    data: attendance = [],
+    isLoading: attLoading,
+    isError: attError,
+    refetch: refetchAtt,
+  } = useStaffAttendance();
+  const {
+    data: visits = [],
+    isLoading: visitsLoading,
+    isError: visitsError,
+    refetch: refetchVisits,
+  } = useStaffVisits();
   const updateProfile = useUpdateStaffProfile();
   const panicMutation = useSendStaffPanic();
   const myNotifications = useMyNotifications({ page_size: 20 });
+  const { data: passData } = useStaffPass();
 
   const openAttendance = attendance.find((a) => a.status === "open");
   const activeHome = homes[0];
@@ -205,47 +245,123 @@ export function DomesticStaffDashboardView({
               marginBottom: "2rem",
             }}
           >
-            <StatMetric
-              label="Assigned Homes Today"
-              value={homes.length}
-              accentColor="#0D9488"
-              icon="🏢"
-              description="Units scheduled for service today"
-              onClick={() => router.push("/domestic-staff/assigned-homes")}
-            />
-            <StatMetric
-              label="Current Shift Status"
-              value={openAttendance ? "Checked In" : "Not Checked In"}
-              accentColor={openAttendance ? "#16A34A" : "#94A3B8"}
-              icon="⏱️"
-              description={
-                openAttendance
-                  ? `${openAttendance.gate_name} at ${openAttendance.check_in_at}`
-                  : "No active gate check-in today"
-              }
-              onClick={() => router.push("/domestic-staff/entry-exit")}
-            />
-            <StatMetric
-              label="Performance Rating"
-              value={profile?.rating ?? 0}
-              suffix="/ 5.0"
-              accentColor="#D97706"
-              icon="⭐"
-              description={`Based on ${profile?.total_ratings ?? 0} resident reviews`}
-              onClick={() => router.push("/domestic-staff/visits")}
-            />
-            <StatMetric
-              label="Police Verification"
-              value={profile?.police_verified ? "Verified" : "Pending"}
-              accentColor={profile?.police_verified ? "#1D4ED8" : "#D97706"}
-              icon="🛡️"
-              description={
-                profile?.verification_id
-                  ? `ID: ${profile.verification_id}`
-                  : "No verification ID on file"
-              }
-              onClick={() => router.push("/domestic-staff/profile")}
-            />
+            {profileLoading || homesLoading || attLoading ? (
+              <>
+                <KpiCardSkeleton borderTop="3px solid #0D9488" />
+                <KpiCardSkeleton borderTop="3px solid #16A34A" />
+                <KpiCardSkeleton borderTop="3px solid #D97706" />
+                <KpiCardSkeleton borderTop="3px solid #1D4ED8" />
+              </>
+            ) : (
+              <>
+                <StatMetric
+                  label="Assigned Homes Today"
+                  value={homes.length}
+                  accentColor="#0D9488"
+                  icon="🏢"
+                  description="Units scheduled for service today"
+                  onClick={() => router.push("/domestic-staff/assigned-homes")}
+                />
+                <StatMetric
+                  label="Current Shift Status"
+                  value={openAttendance ? "Checked In" : "Not Checked In"}
+                  accentColor={openAttendance ? "#16A34A" : "#94A3B8"}
+                  icon="⏱️"
+                  description={
+                    openAttendance
+                      ? `${openAttendance.gate_name} at ${openAttendance.check_in_at}`
+                      : "No active gate check-in today"
+                  }
+                  onClick={() => router.push("/domestic-staff/entry-exit")}
+                />
+                <StatMetric
+                  label="Performance Rating"
+                  value={profile?.rating ?? 0}
+                  suffix="/ 5.0"
+                  accentColor="#D97706"
+                  icon="⭐"
+                  description={`Based on ${profile?.total_ratings ?? 0} resident reviews`}
+                  onClick={() => router.push("/domestic-staff/visits")}
+                />
+                <StatMetric
+                  label="Police Verification"
+                  value={profile?.police_verified ? "Verified" : "Pending"}
+                  accentColor={profile?.police_verified ? "#1D4ED8" : "#D97706"}
+                  icon="🛡️"
+                  description={
+                    profile?.verification_id
+                      ? `ID: ${profile.verification_id}`
+                      : "No verification ID on file"
+                  }
+                  onClick={() => router.push("/domestic-staff/profile")}
+                />
+              </>
+            )}
+          </div>
+
+          {/* Logged Work Hours Cards */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+              gap: "1rem",
+              marginBottom: "2rem",
+            }}
+          >
+            <div
+              className="gs-card"
+              style={{
+                padding: "1rem 1.25rem",
+                background: "linear-gradient(135deg, #F0FDFA, #FFFFFF)",
+                border: "1px solid #CCFBF1",
+              }}
+            >
+              <div style={{ fontSize: "11.5px", fontWeight: 700, color: "#0D9488", textTransform: "uppercase" }}>
+                ⏱️ Hours Logged Today
+              </div>
+              <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "#0F766E", marginTop: "0.25rem" }}>
+                {profile?.hours_worked_today ? `${profile.hours_worked_today.toFixed(1)} hrs` : "0.0 hrs"}
+              </div>
+              <div style={{ fontSize: "12px", color: "var(--brand-body)", marginTop: "0.2rem" }}>
+                Active gate check-in duration
+              </div>
+            </div>
+            <div
+              className="gs-card"
+              style={{
+                padding: "1rem 1.25rem",
+                background: "linear-gradient(135deg, #F0FDF4, #FFFFFF)",
+                border: "1px solid #DCFCE7",
+              }}
+            >
+              <div style={{ fontSize: "11.5px", fontWeight: 700, color: "#16A34A", textTransform: "uppercase" }}>
+                📅 Hours This Week
+              </div>
+              <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "#15803D", marginTop: "0.25rem" }}>
+                {profile?.hours_worked_this_week ? `${profile.hours_worked_this_week.toFixed(1)} hrs` : "0.0 hrs"}
+              </div>
+              <div style={{ fontSize: "12px", color: "var(--brand-body)", marginTop: "0.2rem" }}>
+                Monday to Sunday cumulative
+              </div>
+            </div>
+            <div
+              className="gs-card"
+              style={{
+                padding: "1rem 1.25rem",
+                background: "linear-gradient(135deg, #EFF6FF, #FFFFFF)",
+                border: "1px solid #DBEAFE",
+              }}
+            >
+              <div style={{ fontSize: "11.5px", fontWeight: 700, color: "#2563EB", textTransform: "uppercase" }}>
+                📊 Hours This Month
+              </div>
+              <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "#1D4ED8", marginTop: "0.25rem" }}>
+                {profile?.hours_worked_this_month ? `${profile.hours_worked_this_month.toFixed(1)} hrs` : "0.0 hrs"}
+              </div>
+              <div style={{ fontSize: "12px", color: "var(--brand-body)", marginTop: "0.2rem" }}>
+                Current calendar month total
+              </div>
+            </div>
           </div>
 
           {/* Today's Schedule & Units Quick Action */}
@@ -367,192 +483,288 @@ export function DomesticStaffDashboardView({
 
       {/* TAB 2: MY PROFILE */}
       {activeTab === "profile" && (
-        <div className="gs-card" style={{ maxWidth: 700 }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "flex-start",
-              marginBottom: "1.5rem",
-            }}
-          >
-            <div style={{ display: "flex", gap: "1.25rem", alignItems: "center" }}>
-              <div
-                style={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: "50%",
-                  background: "linear-gradient(135deg, #0D9488, #1D4ED8)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "white",
-                  fontSize: "1.5rem",
-                  fontWeight: 800,
-                }}
-              >
-                AS
-              </div>
-              <div>
-                <h3 className="card-h3" style={{ fontSize: "1.25rem" }}>
-                  {profile?.full_name}
-                </h3>
-                <p style={{ color: "var(--brand-body)", fontSize: "13.5px" }}>
-                  {profile?.service_type}
-                </p>
-              </div>
-            </div>
-            <BrandButton
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setPhoneInput(profile?.phone || "");
-                setEmergencyInput(profile?.emergency_contact || "");
-                setEditProfileOpen(true);
+        profileError ? (
+          <ErrorState
+            title="Failed to Load Staff Profile"
+            message="Could not load your staff profile and verification information."
+            onRetry={() => refetchProfile()}
+          />
+        ) : profileLoading ? (
+          <div style={{ maxWidth: 700 }}>
+            <CardSkeleton height={280} />
+          </div>
+        ) : (
+          <div className="gs-card" style={{ maxWidth: 700 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                marginBottom: "1.5rem",
               }}
             >
-              ✏️ Edit Contact Info
-            </BrandButton>
-          </div>
+              <div style={{ display: "flex", gap: "1.25rem", alignItems: "center" }}>
+                <div
+                  style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: "50%",
+                    background: "linear-gradient(135deg, #0D9488, #1D4ED8)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "white",
+                    fontSize: "1.5rem",
+                    fontWeight: 800,
+                  }}
+                >
+                  AS
+                </div>
+                <div>
+                  <h3 className="card-h3" style={{ fontSize: "1.25rem" }}>
+                    {profile?.full_name}
+                  </h3>
+                  <p style={{ color: "var(--brand-body)", fontSize: "13.5px" }}>
+                    {profile?.service_type}
+                  </p>
+                </div>
+              </div>
+              <BrandButton
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setPhoneInput(profile?.phone || "");
+                  setEmergencyInput(profile?.emergency_contact || "");
+                  setEditProfileOpen(true);
+                }}
+              >
+                ✏️ Edit Contact Info
+              </BrandButton>
+            </div>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(2, 1fr)",
-              gap: "1rem",
-              marginBottom: "1.5rem",
-            }}
-          >
-            <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
-              <div
-                style={{
-                  fontSize: "11px",
-                  color: "var(--brand-body)",
-                  textTransform: "uppercase",
-                  fontWeight: 700,
-                }}
-              >
-                Mobile Number (Editable)
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))",
+                gap: "1rem",
+                marginBottom: "1.5rem",
+              }}
+            >
+              <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
+                <div
+                  style={{
+                    fontSize: "11px",
+                    color: "var(--brand-body)",
+                    textTransform: "uppercase",
+                    fontWeight: 700,
+                  }}
+                >
+                  Mobile Number (Editable)
+                </div>
+                <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>
+                  {profile?.phone}
+                </div>
               </div>
-              <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>
-                {profile?.phone}
+              <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
+                <div
+                  style={{
+                    fontSize: "11px",
+                    color: "var(--brand-body)",
+                    textTransform: "uppercase",
+                    fontWeight: 700,
+                  }}
+                >
+                  Emergency Contact (Editable)
+                </div>
+                <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>
+                  {profile?.emergency_contact}
+                </div>
               </div>
-            </div>
-            <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
-              <div
-                style={{
-                  fontSize: "11px",
-                  color: "var(--brand-body)",
-                  textTransform: "uppercase",
-                  fontWeight: 700,
-                }}
-              >
-                Emergency Contact (Editable)
+              <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
+                <div
+                  style={{
+                    fontSize: "11px",
+                    color: "var(--brand-body)",
+                    textTransform: "uppercase",
+                    fontWeight: 700,
+                  }}
+                >
+                  Police Verification Status (Admin Locked)
+                </div>
+                <div style={{ marginTop: "0.25rem" }}>
+                  <StatusBadge status="verified" label="✓ Police Verified" />
+                </div>
               </div>
-              <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>
-                {profile?.emergency_contact}
-              </div>
-            </div>
-            <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
-              <div
-                style={{
-                  fontSize: "11px",
-                  color: "var(--brand-body)",
-                  textTransform: "uppercase",
-                  fontWeight: 700,
-                }}
-              >
-                Police Verification Status (Admin Locked)
-              </div>
-              <div style={{ marginTop: "0.25rem" }}>
-                <StatusBadge status="verified" label="✓ Police Verified" />
-              </div>
-            </div>
-            <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
-              <div
-                style={{
-                  fontSize: "11px",
-                  color: "var(--brand-body)",
-                  textTransform: "uppercase",
-                  fontWeight: 700,
-                }}
-              >
-                Verification Document Ref (Admin Locked)
-              </div>
-              <div
-                style={{
-                  fontSize: "14px",
-                  fontWeight: 600,
-                  marginTop: "0.25rem",
-                  color: "var(--brand-body)",
-                }}
-              >
-                {profile?.verification_id}
+              <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
+                <div
+                  style={{
+                    fontSize: "11px",
+                    color: "var(--brand-body)",
+                    textTransform: "uppercase",
+                    fontWeight: 700,
+                  }}
+                >
+                  Verification Document Ref (Admin Locked)
+                </div>
+                <div
+                  style={{
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    marginTop: "0.25rem",
+                    color: "var(--brand-body)",
+                  }}
+                >
+                  {profile?.verification_id}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )
       )}
 
       {/* TAB 3: ASSIGNED HOMES */}
       {activeTab === "assigned-homes" && (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
-            gap: "1.25rem",
-          }}
-        >
-          {homes.map((home) => (
-            <div key={home.id} className="gs-card card-hover">
+        homesError ? (
+          <ErrorState
+            title="Failed to Load Assigned Homes"
+            message="Could not load your assigned households from the community database."
+            onRetry={() => refetchHomes()}
+          />
+        ) : homesLoading ? (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
+              gap: "1.25rem",
+            }}
+          >
+            <CardSkeleton height={200} />
+            <CardSkeleton height={200} />
+          </div>
+        ) : homes.length === 0 ? (
+          <div className="gs-card" style={{ textAlign: "center", padding: "2.5rem" }}>
+            <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>
+              No active unit assignments found for your staff profile.
+            </p>
+          </div>
+        ) : (
+          <div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "1.25rem",
+                flexWrap: "wrap",
+                gap: "0.75rem",
+              }}
+            >
+              <div style={{ width: "min(100%, 280px)" }}>
+                <DebouncedInput
+                  value={homeControls.searchTerm}
+                  onChange={homeControls.setSearchTerm}
+                  placeholder="Search units, towers, residents..."
+                  icon="🔍"
+                />
+              </div>
+              <SortDropdown
+                value={homeControls.sortPreset}
+                onChange={homeControls.setSortPreset}
+              />
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
+                gap: "1.25rem",
+              }}
+            >
+              {homeControls.paginatedData.map((home) => (
+                <div key={home.id} className="gs-card card-hover">
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      marginBottom: "0.75rem",
+                    }}
+                  >
+                    <div>
+                      <h4 style={{ fontSize: "1.1rem", fontWeight: 800 }}>{home.unit_number}</h4>
+                      <p style={{ fontSize: "13px", color: "var(--brand-body)" }}>
+                        {home.tower_name} · Floor {home.floor}
+                      </p>
+                    </div>
+                    <StatusBadge status="active" label="Assigned" />
+                  </div>
+
+                  <div
+                    style={{
+                      margin: "0.75rem 0",
+                      padding: "0.75rem",
+                      background: "#F8FAFC",
+                      borderRadius: "6px",
+                      fontSize: "13px",
+                    }}
+                  >
+                    <div>
+                      <strong>Resident:</strong> {home.resident_name}
+                    </div>
+                    <div>
+                      <strong>Phone:</strong>{" "}
+                      <a href={`tel:${home.resident_phone}`}>{home.resident_phone}</a>
+                    </div>
+                    <div>
+                      <strong>Shift:</strong> {home.expected_hours}
+                    </div>
+                  </div>
+
+                  {home.special_instructions && (
+                    <p
+                      style={{ fontSize: "12px", color: "var(--brand-body)", marginBottom: "0.75rem" }}
+                    >
+                      💡 <em>{home.special_instructions}</em>
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {homeControls.totalPages > 1 && (
               <div
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
-                  alignItems: "flex-start",
-                  marginBottom: "0.75rem",
+                  alignItems: "center",
+                  marginTop: "1.25rem",
+                  padding: "0.75rem 0",
                 }}
               >
-                <div>
-                  <h4 style={{ fontSize: "1.1rem", fontWeight: 800 }}>{home.unit_number}</h4>
-                  <p style={{ fontSize: "13px", color: "var(--brand-body)" }}>
-                    {home.tower_name} · Floor {home.floor}
-                  </p>
-                </div>
-                <StatusBadge status="active" label="Assigned" />
-              </div>
-
-              <div
-                style={{
-                  margin: "0.75rem 0",
-                  padding: "0.75rem",
-                  background: "#F8FAFC",
-                  borderRadius: "6px",
-                  fontSize: "13px",
-                }}
-              >
-                <div>
-                  <strong>Resident:</strong> {home.resident_name}
-                </div>
-                <div>
-                  <strong>Phone:</strong>{" "}
-                  <a href={`tel:${home.resident_phone}`}>{home.resident_phone}</a>
-                </div>
-                <div>
-                  <strong>Shift:</strong> {home.expected_hours}
+                <span style={{ fontSize: "13px", color: "var(--brand-body)" }}>
+                  Showing {homeControls.startIndex + 1}–{Math.min(homeControls.startIndex + homeControls.pageSize, homeControls.total)} of {homeControls.total} assigned homes
+                </span>
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <BrandButton
+                    size="sm"
+                    variant="outline"
+                    disabled={homeControls.page <= 1}
+                    onClick={() => homeControls.setPage(homeControls.page - 1)}
+                  >
+                    Previous
+                  </BrandButton>
+                  <BrandButton
+                    size="sm"
+                    variant="outline"
+                    disabled={homeControls.page >= homeControls.totalPages}
+                    onClick={() => homeControls.setPage(homeControls.page + 1)}
+                  >
+                    Next
+                  </BrandButton>
                 </div>
               </div>
-
-              {home.special_instructions && (
-                <p
-                  style={{ fontSize: "12px", color: "var(--brand-body)", marginBottom: "0.75rem" }}
-                >
-                  💡 <em>{home.special_instructions}</em>
-                </p>
-              )}
-            </div>
-          ))}
-        </div>
+            )}
+          </div>
+        )
       )}
 
       {/* TAB 4: SCHEDULE */}
@@ -562,14 +774,18 @@ export function DomesticStaffDashboardView({
             Weekly Duty & Shift Schedule
           </h3>
           {homesLoading ? (
-            <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>Loading schedule…</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+              <CardSkeleton height={56} />
+              <CardSkeleton height={56} />
+              <CardSkeleton height={56} />
+            </div>
           ) : homes.length === 0 ? (
             <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>
               No active unit assignments found.
             </p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((dayCode, idx) => {
+              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((dayCode, idx) => {
                 const dayFull = [
                   "Monday",
                   "Tuesday",
@@ -577,6 +793,7 @@ export function DomesticStaffDashboardView({
                   "Thursday",
                   "Friday",
                   "Saturday",
+                  "Sunday",
                 ][idx];
                 const dayHomes = homes.filter((h) => h.schedule_days.includes(dayCode));
                 return (
@@ -628,50 +845,88 @@ export function DomesticStaffDashboardView({
 
       {/* TAB 5: ATTENDANCE */}
       {activeTab === "attendance" && (
-        <div>
-          <div
-            style={{
-              padding: "0.75rem 1rem",
-              background: "#EFF6FF",
-              border: "1px solid #BFDBFE",
-              borderRadius: "8px",
-              marginBottom: "1.25rem",
-              fontSize: "13.5px",
-              color: "#1E40AF",
-            }}
-          >
-            ℹ️ Attendance timestamps are auto-populated directly from Security Gate check-in events
-            and cannot be manually modified.
-          </div>
-          <DataTable
-            columns={[
-              { key: "date", header: "Date", sortable: true },
-              { key: "check_in_at", header: "Gate Check-In", sortable: true },
-              {
-                key: "check_out_at",
-                header: "Gate Check-Out",
-                render: (i) => i.check_out_at || <LiveDot label="ONGOING" />,
-              },
-              { key: "gate_name", header: "Gate Used" },
-              { key: "unit_number", header: "Units Served" },
-              {
-                key: "duration_minutes",
-                header: "Duration",
-                render: (i) =>
-                  i.duration_minutes
-                    ? `${Math.floor(i.duration_minutes / 60)}h ${i.duration_minutes % 60}m`
-                    : "In Progress",
-              },
-              { key: "status", header: "Status", render: (i) => <StatusBadge status={i.status} /> },
-            ]}
-            data={attControls.paginatedData}
-            isLoading={attLoading}
-            page={attControls.page}
-            pageSize={attControls.pageSize}
-            total={attControls.total}
-            onPageChange={attControls.setPage}
+        attError ? (
+          <ErrorState
+            title="Failed to Load Attendance History"
+            message="Could not load your gate check-in and check-out logs."
+            onRetry={() => refetchAtt()}
           />
-        </div>
+        ) : (
+          <div>
+            <div
+              style={{
+                padding: "0.75rem 1rem",
+                background: "#EFF6FF",
+                border: "1px solid #BFDBFE",
+                borderRadius: "8px",
+                marginBottom: "1.25rem",
+                fontSize: "13.5px",
+                color: "#1E40AF",
+              }}
+            >
+              ℹ️ Attendance timestamps are auto-populated directly from Security Gate check-in events
+              and cannot be manually modified.
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "1rem",
+                flexWrap: "wrap",
+                gap: "0.75rem",
+              }}
+            >
+              <div style={{ width: "min(100%, 280px)" }}>
+                <DebouncedInput
+                  value={attControls.searchTerm}
+                  onChange={attControls.setSearchTerm}
+                  placeholder="Search attendance dates, gates..."
+                  icon="🔍"
+                />
+              </div>
+              <SortDropdown
+                value={attControls.sortPreset}
+                onChange={attControls.setSortPreset}
+              />
+            </div>
+            {attLoading ? (
+              <div className="card">
+                <TableSkeleton rows={5} cols={7} />
+              </div>
+            ) : (
+              <DataTable
+                columns={[
+                  { key: "date", header: "Date", sortable: true },
+                  { key: "check_in_at", header: "Gate Check-In", sortable: true },
+                  {
+                    key: "check_out_at",
+                    header: "Gate Check-Out",
+                    render: (i) => i.check_out_at || <LiveDot label="ONGOING" />,
+                  },
+                  { key: "gate_name", header: "Gate Used" },
+                  { key: "unit_number", header: "Units Served" },
+                  {
+                    key: "duration_minutes",
+                    header: "Duration",
+                    render: (i) =>
+                      i.duration_minutes
+                        ? `${Math.floor(i.duration_minutes / 60)}h ${i.duration_minutes % 60}m`
+                        : "In Progress",
+                  },
+                  { key: "status", header: "Status", render: (i) => <StatusBadge status={i.status} /> },
+                ]}
+                data={attControls.paginatedData}
+                isLoading={attLoading}
+                page={attControls.page}
+                pageSize={attControls.pageSize}
+                total={attControls.total}
+                onPageChange={attControls.setPage}
+                onPageSizeChange={attControls.setPageSize}
+              />
+            )}
+          </div>
+        )
       )}
 
       {/* TAB 6: ENTRY / EXIT */}
@@ -688,7 +943,7 @@ export function DomesticStaffDashboardView({
           <div
             style={{
               width: 220,
-              height: 220,
+              minHeight: 220,
               margin: "0 auto 1.5rem auto",
               padding: "1rem",
               background: "#FFFFFF",
@@ -698,9 +953,18 @@ export function DomesticStaffDashboardView({
               alignItems: "center",
               justifyContent: "center",
               flexDirection: "column",
+              gap: "0.5rem",
             }}
           >
-            <div style={{ fontSize: "5rem" }}>📱</div>
+            <QrCodeSvg
+              value={
+                passData?.qr_payload ||
+                (profile?.id
+                  ? `GSE:STAFF:${profile.id}:${profile.community_id || "VERIFIED"}`
+                  : "GSE:STAFF:PASS")
+              }
+              size={150}
+            />
             <span
               style={{
                 fontSize: "11px",
@@ -709,7 +973,7 @@ export function DomesticStaffDashboardView({
                 letterSpacing: "0.08em",
               }}
             >
-              {profile?.verification_id || profile?.id?.slice(0, 8).toUpperCase() || "STAFF PASS"}
+              {passData?.pass_code || profile?.verification_id || profile?.id?.slice(0, 8).toUpperCase() || "STAFF PASS"}
             </span>
           </div>
 
@@ -739,43 +1003,79 @@ export function DomesticStaffDashboardView({
 
       {/* TAB 7: VISITS & RATINGS */}
       {activeTab === "visits" && (
-        <div className="gs-card">
-          <h3 className="card-h3" style={{ marginBottom: "0.5rem" }}>
-            Past Unit Visits & Resident Ratings
-          </h3>
-          <p style={{ color: "var(--brand-body)", marginBottom: "1.25rem", fontSize: "14px" }}>
-            Historical record of unit visits and feedback submitted by homeowners.
-          </p>
-          <DataTable
-            columns={[
-              { key: "unit_number", header: "Unit" },
-              { key: "date", header: "Date" },
-              {
-                key: "duration_minutes",
-                header: "Duration",
-                render: (i) =>
-                  i.duration_minutes
-                    ? `${Math.floor(i.duration_minutes / 60)}h ${i.duration_minutes % 60}m`
-                    : "–",
-              },
-              { key: "tasks_performed", header: "Tasks Done" },
-              {
-                key: "rating",
-                header: "Rating",
-                render: (i) => (
-                  <span style={{ color: "#D97706", fontWeight: 700 }}>⭐ {i.rating || 5}</span>
-                ),
-              },
-              { key: "feedback", header: "Resident Feedback" },
-            ]}
-            data={visitControls.paginatedData}
-            isLoading={visitsLoading}
-            page={visitControls.page}
-            pageSize={visitControls.pageSize}
-            total={visitControls.total}
-            onPageChange={visitControls.setPage}
+        visitsError ? (
+          <ErrorState
+            title="Failed to Load Visits & Ratings"
+            message="Could not load your service visit history and resident feedback."
+            onRetry={() => refetchVisits()}
           />
-        </div>
+        ) : (
+          <div className="gs-card">
+            <h3 className="card-h3" style={{ marginBottom: "0.5rem" }}>
+              Past Unit Visits & Resident Ratings
+            </h3>
+            <p style={{ color: "var(--brand-body)", marginBottom: "1.25rem", fontSize: "14px" }}>
+              Historical record of unit visits and feedback submitted by homeowners.
+            </p>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "1rem",
+                flexWrap: "wrap",
+                gap: "0.75rem",
+              }}
+            >
+              <div style={{ width: "min(100%, 280px)" }}>
+                <DebouncedInput
+                  value={visitControls.searchTerm}
+                  onChange={visitControls.setSearchTerm}
+                  placeholder="Search visits, tasks, feedback..."
+                  icon="🔍"
+                />
+              </div>
+              <SortDropdown
+                value={visitControls.sortPreset}
+                onChange={visitControls.setSortPreset}
+              />
+            </div>
+            {visitsLoading ? (
+              <TableSkeleton rows={5} cols={6} />
+            ) : (
+              <DataTable
+                columns={[
+                  { key: "unit_number", header: "Unit" },
+                  { key: "date", header: "Date" },
+                  {
+                    key: "duration_minutes",
+                    header: "Duration",
+                    render: (i) =>
+                      i.duration_minutes
+                        ? `${Math.floor(i.duration_minutes / 60)}h ${i.duration_minutes % 60}m`
+                        : "–",
+                  },
+                  { key: "tasks_performed", header: "Tasks Done" },
+                  {
+                    key: "rating",
+                    header: "Rating",
+                    render: (i) => (
+                      <span style={{ color: "#D97706", fontWeight: 700 }}>⭐ {i.rating || 5}</span>
+                    ),
+                  },
+                  { key: "feedback", header: "Resident Feedback" },
+                ]}
+                data={visitControls.paginatedData}
+                isLoading={visitsLoading}
+                page={visitControls.page}
+                pageSize={visitControls.pageSize}
+                total={visitControls.total}
+                onPageChange={visitControls.setPage}
+                onPageSizeChange={visitControls.setPageSize}
+              />
+            )}
+          </div>
+        )
       )}
 
       {/* TAB 8: NOTIFICATIONS */}
@@ -785,7 +1085,11 @@ export function DomesticStaffDashboardView({
             Staff Notice Board & Alerts
           </h3>
           {myNotifications.isLoading ? (
-            <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>Loading notifications…</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              <CardSkeleton height={68} />
+              <CardSkeleton height={68} />
+              <CardSkeleton height={68} />
+            </div>
           ) : (myNotifications.data || []).length === 0 ? (
             <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>No notifications yet.</p>
           ) : (

@@ -23,6 +23,7 @@ def _a_unit_in(community_id: str) -> str:
         )
         if u is None:
             from app.modules.communities.models import Floor, Tower
+
             tower = db.scalar(select(Tower).where(Tower.community_id == community_id))
             if not tower:
                 tower = Tower(community_id=community_id, name="Tower T", code="TT")

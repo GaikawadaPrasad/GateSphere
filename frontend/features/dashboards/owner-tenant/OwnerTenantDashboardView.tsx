@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { DashboardShell } from "@/components/layout/DashboardShell";
 import { StatMetric } from "@/components/common/StatMetric";
@@ -9,9 +10,28 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { DataTable, Column } from "@/components/tables/DataTable";
 import { DebouncedInput } from "@/components/forms/DebouncedInput";
 import { FilterPanel } from "@/components/forms/FilterPanel";
+import { SortDropdown } from "@/components/common/SortDropdown";
 import { BrandButton } from "@/components/common/BrandButton";
 import { Modal } from "@/components/common/Modal";
-import { QrCodeSvg } from "@/components/common/QrCodeSvg";
+import { Skeleton, KpiCardSkeleton, TableSkeleton, CardSkeleton } from "@/components/common/LoadingSkeleton";
+import { ErrorState } from "@/components/common/ErrorState";
+
+const QrCodeSvg = dynamic(
+  () => import("@/components/common/QrCodeSvg").then((m) => m.QrCodeSvg),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="skeleton"
+        style={{
+          width: 180,
+          height: 180,
+          borderRadius: 12,
+        }}
+      />
+    ),
+  },
+);
 import {
   useResidentOverview,
   useResidentVisitors,
@@ -21,12 +41,19 @@ import {
   AmenitySlot,
   useResidentComplaints,
   useResidentPayments,
+  useResidentLedger,
+  LedgerEntryItem,
   useResidentFamilyMembers,
   FamilyMember,
   useResidentProfile,
   useResidentDeliveryProtocols,
   useResidentVehicles,
   useResidentDomesticStaff,
+  useSubmitStaffRating,
+  useAssignDomesticStaff,
+  useEndDomesticStaffAssignment,
+  useCommunityStaffDirectory,
+  AssignedDomesticStaff,
   useSendResidentPanic,
   VisitorRequest,
   DeliveryItem,
@@ -35,7 +62,7 @@ import {
   ComplaintTicket,
   InvoiceItem,
 } from "@/hooks/use-owner-tenant-data";
-import { useAnnouncements } from "@/hooks/use-communication";
+import { useAnnouncements, useEventRsvp } from "@/hooks/use-communication";
 import { useMyNotifications } from "@/hooks/use-notifications";
 import { useTableControls } from "@/hooks/use-table-controls";
 import { formatDate, formatCurrency } from "@/lib/utils";
@@ -103,11 +130,24 @@ export function OwnerTenantDashboardView({
   const [profileEmergencyNotes, setProfileEmergencyNotes] = useState("");
 
   // Visitor Pass form state
-  const [passCategory, setPassCategory] = useState("Guest");
+  const [passCategory, setPassCategory] = useState("Personal Guest");
   const [passVisitorName, setPassVisitorName] = useState("");
   const [passVisitorPhone, setPassVisitorPhone] = useState("");
+  const [passIdType, setPassIdType] = useState("aadhaar");
+  const [passIdNumber, setPassIdNumber] = useState("");
   const [passReason, setPassReason] = useState("");
   const [passDuration, setPassDuration] = useState(24);
+  const [passVehicleNumber, setPassVehicleNumber] = useState("");
+  const [passPartySize, setPassPartySize] = useState(1);
+  const [passGroupLabel, setPassGroupLabel] = useState("");
+  const [blockedAlert, setBlockedAlert] = useState<{
+    name: string;
+    phone: string;
+    id_type?: string;
+    id_number?: string;
+    reason: string;
+    risk_level?: string;
+  } | null>(null);
 
   // Generated / Active Pass Result Modal state
   const [activePassModalOpen, setActivePassModalOpen] = useState(false);
@@ -119,6 +159,9 @@ export function OwnerTenantDashboardView({
     reason?: string;
     valid_from?: string;
     valid_to?: string;
+    vehicle_number?: string;
+    party_size?: number;
+    group_label?: string;
   } | null>(null);
 
   // Service ticket form state
@@ -127,8 +170,37 @@ export function OwnerTenantDashboardView({
   const [ticketDescription, setTicketDescription] = useState("");
   const [ticketPriority, setTicketPriority] = useState("medium");
 
+  // Complaint feedback modal state
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
+  const [feedbackTicket, setFeedbackTicket] = useState<ComplaintTicket | null>(null);
+  const [feedbackRating, setFeedbackRating] = useState<number>(5);
+  const [feedbackComments, setFeedbackComments] = useState<string>("");
+
+  // Domestic staff rating modal state
+  const [staffRatingModalOpen, setStaffRatingModalOpen] = useState(false);
+  const [selectedStaff, setSelectedStaff] = useState<AssignedDomesticStaff | null>(null);
+  const [staffRatingValue, setStaffRatingValue] = useState<number>(5);
+  const [staffFeedbackText, setStaffFeedbackText] = useState<string>("");
+
+  // Domestic staff assignment modal state
+  const [assignStaffModalOpen, setAssignStaffModalOpen] = useState(false);
+  const [assignStaffId, setAssignStaffId] = useState("");
+  const [assignWorkType, setAssignWorkType] = useState("part_time");
+  const [assignStartDate, setAssignStartDate] = useState("");
+  const [assignTimeFrom, setAssignTimeFrom] = useState("");
+  const [assignTimeTo, setAssignTimeTo] = useState("");
+  const [assignDays, setAssignDays] = useState<string[]>(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]);
+  const assignStaffMutation = useAssignDomesticStaff();
+  const endAssignmentMutation = useEndDomesticStaffAssignment();
+  const { data: staffDirectory = [], isLoading: staffDirectoryLoading } = useCommunityStaffDirectory();
+
+
+  // Payments view mode ("invoices" vs "ledger")
+  const [paymentsViewMode, setPaymentsViewMode] = useState<"invoices" | "ledger">("invoices");
+
   // Dismissed state for live visitor approval banner
   const [visitorBannerDismissed, setVisitorBannerDismissed] = useState(false);
+  const [deliveryBannerDismissed, setDeliveryBannerDismissed] = useState(false);
 
   useEffect(() => {
     if (
@@ -140,7 +212,7 @@ export function OwnerTenantDashboardView({
   }, []);
 
   // Data queries
-  const { data: stats, isLoading: statsLoading } = useResidentOverview(activeCommunityId);
+  const { data: stats, isLoading: statsLoading, isError: statsError, refetch: refetchStats } = useResidentOverview(activeCommunityId);
   const visitors = useResidentVisitors();
   const deliveries = useResidentDeliveries();
   const amenities = useResidentAmenities();
@@ -154,6 +226,8 @@ export function OwnerTenantDashboardView({
   const announcements = useAnnouncements();
   const myNotifications = useMyNotifications({ page_size: 20 });
   const panicMutation = useSendResidentPanic();
+  const submitStaffRating = useSubmitStaffRating();
+  const eventRsvp = useEventRsvp();
 
   const visitorList = visitors.data || [];
   const deliveryList = deliveries.data || [];
@@ -161,12 +235,18 @@ export function OwnerTenantDashboardView({
   const invoiceList = payments.data || [];
   const myOccupancy = profile.data?.occupancies?.[0];
 
+  const ledger = useResidentLedger(myOccupancy?.unit_id);
+  const ledgerList = ledger.data || [];
+
   const nextDueInvoice = invoiceList.find((i) => i.balance_due > 0);
   const openTicket = complaintList.find((t) => t.status !== "resolved" && t.status !== "closed");
   const activeStaffCount = (domesticStaff.data || []).filter((s) => s.is_active).length;
   const nextBooking = (amenities.bookings.data || []).find((b) => b.status === "confirmed");
 
   const pendingVisitor = visitorList.find((v) => v.status === "pending");
+  const pendingDelivery = deliveryList.find(
+    (d) => d.status === "at_gate" || d.approval_status === "pending",
+  );
 
   // Table controls
   const visitorControls = useTableControls<VisitorRequest>({
@@ -192,6 +272,123 @@ export function OwnerTenantDashboardView({
     searchKeys: ["invoice_number", "title", "status", "receipt_number"],
     initialPageSize: 10,
   });
+
+  const ledgerControls = useTableControls<LedgerEntryItem>({
+    data: ledgerList,
+    searchKeys: ["entry_type", "source_type", "narration"],
+    initialPageSize: 10,
+  });
+
+  const vehicleControls = useTableControls<any>({
+    data: vehicles.data || [],
+    searchKeys: ["plate", "make_model", "slot", "rfid_tag"],
+    initialPageSize: 10,
+  });
+
+  const staffControls = useTableControls<any>({
+    data: domesticStaff.data || [],
+    searchKeys: ["name", "role", "phone"],
+    initialPageSize: 10,
+  });
+
+  const bookingControls = useTableControls<AmenityBooking>({
+    data: amenities.bookings.data || [],
+    searchKeys: ["amenity_name", "status", "date"],
+    initialPageSize: 10,
+  });
+
+  const familyControls = useTableControls<FamilyMember>({
+    data: family.familyMembers,
+    searchKeys: ["name", "relation", "phone"],
+    initialPageSize: 10,
+  });
+
+  const handleDecideDelivery = async (deliveryId: string, approved: boolean) => {
+    try {
+      await deliveries.decideDelivery.mutateAsync({
+        deliveryId,
+        approved,
+        remarks: approved ? "Approved by resident from portal" : "Denied by resident from portal",
+      });
+      toast.success(
+        approved
+          ? "Delivery approved! Security guard notified to permit entry."
+          : "Delivery rejected. Security guard notified to turn courier away.",
+        approved ? "Delivery Approved" : "Delivery Denied",
+      );
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to record delivery decision.", "Action Failed");
+    }
+  };
+
+  const handleSubmitFeedback = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!feedbackTicket) return;
+    try {
+      await complaints.submitFeedback.mutateAsync({
+        ticketId: feedbackTicket.id,
+        rating: feedbackRating,
+        comments: feedbackComments,
+      });
+      toast.success(
+        `Thank you! You rated ticket ${feedbackTicket.ticket_number} with ${feedbackRating} star(s).`,
+        "Feedback Recorded",
+      );
+      setFeedbackModalOpen(false);
+      setFeedbackTicket(null);
+      setFeedbackComments("");
+      setFeedbackRating(5);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to submit rating.", "Error");
+    }
+  };
+
+  const handleSubmitStaffRating = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedStaff) return;
+    try {
+      await submitStaffRating.mutateAsync({
+        staff_id: selectedStaff.staff_id,
+        rating: staffRatingValue,
+        feedback: staffFeedbackText,
+        unit_id: myOccupancy?.unit_id,
+      });
+      toast.success(
+        `Thank you for rating ${selectedStaff.name} with ${staffRatingValue} star(s).`,
+        "Staff Rated",
+      );
+      setStaffRatingModalOpen(false);
+      setSelectedStaff(null);
+      setStaffFeedbackText("");
+      setStaffRatingValue(5);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to submit staff rating.", "Error");
+    }
+  };
+
+  const handleEventRsvp = async (
+    announcementId: string,
+    response: "going" | "maybe" | "not_going",
+  ) => {
+    try {
+      await eventRsvp.mutateAsync({
+        announcementId,
+        response,
+        guests: 1,
+      });
+      const labels: Record<string, string> = {
+        going: "Going",
+        maybe: "Maybe",
+        not_going: "Not Going",
+      };
+      toast.success(
+        `Your RSVP (${labels[response] || response}) has been recorded for this event.`,
+        "RSVP Confirmed",
+      );
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to record event RSVP.", "RSVP Error");
+    }
+  };
 
   const handleVisitorDecision = async (requestId: string, approved: boolean) => {
     try {
@@ -232,10 +429,15 @@ export function OwnerTenantDashboardView({
       const res = await visitors.createPass.mutateAsync({
         visitor_name: passVisitorName.trim() || "Guest Visitor",
         phone: cleanPhone,
+        id_type: passIdNumber.trim() ? passIdType : undefined,
+        id_number: passIdNumber.trim() ? passIdNumber.trim().toUpperCase() : undefined,
         category: passCategory,
         reason: passReason.trim(),
         valid_for_hours: passDuration,
         unit_id: activeUnitId,
+        vehicle_number: passVehicleNumber.trim() || undefined,
+        party_size: passPartySize,
+        group_label: passGroupLabel.trim() || undefined,
       });
       setVisitorPassModalOpen(false);
       setActivePassResult({
@@ -246,18 +448,42 @@ export function OwnerTenantDashboardView({
         reason: res.reason || passReason.trim() || "Visitor Entry",
         valid_from: res.valid_from,
         valid_to: res.valid_to,
+        vehicle_number: passVehicleNumber.trim() || undefined,
+        party_size: passPartySize,
+        group_label: passGroupLabel.trim() || undefined,
       });
       setActivePassModalOpen(true);
       setPassVisitorName("");
       setPassVisitorPhone("");
+      setPassIdType("aadhaar");
+      setPassIdNumber("");
       setPassReason("");
-      setPassCategory("Guest");
+      setPassCategory("Personal Guest");
       setPassDuration(24);
+      setPassVehicleNumber("");
+      setPassPartySize(1);
+      setPassGroupLabel("");
       toast.success(
         "A QR & 6-digit PIN code have been issued for your visitor.",
         "Visitor Pass Generated",
       );
     } catch (err: any) {
+      if (
+        err?.code === "VISITOR_BLACKLISTED" ||
+        (err?.message && err.message.toLowerCase().includes("blacklist"))
+      ) {
+        setVisitorPassModalOpen(false);
+        setBlockedAlert({
+          name: passVisitorName.trim() || "Visitor",
+          phone: cleanPhone,
+          id_type: passIdNumber.trim() ? passIdType : undefined,
+          id_number: passIdNumber.trim() ? passIdNumber.trim().toUpperCase() : undefined,
+          reason: err?.fields?.reason || err?.message || "Visitor is flagged on the community blacklist.",
+          risk_level: err?.fields?.risk_level || "HIGH",
+        });
+        toast.error("Pass generation blocked: Visitor is blacklisted by community security.", "Entry Denied");
+        return;
+      }
       const fieldMsg = err?.fields ? Object.values(err.fields).join(" · ") : null;
       toast.error(fieldMsg || err?.message || "Failed to generate visitor pass.", "Pass Generation Error");
     }
@@ -511,21 +737,23 @@ export function OwnerTenantDashboardView({
   const handleSimulatedPayment = async () => {
     if (!selectedInvoice) return;
     try {
-      await payments.payDues.mutateAsync({
+      const res = await payments.payDues.mutateAsync({
         invoiceId: selectedInvoice.id,
         amount: selectedInvoice.balance_due,
         method: "simulated_gateway",
       });
-      const generatedRcp = `RCP-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const generatedRcp =
+        res?.receipt_number ||
+        (res?.id ? `RCP-${res.id.slice(0, 8).toUpperCase()}` : `RCP-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
       setCurrentReceiptNumber(generatedRcp);
       setPaymentModalOpen(false);
       setReceiptModalOpen(true);
       toast.success(
-        `Payment of $${selectedInvoice.balance_due} processed successfully.`,
+        `Payment of ${formatCurrency(selectedInvoice.balance_due)} processed successfully.`,
         "Dues Paid",
       );
-    } catch {
-      toast.error("Payment failed. Please try again.", "Error");
+    } catch (err: any) {
+      toast.error(err?.message || "Payment failed. Please try again.", "Error");
     }
   };
 
@@ -745,70 +973,193 @@ export function OwnerTenantDashboardView({
               </div>
             </div>
           )}
+
+          {/* REAL-TIME DELIVERY APPROVAL PROMPT (Courier Waiting at Gate) */}
+          {!deliveryBannerDismissed && pendingDelivery && (
+            <div
+              className="gs-card card-hover"
+              style={{
+                background: "linear-gradient(135deg, #065F46, #059669)",
+                color: "#FFFFFF",
+                padding: "1.25rem 1.5rem",
+                marginBottom: "1.5rem",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "1rem",
+                boxShadow: "0 8px 32px rgba(5, 150, 105, 0.35)",
+                border: "none",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                <div
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: "50%",
+                    background: "rgba(255, 255, 255, 0.2)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "1.5rem",
+                  }}
+                >
+                  📦
+                </div>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 800,
+                        textTransform: "uppercase",
+                        background: "rgba(255,255,255,0.25)",
+                        padding: "0.2rem 0.6rem",
+                        borderRadius: "9999px",
+                      }}
+                    >
+                      DELIVERY AT GATE
+                    </span>
+                    <span style={{ fontSize: "12px", color: "#A7F3D0" }}>
+                      Courier awaiting gate clearance
+                    </span>
+                  </div>
+                  <h3
+                    style={{
+                      fontSize: "1.25rem",
+                      fontWeight: 800,
+                      marginTop: "0.25rem",
+                      color: "white",
+                    }}
+                  >
+                    {pendingDelivery.courier_company} ({pendingDelivery.package_type})
+                  </h3>
+                  <p style={{ fontSize: "13px", color: "#D1FAE5" }}>
+                    Executive: {pendingDelivery.driver_name || "Courier Partner"} · Phone: {pendingDelivery.driver_phone || "—"} · Tracking: {pendingDelivery.tracking_id || "—"}
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: "0.75rem" }}>
+                <BrandButton
+                  variant="outline"
+                  size="sm"
+                  style={{
+                    background: "rgba(255,255,255,0.15)",
+                    color: "white",
+                    borderColor: "rgba(255,255,255,0.3)",
+                  }}
+                  isLoading={deliveries.decideDelivery?.isPending}
+                  onClick={() => {
+                    handleDecideDelivery(pendingDelivery.id, false);
+                    setDeliveryBannerDismissed(true);
+                  }}
+                >
+                  ✕ Deny Entry
+                </BrandButton>
+                <BrandButton
+                  size="sm"
+                  style={{ background: "#FFFFFF", color: "#065F46", fontWeight: 800 }}
+                  isLoading={deliveries.decideDelivery?.isPending}
+                  onClick={() => {
+                    handleDecideDelivery(pendingDelivery.id, true);
+                    setDeliveryBannerDismissed(true);
+                  }}
+                >
+                  ✓ Permit Delivery
+                </BrandButton>
+              </div>
+            </div>
+          )}
           {/* KPI Stats */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-              gap: "1.25rem",
-              marginBottom: "2rem",
-            }}
-          >
-            <StatMetric
-              label="Outstanding Dues"
-              value={formatCurrency(stats?.pending_dues_amount ?? 0)}
-              accentColor="#D97706"
-              icon="💳"
-              description={
-                nextDueInvoice
-                  ? `Due by ${formatDate(nextDueInvoice.due_date)}`
-                  : "No outstanding dues"
-              }
-              onClick={() => router.push("/owner-tenant/payments")}
-            />
-            <StatMetric
-              label="Open Service Tickets"
-              value={stats?.open_service_tickets ?? 0}
-              accentColor="#DC2626"
-              icon="🎫"
-              description={
-                openTicket
-                  ? `${openTicket.category_name} (${openTicket.status.replace(/_/g, " ")})`
-                  : "No open tickets"
-              }
-              onClick={() => router.push("/owner-tenant/complaints")}
-            />
-            <StatMetric
-              label="Domestic Staff Assigned"
-              value={activeStaffCount}
-              accentColor="#0D9488"
-              icon="🧹"
-              description={
-                activeStaffCount > 0
-                  ? `${activeStaffCount} active assignment(s)`
-                  : "No staff assigned"
-              }
-              onClick={() => router.push("/owner-tenant/domestic-staff")}
-            />
-            <StatMetric
-              label="Booked Amenities"
-              value={stats?.upcoming_amenity_bookings ?? 0}
-              accentColor="#9333EA"
-              icon="🏊"
-              description={
-                nextBooking
-                  ? `${nextBooking.amenity_name} (${formatDate(nextBooking.date)})`
-                  : "No upcoming bookings"
-              }
-              onClick={() => router.push("/owner-tenant/amenities")}
-            />
-          </div>
+          {statsError ? (
+            <div style={{ marginBottom: "2rem" }}>
+              <ErrorState
+                title="Failed to load resident overview metrics"
+                message="Unable to fetch current dues, tickets, and facility status from the server."
+                onRetry={() => refetchStats()}
+              />
+            </div>
+          ) : statsLoading ? (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))",
+                gap: "1.25rem",
+                marginBottom: "2rem",
+              }}
+            >
+              <KpiCardSkeleton borderTop="3px solid #D97706" />
+              <KpiCardSkeleton borderTop="3px solid #DC2626" />
+              <KpiCardSkeleton borderTop="3px solid #0D9488" />
+              <KpiCardSkeleton borderTop="3px solid #9333EA" />
+            </div>
+          ) : (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))",
+                gap: "1.25rem",
+                marginBottom: "2rem",
+              }}
+            >
+              <StatMetric
+                label="Outstanding Dues"
+                value={formatCurrency(stats?.pending_dues_amount ?? 0)}
+                accentColor="#D97706"
+                icon="💳"
+                description={
+                  nextDueInvoice
+                    ? `Due by ${formatDate(nextDueInvoice.due_date)}`
+                    : "No outstanding dues"
+                }
+                onClick={() => router.push("/owner-tenant/payments")}
+              />
+              <StatMetric
+                label="Open Service Tickets"
+                value={stats?.open_service_tickets ?? 0}
+                accentColor="#DC2626"
+                icon="🎫"
+                description={
+                  openTicket
+                    ? `${openTicket.category_name} (${openTicket.status.replace(/_/g, " ")})`
+                    : "No open tickets"
+                }
+                onClick={() => router.push("/owner-tenant/complaints")}
+              />
+              <StatMetric
+                label="Domestic Staff Assigned"
+                value={activeStaffCount}
+                accentColor="#0D9488"
+                icon="🧹"
+                description={
+                  activeStaffCount > 0
+                    ? `${activeStaffCount} active assignment(s)`
+                    : "No staff assigned"
+                }
+                onClick={() => router.push("/owner-tenant/domestic-staff")}
+              />
+              <StatMetric
+                label="Booked Amenities"
+                value={stats?.upcoming_amenity_bookings ?? 0}
+                accentColor="#9333EA"
+                icon="🏊"
+                description={
+                  nextBooking
+                    ? `${nextBooking.amenity_name} (${formatDate(nextBooking.date)})`
+                    : "No upcoming bookings"
+                }
+                onClick={() => router.push("/owner-tenant/amenities")}
+              />
+            </div>
+          )}
 
           {/* Action Quick Links & Activity */}
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 400px), 1fr))",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 340px), 1fr))",
               gap: "1.5rem",
             }}
           >
@@ -818,24 +1169,28 @@ export function OwnerTenantDashboardView({
                 ⚡ Quick Resident Actions
               </h3>
               <div
-                style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "0.75rem" }}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))",
+                  gap: "0.75rem",
+                }}
               >
                 <BrandButton
                   variant="outline"
                   size="sm"
                   onClick={() => setVisitorPassModalOpen(true)}
                 >
-                  🎟️ Pre-Approve Guest Pass
+                  🎟️ Pre-Approve Pass
                 </BrandButton>
                 <BrandButton
                   variant="outline"
                   size="sm"
                   onClick={() => router.push("/owner-tenant/deliveries")}
                 >
-                  📦 Delivery Protocol
+                  📦 Gate Protocols
                 </BrandButton>
                 <BrandButton variant="outline" size="sm" onClick={() => setTicketModalOpen(true)}>
-                  🔧 Raise Maintenance Ticket
+                  🔧 Raise Ticket
                 </BrandButton>
                 <BrandButton
                   variant="outline"
@@ -845,7 +1200,7 @@ export function OwnerTenantDashboardView({
                     setPaymentModalOpen(true);
                   }}
                 >
-                  💳 Pay Maintenance Dues
+                  💳 Pay Dues
                 </BrandButton>
               </div>
             </div>
@@ -858,9 +1213,11 @@ export function OwnerTenantDashboardView({
                   justifyContent: "space-between",
                   alignItems: "center",
                   marginBottom: "1rem",
+                  flexWrap: "wrap",
+                  gap: "0.5rem",
                 }}
               >
-                <h3 className="card-h3" style={{ fontSize: "1.1rem" }}>
+                <h3 className="card-h3" style={{ fontSize: "1.1rem", margin: 0 }}>
                   📦 Recent Deliveries
                 </h3>
                 <BrandButton
@@ -872,28 +1229,57 @@ export function OwnerTenantDashboardView({
                 </BrandButton>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                {deliveryList.map((del) => (
-                  <div
-                    key={del.id}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      padding: "0.75rem",
-                      borderRadius: "6px",
-                      background: "#F8FAFC",
-                      border: "1px solid var(--border-light)",
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: "14px" }}>{del.courier_company}</div>
-                      <div style={{ fontSize: "12px", color: "var(--brand-body)" }}>
-                        {del.package_type} · {del.tracking_id}
+                {deliveries.isLoading ? (
+                  Array.from({ length: 2 }).map((_, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        padding: "0.75rem",
+                        borderRadius: "6px",
+                        background: "#F8FAFC",
+                        border: "1px solid var(--border-light)",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <div style={{ width: "60%" }}>
+                        <Skeleton width="80%" height="1rem" borderRadius={4} />
+                        <div style={{ marginTop: "0.3rem" }}>
+                          <Skeleton width="50%" height="0.75rem" borderRadius={4} />
+                        </div>
                       </div>
+                      <Skeleton width={70} height={22} borderRadius={999} />
                     </div>
-                    <StatusBadge status={del.status} />
-                  </div>
-                ))}
+                  ))
+                ) : deliveryList.length === 0 ? (
+                  <p style={{ color: "var(--brand-body)", fontSize: "13px", margin: 0, fontStyle: "italic", padding: "0.5rem 0" }}>
+                    No recent parcel deliveries at the security gate.
+                  </p>
+                ) : (
+                  deliveryList.slice(0, 3).map((del) => (
+                    <div
+                      key={del.id}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        padding: "0.75rem",
+                        borderRadius: "6px",
+                        background: "#F8FAFC",
+                        border: "1px solid var(--border-light)",
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: "14px" }}>{del.courier_company}</div>
+                        <div style={{ fontSize: "12px", color: "var(--brand-body)" }}>
+                          {del.package_type} · {del.tracking_id}
+                        </div>
+                      </div>
+                      <StatusBadge status={del.status} />
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -903,7 +1289,7 @@ export function OwnerTenantDashboardView({
       {/* TAB 2: MY PROFILE */}
       {activeTab === "profile" && (
         <div className="gs-card" style={{ maxWidth: 750 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", flexWrap: "wrap", gap: "0.75rem" }}>
             <div>
               <h3 className="card-h3" style={{ margin: 0 }}>Resident Profile & Emergency Contacts</h3>
               <p style={{ color: "var(--brand-body)", fontSize: "13px", marginTop: "0.25rem", margin: 0 }}>
@@ -917,11 +1303,26 @@ export function OwnerTenantDashboardView({
               ✏️ Edit Profile
             </BrandButton>
           </div>
-          {profile.isLoading ? (
-            <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>Loading profile…</p>
+          {profile.isError ? (
+            <ErrorState
+              title="Failed to load resident profile"
+              message="Unable to fetch profile information from the server."
+              onRetry={() => profile.refetch()}
+            />
+          ) : profile.isLoading ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: "1rem", marginBottom: "1.5rem" }}>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
+                  <Skeleton width="40%" height="0.75rem" borderRadius={4} />
+                  <div style={{ marginTop: "0.4rem" }}>
+                    <Skeleton width="70%" height="1.1rem" borderRadius={4} />
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
             <>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "1rem", marginBottom: "1.5rem" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: "1rem", marginBottom: "1.5rem" }}>
                 <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
                   <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>Full Name</div>
                   <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>{profile.data?.full_name || "—"}</div>
@@ -974,10 +1375,23 @@ export function OwnerTenantDashboardView({
           <h3 className="card-h3" style={{ marginBottom: "1.5rem" }}>
             Property & Tenancy Information
           </h3>
-          {profile.isLoading ? (
-            <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>
-              Loading property details…
-            </p>
+          {profile.isError ? (
+            <ErrorState
+              title="Failed to load property details"
+              message="Unable to fetch tenancy records from the server."
+              onRetry={() => profile.refetch()}
+            />
+          ) : profile.isLoading ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: "1rem", marginBottom: "1.5rem" }}>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
+                  <Skeleton width="40%" height="0.75rem" borderRadius={4} />
+                  <div style={{ marginTop: "0.4rem" }}>
+                    <Skeleton width="70%" height="1.1rem" borderRadius={4} />
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : !myOccupancy ? (
             <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>
               No active unit occupancy found for this profile.
@@ -986,7 +1400,7 @@ export function OwnerTenantDashboardView({
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(2, 1fr)",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
                 gap: "1rem",
                 marginBottom: "1.5rem",
               }}
@@ -1078,11 +1492,13 @@ export function OwnerTenantDashboardView({
               justifyContent: "space-between",
               alignItems: "center",
               marginBottom: "1.25rem",
+              flexWrap: "wrap",
+              gap: "0.75rem",
             }}
           >
             <div>
-              <h3 className="card-h3">Family Members (Gate Pre-Approved)</h3>
-              <p style={{ color: "var(--brand-body)", fontSize: "13.5px" }}>
+              <h3 className="card-h3" style={{ margin: 0 }}>Family Members (Gate Pre-Approved)</h3>
+              <p style={{ color: "var(--brand-body)", fontSize: "13.5px", margin: "0.25rem 0 0 0" }}>
                 Family members listed here feed the gate recognition system and automatically bypass
                 manual guard approval upon entry.
               </p>
@@ -1101,95 +1517,134 @@ export function OwnerTenantDashboardView({
             </BrandButton>
           </div>
 
-          <DataTable<FamilyMember>
-            columns={[
-              {
-                key: "name",
-                header: "Member Name",
-                sortable: true,
-                render: (m) => (
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-                    <div
-                      style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: "50%",
-                        background: "linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)",
-                        color: "#fff",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: "13px",
-                        fontWeight: 700,
-                      }}
-                    >
-                      {m.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 600, color: "var(--brand-heading)" }}>{m.name}</div>
-                      <div style={{ fontSize: "11.5px", color: "var(--brand-body)" }}>
-                        {m.phone}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "1rem",
+              flexWrap: "wrap",
+              gap: "0.75rem",
+            }}
+          >
+            <div style={{ width: "min(100%, 280px)" }}>
+              <DebouncedInput
+                value={familyControls.searchTerm}
+                onChange={familyControls.setSearchTerm}
+                placeholder="Search family members..."
+                icon="🔍"
+              />
+            </div>
+            <SortDropdown
+              value={familyControls.sortPreset}
+              onChange={familyControls.setSortPreset}
+            />
+          </div>
+
+          {family.isError ? (
+            <ErrorState
+              title="Failed to load family members"
+              message="Unable to fetch registered household members."
+              onRetry={() => family.refetch()}
+            />
+          ) : (
+            <DataTable<FamilyMember>
+              columns={[
+                {
+                  key: "name",
+                  header: "Member Name",
+                  sortable: true,
+                  render: (m) => (
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                      <div
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: "50%",
+                          background: "linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)",
+                          color: "#fff",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "13px",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {m.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 600, color: "var(--brand-heading)" }}>{m.name}</div>
+                        <div style={{ fontSize: "11.5px", color: "var(--brand-body)" }}>
+                          {m.phone}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ),
-              },
-              {
-                key: "relation",
-                header: "Relationship",
-                render: (m) => (
-                  <span
-                    style={{
-                      padding: "0.2rem 0.55rem",
-                      borderRadius: "6px",
-                      background: "#F1F5F9",
-                      fontSize: "12px",
-                      fontWeight: 600,
-                      color: "#334155",
-                    }}
-                  >
-                    {m.relation}
-                  </span>
-                ),
-              },
-              {
-                key: "access_enabled",
-                header: "Gate Recognition Whitelist",
-                render: (m) =>
-                  m.access_enabled ? (
-                    <StatusBadge status="approved" label="✓ Pre-Approved (Auto-Pass)" />
-                  ) : (
-                    <StatusBadge status="rejected" label="🔒 Manual Approval Required" />
                   ),
-              },
-              {
-                key: "actions",
-                header: "Actions",
-                render: (m) => (
-                  <div style={{ display: "flex", gap: "0.5rem" }}>
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      style={{ padding: "0.25rem 0.6rem", fontSize: "12px" }}
-                      onClick={() => setEditingMember(m)}
+                },
+                {
+                  key: "relation",
+                  header: "Relationship",
+                  render: (m) => (
+                    <span
+                      style={{
+                        padding: "0.2rem 0.55rem",
+                        borderRadius: "6px",
+                        background: "#F1F5F9",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        color: "#334155",
+                      }}
                     >
-                      ✏️ Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      style={{ padding: "0.25rem 0.6rem", fontSize: "12px", color: "#DC2626" }}
-                      onClick={() => setMemberToDelete(m)}
-                    >
-                      🗑️ Remove
-                    </button>
-                  </div>
-                ),
-              },
-            ]}
-            data={family.familyMembers}
-            isLoading={family.isLoading}
-          />
+                      {m.relation}
+                    </span>
+                  ),
+                },
+                {
+                  key: "access_enabled",
+                  header: "Gate Recognition Whitelist",
+                  render: (m) =>
+                    m.access_enabled ? (
+                      <StatusBadge status="approved" label="✓ Pre-Approved (Auto-Pass)" />
+                    ) : (
+                      <StatusBadge status="rejected" label="🔒 Manual Approval Required" />
+                    ),
+                },
+                {
+                  key: "actions",
+                  header: "Actions",
+                  render: (m) => (
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ padding: "0.25rem 0.6rem", fontSize: "12px" }}
+                        onClick={() => setEditingMember(m)}
+                      >
+                        ✏️ Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ padding: "0.25rem 0.6rem", fontSize: "12px", color: "#DC2626" }}
+                        onClick={() => setMemberToDelete(m)}
+                      >
+                        🗑️ Remove
+                      </button>
+                    </div>
+                  ),
+                },
+              ]}
+              data={familyControls.paginatedData}
+              isLoading={family.isLoading}
+              page={familyControls.page}
+              pageSize={familyControls.pageSize}
+              total={familyControls.total}
+              onPageChange={familyControls.setPage}
+              onPageSizeChange={familyControls.setPageSize}
+              emptyTitle="No family members registered"
+              emptyDescription="Add family members to enable automated gate whitelist pass generation."
+            />
+          )}
         </div>
       )}
 
@@ -1202,10 +1657,12 @@ export function OwnerTenantDashboardView({
               justifyContent: "space-between",
               alignItems: "center",
               marginBottom: "1rem",
+              flexWrap: "wrap",
+              gap: "0.75rem",
             }}
           >
             <FilterPanel onReset={visitorControls.clearFilters}>
-              <div style={{ width: 280 }}>
+              <div style={{ width: "min(100%, 280px)" }}>
                 <DebouncedInput
                   value={visitorControls.searchTerm}
                   onChange={visitorControls.setSearchTerm}
@@ -1213,63 +1670,78 @@ export function OwnerTenantDashboardView({
                   icon="🔍"
                 />
               </div>
+              <SortDropdown
+                value={visitorControls.sortPreset}
+                onChange={visitorControls.setSortPreset}
+              />
             </FilterPanel>
             <BrandButton onClick={() => setVisitorPassModalOpen(true)}>
               🎟️ Generate Guest Pass
             </BrandButton>
           </div>
 
-          <DataTable<VisitorRequest>
-            columns={[
-              { key: "visitor_name", header: "Visitor Name", sortable: true },
-              { key: "phone", header: "Phone" },
-              { key: "purpose", header: "Purpose" },
-              { key: "status", header: "Status", render: (i) => <StatusBadge status={i.status} /> },
-              {
-                key: "pass_code",
-                header: "Pass / PIN",
-                render: (i) =>
-                  i.pass_code || i.qr_token ? (
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                      <code style={{ color: "var(--brand-primary)", fontWeight: 700 }}>
-                        {i.pass_code || "QR PASS"}
-                      </code>
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        style={{ padding: "0.2rem 0.5rem", fontSize: "11px", display: "inline-flex", alignItems: "center", gap: "0.25rem" }}
-                        onClick={() => {
-                          setActivePassResult({
-                            token: i.qr_token || i.pass_code,
-                            pin: i.pass_code,
-                            visitor_name: i.visitor_name,
-                            category: "Visitor",
-                            reason: i.purpose,
-                            valid_to: i.valid_until,
-                          });
-                          setActivePassModalOpen(true);
-                        }}
-                      >
-                        📱 QR
-                      </button>
-                    </div>
-                  ) : (
-                    "–"
-                  ),
-              },
-              {
-                key: "created_at",
-                header: "Requested / Entry",
-                render: (i) => formatDate(i.entry_time || i.created_at),
-              },
-            ]}
-            data={visitorControls.paginatedData}
-            isLoading={visitors.isLoading}
-            page={visitorControls.page}
-            pageSize={visitorControls.pageSize}
-            total={visitorControls.total}
-            onPageChange={visitorControls.setPage}
-          />
+          {visitors.isError ? (
+            <ErrorState
+              title="Failed to Load Visitor Requests"
+              message={visitors.error?.message || "Could not retrieve visitor list from server."}
+              onRetry={() => visitors.refetch()}
+            />
+          ) : (
+            <DataTable<VisitorRequest>
+              columns={[
+                { key: "visitor_name", header: "Visitor Name", sortable: true },
+                { key: "phone", header: "Phone" },
+                { key: "purpose", header: "Purpose" },
+                { key: "status", header: "Status", render: (i) => <StatusBadge status={i.status} /> },
+                {
+                  key: "pass_code",
+                  header: "Pass / PIN",
+                  render: (i) =>
+                    i.pass_code || i.qr_token ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <code style={{ color: "var(--brand-primary)", fontWeight: 700 }}>
+                          {i.pass_code || "QR PASS"}
+                        </code>
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          style={{ padding: "0.2rem 0.5rem", fontSize: "11px", display: "inline-flex", alignItems: "center", gap: "0.25rem" }}
+                          onClick={() => {
+                            setActivePassResult({
+                              token: i.qr_token || i.pass_code,
+                              pin: i.pass_code,
+                              visitor_name: i.visitor_name,
+                              category: "Visitor",
+                              reason: i.purpose,
+                              valid_to: i.valid_until,
+                            });
+                            setActivePassModalOpen(true);
+                          }}
+                        >
+                          📱 QR
+                        </button>
+                      </div>
+                    ) : (
+                      "–"
+                    ),
+                },
+                {
+                  key: "created_at",
+                  header: "Requested / Entry",
+                  render: (i) => formatDate(i.entry_time || i.created_at),
+                },
+              ]}
+              data={visitorControls.paginatedData}
+              isLoading={visitors.isLoading}
+              page={visitorControls.page}
+              pageSize={visitorControls.pageSize}
+              total={visitorControls.total}
+              onPageChange={visitorControls.setPage}
+              onPageSizeChange={visitorControls.setPageSize}
+              emptyTitle="No visitor requests"
+              emptyDescription="Create pre-approved passes or monitor incoming guest requests."
+            />
+          )}
         </div>
       )}
 
@@ -1286,7 +1758,17 @@ export function OwnerTenantDashboardView({
               intercom.
             </p>
             {deliveryProtocols.isLoading ? (
-              <p style={{ color: "var(--brand-body)", fontSize: "13px" }}>Loading protocols…</p>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
+                  gap: "1rem",
+                }}
+              >
+                {[1, 2, 3].map((n) => (
+                  <CardSkeleton key={n} lines={2} />
+                ))}
+              </div>
             ) : (deliveryProtocols.data || []).length === 0 ? (
               <p style={{ color: "var(--brand-body)", fontSize: "13px" }}>
                 No delivery protocols configured for this community yet.
@@ -1295,7 +1777,7 @@ export function OwnerTenantDashboardView({
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
                   gap: "1rem",
                 }}
               >
@@ -1331,29 +1813,106 @@ export function OwnerTenantDashboardView({
             )}
           </div>
 
-          <DataTable
-            columns={[
-              { key: "courier_company", header: "Courier / Platform", sortable: true },
-              { key: "package_type", header: "Package Content" },
-              { key: "tracking_id", header: "Tracking ID" },
-              {
-                key: "status",
-                header: "Delivery Status",
-                render: (i) => <StatusBadge status={i.status} />,
-              },
-              {
-                key: "arrived_at",
-                header: "Arrival / Delivery",
-                render: (i) => formatDate(i.delivered_at || i.arrived_at),
-              },
-            ]}
-            data={deliveryControls.paginatedData}
-            isLoading={deliveries.isLoading}
-            page={deliveryControls.page}
-            pageSize={deliveryControls.pageSize}
-            total={deliveryControls.total}
-            onPageChange={deliveryControls.setPage}
-          />
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "1rem",
+              flexWrap: "wrap",
+              gap: "0.75rem",
+            }}
+          >
+            <div style={{ width: "min(100%, 280px)" }}>
+              <DebouncedInput
+                value={deliveryControls.searchTerm}
+                onChange={deliveryControls.setSearchTerm}
+                placeholder="Search courier, tracking ID..."
+                icon="🔍"
+              />
+            </div>
+            <SortDropdown
+              value={deliveryControls.sortPreset}
+              onChange={deliveryControls.setSortPreset}
+            />
+          </div>
+
+          {deliveries.isError ? (
+            <ErrorState
+              title="Failed to Load Deliveries"
+              message={deliveries.error?.message || "Could not retrieve delivery history."}
+              onRetry={() => deliveries.refetch()}
+            />
+          ) : (
+            <DataTable<DeliveryItem>
+              columns={[
+                { key: "courier_company", header: "Courier / Platform", sortable: true },
+                { key: "package_type", header: "Package Content" },
+                { key: "tracking_id", header: "Tracking ID" },
+                {
+                  key: "status",
+                  header: "Status",
+                  render: (i) => <StatusBadge status={i.status} />,
+                },
+                {
+                  key: "approval_status",
+                  header: "Gate Approval",
+                  render: (i) => <StatusBadge status={i.approval_status || "pending"} />,
+                },
+                {
+                  key: "arrived_at",
+                  header: "Arrival / Delivery",
+                  render: (i) => formatDate(i.delivered_at || i.arrived_at || i.expected_at),
+                },
+                {
+                  key: "actions",
+                  header: "Gate Clearance",
+                  render: (i) => {
+                    if (i.status === "at_gate" || i.approval_status === "pending") {
+                      return (
+                        <div style={{ display: "flex", gap: "0.4rem" }}>
+                          <BrandButton
+                            size="sm"
+                            isLoading={deliveries.decideDelivery?.isPending}
+                            onClick={() => handleDecideDelivery(i.id, true)}
+                          >
+                            ✓ Approve
+                          </BrandButton>
+                          <BrandButton
+                            size="sm"
+                            variant="outline"
+                            style={{ borderColor: "#FECACA", color: "#DC2626" }}
+                            isLoading={deliveries.decideDelivery?.isPending}
+                            onClick={() => handleDecideDelivery(i.id, false)}
+                          >
+                            ✕ Deny
+                          </BrandButton>
+                        </div>
+                      );
+                    }
+                    return (
+                      <span style={{ fontSize: "12px", color: "var(--brand-muted)" }}>
+                        {i.approval_status === "approved" || i.status === "delivered"
+                          ? "✓ Cleared"
+                          : i.approval_status === "rejected" || i.status === "rejected"
+                            ? "✕ Denied"
+                            : "—"}
+                      </span>
+                    );
+                  },
+                },
+              ]}
+              data={deliveryControls.paginatedData}
+              isLoading={deliveries.isLoading}
+              page={deliveryControls.page}
+              pageSize={deliveryControls.pageSize}
+              total={deliveryControls.total}
+              onPageChange={deliveryControls.setPage}
+              onPageSizeChange={deliveryControls.setPageSize}
+              emptyTitle="No deliveries recorded"
+              emptyDescription="Parcels logged at the gate will appear here in real-time."
+            />
+          )}
         </div>
       )}
 
@@ -1362,68 +1921,109 @@ export function OwnerTenantDashboardView({
         <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
           {/* Active Bookings */}
           <div className="gs-card">
-            <h3 className="card-h3" style={{ marginBottom: "1rem" }}>
-              My Active Facility Bookings
-            </h3>
-            <DataTable
-              columns={[
-                { key: "amenity_name", header: "Facility Name" },
-                { key: "date", header: "Reserved Date" },
-                {
-                  key: "start_time",
-                  header: "Time Slot",
-                  render: (i) => `${i.start_time} – ${i.end_time}`,
-                },
-                {
-                  key: "guests_count",
-                  header: "Guests",
-                  render: (i) => `${i.guests_count || 1} Person(s)`,
-                },
-                {
-                  key: "status",
-                  header: "Status",
-                  render: (i) => <StatusBadge status={i.status} />,
-                },
-                {
-                  key: "actions",
-                  header: "Action",
-                  render: (i) => {
-                    if (i.status === "cancelled") {
-                      return (
-                        <span
-                          style={{
-                            fontSize: "12px",
-                            color: "var(--brand-muted)",
-                            fontStyle: "italic",
-                          }}
-                        >
-                          Cancelled
-                        </span>
-                      );
-                    }
-                    if (i.status === "completed") {
-                      return (
-                        <span style={{ fontSize: "12px", color: "#059669", fontWeight: 600 }}>
-                          Completed
-                        </span>
-                      );
-                    }
-                    return (
-                      <BrandButton
-                        variant="outline"
-                        size="sm"
-                        style={{ borderColor: "#FECACA", color: "#DC2626" }}
-                        isLoading={amenities.cancelBooking.isPending}
-                        onClick={() => handleCancelBooking(i)}
-                      >
-                        Cancel Booking
-                      </BrandButton>
-                    );
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "1rem",
+                flexWrap: "wrap",
+                gap: "0.75rem",
+              }}
+            >
+              <h3 className="card-h3" style={{ margin: 0 }}>
+                My Active Facility Bookings
+              </h3>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+                <div style={{ width: "min(100%, 240px)" }}>
+                  <DebouncedInput
+                    value={bookingControls.searchTerm}
+                    onChange={bookingControls.setSearchTerm}
+                    placeholder="Search bookings..."
+                    icon="🔍"
+                  />
+                </div>
+                <SortDropdown
+                  value={bookingControls.sortPreset}
+                  onChange={bookingControls.setSortPreset}
+                />
+              </div>
+            </div>
+            {amenities.bookings.isError ? (
+              <ErrorState
+                title="Failed to Load Bookings"
+                message={amenities.bookings.error?.message || "Could not load reservations."}
+                onRetry={() => amenities.bookings.refetch()}
+              />
+            ) : (
+              <DataTable<AmenityBooking>
+                columns={[
+                  { key: "amenity_name", header: "Facility Name" },
+                  { key: "date", header: "Reserved Date" },
+                  {
+                    key: "start_time",
+                    header: "Time Slot",
+                    render: (i) => `${i.start_time} – ${i.end_time}`,
                   },
-                },
-              ]}
-              data={amenities.bookings.data || []}
-            />
+                  {
+                    key: "guests_count",
+                    header: "Guests",
+                    render: (i) => `${i.guests_count || 1} Person(s)`,
+                  },
+                  {
+                    key: "status",
+                    header: "Status",
+                    render: (i) => <StatusBadge status={i.status} />,
+                  },
+                  {
+                    key: "actions",
+                    header: "Action",
+                    render: (i) => {
+                      if (i.status === "cancelled") {
+                        return (
+                          <span
+                            style={{
+                              fontSize: "12px",
+                              color: "var(--brand-muted)",
+                              fontStyle: "italic",
+                            }}
+                          >
+                            Cancelled
+                          </span>
+                        );
+                      }
+                      if (i.status === "completed") {
+                        return (
+                          <span style={{ fontSize: "12px", color: "#059669", fontWeight: 600 }}>
+                            Completed
+                          </span>
+                        );
+                      }
+                      return (
+                        <BrandButton
+                          variant="outline"
+                          size="sm"
+                          style={{ borderColor: "#FECACA", color: "#DC2626" }}
+                          isLoading={amenities.cancelBooking.isPending}
+                          onClick={() => handleCancelBooking(i)}
+                        >
+                          Cancel Booking
+                        </BrandButton>
+                      );
+                    },
+                  },
+                ]}
+                data={bookingControls.paginatedData}
+                isLoading={amenities.bookings.isLoading}
+                page={bookingControls.page}
+                pageSize={bookingControls.pageSize}
+                total={bookingControls.total}
+                onPageChange={bookingControls.setPage}
+                onPageSizeChange={bookingControls.setPageSize}
+                emptyTitle="No active bookings"
+                emptyDescription="Reserve slots for clubhouse, pool, court, and other amenities."
+              />
+            )}
           </div>
 
           {/* Browse Available Amenities Grid */}
@@ -1431,53 +2031,77 @@ export function OwnerTenantDashboardView({
             <h3 className="card-h3" style={{ marginBottom: "1rem" }}>
               Browse Community Amenities
             </h3>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-                gap: "1.25rem",
-              }}
-            >
-              {(amenities.amenities.data || []).map((amenity) => (
-                <div key={amenity.id} className="gs-card card-hover">
-                  <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>🏊</div>
-                  <h4 style={{ fontWeight: 800, fontSize: "16px" }}>{amenity.name}</h4>
-                  <p
-                    style={{
-                      fontSize: "13px",
-                      color: "var(--brand-body)",
-                      margin: "0.5rem 0 1rem 0",
-                    }}
-                  >
-                    {amenity.description}
-                  </p>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <span
-                      style={{ fontSize: "13px", fontWeight: 700, color: "var(--brand-primary)" }}
-                    >
-                      {amenity.price_per_hour > 0
-                        ? `$${amenity.price_per_hour}/hr`
-                        : "Free for Residents"}
-                    </span>
-                    <BrandButton
-                      size="sm"
-                      onClick={() => {
-                        setSelectedAmenity(amenity);
-                        setAmenityBookingModalOpen(true);
+            {amenities.amenities.isLoading ? (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
+                  gap: "1.25rem",
+                }}
+              >
+                {[1, 2, 3, 4].map((n) => (
+                  <CardSkeleton key={n} lines={4} />
+                ))}
+              </div>
+            ) : amenities.amenities.isError ? (
+              <ErrorState
+                title="Failed to Load Amenities"
+                message={amenities.amenities.error?.message || "Could not retrieve community amenities."}
+                onRetry={() => amenities.amenities.refetch()}
+              />
+            ) : (amenities.amenities.data || []).length === 0 ? (
+              <div className="gs-card" style={{ textAlign: "center", padding: "2rem" }}>
+                <p style={{ color: "var(--brand-body)", margin: 0 }}>No amenities configured for this community.</p>
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
+                  gap: "1.25rem",
+                }}
+              >
+                {(amenities.amenities.data || []).map((amenity) => (
+                  <div key={amenity.id} className="gs-card card-hover">
+                    <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>🏊</div>
+                    <h4 style={{ fontWeight: 800, fontSize: "16px" }}>{amenity.name}</h4>
+                    <p
+                      style={{
+                        fontSize: "13px",
+                        color: "var(--brand-body)",
+                        margin: "0.5rem 0 1rem 0",
                       }}
                     >
-                      Reserve Slot
-                    </BrandButton>
+                      {amenity.description}
+                    </p>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <span
+                        style={{ fontSize: "13px", fontWeight: 700, color: "var(--brand-primary)" }}
+                      >
+                        {amenity.price_per_hour > 0
+                          ? `$${amenity.price_per_hour}/hr`
+                          : "Free for Residents"}
+                      </span>
+                      <BrandButton
+                        size="sm"
+                        onClick={() => {
+                          setSelectedAmenity(amenity);
+                          setAmenityBookingModalOpen(true);
+                        }}
+                      >
+                        Reserve Slot
+                      </BrandButton>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1492,7 +2116,17 @@ export function OwnerTenantDashboardView({
             Scheduled maintenance affecting water, power, elevators, and clubhouse areas.
           </p>
           {announcements.isLoading ? (
-            <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>Loading notices…</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              {[1, 2, 3].map((n) => (
+                <CardSkeleton key={n} lines={2} />
+              ))}
+            </div>
+          ) : announcements.isError ? (
+            <ErrorState
+              title="Failed to Load Notices"
+              message={announcements.error?.message || "Could not retrieve announcements."}
+              onRetry={() => announcements.refetch()}
+            />
           ) : (announcements.data || []).length === 0 ? (
             <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>
               No community notices published yet.
@@ -1503,26 +2137,104 @@ export function OwnerTenantDashboardView({
                 <div
                   key={m.id}
                   style={{
-                    padding: "1rem",
+                    padding: "1rem 1.25rem",
                     background: "#F8FAFC",
                     borderRadius: "8px",
                     border: "1px solid var(--border-light)",
                   }}
                 >
-                  <div style={{ fontWeight: 700, fontSize: "14px" }}>{m.title}</div>
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      color: "var(--brand-primary)",
-                      fontWeight: 600,
-                      marginTop: "0.2rem",
-                    }}
-                  >
-                    {formatDate(m.publish_at || m.created_at)}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.5rem", flexWrap: "wrap" }}>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <span
+                          style={{
+                            fontSize: "10.5px",
+                            fontWeight: 800,
+                            textTransform: "uppercase",
+                            padding: "0.15rem 0.5rem",
+                            borderRadius: "4px",
+                            background: m.announcement_type === "event" ? "#ECFDF5" : "#EFF6FF",
+                            color: m.announcement_type === "event" ? "#065F46" : "#1E40AF",
+                          }}
+                        >
+                          {m.announcement_type || "Notice"}
+                        </span>
+                        <div style={{ fontWeight: 700, fontSize: "14.5px", color: "var(--brand-heading)" }}>{m.title}</div>
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "12px",
+                          color: "var(--brand-muted)",
+                          fontWeight: 500,
+                          marginTop: "0.25rem",
+                        }}
+                      >
+                        Published: {formatDate(m.publish_at || m.created_at)}
+                      </div>
+                    </div>
+                    {m.priority && m.priority !== "normal" && (
+                      <span
+                        style={{
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          color: m.priority === "urgent" ? "#DC2626" : "#D97706",
+                        }}
+                      >
+                        ⚠️ {m.priority.toUpperCase()} PRIORITY
+                      </span>
+                    )}
                   </div>
-                  <p style={{ fontSize: "13px", color: "var(--brand-body)", marginTop: "0.35rem" }}>
+                  <p style={{ fontSize: "13.5px", color: "var(--brand-body)", marginTop: "0.6rem", lineHeight: 1.5 }}>
                     {m.body}
                   </p>
+                  {(m.announcement_type === "event" || m.event_start_at) && (
+                    <div
+                      style={{
+                        marginTop: "0.75rem",
+                        paddingTop: "0.75rem",
+                        borderTop: "1px dashed var(--border-light)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        flexWrap: "wrap",
+                        gap: "0.75rem",
+                      }}
+                    >
+                      <div style={{ fontSize: "12.5px", color: "#1E3A8A", fontWeight: 600 }}>
+                        🗓️ Event Date: {formatDate(m.event_start_at)}
+                        {m.event_end_at ? ` to ${formatDate(m.event_end_at)}` : ""}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                        <span style={{ fontSize: "12px", color: "var(--brand-muted)", marginRight: "0.25rem" }}>
+                          RSVP:
+                        </span>
+                        <BrandButton
+                          size="sm"
+                          isLoading={eventRsvp.isPending}
+                          onClick={() => handleEventRsvp(m.id, "going")}
+                        >
+                          ✓ Going
+                        </BrandButton>
+                        <BrandButton
+                          size="sm"
+                          variant="outline"
+                          isLoading={eventRsvp.isPending}
+                          onClick={() => handleEventRsvp(m.id, "maybe")}
+                        >
+                          ? Maybe
+                        </BrandButton>
+                        <BrandButton
+                          size="sm"
+                          variant="outline"
+                          style={{ borderColor: "#FECACA", color: "#DC2626" }}
+                          isLoading={eventRsvp.isPending}
+                          onClick={() => handleEventRsvp(m.id, "not_going")}
+                        >
+                          ✕ Decline
+                        </BrandButton>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -1539,10 +2251,12 @@ export function OwnerTenantDashboardView({
               justifyContent: "space-between",
               alignItems: "center",
               marginBottom: "1rem",
+              flexWrap: "wrap",
+              gap: "0.75rem",
             }}
           >
             <FilterPanel onReset={complaintControls.clearFilters}>
-              <div style={{ width: 280 }}>
+              <div style={{ width: "min(100%, 280px)" }}>
                 <DebouncedInput
                   value={complaintControls.searchTerm}
                   onChange={complaintControls.setSearchTerm}
@@ -1550,76 +2264,109 @@ export function OwnerTenantDashboardView({
                   icon="🔍"
                 />
               </div>
+              <SortDropdown
+                value={complaintControls.sortPreset}
+                onChange={complaintControls.setSortPreset}
+              />
             </FilterPanel>
             <BrandButton onClick={() => setTicketModalOpen(true)}>
               + Raise Service Ticket
             </BrandButton>
           </div>
 
-          <DataTable<ComplaintTicket>
-            columns={[
-              { key: "ticket_number", header: "Ticket #", sortable: true },
-              { key: "subject", header: "Subject", sortable: true },
-              { key: "category_name", header: "Category" },
-              {
-                key: "priority",
-                header: "Priority",
-                render: (i) => <StatusBadge status={i.priority} />,
-              },
-              { key: "status", header: "Status", render: (i) => <StatusBadge status={i.status} /> },
-              {
-                key: "escalation_state",
-                header: "SLA Tracker",
-                render: (i) => <StatusBadge status={i.escalation_state} />,
-              },
-              { key: "created_at", header: "Raised", render: (i) => formatDate(i.created_at) },
-              {
-                key: "actions",
-                header: "Action",
-                render: (i) => {
-                  if (i.status !== "resident_confirmation") return null;
-                  return (
-                    <div style={{ display: "flex", gap: "0.4rem" }}>
-                      <BrandButton
-                        size="sm"
-                        isLoading={complaints.confirmTicket.isPending}
-                        onClick={() =>
-                          complaints.confirmTicket.mutateAsync({
-                            ticketId: i.id,
-                            satisfied: true,
-                            notes: "Fix confirmed by resident",
-                          }).catch((e: any) => toast.error(e?.message || "Failed to confirm.", "Error"))
-                        }
-                      >
-                        ✓ Confirm Fix
-                      </BrandButton>
-                      <BrandButton
-                        size="sm"
-                        variant="outline"
-                        style={{ borderColor: "#FECACA", color: "#DC2626" }}
-                        isLoading={complaints.confirmTicket.isPending}
-                        onClick={() =>
-                          complaints.confirmTicket.mutateAsync({
-                            ticketId: i.id,
-                            satisfied: false,
-                            notes: "Issue not resolved — disputed by resident",
-                          }).catch((e: any) => toast.error(e?.message || "Failed to dispute.", "Error"))
-                        }
-                      >
-                        ✗ Dispute
-                      </BrandButton>
-                    </div>
-                  );
+          {complaints.isError ? (
+            <ErrorState
+              title="Failed to Load Service Tickets"
+              message={complaints.error?.message || "Could not retrieve maintenance complaints."}
+              onRetry={() => complaints.refetch()}
+            />
+          ) : (
+            <DataTable<ComplaintTicket>
+              columns={[
+                { key: "ticket_number", header: "Ticket #", sortable: true },
+                { key: "subject", header: "Subject", sortable: true },
+                { key: "category_name", header: "Category" },
+                {
+                  key: "priority",
+                  header: "Priority",
+                  render: (i) => <StatusBadge status={i.priority} />,
                 },
-              },
-            ]}
-            data={complaintControls.paginatedData}
-            isLoading={complaints.isLoading}
-            page={complaintControls.page}
-            pageSize={complaintControls.pageSize}
-            total={complaintControls.total}
-            onPageChange={complaintControls.setPage}
-          />
+                { key: "status", header: "Status", render: (i) => <StatusBadge status={i.status} /> },
+                {
+                  key: "escalation_state",
+                  header: "SLA Tracker",
+                  render: (i) => <StatusBadge status={i.escalation_state} />,
+                },
+                { key: "created_at", header: "Raised", render: (i) => formatDate(i.created_at) },
+                {
+                  key: "actions",
+                  header: "Action",
+                  render: (i) => {
+                    if (i.status === "resident_confirmation") {
+                      return (
+                        <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+                          <BrandButton
+                            size="sm"
+                            isLoading={complaints.confirmTicket.isPending}
+                            onClick={() =>
+                              complaints.confirmTicket.mutateAsync({
+                                ticketId: i.id,
+                                satisfied: true,
+                                notes: "Fix confirmed by resident",
+                              }).catch((e: any) => toast.error(e?.message || "Failed to confirm.", "Error"))
+                            }
+                          >
+                            ✓ Confirm Fix
+                          </BrandButton>
+                          <BrandButton
+                            size="sm"
+                            variant="outline"
+                            style={{ borderColor: "#FECACA", color: "#DC2626" }}
+                            isLoading={complaints.confirmTicket.isPending}
+                            onClick={() =>
+                              complaints.confirmTicket.mutateAsync({
+                                ticketId: i.id,
+                                satisfied: false,
+                                notes: "Issue not resolved — disputed by resident",
+                              }).catch((e: any) => toast.error(e?.message || "Failed to dispute.", "Error"))
+                            }
+                          >
+                            ✗ Dispute
+                          </BrandButton>
+                        </div>
+                      );
+                    }
+                    if (i.status === "resolved" || i.status === "closed") {
+                      return (
+                        <BrandButton
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setFeedbackTicket(i);
+                            setFeedbackRating(5);
+                            setFeedbackComments("");
+                            setFeedbackModalOpen(true);
+                          }}
+                        >
+                          ⭐ Rate Service
+                        </BrandButton>
+                      );
+                    }
+                    return null;
+                  },
+                },
+              ]}
+              data={complaintControls.paginatedData}
+              isLoading={complaints.isLoading}
+              page={complaintControls.page}
+              pageSize={complaintControls.pageSize}
+              total={complaintControls.total}
+              onPageChange={complaintControls.setPage}
+              onPageSizeChange={complaintControls.setPageSize}
+              emptyTitle="No service tickets"
+              emptyDescription="Raise a maintenance ticket to get assistance from society facility technicians."
+            />
+          )}
         </div>
       )}
 
@@ -1627,39 +2374,79 @@ export function OwnerTenantDashboardView({
       {activeTab === "vehicles" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
           <div className="gs-card">
-            <h3 className="card-h3" style={{ marginBottom: "1rem" }}>
-              Registered Vehicles & Parking Allocation
-            </h3>
-            <DataTable
-              columns={[
-                {
-                  key: "plate",
-                  header: "License Plate",
-                  render: (i) => <code style={{ fontWeight: 800 }}>{i.plate}</code>,
-                },
-                { key: "make_model", header: "Make & Model" },
-                {
-                  key: "slot",
-                  header: "Allocated Slot",
-                  render: (i) => (
-                    <span style={{ fontWeight: 700, color: "var(--brand-primary)" }}>{i.slot}</span>
-                  ),
-                },
-                { key: "rfid_tag", header: "Gate FastTag / RFID" },
-                {
-                  key: "violations",
-                  header: "Recorded Violations",
-                  render: (i) =>
-                    i.violations === 0 ? (
-                      <StatusBadge status="active" label="0 Violations" />
-                    ) : (
-                      <StatusBadge status="warning" label={`${i.violations} Warning`} />
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "1rem",
+                flexWrap: "wrap",
+                gap: "0.75rem",
+              }}
+            >
+              <h3 className="card-h3" style={{ margin: 0 }}>
+                Registered Vehicles & Parking Allocation
+              </h3>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+                <div style={{ width: "min(100%, 240px)" }}>
+                  <DebouncedInput
+                    value={vehicleControls.searchTerm}
+                    onChange={vehicleControls.setSearchTerm}
+                    placeholder="Search vehicles, plates..."
+                    icon="🔍"
+                  />
+                </div>
+                <SortDropdown
+                  value={vehicleControls.sortPreset}
+                  onChange={vehicleControls.setSortPreset}
+                />
+              </div>
+            </div>
+            {vehicles.isError ? (
+              <ErrorState
+                title="Failed to Load Vehicles"
+                message={vehicles.error?.message || "Could not retrieve registered vehicles."}
+                onRetry={() => vehicles.refetch()}
+              />
+            ) : (
+              <DataTable
+                columns={[
+                  {
+                    key: "plate",
+                    header: "License Plate",
+                    render: (i) => <code style={{ fontWeight: 800 }}>{i.plate}</code>,
+                  },
+                  { key: "make_model", header: "Make & Model" },
+                  {
+                    key: "slot",
+                    header: "Allocated Slot",
+                    render: (i) => (
+                      <span style={{ fontWeight: 700, color: "var(--brand-primary)" }}>{i.slot}</span>
                     ),
-                },
-              ]}
-              data={vehicles.data || []}
-              isLoading={vehicles.isLoading}
-            />
+                  },
+                  { key: "rfid_tag", header: "Gate FastTag / RFID" },
+                  {
+                    key: "violations",
+                    header: "Recorded Violations",
+                    render: (i) =>
+                      i.violations === 0 ? (
+                        <StatusBadge status="active" label="0 Violations" />
+                      ) : (
+                        <StatusBadge status="warning" label={`${i.violations} Warning`} />
+                      ),
+                  },
+                ]}
+                data={vehicleControls.paginatedData}
+                isLoading={vehicles.isLoading}
+                page={vehicleControls.page}
+                pageSize={vehicleControls.pageSize}
+                total={vehicleControls.total}
+                onPageChange={vehicleControls.setPage}
+                onPageSizeChange={vehicleControls.setPageSize}
+                emptyTitle="No vehicles registered"
+                emptyDescription="Contact your facility office or community admin to link registered vehicles."
+              />
+            )}
           </div>
         </div>
       )}
@@ -1673,41 +2460,134 @@ export function OwnerTenantDashboardView({
               justifyContent: "space-between",
               alignItems: "center",
               marginBottom: "1.25rem",
+              flexWrap: "wrap",
+              gap: "0.75rem",
             }}
           >
             <div>
               <h3 className="card-h3">Assigned Domestic Staff</h3>
               <p style={{ color: "var(--brand-body)", fontSize: "13.5px" }}>
-                Domestic helpers assigned to your unit. New assignments are made by your Community
-                Admin.
+                Domestic helpers assigned to your unit. Hire verified staff members, view real-time gate presence, and rate service.
               </p>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+              <div style={{ width: "min(100%, 240px)" }}>
+                <DebouncedInput
+                  value={staffControls.searchTerm}
+                  onChange={staffControls.setSearchTerm}
+                  placeholder="Search staff name, role..."
+                  icon="🔍"
+                />
+              </div>
+              <SortDropdown
+                value={staffControls.sortPreset}
+                onChange={staffControls.setSortPreset}
+              />
+              <BrandButton
+                size="sm"
+                variant="primary"
+                onClick={() => setAssignStaffModalOpen(true)}
+              >
+                + Assign / Hire Staff
+              </BrandButton>
             </div>
           </div>
 
-          <DataTable
-            columns={[
-              { key: "name", header: "Staff Member", sortable: true },
-              { key: "role", header: "Service Type" },
-              { key: "phone", header: "Phone" },
-              {
-                key: "police_verified",
-                header: "Verification",
-                render: (i) =>
-                  i.police_verified ? (
-                    <StatusBadge status="verified" label="✓ Police Verified" />
-                  ) : (
-                    <StatusBadge status="pending" label="Verification Pending" />
+          {domesticStaff.isError ? (
+            <ErrorState
+              title="Failed to Load Domestic Staff"
+              message={domesticStaff.error?.message || "Could not retrieve assigned domestic staff."}
+              onRetry={() => domesticStaff.refetch()}
+            />
+          ) : (
+            <DataTable<AssignedDomesticStaff>
+              columns={[
+                { key: "name", header: "Staff Member", sortable: true },
+                { key: "role", header: "Service Type" },
+                { key: "phone", header: "Phone" },
+                {
+                  key: "is_inside",
+                  header: "Gate Presence",
+                  render: (i) =>
+                    i.is_inside ? (
+                      <div>
+                        <StatusBadge status="active" label="🟢 Inside Community" />
+                        {i.last_check_in && (
+                          <div style={{ fontSize: "11px", color: "var(--brand-muted)", marginTop: "0.2rem" }}>
+                            In: {new Date(i.last_check_in).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <StatusBadge status="inactive" label="⚪ Off Duty" />
+                    ),
+                },
+                {
+                  key: "police_verified",
+                  header: "Verification",
+                  render: (i) =>
+                    i.police_verified ? (
+                      <StatusBadge status="verified" label="✓ Police Verified" />
+                    ) : (
+                      <StatusBadge status="pending" label="Verification Pending" />
+                    ),
+                },
+                {
+                  key: "is_active",
+                  header: "Assignment Status",
+                  render: (i) => <StatusBadge status={i.is_active ? "active" : "inactive"} />,
+                },
+                {
+                  key: "actions",
+                  header: "Action",
+                  render: (i) => (
+                    <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                      <BrandButton
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedStaff(i);
+                          setStaffRatingValue(5);
+                          setStaffFeedbackText("");
+                          setStaffRatingModalOpen(true);
+                        }}
+                      >
+                        ⭐ Rate
+                      </BrandButton>
+                      {i.is_active && (
+                        <BrandButton
+                          size="sm"
+                          variant="ghost"
+                          style={{ color: "var(--brand-danger, #ef4444)" }}
+                          onClick={async () => {
+                            if (window.confirm(`Are you sure you want to end service for ${i.name}?`)) {
+                              try {
+                                await endAssignmentMutation.mutateAsync(i.id);
+                                toast.success(`Service ended for ${i.name}`);
+                              } catch (err: any) {
+                                toast.error(err?.message || "Failed to end service");
+                              }
+                            }
+                          }}
+                        >
+                          ✕ End
+                        </BrandButton>
+                      )}
+                    </div>
                   ),
-              },
-              {
-                key: "is_active",
-                header: "Assignment Status",
-                render: (i) => <StatusBadge status={i.is_active ? "active" : "inactive"} />,
-              },
-            ]}
-            data={domesticStaff.data || []}
-            isLoading={domesticStaff.isLoading}
-          />
+                },
+              ]}
+              data={staffControls.paginatedData}
+              isLoading={domesticStaff.isLoading}
+              page={staffControls.page}
+              pageSize={staffControls.pageSize}
+              total={staffControls.total}
+              onPageChange={staffControls.setPage}
+              onPageSizeChange={staffControls.setPageSize}
+              emptyTitle="No domestic staff assigned"
+              emptyDescription="Staff assignments are registered and managed through your community management."
+            />
+          )}
         </div>
       )}
 
@@ -1748,58 +2628,219 @@ export function OwnerTenantDashboardView({
           </div>
 
           <div className="gs-card">
-            <h3 className="card-h3" style={{ marginBottom: "1rem" }}>
-              Invoices & Dues Ledger
-            </h3>
-            <DataTable
-              columns={[
-                { key: "invoice_number", header: "Invoice #", sortable: true },
-                { key: "title", header: "Billing Item" },
-                {
-                  key: "total_amount",
-                  header: "Total Amount",
-                  render: (i) => formatCurrency(i.total_amount),
-                },
-                {
-                  key: "balance_due",
-                  header: "Balance Due",
-                  render: (i) => formatCurrency(i.balance_due),
-                },
-                {
-                  key: "status",
-                  header: "Status",
-                  render: (i) => <StatusBadge status={i.status} />,
-                },
-                {
-                  key: "actions",
-                  header: "Action",
-                  render: (i) =>
-                    i.status !== "paid" ? (
-                      <BrandButton
-                        size="sm"
-                        onClick={() => {
-                          setSelectedInvoice(i);
-                          setPaymentModalOpen(true);
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "1.25rem",
+                flexWrap: "wrap",
+                gap: "0.75rem",
+                borderBottom: "1px solid var(--border-light)",
+                paddingBottom: "1rem",
+              }}
+            >
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <button
+                  type="button"
+                  style={{
+                    padding: "0.45rem 0.9rem",
+                    borderRadius: "6px",
+                    border: "none",
+                    fontWeight: 700,
+                    fontSize: "13.5px",
+                    cursor: "pointer",
+                    background: paymentsViewMode === "invoices" ? "var(--brand-primary)" : "#F1F5F9",
+                    color: paymentsViewMode === "invoices" ? "#FFFFFF" : "var(--brand-body)",
+                  }}
+                  onClick={() => setPaymentsViewMode("invoices")}
+                >
+                  📄 Invoices & Bills
+                </button>
+                <button
+                  type="button"
+                  style={{
+                    padding: "0.45rem 0.9rem",
+                    borderRadius: "6px",
+                    border: "none",
+                    fontWeight: 700,
+                    fontSize: "13.5px",
+                    cursor: "pointer",
+                    background: paymentsViewMode === "ledger" ? "var(--brand-primary)" : "#F1F5F9",
+                    color: paymentsViewMode === "ledger" ? "#FFFFFF" : "var(--brand-body)",
+                  }}
+                  onClick={() => setPaymentsViewMode("ledger")}
+                >
+                  📒 Unit Financial Ledger
+                </button>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+                <div style={{ width: "min(100%, 240px)" }}>
+                  <DebouncedInput
+                    value={paymentsViewMode === "invoices" ? invoiceControls.searchTerm : ledgerControls.searchTerm}
+                    onChange={paymentsViewMode === "invoices" ? invoiceControls.setSearchTerm : ledgerControls.setSearchTerm}
+                    placeholder={paymentsViewMode === "invoices" ? "Search invoices, dues..." : "Search ledger entries..."}
+                    icon="🔍"
+                  />
+                </div>
+                <SortDropdown
+                  value={paymentsViewMode === "invoices" ? invoiceControls.sortPreset : ledgerControls.sortPreset}
+                  onChange={paymentsViewMode === "invoices" ? invoiceControls.setSortPreset : ledgerControls.setSortPreset}
+                />
+              </div>
+            </div>
+
+            {paymentsViewMode === "invoices" ? (
+              payments.isError ? (
+                <ErrorState
+                  title="Failed to Load Invoices"
+                  message={payments.error?.message || "Could not retrieve billing invoices."}
+                  onRetry={() => payments.refetch()}
+                />
+              ) : (
+                <DataTable<InvoiceItem>
+                  columns={[
+                    { key: "invoice_number", header: "Invoice #", sortable: true },
+                    { key: "title", header: "Billing Item" },
+                    {
+                      key: "total_amount",
+                      header: "Total Amount",
+                      render: (i) => formatCurrency(i.total_amount),
+                    },
+                    {
+                      key: "balance_due",
+                      header: "Balance Due",
+                      render: (i) => formatCurrency(i.balance_due),
+                    },
+                    {
+                      key: "status",
+                      header: "Status",
+                      render: (i) => <StatusBadge status={i.status} />,
+                    },
+                    {
+                      key: "actions",
+                      header: "Action",
+                      render: (i) =>
+                        i.status !== "paid" ? (
+                          <BrandButton
+                            size="sm"
+                            onClick={() => {
+                              setSelectedInvoice(i);
+                              setPaymentModalOpen(true);
+                            }}
+                          >
+                            Pay Now
+                          </BrandButton>
+                        ) : (
+                          <BrandButton
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setCurrentReceiptNumber(i.receipt_number || `RCP-${i.invoice_number}`);
+                              setReceiptModalOpen(true);
+                            }}
+                          >
+                            Receipt
+                          </BrandButton>
+                        ),
+                    },
+                  ]}
+                  data={invoiceControls.paginatedData}
+                  isLoading={payments.isLoading}
+                  page={invoiceControls.page}
+                  pageSize={invoiceControls.pageSize}
+                  total={invoiceControls.total}
+                  onPageChange={invoiceControls.setPage}
+                  onPageSizeChange={invoiceControls.setPageSize}
+                  emptyTitle="No invoices or dues"
+                  emptyDescription="All maintenance and amenity dues have been settled."
+                />
+              )
+            ) : ledger.isError ? (
+              <ErrorState
+                title="Failed to Load Unit Ledger"
+                message={ledger.error?.message || "Could not retrieve financial ledger journal."}
+                onRetry={() => ledger.refetch()}
+              />
+            ) : (
+              <DataTable<LedgerEntryItem>
+                columns={[
+                  {
+                    key: "entry_date",
+                    header: "Posting Date",
+                    render: (i) => formatDate(i.entry_date || i.created_at),
+                  },
+                  {
+                    key: "entry_type",
+                    header: "Type",
+                    render: (i) =>
+                      i.entry_type === "credit" ? (
+                        <span style={{ fontWeight: 700, color: "#059669" }}>✓ CREDIT</span>
+                      ) : (
+                        <span style={{ fontWeight: 700, color: "#DC2626" }}>− DEBIT</span>
+                      ),
+                  },
+                  {
+                    key: "source_type",
+                    header: "Transaction Head",
+                    render: (i) => (
+                      <span
+                        style={{
+                          fontSize: "11.5px",
+                          fontWeight: 600,
+                          padding: "0.2rem 0.5rem",
+                          borderRadius: "4px",
+                          background: "#F1F5F9",
+                          color: "#334155",
+                          textTransform: "uppercase",
                         }}
                       >
-                        Pay Now
-                      </BrandButton>
-                    ) : (
-                      <BrandButton
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setCurrentReceiptNumber(`RCP-${i.invoice_number}`);
-                          setReceiptModalOpen(true);
-                        }}
-                      >
-                        Receipt
-                      </BrandButton>
+                        {i.source_type.replace(/_/g, " ")}
+                      </span>
                     ),
-                },
-              ]}
-              data={invoiceList}
-            />
+                  },
+                  {
+                    key: "narration",
+                    header: "Narration / Description",
+                    render: (i) => i.narration || "Unit ledger transaction entry",
+                  },
+                  {
+                    key: "amount",
+                    header: "Amount",
+                    render: (i) => (
+                      <span
+                        style={{
+                          fontWeight: 700,
+                          color: i.entry_type === "credit" ? "#059669" : "#DC2626",
+                        }}
+                      >
+                        {i.entry_type === "credit" ? "+" : "-"}
+                        {formatCurrency(i.amount)}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: "balance_after",
+                    header: "Running Balance",
+                    render: (i) => (
+                      <span style={{ fontWeight: 700, color: "var(--brand-heading)" }}>
+                        {formatCurrency(i.balance_after)}
+                      </span>
+                    ),
+                  },
+                ]}
+                data={ledgerControls.paginatedData}
+                isLoading={ledger.isLoading}
+                page={ledgerControls.page}
+                pageSize={ledgerControls.pageSize}
+                total={ledgerControls.total}
+                onPageChange={ledgerControls.setPage}
+                onPageSizeChange={ledgerControls.setPageSize}
+                emptyTitle="No ledger journal entries"
+                emptyDescription="Posted invoice debits and payment credit allocations will record here."
+              />
+            )}
           </div>
         </div>
       )}
@@ -1811,7 +2852,17 @@ export function OwnerTenantDashboardView({
             Notifications & Gate Alerts
           </h3>
           {myNotifications.isLoading ? (
-            <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>Loading notifications…</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+              {[1, 2, 3, 4].map((n) => (
+                <CardSkeleton key={n} lines={2} />
+              ))}
+            </div>
+          ) : myNotifications.isError ? (
+            <ErrorState
+              title="Failed to Load Notifications"
+              message={myNotifications.error?.message || "Could not retrieve notifications."}
+              onRetry={() => myNotifications.refetch()}
+            />
           ) : (myNotifications.data || []).length === 0 ? (
             <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>No notifications yet.</p>
           ) : (
@@ -1833,10 +2884,12 @@ export function OwnerTenantDashboardView({
                       display: "flex",
                       justifyContent: "space-between",
                       marginBottom: "0.25rem",
+                      flexWrap: "wrap",
+                      gap: "0.5rem",
                     }}
                   >
                     <h4
-                      style={{ fontWeight: 700, fontSize: "14px", color: "var(--brand-heading)" }}
+                      style={{ fontWeight: 700, fontSize: "14px", color: "var(--brand-heading)", margin: 0 }}
                     >
                       {n.title}
                     </h4>
@@ -1877,7 +2930,7 @@ export function OwnerTenantDashboardView({
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(2, 1fr)",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))",
               gap: "0.75rem",
               marginBottom: "1.5rem",
             }}
@@ -1965,12 +3018,15 @@ export function OwnerTenantDashboardView({
               onChange={(e) => setPassCategory(e.target.value)}
               required
             >
-              <option value="Guest">Guest / Friend & Family</option>
-              <option value="Delivery">Delivery / Courier</option>
-              <option value="Cab">Cab / Taxi</option>
-              <option value="Service">Service / Maintenance Technician</option>
-              <option value="Domestic Staff">Domestic Staff / Daily Help</option>
-              <option value="Contractor">Contractor / Interior Worker</option>
+              <option value="Personal Guest">Personal Guest / Family & Friends</option>
+              <option value="Relative">Relative / Extended Family</option>
+              <option value="Cab / Taxi">Cab / Taxi Driver (Uber / Ola)</option>
+              <option value="Delivery Executive">Delivery Executive (Amazon / Swiggy / Zomato)</option>
+              <option value="Service Technician">Service Technician (Plumbing / Electrical / AC)</option>
+              <option value="Vendor / Contractor">Vendor / Contractor / Interior Worker</option>
+              <option value="Interviewee">Interviewee / Applicant</option>
+              <option value="Event Guest">Event Guest / Party Invite</option>
+              <option value="Recurring / Daily Help">Recurring Visitor / Daily Help</option>
               <option value="Other">Other Visitor</option>
             </select>
           </div>
@@ -2015,6 +3071,117 @@ export function OwnerTenantDashboardView({
               10-digit mobile number required for gate security & pass delivery
             </span>
           </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  marginBottom: "0.35rem",
+                }}
+              >
+                Govt ID Type <span style={{ fontSize: "11px", color: "var(--muted)" }}>(Optional)</span>
+              </label>
+              <select
+                className="select-field"
+                value={passIdType}
+                onChange={(e) => setPassIdType(e.target.value)}
+              >
+                <option value="aadhaar">Aadhaar Card (12 digits)</option>
+                <option value="pan">PAN Card (10 chars)</option>
+                <option value="voter_id">Voter ID</option>
+                <option value="driving_license">Driving License</option>
+                <option value="passport">Passport</option>
+                <option value="other">Other Government ID</option>
+              </select>
+            </div>
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  marginBottom: "0.35rem",
+                }}
+              >
+                Govt ID Number <span style={{ fontSize: "11px", color: "var(--muted)" }}>(Optional)</span>
+              </label>
+              <input
+                className="input-field"
+                placeholder={
+                  passIdType === "aadhaar"
+                    ? "e.g. 1234 5678 9012"
+                    : passIdType === "pan"
+                    ? "e.g. ABCDE1234F"
+                    : "Enter Govt ID number"
+                }
+                value={passIdNumber}
+                onChange={(e) => setPassIdNumber(e.target.value.toUpperCase())}
+                style={{ fontFamily: "monospace" }}
+              />
+            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  marginBottom: "0.35rem",
+                }}
+              >
+                Vehicle Number <span style={{ fontSize: "11px", color: "var(--muted)" }}>(Optional)</span>
+              </label>
+              <input
+                className="input-field"
+                placeholder="e.g. MH12AB1234"
+                value={passVehicleNumber}
+                onChange={(e) => setPassVehicleNumber(e.target.value)}
+              />
+            </div>
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  marginBottom: "0.35rem",
+                }}
+              >
+                Party Size (Visitors)
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={50}
+                className="input-field"
+                value={passPartySize}
+                onChange={(e) => setPassPartySize(Math.max(1, parseInt(e.target.value, 10) || 1))}
+              />
+            </div>
+          </div>
+          {passPartySize > 1 && (
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  marginBottom: "0.35rem",
+                }}
+              >
+                Group Label / Occasion
+              </label>
+              <input
+                className="input-field"
+                placeholder="e.g. Birthday Party Group / Dinner Guests"
+                value={passGroupLabel}
+                onChange={(e) => setPassGroupLabel(e.target.value)}
+              />
+            </div>
+          )}
           <div>
             <label
               style={{
@@ -2051,8 +3218,10 @@ export function OwnerTenantDashboardView({
             >
               <option value={1}>1 Hour (Quick Drop / Express Delivery)</option>
               <option value={4}>4 Hours (Standard Short Visit)</option>
+              <option value={8}>8 Hours (Half Day)</option>
               <option value={12}>12 Hours (Full Day Access)</option>
               <option value={24}>24 Hours (Overnight Stay)</option>
+              <option value={48}>48 Hours (2 Days)</option>
               <option value={72}>72 Hours (Weekend / Multi-Day Guest)</option>
             </select>
           </div>
@@ -2201,36 +3370,74 @@ export function OwnerTenantDashboardView({
                   {activePassResult.valid_to ? formatDate(activePassResult.valid_to) : "Scheduled Visit"}
                 </div>
               </div>
+              {activePassResult.vehicle_number && (
+                <div>
+                  <div style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>Vehicle Plate</div>
+                  <div style={{ fontWeight: 700, fontSize: "13px", color: "var(--brand-heading)" }}>
+                    🚗 {activePassResult.vehicle_number}
+                  </div>
+                </div>
+              )}
+              {activePassResult.party_size && activePassResult.party_size > 1 && (
+                <div>
+                  <div style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>Party Size / Group</div>
+                  <div style={{ fontWeight: 700, fontSize: "13px", color: "var(--brand-primary)" }}>
+                    👥 {activePassResult.party_size} Persons {activePassResult.group_label ? `(${activePassResult.group_label})` : ""}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Action Buttons */}
-            <div style={{ width: "100%", display: "flex", gap: "0.75rem", justifyContent: "space-between" }}>
-              <BrandButton
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  const shareText = `*GateSphere Visitor Pass*\nVisitor: ${activePassResult.visitor_name || "Guest"}\nCategory: ${activePassResult.category || "Guest"}\nPIN/OTP: ${activePassResult.pin || activePassResult.token}\nValid Until: ${activePassResult.valid_to ? new Date(activePassResult.valid_to).toLocaleString() : "Visit Duration"}`;
-                  if (typeof navigator !== "undefined" && navigator.clipboard) {
-                    navigator.clipboard.writeText(shareText);
-                    toast.success("Pass details copied to clipboard!", "Copied");
-                  }
-                }}
-              >
-                📋 Copy Pass
-              </BrandButton>
+            <div style={{ width: "100%", display: "flex", gap: "0.5rem", justifyContent: "space-between", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                <BrandButton
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    const shareText = `*GateSphere Visitor Pass*\nVisitor: ${activePassResult.visitor_name || "Guest"}\nCategory: ${activePassResult.category || "Guest"}\nPIN/OTP: ${activePassResult.pin || activePassResult.token}${activePassResult.vehicle_number ? `\nVehicle: ${activePassResult.vehicle_number}` : ""}${activePassResult.party_size && activePassResult.party_size > 1 ? `\nParty Size: ${activePassResult.party_size} Persons` : ""}\nValid Until: ${activePassResult.valid_to ? new Date(activePassResult.valid_to).toLocaleString() : "Visit Duration"}`;
+                    if (typeof navigator !== "undefined" && navigator.clipboard) {
+                      navigator.clipboard.writeText(shareText);
+                      toast.success("Pass details copied to clipboard!", "Copied");
+                    }
+                  }}
+                >
+                  📋 Copy
+                </BrandButton>
 
-              <BrandButton
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  const shareText = encodeURIComponent(`*GateSphere Visitor Pass*\nVisitor: ${activePassResult.visitor_name || "Guest"}\nCategory: ${activePassResult.category || "Guest"}\nGate PIN: ${activePassResult.pin || activePassResult.token}\nValid Until: ${activePassResult.valid_to ? new Date(activePassResult.valid_to).toLocaleString() : "Visit Duration"}`);
-                  if (typeof window !== "undefined") {
-                    window.open(`https://wa.me/?text=${shareText}`, "_blank");
-                  }
-                }}
-              >
-                💬 WhatsApp
-              </BrandButton>
+                <BrandButton
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    const shareText = encodeURIComponent(`*GateSphere Visitor Pass*\nVisitor: ${activePassResult.visitor_name || "Guest"}\nCategory: ${activePassResult.category || "Guest"}\nGate PIN: ${activePassResult.pin || activePassResult.token}${activePassResult.vehicle_number ? `\nVehicle: ${activePassResult.vehicle_number}` : ""}${activePassResult.party_size && activePassResult.party_size > 1 ? `\nParty Size: ${activePassResult.party_size} Persons` : ""}\nValid Until: ${activePassResult.valid_to ? new Date(activePassResult.valid_to).toLocaleString() : "Visit Duration"}`);
+                    if (typeof window !== "undefined") {
+                      window.open(`https://wa.me/?text=${shareText}`, "_blank");
+                    }
+                  }}
+                >
+                  💬 WhatsApp
+                </BrandButton>
+
+                {typeof navigator !== "undefined" && typeof navigator.share === "function" && (
+                  <BrandButton
+                    type="button"
+                    variant="outline"
+                    onClick={async () => {
+                      const shareText = `*GateSphere Visitor Pass*\nVisitor: ${activePassResult.visitor_name || "Guest"}\nCategory: ${activePassResult.category || "Guest"}\nPIN/OTP: ${activePassResult.pin || activePassResult.token}${activePassResult.vehicle_number ? `\nVehicle: ${activePassResult.vehicle_number}` : ""}${activePassResult.party_size && activePassResult.party_size > 1 ? `\nParty Size: ${activePassResult.party_size} Persons` : ""}\nValid Until: ${activePassResult.valid_to ? new Date(activePassResult.valid_to).toLocaleString() : "Visit Duration"}`;
+                      try {
+                        await navigator.share({
+                          title: "GateSphere Visitor Entry Pass",
+                          text: shareText,
+                        });
+                      } catch {
+                        // User dismissed share dialog
+                      }
+                    }}
+                  >
+                    📤 Share Pass
+                  </BrandButton>
+                )}
+              </div>
 
               <BrandButton
                 type="button"
@@ -2242,6 +3449,83 @@ export function OwnerTenantDashboardView({
           </div>
         )}
       </Modal>
+
+      {/* Blocked / Blacklisted Visitor Alert Modal */}
+      {blockedAlert && (
+        <Modal
+          isOpen={true}
+          onClose={() => setBlockedAlert(null)}
+          title="⛔ VISITOR IS BLOCKED — ENTRY RESTRICTED"
+          size="md"
+        >
+          <div style={{ textAlign: "center", padding: "0.5rem 0" }}>
+            <div style={{ fontSize: "3.5rem", marginBottom: "0.5rem" }}>🚫</div>
+            <h3 style={{ color: "#991B1B", margin: "0 0 0.5rem 0", fontSize: "1.3rem", fontWeight: 800 }}>
+              COMMUNITY RESTRICTION WARNING
+            </h3>
+            <p style={{ color: "#DC2626", fontSize: "0.95rem", fontWeight: 700, marginBottom: "1.25rem" }}>
+              PASS GENERATION CANNOT PROCEED
+            </p>
+
+            <div
+              style={{
+                background: "#FEF2F2",
+                border: "2px solid #F87171",
+                borderRadius: "8px",
+                padding: "1rem 1.25rem",
+                textAlign: "left",
+                marginBottom: "1.25rem",
+              }}
+            >
+              <div style={{ marginBottom: "0.5rem" }}>
+                <span style={{ fontSize: "0.75rem", color: "#991B1B", fontWeight: 700, textTransform: "uppercase" }}>Visitor Name</span>
+                <div style={{ fontWeight: 700, fontSize: "1rem", color: "#111827" }}>{blockedAlert.name}</div>
+              </div>
+              {blockedAlert.phone && (
+                <div style={{ marginBottom: "0.5rem" }}>
+                  <span style={{ fontSize: "0.75rem", color: "#991B1B", fontWeight: 700, textTransform: "uppercase" }}>Phone Number</span>
+                  <div style={{ fontFamily: "monospace", fontWeight: 600 }}>{blockedAlert.phone}</div>
+                </div>
+              )}
+              {blockedAlert.id_number && (
+                <div style={{ marginBottom: "0.5rem" }}>
+                  <span style={{ fontSize: "0.75rem", color: "#991B1B", fontWeight: 700, textTransform: "uppercase" }}>Government ID</span>
+                  <div style={{ fontFamily: "monospace", fontWeight: 700, color: "#991B1B" }}>
+                    {blockedAlert.id_type ? `${blockedAlert.id_type.toUpperCase()}: ` : ""}{blockedAlert.id_number}
+                  </div>
+                </div>
+              )}
+              <div style={{ marginTop: "0.5rem", paddingTop: "0.5rem", borderTop: "1px dashed #FCA5A5" }}>
+                <span style={{ fontSize: "0.75rem", color: "#991B1B", fontWeight: 700, textTransform: "uppercase" }}>Blacklist Reason</span>
+                <div style={{ fontWeight: 600, color: "#7F1D1D", marginTop: "0.15rem" }}>
+                  {blockedAlert.reason}
+                </div>
+              </div>
+              {blockedAlert.risk_level && (
+                <div style={{ marginTop: "0.5rem" }}>
+                  <span style={{ fontSize: "0.75rem", color: "#991B1B", fontWeight: 700, textTransform: "uppercase" }}>Security Risk: </span>
+                  <span style={{ fontWeight: 800, color: "#B91C1C", textTransform: "uppercase" }}>
+                    {blockedAlert.risk_level}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <p style={{ fontSize: "0.85rem", color: "var(--muted)", marginBottom: "1.5rem" }}>
+              This individual is listed on the community restricted visitor registry. Contact the Security Office or Association Committee for clarifications.
+            </p>
+
+            <BrandButton
+              type="button"
+              variant="danger"
+              onClick={() => setBlockedAlert(null)}
+              style={{ width: "100%", padding: "0.75rem", fontWeight: 800 }}
+            >
+              ACKNOWLEDGE & CLOSE
+            </BrandButton>
+          </div>
+        </Modal>
+      )}
 
       {/* Add Family Member Modal */}
       <Modal
@@ -3339,6 +4623,328 @@ export function OwnerTenantDashboardView({
             </BrandButton>
             <BrandButton type="submit" isLoading={profile.updateProfile.isPending}>
               Save Profile Changes
+            </BrandButton>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Rate Maintenance Complaint Modal */}
+      <Modal
+        isOpen={feedbackModalOpen}
+        onClose={() => setFeedbackModalOpen(false)}
+        title="⭐ Rate Maintenance Service"
+        size="md"
+      >
+        <form onSubmit={handleSubmitFeedback} style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}>
+          <div>
+            <div style={{ fontSize: "13px", color: "var(--brand-muted)", marginBottom: "0.25rem" }}>
+              Ticket: <strong style={{ color: "var(--brand-heading)" }}>{feedbackTicket?.ticket_number}</strong>
+            </div>
+            <div style={{ fontSize: "14px", fontWeight: 700, color: "var(--brand-heading)" }}>
+              {feedbackTicket?.subject}
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, marginBottom: "0.5rem" }}>
+              Service Satisfaction Rating *
+            </label>
+            <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  type="button"
+                  onClick={() => setFeedbackRating(star)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    fontSize: "1.75rem",
+                    cursor: "pointer",
+                    padding: "0.15rem",
+                    filter: star <= feedbackRating ? "none" : "grayscale(100%) opacity(40%)",
+                    transform: star <= feedbackRating ? "scale(1.1)" : "scale(1)",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  ⭐
+                </button>
+              ))}
+              <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--brand-primary)", marginLeft: "0.5rem" }}>
+                {feedbackRating === 5
+                  ? "5/5 — Excellent"
+                  : feedbackRating === 4
+                    ? "4/5 — Good"
+                    : feedbackRating === 3
+                      ? "3/5 — Average"
+                      : feedbackRating === 2
+                        ? "2/5 — Poor"
+                        : "1/5 — Very Unsatisfied"}
+              </span>
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, marginBottom: "0.35rem" }}>
+              Feedback & Comments (Optional)
+            </label>
+            <textarea
+              className="input-field"
+              rows={3}
+              placeholder="Describe your experience with the technician resolution..."
+              value={feedbackComments}
+              onChange={(e) => setFeedbackComments(e.target.value)}
+            />
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
+            <BrandButton type="button" variant="outline" onClick={() => setFeedbackModalOpen(false)}>
+              Cancel
+            </BrandButton>
+            <BrandButton type="submit" isLoading={complaints.submitFeedback?.isPending}>
+              Submit Feedback
+            </BrandButton>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Rate Domestic Staff Modal */}
+      <Modal
+        isOpen={staffRatingModalOpen}
+        onClose={() => setStaffRatingModalOpen(false)}
+        title="⭐ Rate Domestic Staff"
+        size="md"
+      >
+        <form onSubmit={handleSubmitStaffRating} style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}>
+          <div>
+            <div style={{ fontSize: "13px", color: "var(--brand-muted)", marginBottom: "0.25rem" }}>
+              Staff Member: <strong style={{ color: "var(--brand-heading)" }}>{selectedStaff?.name}</strong>
+            </div>
+            <div style={{ fontSize: "13.5px", color: "var(--brand-body)", textTransform: "capitalize" }}>
+              Role: {selectedStaff?.role}
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, marginBottom: "0.5rem" }}>
+              Performance & Conduct Rating *
+            </label>
+            <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  type="button"
+                  onClick={() => setStaffRatingValue(star)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    fontSize: "1.75rem",
+                    cursor: "pointer",
+                    padding: "0.15rem",
+                    filter: star <= staffRatingValue ? "none" : "grayscale(100%) opacity(40%)",
+                    transform: star <= staffRatingValue ? "scale(1.1)" : "scale(1)",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  ⭐
+                </button>
+              ))}
+              <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--brand-primary)", marginLeft: "0.5rem" }}>
+                {staffRatingValue === 5
+                  ? "5/5 — Highly Recommended"
+                  : staffRatingValue === 4
+                    ? "4/5 — Reliable & Good"
+                    : staffRatingValue === 3
+                      ? "3/5 — Satisfactory"
+                      : staffRatingValue === 2
+                        ? "2/5 — Needs Improvement"
+                        : "1/5 — Unsatisfactory"}
+              </span>
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, marginBottom: "0.35rem" }}>
+              Feedback & Remarks (Optional)
+            </label>
+            <textarea
+              className="input-field"
+              rows={3}
+              placeholder="Share details on punctuality, quality of work, honesty..."
+              value={staffFeedbackText}
+              onChange={(e) => setStaffFeedbackText(e.target.value)}
+            />
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
+            <BrandButton type="button" variant="outline" onClick={() => setStaffRatingModalOpen(false)}>
+              Cancel
+            </BrandButton>
+            <BrandButton type="submit" isLoading={submitStaffRating.isPending}>
+              Submit Staff Rating
+            </BrandButton>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Assign Domestic Staff Modal */}
+      <Modal
+        isOpen={assignStaffModalOpen}
+        onClose={() => setAssignStaffModalOpen(false)}
+        title="👔 Assign Domestic Staff to Unit"
+        size="md"
+      >
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!assignStaffId) {
+              toast.error("Please select a domestic staff member.");
+              return;
+            }
+            if (!myOccupancy?.unit_id) {
+              toast.error("No active unit found for your account.");
+              return;
+            }
+            try {
+              await assignStaffMutation.mutateAsync({
+                staff_id: assignStaffId,
+                unit_id: myOccupancy.unit_id,
+                work_type: assignWorkType,
+                start_date: assignStartDate || undefined,
+                time_from: assignTimeFrom ? `${assignTimeFrom}:00` : undefined,
+                time_to: assignTimeTo ? `${assignTimeTo}:00` : undefined,
+                days_of_week: assignDays.length > 0 ? assignDays : undefined,
+              });
+              toast.success("Domestic staff assigned to your unit successfully!");
+              setAssignStaffModalOpen(false);
+              setAssignStaffId("");
+            } catch (err: any) {
+              toast.error(err?.message || "Failed to assign staff member.");
+            }
+          }}
+          style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}
+        >
+          <div>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, marginBottom: "0.35rem" }}>
+              Select Verified Staff Member *
+            </label>
+            <select
+              className="input-field"
+              value={assignStaffId}
+              onChange={(e) => setAssignStaffId(e.target.value)}
+              required
+            >
+              <option value="">-- Choose from Community Directory --</option>
+              {staffDirectory.map((st: any) => (
+                <option key={st.id} value={st.id}>
+                  {st.full_name} ({String(st.staff_type).replace(/_/g, " ")}) — {st.phone}{" "}
+                  {st.police_verification_status === "verified" ? "✓ Verified" : ""}
+                </option>
+              ))}
+            </select>
+            {staffDirectoryLoading && (
+              <span style={{ fontSize: "12px", color: "var(--brand-muted)" }}>
+                Loading community directory...
+              </span>
+            )}
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+            <div>
+              <label style={{ display: "block", fontSize: "13px", fontWeight: 700, marginBottom: "0.35rem" }}>
+                Service Type
+              </label>
+              <select
+                className="input-field"
+                value={assignWorkType}
+                onChange={(e) => setAssignWorkType(e.target.value)}
+              >
+                <option value="part_time">Part Time</option>
+                <option value="full_time">Full Time</option>
+                <option value="daily_help">Daily Help</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: "13px", fontWeight: 700, marginBottom: "0.35rem" }}>
+                Start Date
+              </label>
+              <input
+                type="date"
+                className="input-field"
+                value={assignStartDate}
+                onChange={(e) => setAssignStartDate(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+            <div>
+              <label style={{ display: "block", fontSize: "13px", fontWeight: 700, marginBottom: "0.35rem" }}>
+                Working Hours From
+              </label>
+              <input
+                type="time"
+                className="input-field"
+                value={assignTimeFrom}
+                onChange={(e) => setAssignTimeFrom(e.target.value)}
+              />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: "13px", fontWeight: 700, marginBottom: "0.35rem" }}>
+                Working Hours To
+              </label>
+              <input
+                type="time"
+                className="input-field"
+                value={assignTimeTo}
+                onChange={(e) => setAssignTimeTo(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, marginBottom: "0.4rem" }}>
+              Working Days of Week
+            </label>
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => {
+                const isSelected = assignDays.includes(day);
+                return (
+                  <button
+                    key={day}
+                    type="button"
+                    onClick={() => {
+                      if (isSelected) {
+                        setAssignDays(assignDays.filter((d) => d !== day));
+                      } else {
+                        setAssignDays([...assignDays, day]);
+                      }
+                    }}
+                    style={{
+                      padding: "0.35rem 0.65rem",
+                      borderRadius: "6px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      border: "1px solid",
+                      borderColor: isSelected ? "var(--brand-primary)" : "var(--brand-border)",
+                      backgroundColor: isSelected ? "var(--brand-primary)" : "transparent",
+                      color: isSelected ? "#ffffff" : "var(--brand-body)",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    {day}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
+            <BrandButton type="button" variant="outline" onClick={() => setAssignStaffModalOpen(false)}>
+              Cancel
+            </BrandButton>
+            <BrandButton type="submit" isLoading={assignStaffMutation.isPending}>
+              Assign Staff
             </BrandButton>
           </div>
         </form>

@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import pytest
+from sqlalchemy import select
 
 from app.core.errors import BusinessRuleError, ConflictError
 from app.modules.domestic_staff import schemas
 from app.modules.domestic_staff.service import DomesticStaffService
+from app.modules.gate.models import GateEvent
 
 
 def _svc(db, scope, actor):
@@ -93,3 +95,48 @@ async def test_verification_status_is_guarded(db, scope_for, community, superadm
             staff.id, schemas.StaffUpdate(police_verification_status="not_started")
         )
     assert exc.value.code == "INVALID_TRANSITION"
+
+
+async def test_gate_event_written_on_checkin_and_checkout(db, scope_for, community, superadmin):
+    svc = _svc(db, scope_for(community.id), superadmin)
+    staff = await _staff(svc, community, phone="+919870000077")
+    att = await svc.check_in(schemas.CheckInCreate(staff_id=staff.id))
+    await svc.check_out(att.id)
+
+    events = (
+        await db.scalars(
+            select(GateEvent)
+            .where(
+                GateEvent.reference_id == staff.id,
+                GateEvent.reference_type == "domestic_staff",
+            )
+            .order_by(GateEvent.occurred_at.asc())
+        )
+    ).all()
+    assert len(events) >= 2
+    types = [e.event_type for e in events]
+    assert "staff_in" in types
+    assert "staff_out" in types
+
+
+async def test_blacklisted_staff_blocked_at_checkin(db, scope_for, community, superadmin):
+    from app.core.hashing import digest
+    from app.modules.visitors.models import VisitorBlacklist
+
+    svc = _svc(db, scope_for(community.id), superadmin)
+    staff_phone = "+919870000088"
+    staff = await _staff(svc, community, phone=staff_phone)
+
+    # Blacklist staff by phone
+    bl = VisitorBlacklist(
+        community_id=community.id,
+        phone_hash=digest(staff_phone),
+        reason="Theft suspected",
+        is_active=True,
+    )
+    db.add(bl)
+    await db.flush()
+
+    with pytest.raises(BusinessRuleError) as exc:
+        await svc.check_in(schemas.CheckInCreate(staff_id=staff.id))
+    assert exc.value.code == "STAFF_BLACKLISTED"

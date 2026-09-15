@@ -9,8 +9,10 @@ import {
   useCheckInStaff,
   useCheckOutStaff,
   useCreateStaff,
+  useCreateStaffAssignment,
+  useEndStaffAssignment,
 } from "@/hooks/use-staff";
-import { useGates } from "@/hooks/use-communities";
+import { useGates, useCommunityUnits } from "@/hooks/use-communities";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { FilterPanel } from "@/components/common/FilterPanel";
@@ -58,10 +60,17 @@ export default function CommunityAdminStaffPage() {
   const checkIn = useCheckInStaff();
   const checkOut = useCheckOutStaff();
   const createStaff = useCreateStaff();
+  const createAssignment = useCreateStaffAssignment();
+  const endAssignment = useEndStaffAssignment();
+  const { data: communityUnits } = useCommunityUnits(activeCommunityId || undefined);
 
   // Modals state
   const [isCheckInModalOpen, setIsCheckInModalOpen] = useState(false);
   const [isAddStaffModalOpen, setIsAddStaffModalOpen] = useState(false);
+  const [isAssignUnitModalOpen, setIsAssignUnitModalOpen] = useState(false);
+  const [assignUnitId, setAssignUnitId] = useState("");
+  const [assignWorkType, setAssignWorkType] = useState<string>("part_time");
+  const [assignDays, setAssignDays] = useState<string[]>(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]);
   const [checkInForm, setCheckInForm] = useState<{ staff_id: string; gate_id: string }>({
     staff_id: "",
     gate_id: "",
@@ -431,6 +440,7 @@ export default function CommunityAdminStaffPage() {
             isLoading={staffLoading}
             emptyTitle="No staff registered"
             emptyDescription="Register domestic helpers and support technicians for this community."
+            enableClientPagination={true}
           />
         </div>
       )}
@@ -442,6 +452,7 @@ export default function CommunityAdminStaffPage() {
           isLoading={attendanceLoading}
           emptyTitle="No attendance records"
           emptyDescription="Daily check-ins recorded at security gates will appear here."
+          enableClientPagination={true}
         />
       )}
 
@@ -500,9 +511,19 @@ export default function CommunityAdminStaffPage() {
 
             {/* Assigned Units */}
             <div>
-              <h4 style={{ fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.5rem" }}>
-                🚪 Assigned Residential Units
-              </h4>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                <h4 style={{ fontSize: "0.85rem", fontWeight: 600 }}>
+                  🚪 Assigned Residential Units
+                </h4>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem" }}
+                  onClick={() => setIsAssignUnitModalOpen(true)}
+                >
+                  + Assign Unit
+                </button>
+              </div>
               {assignments && assignments.length > 0 ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
                   {assignments.map((asg: StaffAssignment) => (
@@ -515,14 +536,36 @@ export default function CommunityAdminStaffPage() {
                         borderRadius: "var(--radius-sm)",
                         display: "flex",
                         justifyContent: "space-between",
+                        alignItems: "center",
                         fontSize: "0.85rem",
                       }}
                     >
-                      <span>
+                      <div>
                         <strong>Unit {asg.unit_number || asg.unit_id}</strong> (
                         {asg.tower_name || "Tower"})
-                      </span>
-                      <span className="badge badge-success">Active Service</span>
+                        <span style={{ fontSize: "0.75rem", color: "var(--muted)", marginLeft: "0.5rem" }}>
+                          {asg.work_type}
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
+                        <span className={`badge ${asg.is_active ? "badge-success" : "badge-neutral"}`}>
+                          {asg.is_active ? "Active" : "Ended"}
+                        </span>
+                        {asg.is_active && (
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            style={{ fontSize: "0.7rem", padding: "0.15rem 0.4rem", color: "#dc2626" }}
+                            onClick={async () => {
+                              if (confirm("End this staff assignment?")) {
+                                await endAssignment.mutateAsync(asg.id);
+                              }
+                            }}
+                          >
+                            End
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -534,6 +577,140 @@ export default function CommunityAdminStaffPage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Assign Unit Modal */}
+      <Modal
+        isOpen={isAssignUnitModalOpen}
+        onClose={() => {
+          setIsAssignUnitModalOpen(false);
+          setAssignUnitId("");
+        }}
+        title={`Assign Unit to ${selectedStaff?.full_name}`}
+      >
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!selectedStaff?.id || !assignUnitId) return;
+            try {
+              setIsSubmitting(true);
+              setErrorMessage(null);
+              await createAssignment.mutateAsync({
+                staff_id: selectedStaff.id,
+                unit_id: assignUnitId,
+                work_type: assignWorkType,
+                days_of_week: assignDays,
+              });
+              setIsAssignUnitModalOpen(false);
+              setAssignUnitId("");
+            } catch (err: unknown) {
+              console.error(err);
+              setErrorMessage(err instanceof Error ? err.message : "Failed to assign unit");
+            } finally {
+              setIsSubmitting(false);
+            }
+          }}
+          style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
+        >
+          {errorMessage && (
+            <div
+              style={{
+                padding: "0.6rem 0.8rem",
+                background: "#fef2f2",
+                border: "1px solid #fecaca",
+                borderRadius: "var(--radius-sm)",
+                color: "#b91c1c",
+                fontSize: "0.85rem",
+              }}
+            >
+              {errorMessage}
+            </div>
+          )}
+
+          <div>
+            <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+              Select Residential Unit *
+            </label>
+            <select
+              className="select-field"
+              required
+              value={assignUnitId}
+              onChange={(e) => setAssignUnitId(e.target.value)}
+            >
+              <option value="">-- Choose Unit --</option>
+              {communityUnits?.map((u: any) => (
+                <option key={u.id} value={u.id}>
+                  Unit {u.unit_number} {u.tower_name ? `(${u.tower_name})` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+              Service / Work Type
+            </label>
+            <select
+              className="select-field"
+              value={assignWorkType}
+              onChange={(e) => setAssignWorkType(e.target.value)}
+            >
+              <option value="part_time">Part Time</option>
+              <option value="full_time">Full Time</option>
+              <option value="daily_help">Daily Help</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "0.4rem" }}>
+              Working Days
+            </label>
+            <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => {
+                const isSelected = assignDays.includes(day);
+                return (
+                  <button
+                    key={day}
+                    type="button"
+                    onClick={() => {
+                      if (isSelected) {
+                        setAssignDays(assignDays.filter((d) => d !== day));
+                      } else {
+                        setAssignDays([...assignDays, day]);
+                      }
+                    }}
+                    style={{
+                      padding: "0.3rem 0.55rem",
+                      borderRadius: "4px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      border: "1px solid",
+                      borderColor: isSelected ? "var(--primary)" : "var(--border)",
+                      backgroundColor: isSelected ? "var(--primary)" : "transparent",
+                      color: isSelected ? "#ffffff" : "inherit",
+                    }}
+                  >
+                    {day}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "0.5rem" }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setIsAssignUnitModalOpen(false)}
+            >
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+              {isSubmitting ? "Assigning..." : "Assign Unit"}
+            </button>
+          </div>
+        </form>
       </Modal>
 
       {/* Record Gate Check-in Modal */}

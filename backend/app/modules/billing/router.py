@@ -446,7 +446,9 @@ async def create_assessment(
         units_count = 120
 
     try:
-        per_unit = str(payload.get("per_unit_amount") or f"{float(target_amt) / max(units_count, 1):.2f}")
+        per_unit = str(
+            payload.get("per_unit_amount") or f"{float(target_amt) / max(units_count, 1):.2f}"
+        )
     except (ValueError, TypeError):
         per_unit = "0.00"
 
@@ -487,7 +489,9 @@ async def approve_assessment(
 
     sa["status"] = "approved"
     sa["approved_at"] = datetime.now(UTC).isoformat()
-    sa["approval_notes"] = (payload.get("notes") if payload else None) or "Approved by Association Committee"
+    sa["approval_notes"] = (
+        payload.get("notes") if payload else None
+    ) or "Approved by Association Committee"
     sa["updated_at"] = datetime.now(UTC).isoformat()
     return ok(sa, message="Special assessment approved")
 
@@ -508,6 +512,8 @@ async def reject_assessment(
         raise NotFoundError("Special assessment not found")
 
     sa["status"] = "rejected"
-    sa["rejection_reason"] = (payload.get("reason") if payload else None) or "Rejected by Association Committee"
+    sa["rejection_reason"] = (
+        payload.get("reason") if payload else None
+    ) or "Rejected by Association Committee"
     sa["updated_at"] = datetime.now(UTC).isoformat()
     return ok(sa, message="Special assessment rejected")

@@ -15,13 +15,24 @@ export function useMe() {
     queryFn: async () => {
       try {
         return await authApi.me();
-      } catch {
-        return null;
+      } catch (err: any) {
+        if (err?.isUnauthenticated || err?.status === 401) {
+          return null;
+        }
+        // Re-throw genuine errors (e.g. 400 AMBIGUOUS_SESSION, 500) so UI exposes the error state rather than treating user as logged out (FE-014)
+        throw err;
       }
     },
     staleTime: 60_000,
+    retry: (failureCount, error: any) => {
+      if (error?.isUnauthenticated || error?.status === 401 || error?.status === 400) {
+        return false;
+      }
+      return failureCount < 2;
+    },
   });
 }
+
 
 export function useLogin() {
   const qc = useQueryClient();

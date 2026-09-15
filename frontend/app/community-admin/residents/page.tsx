@@ -15,8 +15,9 @@ import { DataTable, type Column } from "@/components/tables/DataTable";
 import { FilterPanel } from "@/components/common/FilterPanel";
 import { Modal } from "@/components/common/Modal";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { PasswordField } from "@/components/forms/PasswordField";
 import type { ResidentProfile, MoveRecord } from "@/types/residents";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime, generateInitialPassword } from "@/lib/utils";
 
 export default function CommunityAdminResidentsPage() {
   const { activeCommunityId } = useUiStore();
@@ -259,7 +260,7 @@ export default function CommunityAdminResidentsPage() {
     setFullName("");
     setEmail("");
     setPhone("");
-    setPassword("");
+    setPassword("resident@Gate2026!");
     setOccupancyRole("primary_owner");
     setIsPrimary(true);
     setAgreementRef("");
@@ -289,13 +290,14 @@ export default function CommunityAdminResidentsPage() {
     setAddError("");
     setIsAdding(true);
     try {
+      const defaultPassword = generateInitialPassword(fullName, "resident");
       await addResidentMutation.mutateAsync({
         communityId: activeCommunityId,
         data: {
           full_name: fullName.trim(),
           email: email.trim().toLowerCase(),
           phone: phone.trim() || undefined,
-          password: password.trim() || undefined,
+          password: password.trim() || defaultPassword,
           unit_id: targetUnitId,
           occupancy_role: occupancyRole,
           is_primary: isPrimary,
@@ -401,6 +403,7 @@ export default function CommunityAdminResidentsPage() {
             isLoading={residentsLoading}
             emptyTitle="No residents found"
             emptyDescription="No resident profiles matching your filter criteria."
+            enableClientPagination={true}
           />
         </div>
       )}
@@ -413,6 +416,7 @@ export default function CommunityAdminResidentsPage() {
             isLoading={movesLoading}
             emptyTitle="No move records"
             emptyDescription="All resident move-in and move-out applications have been processed."
+            enableClientPagination={true}
           />
         </div>
       )}
@@ -734,7 +738,11 @@ export default function CommunityAdminResidentsPage() {
                     type="text"
                     className="input-field"
                     value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFullName(val);
+                      setPassword(generateInitialPassword(val, "resident"));
+                    }}
                     placeholder="e.g. Ananya Patel"
                     required
                     style={{
@@ -790,25 +798,16 @@ export default function CommunityAdminResidentsPage() {
                   />
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#475569", marginBottom: "0.35rem" }}>
-                    Initial Password (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    className="input-field"
+                  <PasswordField
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Auto: GateSphere@2026!"
-                    style={{
-                      width: "100%",
-                      padding: "0.5rem 0.75rem",
-                      fontSize: "0.85rem",
-                      borderRadius: "6px",
-                      border: "1px solid #cbd5e1",
-                    }}
+                    onChange={(val) => setPassword(val)}
+                    placeholder="e.g. ananya@Gate2026!"
                   />
                 </div>
               </div>
+              <p style={{ margin: 0, fontSize: "11.5px", color: "var(--muted)" }}>
+                💡 Providing credentials allows this resident to sign in to the <strong>Resident Portal</strong> to approve visitors, receive delivery alerts, and book amenities.
+              </p>
             </div>
 
             {/* SECTION 3: OCCUPANCY & ROLES */}

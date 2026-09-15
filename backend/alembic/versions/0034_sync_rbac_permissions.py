@@ -1,0 +1,292 @@
+"""Sync canonical RBAC roles and permissions.
+
+Revision ID: 0034_sync_rbac_permissions
+Revises: 0033_staff_assignment_schedule
+Create Date: 2026-09-15
+"""
+
+from __future__ import annotations
+
+import sqlalchemy as sa
+from alembic import op
+
+revision = "0034_sync_rbac_permissions"
+down_revision = "0033_staff_assignment_schedule"
+branch_labels = None
+depends_on = None
+
+ROLES = {
+    "super_admin": (
+        "Super Admin — global platform control",
+        "Global platform control across all communities",
+    ),
+    "community_admin": (
+        "Community Admin — single-community management",
+        "Community administration",
+    ),
+    "association_committee": (
+        "Association Committee — governance & oversight",
+        "Community governance and financial oversight committee",
+    ),
+    "facility_manager": (
+        "Facility Manager — operations & maintenance",
+        "Operations, amenities, and vendor technician management",
+    ),
+    "security_supervisor": (
+        "Security Supervisor — gate security oversight",
+        "Security team and gate operations oversight",
+    ),
+    "security_guard": (
+        "Security Guard — live gate operations",
+        "Gate access and live entry logging",
+    ),
+    "resident": (
+        "Owner / Tenant — residential unit control",
+        "Residential unit occupant",
+    ),
+    "domestic_staff": (
+        "Domestic Staff — workforce access",
+        "Domestic service staff",
+    ),
+    "vendor_technician": (
+        "Vendor / Technician — service execution",
+        "Third-party vendor and service technician",
+    ),
+    "auditor": (
+        "Auditor — read-only compliance",
+        "Read-only statutory compliance",
+    ),
+}
+
+MODULES = [
+    "users",
+    "communities",
+    "residents",
+    "visitors",
+    "gate",
+    "domestic_staff",
+    "deliveries",
+    "vehicles",
+    "billing",
+    "complaints",
+    "amenities",
+    "communication",
+    "incidents",
+    "notifications",
+    "audit",
+    "dashboards",
+]
+ACTIONS = ["view", "create", "update", "delete", "approve", "export"]
+
+ALL_PERMS = [f"{m}:{a}" for m in MODULES for a in ACTIONS]
+
+ROLE_PERMISSIONS: dict[str, list[str]] = {
+    "super_admin": ALL_PERMS,
+    "community_admin": [p for p in ALL_PERMS if not p.startswith("audit:")],
+    "association_committee": [
+        "billing:view",
+        "billing:create",
+        "billing:approve",
+        "billing:export",
+        "communication:view",
+        "communication:create",
+        "communication:update",
+        "communication:approve",
+        "communities:view",
+        "complaints:view",
+        "residents:view",
+        "incidents:view",
+        "dashboards:view",
+        "audit:view",
+        "audit:export",
+        "notifications:view",
+    ],
+    "facility_manager": [
+        "communities:view",
+        "users:view",
+        "users:create",
+        "users:update",
+        "amenities:view",
+        "amenities:create",
+        "amenities:update",
+        "amenities:approve",
+        "complaints:view",
+        "complaints:create",
+        "complaints:update",
+        "complaints:approve",
+        "complaints:export",
+        "vehicles:view",
+        "vehicles:update",
+        "vehicles:approve",
+        "incidents:view",
+        "incidents:create",
+        "incidents:update",
+        "domestic_staff:view",
+        "dashboards:view",
+        "notifications:view",
+    ],
+    "security_supervisor": [
+        "visitors:view",
+        "visitors:create",
+        "visitors:approve",
+        "visitors:update",
+        "visitors:export",
+        "gate:view",
+        "gate:create",
+        "gate:update",
+        "gate:approve",
+        "gate:export",
+        "domestic_staff:view",
+        "domestic_staff:create",
+        "domestic_staff:update",
+        "deliveries:view",
+        "deliveries:create",
+        "deliveries:update",
+        "vehicles:view",
+        "vehicles:create",
+        "vehicles:update",
+        "incidents:view",
+        "incidents:create",
+        "incidents:update",
+        "users:view",
+        "communities:view",
+        "dashboards:view",
+        "notifications:view",
+    ],
+    "security_guard": [
+        "visitors:view",
+        "visitors:create",
+        "visitors:update",
+        "gate:view",
+        "gate:create",
+        "gate:update",
+        "domestic_staff:view",
+        "domestic_staff:create",
+        "domestic_staff:update",
+        "deliveries:view",
+        "deliveries:create",
+        "deliveries:update",
+        "vehicles:view",
+        "vehicles:create",
+        "vehicles:update",
+        "incidents:view",
+        "incidents:create",
+        "dashboards:view",
+        "notifications:view",
+        "communities:view",
+    ],
+    "resident": [
+        "visitors:view",
+        "visitors:create",
+        "visitors:approve",
+        "domestic_staff:view",
+        "domestic_staff:create",
+        "domestic_staff:update",
+        "deliveries:view",
+        "deliveries:create",
+        "deliveries:approve",
+        "deliveries:update",
+        "billing:view",
+        "billing:create",
+        "communication:view",
+        "incidents:view",
+        "incidents:create",
+        "dashboards:view",
+        "notifications:view",
+        "complaints:view",
+        "complaints:create",
+        "complaints:update",
+        "amenities:view",
+        "amenities:create",
+        "amenities:update",
+        "vehicles:view",
+        "vehicles:create",
+        "vehicles:update",
+    ],
+    "domestic_staff": [
+        "domestic_staff:view",
+        "domestic_staff:update",
+        "gate:view",
+        "notifications:view",
+        "incidents:create",
+    ],
+    "vendor_technician": [
+        "complaints:view",
+        "complaints:update",
+        "gate:view",
+        "notifications:view",
+    ],
+    "auditor": [f"{m}:view" for m in MODULES]
+    + [
+        "billing:export",
+        "gate:export",
+        "complaints:export",
+        "visitors:export",
+        "audit:view",
+        "audit:export",
+    ],
+}
+
+
+def upgrade() -> None:
+    conn = op.get_bind()
+
+    # 1. Insert canonical permissions
+    perm_params = []
+    for perm_code in ALL_PERMS:
+        mod, act = perm_code.split(":")
+        desc = f"{act.title()} {mod.replace('_', ' ')}"
+        perm_params.append({"code": perm_code, "desc": desc})
+
+    conn.execute(
+        sa.text(
+            """
+            INSERT INTO permissions (id, code, description)
+            VALUES (gen_random_uuid(), :code, :desc)
+            ON CONFLICT (code) DO NOTHING;
+            """
+        ),
+        perm_params,
+    )
+
+    # 2. Insert canonical roles
+    role_params = [
+        {"slug": slug, "name": name, "desc": desc} for slug, (name, desc) in ROLES.items()
+    ]
+    conn.execute(
+        sa.text(
+            """
+            INSERT INTO roles (id, slug, name, description)
+            VALUES (gen_random_uuid(), :slug, :name, :desc)
+            ON CONFLICT (slug) DO NOTHING;
+            """
+        ),
+        role_params,
+    )
+
+    # 3. Insert role_permissions mappings
+    rp_params = [
+        {"role_slug": role_slug, "perm_code": perm_code}
+        for role_slug, perms in ROLE_PERMISSIONS.items()
+        for perm_code in perms
+    ]
+    conn.execute(
+        sa.text(
+            """
+            INSERT INTO role_permissions (id, role_id, permission_id)
+            SELECT gen_random_uuid(), r.id, p.id
+            FROM roles r
+            CROSS JOIN permissions p
+            WHERE r.slug = :role_slug AND p.code = :perm_code
+            ON CONFLICT (role_id, permission_id) DO NOTHING;
+            """
+        ),
+        rp_params,
+    )
+
+    # 4. Invalidate permission cache so all active user sessions reload new grants
+    conn.execute(sa.text("UPDATE users SET permission_version = permission_version + 1;"))
+
+
+def downgrade() -> None:
+    pass

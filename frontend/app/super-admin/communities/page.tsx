@@ -18,6 +18,7 @@ import {
   useCreateGate,
   useCommunityUnits,
 } from "@/hooks/use-communities";
+import { useSuperAdminDashboardMetrics } from "@/hooks/use-dashboards";
 import { useAddResident } from "@/hooks/use-residents";
 import {
   INDIAN_STATES_AND_UTS,
@@ -27,6 +28,8 @@ import {
 } from "@/constants/locations";
 import type { Community, Tower, Gate, Floor } from "@/types/communities";
 import type { ResidentProfile } from "@/types/residents";
+import { PasswordField } from "@/components/forms/PasswordField";
+import { generateInitialPassword } from "@/lib/utils";
 
 export default function CommunitiesPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -40,6 +43,20 @@ export default function CommunitiesPage() {
   const [state, setState] = useState("");
   const [formError, setFormError] = useState("");
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  // Community Admin credentials state for Create Modal
+  const [adminName, setAdminName] = useState("");
+  const [adminEmail, setAdminEmail] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
+  const [adminPhone, setAdminPhone] = useState("");
+  const [createdAdminInfo, setCreatedAdminInfo] = useState<{
+    communityName: string;
+    communityCode: string;
+    adminName: string;
+    adminEmail: string;
+    adminPassword?: string;
+  } | null>(null);
+  const [copiedPassword, setCopiedPassword] = useState(false);
 
   // Edit & Delete modal state & validations
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -99,6 +116,7 @@ export default function CommunitiesPage() {
   const [gateType, setGateType] = useState<"entry" | "exit" | "both" | "pedestrian">("both");
 
   const { data: communities, isLoading, refetch } = useCommunities();
+  const { data: metrics } = useSuperAdminDashboardMetrics();
   const { data: communityUnitsList, refetch: refetchUnits } = useCommunityUnits(
     viewingCommunity?.id || undefined
   );
@@ -157,8 +175,31 @@ export default function CommunitiesPage() {
       errs.state = "State cannot exceed 120 characters";
     }
 
+    const trimmedAdminName = adminName.trim();
+    if (!trimmedAdminName) {
+      errs.adminName = "Admin full name is required";
+    }
+
+    const trimmedAdminEmail = adminEmail.trim();
+    if (!trimmedAdminEmail) {
+      errs.adminEmail = "Admin login email is required";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedAdminEmail)) {
+      errs.adminEmail = "Please enter a valid email address (e.g. admin@example.com)";
+    }
+
+    if (!adminPassword) {
+      errs.adminPassword = "Admin password is required";
+    } else if (adminPassword.length < 8) {
+      errs.adminPassword = "Password must be at least 8 characters";
+    }
+
+    const trimmedAdminPhone = adminPhone.trim();
+    if (trimmedAdminPhone && trimmedAdminPhone.length > 20) {
+      errs.adminPhone = "Phone cannot exceed 20 characters";
+    }
+
     return errs;
-  }, [name, code, city, state]);
+  }, [name, code, city, state, adminName, adminEmail, adminPassword, adminPhone]);
 
   // Field validation rules for Edit Community
   const editErrors = useMemo(() => {
@@ -195,29 +236,45 @@ export default function CommunitiesPage() {
   const isCreateFormValid = Object.keys(createErrors).length === 0;
   const isEditFormValid = Object.keys(editErrors).length === 0;
 
-  const filteredCommunities = useMemo(() => {
+  const filteredCommunities: CommunityWithMetrics[] = useMemo(() => {
     if (!communities) return [];
-    return communities.filter((comm: Community) => {
-      const matchesSearch =
-        searchQuery === "" ||
-        comm.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        comm.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (comm.city && comm.city.toLowerCase().includes(searchQuery.toLowerCase()));
+    return communities
+      .filter((comm: Community) => {
+        const matchesSearch =
+          searchQuery === "" ||
+          comm.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          comm.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (comm.city && comm.city.toLowerCase().includes(searchQuery.toLowerCase()));
 
-      const matchesStatus =
-        statusFilter === "all" ||
-        (statusFilter === "active" && comm.is_active) ||
-        (statusFilter === "inactive" && !comm.is_active);
+        const matchesStatus =
+          statusFilter === "all" ||
+          (statusFilter === "active" && comm.is_active) ||
+          (statusFilter === "inactive" && !comm.is_active);
 
-      return matchesSearch && matchesStatus;
-    });
-  }, [communities, searchQuery, statusFilter]);
+        return matchesSearch && matchesStatus;
+      })
+      .map((comm: Community) => {
+        const bd = metrics?.communityBreakdown?.[comm.id];
+        return {
+          ...comm,
+          totalTowersCount: bd?.totalTowers,
+          totalUnitsCount: bd?.totalUnits,
+          totalResidentsCount: bd?.totalResidents,
+          occupancyRate: bd?.occupancyRate ?? 0,
+          financialStatus: bd?.financialStatus ?? "Good",
+        };
+      });
+  }, [communities, searchQuery, statusFilter, metrics]);
 
   const handleOpenCreate = () => {
     setName("");
     setCode("");
     setCity("");
     setState("");
+    setAdminName("");
+    setAdminEmail("");
+    setAdminPassword(generateInitialPassword("Admin"));
+    setAdminPhone("");
     setFormError("");
     setTouched({});
     setIsCreateModalOpen(true);
@@ -226,7 +283,16 @@ export default function CommunitiesPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
-    setTouched({ name: true, code: true, city: true, state: true });
+    setTouched({
+      name: true,
+      code: true,
+      city: true,
+      state: true,
+      adminName: true,
+      adminEmail: true,
+      adminPassword: true,
+      adminPhone: true,
+    });
 
     if (!isCreateFormValid) {
       const firstError = Object.values(createErrors)[0];
@@ -240,12 +306,27 @@ export default function CommunitiesPage() {
         code: code.trim().toUpperCase(),
         city: city.trim() || undefined,
         state: state.trim() || undefined,
+        admin_name: adminName.trim(),
+        admin_email: adminEmail.trim(),
+        admin_password: adminPassword,
+        admin_phone: adminPhone.trim() || undefined,
       });
       setIsCreateModalOpen(false);
+      setCreatedAdminInfo({
+        communityName: name.trim(),
+        communityCode: code.trim().toUpperCase(),
+        adminName: adminName.trim(),
+        adminEmail: adminEmail.trim(),
+        adminPassword: adminPassword,
+      });
       setName("");
       setCode("");
       setCity("");
       setState("");
+      setAdminName("");
+      setAdminEmail("");
+      setAdminPassword("");
+      setAdminPhone("");
       setTouched({});
       refetch();
     } catch (err: unknown) {
@@ -449,7 +530,7 @@ export default function CommunitiesPage() {
     setResidentFullName("");
     setResidentEmail("");
     setResidentPhone("");
-    setResidentPassword("");
+    setResidentPassword("resident@Gate2026!");
     setResidentRole("primary_owner");
     setResidentIsPrimary(true);
     setDetailsFeedback(null);
@@ -469,7 +550,7 @@ export default function CommunitiesPage() {
           full_name: residentFullName.trim(),
           email: residentEmail.trim().toLowerCase(),
           phone: residentPhone.trim(),
-          password: residentPassword.trim() || "GateSphere@2026!",
+          password: residentPassword.trim() || generateInitialPassword(residentFullName, "resident"),
           occupancy_role: residentRole,
           is_primary: residentIsPrimary,
         },
@@ -601,8 +682,8 @@ export default function CommunitiesPage() {
             </p>
           </div>
 
-          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-            <div style={{ width: 260 }}>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
+            <div style={{ maxWidth: 260, width: "100%", minWidth: 160 }}>
               <SearchInput
                 value={searchQuery}
                 onChange={setSearchQuery}
@@ -865,7 +946,384 @@ export default function CommunitiesPage() {
               )}
             </div>
           </div>
+
+          {/* Section: Community Admin Credentials */}
+          <div
+            style={{
+              marginTop: "1.5rem",
+              paddingTop: "1.25rem",
+              borderTop: "1px solid #e2e8f0",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: "0.85rem",
+              }}
+            >
+              <div>
+                <h4
+                  style={{
+                    margin: 0,
+                    fontSize: "0.95rem",
+                    fontWeight: 700,
+                    color: "var(--fg)",
+                  }}
+                >
+                  👤 Community Admin Account
+                </h4>
+                <p
+                  style={{
+                    margin: "0.2rem 0 0 0",
+                    fontSize: "0.75rem",
+                    color: "var(--muted)",
+                  }}
+                >
+                  Set up initial login credentials for the Community Admin.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ fontSize: "0.75rem", padding: "0.3rem 0.6rem" }}
+                onClick={() => {
+                  setAdminPassword(generateInitialPassword(adminName || name || "Admin"));
+                  if (!touched.adminPassword) setTouched((t) => ({ ...t, adminPassword: true }));
+                }}
+              >
+                ⚡ Generate Password
+              </button>
+            </div>
+
+            {/* Admin Name & Phone Grid */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "1rem",
+                marginBottom: "1.25rem",
+              }}
+            >
+              <div>
+                <label
+                  htmlFor="modal-admin-name"
+                  style={{
+                    fontWeight: 600,
+                    fontSize: "0.85rem",
+                    color: "var(--fg)",
+                    display: "block",
+                    marginBottom: "0.35rem",
+                  }}
+                >
+                  Admin Full Name <span style={{ color: "var(--danger)" }}>*</span>
+                </label>
+                <input
+                  id="modal-admin-name"
+                  type="text"
+                  className="input-field"
+                  placeholder="e.g. Ramesh Sharma"
+                  value={adminName}
+                  onChange={(e) => {
+                    setAdminName(e.target.value);
+                    if (!touched.adminName) setTouched((t) => ({ ...t, adminName: true }));
+                  }}
+                  onBlur={() => setTouched((t) => ({ ...t, adminName: true }))}
+                  style={{
+                    borderColor:
+                      touched.adminName && createErrors.adminName ? "var(--danger)" : undefined,
+                  }}
+                  required
+                />
+                {touched.adminName && createErrors.adminName && (
+                  <p
+                    style={{
+                      color: "var(--danger)",
+                      fontSize: "0.75rem",
+                      marginTop: "0.3rem",
+                      fontWeight: 500,
+                    }}
+                  >
+                    ✕ {createErrors.adminName}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label
+                  htmlFor="modal-admin-phone"
+                  style={{
+                    fontWeight: 600,
+                    fontSize: "0.85rem",
+                    color: "var(--fg)",
+                    display: "block",
+                    marginBottom: "0.35rem",
+                  }}
+                >
+                  Admin Phone{" "}
+                  <span style={{ color: "var(--muted)", fontWeight: 400, fontSize: "0.75rem" }}>
+                    (Optional)
+                  </span>
+                </label>
+                <input
+                  id="modal-admin-phone"
+                  type="tel"
+                  className="input-field"
+                  placeholder="+91 98765 43210"
+                  value={adminPhone}
+                  onChange={(e) => {
+                    setAdminPhone(e.target.value);
+                    if (!touched.adminPhone) setTouched((t) => ({ ...t, adminPhone: true }));
+                  }}
+                  onBlur={() => setTouched((t) => ({ ...t, adminPhone: true }))}
+                  style={{
+                    borderColor:
+                      touched.adminPhone && createErrors.adminPhone ? "var(--danger)" : undefined,
+                  }}
+                />
+                {touched.adminPhone && createErrors.adminPhone && (
+                  <p
+                    style={{
+                      color: "var(--danger)",
+                      fontSize: "0.75rem",
+                      marginTop: "0.3rem",
+                      fontWeight: 500,
+                    }}
+                  >
+                    ✕ {createErrors.adminPhone}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Admin Email */}
+            <div style={{ marginBottom: "1.25rem" }}>
+              <label
+                htmlFor="modal-admin-email"
+                style={{
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  color: "var(--fg)",
+                  display: "block",
+                  marginBottom: "0.35rem",
+                }}
+              >
+                Admin Login Email <span style={{ color: "var(--danger)" }}>*</span>
+              </label>
+              <input
+                id="modal-admin-email"
+                type="email"
+                className="input-field"
+                placeholder="e.g. admin.prestige@gatesphere.com"
+                value={adminEmail}
+                onChange={(e) => {
+                  setAdminEmail(e.target.value);
+                  if (!touched.adminEmail) setTouched((t) => ({ ...t, adminEmail: true }));
+                }}
+                onBlur={() => setTouched((t) => ({ ...t, adminEmail: true }))}
+                style={{
+                  borderColor:
+                    touched.adminEmail && createErrors.adminEmail ? "var(--danger)" : undefined,
+                }}
+                required
+              />
+              {touched.adminEmail && createErrors.adminEmail && (
+                <p
+                  style={{
+                    color: "var(--danger)",
+                    fontSize: "0.75rem",
+                    marginTop: "0.3rem",
+                    fontWeight: 500,
+                  }}
+                >
+                  ✕ {createErrors.adminEmail}
+                </p>
+              )}
+            </div>
+
+            {/* Admin Password using PasswordField */}
+            <div style={{ marginBottom: "0.5rem" }}>
+              <PasswordField
+                id="modal-admin-password"
+                label="Initial Password"
+                subLabel="(Min 8 characters)"
+                value={adminPassword}
+                onChange={(val) => {
+                  setAdminPassword(val);
+                  if (!touched.adminPassword) setTouched((t) => ({ ...t, adminPassword: true }));
+                }}
+                placeholder="e.g. admin@Gate2026!"
+                required
+                minLength={8}
+                helperText="💡 The admin will use this email and password to log in and manage the community portal."
+              />
+              {touched.adminPassword && createErrors.adminPassword && (
+                <p
+                  style={{
+                    color: "var(--danger)",
+                    fontSize: "0.75rem",
+                    marginTop: "0.3rem",
+                    fontWeight: 500,
+                  }}
+                >
+                  ✕ {createErrors.adminPassword}
+                </p>
+              )}
+            </div>
+          </div>
         </form>
+      </Modal>
+
+      {/* Community & Admin Created Success Modal */}
+      <Modal
+        isOpen={Boolean(createdAdminInfo)}
+        onClose={() => setCreatedAdminInfo(null)}
+        title="🎉 Community & Admin Account Created"
+        footer={
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => setCreatedAdminInfo(null)}
+          >
+            Done
+          </button>
+        }
+      >
+        <div style={{ padding: "0.5rem 0" }}>
+          <div
+            style={{
+              padding: "1rem",
+              background: "#f0fdf4",
+              border: "1px solid #bbf7d0",
+              borderRadius: "8px",
+              marginBottom: "1.25rem",
+            }}
+          >
+            <p style={{ margin: 0, fontWeight: 600, color: "#166534", fontSize: "0.95rem" }}>
+              ✅ {createdAdminInfo?.communityName} ({createdAdminInfo?.communityCode}) has been
+              successfully created!
+            </p>
+            <p style={{ margin: "0.4rem 0 0 0", fontSize: "0.8rem", color: "#15803d" }}>
+              The Community Admin account has been provisioned and is ready for login.
+            </p>
+          </div>
+
+          <div
+            style={{
+              background: "#f8fafc",
+              border: "1px solid #e2e8f0",
+              borderRadius: "8px",
+              padding: "1rem",
+            }}
+          >
+            <h4
+              style={{
+                margin: "0 0 0.75rem 0",
+                fontSize: "0.85rem",
+                fontWeight: 700,
+                color: "#334155",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+              }}
+            >
+              Admin Login Credentials
+            </h4>
+
+            <div style={{ display: "grid", gap: "0.6rem", fontSize: "0.85rem" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  paddingBottom: "0.4rem",
+                  borderBottom: "1px dashed #e2e8f0",
+                }}
+              >
+                <span style={{ color: "var(--muted)" }}>Admin Name:</span>
+                <span style={{ fontWeight: 600, color: "var(--fg)" }}>
+                  {createdAdminInfo?.adminName}
+                </span>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  paddingBottom: "0.4rem",
+                  borderBottom: "1px dashed #e2e8f0",
+                }}
+              >
+                <span style={{ color: "var(--muted)" }}>Login Email:</span>
+                <span style={{ fontWeight: 600, color: "var(--fg)" }}>
+                  {createdAdminInfo?.adminEmail}
+                </span>
+              </div>
+              {createdAdminInfo?.adminPassword && (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <span style={{ color: "var(--muted)" }}>Initial Password:</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <code
+                      style={{
+                        background: "#e2e8f0",
+                        padding: "0.2rem 0.5rem",
+                        borderRadius: "4px",
+                        fontWeight: 600,
+                        color: "#0f172a",
+                      }}
+                    >
+                      {createdAdminInfo.adminPassword}
+                    </code>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ fontSize: "0.7rem", padding: "0.2rem 0.5rem" }}
+                      onClick={() => {
+                        if (createdAdminInfo?.adminPassword) {
+                          navigator.clipboard.writeText(createdAdminInfo.adminPassword);
+                          setCopiedPassword(true);
+                          setTimeout(() => setCopiedPassword(false), 2000);
+                        }
+                      }}
+                    >
+                      {copiedPassword ? "✓ Copied" : "Copy"}
+                    </button>
+                  </div>
+                </div>
+              )}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  paddingTop: "0.4rem",
+                  borderTop: "1px dashed #e2e8f0",
+                }}
+              >
+                <span style={{ color: "var(--muted)" }}>Assigned Role:</span>
+                <span className="badge badge-primary" style={{ fontWeight: 600 }}>
+                  Community Admin (community_admin)
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <p
+            style={{
+              marginTop: "1rem",
+              fontSize: "0.8rem",
+              color: "var(--muted)",
+              lineHeight: 1.4,
+            }}
+          >
+            💡 You or the community administrator can now sign in directly at the GateSphere login
+            page with these credentials to manage towers, units, staff, and visitors for this
+            community.
+          </p>
+        </div>
       </Modal>
 
       {/* Edit & Delete Modal */}
@@ -2108,7 +2566,11 @@ export default function CommunitiesPage() {
                     className="input-field"
                     placeholder="e.g. Ananya Patel"
                     value={residentFullName}
-                    onChange={(e) => setResidentFullName(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setResidentFullName(val);
+                      setResidentPassword(generateInitialPassword(val, "resident"));
+                    }}
                     required
                   />
                 </div>
@@ -2159,15 +2621,11 @@ export default function CommunitiesPage() {
               </div>
 
               <div>
-                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "#475569", marginBottom: "0.3rem" }}>
-                  Initial Password (Optional)
-                </label>
-                <input
-                  type="text"
-                  className="input-field"
-                  placeholder="Default: GateSphere@2026!"
+                <PasswordField
                   value={residentPassword}
-                  onChange={(e) => setResidentPassword(e.target.value)}
+                  onChange={(val) => setResidentPassword(val)}
+                  placeholder="e.g. ananya@Gate2026!"
+                  helperText="💡 Providing credentials allows this resident to sign in to the Resident Portal to approve visitors, receive delivery alerts, and book amenities."
                 />
               </div>
 

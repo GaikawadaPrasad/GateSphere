@@ -136,61 +136,189 @@ def _role_url(role_slugs: frozenset[str], category: str, fallback: str = "/dashb
 # category happened to be checked first — see AGENTS.md discussion of the old first-match bug.
 _INTENT_TERMS: dict[str, tuple[str, ...]] = {
     "payment_history": (
-        "payment history", "past payments", "past payment", "receipt", "receipts",
-        "transaction history", "transactions",
+        "payment history",
+        "past payments",
+        "past payment",
+        "receipt",
+        "receipts",
+        "transaction history",
+        "transactions",
     ),
     "billing": (
-        "due", "dues", "bill", "bills", "invoice", "invoices", "payment", "payments",
-        "maintenance", "pay", "balance", "fee", "collection", "collections", "collection summary",
+        "due",
+        "dues",
+        "bill",
+        "bills",
+        "invoice",
+        "invoices",
+        "payment",
+        "payments",
+        "maintenance",
+        "pay",
+        "balance",
+        "fee",
+        "collection",
+        "collections",
+        "collection summary",
     ),
     "visitors": (
-        "visitor", "visitors", "guest", "guests", "cab", "uber", "visitor pass", "guest pass",
-        "entry pass", "traffic", "gate traffic",
+        "visitor",
+        "visitors",
+        "guest",
+        "guests",
+        "cab",
+        "uber",
+        "visitor pass",
+        "guest pass",
+        "entry pass",
+        "traffic",
+        "gate traffic",
     ),
     "deliveries": (
-        "delivery", "deliveries", "courier", "swiggy", "zomato", "amazon", "blinkit", "parcel",
-        "parcels", "gate desk", "package", "food",
+        "delivery",
+        "deliveries",
+        "courier",
+        "swiggy",
+        "zomato",
+        "amazon",
+        "blinkit",
+        "parcel",
+        "parcels",
+        "gate desk",
+        "package",
+        "food",
     ),
     "vehicles": (
-        "parking", "vehicle", "vehicles", "car", "cars", "bike", "bikes", "slot", "slots", "ev",
-        "charging", "unauthorized", "wrong parking", "bay", "bays",
+        "parking",
+        "vehicle",
+        "vehicles",
+        "car",
+        "cars",
+        "bike",
+        "bikes",
+        "slot",
+        "slots",
+        "ev",
+        "charging",
+        "unauthorized",
+        "wrong parking",
+        "bay",
+        "bays",
     ),
     "pets": ("pet", "pets", "dog", "dogs", "cat", "cats", "animal", "animals", "leash", "barking"),
     "renovation": (
-        "renovation", "carpenter", "carpentry", "interior", "drilling", "noise", "construction",
-        "contractor", "drill",
+        "renovation",
+        "carpenter",
+        "carpentry",
+        "interior",
+        "drilling",
+        "noise",
+        "construction",
+        "contractor",
+        "drill",
     ),
     "garbage": (
-        "garbage", "waste", "trash", "segregation", "wet waste", "dry waste", "debris", "chute",
+        "garbage",
+        "waste",
+        "trash",
+        "segregation",
+        "wet waste",
+        "dry waste",
+        "debris",
+        "chute",
     ),
     "complaints": (
-        "complaint", "complaints", "ticket", "tickets", "issue", "issues", "leak", "plumbing",
-        "plumber", "electrical", "electrician", "lift", "repair", "service desk",
+        "complaint",
+        "complaints",
+        "ticket",
+        "tickets",
+        "issue",
+        "issues",
+        "leak",
+        "plumbing",
+        "plumber",
+        "electrical",
+        "electrician",
+        "lift",
+        "repair",
+        "service desk",
     ),
     "emergency": (
-        "emergency", "security", "panic", "police", "ambulance", "fire", "contact", "contacts",
-        "guard", "hotline",
+        "emergency",
+        "security",
+        "panic",
+        "police",
+        "ambulance",
+        "fire",
+        "contact",
+        "contacts",
+        "guard",
+        "hotline",
     ),
     "amenities": (
-        "amenity", "amenities", "gym", "pool", "swimming", "clubhouse", "tennis", "court",
-        "timing", "timings", "slot", "slots", "book",
+        "amenity",
+        "amenities",
+        "gym",
+        "pool",
+        "swimming",
+        "clubhouse",
+        "tennis",
+        "court",
+        "timing",
+        "timings",
+        "slot",
+        "slots",
+        "book",
     ),
     "domestic_staff": (
-        "staff", "maid", "maids", "driver", "drivers", "cook", "cooks", "cleaner", "attendance",
+        "staff",
+        "maid",
+        "maids",
+        "driver",
+        "drivers",
+        "cook",
+        "cooks",
+        "cleaner",
+        "attendance",
         "helper",
     ),
     "move": ("move", "relocation", "shifting", "furniture", "rule", "rules", "quiet", "noc"),
     "utilities": (
-        "internet", "wifi", "broadband", "fiber", "cable", "gas", "electricity", "generator",
-        "power backup", "dg",
+        "internet",
+        "wifi",
+        "broadband",
+        "fiber",
+        "cable",
+        "gas",
+        "electricity",
+        "generator",
+        "power backup",
+        "dg",
     ),
     "communication": (
-        "notice", "notices", "circular", "circulars", "announcement", "announcements",
-        "broadcast", "meeting", "agm", "event", "events",
+        "notice",
+        "notices",
+        "circular",
+        "circulars",
+        "announcement",
+        "announcements",
+        "broadcast",
+        "meeting",
+        "agm",
+        "event",
+        "events",
     ),
     "profile": (
-        "profile", "my details", "who am i", "who i am", "my flat", "my unit", "flat number",
-        "account details", "my phone", "my email",
+        "profile",
+        "my details",
+        "who am i",
+        "who i am",
+        "my flat",
+        "my unit",
+        "flat number",
+        "account details",
+        "my phone",
+        "my email",
     ),
     "blacklist": ("blacklist", "blacklisted", "banned visitor"),
     "communities_overview": ("communities overview", "how many communities", "communities"),
@@ -204,9 +332,7 @@ def _match_score(q: str, words: set[str], terms: tuple[str, ...]) -> int:
         if " " in t:
             if t in q:
                 score += 2
-        elif t in words:
-            score += 1
-        elif len(t) >= 5 and t in q:
+        elif t in words or (len(t) >= 5 and t in q):
             score += 1
     return score
 
@@ -297,9 +423,9 @@ class AssistantService:
                 self._role_slugs_cache = frozenset({"super_admin"})
             else:
                 rows = await self.db.scalars(
-                    select(Role.slug).join(UserRole, UserRole.role_id == Role.id).where(
-                        UserRole.user_id == self.actor.id
-                    )
+                    select(Role.slug)
+                    .join(UserRole, UserRole.role_id == Role.id)
+                    .where(UserRole.user_id == self.actor.id)
                 )
                 self._role_slugs_cache = frozenset(rows.all())
         return self._role_slugs_cache
@@ -323,13 +449,22 @@ class AssistantService:
                     id="pass", icon="user-plus", label="Create Visitor Pass", query="visitor pass"
                 ),
                 schemas.AssistantQuickChip(
-                    id="complaint", icon="tool", label="Report Issue / Leak", query="raise complaint"
+                    id="complaint",
+                    icon="tool",
+                    label="Report Issue / Leak",
+                    query="raise complaint",
                 ),
                 schemas.AssistantQuickChip(
-                    id="amenities", icon="calendar", label="Gym & Pool Timings", query="pool gym timings"
+                    id="amenities",
+                    icon="calendar",
+                    label="Gym & Pool Timings",
+                    query="pool gym timings",
                 ),
                 schemas.AssistantQuickChip(
-                    id="emergency", icon="phone", label="Emergency Contacts", query="emergency security contact"
+                    id="emergency",
+                    icon="phone",
+                    label="Emergency Contacts",
+                    query="emergency security contact",
                 ),
             ]
             suggested = [
@@ -345,7 +480,10 @@ class AssistantService:
                     id="gate", icon="shield", label="Live Gate Traffic", query="gate traffic"
                 ),
                 schemas.AssistantQuickChip(
-                    id="panic", icon="alert-triangle", label="Active Panic Alerts", query="panic alerts"
+                    id="panic",
+                    icon="alert-triangle",
+                    label="Active Panic Alerts",
+                    query="panic alerts",
                 ),
                 schemas.AssistantQuickChip(
                     id="staff", icon="users", label="Staff Attendance", query="staff attendance"
@@ -354,7 +492,10 @@ class AssistantService:
                     id="blacklist", icon="slash", label="Visitor Blacklist", query="blacklist"
                 ),
                 schemas.AssistantQuickChip(
-                    id="emergency", icon="phone", label="Gate Checkpoints", query="emergency security contact"
+                    id="emergency",
+                    icon="phone",
+                    label="Gate Checkpoints",
+                    query="emergency security contact",
                 ),
             ]
             suggested = [
@@ -367,13 +508,22 @@ class AssistantService:
         elif role_cat == "super_admin":
             chips = [
                 schemas.AssistantQuickChip(
-                    id="communities", icon="grid", label="Communities Overview", query="communities overview"
+                    id="communities",
+                    icon="grid",
+                    label="Communities Overview",
+                    query="communities overview",
                 ),
                 schemas.AssistantQuickChip(
-                    id="financial", icon="dollar-sign", label="Global Financials", query="collection summary"
+                    id="financial",
+                    icon="dollar-sign",
+                    label="Global Financials",
+                    query="collection summary",
                 ),
                 schemas.AssistantQuickChip(
-                    id="traffic", icon="activity", label="Platform Gate Traffic", query="gate traffic"
+                    id="traffic",
+                    icon="activity",
+                    label="Platform Gate Traffic",
+                    query="gate traffic",
                 ),
                 schemas.AssistantQuickChip(
                     id="tickets", icon="tool", label="Open Complaints", query="open tickets"
@@ -391,7 +541,10 @@ class AssistantService:
                     id="tickets", icon="tool", label="Open Complaints", query="open tickets"
                 ),
                 schemas.AssistantQuickChip(
-                    id="financial", icon="dollar-sign", label="Financial Overview", query="collection summary"
+                    id="financial",
+                    icon="dollar-sign",
+                    label="Financial Overview",
+                    query="collection summary",
                 ),
                 schemas.AssistantQuickChip(
                     id="gate", icon="shield", label="Live Gate Traffic", query="gate traffic"
@@ -400,7 +553,10 @@ class AssistantService:
                     id="staff", icon="users", label="Staff Attendance", query="staff attendance"
                 ),
                 schemas.AssistantQuickChip(
-                    id="panic", icon="alert-triangle", label="Active Panic Alerts", query="panic alerts"
+                    id="panic",
+                    icon="alert-triangle",
+                    label="Active Panic Alerts",
+                    query="panic alerts",
                 ),
             ]
             suggested = [
@@ -419,9 +575,7 @@ class AssistantService:
         )
 
     # -- Primary Assistant Query Handler ----------------------- #
-    async def query(
-        self, community_id: uuid.UUID | None, query: str
-    ) -> schemas.AssistantResponse:
+    async def query(self, community_id: uuid.UUID | None, query: str) -> schemas.AssistantResponse:
         cids = await self._communities(community_id)
 
         q = query.lower().strip()
@@ -449,7 +603,9 @@ class AssistantService:
                 reply_text=reply,
                 category="billing",
                 actions=[
-                    schemas.AssistantAction(label="View Full Invoice History", url=await self._url("billing")),
+                    schemas.AssistantAction(
+                        label="View Full Invoice History", url=await self._url("billing")
+                    ),
                 ],
                 related_faqs=[
                     "What are my outstanding maintenance dues?",
@@ -484,9 +640,14 @@ class AssistantService:
                 reply_text=reply,
                 category="billing",
                 actions=[
-                    schemas.AssistantAction(label="View Invoices & Pay", url=await self._url("billing")),
                     schemas.AssistantAction(
-                        label="Payment History", url="", action_type="action", query="show my payment history"
+                        label="View Invoices & Pay", url=await self._url("billing")
+                    ),
+                    schemas.AssistantAction(
+                        label="Payment History",
+                        url="",
+                        action_type="action",
+                        query="show my payment history",
                     ),
                 ],
                 related_faqs=[
@@ -510,7 +671,9 @@ class AssistantService:
                 pending_line = f"You have {pending_reqs} visitor request(s) awaiting approval."
             else:
                 pending_reqs = await self._count(
-                    VisitorRequest, VisitorRequest.community_id.in_(cids), VisitorRequest.status == "pending"
+                    VisitorRequest,
+                    VisitorRequest.community_id.in_(cids),
+                    VisitorRequest.status == "pending",
                 )
                 pending_line = f"There are {pending_reqs} visitor request(s) awaiting approval {self._scope_desc(cids)}."
             reply = (
@@ -522,8 +685,12 @@ class AssistantService:
                 reply_text=reply,
                 category="visitors",
                 actions=[
-                    schemas.AssistantAction(label="Create Visitor Pass", url=await self._url("visitors")),
-                    schemas.AssistantAction(label="View Visitor Log", url=await self._url("visitors")),
+                    schemas.AssistantAction(
+                        label="Create Visitor Pass", url=await self._url("visitors")
+                    ),
+                    schemas.AssistantAction(
+                        label="View Visitor Log", url=await self._url("visitors")
+                    ),
                 ],
                 related_faqs=[
                     "How long is a visitor pass valid?",
@@ -545,8 +712,12 @@ class AssistantService:
                 reply_text=reply,
                 category="deliveries",
                 actions=[
-                    schemas.AssistantAction(label="Configure Delivery Rules", url=await self._url("deliveries")),
-                    schemas.AssistantAction(label="View Gate Deliveries", url=await self._url("deliveries")),
+                    schemas.AssistantAction(
+                        label="Configure Delivery Rules", url=await self._url("deliveries")
+                    ),
+                    schemas.AssistantAction(
+                        label="View Gate Deliveries", url=await self._url("deliveries")
+                    ),
                 ],
                 related_faqs=[
                     "How do I collect parcels left at the gate desk?",
@@ -566,8 +737,12 @@ class AssistantService:
                 reply_text=reply,
                 category="vehicles",
                 actions=[
-                    schemas.AssistantAction(label="My Registered Vehicles", url=await self._url("vehicles")),
-                    schemas.AssistantAction(label="Report Parking Violation", url=await self._url("vehicles")),
+                    schemas.AssistantAction(
+                        label="My Registered Vehicles", url=await self._url("vehicles")
+                    ),
+                    schemas.AssistantAction(
+                        label="Report Parking Violation", url=await self._url("vehicles")
+                    ),
                 ],
                 related_faqs=[
                     "How do I register a second car or motorcycle?",
@@ -587,7 +762,9 @@ class AssistantService:
                 reply_text=reply,
                 category="rules",
                 actions=[
-                    schemas.AssistantAction(label="Community Guidelines", url=await self._url("residents_directory")),
+                    schemas.AssistantAction(
+                        label="Community Guidelines", url=await self._url("residents_directory")
+                    ),
                 ],
                 related_faqs=[
                     "Are pets allowed in the main clubhouse area?",
@@ -607,8 +784,12 @@ class AssistantService:
                 reply_text=reply,
                 category="rules",
                 actions=[
-                    schemas.AssistantAction(label="Contractor Passes", url=await self._url("visitors")),
-                    schemas.AssistantAction(label="Raise Maintenance Query", url=await self._url("complaints")),
+                    schemas.AssistantAction(
+                        label="Contractor Passes", url=await self._url("visitors")
+                    ),
+                    schemas.AssistantAction(
+                        label="Raise Maintenance Query", url=await self._url("complaints")
+                    ),
                 ],
                 related_faqs=[
                     "What is the refundable renovation security deposit?",
@@ -630,7 +811,9 @@ class AssistantService:
                 reply_text=reply,
                 category="housekeeping",
                 actions=[
-                    schemas.AssistantAction(label="Report Housekeeping Issue", url=await self._url("complaints")),
+                    schemas.AssistantAction(
+                        label="Report Housekeeping Issue", url=await self._url("complaints")
+                    ),
                 ],
                 related_faqs=[
                     "Where do I dispose of old electronic items?",
@@ -654,7 +837,9 @@ class AssistantService:
                 )
             else:
                 total_tickets = await self._count(
-                    ServiceTicket, ServiceTicket.community_id.in_(cids), ServiceTicket.status.in_(_OPEN_TICKET)
+                    ServiceTicket,
+                    ServiceTicket.community_id.in_(cids),
+                    ServiceTicket.status.in_(_OPEN_TICKET),
                 )
                 reply = (
                     f"There are currently {total_tickets} open service ticket(s) {self._scope_desc(cids)}. "
@@ -665,8 +850,12 @@ class AssistantService:
                 reply_text=reply,
                 category="complaints",
                 actions=[
-                    schemas.AssistantAction(label="Raise New Ticket", url=await self._url("complaints")),
-                    schemas.AssistantAction(label="Track My Tickets", url=await self._url("complaints")),
+                    schemas.AssistantAction(
+                        label="Raise New Ticket", url=await self._url("complaints")
+                    ),
+                    schemas.AssistantAction(
+                        label="Track My Tickets", url=await self._url("complaints")
+                    ),
                 ],
                 related_faqs=[
                     "What are the SLA turnaround times for emergency tickets?",
@@ -689,8 +878,12 @@ class AssistantService:
                 reply_text=reply,
                 category="emergency",
                 actions=[
-                    schemas.AssistantAction(label="Security Gate View", url=await self._url("emergency")),
-                    schemas.AssistantAction(label="Emergency Directory", url=await self._url("residents_directory")),
+                    schemas.AssistantAction(
+                        label="Security Gate View", url=await self._url("emergency")
+                    ),
+                    schemas.AssistantAction(
+                        label="Emergency Directory", url=await self._url("residents_directory")
+                    ),
                 ],
                 related_faqs=[
                     "How does the gate panic alert work?",
@@ -718,7 +911,9 @@ class AssistantService:
                 reply_text=reply,
                 category="amenities",
                 actions=[
-                    schemas.AssistantAction(label="Book an Amenity", url=await self._url("amenities")),
+                    schemas.AssistantAction(
+                        label="Book an Amenity", url=await self._url("amenities")
+                    ),
                     schemas.AssistantAction(label="My Bookings", url=await self._url("amenities")),
                 ],
                 related_faqs=[
@@ -741,7 +936,9 @@ class AssistantService:
                 reply_text=reply,
                 category="domestic_staff",
                 actions=[
-                    schemas.AssistantAction(label="View Domestic Staff", url=await self._url("domestic_staff")),
+                    schemas.AssistantAction(
+                        label="View Domestic Staff", url=await self._url("domestic_staff")
+                    ),
                 ],
                 related_faqs=[
                     "How do I add a new maid or driver?",
@@ -761,7 +958,9 @@ class AssistantService:
                 reply_text=reply,
                 category="rules",
                 actions=[
-                    schemas.AssistantAction(label="Request Move Clearance", url=await self._url("residents_directory")),
+                    schemas.AssistantAction(
+                        label="Request Move Clearance", url=await self._url("residents_directory")
+                    ),
                 ],
                 related_faqs=[
                     "How to submit a Move-Out NOC request?",
@@ -780,8 +979,12 @@ class AssistantService:
                 reply_text=reply,
                 category="utilities",
                 actions=[
-                    schemas.AssistantAction(label="Emergency Desk", url=await self._url("emergency")),
-                    schemas.AssistantAction(label="Report Power/Utility Issue", url=await self._url("complaints")),
+                    schemas.AssistantAction(
+                        label="Emergency Desk", url=await self._url("emergency")
+                    ),
+                    schemas.AssistantAction(
+                        label="Report Power/Utility Issue", url=await self._url("complaints")
+                    ),
                 ],
                 related_faqs=[
                     "What is the DG generator diesel surcharge policy?",
@@ -791,7 +994,9 @@ class AssistantService:
 
         if intent == "communication":
             latest_notices = await self._count(
-                Announcement, Announcement.community_id.in_(cids), Announcement.is_published.is_(True)
+                Announcement,
+                Announcement.community_id.in_(cids),
+                Announcement.is_published.is_(True),
             )
             reply = (
                 f"📢 **Community Notices & Circulars:**\n"
@@ -802,7 +1007,9 @@ class AssistantService:
                 reply_text=reply,
                 category="communication",
                 actions=[
-                    schemas.AssistantAction(label="Open Notice Board", url=await self._url("communication")),
+                    schemas.AssistantAction(
+                        label="Open Notice Board", url=await self._url("communication")
+                    ),
                 ],
                 related_faqs=[
                     "When is the next Annual General Meeting (AGM)?",
@@ -846,8 +1053,12 @@ class AssistantService:
                 category="profile",
                 actions=[
                     schemas.AssistantAction(label="Edit Profile", url=await self._url("profile")),
-                    schemas.AssistantAction(label="My Registered Vehicles", url=await self._url("vehicles")),
-                    schemas.AssistantAction(label="Maintenance Invoices", url=await self._url("billing")),
+                    schemas.AssistantAction(
+                        label="My Registered Vehicles", url=await self._url("vehicles")
+                    ),
+                    schemas.AssistantAction(
+                        label="Maintenance Invoices", url=await self._url("billing")
+                    ),
                 ],
                 related_faqs=[
                     "What are my outstanding maintenance dues?",
@@ -861,7 +1072,9 @@ class AssistantService:
                 VisitorBlacklist,
                 VisitorBlacklist.community_id.in_(cids),
                 VisitorBlacklist.active_from <= today,
-                or_(VisitorBlacklist.active_until.is_(None), VisitorBlacklist.active_until >= today),
+                or_(
+                    VisitorBlacklist.active_until.is_(None), VisitorBlacklist.active_until >= today
+                ),
             )
             reply = (
                 f"🚫 There {'is' if active_count == 1 else 'are'} currently {active_count} active blacklist "
@@ -871,7 +1084,9 @@ class AssistantService:
                 reply_text=reply,
                 category="blacklist",
                 actions=[
-                    schemas.AssistantAction(label="View Blacklist", url=await self._url("blacklist")),
+                    schemas.AssistantAction(
+                        label="View Blacklist", url=await self._url("blacklist")
+                    ),
                 ],
                 related_faqs=[
                     "How do I add a visitor to the blacklist?",
@@ -889,7 +1104,9 @@ class AssistantService:
                 reply_text=reply,
                 category="communities",
                 actions=[
-                    schemas.AssistantAction(label="View All Communities", url=await self._url("communities")),
+                    schemas.AssistantAction(
+                        label="View All Communities", url=await self._url("communities")
+                    ),
                 ],
                 related_faqs=[
                     "Show platform-wide collection summary",
@@ -931,10 +1148,18 @@ class AssistantService:
                 reply_text=reply,
                 category="capabilities",
                 actions=[
-                    schemas.AssistantAction(label="💳 Maintenance Dues", url=await self._url("billing")),
-                    schemas.AssistantAction(label="👥 Create Visitor Pass", url=await self._url("visitors")),
-                    schemas.AssistantAction(label="🛠️ Report Issue", url=await self._url("complaints")),
-                    schemas.AssistantAction(label="🏊 Amenity Booking", url=await self._url("amenities")),
+                    schemas.AssistantAction(
+                        label="💳 Maintenance Dues", url=await self._url("billing")
+                    ),
+                    schemas.AssistantAction(
+                        label="👥 Create Visitor Pass", url=await self._url("visitors")
+                    ),
+                    schemas.AssistantAction(
+                        label="🛠️ Report Issue", url=await self._url("complaints")
+                    ),
+                    schemas.AssistantAction(
+                        label="🏊 Amenity Booking", url=await self._url("amenities")
+                    ),
                 ],
                 related_faqs=[
                     "What are my outstanding maintenance dues?",
@@ -947,7 +1172,16 @@ class AssistantService:
         # Polite & Warm Greetings
         if any(
             q == k or q.startswith(f"{k} ") or f" {k}" in q
-            for k in ("hi", "hello", "hey", "good morning", "good evening", "good afternoon", "namaste", "greetings")
+            for k in (
+                "hi",
+                "hello",
+                "hey",
+                "good morning",
+                "good evening",
+                "good afternoon",
+                "namaste",
+                "greetings",
+            )
         ):
             role_cat = await self._resolve_role_category()
             if role_cat == "security":
@@ -962,10 +1196,18 @@ class AssistantService:
                     "• 📞 View emergency gate checkpoints & contacts"
                 )
                 actions = [
-                    schemas.AssistantAction(label="👥 Gate Operations", url=await self._url("gate_live")),
-                    schemas.AssistantAction(label="🚨 Incident Logs", url=await self._url("emergency")),
-                    schemas.AssistantAction(label="🧹 Staff Attendance", url=await self._url("domestic_staff")),
-                    schemas.AssistantAction(label="🚫 Visitor Blacklist", url=await self._url("blacklist")),
+                    schemas.AssistantAction(
+                        label="👥 Gate Operations", url=await self._url("gate_live")
+                    ),
+                    schemas.AssistantAction(
+                        label="🚨 Incident Logs", url=await self._url("emergency")
+                    ),
+                    schemas.AssistantAction(
+                        label="🧹 Staff Attendance", url=await self._url("domestic_staff")
+                    ),
+                    schemas.AssistantAction(
+                        label="🚫 Visitor Blacklist", url=await self._url("blacklist")
+                    ),
                 ]
                 faqs = [
                     "How many visitors and vehicles are inside?",
@@ -983,8 +1225,12 @@ class AssistantService:
                 )
                 actions = [
                     schemas.AssistantAction(label="🌐 Global Dashboard", url="/dashboard"),
-                    schemas.AssistantAction(label="🏘️ Communities List", url=await self._url("communities")),
-                    schemas.AssistantAction(label="💳 Financial Overview", url=await self._url("billing")),
+                    schemas.AssistantAction(
+                        label="🏘️ Communities List", url=await self._url("communities")
+                    ),
+                    schemas.AssistantAction(
+                        label="💳 Financial Overview", url=await self._url("billing")
+                    ),
                     schemas.AssistantAction(label="📋 Audit Logs", url=await self._url("audit")),
                 ]
                 faqs = [
@@ -1005,9 +1251,15 @@ class AssistantService:
                 )
                 actions = [
                     schemas.AssistantAction(label="📊 Admin Dashboard", url="/dashboard"),
-                    schemas.AssistantAction(label="🛠️ Manage Complaints", url=await self._url("complaints")),
-                    schemas.AssistantAction(label="💳 Billing & Invoices", url=await self._url("billing")),
-                    schemas.AssistantAction(label="📢 Broadcast Notice", url=await self._url("communication")),
+                    schemas.AssistantAction(
+                        label="🛠️ Manage Complaints", url=await self._url("complaints")
+                    ),
+                    schemas.AssistantAction(
+                        label="💳 Billing & Invoices", url=await self._url("billing")
+                    ),
+                    schemas.AssistantAction(
+                        label="📢 Broadcast Notice", url=await self._url("communication")
+                    ),
                 ]
                 faqs = [
                     "Show open complaints by priority",
@@ -1026,11 +1278,21 @@ class AssistantService:
                     "• 🚨 View emergency security gate contacts"
                 )
                 actions = [
-                    schemas.AssistantAction(label="💳 Maintenance Dues", url=await self._url("billing")),
-                    schemas.AssistantAction(label="👥 Create Visitor Pass", url=await self._url("visitors")),
-                    schemas.AssistantAction(label="🛠️ Report Issue", url=await self._url("complaints")),
-                    schemas.AssistantAction(label="🏊 Amenity Booking", url=await self._url("amenities")),
-                    schemas.AssistantAction(label="🚨 Emergency Contacts", url=await self._url("emergency")),
+                    schemas.AssistantAction(
+                        label="💳 Maintenance Dues", url=await self._url("billing")
+                    ),
+                    schemas.AssistantAction(
+                        label="👥 Create Visitor Pass", url=await self._url("visitors")
+                    ),
+                    schemas.AssistantAction(
+                        label="🛠️ Report Issue", url=await self._url("complaints")
+                    ),
+                    schemas.AssistantAction(
+                        label="🏊 Amenity Booking", url=await self._url("amenities")
+                    ),
+                    schemas.AssistantAction(
+                        label="🚨 Emergency Contacts", url=await self._url("emergency")
+                    ),
                 ]
                 faqs = [
                     "What are my outstanding maintenance dues?",
@@ -1055,7 +1317,7 @@ class AssistantService:
             actor_id=str(self.actor.id),
         )
         reply = (
-            f"I couldn't find a direct policy match for \"{query}\".\n\n"
+            f'I couldn\'t find a direct policy match for "{query}".\n\n'
             "You can ask me about:\n"
             "• Maintenance Dues & Invoices\n"
             "• Visitor & Delivery Gate Passes\n"
@@ -1070,7 +1332,9 @@ class AssistantService:
             actions=[
                 schemas.AssistantAction(label="View Dashboard", url="/dashboard"),
                 schemas.AssistantAction(label="Raise Complaint", url=await self._url("complaints")),
-                schemas.AssistantAction(label="Create Visitor Pass", url=await self._url("visitors")),
+                schemas.AssistantAction(
+                    label="Create Visitor Pass", url=await self._url("visitors")
+                ),
             ],
             related_faqs=[
                 "What are my outstanding maintenance dues?",

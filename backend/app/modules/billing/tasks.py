@@ -69,7 +69,7 @@ async def _sweep_overdue_invoices() -> dict:
                     ),
                     reference_type="maintenance_invoice",
                     reference_id=inv.id,
-                    channels=["in_app", "email", "sms"],
+                    channels=["in_app", "email", "sms", "whatsapp", "push"],
                 )
             moved += 1
     log.info("billing.overdue_sweep", invoices_marked=moved)
@@ -107,7 +107,7 @@ async def _send_dues_reminders() -> dict:
                 ),
                 reference_type="maintenance_invoice",
                 reference_id=inv.id,
-                channels=["in_app", "email"],
+                channels=["in_app", "email", "sms", "whatsapp", "push"],
             )
             sent += 1
     log.info("billing.dues_reminders", reminders_sent=sent, at=now.isoformat())

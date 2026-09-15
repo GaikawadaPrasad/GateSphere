@@ -31,16 +31,22 @@ class BlacklistRepository(AsyncTenantRepository[VisitorBlacklist]):
     model = VisitorBlacklist
 
     async def match(
-        self, community_id: uuid.UUID, phone_hash: str, id_hash: str | None
+        self, community_id: uuid.UUID, phone_hash: str | None, id_hash: str | None
     ) -> VisitorBlacklist | None:
-        clause = VisitorBlacklist.phone_hash == phone_hash
-        if id_hash:
-            clause = clause | (VisitorBlacklist.id_number_hash == id_hash)
+        from sqlalchemy import or_
+
+        conditions = []
+        if phone_hash and phone_hash.strip():
+            conditions.append(VisitorBlacklist.phone_hash == phone_hash.strip())
+        if id_hash and id_hash.strip():
+            conditions.append(VisitorBlacklist.id_number_hash == id_hash.strip())
+        if not conditions:
+            return None
         return await self.db.scalar(
             select(VisitorBlacklist).where(
                 VisitorBlacklist.community_id == community_id,
                 VisitorBlacklist.is_active.is_(True),
-                clause,
+                or_(*conditions),
             )
         )
 

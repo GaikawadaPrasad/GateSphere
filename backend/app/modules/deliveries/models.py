@@ -15,6 +15,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
+    Index,
     Integer,
     String,
     Text,
@@ -53,11 +54,28 @@ EVENT_TYPES = ("logged", "arrived", "approved", "rejected", "entered", "delivere
 class DeliveryProtocol(Base, TimestampMixin, TenantMixin):
     __tablename__ = "delivery_protocols"
     __table_args__ = (
-        UniqueConstraint("community_id", "delivery_type"),
         UniqueConstraint("id", "community_id"),
+        Index(
+            "uq_delivery_protocols_community_default",
+            "community_id",
+            "delivery_type",
+            unique=True,
+            postgresql_where=text("unit_id IS NULL"),
+        ),
+        Index(
+            "uq_delivery_protocols_unit_override",
+            "community_id",
+            "unit_id",
+            "delivery_type",
+            unique=True,
+            postgresql_where=text("unit_id IS NOT NULL"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = pk()
+    unit_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("units.id", ondelete="CASCADE"), nullable=True
+    )
     delivery_type: Mapped[str] = mapped_column(String(20))
     protocol_type: Mapped[str] = mapped_column(String(20), default="collect_at_gate")
     requires_otp: Mapped[bool] = mapped_column(Boolean, default=False)

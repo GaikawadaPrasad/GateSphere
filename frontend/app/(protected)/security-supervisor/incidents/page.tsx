@@ -61,6 +61,12 @@ export default function SecuritySupervisorIncidentsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
+  // Resolution Modal
+  const [isResolveModalOpen, setIsResolveModalOpen] = useState(false);
+  const [resolvingIncident, setResolvingIncident] = useState<SecurityIncident | null>(null);
+  const [resolutionSummary, setResolutionSummary] = useState("");
+  const [isResolving, setIsResolving] = useState(false);
+
   const loadData = async () => {
     setIsLoading(true);
     try {
@@ -117,20 +123,50 @@ export default function SecuritySupervisorIncidentsPage() {
     }
   };
 
-  const handleStatusChange = async (id: string, newStatusSlug: string) => {
-    setUpdatingId(id);
+  const handleStatusChange = async (inc: SecurityIncident, newStatusSlug: string) => {
+    if (newStatusSlug === "resolved") {
+      setResolvingIncident(inc);
+      setResolutionSummary("");
+      setIsResolveModalOpen(true);
+      return;
+    }
+    setUpdatingId(inc.id);
     try {
-      await incidentsApi.transition(id, {
+      await incidentsApi.transition(inc.id, {
         status: newStatusSlug as any,
         reason: "Supervisor status transition",
       });
       setIncidents((prev) =>
-        prev.map((inc) => (inc.id === id ? { ...inc, status: newStatusSlug } : inc)),
+        prev.map((item) => (item.id === inc.id ? { ...item, status: newStatusSlug } : item)),
       );
     } catch (err: any) {
       alert(err?.message || "Failed to update incident status.");
     } finally {
       setUpdatingId(null);
+    }
+  };
+
+  const handleConfirmResolve = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resolvingIncident || !resolutionSummary.trim()) {
+      alert("Please provide a resolution summary.");
+      return;
+    }
+    setIsResolving(true);
+    try {
+      await incidentsApi.transition(resolvingIncident.id, {
+        status: "resolved",
+        resolution_summary: resolutionSummary.trim(),
+        reason: "Supervisor incident resolution",
+      });
+      setIsResolveModalOpen(false);
+      setResolvingIncident(null);
+      setResolutionSummary("");
+      await loadData();
+    } catch (err: any) {
+      alert(err?.message || "Failed to resolve security incident.");
+    } finally {
+      setIsResolving(false);
     }
   };
 
@@ -248,7 +284,7 @@ export default function SecuritySupervisorIncidentsPage() {
                       <select
                         className="select-field"
                         value={inc.status}
-                        onChange={(e) => handleStatusChange(inc.id, e.target.value)}
+                        onChange={(e) => handleStatusChange(inc, e.target.value)}
                         disabled={updatingId === inc.id}
                         style={{ height: 30, fontSize: "0.75rem", padding: "0.15rem 0.4rem" }}
                       >
@@ -387,6 +423,77 @@ export default function SecuritySupervisorIncidentsPage() {
               placeholder="e.g. Gate 2 / Tower C Basement"
               value={locationText}
               onChange={(e) => setLocationText(e.target.value)}
+            />
+          </div>
+        </form>
+      </Modal>
+
+      {/* Resolve Incident Modal */}
+      <Modal
+        isOpen={isResolveModalOpen}
+        onClose={() => setIsResolveModalOpen(false)}
+        title={`Resolve Incident — ${resolvingIncident?.incident_number}`}
+        footer={
+          <>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setIsResolveModalOpen(false)}
+              disabled={isResolving}
+            >
+              Cancel
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={handleConfirmResolve}
+              disabled={isResolving}
+            >
+              {isResolving ? "Resolving…" : "Confirm Resolution"}
+            </button>
+          </>
+        }
+      >
+        <form onSubmit={handleConfirmResolve}>
+          <div
+            style={{
+              padding: "0.75rem",
+              background: "rgba(59, 130, 246, 0.08)",
+              borderRadius: "var(--radius-sm)",
+              border: "1px solid rgba(59, 130, 246, 0.2)",
+              color: "var(--primary)",
+              fontSize: "0.85rem",
+              marginBottom: "1rem",
+            }}
+          >
+            ℹ️ Resolving an incident requires a documented resolution summary and findings for compliance audit.
+          </div>
+
+          <div style={{ marginBottom: "1rem" }}>
+            <div style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--fg)" }}>
+              {resolvingIncident?.title}
+            </div>
+            <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+              Location: {resolvingIncident?.location} | Severity: {resolvingIncident?.severity}
+            </div>
+          </div>
+
+          <div>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
+              Resolution Summary & Action Taken *
+            </label>
+            <textarea
+              className="input-field"
+              rows={3}
+              placeholder="e.g. Perimeter inspected by duty guards. Unattended item verified and returned to rightful owner. Area secured."
+              value={resolutionSummary}
+              onChange={(e) => setResolutionSummary(e.target.value)}
+              required
             />
           </div>
         </form>

@@ -37,6 +37,7 @@ class _Read(BaseModel):
 # -- protocols ------------------------------------------------------- #
 class ProtocolUpsert(_Write):
     delivery_type: str
+    unit_id: uuid.UUID | None = None
     protocol_type: str = "collect_at_gate"
     requires_otp: bool = False
     allow_direct_entry: bool = False
@@ -49,6 +50,7 @@ class ProtocolUpsert(_Write):
 class ProtocolRead(_Read):
     community_id: uuid.UUID
     delivery_type: str
+    unit_id: uuid.UUID | None = None
     protocol_type: str
     requires_otp: bool
     allow_direct_entry: bool

@@ -22,7 +22,8 @@ def _unit_in(community_id: str) -> str:
             select(Unit).where(Unit.community_id == community_id).order_by(Unit.unit_number)
         )
         if u is None:
-            from app.modules.communities.models import Tower, Floor
+            from app.modules.communities.models import Floor, Tower
+
             t = db.scalar(select(Tower).where(Tower.community_id == community_id))
             if not t:
                 t = Tower(community_id=community_id, name="Test Tower", code="TT-01")
@@ -30,7 +31,9 @@ def _unit_in(community_id: str) -> str:
                 db.flush()
             fl = db.scalar(select(Floor).where(Floor.tower_id == t.id))
             if not fl:
-                fl = Floor(community_id=community_id, tower_id=t.id, floor_number=1, label="Floor 1")
+                fl = Floor(
+                    community_id=community_id, tower_id=t.id, floor_number=1, label="Floor 1"
+                )
                 db.add(fl)
                 db.flush()
             u = Unit(community_id=community_id, tower_id=t.id, floor_id=fl.id, unit_number="T-101")
@@ -149,3 +152,61 @@ def test_resident_cannot_act_on_other_units_request(as_role, seed_ids, resident_
     assert all(x["id"] != req["id"] for x in resident.get(f"{P}/requests").json()["data"])
     # a community admin is unrestricted
     assert admin.get(f"{P}/requests/{req['id']}").status_code == 200
+
+
+def test_supervisor_can_remove_blacklist(as_role):
+    sup = as_role("security_supervisor")
+    phone = _phone()
+    r = sup.post(
+        "/api/v1/visitors/blacklist",
+        json={"phone": phone, "reason": "temporary ban", "risk_level": "medium"},
+    )
+    assert r.status_code == 201
+    bl_id = r.json()["data"]["id"]
+
+    # resident cannot delete
+    assert as_role("resident").delete(f"/api/v1/visitors/blacklist/{bl_id}").status_code == 403
+
+    # supervisor can delete
+    assert sup.delete(f"/api/v1/visitors/blacklist/{bl_id}").status_code == 204
+
+    # subsequent delete is 404
+    assert sup.delete(f"/api/v1/visitors/blacklist/{bl_id}").status_code == 404
+
+
+def test_supervisor_blacklist_by_id_blocks_request(as_role, seed_ids):
+    sup = as_role("security_supervisor")
+    pan_card = "ABCDE" + str(uuid.uuid4().int)[:4] + "F"
+    r = sup.post(
+        "/api/v1/visitors/blacklist",
+        json={"id_number": pan_card, "reason": "banned by PAN", "risk_level": "high"},
+    )
+    assert r.status_code == 201, r.text
+
+    # fast blacklist check endpoint
+    guard = as_role("security_guard")
+    check_res = guard.post(
+        f"{P}/blacklist/check",
+        json={"id_number": pan_card.lower()},
+    )
+    assert check_res.status_code == 200
+    assert check_res.json()["data"]["blacklisted"] is True
+    assert check_res.json()["data"]["reason"] == "banned by PAN"
+
+    # attempting to create request with different phone but matching id_number
+    unit_id = _unit_in(seed_ids["community_id"])
+    diff_phone = _phone()
+    r = guard.post(
+        f"{P}/requests",
+        json={
+            "unit_id": unit_id,
+            "visitor": {
+                "full_name": "Suspicious Person",
+                "phone": diff_phone,
+                "id_number": pan_card,
+            },
+            "visitor_type": "personal_guest",
+        },
+    )
+    assert r.status_code == 403
+    assert r.json()["error"]["code"] == "VISITOR_BLACKLISTED"

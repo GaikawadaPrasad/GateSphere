@@ -370,7 +370,7 @@ class GateService:
             message=payload.message or f"A {payload.alert_type} alert was raised. Respond now.",
             reference_type="panic_alert",
             reference_id=obj.id,
-            channels=["in_app", "sms"],
+            channels=["in_app", "push", "sms", "whatsapp"],
         )
         return obj
 

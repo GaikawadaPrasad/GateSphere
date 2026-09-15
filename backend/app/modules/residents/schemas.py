@@ -74,7 +74,6 @@ class ResidentProfileRead(_Read):
     is_primary: bool | None = None
 
 
-
 # --- UnitOccupancy ---------------------------------------------------- #
 class OccupancyCreate(_Write):
     unit_id: uuid.UUID
@@ -228,5 +227,3 @@ class ResidentMeUpdate(_Write):
     emergency_contact_name: str | None = Field(default=None, max_length=180)
     emergency_contact_phone: str | None = _Phone
     emergency_contact_relationship: str | None = Field(default=None, max_length=40)
-
-

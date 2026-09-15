@@ -30,6 +30,11 @@ const syne = Syne({
 export const metadata: Metadata = {
   title: "GateSphere — Smart Community Management Platform",
   description: "Enterprise community, visitor, security & facility management platform",
+  icons: {
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
+    apple: "/images/gatesphere-logo.webp",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

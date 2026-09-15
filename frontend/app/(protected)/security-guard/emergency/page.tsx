@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Modal } from "@/components/common/Modal";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { DataTable, type Column } from "@/components/tables/DataTable";
 import { gateApi, type PanicAlert } from "@/lib/api";
 import { formatDateTime } from "@/lib/utils";
 
@@ -19,6 +20,7 @@ const EMERGENCY_TYPES = [
 export default function SecurityGuardEmergencyPage() {
   const [alertsList, setAlertsList] = useState<PanicAlert[]>([]);
   const [activeSos, setActiveSos] = useState<PanicAlert | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [emergencyType, setEmergencyType] = useState("medical");
   const [location, setLocation] = useState("Main Gate North");
@@ -40,8 +42,11 @@ export default function SecurityGuardEmergencyPage() {
           const live = data.find((a) => a.status === "active" || a.status === "acknowledged");
           if (live) setActiveSos(live);
         }
+        setIsLoading(false);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (mounted) setIsLoading(false);
+      });
     return () => {
       mounted = false;
     };
@@ -90,8 +95,54 @@ export default function SecurityGuardEmergencyPage() {
     }
   };
 
+  const emergencyColumns: Column<PanicAlert>[] = [
+    {
+      key: "id",
+      header: "Ref ID",
+      sortable: true,
+      render: (a) => (
+        <span style={{ fontWeight: 700, fontFamily: "monospace", whiteSpace: "nowrap" }}>
+          SOS-{a.id.slice(0, 8).toUpperCase()}
+        </span>
+      ),
+    },
+    {
+      key: "alert_type",
+      header: "Type",
+      sortable: true,
+      render: (a) => (
+        <span
+          style={{
+            fontWeight: 600,
+            color: "var(--danger)",
+            textTransform: "capitalize",
+          }}
+        >
+          🚨 {a.alert_type}
+        </span>
+      ),
+    },
+    {
+      key: "message",
+      header: "Details",
+      render: (a) => <span>{(a as any).message || "—"}</span>,
+    },
+    {
+      key: "triggered_at",
+      header: "Time",
+      sortable: true,
+      render: (a) => <span>⏱️ {formatDateTime((a as any).triggered_at)}</span>,
+    },
+    {
+      key: "status",
+      header: "Status",
+      sortable: true,
+      render: (a) => <StatusBadge status={a.status} />,
+    },
+  ];
+
   return (
-    <div>
+    <div style={{ maxWidth: 1600, margin: "0 auto" }}>
       <PageHeader
         title="SOS Emergency & Panic Command Console"
         subtitle="Immediate emergency alert dispatch, active alert status monitoring, and Security Supervisor escalation"
@@ -358,60 +409,16 @@ export default function SecurityGuardEmergencyPage() {
           <div className="card-header">
             <h3 className="card-title">Recent Emergency & SOS Activity</h3>
           </div>
-          <div className="table-container">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Ref ID</th>
-                  <th>Type</th>
-                  <th>Details</th>
-                  <th>Time</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {alertsList.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={5}
-                      style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}
-                    >
-                      No emergency alerts recorded.
-                    </td>
-                  </tr>
-                ) : (
-                  alertsList.map((a) => (
-                    <tr
-                      key={a.id}
-                      style={{
-                        background: a.status === "active" ? "var(--danger-light)" : undefined,
-                      }}
-                    >
-                      <td
-                        style={{ fontWeight: 700, fontFamily: "monospace", whiteSpace: "nowrap" }}
-                      >
-                        SOS-{a.id.slice(0, 8).toUpperCase()}
-                      </td>
-                      <td
-                        style={{
-                          fontWeight: 600,
-                          color: "var(--danger)",
-                          textTransform: "capitalize",
-                        }}
-                      >
-                        🚨 {a.alert_type}
-                      </td>
-                      <td>{(a as any).message || "—"}</td>
-                      <td>{formatDateTime((a as any).triggered_at)}</td>
-                      <td>
-                        <StatusBadge status={a.status} />
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            columns={emergencyColumns}
+            data={alertsList}
+            isLoading={isLoading}
+            enableClientPagination={true}
+            pageSize={5}
+            emptyTitle="No Emergency Alerts Recorded"
+            emptyDescription="There are no active or recent SOS emergency incidents logged at this time."
+            emptyIcon="🛡️"
+          />
         </div>
       </div>
 

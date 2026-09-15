@@ -33,12 +33,12 @@ async def module_health() -> dict:
 
 
 # --- self-service (staff persona) ------------------------------------- #
-@router.get("/me", response_model=Envelope[schemas.StaffMeRead], dependencies=[VIEW])
+@router.get("/me", response_model=Envelope[schemas.StaffMeRead])
 async def get_my_profile(svc: Svc = Depends(domestic_staff_service)) -> dict:
     return ok(await svc.get_my_profile())
 
 
-@router.patch("/me", response_model=Envelope[schemas.StaffMeRead], dependencies=[UPDATE])
+@router.patch("/me", response_model=Envelope[schemas.StaffMeRead])
 async def update_my_profile(
     payload: schemas.StaffMeUpdate, svc: Svc = Depends(domestic_staff_service)
 ) -> dict:
@@ -48,7 +48,6 @@ async def update_my_profile(
 @router.get(
     "/me/assignments",
     response_model=Envelope[list[schemas.AssignmentDetailRead]],
-    dependencies=[VIEW],
 )
 async def get_my_assignments(
     params: PageParams = Depends(page_params), svc: Svc = Depends(domestic_staff_service)
@@ -60,7 +59,6 @@ async def get_my_assignments(
 @router.get(
     "/me/attendance",
     response_model=Envelope[list[schemas.AttendanceRead]],
-    dependencies=[VIEW],
 )
 async def get_my_attendance(
     params: PageParams = Depends(page_params), svc: Svc = Depends(domestic_staff_service)
@@ -74,13 +72,33 @@ async def get_my_attendance(
 @router.get(
     "/me/visits",
     response_model=Envelope[list[schemas.StaffVisitRead]],
-    dependencies=[VIEW],
 )
 async def get_my_visits(
     params: PageParams = Depends(page_params), svc: Svc = Depends(domestic_staff_service)
 ) -> dict:
     rows, total = await svc.get_my_visits(offset=params.offset, limit=params.page_size)
     return paginated(rows, total=total, params=params)
+
+
+@router.get(
+    "/me/pass",
+    response_model=Envelope[schemas.StaffPassRead],
+)
+async def get_my_pass(svc: Svc = Depends(domestic_staff_service)) -> dict:
+    return ok(await svc.generate_my_pass())
+
+
+@router.get(
+    "/me/ratings",
+    response_model=Envelope[list[schemas.RatingRead]],
+)
+async def get_my_ratings(
+    params: PageParams = Depends(page_params), svc: Svc = Depends(domestic_staff_service)
+) -> dict:
+    rows, total = await svc.get_my_ratings(offset=params.offset, limit=params.page_size)
+    return paginated(
+        [schemas.RatingRead.model_validate(r) for r in rows], total=total, params=params
+    )
 
 
 # --- assignments ------------------------------------------------------- #
@@ -110,7 +128,7 @@ async def list_assignments(
     "/assignments",
     response_model=Envelope[schemas.AssignmentRead],
     status_code=status.HTTP_201_CREATED,
-    dependencies=[APPROVE],
+    dependencies=[CREATE],
 )
 async def assign_unit(
     payload: schemas.AssignmentCreate, svc: Svc = Depends(domestic_staff_service)
@@ -181,6 +199,17 @@ async def check_out(attendance_id: uuid.UUID, svc: Svc = Depends(domestic_staff_
         schemas.AttendanceRead.model_validate(await svc.check_out(attendance_id)),
         message="Checked out",
     )
+
+
+@router.post(
+    "/passes/verify",
+    response_model=Envelope[schemas.StaffPassVerifyOut],
+    dependencies=[CREATE],
+)
+async def verify_pass(
+    payload: schemas.StaffPassVerifyIn, svc: Svc = Depends(domestic_staff_service)
+) -> dict:
+    return ok(await svc.verify_pass(payload))
 
 
 # --- ratings ---------------------------------------------------- #

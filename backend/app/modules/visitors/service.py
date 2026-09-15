@@ -7,6 +7,7 @@ A blacklisted visitor is intercepted before any entry is recorded (policy `black
 
 from __future__ import annotations
 
+import re
 import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -23,7 +24,7 @@ from app.modules.audit.service import record_audit_async
 from app.modules.communities.models import Gate, Unit
 from app.modules.notifications import events as notif_events
 from app.modules.residents.access import UnitScopedAccess
-from app.modules.residents.models import UnitOccupancy
+from app.modules.residents.models import ResidentProfile, UnitOccupancy
 from app.modules.uploads.guard import ensure_confirmed_async
 from app.modules.users.models import User
 from app.modules.visitors import schemas
@@ -43,10 +44,16 @@ from app.modules.visitors.repository import (
     PolicyRepository,
     RequestRepository,
     VisitorRepository,
-    approval_row,
     pass_by_hash,
 )
 from app.modules.visitors.schemas import ALLOWED
+
+
+def normalize_id_number(val: str | None) -> str | None:
+    if not val:
+        return None
+    return re.sub(r"[\s\-]", "", val).strip().upper()
+
 
 _DEFAULT_POLICY = {
     "approval_required": True,
@@ -161,8 +168,18 @@ class VisitorService(UnitScopedAccess):
 
     # -- visitors --------------------------------------------------- #
     async def upsert_visitor(self, community_id: uuid.UUID, data: schemas.VisitorCreate) -> Visitor:
+        norm_id = normalize_id_number(data.id_number)
         existing = await self.visitors.by_phone(community_id, data.phone)
         if existing:
+            if data.id_type:
+                existing.id_type = data.id_type
+            if norm_id:
+                existing.id_number_hash = digest_opt(norm_id)
+            if data.vehicle_number:
+                existing.vehicle_number = data.vehicle_number
+            if data.full_name:
+                existing.full_name = data.full_name
+            await self.db.flush()
             return existing
         await ensure_confirmed_async(self.db, data.photo_url)
         obj = Visitor(
@@ -170,7 +187,7 @@ class VisitorService(UnitScopedAccess):
             full_name=data.full_name,
             phone=data.phone,
             id_type=data.id_type,
-            id_number_hash=digest_opt(data.id_number),
+            id_number_hash=digest_opt(norm_id),
             vehicle_number=data.vehicle_number,
             photo_url=data.photo_url,
         )
@@ -190,13 +207,17 @@ class VisitorService(UnitScopedAccess):
         ), await self.visitors.count(extra=stmt)
 
     # -- blacklist ------------------------------------------------ #
-    async def list_blacklist(self, *, community_id: uuid.UUID | None, offset: int, limit: int):
+    async def list_blacklist(
+        self, *, community_id: uuid.UUID | None, q: str | None = None, offset: int, limit: int
+    ):
         cid = self._one_community(community_id)
         stmt = (
             select(VisitorBlacklist)
             .where(VisitorBlacklist.community_id == cid)
             .order_by(VisitorBlacklist.created_at.desc())
         )
+        if q:
+            stmt = stmt.where(VisitorBlacklist.reason.ilike(f"%{q}%"))
         return await self.blacklist.list(
             offset=offset, limit=limit, extra=stmt
         ), await self.blacklist.count(extra=stmt)
@@ -206,11 +227,13 @@ class VisitorService(UnitScopedAccess):
     ):
         cid = self._one_community(community_id)
         _enum("risk_level", payload.risk_level)
+        clean_phone = payload.phone.strip() if payload.phone else ""
+        norm_id = normalize_id_number(payload.id_number)
         obj = VisitorBlacklist(
             community_id=cid,
             visitor_id=payload.visitor_id,
-            phone_hash=digest(payload.phone),
-            id_number_hash=digest_opt(payload.id_number),
+            phone_hash=digest(clean_phone) if clean_phone else "",
+            id_number_hash=digest_opt(norm_id),
             reason=payload.reason,
             risk_level=payload.risk_level,
             active_until=payload.active_until.date() if payload.active_until else None,
@@ -222,10 +245,58 @@ class VisitorService(UnitScopedAccess):
         )
         return obj
 
+    async def remove_blacklist(self, blacklist_id: uuid.UUID) -> None:
+        obj = await self.blacklist.get(blacklist_id)
+        if obj is None:
+            raise NotFoundError("Blacklist entry not found")
+        cid = obj.community_id
+        await self.blacklist.delete(obj)
+        await self._audit(
+            "blacklist.remove", cid, "visitor_blacklist", blacklist_id, old={"reason": obj.reason}
+        )
+
     async def _blacklist_hit(
-        self, community_id: uuid.UUID, phone: str, id_number: str | None
+        self,
+        community_id: uuid.UUID,
+        phone: str,
+        id_number: str | None = None,
+        id_hash: str | None = None,
     ) -> VisitorBlacklist | None:
-        return await self.blacklist.match(community_id, digest(phone), digest_opt(id_number))
+        norm_id = normalize_id_number(id_number)
+        computed_id_hash = id_hash or digest_opt(norm_id)
+        phone_h = digest(phone.strip()) if phone else ""
+        return await self.blacklist.match(community_id, phone_h, computed_id_hash)
+
+    async def check_blacklist(
+        self, payload: schemas.BlacklistCheckRequest, *, community_id: uuid.UUID | None
+    ) -> dict:
+        cid = self._one_community(community_id)
+        query = (payload.query or "").strip()
+        phone = (payload.phone or "").strip()
+        id_number = (payload.id_number or "").strip()
+
+        hit = None
+        if phone:
+            hit = await self._blacklist_hit(cid, phone, id_number or None)
+        elif id_number:
+            norm_id = normalize_id_number(id_number)
+            hit = await self.blacklist.match(cid, "", digest_opt(norm_id))
+        elif query:
+            clean_phone = re.sub(r"[^\d+]", "", query)
+            norm_q = normalize_id_number(query)
+            if clean_phone and len(clean_phone) >= 7:
+                hit = await self._blacklist_hit(cid, clean_phone, query)
+            if not hit:
+                hit = await self.blacklist.match(cid, "", digest_opt(norm_q))
+
+        if hit:
+            return {
+                "blacklisted": True,
+                "reason": hit.reason,
+                "risk_level": hit.risk_level,
+                "active_since": str(hit.active_from) if hit.active_from else None,
+            }
+        return {"blacklisted": False}
 
     # -- requests ----------------------------------------------- #
     async def list_requests(
@@ -286,16 +357,23 @@ class VisitorService(UnitScopedAccess):
             )
 
         # Blacklist screening happens before the request is usable.
-        hit = await self._blacklist_hit(unit.community_id, visitor.phone, None)
+        raw_id_num = payload.visitor.id_number if payload.visitor else None
+        hit = await self._blacklist_hit(
+            unit.community_id, visitor.phone, raw_id_num, visitor.id_number_hash
+        )
         if hit and policy.blacklist_mode == "block":
             await self._audit(
                 "request.blacklisted",
                 unit.community_id,
                 "visitor",
                 visitor.id,
-                new={"blacklist_id": str(hit.id)},
+                new={"blacklist_id": str(hit.id), "reason": hit.reason},
             )
-            raise ForbiddenError("Visitor is blacklisted", code="VISITOR_BLACKLISTED")
+            raise ForbiddenError(
+                f"Visitor is blacklisted: {hit.reason} (Risk: {hit.risk_level.upper()})",
+                code="VISITOR_BLACKLISTED",
+                fields={"reason": hit.reason, "risk_level": hit.risk_level},
+            )
 
         approval_required = policy.approval_required and visitor_type != "recurring"
         obj = VisitorRequest(
@@ -324,10 +402,12 @@ class VisitorService(UnitScopedAccess):
             mv = await self.visitors.get(extra_id)
             if mv is None or mv.community_id != unit.community_id:
                 raise NotFoundError("Additional visitor not found")
-            hit_m = await self._blacklist_hit(unit.community_id, mv.phone, None)
+            hit_m = await self._blacklist_hit(unit.community_id, mv.phone, None, mv.id_number_hash)
             if hit_m and policy.blacklist_mode == "block":
                 raise ForbiddenError(
-                    f"Visitor {mv.full_name} is blacklisted", code="VISITOR_BLACKLISTED"
+                    f"Visitor {mv.full_name} is blacklisted: {hit_m.reason}",
+                    code="VISITOR_BLACKLISTED",
+                    fields={"reason": hit_m.reason, "risk_level": hit_m.risk_level},
                 )
             await self._add_member(obj, mv.id, is_primary=False)
         await self._audit(
@@ -350,24 +430,28 @@ class VisitorService(UnitScopedAccess):
                 message=f"{visitor.full_name} is requesting to visit your unit.",
                 reference_type="visitor_request",
                 reference_id=obj.id,
+                channels=["in_app", "push", "sms", "whatsapp"],
             )
         obj.visitor = visitor
         return obj
 
     async def _primary_host(self, unit_id: uuid.UUID) -> uuid.UUID | None:
-        occ = await self.db.scalar(
-            select(UnitOccupancy).where(
+        user_id = await self.db.scalar(
+            select(ResidentProfile.user_id)
+            .join(UnitOccupancy, UnitOccupancy.resident_profile_id == ResidentProfile.id)
+            .where(
                 UnitOccupancy.unit_id == unit_id,
                 UnitOccupancy.is_primary.is_(True),
                 UnitOccupancy.is_active.is_(True),
             )
         )
-        if occ is None:
-            return None
-        from app.modules.residents.models import ResidentProfile
-
-        profile = await self.db.get(ResidentProfile, occ.resident_profile_id)
-        return profile.user_id if profile else None
+        if user_id is None:
+            user_id = await self.db.scalar(
+                select(ResidentProfile.user_id)
+                .join(UnitOccupancy, UnitOccupancy.resident_profile_id == ResidentProfile.id)
+                .where(UnitOccupancy.unit_id == unit_id, UnitOccupancy.is_active.is_(True))
+            )
+        return user_id
 
     async def decide_request(
         self, request_id: uuid.UUID, payload: schemas.RequestDecision
@@ -375,9 +459,15 @@ class VisitorService(UnitScopedAccess):
         req = await self.get_request(request_id)
         _enum("decision", payload.decision)
         target = "approved" if payload.decision == "approved" else "rejected"
-        ensure_transition(req.status, target, _REQUEST_TRANSITIONS, entity="visitor request")
-        if await approval_row(self.db, req.id, self.actor.id):
-            raise ConflictError("You have already decided on this request", code="ALREADY_DECIDED")
+        ensure_transition(
+            req.status,
+            target,
+            _REQUEST_TRANSITIONS,
+            entity="visitor request",
+            allow_noop=True,
+            code="NOT_PENDING",
+        )
+        req.status = target
         self.db.add(
             VisitorApproval(
                 request_id=req.id,
@@ -386,10 +476,9 @@ class VisitorService(UnitScopedAccess):
                 remarks=payload.remarks,
             )
         )
-        req.status = target
         await self.db.flush()
         await self._audit(
-            f"request.{payload.decision}",
+            "request.decide",
             req.community_id,
             "visitor_request",
             req.id,
@@ -409,6 +498,7 @@ class VisitorService(UnitScopedAccess):
             f"{visitor.full_name if visitor else 'a guest'} was {req.status}.",
             reference_type="visitor_request",
             reference_id=req.id,
+            channels=["in_app", "push", "sms", "whatsapp"],
         )
         return req
 
@@ -470,10 +560,16 @@ class VisitorService(UnitScopedAccess):
             )
         ):
             raise ConflictError("Visitor already in this group", code="MEMBER_EXISTS")
-        hit = await self._blacklist_hit(req.community_id, visitor.phone, None)
+        hit = await self._blacklist_hit(
+            req.community_id, visitor.phone, None, visitor.id_number_hash
+        )
         policy = await self._policy(req.community_id)
         if hit and policy.blacklist_mode == "block":
-            raise ForbiddenError("Visitor is blacklisted", code="VISITOR_BLACKLISTED")
+            raise ForbiddenError(
+                f"Visitor is blacklisted: {hit.reason}",
+                code="VISITOR_BLACKLISTED",
+                fields={"reason": hit.reason, "risk_level": hit.risk_level},
+            )
         row = await self._add_member(req, visitor.id, is_primary=False)
         req.party_size = max(req.party_size, len(await self.list_group_members(req.id)))
         await self.db.flush()
@@ -624,7 +720,11 @@ class VisitorService(UnitScopedAccess):
         # blacklist re-check at the gate
         visitor = await self.db.get(Visitor, visitor_id)
         policy = await self._policy(req.community_id)
-        hit = await self._blacklist_hit(req.community_id, visitor.phone, None) if visitor else None
+        hit = (
+            await self._blacklist_hit(req.community_id, visitor.phone, None, visitor.id_number_hash)
+            if visitor
+            else None
+        )
         if hit and policy.blacklist_mode == "block":
             entry = VisitorEntry(
                 community_id=req.community_id,

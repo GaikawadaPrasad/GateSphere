@@ -37,6 +37,7 @@ from app.modules.amenities.repository import (
 )
 from app.modules.amenities.schemas import ALLOWED
 from app.modules.audit.service import record_audit_async
+from app.modules.notifications import events as notif_events
 from app.modules.residents.access import UnitScopedAccess
 from app.modules.residents.models import ResidentProfile, UnitOccupancy
 from app.modules.users.models import User
@@ -158,6 +159,7 @@ class AmenityService(UnitScopedAccess):
         )
         if len(existing) == 0 or has_only_monolithic:
             from datetime import time
+
             for s in existing:
                 await self.db.delete(s)
             standard_slot_times = [
@@ -186,7 +188,9 @@ class AmenityService(UnitScopedAccess):
                 (
                     await self.db.scalars(
                         select(AmenitySlot)
-                        .where(AmenitySlot.amenity_id == amenity_id, AmenitySlot.is_active.is_(True))
+                        .where(
+                            AmenitySlot.amenity_id == amenity_id, AmenitySlot.is_active.is_(True)
+                        )
                         .order_by(AmenitySlot.day_of_week, AmenitySlot.start_time)
                     )
                 ).all()
@@ -396,6 +400,20 @@ class AmenityService(UnitScopedAccess):
             obj.id,
             new={"amenity": amenity.code, "date": payload.booking_date.isoformat()},
         )
+        if obj.resident_user_id:
+            await notif_events.emit(
+                self.db,
+                self.scope,
+                self.actor,
+                self.ctx,
+                recipient_user_id=obj.resident_user_id,
+                community_id=amenity.community_id,
+                notification_type="amenity.booking_confirmed",
+                title="Amenity Booking Confirmed",
+                message=f"Your booking for {amenity.name} on {payload.booking_date.isoformat()} has been confirmed.",
+                reference_type="amenity_booking",
+                reference_id=obj.id,
+            )
         return obj
 
     async def cancel_booking(self, booking_id: uuid.UUID, payload: schemas.BookingCancel):
@@ -420,6 +438,20 @@ class AmenityService(UnitScopedAccess):
         obj.cancellation_reason = payload.reason
         await self.db.flush()
         await self._audit("booking.cancel", obj.community_id, "amenity_booking", obj.id)
+        if obj.resident_user_id:
+            await notif_events.emit(
+                self.db,
+                self.scope,
+                self.actor,
+                self.ctx,
+                recipient_user_id=obj.resident_user_id,
+                community_id=obj.community_id,
+                notification_type="amenity.booking_cancelled",
+                title="Amenity Booking Cancelled",
+                message="Your booking has been cancelled.",
+                reference_type="amenity_booking",
+                reference_id=obj.id,
+            )
         return obj
 
     async def mark_booking(self, booking_id: uuid.UUID, new_status: str):

@@ -111,3 +111,29 @@ export function useCreateResidentGroup() {
     },
   });
 }
+
+export function useEventRsvp() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      announcementId,
+      response,
+      guests = 0,
+      note,
+    }: {
+      announcementId: string;
+      response: "going" | "maybe" | "not_going";
+      guests?: number;
+      note?: string;
+    }) =>
+      communicationApi.rsvpEvent(announcementId, {
+        response,
+        guests,
+        note: note?.trim() || undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["announcements"] });
+    },
+  });
+}
+

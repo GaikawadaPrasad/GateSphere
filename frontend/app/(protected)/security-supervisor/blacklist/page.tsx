@@ -16,6 +16,8 @@ export default function SecuritySupervisorBlacklistPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [idType, setIdType] = useState("aadhaar");
+  const [idNumber, setIdNumber] = useState("");
   const [vehicleNumber, setVehicleNumber] = useState("");
   const [reason, setReason] = useState("");
 
@@ -32,16 +34,35 @@ export default function SecuritySupervisorBlacklistPage() {
 
   const handleAddBlacklist = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone.trim() || !reason.trim()) return;
+    const cleanPhone = phone.trim();
+    const cleanId = idNumber.trim().toUpperCase();
+    if (!cleanPhone && !cleanId) {
+      alert("Please provide either a mobile number or Government ID number to blacklist.");
+      return;
+    }
+    if (!reason.trim()) {
+      alert("Please provide a reason for the restriction.");
+      return;
+    }
     try {
+      let formattedPhone: string | undefined = undefined;
+      if (cleanPhone) {
+        const stripped = cleanPhone.replace(/[\s\-()]/g, "");
+        formattedPhone = stripped.startsWith("+") ? stripped : (stripped.length === 10 ? `+91${stripped}` : `+${stripped}`);
+      }
+
       await blacklistApi.add({
-        phone: phone.trim(),
-        reason: `${name.trim() ? name.trim() + ": " : ""}${reason.trim()}${vehicleNumber ? " (Vehicle: " + vehicleNumber + ")" : ""}`,
+        phone: formattedPhone,
+        id_type: cleanId ? idType : undefined,
+        id_number: cleanId || undefined,
+        reason: `${name.trim() ? name.trim() + ": " : ""}${reason.trim()}${cleanId ? ` [${idType.toUpperCase()}: ${cleanId}]` : ""}${vehicleNumber.trim() ? " (Vehicle: " + vehicleNumber.trim() + ")" : ""}`,
         risk_level: "high",
       });
       setIsAddModalOpen(false);
       setName("");
       setPhone("");
+      setIdType("aadhaar");
+      setIdNumber("");
       setVehicleNumber("");
       setReason("");
       loadData();
@@ -71,12 +92,14 @@ export default function SecuritySupervisorBlacklistPage() {
     const q = search.toLowerCase();
     const nameStr = (b.name || "").toLowerCase();
     const phoneStr = (b.phone || "").toLowerCase();
+    const idStr = (b.id_number || "").toLowerCase();
     const vehicleStr = (b.vehicle_number || "").toLowerCase();
     const reasonStr = (b.reason || "").toLowerCase();
     return (
       !search ||
       nameStr.includes(q) ||
       phoneStr.includes(q) ||
+      idStr.includes(q) ||
       vehicleStr.includes(q) ||
       reasonStr.includes(q)
     );
@@ -112,7 +135,7 @@ export default function SecuritySupervisorBlacklistPage() {
             <SearchInput
               value={search}
               onChange={setSearch}
-              placeholder="Search name/phone/reason…"
+              placeholder="Search name/phone/ID/reason…"
             />
           </div>
         </div>
@@ -123,6 +146,7 @@ export default function SecuritySupervisorBlacklistPage() {
               <tr>
                 <th>Blacklisted Entity / Person</th>
                 <th>Phone Number</th>
+                <th>Govt ID / Identifier</th>
                 <th>Risk Level</th>
                 <th>Reason for Restriction</th>
                 <th>Date Added</th>
@@ -133,14 +157,14 @@ export default function SecuritySupervisorBlacklistPage() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: "center", padding: "2rem" }}>
+                  <td colSpan={8} style={{ textAlign: "center", padding: "2rem" }}>
                     Loading blacklist records…
                   </td>
                 </tr>
               ) : filteredBlacklist.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
                   >
                     No blacklist records found.
@@ -161,6 +185,29 @@ export default function SecuritySupervisorBlacklistPage() {
                     <tr key={b.id}>
                       <td style={{ fontWeight: 600, color: "var(--danger)" }}>🚫 {displayName}</td>
                       <td>{displayPhone}</td>
+                      <td>
+                        {b.id_number ? (
+                          <span
+                            style={{
+                              fontFamily: "monospace",
+                              fontSize: "0.82rem",
+                              fontWeight: 700,
+                              color: "#991b1b",
+                              background: "#fee2e2",
+                              padding: "0.15rem 0.45rem",
+                              borderRadius: "4px",
+                            }}
+                          >
+                            {b.id_type ? `${b.id_type.toUpperCase()}: ` : ""}{b.id_number}
+                          </span>
+                        ) : b.id_number_hash ? (
+                          <span style={{ fontSize: "0.75rem", color: "var(--muted)", fontFamily: "monospace" }}>
+                            ID Hash: {b.id_number_hash.slice(0, 8)}…
+                          </span>
+                        ) : (
+                          <span style={{ color: "var(--muted)", fontSize: "0.8rem" }}>—</span>
+                        )}
+                      </td>
                       <td>
                         <StatusBadge status={riskLevel} />
                       </td>
@@ -214,7 +261,7 @@ export default function SecuritySupervisorBlacklistPage() {
                 marginBottom: "0.35rem",
               }}
             >
-              Full Name / Identifier *
+              Full Name / Identifier
             </label>
             <input
               type="text"
@@ -222,7 +269,6 @@ export default function SecuritySupervisorBlacklistPage() {
               placeholder="e.g. Ramesh Kumar"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              required
             />
           </div>
 
@@ -248,7 +294,7 @@ export default function SecuritySupervisorBlacklistPage() {
               <input
                 type="text"
                 className="input-field"
-                placeholder="+91 98000 00000"
+                placeholder="e.g. +91 98000 00000"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
               />
@@ -263,7 +309,7 @@ export default function SecuritySupervisorBlacklistPage() {
                   marginBottom: "0.35rem",
                 }}
               >
-                Vehicle Plate Number
+                Vehicle Plate Number (Optional)
               </label>
               <input
                 type="text"
@@ -274,6 +320,64 @@ export default function SecuritySupervisorBlacklistPage() {
               />
             </div>
           </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "1rem",
+              marginBottom: "1rem",
+            }}
+          >
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  marginBottom: "0.35rem",
+                }}
+              >
+                Govt ID Type
+              </label>
+              <select
+                className="input-field"
+                value={idType}
+                onChange={(e) => setIdType(e.target.value)}
+              >
+                <option value="aadhaar">Aadhaar Card (12 digits)</option>
+                <option value="pan">PAN Card (10 chars)</option>
+                <option value="voter_id">Voter ID</option>
+                <option value="driving_license">Driving License</option>
+                <option value="passport">Passport</option>
+                <option value="other">Other Government ID</option>
+              </select>
+            </div>
+
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  marginBottom: "0.35rem",
+                }}
+              >
+                Govt ID Number
+              </label>
+              <input
+                type="text"
+                className="input-field"
+                placeholder="e.g. 1234 5678 9012 or ABCDE1234F"
+                value={idNumber}
+                onChange={(e) => setIdNumber(e.target.value.toUpperCase())}
+              />
+            </div>
+          </div>
+
+          <p style={{ fontSize: "0.78rem", color: "var(--muted)", marginBottom: "1rem" }}>
+            💡 Provide at least Mobile Number or Government ID (Aadhaar / PAN / Voter ID / DL / Passport) to restrict gate entry.
+          </p>
 
           <div>
             <label

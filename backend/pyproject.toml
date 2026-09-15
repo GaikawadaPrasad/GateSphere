@@ -16,7 +16,10 @@ src = ["app", "tests"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "S", "C4", "SIM", "RUF"]
 # B008: FastAPI's `Depends()` in defaults is the idiomatic pattern.
-ignore = ["S101", "B008"]
+# E501: Line length handled by black; avoids errors on long string literals.
+# RUF001: En-dash/typographic characters in human-facing assistant strings.
+ignore = ["S101", "B008", "E501", "RUF001"]
+
 
 [tool.ruff.lint.isort]
 known-first-party = ["app"]

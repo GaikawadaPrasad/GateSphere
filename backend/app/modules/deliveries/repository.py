@@ -14,12 +14,23 @@ class ProtocolRepository(AsyncTenantRepository[DeliveryProtocol]):
     model = DeliveryProtocol
 
     async def for_type(
-        self, community_id: uuid.UUID, delivery_type: str
+        self, community_id: uuid.UUID, delivery_type: str, unit_id: uuid.UUID | None = None
     ) -> DeliveryProtocol | None:
+        if unit_id is not None:
+            unit_proto = await self.db.scalar(
+                select(DeliveryProtocol).where(
+                    DeliveryProtocol.community_id == community_id,
+                    DeliveryProtocol.delivery_type == delivery_type,
+                    DeliveryProtocol.unit_id == unit_id,
+                )
+            )
+            if unit_proto is not None:
+                return unit_proto
         return await self.db.scalar(
             select(DeliveryProtocol).where(
                 DeliveryProtocol.community_id == community_id,
                 DeliveryProtocol.delivery_type == delivery_type,
+                DeliveryProtocol.unit_id.is_(None),
             )
         )
 

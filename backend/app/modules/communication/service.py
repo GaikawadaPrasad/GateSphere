@@ -42,7 +42,7 @@ from app.modules.communication.repository import (
 )
 from app.modules.communication.schemas import ALLOWED
 from app.modules.communities.models import Tower, Unit
-from app.modules.residents.access import user_in_community
+from app.modules.residents.access import UnitScopedAccess, user_in_community
 from app.modules.residents.models import ResidentProfile, UnitOccupancy
 from app.modules.users.models import Role, User, UserRole
 
@@ -69,7 +69,7 @@ def _enum(field: str, value: str | None) -> None:
         )
 
 
-class CommunicationService:
+class CommunicationService(UnitScopedAccess):
     def __init__(
         self, db: AsyncSession, scope: TenantScope, actor: User, ctx: RequestContext | None = None
     ):
@@ -415,6 +415,41 @@ class CommunicationService:
             stmt = stmt.where(Announcement.community_id == community_id)
         if published_only:
             stmt = stmt.where(Announcement.is_published.is_(True))
+        if await self.is_unit_restricted():
+            scope = await self._unit_scope()
+            unit_ids = list(scope) if scope else []
+            tower_ids: list[uuid.UUID] = []
+            if unit_ids:
+                tower_ids = list(
+                    await self.db.scalars(
+                        select(Unit.tower_id).where(
+                            Unit.id.in_(unit_ids), Unit.tower_id.is_not(None)
+                        )
+                    )
+                )
+            grp_ids = list(
+                await self.db.scalars(
+                    select(ResidentGroupMember.group_id).where(
+                        ResidentGroupMember.user_id == self.actor.id
+                    )
+                )
+            )
+            target_match = ~Announcement.targets.any() | Announcement.targets.any(
+                AnnouncementTarget.target_all_community.is_(True)
+            )
+            if unit_ids:
+                target_match = target_match | Announcement.targets.any(
+                    AnnouncementTarget.unit_id.in_(unit_ids)
+                )
+            if tower_ids:
+                target_match = target_match | Announcement.targets.any(
+                    AnnouncementTarget.tower_id.in_(tower_ids)
+                )
+            if grp_ids:
+                target_match = target_match | Announcement.targets.any(
+                    AnnouncementTarget.resident_group_id.in_(grp_ids)
+                )
+            stmt = stmt.where(target_match)
         stmt = stmt.order_by(Announcement.created_at.desc())
         return (
             await self.announcements.list(offset=offset, limit=limit, extra=stmt),

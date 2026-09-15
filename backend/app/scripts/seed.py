@@ -58,7 +58,9 @@ def seed_rbac(db: Session) -> None:
         role, _ = _get_or_create(db, Role, slug=slug, defaults={"name": name})
         granted = ROLE_PERMISSIONS.get(slug, [])
         codes = set(PERMISSIONS.keys() if granted == ["*"] else granted)
-        current_rps = db.scalars(select(RolePermission).where(RolePermission.role_id == role.id)).all()
+        current_rps = db.scalars(
+            select(RolePermission).where(RolePermission.role_id == role.id)
+        ).all()
         for rp in current_rps:
             p_obj = db.scalar(select(Permission).where(Permission.id == rp.permission_id))
             if p_obj and p_obj.code not in codes:
@@ -221,13 +223,25 @@ def seed_residents(db: Session, communities: list[Community]) -> None:
             .offset(6)
             .limit(1)
         ).first()
-        dp, _ = _get_or_create(
-            db,
-            ResidentProfile,
-            community_id=c0.id,
-            user_id=demo.id,
-            defaults={"profile_status": "active", "kyc_status": "verified"},
+
+        # Upsert the demo resident's profile, strictly keyed by the demo user's id.
+        # This corrects any historical data where the profile was linked to a different user.
+        dp = db.scalar(
+            select(ResidentProfile).where(
+                ResidentProfile.user_id == demo.id,
+                ResidentProfile.community_id == c0.id,
+            )
         )
+        if dp is None:
+            dp = ResidentProfile(
+                community_id=c0.id,
+                user_id=demo.id,
+                profile_status="active",
+                kyc_status="verified",
+            )
+            db.add(dp)
+            db.flush()
+
         if home is not None:
             _get_or_create(
                 db,
@@ -235,7 +249,7 @@ def seed_residents(db: Session, communities: list[Community]) -> None:
                 community_id=c0.id,
                 unit_id=home.id,
                 resident_profile_id=dp.id,
-                defaults={"occupancy_role": "primary_owner", "is_primary": True},
+                defaults={"occupancy_role": "primary_owner", "is_primary": True, "is_active": True},
             )
 
 
@@ -315,24 +329,25 @@ def seed_domestic_staff(db: Session, communities: list[Community]) -> None:
                 community_id=c.id,
                 phone=f"+9197{c.code[-2:]}00{i:04d}",
                 defaults={
-                    "user_id": staff_user.id if (i == 1 and staff_user and c == communities[0]) else None,
+                    "user_id": (
+                        staff_user.id if (i == 1 and staff_user and c == communities[0]) else None
+                    ),
                     "full_name": name,
                     "staff_type": kind,
                     "police_verification_status": "verified",
                 },
             )
-            if staff and i == 1 and staff_user and c == communities[0] and not staff.user_id:
+            if staff and i == 1 and staff_user and c == communities[0]:
                 staff.user_id = staff_user.id
-            if created and unit is not None and i == 1:
-                db.add(
-                    StaffUnitAssignment(
-                        community_id=c.id,
-                        staff_id=staff.id,
-                        unit_id=unit.id,
-                        work_type="part_time",
-                    )
+            if unit is not None and i == 1:
+                _get_or_create(
+                    db,
+                    StaffUnitAssignment,
+                    community_id=c.id,
+                    staff_id=staff.id,
+                    unit_id=unit.id,
+                    defaults={"work_type": "part_time"},
                 )
-
 
 
 def seed_deliveries(db: Session, communities: list[Community]) -> None:

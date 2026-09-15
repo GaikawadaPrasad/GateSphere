@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.context import RequestContext
 from app.core.errors import BusinessRuleError, ConflictError, ForbiddenError, NotFoundError
+from app.core.security import hash_password, invalidate_user_permissions_async
 from app.core.tenancy import TenantScope
 from app.modules.audit.service import record_audit_async
 from app.modules.communities import schemas
@@ -105,9 +106,44 @@ class CommunityService:
                 code="COMMUNITY_CODE_TAKEN",
                 fields={"code": "taken"},
             )
-        obj = Community(**payload.model_dump(exclude={"code"}), code=code)
+        obj = Community(
+            **payload.model_dump(
+                exclude={"code", "admin_name", "admin_email", "admin_password", "admin_phone"}
+            ),
+            code=code,
+        )
         await self.communities.add(obj)
-        await self._audit("community.create", obj.id, "community", obj.id, new=payload.model_dump())
+
+        if payload.admin_email and payload.admin_password:
+            admin_user = await self.communities.provision_community_admin(
+                obj.id,
+                email=payload.admin_email,
+                password_hash=hash_password(payload.admin_password),
+                full_name=payload.admin_name or f"{obj.name} Admin",
+                phone=payload.admin_phone,
+            )
+            await invalidate_user_permissions_async(self.db, [admin_user.id])
+            await self._audit(
+                "community.admin_provisioned",
+                obj.id,
+                "user",
+                admin_user.id,
+                new={
+                    "email": admin_user.email,
+                    "role": "community_admin",
+                    "community_id": str(obj.id),
+                },
+            )
+            obj.admin_email = admin_user.email
+            obj.admin_name = admin_user.full_name
+
+        await self._audit(
+            "community.create",
+            obj.id,
+            "community",
+            obj.id,
+            new=payload.model_dump(exclude={"admin_password"}),
+        )
         return obj
 
     async def update_community(

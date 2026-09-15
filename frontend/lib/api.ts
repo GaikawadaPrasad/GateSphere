@@ -6,7 +6,7 @@ import type { ApiResponse, ListQueryParams, PaginationMeta } from "@/types/api";
 import type { CurrentUser } from "@/types/auth";
 import type { AuditLog, AuditQueryParams } from "@/types/audit";
 import type { MaintenanceInvoice, Payment } from "@/types/billing";
-import type { Community, Gate, Tower, Floor, Unit } from "@/types/communities";
+import type { Community, CommunityCreate, Gate, Tower, Floor, Unit } from "@/types/communities";
 import type { ServiceCategory, ServiceTicket } from "@/types/complaints";
 import type {
   FinancialStats,
@@ -38,7 +38,24 @@ import type { AssistantQuickActionsResponse, AssistantResponse } from "@/types/a
 export type { CurrentUser, GateEvent, PanicAlert, GuardRoster, ServiceTicket, ServiceCategory };
 export type NotificationItem = AppNotification;
 export type VisitorRecord = Record<string, any>;
-export type BlacklistEntry = Record<string, any>;
+export interface BlacklistEntry {
+  id: string;
+  name?: string;
+  phone?: string;
+  phone_hash?: string;
+  id_type?: string;
+  id_number?: string;
+  id_number_hash?: string;
+  vehicle_number?: string;
+  reason?: string;
+  risk_level?: string;
+  active_from?: string;
+  active_until?: string;
+  created_at?: string;
+  date_added?: string;
+  status?: string;
+  is_active?: boolean;
+}
 export type VendorTicket = Record<string, any>;
 export type Amenity = Record<string, any>;
 export type AmenityBooking = Record<string, any>;
@@ -151,26 +168,13 @@ export function getCsrfToken(role?: string): string | null {
     if (cookies[`gatesphere_${targetRole}_csrf`]) return cookies[`gatesphere_${targetRole}_csrf`];
   }
 
-  // 2. Search for any role-bucketed cookie starting with gatesphere_ and ending with _csrf
-  for (const [name, val] of Object.entries(cookies)) {
-    if (name.startsWith("gatesphere_") && name.endsWith("_csrf") && val) {
-      return val;
-    }
-  }
-
-  // 3. Fallback to legacy or generic CSRF cookies
+  // 2. Fallback to legacy or generic CSRF cookies only (BE-002: strictly do NOT fall back to other role buckets)
   if (cookies["gs_csrf"]) return cookies["gs_csrf"];
-  for (const [name, val] of Object.entries(cookies)) {
-    if (name.endsWith("_csrf") && val) {
-      return val;
-    }
-    if ((name === "csrf_token" || name === "csrf") && val) {
-      return val;
-    }
-  }
+  if (cookies["csrf_token"] || cookies["csrf"]) return cookies["csrf_token"] || cookies["csrf"];
 
   return null;
 }
+
 
 function buildUrl(path: string, params?: Record<string, unknown>): string {
   const normalizedPath = path.startsWith("/api")
@@ -359,7 +363,8 @@ export const authApi = {
 export const communitiesApi = {
   list: (params?: { active?: boolean }) => apiGet<Community[]>("/communities", params),
   get: (id: string) => apiGet<Community>(`/communities/${id}`),
-  create: (data: Partial<Community>) => apiSend<Community>("POST", "/communities", data),
+  create: (data: Partial<Community> | CommunityCreate) =>
+    apiSend<Community>("POST", "/communities", data),
   update: (id: string, data: Partial<Community>) =>
     apiSend<Community>("PATCH", `/communities/${id}`, data),
   delete: (id: string) => apiSend<void>("DELETE", `/communities/${id}`),
@@ -382,7 +387,8 @@ export const communitiesApi = {
     apiSend<Gate>("POST", `/communities/${communityId}/gates`, data),
   floors: (towerId: string) => apiGet<Floor[]>(`/communities/towers/${towerId}/floors`),
   units: (floorId: string) => apiGet<Unit[]>(`/communities/floors/${floorId}/units`),
-  communityUnits: (communityId: string) => apiGet<Unit[]>(`/communities/${communityId}/units`),
+  communityUnits: (communityId: string, params?: Record<string, unknown>) =>
+    apiGet<Unit[]>(`/communities/${communityId}/units`, { page_size: 100, ...params }),
 };
 
 export const dashboardsApi = {
@@ -434,9 +440,17 @@ export const gateApi = {
   }) => apiSend<any>("POST", "/gate/alerts", data),
   verifyPass: (tokenOrPin: string) =>
     apiSend<any>("POST", "/gate/verify-pass", { token: tokenOrPin }),
+  logEvent: (data: {
+    event_type: string;
+    gate_id?: string;
+    reference_type?: string;
+    reference_id?: string;
+    metadata?: Record<string, any>;
+  }) => apiSend<any>("POST", "/gate/events", data),
   recordEntry: (data: any) =>
-    apiSend<any>("POST", "/gate/events", { ...data, event_type: "entry" }),
-  recordExit: (data: any) => apiSend<any>("POST", "/gate/events", { ...data, event_type: "exit" }),
+    apiSend<any>("POST", "/gate/events", { event_type: "visitor_in", ...data }),
+  recordExit: (data: any) =>
+    apiSend<any>("POST", "/gate/events", { event_type: "visitor_out", ...data }),
   acknowledgeAlert: (alertId: string) =>
     apiSend<any>("POST", `/gate/alerts/${alertId}/acknowledge`),
   resolveAlert: (alertId: string, resolutionSummary?: string) =>
@@ -580,6 +594,10 @@ export const communicationApi = {
     apiSend<any>("POST", `/communication/announcements/${id}/publish`),
   expireAnnouncement: (id: string) =>
     apiSend<any>("POST", `/communication/announcements/${id}/expire`),
+  rsvpEvent: (announcementId: string, data: { response: string; guests?: number; note?: string }) =>
+    apiSend<any>("POST", `/communication/announcements/${announcementId}/rsvp`, data),
+  getRsvps: (announcementId: string) =>
+    apiGet<any>(`/communication/announcements/${announcementId}/rsvps`),
   polls: (communityId?: string) =>
     apiGet<any[]>("/communication/polls", communityId ? { community_id: communityId } : undefined),
   pollResults: (pollId: string) => apiGet<any>(`/communication/polls/${pollId}/results`),
@@ -701,6 +719,11 @@ export const domesticStaffApi = {
       "/domestic-staff/me/visits",
       params as Record<string, unknown>,
     ),
+  myRatings: (params?: ListQueryParams) =>
+    apiGet<Record<string, unknown>[]>(
+      "/domestic-staff/me/ratings",
+      params as Record<string, unknown>,
+    ),
   list: (params?: { community_id?: string; q?: string; page?: number; page_size?: number }) =>
     apiGet<Staff[]>("/domestic-staff", params as Record<string, unknown>),
   get: (id: string) => apiGet<Staff>(`/domestic-staff/${id}`),
@@ -730,17 +753,50 @@ export const domesticStaffApi = {
   },
   checkOut: (attendanceId: string) =>
     apiSend<any>("PATCH", `/domestic-staff/attendance/${attendanceId}/check-out`),
+  createAssignment: (data: {
+    staff_id: string;
+    unit_id: string;
+    work_type?: string;
+    start_date?: string;
+    end_date?: string;
+    time_from?: string;
+    time_to?: string;
+    days_of_week?: string[];
+  }) => apiSend<StaffAssignment>("POST", "/domestic-staff/assignments", data),
+  endAssignment: (assignmentId: string) =>
+    apiSend<StaffAssignment>("POST", `/domestic-staff/assignments/${assignmentId}/end`),
+  rateStaff: (data: {
+    staff_id: string;
+    unit_id?: string;
+    rating: number;
+    feedback?: string;
+  }) => apiSend<any>("POST", "/domestic-staff/ratings", data),
+  ratings: (staffId: string, params?: ListQueryParams) =>
+    apiGet<any[]>(`/domestic-staff/${staffId}/ratings`, params as Record<string, unknown>),
+  myPass: () => apiGet<Record<string, unknown>>("/domestic-staff/me/pass"),
+  verifyPass: (data: {
+    pass_code: string;
+    gate_id?: string;
+    action?: "check_in" | "check_out";
+  }) => apiSend<any>("POST", "/domestic-staff/passes/verify", data),
 };
 
 export const staffApi = domesticStaffApi;
 
 export const blacklistApi = {
   list: (params?: ListQueryParams) =>
-    apiGet<Record<string, unknown>[]>("/visitors/blacklist", params as Record<string, unknown>),
+    apiGet<BlacklistEntry[]>("/visitors/blacklist", params as Record<string, unknown>),
   add: (data: Record<string, unknown>) =>
     apiSend<Record<string, unknown>>("POST", "/visitors/blacklist", data),
   remove: (id: string) => apiSend<void>("DELETE", `/visitors/blacklist/${id}`),
-  check: (identifier: string) => apiGet<any>("/visitors/blacklist", { q: identifier }),
+  check: (queryOrPayload: string | { phone?: string; id_number?: string; query?: string }) => {
+    const body = typeof queryOrPayload === "string" ? { query: queryOrPayload } : queryOrPayload;
+    return apiSend<{ blacklisted: boolean; reason?: string; risk_level?: string; active_since?: string }>(
+      "POST",
+      "/visitors/blacklist/check",
+      body,
+    );
+  },
 };
 
 export const vendorTicketsApi = {
@@ -807,6 +863,16 @@ export const vendorsApi = {
   get: (id: string) => apiGet<any>(`/users/${id}`),
   create: (data: { email: string; full_name: string; password: string; phone?: string; community_id?: string }) =>
     apiSend<any>("POST", "/users", { ...data, role_slug: "vendor_technician" }),
+  toggleActive: (id: string, is_active: boolean) =>
+    apiSend<any>("PATCH", `/users/${id}`, { is_active }),
+};
+
+export const guardsApi = {
+  list: (params?: ListQueryParams) =>
+    apiGet<any[]>("/users", { role_slug: "security_guard", ...(params as any) }),
+  get: (id: string) => apiGet<any>(`/users/${id}`),
+  create: (data: { email: string; full_name: string; password: string; phone?: string; community_id?: string }) =>
+    apiSend<any>("POST", "/users", { ...data, role_slug: "security_guard" }),
   toggleActive: (id: string, is_active: boolean) =>
     apiSend<any>("PATCH", `/users/${id}`, { is_active }),
 };

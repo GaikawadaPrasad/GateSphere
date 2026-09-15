@@ -53,6 +53,65 @@ class CommunityRepository:
         await self.db.flush()
         return obj
 
+    async def provision_community_admin(
+        self,
+        community_id: uuid.UUID,
+        *,
+        email: str,
+        password_hash: str,
+        full_name: str,
+        phone: str | None = None,
+    ):
+        from app.modules.users.models import Role, User, UserRole
+
+        clean_email = email.strip().lower()
+        user = await self.db.scalar(select(User).where(User.email == clean_email))
+        clean_phone = phone.strip()[:20] if phone and phone.strip() else None
+        if clean_phone:
+            phone_user = await self.db.scalar(select(User).where(User.phone == clean_phone))
+            if phone_user is not None and (user is None or phone_user.id != user.id):
+                from app.core.errors import ConflictError
+
+                raise ConflictError(
+                    "Phone number is already associated with another account",
+                    code="PHONE_TAKEN",
+                    fields={"admin_phone": "taken"},
+                )
+
+        if user is None:
+            user = User(
+                email=clean_email,
+                full_name=full_name.strip(),
+                phone=clean_phone,
+                password_hash=password_hash,
+                is_active=True,
+            )
+            self.db.add(user)
+            await self.db.flush()
+        else:
+            user.password_hash = password_hash
+            if full_name:
+                user.full_name = full_name.strip()
+            user.phone = clean_phone
+            user.is_active = True
+            await self.db.flush()
+
+        role = await self.db.scalar(select(Role).where(Role.slug == "community_admin"))
+        if role is not None:
+            existing_role = await self.db.scalar(
+                select(UserRole).where(
+                    UserRole.user_id == user.id,
+                    UserRole.role_id == role.id,
+                    UserRole.community_id == community_id,
+                )
+            )
+            if existing_role is None:
+                ur = UserRole(user_id=user.id, role_id=role.id, community_id=community_id)
+                self.db.add(ur)
+                await self.db.flush()
+
+        return user
+
 
 class GateRepository(AsyncTenantRepository[Gate]):
     model = Gate
@@ -162,4 +221,3 @@ class UnitRepository(AsyncTenantRepository[Unit]):
                 Unit.unit_number == number,
             )
         )
-

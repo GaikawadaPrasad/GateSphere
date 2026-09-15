@@ -167,17 +167,18 @@ export function ActivityFeedSkeleton({ rows = 4 }: { rows?: number }) {
   );
 }
 
-export function CardSkeleton({ height = 240 }: { height?: number }) {
+export function CardSkeleton({ height = 240, lines }: { height?: number; lines?: number }) {
+  const effectiveHeight = lines ? Math.max(80, lines * 40 + 40) : height;
   return (
     <div
       className="card"
-      style={{ minHeight: height, display: "flex", flexDirection: "column", gap: "1rem" }}
+      style={{ minHeight: effectiveHeight, display: "flex", flexDirection: "column", gap: "1rem" }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <Skeleton width={180} height={20} borderRadius={4} />
         <Skeleton width={60} height={16} borderRadius={4} />
       </div>
-      <Skeleton width="100%" height={height - 80} borderRadius={8} />
+      <Skeleton width="100%" height={Math.max(40, effectiveHeight - 80)} borderRadius={8} />
     </div>
   );
 }

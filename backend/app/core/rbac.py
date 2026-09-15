@@ -137,6 +137,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "incidents:create",
         "dashboards:view",
         "notifications:view",
+        "communities:view",
     ],
     "resident": [
         "visitors:view",

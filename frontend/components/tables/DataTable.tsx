@@ -4,6 +4,7 @@ import React, { useState, useMemo, type ReactNode } from "react";
 import { TableSkeleton } from "@/components/common/LoadingSkeleton";
 import { EmptyState } from "@/components/common/EmptyState";
 import { Pagination } from "@/components/tables/Pagination";
+import { SortDropdown, type SortPreset } from "@/components/common/SortDropdown";
 
 export type SortDirection = "asc" | "desc" | null;
 
@@ -35,7 +36,44 @@ interface DataTableProps<T> {
   enableClientPagination?: boolean;
   defaultSortKey?: string;
   defaultSortDir?: "asc" | "desc";
+  // Integrated Sort Dropdown
+  showSortDropdown?: boolean;
+  sortPreset?: SortPreset;
+  onSortPresetChange?: (preset: SortPreset) => void;
+  toolbarActions?: ReactNode;
 }
+
+const COMMON_DATE_KEYS = [
+  "created_at",
+  "createdAt",
+  "occurred_at",
+  "entry_time",
+  "entry_at",
+  "timestamp",
+  "date",
+  "start_date",
+  "shift_date",
+  "updated_at",
+];
+
+const COMMON_TEXT_KEYS = [
+  "visitor_name",
+  "full_name",
+  "resident_name",
+  "name",
+  "subject",
+  "title",
+  "courier_company",
+  "ticket_number",
+  "invoice_number",
+  "unit_number",
+  "plate",
+  "amenity_name",
+  "gate_name",
+  "vendor_name",
+  "label",
+  "code",
+];
 
 export function DataTable<T extends object = Record<string, unknown>>({
   columns,
@@ -54,12 +92,33 @@ export function DataTable<T extends object = Record<string, unknown>>({
   enableClientSort = true,
   enableClientPagination = false,
   defaultSortKey,
-  defaultSortDir = "asc",
+  defaultSortDir,
+  showSortDropdown = false,
+  sortPreset: controlledSortPreset,
+  onSortPresetChange,
+  toolbarActions,
 }: DataTableProps<T>) {
+  const [internalSortPreset, setInternalSortPreset] = useState<SortPreset>("newest");
+  const activeSortPreset = controlledSortPreset || internalSortPreset;
+
   const [sortKey, setSortKey] = useState<string | null>(defaultSortKey || null);
-  const [sortDir, setSortDir] = useState<SortDirection>(defaultSortKey ? defaultSortDir : null);
+  const [sortDir, setSortDir] = useState<SortDirection>(
+    defaultSortKey ? defaultSortDir || "desc" : null,
+  );
   const [localPage, setLocalPage] = useState<number>(1);
-  const [localPageSize, setLocalPageSize] = useState<number>(10);
+  const [localPageSize, setLocalPageSize] = useState<number>(controlledPageSize || 10);
+
+  const handleSortPresetChange = (preset: SortPreset) => {
+    if (onSortPresetChange) {
+      onSortPresetChange(preset);
+    } else {
+      setInternalSortPreset(preset);
+    }
+    // Clear manual column sort override so dropdown preset takes effect
+    setSortKey(null);
+    setSortDir(null);
+    setLocalPage(1);
+  };
 
   const handleSort = (colKey: string, sortable?: boolean) => {
     if (!sortable && !enableClientSort) return;
@@ -75,28 +134,100 @@ export function DataTable<T extends object = Record<string, unknown>>({
     }
   };
 
+  // Determine active date and text keys for automatic preset sorting
+  const detectedDateKey = useMemo(() => {
+    if (!data || data.length === 0) return null;
+    const sample = data[0] as Record<string, unknown>;
+    for (const k of COMMON_DATE_KEYS) {
+      if (k in sample && sample[k] !== undefined) return k;
+    }
+    return null;
+  }, [data]);
+
+  const detectedTextKey = useMemo(() => {
+    if (!data || data.length === 0) return null;
+    const sample = data[0] as Record<string, unknown>;
+    for (const k of COMMON_TEXT_KEYS) {
+      if (k in sample && sample[k] !== undefined) return k;
+    }
+    for (const col of columns) {
+      const val = sample[col.key];
+      if (typeof val === "string" && !col.key.endsWith("_id") && col.key !== "id") {
+        return col.key;
+      }
+    }
+    return null;
+  }, [data, columns]);
+
   // Process data (sort)
   const sortedData = useMemo(() => {
     if (!data || data.length === 0) return [];
-    if (!sortKey || !sortDir) return data;
+
+    // 1. Column header sort override
+    if (sortKey && sortDir) {
+      return [...data].sort((a, b) => {
+        const aVal = (a as Record<string, unknown>)[sortKey];
+        const bVal = (b as Record<string, unknown>)[sortKey];
+
+        if (aVal === null || aVal === undefined) return 1;
+        if (bVal === null || bVal === undefined) return -1;
+
+        if (typeof aVal === "number" && typeof bVal === "number") {
+          return sortDir === "asc" ? aVal - bVal : bVal - aVal;
+        }
+
+        const aDate = Date.parse(String(aVal));
+        const bDate = Date.parse(String(bVal));
+        if (!isNaN(aDate) && !isNaN(bDate) && String(aVal).length > 8 && String(bVal).length > 8) {
+          return sortDir === "asc" ? aDate - bDate : bDate - aDate;
+        }
+
+        const aStr = String(aVal);
+        const bStr = String(bVal);
+        const comp = aStr.localeCompare(bStr, undefined, { numeric: true, sensitivity: "base" });
+        return sortDir === "asc" ? comp : -comp;
+      });
+    }
+
+    // 2. Preset sort: only apply if sort dropdown or preset is enabled
+    if (!enableClientSort || (!showSortDropdown && !controlledSortPreset)) return data;
 
     return [...data].sort((a, b) => {
-      const aVal = (a as Record<string, unknown>)[sortKey];
-      const bVal = (b as Record<string, unknown>)[sortKey];
+      const aRec = a as Record<string, unknown>;
+      const bRec = b as Record<string, unknown>;
 
-      if (aVal === null || aVal === undefined) return 1;
-      if (bVal === null || bVal === undefined) return -1;
-
-      if (typeof aVal === "number" && typeof bVal === "number") {
-        return sortDir === "asc" ? aVal - bVal : bVal - aVal;
+      if (activeSortPreset === "newest" || activeSortPreset === "oldest") {
+        const dKey = detectedDateKey;
+        if (dKey) {
+          const aVal = aRec[dKey];
+          const bVal = bRec[dKey];
+          if (aVal && bVal) {
+            const aTime = new Date(String(aVal)).getTime();
+            const bTime = new Date(String(bVal)).getTime();
+            if (!isNaN(aTime) && !isNaN(bTime)) {
+              return activeSortPreset === "newest" ? bTime - aTime : aTime - bTime;
+            }
+          }
+        }
+        return 0;
       }
 
-      const aStr = String(aVal);
-      const bStr = String(bVal);
-      const comp = aStr.localeCompare(bStr, undefined, { numeric: true, sensitivity: "base" });
-      return sortDir === "asc" ? comp : -comp;
+      if (activeSortPreset === "a-z" || activeSortPreset === "z-a") {
+        const tKey = detectedTextKey;
+        if (tKey) {
+          const aVal = String(aRec[tKey] ?? "");
+          const bVal = String(bRec[tKey] ?? "");
+          const comp = aVal.localeCompare(bVal, undefined, {
+            numeric: true,
+            sensitivity: "base",
+          });
+          return activeSortPreset === "a-z" ? comp : -comp;
+        }
+      }
+
+      return 0;
     });
-  }, [data, sortKey, sortDir]);
+  }, [data, sortKey, sortDir, activeSortPreset, enableClientSort, detectedDateKey, detectedTextKey]);
 
   // Client-side pagination if needed
   const isClientPaging = enableClientPagination && !onPageChange;
@@ -123,95 +254,124 @@ export function DataTable<T extends object = Record<string, unknown>>({
   }
 
   return (
-    <div className="table-responsive-wrapper">
-      <table className="data-table">
-        <thead>
-          <tr>
-            {columns.map((col) => {
-              const isSorted = sortKey === col.key;
-              const canSort = col.sortable ?? enableClientSort;
+    <div className="table-responsive-container">
+      {(showSortDropdown || toolbarActions) && (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "0.75rem",
+            marginBottom: "0.85rem",
+            padding: "0 0.15rem",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            {toolbarActions}
+          </div>
+          {showSortDropdown && (
+            <div style={{ marginLeft: "auto" }}>
+              <SortDropdown
+                value={activeSortPreset}
+                onChange={handleSortPresetChange}
+                size="sm"
+              />
+            </div>
+          )}
+        </div>
+      )}
 
-              return (
-                <th
-                  key={col.key}
-                  onClick={() => canSort && handleSort(col.key, col.sortable)}
-                  style={{
-                    width: col.width,
-                    textAlign: col.align || "left",
-                    cursor: canSort ? "pointer" : "default",
-                    userSelect: "none",
-                  }}
-                  title={canSort ? `Sort by ${col.header}` : undefined}
-                >
-                  <div
+      <div className="table-responsive-wrapper">
+        <table className="data-table">
+          <thead>
+            <tr>
+              {columns.map((col) => {
+                const isSorted = sortKey === col.key;
+                const canSort = col.sortable ?? enableClientSort;
+
+                return (
+                  <th
+                    key={col.key}
+                    onClick={() => canSort && handleSort(col.key, col.sortable)}
                     style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "0.35rem",
-                      justifyContent:
-                        col.align === "right"
-                          ? "flex-end"
-                          : col.align === "center"
-                            ? "center"
-                            : "flex-start",
-                      width: "100%",
+                      width: col.width,
+                      textAlign: col.align || "left",
+                      cursor: canSort ? "pointer" : "default",
+                      userSelect: "none",
                     }}
+                    title={canSort ? `Sort by ${col.header}` : undefined}
                   >
-                    <span>{col.header}</span>
-                    {canSort && (
-                      <span
-                        style={{
-                          fontSize: "11px",
-                          color: isSorted ? "var(--brand-primary)" : "var(--text-muted)",
-                          opacity: isSorted ? 1 : 0.4,
-                        }}
-                      >
-                        {isSorted ? (sortDir === "asc" ? "▲" : "▼") : "↕"}
-                      </span>
-                    )}
-                  </div>
-                </th>
+                    <div
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "0.35rem",
+                        justifyContent:
+                          col.align === "right"
+                            ? "flex-end"
+                            : col.align === "center"
+                              ? "center"
+                              : "flex-start",
+                        width: "100%",
+                      }}
+                    >
+                      <span>{col.header}</span>
+                      {canSort && (
+                        <span
+                          style={{
+                            fontSize: "11px",
+                            color: isSorted ? "var(--brand-primary)" : "var(--text-muted)",
+                            opacity: isSorted ? 1 : 0.4,
+                          }}
+                        >
+                          {isSorted ? (sortDir === "asc" ? "▲" : "▼") : "↕"}
+                        </span>
+                      )}
+                    </div>
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {paginatedData.map((item, index) => {
+              const itemRecord = item as Record<string, unknown>;
+              const key = keyExtractor
+                ? keyExtractor(item, index)
+                : (itemRecord.id as string) || String(index);
+              return (
+                <tr
+                  key={key}
+                  onClick={() => onRowClick?.(item)}
+                  style={{ cursor: onRowClick ? "pointer" : "default" }}
+                >
+                  {columns.map((col) => (
+                    <td
+                      key={col.key}
+                      style={{
+                        textAlign: col.align || "left",
+                      }}
+                    >
+                      {col.render ? col.render(item, index) : String(itemRecord[col.key] ?? "–")}
+                    </td>
+                  ))}
+                </tr>
               );
             })}
-          </tr>
-        </thead>
-        <tbody>
-          {paginatedData.map((item, index) => {
-            const itemRecord = item as Record<string, unknown>;
-            const key = keyExtractor
-              ? keyExtractor(item, index)
-              : (itemRecord.id as string) || String(index);
-            return (
-              <tr
-                key={key}
-                onClick={() => onRowClick?.(item)}
-                style={{ cursor: onRowClick ? "pointer" : "default" }}
-              >
-                {columns.map((col) => (
-                  <td
-                    key={col.key}
-                    style={{
-                      textAlign: col.align || "left",
-                    }}
-                  >
-                    {col.render ? col.render(item, index) : String(itemRecord[col.key] ?? "–")}
-                  </td>
-                ))}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+          </tbody>
+        </table>
 
-      {(onPageChange || isClientPaging) && (
-        <Pagination
-          page={currentPage}
-          pageSize={currentPageSize}
-          total={currentTotal}
-          onPageChange={isClientPaging ? setLocalPage : onPageChange!}
-          onPageSizeChange={isClientPaging ? setLocalPageSize : onPageSizeChange}
-        />
-      )}
+        {(onPageChange || isClientPaging) && (
+          <Pagination
+            page={currentPage}
+            pageSize={currentPageSize}
+            total={currentTotal}
+            onPageChange={isClientPaging ? setLocalPage : onPageChange!}
+            onPageSizeChange={isClientPaging ? setLocalPageSize : onPageSizeChange}
+          />
+        )}
+      </div>
     </div>
   );
 }

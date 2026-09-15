@@ -19,7 +19,14 @@ def _amenity_and_slot(community_id: str):
             select(Amenity).where(Amenity.community_id == community_id).order_by(Amenity.code)
         )
         if not am:
-            am = Amenity(community_id=community_id, code=f"AM-{uuid.uuid4().hex[:4]}", name="Test Amenity", amenity_type="court", capacity=10, is_active=True)
+            am = Amenity(
+                community_id=community_id,
+                code=f"AM-{uuid.uuid4().hex[:4]}",
+                name="Test Amenity",
+                amenity_type="court",
+                capacity=10,
+                is_active=True,
+            )
             db.add(am)
             db.flush()
         target = date.today() + timedelta(days=2)
@@ -30,7 +37,15 @@ def _amenity_and_slot(community_id: str):
         )
         if not slot:
             from datetime import time
-            slot = AmenitySlot(community_id=am.community_id, amenity_id=am.id, day_of_week=target.weekday(), start_time=time(10, 0), end_time=time(11, 0), capacity=10)
+
+            slot = AmenitySlot(
+                community_id=am.community_id,
+                amenity_id=am.id,
+                day_of_week=target.weekday(),
+                start_time=time(10, 0),
+                end_time=time(11, 0),
+                capacity=10,
+            )
             db.add(slot)
             db.commit()
             db.refresh(slot)
@@ -105,9 +120,7 @@ def test_resident_amenity_bookings_are_own_only(as_role, seed_ids):
     from app.modules.users.models import User
 
     with SessionLocal() as db:
-        other_u = db.scalar(
-            select(User).where(User.email.like("%@gatesphere.com"), User.id != me)
-        )
+        other_u = db.scalar(select(User).where(User.email.like("%@gatesphere.com"), User.id != me))
         other_uid = str(other_u.id) if other_u else None
 
     if other_uid and not any(b["resident_user_id"] != me for b in fm_listed):

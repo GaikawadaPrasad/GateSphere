@@ -16,7 +16,9 @@ def test_assistant_needs_auth(client):
 
 def test_vendor_has_no_assistant_access(as_role):
     assert as_role("vendor_technician").get(f"{P}/quick-actions").status_code == 403
-    assert as_role("vendor_technician").post(f"{P}/query", json={"query": "hello"}).status_code == 403
+    assert (
+        as_role("vendor_technician").post(f"{P}/query", json={"query": "hello"}).status_code == 403
+    )
 
 
 def test_assistant_quick_actions_resident(as_role):
@@ -135,7 +137,8 @@ _ASSISTANT_ROLES = (
 
 def test_all_permitted_roles_can_load_quick_actions(as_role):
     """Regression guard: Super Admin's global scope used to 422 (COMMUNITY_REQUIRED) on this
-    exact call, making the assistant entirely unusable for that role — see AssistantService._communities."""
+    exact call, making the assistant entirely unusable for that role — see AssistantService._communities.
+    """
     for role_slug in _ASSISTANT_ROLES:
         r = as_role(role_slug).get(f"{P}/quick-actions")
         assert r.status_code == 200, f"{role_slug}: {r.text}"
@@ -162,7 +165,9 @@ def test_super_admin_platform_wide_queries(as_role):
         r = super_admin.post(f"{P}/query", json={"query": query})
         assert r.status_code == 200, f"{query}: {r.text}"
         d = r.json()["data"]
-        assert d["category"] == expected_category, f"{query} -> {d['category']} (reply: {d['reply_text']})"
+        assert (
+            d["category"] == expected_category
+        ), f"{query} -> {d['category']} (reply: {d['reply_text']})"
         assert d["category"] != "general"
 
 
@@ -186,6 +191,8 @@ def test_amenities_slot_query_not_misclassified_as_vehicles(as_role):
     assert r.json()["data"]["category"] == "amenities"
 
     # Sanity check the vehicles branch still owns queries that are actually about parking.
-    r = as_role("resident").post(f"{P}/query", json={"query": "unauthorized vehicle parked in my slot"})
+    r = as_role("resident").post(
+        f"{P}/query", json={"query": "unauthorized vehicle parked in my slot"}
+    )
     assert r.status_code == 200, r.text
     assert r.json()["data"]["category"] == "vehicles"

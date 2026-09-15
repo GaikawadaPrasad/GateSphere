@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 
 export interface StaffProfile {
   id: string;
+  community_id?: string;
   full_name: string;
   phone: string;
   emergency_contact: string;
@@ -16,6 +17,9 @@ export interface StaffProfile {
   active: boolean;
   avatar_url?: string;
   current_status?: string;
+  hours_worked_today?: number;
+  hours_worked_this_week?: number;
+  hours_worked_this_month?: number;
 }
 
 export interface AssignedHome {
@@ -63,6 +67,7 @@ export function useStaffProfile() {
       }
       return {
         id: res.id,
+        community_id: res.community_id,
         full_name: res.full_name || "Domestic Staff Member",
         phone: res.phone || "",
         emergency_contact: res.emergency_address || "None specified",
@@ -74,7 +79,27 @@ export function useStaffProfile() {
         active: res.is_active ?? true,
         avatar_url: res.photo_url,
         current_status: res.current_status || "outside",
+        hours_worked_today: Number(res.hours_worked_today ?? 0),
+        hours_worked_this_week: Number(res.hours_worked_this_week ?? 0),
+        hours_worked_this_month: Number(res.hours_worked_this_month ?? 0),
       };
+    },
+  });
+}
+
+export function useStaffPass() {
+  return useQuery<{
+    pass_code: string;
+    staff_id: string;
+    staff_name: string;
+    qr_payload: string;
+    generated_at: string;
+    expires_at: string;
+  }>({
+    queryKey: ["staff", "pass"],
+    queryFn: async () => {
+      const res = await api.get<any>("/domestic-staff/me/pass");
+      return res;
     },
   });
 }
@@ -82,12 +107,12 @@ export function useStaffProfile() {
 export function useUpdateStaffProfile() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ staffId, data }: { staffId?: string; data: Partial<StaffProfile> }) => {
-      return await api.patch<any>("/domestic-staff/me", {
-        phone: data.phone,
-        emergency_address: data.emergency_contact,
-        photo_url: data.avatar_url,
-      });
+    mutationFn: async ({ data }: { staffId?: string; data: Partial<StaffProfile> }) => {
+      const payload: Record<string, any> = {};
+      if (data.phone && data.phone.trim()) payload.phone = data.phone.trim();
+      if (data.emergency_contact !== undefined) payload.emergency_address = data.emergency_contact;
+      if (data.avatar_url) payload.photo_url = data.avatar_url;
+      return await api.patch<any>("/domestic-staff/me", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["staff", "profile"] });
@@ -113,7 +138,10 @@ export function useAssignedHomes() {
         special_instructions: a.work_type
           ? `${a.work_type.replace("_", " ").toUpperCase()} duty`
           : undefined,
-        schedule_days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+        schedule_days:
+          Array.isArray(a.days_of_week) && a.days_of_week.length > 0
+            ? a.days_of_week
+            : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
       }));
     },
   });
@@ -215,10 +243,11 @@ export function useStaffCheckOut() {
 export function useSendStaffPanic() {
   return useMutation({
     mutationFn: async (payload: { location?: string; note?: string }) => {
+      const locationText = payload.location ? ` [Location: ${payload.location}]` : "";
       return await api.post("/gate/alerts", {
         alert_type: "medical",
         severity: "high",
-        message: payload.note || "Domestic staff SOS emergency trigger",
+        message: `${payload.note || "Domestic staff SOS emergency trigger"}${locationText}`,
       });
     },
   });

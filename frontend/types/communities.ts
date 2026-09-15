@@ -9,11 +9,29 @@ export interface Community {
   postal_code?: string;
   country?: string;
   is_active: boolean;
+  admin_email?: string;
+  admin_name?: string;
   total_units?: number;
   total_towers?: number;
   total_residents?: number;
   created_at: string;
   updated_at?: string;
+}
+
+export interface CommunityCreate {
+  name: string;
+  code: string;
+  address_line1?: string;
+  address_line2?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  country?: string;
+  is_active?: boolean;
+  admin_name?: string;
+  admin_email?: string;
+  admin_password?: string;
+  admin_phone?: string;
 }
 
 export interface Tower {

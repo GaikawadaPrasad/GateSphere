@@ -10,6 +10,7 @@ export default function Hero() {
         muted
         playsInline
         preload="auto"
+        suppressHydrationWarning
         className="absolute inset-0 w-full h-full object-cover object-center"
       >
         <source src="/hero-video.mp4" type="video/mp4" />

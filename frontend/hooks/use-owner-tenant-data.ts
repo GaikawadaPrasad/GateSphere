@@ -34,12 +34,15 @@ export interface DeliveryItem {
   courier_company: string;
   package_type: string;
   tracking_id?: string;
-  protocol: "allow_gate" | "require_approval" | "leave_at_desk" | "reject";
-  status: "expected" | "at_gate" | "delivered" | "rejected" | "collected";
+  protocol: "allow_gate" | "require_approval" | "leave_at_desk" | "reject" | string;
+  status: "expected" | "at_gate" | "delivered" | "rejected" | "collected" | string;
+  approval_status?: "pending" | "approved" | "rejected" | "auto_approved" | string;
   arrived_at?: string;
+  expected_at?: string;
   delivered_at?: string;
   driver_name?: string;
   driver_phone?: string;
+  parcel_count?: number;
 }
 
 export interface Amenity {
@@ -108,11 +111,11 @@ export function useResidentOverview(communityId?: string | null) {
         `/dashboards/resident${communityId ? `?community_id=${communityId}` : ""}`,
       );
       return {
-        pending_dues_amount: Number(stats?.pending_dues_amount ?? 0),
-        pending_visitor_count: Number(stats?.pending_visitor_count ?? 0),
-        open_service_tickets: Number(stats?.open_tickets_count ?? 0),
+        pending_dues_amount: Number(stats?.pending_dues_amount ?? stats?.my_outstanding_balance ?? 0),
+        pending_visitor_count: Number(stats?.pending_visitor_count ?? stats?.my_pending_visitor_requests ?? 0),
+        open_service_tickets: Number(stats?.open_tickets_count ?? stats?.my_open_tickets ?? 0),
         staff_on_duty_count: Number(stats?.staff_on_duty_count ?? 0),
-        upcoming_amenity_bookings: Number(stats?.upcoming_amenity_bookings ?? 0),
+        upcoming_amenity_bookings: Number(stats?.upcoming_amenity_bookings ?? stats?.my_upcoming_bookings ?? 0),
         active_deliveries_count: Number(stats?.active_deliveries_count ?? 0),
       } as ResidentDashboardStats;
     },
@@ -173,10 +176,15 @@ export function useResidentVisitors() {
     mutationFn: async (payload: {
       visitor_name?: string;
       phone?: string;
+      id_type?: string;
+      id_number?: string;
       category?: string;
       reason?: string;
       valid_for_hours: number;
       unit_id?: string;
+      vehicle_number?: string;
+      party_size?: number;
+      group_label?: string;
     }) => {
       const isUuid = (s?: string) =>
         Boolean(s && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s));
@@ -214,7 +222,8 @@ export function useResidentVisitors() {
         if (c.includes("cab") || c.includes("taxi")) return "cab_taxi";
         if (c.includes("service") || c.includes("tech") || c.includes("maint")) return "service_tech";
         if (c.includes("contract") || c.includes("vendor") || c.includes("work")) return "vendor";
-        if (c.includes("staff") || c.includes("domestic") || c.includes("help") || c.includes("maid")) return "recurring";
+        if (c.includes("interview")) return "interviewee";
+        if (c.includes("staff") || c.includes("domestic") || c.includes("help") || c.includes("maid") || c.includes("recurr")) return "recurring";
         if (c.includes("event") || c.includes("party")) return "event_guest";
         if (c.includes("relat") || c.includes("family")) return "relative";
         return "personal_guest";
@@ -228,21 +237,29 @@ export function useResidentVisitors() {
         now.getTime() + (payload.valid_for_hours || 24) * 60 * 60 * 1000,
       );
 
+      const cleanIdNum = payload.id_number ? payload.id_number.trim().toUpperCase().replace(/[\s\-]/g, "") : undefined;
+
       const req = await api.post<any>("/visitors/requests", {
         unit_id: unitId,
         visitor_type: visitorType,
         visitor: {
           full_name: cleanName,
           phone: cleanPhone,
+          id_type: cleanIdNum ? payload.id_type : undefined,
+          id_number: cleanIdNum || undefined,
+          vehicle_number: payload.vehicle_number || undefined,
         },
         purpose: cleanReason,
         expected_at: now.toISOString(),
         valid_until: validUntil.toISOString(),
+        vehicle_number: payload.vehicle_number || undefined,
+        party_size: payload.party_size || 1,
+        group_label: payload.group_label || undefined,
       });
 
       const passRes = await api.post<any>(`/visitors/requests/${req.id}/passes`, {
         pass_type: "qr",
-        max_entries: 1,
+        max_entries: payload.party_size && payload.party_size > 1 ? payload.party_size : 1,
         with_pin: true,
         valid_from: now.toISOString(),
         valid_to: validUntil.toISOString(),
@@ -287,12 +304,16 @@ export function useResidentDeliveries() {
         tracking_id: d.tracking_reference || d.id.slice(0, 8),
         protocol: d.protocol_id || "allow_gate",
         status: d.status || "expected",
+        approval_status: d.approval_status || "pending",
         arrived_at: d.arrived_at,
+        expected_at: d.expected_at,
         delivered_at: d.delivered_at,
         driver_name: d.executive_name,
         driver_phone: d.executive_phone,
+        parcel_count: d.parcel_count || 1,
       }));
     },
+    refetchInterval: 10000,
   });
 
   const updateProtocol = useMutation({
@@ -304,7 +325,28 @@ export function useResidentDeliveries() {
     },
   });
 
-  return { ...query, updateProtocol };
+  const decideDelivery = useMutation({
+    mutationFn: async ({
+      deliveryId,
+      approved,
+      remarks,
+    }: {
+      deliveryId: string;
+      approved: boolean;
+      remarks?: string;
+    }) => {
+      return await api.post(`/deliveries/${deliveryId}/decision`, {
+        decision: approved ? "approved" : "rejected",
+        remarks: remarks || (approved ? "Approved by resident" : "Rejected by resident"),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["resident", "deliveries"] });
+      queryClient.invalidateQueries({ queryKey: ["resident", "overview"] });
+    },
+  });
+
+  return { ...query, updateProtocol, decideDelivery };
 }
 
 export interface AmenitySlot {
@@ -539,7 +581,73 @@ export function useResidentComplaints() {
     },
   });
 
-  return { ...query, createTicket: createTicketMutation, confirmTicket: confirmTicketMutation };
+  const submitFeedbackMutation = useMutation({
+    mutationFn: async ({
+      ticketId,
+      rating,
+      comments,
+    }: {
+      ticketId: string;
+      rating: number;
+      comments?: string;
+    }) => {
+      return await api.post(`/complaints/tickets/${ticketId}/feedback`, {
+        rating,
+        comments: comments?.trim() || undefined,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["resident", "complaints"] });
+    },
+  });
+
+  return {
+    ...query,
+    createTicket: createTicketMutation,
+    confirmTicket: confirmTicketMutation,
+    submitFeedback: submitFeedbackMutation,
+  };
+}
+
+export interface LedgerEntryItem {
+  id: string;
+  unit_id?: string;
+  entry_type: "debit" | "credit" | string;
+  source_type: string;
+  source_id?: string;
+  amount: number;
+  balance_after: number;
+  entry_date: string;
+  narration?: string;
+  created_at: string;
+}
+
+export function useResidentLedger(unitId?: string) {
+  return useQuery<LedgerEntryItem[]>({
+    queryKey: ["resident", "ledger", unitId],
+    queryFn: async () => {
+      let targetUnitId = unitId;
+      if (!targetUnitId) {
+        const me = await api.get<any>("/residents/me").catch(() => null);
+        targetUnitId = me?.occupancies?.[0]?.unit_id;
+      }
+      if (!targetUnitId) return [];
+      const res = await api.get<any[]>(`/billing/units/${targetUnitId}/ledger`);
+      if (!Array.isArray(res)) return [];
+      return res.map((l: any) => ({
+        id: l.id,
+        unit_id: l.unit_id,
+        entry_type: l.entry_type,
+        source_type: l.source_type,
+        source_id: l.source_id,
+        amount: Number(l.amount ?? 0),
+        balance_after: Number(l.balance_after ?? 0),
+        entry_date: l.entry_date || l.created_at,
+        narration: l.narration,
+        created_at: l.created_at,
+      }));
+    },
+  });
 }
 
 export function useResidentPayments() {
@@ -581,16 +689,18 @@ export function useResidentPayments() {
       amount: number;
       method?: string;
     }) => {
-      return await api.post("/billing/payments", {
+      const res = await api.post<any>("/billing/payments", {
         amount: Number(amount),
         payment_method: "upi",
         allocations: [{ invoice_id: invoiceId, amount: Number(amount) }],
         remarks: `Resident portal simulated payment via ${method || "UPI"}`,
       });
+      return res;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["resident", "invoices"] });
       queryClient.invalidateQueries({ queryKey: ["resident", "overview"] });
+      queryClient.invalidateQueries({ queryKey: ["resident", "ledger"] });
     },
   });
 
@@ -615,36 +725,48 @@ export function useResidentFamilyMembers() {
   const query = useQuery<FamilyMember[]>({
     queryKey: ["resident", "family-members"],
     queryFn: async () => {
-      try {
-        const me = await api.get<any>("/residents/me");
-        if (me && Array.isArray(me.family_members) && me.family_members.length > 0) {
-          return me.family_members.map((f: any) => ({
-            id: f.id,
-            name: f.full_name || f.name,
-            relation: f.relationship || f.relationship_type || "Family Member",
-            phone: f.phone || "",
-            access_enabled: f.access_enabled !== false,
-            unit_id: f.unit_id,
-            primary_resident_profile_id: f.primary_resident_profile_id,
-            date_of_birth: f.date_of_birth,
-            created_at: f.created_at,
-          }));
-        }
-      } catch {
-        // Fallback to local / cached storage if not authenticated
-      }
-
-      if (typeof window !== "undefined") {
-        const saved = localStorage.getItem("gatesphere_family_members");
-        if (saved) {
-          try {
-            return JSON.parse(saved);
-          } catch {}
-        }
+      const me = await api.get<any>("/residents/me");
+      if (me && Array.isArray(me.family_members)) {
+        return me.family_members.map((f: any) => ({
+          id: f.id,
+          name: f.full_name || f.name,
+          relation: f.relationship || f.relationship_type || "Family Member",
+          phone: f.phone || "",
+          access_enabled: f.access_enabled !== false,
+          unit_id: f.unit_id,
+          primary_resident_profile_id: f.primary_resident_profile_id,
+          date_of_birth: f.date_of_birth,
+          created_at: f.created_at,
+        }));
       }
       return [];
     },
   });
+
+  const relationshipTypeMap: Record<string, string> = {
+    Spouse: "spouse",
+    "Co-Owner / Spouse": "spouse",
+    Son: "child",
+    Daughter: "child",
+    Child: "child",
+    Parent: "parent",
+    Sibling: "sibling",
+    Relative: "relative",
+    "Domestic Help": "domestic_help",
+    Other: "other",
+  };
+
+  const normalizePhone = (phone?: string): string | undefined => {
+    if (!phone) return undefined;
+    let clean = phone.trim().replace(/[\s\-()]/g, "");
+    if (!clean) return undefined;
+    if (!clean.startsWith("+") && clean.length === 10) {
+      clean = `+91${clean}`;
+    } else if (!clean.startsWith("+") && clean.length > 10) {
+      clean = `+${clean}`;
+    }
+    return clean;
+  };
 
   const addMemberMutation = useMutation({
     mutationFn: async (payload: {
@@ -653,51 +775,24 @@ export function useResidentFamilyMembers() {
       phone: string;
       access_enabled?: boolean;
     }) => {
-      try {
-        const me = await api.get<any>("/residents/me");
-        const unitId = me?.occupancies?.[0]?.unit_id;
-        const profileId = me?.id;
-        if (unitId && profileId) {
-          const relationshipTypeMap: Record<string, string> = {
-            Spouse: "spouse",
-            "Co-Owner / Spouse": "spouse",
-            Son: "child",
-            Daughter: "child",
-            Child: "child",
-            Parent: "parent",
-            Sibling: "sibling",
-            Relative: "relative",
-            "Domestic Help": "domestic_help",
-          };
-          const relEnum = relationshipTypeMap[payload.relation] || "other";
-          const res = await api.post<any>("/residents/family-members", {
-            unit_id: unitId,
-            primary_resident_profile_id: profileId,
-            full_name: payload.name,
-            relationship: relEnum,
-            phone: payload.phone,
-            access_enabled: payload.access_enabled !== false,
-          });
-          return res;
-        }
-      } catch {
-        // Fallback to client-side persistence
+      const me = await api.get<any>("/residents/me");
+      const unitId = me?.occupancies?.[0]?.unit_id;
+      const profileId = me?.id;
+      if (!unitId || !profileId) {
+        throw new Error(
+          "No active unit occupancy found for resident profile. Ensure you have an assigned unit.",
+        );
       }
-
-      const newMember: FamilyMember = {
-        id: `fam-${Date.now()}`,
-        name: payload.name,
-        relation: payload.relation,
-        phone: payload.phone,
+      const relEnum =
+        relationshipTypeMap[payload.relation] || payload.relation?.toLowerCase() || "other";
+      return await api.post<any>("/residents/family-members", {
+        unit_id: unitId,
+        primary_resident_profile_id: profileId,
+        full_name: payload.name.trim(),
+        relationship: relEnum,
+        phone: normalizePhone(payload.phone),
         access_enabled: payload.access_enabled !== false,
-        created_at: new Date().toISOString(),
-      };
-      const current = query.data || [];
-      const updated = [...current, newMember];
-      if (typeof window !== "undefined") {
-        localStorage.setItem("gatesphere_family_members", JSON.stringify(updated));
-      }
-      return newMember;
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["resident", "family-members"] });
@@ -713,46 +808,14 @@ export function useResidentFamilyMembers() {
       phone: string;
       access_enabled?: boolean;
     }) => {
-      try {
-        const relationshipTypeMap: Record<string, string> = {
-          Spouse: "spouse",
-          "Co-Owner / Spouse": "spouse",
-          Son: "child",
-          Daughter: "child",
-          Child: "child",
-          Parent: "parent",
-          Sibling: "sibling",
-          Relative: "relative",
-          "Domestic Help": "domestic_help",
-        };
-        const relEnum = relationshipTypeMap[payload.relation] || "other";
-        await api.patch(`/residents/family-members/${payload.id}`, {
-          full_name: payload.name,
-          relationship: relEnum,
-          phone: payload.phone,
-          access_enabled: payload.access_enabled,
-        });
-      } catch {
-        // Fallback to client-side persistence
-      }
-
-      const current = query.data || [];
-      const updated = current.map((m) =>
-        m.id === payload.id
-          ? {
-              ...m,
-              name: payload.name,
-              relation: payload.relation,
-              phone: payload.phone,
-              access_enabled:
-                payload.access_enabled !== undefined ? payload.access_enabled : m.access_enabled,
-            }
-          : m,
-      );
-      if (typeof window !== "undefined") {
-        localStorage.setItem("gatesphere_family_members", JSON.stringify(updated));
-      }
-      return payload;
+      const relEnum =
+        relationshipTypeMap[payload.relation] || payload.relation?.toLowerCase() || "other";
+      return await api.patch(`/residents/family-members/${payload.id}`, {
+        full_name: payload.name.trim(),
+        relationship: relEnum,
+        phone: normalizePhone(payload.phone),
+        access_enabled: payload.access_enabled,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["resident", "family-members"] });
@@ -762,17 +825,7 @@ export function useResidentFamilyMembers() {
 
   const removeMemberMutation = useMutation({
     mutationFn: async (id: string) => {
-      try {
-        await api.delete(`/residents/family-members/${id}`);
-      } catch {
-        // Fallback to client-side persistence
-      }
-      const current = query.data || [];
-      const updated = current.filter((m) => m.id !== id);
-      if (typeof window !== "undefined") {
-        localStorage.setItem("gatesphere_family_members", JSON.stringify(updated));
-      }
-      return id;
+      return await api.delete(`/residents/family-members/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["resident", "family-members"] });
@@ -935,6 +988,8 @@ export interface AssignedDomesticStaff {
   phone: string;
   police_verified: boolean;
   is_active: boolean;
+  is_inside?: boolean;
+  last_check_in?: string;
 }
 
 export function useResidentDomesticStaff() {
@@ -944,15 +999,29 @@ export function useResidentDomesticStaff() {
       const me = await api.get<any>("/residents/me");
       const unitId = me?.occupancies?.[0]?.unit_id;
       if (!unitId) return [];
-      const assignments = await api.get<any[]>("/domestic-staff/assignments", { unit_id: unitId });
+      const [assignments, openAttendance] = await Promise.all([
+        api.get<any[]>("/domestic-staff/assignments", { unit_id: unitId }),
+        api.get<any[]>("/domestic-staff/attendance?open_only=true").catch(() => []),
+      ]);
       if (!Array.isArray(assignments) || assignments.length === 0) return [];
       const staffList = await Promise.all(
         assignments.map((a: any) =>
           api.get<any>(`/domestic-staff/${a.staff_id}`).catch(() => null),
         ),
       );
+
+      const openAttendanceMap = new Map<string, any>();
+      if (Array.isArray(openAttendance)) {
+        for (const att of openAttendance) {
+          if (att?.staff_id && !att.check_out_at) {
+            openAttendanceMap.set(att.staff_id, att);
+          }
+        }
+      }
+
       return assignments.map((a: any, idx: number) => {
         const staff = staffList[idx];
+        const activeAtt = openAttendanceMap.get(a.staff_id);
         return {
           id: a.id,
           staff_id: a.staff_id,
@@ -961,8 +1030,38 @@ export function useResidentDomesticStaff() {
           phone: staff?.phone || "",
           police_verified: staff?.police_verification_status === "verified",
           is_active: Boolean(a.is_active),
+          is_inside: Boolean(activeAtt),
+          last_check_in: activeAtt?.check_in_at,
         };
       });
+    },
+    refetchInterval: 15000,
+  });
+}
+
+export function useSubmitStaffRating() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: {
+      staff_id: string;
+      rating: number;
+      feedback?: string;
+      unit_id?: string;
+    }) => {
+      let unitId = payload.unit_id;
+      if (!unitId) {
+        const me = await api.get<any>("/residents/me").catch(() => null);
+        unitId = me?.occupancies?.[0]?.unit_id;
+      }
+      return await api.post("/domestic-staff/ratings", {
+        staff_id: payload.staff_id,
+        unit_id: unitId || undefined,
+        rating: payload.rating,
+        feedback: payload.feedback?.trim() || undefined,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["resident", "domestic-staff"] });
     },
   });
 }
@@ -975,6 +1074,50 @@ export function useSendResidentPanic() {
         severity: "high",
         message: payload.note || "Resident emergency panic triggered from portal",
       });
+    },
+  });
+}
+
+export function useCommunityStaffDirectory() {
+  return useQuery({
+    queryKey: ["community", "staff-directory"],
+    queryFn: async () => {
+      const res = await api.get<any[]>("/domestic-staff?page_size=100");
+      return Array.isArray(res) ? res : [];
+    },
+    staleTime: 60000,
+  });
+}
+
+export function useAssignDomesticStaff() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: {
+      staff_id: string;
+      unit_id: string;
+      work_type?: string;
+      start_date?: string;
+      end_date?: string;
+      time_from?: string;
+      time_to?: string;
+      days_of_week?: string[];
+    }) => {
+      return await api.post("/domestic-staff/assignments", payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["resident", "domestic-staff"] });
+    },
+  });
+}
+
+export function useEndDomesticStaffAssignment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (assignmentId: string) => {
+      return await api.post(`/domestic-staff/assignments/${assignmentId}/end`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["resident", "domestic-staff"] });
     },
   });
 }

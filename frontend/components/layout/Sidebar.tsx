@@ -8,6 +8,8 @@ import {
   AUDITOR_NAV,
   DOMESTIC_STAFF_NAV,
   OWNER_TENANT_NAV,
+  SECURITY_GUARD_NAV,
+  VENDOR_TECHNICIAN_NAV,
   NavItem,
 } from "@/config/dashboard-navigation";
 
@@ -90,9 +92,7 @@ export function Sidebar() {
       title: "GateSphere",
       roleLabel: "Security Guard",
       accentColor: "#DC2626",
-      items: [
-        { id: "dashboard", label: "Dashboard", href: "/security-guard/dashboard", icon: "🛡️" },
-      ],
+      items: SECURITY_GUARD_NAV.navItems,
     };
   } else if (
     pathname.startsWith("/security-supervisor") ||
@@ -140,14 +140,15 @@ export function Sidebar() {
         },
       ],
     };
-  } else if (pathname.startsWith("/dashboard/vendor-technician")) {
+  } else if (
+    pathname.startsWith("/vendor-technician") ||
+    pathname.startsWith("/dashboard/vendor-technician")
+  ) {
     navConfig = {
       title: "GateSphere",
       roleLabel: "Vendor Technician",
       accentColor: "#D97706",
-      items: [
-        { id: "dashboard", label: "Dashboard", href: "/dashboard/vendor-technician", icon: "🔨" },
-      ],
+      items: VENDOR_TECHNICIAN_NAV.navItems,
     };
   }
 

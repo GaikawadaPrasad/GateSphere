@@ -89,6 +89,38 @@ def test_two_role_sessions_coexist_in_one_jar_and_logout_is_isolated():
     jar.close()
 
 
+def test_cross_bucket_csrf_rejected_when_multiple_sessions_present():
+    """BE-002 regression guard: A request acting as 'resident' must NOT accept
+    the super-admin session's CSRF token even if both cookies coexist in the jar."""
+    jar = TestClient(app)
+
+    jar.post("/api/v1/auth/login", json={"email": DEMO_EMAIL, "password": DEMO_PASSWORD})
+    jar.post(
+        "/api/v1/auth/login",
+        json={"email": "resident@gatesphere.com", "password": "resident@Gate2026!"},
+    )
+
+    sa_csrf = jar.cookies.get("gatesphere_superadmin_csrf")
+    res_csrf = jar.cookies.get("gatesphere_resident_csrf")
+    assert sa_csrf and res_csrf and sa_csrf != res_csrf
+
+    # Attempt action as resident using superadmin's CSRF token -> MUST FAIL 403 CSRF_INVALID
+    r = jar.post(
+        "/api/v1/auth/logout",
+        headers={"X-Session-Role": "resident", "X-CSRF-Token": sa_csrf},
+    )
+    assert r.status_code == 403
+    assert r.json()["error"]["code"] == "CSRF_INVALID"
+
+    # Attempt action as resident using resident's CSRF token -> SUCCEEDS
+    r = jar.post(
+        "/api/v1/auth/logout",
+        headers={"X-Session-Role": "resident", "X-CSRF-Token": res_csrf},
+    )
+    assert r.status_code == 204
+    jar.close()
+
+
 def test_wrong_role_at_login_is_rejected():
     """Asking to log in as a role the account does not hold is refused."""
     c = TestClient(app)

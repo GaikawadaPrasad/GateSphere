@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { communitiesApi } from "@/lib/api";
-import type { Community } from "@/types/communities";
+import type { Community, CommunityCreate } from "@/types/communities";
 
 export const communityKeys = {
   all: ["communities"] as const,
@@ -91,7 +91,7 @@ export function useGates(communityId?: string) {
 export function useCreateCommunity() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: Partial<Community>) => communitiesApi.create(data),
+    mutationFn: (data: Partial<Community> | CommunityCreate) => communitiesApi.create(data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: communityKeys.all });
       qc.invalidateQueries({ queryKey: ["dashboards"] });

@@ -326,12 +326,181 @@ export const OWNER_TENANT_NAV: DashboardNavConfig = {
   ],
 };
 
+export const SECURITY_GUARD_NAV: DashboardNavConfig = {
+  role: "security_guard",
+  title: "Security Guard",
+  subtitle: "Gate Operations & Access Verification",
+  basePath: "/security-guard",
+  color: "#DC2626",
+  navItems: [
+    {
+      id: "dashboard",
+      label: "Gate Console",
+      href: "/security-guard/dashboard",
+      icon: "🛡️",
+      accentColor: "#DC2626",
+      description: "Live gate operations & KPIs",
+    },
+    {
+      id: "live-gate",
+      label: "Pass / PIN Verify",
+      href: "/security-guard/live-gate",
+      icon: "🚪",
+      accentColor: "#2563EB",
+      description: "Instant QR / Pass code verification",
+    },
+    {
+      id: "visitors",
+      label: "Visitor Management",
+      href: "/security-guard/visitors",
+      icon: "👤",
+      accentColor: "#7C3AED",
+      description: "Daily visitor entry & exit check",
+    },
+    {
+      id: "deliveries",
+      label: "Delivery Desk",
+      href: "/security-guard/deliveries",
+      icon: "📦",
+      accentColor: "#D97706",
+      description: "Courier arrival & handoff logging",
+    },
+    {
+      id: "cab-taxi",
+      label: "Cab / Taxi Verify",
+      href: "/security-guard/cab-taxi",
+      icon: "🚖",
+      accentColor: "#059669",
+      description: "Cab license & driver verification",
+    },
+    {
+      id: "staff-attendance",
+      label: "Staff Attendance",
+      href: "/security-guard/staff-attendance",
+      icon: "🪪",
+      accentColor: "#0D9488",
+      description: "Domestic staff check-in & check-out",
+    },
+    {
+      id: "blacklist-check",
+      label: "Blacklist Lookup",
+      href: "/security-guard/blacklist-check",
+      icon: "🔍",
+      accentColor: "#DC2626",
+      description: "Real-time security registry search",
+    },
+    {
+      id: "emergency",
+      label: "SOS & Emergency",
+      href: "/security-guard/emergency",
+      icon: "🚨",
+      accentColor: "#EF4444",
+      description: "Panic alarm & emergency broadcast",
+    },
+    {
+      id: "gate-history",
+      label: "Gate History",
+      href: "/security-guard/gate-history",
+      icon: "📜",
+      accentColor: "#475569",
+      description: "Read-only gate event logs",
+    },
+    {
+      id: "notifications",
+      label: "Notifications",
+      href: "/security-guard/notifications",
+      icon: "🔔",
+      accentColor: "#3B82F6",
+      description: "Gate notifications & alerts",
+    },
+  ],
+};
+
+export const VENDOR_TECHNICIAN_NAV: DashboardNavConfig = {
+  role: "vendor_technician",
+  title: "Vendor / Technician",
+  subtitle: "Service Operations & Digital Passes",
+  basePath: "/vendor-technician",
+  color: "#D97706",
+  navItems: [
+    {
+      id: "dashboard",
+      label: "Dashboard",
+      href: "/vendor-technician/dashboard",
+      icon: "📊",
+      accentColor: "#2563EB",
+      description: "Work console, active job & KPI metrics",
+    },
+    {
+      id: "assigned-tickets",
+      label: "Assigned Tickets",
+      href: "/vendor-technician/assigned-tickets",
+      icon: "🎫",
+      accentColor: "#F59E0B",
+      description: "Assigned work orders & job acceptance",
+    },
+    {
+      id: "work-progress",
+      label: "Work Progress",
+      href: "/vendor-technician/work-progress",
+      icon: "⏳",
+      accentColor: "#3B82F6",
+      description: "Update step-by-step job execution status",
+    },
+    {
+      id: "entry-pass",
+      label: "Entry Pass",
+      href: "/vendor-technician/entry-pass",
+      icon: "🪪",
+      accentColor: "#10B981",
+      description: "Digital QR gate pass for security scanning",
+    },
+    {
+      id: "work-completion",
+      label: "Work Completion",
+      href: "/vendor-technician/work-completion",
+      icon: "✅",
+      accentColor: "#059669",
+      description: "Submit materials, remarks & completion proof",
+    },
+    {
+      id: "service-history",
+      label: "Service History",
+      href: "/vendor-technician/service-history",
+      icon: "📜",
+      accentColor: "#6B7280",
+      description: "Historical archive of completed work orders",
+    },
+    {
+      id: "notifications",
+      label: "Notifications",
+      href: "/vendor-technician/notifications",
+      icon: "🔔",
+      accentColor: "#8B5CF6",
+      description: "Assignment alerts & signoff updates",
+    },
+    {
+      id: "profile",
+      label: "Profile",
+      href: "/vendor-technician/profile",
+      icon: "👤",
+      accentColor: "#4B5563",
+      description: "Technician credentials & service details",
+    },
+  ],
+};
+
 export const AUDITOR_NAV_ITEMS = AUDITOR_NAV.navItems;
 export const DOMESTIC_STAFF_NAV_ITEMS = DOMESTIC_STAFF_NAV.navItems;
 export const RESIDENT_NAV_ITEMS = OWNER_TENANT_NAV.navItems;
+export const SECURITY_GUARD_NAV_ITEMS = SECURITY_GUARD_NAV.navItems;
+export const VENDOR_TECHNICIAN_NAV_ITEMS = VENDOR_TECHNICIAN_NAV.navItems;
 
 export function getDashboardNavForRole(roleSlug: string): DashboardNavConfig {
   if (roleSlug === "auditor") return AUDITOR_NAV;
   if (roleSlug === "domestic_staff") return DOMESTIC_STAFF_NAV;
+  if (roleSlug === "security_guard") return SECURITY_GUARD_NAV;
+  if (roleSlug === "vendor_technician") return VENDOR_TECHNICIAN_NAV;
   return OWNER_TENANT_NAV;
 }
+

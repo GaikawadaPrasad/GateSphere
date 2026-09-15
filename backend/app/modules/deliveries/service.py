@@ -27,6 +27,7 @@ from app.modules.deliveries.repository import (
     delivery_events,
 )
 from app.modules.deliveries.schemas import ALLOWED
+from app.modules.notifications import events as notif_events
 from app.modules.residents.access import UnitScopedAccess
 from app.modules.residents.models import ResidentProfile, UnitOccupancy
 from app.modules.users.models import User
@@ -131,9 +132,27 @@ class DeliveryService(UnitScopedAccess):
     # -- protocols --------------------------------------------- #
     async def list_protocols(self, *, community_id: uuid.UUID | None):
         cid = self._one_community(community_id)
+        if await self.is_unit_restricted():
+            scope = await self._unit_scope()
+            if scope:
+                u_id = next(iter(scope))
+                stmt = (
+                    select(DeliveryProtocol)
+                    .where(
+                        DeliveryProtocol.community_id == cid,
+                        (DeliveryProtocol.unit_id == u_id) | (DeliveryProtocol.unit_id.is_(None)),
+                    )
+                    .order_by(DeliveryProtocol.delivery_type)
+                )
+                rows = list((await self.db.scalars(stmt)).all())
+                by_type: dict[str, DeliveryProtocol] = {}
+                for r in rows:
+                    if r.delivery_type not in by_type or r.unit_id is not None:
+                        by_type[r.delivery_type] = r
+                return list(by_type.values())
         stmt = (
             select(DeliveryProtocol)
-            .where(DeliveryProtocol.community_id == cid)
+            .where(DeliveryProtocol.community_id == cid, DeliveryProtocol.unit_id.is_(None))
             .order_by(DeliveryProtocol.delivery_type)
         )
         return list((await self.db.scalars(stmt)).all())
@@ -144,7 +163,17 @@ class DeliveryService(UnitScopedAccess):
         cid = self._one_community(community_id)
         _enum("delivery_type", payload.delivery_type)
         _enum("protocol_type", payload.protocol_type)
-        obj = await self.protocols.for_type(cid, payload.delivery_type)
+        if await self.is_unit_restricted():
+            scope = await self._unit_scope()
+            if not scope:
+                raise NotFoundError("Unit not found")
+            unit_id = payload.unit_id or next(iter(scope))
+            await self._assert_unit_visible(unit_id)
+            payload.unit_id = unit_id
+            obj = await self.protocols.for_type(cid, payload.delivery_type, unit_id=unit_id)
+        else:
+            obj = await self.protocols.for_type(cid, payload.delivery_type, unit_id=payload.unit_id)
+
         data = payload.model_dump()
         if obj is None:
             obj = DeliveryProtocol(community_id=cid, **data)
@@ -158,11 +187,16 @@ class DeliveryService(UnitScopedAccess):
         await self._audit(action, cid, "delivery_protocol", obj.id, new=data)
         return obj
 
-    async def _protocol_for(self, community_id: uuid.UUID, delivery_type: str) -> DeliveryProtocol:
-        obj = await self.protocols.for_type(community_id, delivery_type)
+    async def _protocol_for(
+        self, community_id: uuid.UUID, delivery_type: str, unit_id: uuid.UUID | None = None
+    ) -> DeliveryProtocol:
+        obj = await self.protocols.for_type(community_id, delivery_type, unit_id=unit_id)
         if obj is None:
             obj = DeliveryProtocol(
-                community_id=community_id, delivery_type=delivery_type, **_DEFAULT_PROTOCOL
+                community_id=community_id,
+                unit_id=unit_id,
+                delivery_type=delivery_type,
+                **_DEFAULT_PROTOCOL,
             )
             await self.protocols.add(obj)
         return obj
@@ -172,7 +206,9 @@ class DeliveryService(UnitScopedAccess):
         unit = await self._unit_in_scope(payload.unit_id)
         await self._assert_unit_visible(unit.id)  # a resident logs deliveries for their own unit
         _enum("delivery_type", payload.delivery_type)
-        protocol = await self._protocol_for(unit.community_id, payload.delivery_type)
+        protocol = await self._protocol_for(
+            unit.community_id, payload.delivery_type, unit_id=unit.id
+        )
         auto = protocol.allow_direct_entry and not protocol.requires_otp
         obj = Delivery(
             community_id=unit.community_id,
@@ -199,6 +235,20 @@ class DeliveryService(UnitScopedAccess):
             obj.id,
             new={"delivery_type": payload.delivery_type, "approval_status": obj.approval_status},
         )
+        if obj.approval_status == "pending" and obj.resident_user_id:
+            await notif_events.emit(
+                self.db,
+                self.scope,
+                self.actor,
+                self.ctx,
+                recipient_user_id=obj.resident_user_id,
+                community_id=unit.community_id,
+                notification_type="delivery.approval_needed",
+                title="Delivery Approval Needed",
+                message=f"A {obj.delivery_type} delivery from {obj.provider_name or 'courier'} is pending your approval.",
+                reference_type="delivery",
+                reference_id=obj.id,
+            )
         return obj
 
     async def get_delivery(self, delivery_id: uuid.UUID) -> Delivery:
@@ -261,6 +311,20 @@ class DeliveryService(UnitScopedAccess):
         await self._event(obj, payload.decision, remarks=payload.remarks)
         await self.db.flush()
         await self._audit(f"delivery.{payload.decision}", obj.community_id, "delivery", obj.id)
+        if obj.resident_user_id:
+            await notif_events.emit(
+                self.db,
+                self.scope,
+                self.actor,
+                self.ctx,
+                recipient_user_id=obj.resident_user_id,
+                community_id=obj.community_id,
+                notification_type=f"delivery.{payload.decision}",
+                title=f"Delivery {payload.decision.title()}",
+                message=f"Your {obj.delivery_type} delivery was {payload.decision}.",
+                reference_type="delivery",
+                reference_id=obj.id,
+            )
         return obj
 
     async def record_arrival(
@@ -283,6 +347,20 @@ class DeliveryService(UnitScopedAccess):
         await self._event(obj, "arrived", gate_id=gate_id)
         await self.db.flush()
         await self._audit("delivery.arrived", obj.community_id, "delivery", obj.id)
+        if obj.resident_user_id:
+            await notif_events.emit(
+                self.db,
+                self.scope,
+                self.actor,
+                self.ctx,
+                recipient_user_id=obj.resident_user_id,
+                community_id=obj.community_id,
+                notification_type="delivery.arrived",
+                title="Delivery Arrived at Gate",
+                message=f"Your {obj.delivery_type} delivery from {obj.provider_name or 'courier'} has arrived at the gate.",
+                reference_type="delivery",
+                reference_id=obj.id,
+            )
         return obj
 
     async def mark_delivered(self, delivery_id: uuid.UUID) -> Delivery:

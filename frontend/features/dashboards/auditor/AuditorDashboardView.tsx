@@ -9,6 +9,7 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { DataTable, Column } from "@/components/tables/DataTable";
 import { DebouncedInput } from "@/components/forms/DebouncedInput";
 import { FilterPanel } from "@/components/forms/FilterPanel";
+import { SortDropdown } from "@/components/common/SortDropdown";
 import { BrandButton } from "@/components/common/BrandButton";
 import {
   useAuditorOverview,
@@ -504,6 +505,10 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
               <option value="complaints">Complaints</option>
               <option value="incidents">Incidents</option>
             </select>
+            <SortDropdown
+              value={logControls.sortPreset}
+              onChange={logControls.setSortPreset}
+            />
           </FilterPanel>
 
           <DataTable<AuditLogItem>
@@ -572,6 +577,10 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
               <option value="Domestic Staff">Domestic Staff</option>
               <option value="Delivery Agent">Delivery Agent</option>
             </select>
+            <SortDropdown
+              value={gateControls.sortPreset}
+              onChange={gateControls.setSortPreset}
+            />
           </FilterPanel>
 
           <DataTable
@@ -629,6 +638,10 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
                 icon="🔍"
               />
             </div>
+            <SortDropdown
+              value={visitorControls.sortPreset}
+              onChange={visitorControls.setSortPreset}
+            />
           </FilterPanel>
 
           <DataTable
@@ -666,6 +679,29 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
             Audit verification of resolution times, contractor performance, and automatic SLA tier
             sweeps.
           </p>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "1rem",
+              flexWrap: "wrap",
+              gap: "0.75rem",
+            }}
+          >
+            <div style={{ width: "min(100%, 280px)" }}>
+              <DebouncedInput
+                value={complaintControls.searchTerm}
+                onChange={complaintControls.setSearchTerm}
+                placeholder="Search ticket #, subject..."
+                icon="🔍"
+              />
+            </div>
+            <SortDropdown
+              value={complaintControls.sortPreset}
+              onChange={complaintControls.setSortPreset}
+            />
+          </div>
           <DataTable
             columns={[
               { key: "ticket_number", header: "Ticket #", sortable: true },
@@ -706,6 +742,29 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
           <p style={{ color: "var(--brand-body)", marginBottom: "1.25rem", fontSize: "14px" }}>
             Track assigned specialized vendors, gate permits, and job completion proofs.
           </p>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "1rem",
+              flexWrap: "wrap",
+              gap: "0.75rem",
+            }}
+          >
+            <div style={{ width: "min(100%, 280px)" }}>
+              <DebouncedInput
+                value={vendorControls.searchTerm}
+                onChange={vendorControls.setSearchTerm}
+                placeholder="Search vendor, contractor..."
+                icon="🔍"
+              />
+            </div>
+            <SortDropdown
+              value={vendorControls.sortPreset}
+              onChange={vendorControls.setSortPreset}
+            />
+          </div>
           <DataTable
             columns={[
               { key: "vendor_name", header: "Vendor Name", sortable: true },
@@ -738,6 +797,29 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
             Immutable audit record of all emergency panic triggers, security supervisor assignments,
             and guard responses.
           </p>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "1rem",
+              flexWrap: "wrap",
+              gap: "0.75rem",
+            }}
+          >
+            <div style={{ width: "min(100%, 280px)" }}>
+              <DebouncedInput
+                value={incidentControls.searchTerm}
+                onChange={incidentControls.setSearchTerm}
+                placeholder="Search incidents, locations..."
+                icon="🔍"
+              />
+            </div>
+            <SortDropdown
+              value={incidentControls.sortPreset}
+              onChange={incidentControls.setSortPreset}
+            />
+          </div>
           <DataTable
             columns={[
               { key: "id", header: "Incident ID", sortable: true },
@@ -777,6 +859,10 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
                 icon="🔍"
               />
             </div>
+            <SortDropdown
+              value={financialControls.sortPreset}
+              onChange={financialControls.setSortPreset}
+            />
           </FilterPanel>
 
           <DataTable

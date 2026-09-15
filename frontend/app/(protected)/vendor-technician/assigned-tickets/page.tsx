@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SearchInput } from "@/components/forms/SearchInput";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { DataTable, type Column } from "@/components/tables/DataTable";
 import { vendorTicketsApi, type VendorTicket } from "@/lib/api";
 
 export default function VendorAssignedTicketsPage() {
@@ -55,15 +56,94 @@ export default function VendorAssignedTicketsPage() {
     }
   };
 
-  const filteredTickets = tickets.filter((t) => {
-    const matchSearch =
-      t.ticket_number.toLowerCase().includes(search.toLowerCase()) ||
-      t.title.toLowerCase().includes(search.toLowerCase()) ||
-      t.facility.toLowerCase().includes(search.toLowerCase());
-    const matchPriority =
-      priorityFilter === "all" || t.priority.toLowerCase() === priorityFilter.toLowerCase();
-    return matchSearch && matchPriority;
-  });
+  const filteredTickets = useMemo(() => {
+    return tickets.filter((t) => {
+      const matchSearch =
+        t.ticket_number.toLowerCase().includes(search.toLowerCase()) ||
+        t.title.toLowerCase().includes(search.toLowerCase()) ||
+        t.facility.toLowerCase().includes(search.toLowerCase());
+      const matchPriority =
+        priorityFilter === "all" || t.priority.toLowerCase() === priorityFilter.toLowerCase();
+      return matchSearch && matchPriority;
+    });
+  }, [tickets, search, priorityFilter]);
+
+  const columns: Column<VendorTicket>[] = useMemo(
+    () => [
+      {
+        key: "ticket_number",
+        header: "Ticket #",
+        render: (t) => (
+          <span style={{ fontWeight: 600, fontFamily: "monospace" }}>{t.ticket_number}</span>
+        ),
+      },
+      {
+        key: "title",
+        header: "Task Summary",
+        render: (t) => <span style={{ fontWeight: 500, color: "var(--fg)" }}>{t.title}</span>,
+      },
+      {
+        key: "facility",
+        header: "Facility / Details",
+        render: (t) => (
+          <div>
+            <div>{t.facility}</div>
+            <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>{t.location}</div>
+          </div>
+        ),
+      },
+      {
+        key: "priority",
+        header: "Priority",
+        render: (t) => <StatusBadge status={t.priority} />,
+      },
+      {
+        key: "sla_deadline",
+        header: "SLA Deadline",
+        render: (t) => (
+          <span style={{ fontWeight: 600, color: "var(--warning)" }}>{t.sla_deadline}</span>
+        ),
+      },
+      {
+        key: "status",
+        header: "Status",
+        render: (t) => <StatusBadge status={t.status.replace(/_/g, " ").toUpperCase()} />,
+      },
+      {
+        key: "actions",
+        header: "Actions",
+        render: (t) => (
+          <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+            {t.status === "assigned" || t.status === "created" ? (
+              <button
+                className="btn btn-primary"
+                style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}
+                onClick={() => handleAcceptTicket(t.id)}
+              >
+                Accept Work
+              </button>
+            ) : (
+              <button
+                className="btn btn-secondary"
+                style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}
+                onClick={() => router.push("/vendor-technician/work-progress")}
+              >
+                Progress Job
+              </button>
+            )}
+            <button
+              className="btn btn-secondary"
+              style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}
+              onClick={() => router.push("/vendor-technician/entry-pass")}
+            >
+              View Gate Pass
+            </button>
+          </div>
+        ),
+      },
+    ],
+    [router],
+  );
 
   return (
     <div>
@@ -106,86 +186,19 @@ export default function VendorAssignedTicketsPage() {
           </div>
         </div>
 
-        <div className="table-container">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Ticket #</th>
-                <th>Task Summary</th>
-                <th>Facility / Details</th>
-                <th>Priority</th>
-                <th>SLA Deadline</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <tr>
-                  <td colSpan={7} style={{ textAlign: "center", padding: "2rem" }}>
-                    Loading tickets…
-                  </td>
-                </tr>
-              ) : filteredTickets.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={7}
-                    style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
-                  >
-                    No assigned tickets found.
-                  </td>
-                </tr>
-              ) : (
-                filteredTickets.map((t) => (
-                  <tr key={t.id}>
-                    <td style={{ fontWeight: 600, fontFamily: "monospace" }}>{t.ticket_number}</td>
-                    <td style={{ fontWeight: 500, color: "var(--fg)" }}>{t.title}</td>
-                    <td>
-                      <div>{t.facility}</div>
-                      <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>{t.location}</div>
-                    </td>
-                    <td>
-                      <StatusBadge status={t.priority} />
-                    </td>
-                    <td style={{ fontWeight: 600, color: "var(--warning)" }}>{t.sla_deadline}</td>
-                    <td>
-                      <StatusBadge status={t.status.replace(/_/g, " ").toUpperCase()} />
-                    </td>
-                    <td>
-                      <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
-                        {t.status === "assigned" || t.status === "created" ? (
-                          <button
-                            className="btn btn-primary"
-                            style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}
-                            onClick={() => handleAcceptTicket(t.id)}
-                          >
-                            Accept Work
-                          </button>
-                        ) : (
-                          <button
-                            className="btn btn-secondary"
-                            style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}
-                            onClick={() => router.push("/vendor-technician/work-progress")}
-                          >
-                            Progress Job
-                          </button>
-                        )}
-                        <button
-                          className="btn btn-secondary"
-                          style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}
-                          onClick={() => router.push("/vendor-technician/entry-pass")}
-                        >
-                          View Gate Pass
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable<VendorTicket>
+          columns={columns}
+          data={filteredTickets}
+          isLoading={isLoading}
+          enableClientPagination={true}
+          pageSize={10}
+          emptyTitle="No assigned tickets found"
+          emptyDescription="You have no assigned service tickets matching the selected filters."
+          emptyIcon="🎫"
+          keyExtractor={(t) => t.id}
+        />
       </div>
     </div>
   );
 }
+

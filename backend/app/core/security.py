@@ -322,13 +322,10 @@ def verify_csrf(request: Request) -> None:
     cookie = request.cookies.get(csrf_cookie)
     if cookie and secrets.compare_digest(cookie, header):
         return
-    # Fallback: check if header matches any valid CSRF cookie in the request jar
-    for cname, cval in request.cookies.items():
-        if (
-            cname == "gs_csrf"
-            or (cname.startswith("gatesphere_") and cname.endswith("_csrf"))
-        ) and secrets.compare_digest(cval, header):
-            return
+    # Fallback: only check legacy gs_csrf cookie if acting bucket cookie was absent
+    legacy_cookie = request.cookies.get("gs_csrf")
+    if legacy_cookie and secrets.compare_digest(legacy_cookie, header):
+        return
     raise ForbiddenError("CSRF token missing or invalid", code="CSRF_INVALID")
 
 

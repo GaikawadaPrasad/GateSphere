@@ -58,11 +58,12 @@ async def update_policy(
 @router.get("/blacklist", response_model=Envelope[list[schemas.BlacklistRead]], dependencies=[VIEW])
 async def list_blacklist(
     community_id: uuid.UUID | None = None,
+    q: str | None = None,
     params: PageParams = Depends(page_params),
     svc: VisitorService = Depends(visitor_service),
 ) -> dict:
     rows, total = await svc.list_blacklist(
-        community_id=community_id, offset=params.offset, limit=params.page_size
+        community_id=community_id, q=q, offset=params.offset, limit=params.page_size
     )
     return paginated(
         [schemas.BlacklistRead.model_validate(r) for r in rows], total=total, params=params
@@ -86,6 +87,33 @@ async def add_blacklist(
         ),
         message="Blacklisted",
     )
+
+
+@router.post(
+    "/blacklist/check",
+    response_model=Envelope[schemas.BlacklistCheckResponse],
+    dependencies=[VIEW],
+)
+async def check_blacklist(
+    payload: schemas.BlacklistCheckRequest,
+    community_id: uuid.UUID | None = None,
+    svc: VisitorService = Depends(visitor_service),
+) -> dict:
+    res = await svc.check_blacklist(payload, community_id=community_id)
+    return ok(schemas.BlacklistCheckResponse.model_validate(res))
+
+
+@router.delete(
+    "/blacklist/{blacklist_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    dependencies=[UPDATE],
+)
+async def remove_blacklist(
+    blacklist_id: uuid.UUID, svc: VisitorService = Depends(visitor_service)
+) -> Response:
+    await svc.remove_blacklist(blacklist_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # --- entries -------------------------------------------------------- #

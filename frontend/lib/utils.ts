@@ -119,3 +119,13 @@ export function deriveTicketEscalationState(ticket: {
   if (totalWindow > 0 && remaining / totalWindow < 0.25) return "at_risk";
   return "on_track";
 }
+
+/**
+ * Auto-generates a user-friendly default initial password from a user's full name,
+ * matching GateSphere's standard pattern (e.g. "Ananya Patel" -> "ananya@Gate2026!").
+ */
+export function generateInitialPassword(fullName: string, defaultPrefix = "user"): string {
+  const cleanName = fullName.trim().replace(/[^a-zA-Z0-9]/g, "");
+  const firstName = cleanName.length > 0 ? cleanName.toLowerCase() : defaultPrefix;
+  return `${firstName}@Gate2026!`;
+}

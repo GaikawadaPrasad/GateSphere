@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { DataTable, type Column } from "@/components/tables/DataTable";
 import { complaintsApi, type ServiceTicket } from "@/lib/api";
 
 export default function VendorServiceHistoryPage() {
@@ -36,6 +37,91 @@ export default function VendorServiceHistoryPage() {
     loadData();
   }, []);
 
+  const columns: Column<ServiceTicket>[] = useMemo(
+    () => [
+      {
+        key: "ticket_number",
+        header: "Ticket #",
+        render: (h) => (
+          <span style={{ fontWeight: 600, fontFamily: "monospace" }}>{h.ticket_number}</span>
+        ),
+      },
+      {
+        key: "subject",
+        header: "Service Subject",
+        render: (h) => <span style={{ fontWeight: 500, color: "var(--fg)" }}>{h.subject}</span>,
+      },
+      {
+        key: "priority",
+        header: "Priority",
+        render: (h) => (
+          <span
+            style={{
+              fontSize: "0.75rem",
+              fontWeight: 600,
+              textTransform: "uppercase",
+              padding: "0.2rem 0.5rem",
+              borderRadius: "var(--radius-sm)",
+              background:
+                h.priority === "urgent" || h.priority === "emergency" || h.priority === "critical"
+                  ? "#fee2e2"
+                  : h.priority === "high"
+                    ? "#ffedd5"
+                    : "#f1f5f9",
+              color:
+                h.priority === "urgent" || h.priority === "emergency" || h.priority === "critical"
+                  ? "#991b1b"
+                  : h.priority === "high"
+                    ? "#9a3412"
+                    : "#475569",
+            }}
+          >
+            {h.priority}
+          </span>
+        ),
+      },
+      {
+        key: "resolved_date",
+        header: "Resolved / Closed Date",
+        render: (h) => {
+          const resolvedDate = h.resolved_at
+            ? new Date(h.resolved_at).toLocaleDateString()
+            : h.closed_at
+              ? new Date(h.closed_at).toLocaleDateString()
+              : "Completed";
+          return <span>{resolvedDate}</span>;
+        },
+      },
+      {
+        key: "confirmation_status",
+        header: "Confirmation Status",
+        render: (h) => (
+          <span
+            style={{
+              fontSize: "0.8rem",
+              fontWeight: 600,
+              textTransform: "capitalize",
+              color:
+                h.resident_confirmation_status === "confirmed"
+                  ? "var(--success)"
+                  : h.resident_confirmation_status === "disputed"
+                    ? "var(--danger)"
+                    : "var(--muted)",
+            }}
+          >
+            {h.resident_confirmation_status || "Pending"}
+          </span>
+        ),
+      },
+      {
+        key: "status",
+        header: "Workflow Status",
+        render: (h) => <StatusBadge status={h.status} />,
+      },
+    ],
+    [],
+  );
+
   return (
     <div>
       <PageHeader
@@ -59,104 +145,19 @@ export default function VendorServiceHistoryPage() {
           </button>
         </div>
 
-        <div className="table-container">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Ticket #</th>
-                <th>Service Subject</th>
-                <th>Priority</th>
-                <th>Resolved / Closed Date</th>
-                <th>Confirmation Status</th>
-                <th>Workflow Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    style={{ textAlign: "center", padding: "2.5rem", color: "var(--muted)" }}
-                  >
-                    Loading service history records…
-                  </td>
-                </tr>
-              ) : tickets.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    style={{ textAlign: "center", padding: "2.5rem", color: "var(--muted)" }}
-                  >
-                    No completed service records found in the archive yet.
-                  </td>
-                </tr>
-              ) : (
-                tickets.map((h) => {
-                  const resolvedDate = h.resolved_at
-                    ? new Date(h.resolved_at).toLocaleDateString()
-                    : h.closed_at
-                      ? new Date(h.closed_at).toLocaleDateString()
-                      : "Completed";
-
-                  return (
-                    <tr key={h.id}>
-                      <td style={{ fontWeight: 600, fontFamily: "monospace" }}>
-                        {h.ticket_number}
-                      </td>
-                      <td style={{ fontWeight: 500, color: "var(--fg)" }}>{h.subject}</td>
-                      <td>
-                        <span
-                          style={{
-                            fontSize: "0.75rem",
-                            fontWeight: 600,
-                            textTransform: "uppercase",
-                            padding: "0.2rem 0.5rem",
-                            borderRadius: "var(--radius-sm)",
-                            background:
-                              h.priority === "urgent" || h.priority === "emergency"
-                                ? "#fee2e2"
-                                : h.priority === "high"
-                                  ? "#ffedd5"
-                                  : "#f1f5f9",
-                            color:
-                              h.priority === "urgent" || h.priority === "emergency"
-                                ? "#991b1b"
-                                : h.priority === "high"
-                                  ? "#9a3412"
-                                  : "#475569",
-                          }}
-                        >
-                          {h.priority}
-                        </span>
-                      </td>
-                      <td>{resolvedDate}</td>
-                      <td style={{ textTransform: "capitalize" }}>
-                        <span
-                          style={{
-                            fontSize: "0.8rem",
-                            fontWeight: 600,
-                            color:
-                              h.resident_confirmation_status === "confirmed"
-                                ? "var(--success)"
-                                : h.resident_confirmation_status === "disputed"
-                                  ? "var(--danger)"
-                                  : "var(--muted)",
-                          }}
-                        >
-                          {h.resident_confirmation_status || "Pending"}
-                        </span>
-                      </td>
-                      <td>
-                        <StatusBadge status={h.status} />
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable<ServiceTicket>
+          columns={columns}
+          data={tickets}
+          isLoading={isLoading}
+          enableClientPagination={true}
+          pageSize={10}
+          emptyTitle="No completed service records found"
+          emptyDescription="No completed service records found in the archive yet."
+          emptyIcon="📜"
+          keyExtractor={(h) => h.id}
+        />
       </div>
     </div>
   );
 }
+

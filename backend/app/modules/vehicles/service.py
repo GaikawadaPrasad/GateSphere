@@ -20,6 +20,8 @@ from app.core.errors import BusinessRuleError, ConflictError, NotFoundError
 from app.core.tenancy import TenantScope
 from app.modules.audit.service import record_audit_async
 from app.modules.communities.models import Gate
+from app.modules.residents.access import UnitScopedAccess
+from app.modules.residents.models import ResidentProfile
 from app.modules.uploads.guard import ensure_confirmed_async
 from app.modules.users.models import User
 from app.modules.vehicles import schemas
@@ -64,7 +66,7 @@ def _enum(field: str, value: str | None) -> None:
         )
 
 
-class VehicleService:
+class VehicleService(UnitScopedAccess):
     def __init__(
         self, db: AsyncSession, scope: TenantScope, actor: User, ctx: RequestContext | None = None
     ):
@@ -141,6 +143,29 @@ class VehicleService:
         plate = payload.registration_number.upper()
         if await self.vehicles.by_plate(cid, plate):
             raise ConflictError("That plate is already registered", code="VEHICLE_EXISTS")
+
+        if await self.is_unit_restricted():
+            if payload.unit_id is not None:
+                await self._assert_unit_visible(payload.unit_id)
+            else:
+                scope = await self._unit_scope()
+                if scope and len(scope) == 1:
+                    payload.unit_id = next(iter(scope))
+                else:
+                    raise BusinessRuleError(
+                        "Specify your unit", code="UNIT_REQUIRED", fields={"unit_id": "required"}
+                    )
+
+            if payload.resident_profile_id is None and payload.visitor_id is None:
+                prof_id = await self.db.scalar(
+                    select(ResidentProfile.id).where(
+                        ResidentProfile.user_id == self.actor.id,
+                        ResidentProfile.community_id == cid,
+                    )
+                )
+                if prof_id is not None:
+                    payload.resident_profile_id = prof_id
+
         obj = Vehicle(
             community_id=cid,
             resident_profile_id=payload.resident_profile_id,
@@ -161,12 +186,16 @@ class VehicleService:
         obj = await self.vehicles.get(vehicle_id)
         if obj is None:
             raise NotFoundError("Vehicle not found")
+        if await self.is_unit_restricted():
+            await self._assert_unit_visible(obj.unit_id)
         return obj
 
     async def update_vehicle(
         self, vehicle_id: uuid.UUID, payload: schemas.VehicleUpdate
     ) -> Vehicle:
         obj = await self.get_vehicle(vehicle_id)
+        if await self.is_unit_restricted():
+            await self._assert_unit_visible(obj.unit_id)
         patch = payload.model_dump(exclude_unset=True)
         _enum("vehicle_type", patch.get("vehicle_type"))
         for k, v in patch.items():
@@ -182,6 +211,7 @@ class VehicleService:
         stmt = select(Vehicle).where(Vehicle.community_id == cid)
         if q:
             stmt = stmt.where(Vehicle.registration_number.ilike(f"%{q.upper()}%"))
+        stmt = await self._scope_unit_column(stmt, Vehicle.unit_id)
         stmt = stmt.order_by(Vehicle.registration_number)
         return await self.vehicles.list(
             offset=offset, limit=limit, extra=stmt
@@ -287,6 +317,7 @@ class VehicleService:
             stmt = stmt.where(ParkingAllocation.community_id == community_id)
         if active_only:
             stmt = stmt.where(ParkingAllocation.status == "active")
+        stmt = await self._scope_unit_column(stmt, ParkingAllocation.unit_id)
         stmt = stmt.order_by(ParkingAllocation.allocated_from.desc())
         return await self.allocations.list(
             offset=offset, limit=limit, extra=stmt
@@ -407,6 +438,16 @@ class VehicleService:
             stmt = stmt.where(ParkingViolation.community_id == community_id)
         if violation_status:
             stmt = stmt.where(ParkingViolation.status == violation_status)
+        if await self.is_unit_restricted():
+            scope = await self._unit_scope()
+            if scope:
+                my_veh_ids = select(Vehicle.id).where(Vehicle.unit_id.in_(scope))
+                stmt = stmt.where(
+                    ParkingViolation.vehicle_id.in_(my_veh_ids)
+                    | (ParkingViolation.reported_by_user_id == self.actor.id)
+                )
+            else:
+                stmt = stmt.where(ParkingViolation.reported_by_user_id == self.actor.id)
         stmt = stmt.order_by(ParkingViolation.occurred_at.desc())
         return await self.violations.list(
             offset=offset, limit=limit, extra=stmt

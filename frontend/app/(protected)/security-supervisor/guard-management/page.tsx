@@ -4,7 +4,10 @@ import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
-import { gateApi } from "@/lib/api";
+import { DataTable, type Column } from "@/components/tables/DataTable";
+import { gateApi, guardsApi } from "@/lib/api";
+import { PasswordField } from "@/components/forms/PasswordField";
+import { generateInitialPassword } from "@/lib/utils";
 
 interface GuardRosterItem {
   id: string;
@@ -40,19 +43,74 @@ export default function SecuritySupervisorGuardManagementPage() {
   const [shiftNotes, setShiftNotes] = useState("");
   const [isCreating, setIsCreating] = useState(false);
 
+  // Register Guard Modal
+  const [isRegisterGuardOpen, setIsRegisterGuardOpen] = useState(false);
+  const [guardFullName, setGuardFullName] = useState("");
+  const [guardEmail, setGuardEmail] = useState("");
+  const [guardPhone, setGuardPhone] = useState("");
+  const [guardPassword, setGuardPassword] = useState("guard@Gate2026!");
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [registerError, setRegisterError] = useState("");
+
+  const handleOpenRegisterGuard = () => {
+    setGuardFullName("");
+    setGuardEmail("");
+    setGuardPhone("");
+    setGuardPassword("guard@Gate2026!");
+    setRegisterError("");
+    setIsRegisterGuardOpen(true);
+  };
+
+  const handleRegisterGuard = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!guardFullName.trim() || !guardEmail.trim()) {
+      setRegisterError("Guard full name and email are required.");
+      return;
+    }
+    const finalPassword = guardPassword.trim() || generateInitialPassword(guardFullName, "guard");
+    setIsRegistering(true);
+    setRegisterError("");
+    try {
+      await guardsApi.create({
+        full_name: guardFullName.trim(),
+        email: guardEmail.trim(),
+        password: finalPassword,
+        phone: guardPhone.trim() || undefined,
+      });
+      setIsRegisterGuardOpen(false);
+      await loadData();
+    } catch (err: any) {
+      setRegisterError(err?.message || "Failed to register security guard.");
+    } finally {
+      setIsRegistering(false);
+    }
+  };
+
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [rosterData, assignData] = await Promise.allSettled([
+      const [rosterData, assignData, guardsData] = await Promise.allSettled([
         gateApi.rosters(),
         gateApi.assignments(),
+        guardsApi.list(),
       ]);
 
       const rawRoster = rosterData.status === "fulfilled" && Array.isArray(rosterData.value) ? rosterData.value : [];
       const rawAssigns = assignData.status === "fulfilled" && Array.isArray(assignData.value) ? assignData.value : [];
+      const rawGuards = guardsData.status === "fulfilled" && Array.isArray(guardsData.value) ? guardsData.value : [];
 
       const guards: { id: string; name: string }[] = [];
       const seenIds = new Set<string>();
+
+      rawGuards.forEach((g: any) => {
+        if (g.id && !seenIds.has(g.id)) {
+          seenIds.add(g.id);
+          guards.push({
+            id: g.id,
+            name: `${g.full_name || "Guard"} (${g.email || g.id.slice(0, 8)})`,
+          });
+        }
+      });
 
       rawAssigns.forEach((a: any) => {
         if (a.guard_user_id && !seenIds.has(a.guard_user_id)) {
@@ -142,8 +200,61 @@ export default function SecuritySupervisorGuardManagementPage() {
     }
   };
 
+  const columns: Column<GuardRosterItem>[] = [
+    {
+      key: "guard_name",
+      header: "Guard Name",
+      sortable: true,
+      render: (g) => <span style={{ fontWeight: 600, color: "var(--fg)" }}>👮 {g.guard_name}</span>,
+    },
+    {
+      key: "shift_date",
+      header: "Shift Date",
+      sortable: true,
+      render: (g) => <span>{g.shift_date}</span>,
+    },
+    {
+      key: "shift",
+      header: "Duty Hours",
+      sortable: true,
+      render: (g) => <span>{g.shift}</span>,
+    },
+    {
+      key: "assigned_gate",
+      header: "Assigned Post",
+      sortable: true,
+      render: (g) => <span>{g.assigned_gate}</span>,
+    },
+    {
+      key: "status",
+      header: "Duty Status",
+      sortable: true,
+      render: (g) => <StatusBadge status={g.status} />,
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      align: "right",
+      render: (g) => (
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <button
+            className="btn btn-secondary"
+            style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}
+            onClick={() => {
+              setSelectedGuard(g);
+              setNewStatus(g.status.toLowerCase().replace(/\s+/g, "_"));
+              setIsStatusModalOpen(true);
+            }}
+          >
+            Update Status
+          </button>
+        </div>
+      ),
+    },
+  ];
+
   return (
-    <div>
+    <div style={{ maxWidth: 1600, margin: "0 auto" }}>
       <PageHeader
         title="Guard Management & Duty Roster"
         subtitle="Schedule security personnel shifts, assign duty checkpoints, and monitor active duty roster transitions"
@@ -153,9 +264,14 @@ export default function SecuritySupervisorGuardManagementPage() {
           { label: "Guard Management" },
         ]}
         actions={
-          <button className="btn btn-primary" onClick={() => setIsCreateModalOpen(true)}>
-            ➕ Schedule Guard Shift
-          </button>
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            <button className="btn btn-secondary" onClick={handleOpenRegisterGuard}>
+              👮 + Register Security Guard
+            </button>
+            <button className="btn btn-primary" onClick={() => setIsCreateModalOpen(true)}>
+              ➕ Schedule Guard Shift
+            </button>
+          </div>
         }
       />
 
@@ -169,63 +285,16 @@ export default function SecuritySupervisorGuardManagementPage() {
           </div>
         </div>
 
-        <div className="table-container">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Guard Name</th>
-                <th>Shift Date</th>
-                <th>Duty Hours</th>
-                <th>Assigned Post</th>
-                <th>Duty Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: "center", padding: "2rem" }}>
-                    Loading security duty roster…
-                  </td>
-                </tr>
-              ) : roster.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
-                  >
-                    No guard shifts scheduled. Click &quot;Schedule Guard Shift&quot; above.
-                  </td>
-                </tr>
-              ) : (
-                roster.map((g) => (
-                  <tr key={g.id}>
-                    <td style={{ fontWeight: 600, color: "var(--fg)" }}>👮 {g.guard_name}</td>
-                    <td>{g.shift_date}</td>
-                    <td>{g.shift}</td>
-                    <td>{g.assigned_gate}</td>
-                    <td>
-                      <StatusBadge status={g.status} />
-                    </td>
-                    <td>
-                      <button
-                        className="btn btn-secondary"
-                        style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}
-                        onClick={() => {
-                          setSelectedGuard(g);
-                          setNewStatus(g.status.toLowerCase().replace(/\s+/g, "_"));
-                          setIsStatusModalOpen(true);
-                        }}
-                      >
-                        Update Shift Status
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          columns={columns}
+          data={roster}
+          isLoading={isLoading}
+          enableClientPagination={true}
+          pageSize={10}
+          emptyTitle="No Guard Shifts Scheduled"
+          emptyDescription="Click 'Schedule Guard Shift' above to assign guard duty rosters."
+          emptyIcon="👮"
+        />
       </div>
 
       {/* Schedule Shift Modal */}
@@ -441,6 +510,164 @@ export default function SecuritySupervisorGuardManagementPage() {
             </p>
           </div>
         </div>
+      </Modal>
+
+      {/* Register Guard Modal */}
+      <Modal
+        isOpen={isRegisterGuardOpen}
+        onClose={() => setIsRegisterGuardOpen(false)}
+        title="👮 Register New Security Guard"
+        footer={
+          <>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setIsRegisterGuardOpen(false)}
+              disabled={isRegistering}
+            >
+              Cancel
+            </button>
+            <button
+              className="btn btn-primary"
+              type="submit"
+              form="register-guard-form"
+              disabled={isRegistering}
+            >
+              {isRegistering ? "Registering…" : "Register Guard"}
+            </button>
+          </>
+        }
+      >
+        <form id="register-guard-form" onSubmit={handleRegisterGuard}>
+          {registerError && (
+            <div
+              style={{
+                padding: "0.6rem 0.75rem",
+                borderRadius: "6px",
+                background: "#fef2f2",
+                border: "1px solid #fecaca",
+                color: "#dc2626",
+                fontSize: "0.8rem",
+                marginBottom: "1rem",
+              }}
+            >
+              {registerError}
+            </div>
+          )}
+
+          <div
+            style={{
+              padding: "1rem",
+              background: "#F8FAFC",
+              border: "1px solid var(--border)",
+              borderRadius: "10px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.85rem",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "12px",
+                fontWeight: 700,
+                color: "var(--primary)",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem",
+              }}
+            >
+              <span>👮</span> 1. Guard Identity &amp; Portal Login
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.85rem" }}>
+              <div>
+                <label
+                  style={{
+                    fontSize: "0.82rem",
+                    fontWeight: 600,
+                    display: "block",
+                    marginBottom: "0.3rem",
+                  }}
+                >
+                  Full Name <span style={{ color: "#EF4444" }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  className="input-field"
+                  required
+                  placeholder="e.g. Vikram Singh"
+                  value={guardFullName}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setGuardFullName(val);
+                    setGuardPassword(generateInitialPassword(val, "guard"));
+                  }}
+                />
+              </div>
+
+              <div>
+                <label
+                  style={{
+                    fontSize: "0.82rem",
+                    fontWeight: 600,
+                    display: "block",
+                    marginBottom: "0.3rem",
+                  }}
+                >
+                  Phone Number
+                </label>
+                <input
+                  type="tel"
+                  className="input-field"
+                  placeholder="+91 98765 43210"
+                  value={guardPhone}
+                  onChange={(e) => setGuardPhone(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.85rem" }}>
+              <div>
+                <label
+                  style={{
+                    fontSize: "0.82rem",
+                    fontWeight: 600,
+                    display: "block",
+                    marginBottom: "0.3rem",
+                  }}
+                >
+                  Email Address <span style={{ color: "#EF4444" }}>*</span>{" "}
+                  <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 400 }}>
+                    (For Gate Login)
+                  </span>
+                </label>
+                <input
+                  type="email"
+                  className="input-field"
+                  required
+                  placeholder="e.g. vikram.guard@gatesphere.com"
+                  value={guardEmail}
+                  onChange={(e) => setGuardEmail(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <PasswordField
+                  value={guardPassword}
+                  onChange={(val) => setGuardPassword(val)}
+                  placeholder="e.g. vikram@Gate2026!"
+                  required
+                  minLength={10}
+                />
+              </div>
+            </div>
+
+            <p style={{ margin: 0, fontSize: "11.5px", color: "var(--muted)" }}>
+              💡 Providing an email and password allows this security guard to sign in to the <strong>Security Guard Live Gate Dashboard</strong> to verify visitors, scan entry QR codes, and record cab/delivery logs.
+            </p>
+          </div>
+        </form>
       </Modal>
     </div>
   );

@@ -42,6 +42,10 @@ class CommunityCreate(_Write):
     postal_code: str | None = Field(default=None, max_length=20)
     country: str = Field(default="India", max_length=80)
     timezone: str = Field(default="Asia/Kolkata", max_length=64)
+    admin_name: str | None = Field(default=None, max_length=255)
+    admin_email: str | None = Field(default=None, max_length=255)
+    admin_password: str | None = Field(default=None, min_length=8, max_length=128)
+    admin_phone: str | None = Field(default=None, max_length=20)
 
 
 class CommunityUpdate(_Write):
@@ -67,6 +71,8 @@ class CommunityRead(_Read):
     country: str
     timezone: str
     is_active: bool
+    admin_email: str | None = None
+    admin_name: str | None = None
 
 
 # --- Gate ----------------------------------------------------------------- #

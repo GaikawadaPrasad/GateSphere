@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SearchInput } from "@/components/forms/SearchInput";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { DataTable, type Column } from "@/components/tables/DataTable";
 import { deliveriesApi } from "@/lib/api";
 
 interface DeliveryRow {
@@ -22,6 +23,7 @@ export default function SecurityGuardDeliveriesPage() {
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -57,29 +59,35 @@ export default function SecurityGuardDeliveriesPage() {
   }, []);
 
   const handleRecordArrival = async (id: string) => {
+    setActionMessage(null);
     try {
       await deliveriesApi.recordArrival(id);
+      setActionMessage({ type: "success", text: "Courier arrival recorded at gate desk." });
       loadData();
     } catch (err: any) {
-      alert(err?.message || "Failed to record arrival.");
+      setActionMessage({ type: "error", text: err?.message || "Failed to record arrival." });
     }
   };
 
   const handleMarkDelivered = async (id: string) => {
+    setActionMessage(null);
     try {
       await deliveriesApi.markDelivered(id);
+      setActionMessage({ type: "success", text: "Package marked as delivered / collected." });
       loadData();
     } catch (err: any) {
-      alert(err?.message || "Failed to mark delivered.");
+      setActionMessage({ type: "error", text: err?.message || "Failed to mark delivered." });
     }
   };
 
   const handleCancel = async (id: string) => {
+    setActionMessage(null);
     try {
       await deliveriesApi.cancel(id);
+      setActionMessage({ type: "success", text: "Delivery entry rejected / cancelled." });
       loadData();
     } catch (err: any) {
-      alert(err?.message || "Failed to cancel delivery.");
+      setActionMessage({ type: "error", text: err?.message || "Failed to cancel delivery." });
     }
   };
 
@@ -92,8 +100,83 @@ export default function SecurityGuardDeliveriesPage() {
     );
   });
 
+  const columns: Column<DeliveryRow>[] = [
+    {
+      key: "provider_name",
+      header: "Provider",
+      sortable: true,
+      render: (d) => <span style={{ fontWeight: 600, color: "var(--fg)" }}>📦 {d.provider_name}</span>,
+    },
+    {
+      key: "delivery_type",
+      header: "Type",
+      sortable: true,
+      render: (d) => <span style={{ textTransform: "capitalize" }}>{d.delivery_type}</span>,
+    },
+    {
+      key: "executive_name",
+      header: "Executive",
+      sortable: true,
+      render: (d) => <span>{d.executive_name}</span>,
+    },
+    {
+      key: "tracking_reference",
+      header: "Tracking Ref",
+      sortable: true,
+      render: (d) => <span style={{ fontFamily: "monospace" }}>{d.tracking_reference}</span>,
+    },
+    {
+      key: "protocol_type",
+      header: "Protocol",
+      sortable: true,
+      render: (d) => <span style={{ textTransform: "capitalize" }}>{d.protocol_type.replace(/_/g, " ")}</span>,
+    },
+    {
+      key: "status",
+      header: "Status",
+      sortable: true,
+      render: (d) => <StatusBadge status={d.status} />,
+    },
+    {
+      key: "actions",
+      header: "Gate Action",
+      align: "right",
+      render: (d) => (
+        <div style={{ display: "flex", gap: "0.35rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
+          {d.status === "expected" && (
+            <button
+              className="btn btn-primary"
+              style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
+              onClick={() => handleRecordArrival(d.id)}
+            >
+              Arrival
+            </button>
+          )}
+          {(d.status === "at_gate" || d.status === "in_transit") && (
+            <button
+              className="btn btn-secondary"
+              style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
+              onClick={() => handleMarkDelivered(d.id)}
+            >
+              Delivered
+            </button>
+          )}
+          {!["delivered", "collected", "cancelled", "returned"].includes(d.status) && (
+            <button
+              className="btn btn-danger"
+              style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
+              onClick={() => handleCancel(d.id)}
+            >
+              Reject
+            </button>
+          )}
+        </div>
+      ),
+    },
+  ];
+
   return (
-    <div>
+    <div style={{ maxWidth: 1600, margin: "0 auto" }}>
       <PageHeader
         title="Delivery Verification & Gate Decision"
         subtitle="Verify courier arrival, record gate hand-off, and track delivery protocol status"
@@ -104,16 +187,69 @@ export default function SecurityGuardDeliveriesPage() {
         ]}
       />
 
+      {actionMessage && (
+        <div
+          style={{
+            padding: "0.75rem 1rem",
+            marginBottom: "1.25rem",
+            borderRadius: "var(--radius)",
+            background: actionMessage.type === "success" ? "var(--success-light)" : "var(--danger-light)",
+            border: `1px solid ${actionMessage.type === "success" ? "var(--success-border)" : "var(--danger-border)"}`,
+            color: actionMessage.type === "success" ? "#065f46" : "#991b1b",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>
+            {actionMessage.type === "success" ? "✅" : "⚠️"} {actionMessage.text}
+          </span>
+          <button
+            type="button"
+            onClick={() => setActionMessage(null)}
+            style={{ background: "none", border: "none", cursor: "pointer", fontWeight: 700 }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {loadError && (
+        <div
+          style={{
+            padding: "0.75rem 1rem",
+            marginBottom: "1.25rem",
+            borderRadius: "var(--radius)",
+            background: "var(--danger-light)",
+            border: "1px solid var(--danger-border)",
+            color: "#991b1b",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>⚠️ {loadError}</span>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}
+            onClick={loadData}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       <div className="card">
         <div className="card-header" style={{ flexWrap: "wrap", gap: "0.75rem" }}>
           <div>
             <h3 className="card-title">Delivery Desk Queue</h3>
             <p style={{ fontSize: "0.775rem", color: "var(--muted)" }}>
-              {filteredDeliveries.length} deliveries
+              {filteredDeliveries.length} parcels registered
             </p>
           </div>
 
-          <div style={{ width: "100%", maxWidth: 220 }}>
+          <div style={{ width: "100%", maxWidth: 240 }}>
             <SearchInput
               value={search}
               onChange={setSearch}
@@ -122,100 +258,16 @@ export default function SecurityGuardDeliveriesPage() {
           </div>
         </div>
 
-        <div className="table-container">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Provider</th>
-                <th>Type</th>
-                <th>Executive</th>
-                <th>Tracking Ref</th>
-                <th>Protocol</th>
-                <th>Status</th>
-                <th>Gate Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <tr>
-                  <td colSpan={7} style={{ textAlign: "center", padding: "2rem" }}>
-                    Loading deliveries…
-                  </td>
-                </tr>
-              ) : loadError ? (
-                <tr>
-                  <td
-                    colSpan={7}
-                    style={{
-                      textAlign: "center",
-                      padding: "2rem",
-                      color: "var(--danger, #dc2626)",
-                    }}
-                  >
-                    {loadError}
-                  </td>
-                </tr>
-              ) : filteredDeliveries.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={7}
-                    style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
-                  >
-                    No deliveries found.
-                  </td>
-                </tr>
-              ) : (
-                filteredDeliveries.map((d) => (
-                  <tr key={d.id}>
-                    <td style={{ fontWeight: 600, color: "var(--fg)" }}>{d.provider_name}</td>
-                    <td style={{ textTransform: "capitalize" }}>{d.delivery_type}</td>
-                    <td>{d.executive_name}</td>
-                    <td style={{ fontFamily: "monospace" }}>{d.tracking_reference}</td>
-                    <td style={{ textTransform: "capitalize" }}>
-                      {d.protocol_type.replace(/_/g, " ")}
-                    </td>
-                    <td>
-                      <StatusBadge status={d.status} />
-                    </td>
-                    <td>
-                      <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
-                        {d.status === "expected" && (
-                          <button
-                            className="btn btn-primary"
-                            style={{ fontSize: "0.75rem", padding: "0.2rem 0.45rem" }}
-                            onClick={() => handleRecordArrival(d.id)}
-                          >
-                            Record Arrival
-                          </button>
-                        )}
-                        {(d.status === "at_gate" || d.status === "in_transit") && (
-                          <button
-                            className="btn btn-secondary"
-                            style={{ fontSize: "0.75rem", padding: "0.2rem 0.45rem" }}
-                            onClick={() => handleMarkDelivered(d.id)}
-                          >
-                            Mark Delivered
-                          </button>
-                        )}
-                        {!["delivered", "collected", "cancelled", "returned"].includes(
-                          d.status,
-                        ) && (
-                          <button
-                            className="btn btn-danger"
-                            style={{ fontSize: "0.75rem", padding: "0.2rem 0.45rem" }}
-                            onClick={() => handleCancel(d.id)}
-                          >
-                            Reject
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          columns={columns}
+          data={filteredDeliveries}
+          isLoading={isLoading}
+          enableClientPagination={true}
+          pageSize={10}
+          emptyTitle="No Delivery Records Found"
+          emptyDescription="There are no expected or active courier deliveries at the gate desk."
+          emptyIcon="📦"
+        />
       </div>
     </div>
   );

@@ -660,6 +660,7 @@ export default function CommunityAdminBillingPage() {
             isLoading={invoicesLoading}
             emptyTitle="No invoices found"
             emptyDescription="No maintenance invoices match the current filter."
+            enableClientPagination={true}
           />
         </div>
       )}
@@ -671,6 +672,7 @@ export default function CommunityAdminBillingPage() {
           isLoading={paymentsLoading}
           emptyTitle="No payments recorded"
           emptyDescription="Resident maintenance collections and simulated payments will appear here."
+          enableClientPagination={true}
         />
       )}
 
@@ -741,6 +743,7 @@ export default function CommunityAdminBillingPage() {
               isLoading={chargeHeadsLoading}
               emptyTitle="No charge heads configured"
               emptyDescription="Charge heads define line items such as maintenance fees, parking, and clubhouse utilities."
+              enableClientPagination={true}
             />
           </div>
         </div>
@@ -1081,6 +1084,7 @@ export default function CommunityAdminBillingPage() {
             isLoading={ledgerLoading}
             emptyTitle="No ledger transactions"
             emptyDescription="No invoices or payment adjustments posted for this unit yet."
+            enableClientPagination={true}
           />
         </div>
       </Modal>
