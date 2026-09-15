@@ -56,7 +56,10 @@ export default function CommunitiesPage() {
     adminEmail: string;
     adminPassword?: string;
   } | null>(null);
+  const [copiedEmail, setCopiedEmail] = useState(false);
   const [copiedPassword, setCopiedPassword] = useState(false);
+  const [copiedAll, setCopiedAll] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Edit & Delete modal state & validations
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -72,12 +75,31 @@ export default function CommunitiesPage() {
   // View / Structure Details Modal state
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [viewingCommunity, setViewingCommunity] = useState<CommunityWithMetrics | null>(null);
-  const [activeTab, setActiveTab] = useState<"towers" | "units" | "residents" | "gates">("towers");
+  const [activeTab, setActiveTab] = useState<"towers" | "units" | "residents" | "gates" | "credentials">("towers");
   const [communityTowers, setCommunityTowers] = useState<Tower[]>([]);
   const [communityGates, setCommunityGates] = useState<Gate[]>([]);
   const [communityResidents, setCommunityResidents] = useState<ResidentProfile[]>([]);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [detailsFeedback, setDetailsFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  const handleShowCredentials = (comm: CommunityWithMetrics) => {
+    const codeSlug = comm.code.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const email = comm.admin_email || `admin.${codeSlug}@gatesphere.com`;
+    const adminName = comm.admin_name || `Admin (${comm.name})`;
+    const pwd = `${codeSlug}@Gate2026!`;
+
+    setShowPassword(false);
+    setCopiedEmail(false);
+    setCopiedPassword(false);
+    setCopiedAll(false);
+    setCreatedAdminInfo({
+      communityName: comm.name,
+      communityCode: comm.code,
+      adminName: adminName,
+      adminEmail: email,
+      adminPassword: pwd,
+    });
+  };
 
   // Sub-modals for adding Tower, Floor, Unit, Resident, Gate
   const [isAddTowerOpen, setIsAddTowerOpen] = useState(false);
@@ -708,6 +730,7 @@ export default function CommunitiesPage() {
           isLoading={isLoading}
           onEdit={handleOpenEdit}
           onView={handleOpenView}
+          onViewCredentials={handleShowCredentials}
         />
       </div>
 
@@ -1175,37 +1198,65 @@ export default function CommunitiesPage() {
         </form>
       </Modal>
 
-      {/* Community & Admin Created Success Modal */}
+      {/* Community & Admin Credentials Modal */}
       <Modal
         isOpen={Boolean(createdAdminInfo)}
         onClose={() => setCreatedAdminInfo(null)}
-        title="🎉 Community & Admin Account Created"
+        title={`🔑 Community Admin Credentials — ${createdAdminInfo?.communityName || ""}`}
+        maxWidth={620}
         footer={
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => setCreatedAdminInfo(null)}
-          >
-            Done
-          </button>
+          <div style={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "center" }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                if (createdAdminInfo) {
+                  const text = `GateSphere Enterprise - Community Admin Credentials\nCommunity: ${createdAdminInfo.communityName} (${createdAdminInfo.communityCode})\nAdmin Name: ${createdAdminInfo.adminName}\nLogin Email: ${createdAdminInfo.adminEmail}\nInitial Password: ${createdAdminInfo.adminPassword || "admin@Gate2026!"}\nRole: Community Admin\nPortal Link: ${window.location.origin}/login`;
+                  navigator.clipboard.writeText(text);
+                  setCopiedAll(true);
+                  setTimeout(() => setCopiedAll(false), 2000);
+                }
+              }}
+              style={{ fontSize: "0.8rem" }}
+            >
+              {copiedAll ? "✓ All Credentials Copied!" : "📋 Copy All Credentials"}
+            </button>
+            <div style={{ display: "flex", gap: "0.5rem" }}>
+              <a
+                href="/login"
+                target="_blank"
+                rel="noreferrer"
+                className="btn btn-secondary"
+                style={{ fontSize: "0.8rem", textDecoration: "none" }}
+              >
+                🚀 Open Login
+              </a>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => setCreatedAdminInfo(null)}
+              >
+                Done
+              </button>
+            </div>
+          </div>
         }
       >
-        <div style={{ padding: "0.5rem 0" }}>
+        <div style={{ padding: "0.25rem 0" }}>
           <div
             style={{
-              padding: "1rem",
+              padding: "0.85rem 1rem",
               background: "#f0fdf4",
               border: "1px solid #bbf7d0",
               borderRadius: "8px",
               marginBottom: "1.25rem",
             }}
           >
-            <p style={{ margin: 0, fontWeight: 600, color: "#166534", fontSize: "0.95rem" }}>
-              ✅ {createdAdminInfo?.communityName} ({createdAdminInfo?.communityCode}) has been
-              successfully created!
+            <p style={{ margin: 0, fontWeight: 600, color: "#166534", fontSize: "0.9rem" }}>
+              ✅ Credentials ready for <strong>{createdAdminInfo?.communityName}</strong> ({createdAdminInfo?.communityCode})
             </p>
-            <p style={{ margin: "0.4rem 0 0 0", fontSize: "0.8rem", color: "#15803d" }}>
-              The Community Admin account has been provisioned and is ready for login.
+            <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.775rem", color: "#15803d" }}>
+              Use these credentials to sign in as Community Administrator or share them with the designated admin.
             </p>
           </div>
 
@@ -1217,46 +1268,86 @@ export default function CommunitiesPage() {
               padding: "1rem",
             }}
           >
-            <h4
-              style={{
-                margin: "0 0 0.75rem 0",
-                fontSize: "0.85rem",
-                fontWeight: 700,
-                color: "#334155",
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-              }}
-            >
-              Admin Login Credentials
-            </h4>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
+              <h4
+                style={{
+                  margin: 0,
+                  fontSize: "0.85rem",
+                  fontWeight: 700,
+                  color: "#334155",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                🔑 Admin Credentials Card
+              </h4>
+              <span className="badge badge-primary" style={{ fontSize: "0.7rem" }}>
+                community_admin
+              </span>
+            </div>
 
-            <div style={{ display: "grid", gap: "0.6rem", fontSize: "0.85rem" }}>
+            <div style={{ display: "grid", gap: "0.75rem", fontSize: "0.85rem" }}>
               <div
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
+                  alignItems: "center",
                   paddingBottom: "0.4rem",
                   borderBottom: "1px dashed #e2e8f0",
                 }}
               >
-                <span style={{ color: "var(--muted)" }}>Admin Name:</span>
+                <span style={{ color: "var(--muted)", fontWeight: 500 }}>Community Name & Code:</span>
+                <span style={{ fontWeight: 600, color: "var(--fg)" }}>
+                  {createdAdminInfo?.communityName} <code style={{ background: "#e2e8f0", padding: "0.1rem 0.35rem", borderRadius: 4 }}>{createdAdminInfo?.communityCode}</code>
+                </span>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  paddingBottom: "0.4rem",
+                  borderBottom: "1px dashed #e2e8f0",
+                }}
+              >
+                <span style={{ color: "var(--muted)", fontWeight: 500 }}>Admin Name:</span>
                 <span style={{ fontWeight: 600, color: "var(--fg)" }}>
                   {createdAdminInfo?.adminName}
                 </span>
               </div>
+
               <div
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
+                  alignItems: "center",
                   paddingBottom: "0.4rem",
                   borderBottom: "1px dashed #e2e8f0",
                 }}
               >
-                <span style={{ color: "var(--muted)" }}>Login Email:</span>
-                <span style={{ fontWeight: 600, color: "var(--fg)" }}>
-                  {createdAdminInfo?.adminEmail}
-                </span>
+                <span style={{ color: "var(--muted)", fontWeight: 500 }}>Login Email:</span>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <span style={{ fontWeight: 600, color: "#1e293b", fontFamily: "monospace" }}>
+                    {createdAdminInfo?.adminEmail}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ fontSize: "0.7rem", padding: "0.15rem 0.45rem" }}
+                    onClick={() => {
+                      if (createdAdminInfo?.adminEmail) {
+                        navigator.clipboard.writeText(createdAdminInfo.adminEmail);
+                        setCopiedEmail(true);
+                        setTimeout(() => setCopiedEmail(false), 2000);
+                      }
+                    }}
+                  >
+                    {copiedEmail ? "✓ Copied" : "Copy"}
+                  </button>
+                </div>
               </div>
+
               {createdAdminInfo?.adminPassword && (
                 <div
                   style={{
@@ -1265,23 +1356,34 @@ export default function CommunitiesPage() {
                     alignItems: "center",
                   }}
                 >
-                  <span style={{ color: "var(--muted)" }}>Initial Password:</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <span style={{ color: "var(--muted)", fontWeight: 500 }}>Admin Password:</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
                     <code
                       style={{
-                        background: "#e2e8f0",
+                        background: "#f1f5f9",
+                        border: "1px solid #cbd5e1",
                         padding: "0.2rem 0.5rem",
                         borderRadius: "4px",
                         fontWeight: 600,
                         color: "#0f172a",
+                        fontSize: "0.85rem",
+                        letterSpacing: showPassword ? "normal" : "0.15em",
                       }}
                     >
-                      {createdAdminInfo.adminPassword}
+                      {showPassword ? createdAdminInfo.adminPassword : "••••••••••••"}
                     </code>
                     <button
                       type="button"
                       className="btn btn-secondary"
-                      style={{ fontSize: "0.7rem", padding: "0.2rem 0.5rem" }}
+                      style={{ fontSize: "0.7rem", padding: "0.15rem 0.45rem" }}
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? "Hide" : "Show"}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ fontSize: "0.7rem", padding: "0.15rem 0.45rem" }}
                       onClick={() => {
                         if (createdAdminInfo?.adminPassword) {
                           navigator.clipboard.writeText(createdAdminInfo.adminPassword);
@@ -1295,33 +1397,18 @@ export default function CommunitiesPage() {
                   </div>
                 </div>
               )}
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  paddingTop: "0.4rem",
-                  borderTop: "1px dashed #e2e8f0",
-                }}
-              >
-                <span style={{ color: "var(--muted)" }}>Assigned Role:</span>
-                <span className="badge badge-primary" style={{ fontWeight: 600 }}>
-                  Community Admin (community_admin)
-                </span>
-              </div>
             </div>
           </div>
 
           <p
             style={{
-              marginTop: "1rem",
-              fontSize: "0.8rem",
+              marginTop: "0.85rem",
+              fontSize: "0.775rem",
               color: "var(--muted)",
               lineHeight: 1.4,
             }}
           >
-            💡 You or the community administrator can now sign in directly at the GateSphere login
-            page with these credentials to manage towers, units, staff, and visitors for this
-            community.
+            💡 Community administrators sign in at <strong>/login</strong> using their registered email and password to access the Community Console, manage towers, gates, units, and residents.
           </p>
         </div>
       </Modal>
@@ -1752,6 +1839,13 @@ export default function CommunitiesPage() {
               >
                 🛡️ Gates ({communityGates.length})
               </button>
+              <button
+                type="button"
+                className={`btn btn-sm ${activeTab === "credentials" ? "btn-primary" : "btn-secondary"}`}
+                onClick={() => setActiveTab("credentials")}
+              >
+                🔑 Admin Credentials
+              </button>
             </div>
 
             {isLoadingDetails ? (
@@ -2153,6 +2247,179 @@ export default function CommunitiesPage() {
                         </button>
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* Tab 5: ADMIN CREDENTIALS */}
+                {activeTab === "credentials" && (
+                  <div style={{ padding: "0.5rem 0" }}>
+                    <div
+                      style={{
+                        background: "#f8fafc",
+                        border: "1px solid #e2e8f0",
+                        borderRadius: "8px",
+                        padding: "1.25rem",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          marginBottom: "1rem",
+                        }}
+                      >
+                        <div>
+                          <h4 style={{ margin: 0, fontWeight: 700, fontSize: "0.95rem", color: "#1e293b" }}>
+                            🔑 Community Admin Account Credentials
+                          </h4>
+                          <p style={{ margin: "0.2rem 0 0 0", fontSize: "0.775rem", color: "var(--muted)" }}>
+                            Portal access and login details for <strong>{viewingCommunity.name}</strong> ({viewingCommunity.code})
+                          </p>
+                        </div>
+                        <span className="badge badge-primary" style={{ fontSize: "0.75rem" }}>
+                          community_admin
+                        </span>
+                      </div>
+
+                      <div style={{ display: "grid", gap: "0.85rem", fontSize: "0.85rem" }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            paddingBottom: "0.5rem",
+                            borderBottom: "1px dashed #e2e8f0",
+                          }}
+                        >
+                          <span style={{ color: "var(--muted)", fontWeight: 500 }}>Community Code:</span>
+                          <code style={{ background: "#e2e8f0", padding: "0.15rem 0.4rem", borderRadius: 4, fontWeight: 700 }}>
+                            {viewingCommunity.code}
+                          </code>
+                        </div>
+
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            paddingBottom: "0.5rem",
+                            borderBottom: "1px dashed #e2e8f0",
+                          }}
+                        >
+                          <span style={{ color: "var(--muted)", fontWeight: 500 }}>Admin Name:</span>
+                          <span style={{ fontWeight: 600, color: "var(--fg)" }}>
+                            {viewingCommunity.admin_name || `Admin (${viewingCommunity.name})`}
+                          </span>
+                        </div>
+
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            paddingBottom: "0.5rem",
+                            borderBottom: "1px dashed #e2e8f0",
+                          }}
+                        >
+                          <span style={{ color: "var(--muted)", fontWeight: 500 }}>Login Email:</span>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                            <span style={{ fontWeight: 600, color: "#0f172a", fontFamily: "monospace" }}>
+                              {viewingCommunity.admin_email || `admin.${viewingCommunity.code.toLowerCase().replace(/[^a-z0-9]/g, "")}@gatesphere.com`}
+                            </span>
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              style={{ fontSize: "0.7rem", padding: "0.15rem 0.45rem" }}
+                              onClick={() => {
+                                const email = viewingCommunity.admin_email || `admin.${viewingCommunity.code.toLowerCase().replace(/[^a-z0-9]/g, "")}@gatesphere.com`;
+                                navigator.clipboard.writeText(email);
+                                setCopiedEmail(true);
+                                setTimeout(() => setCopiedEmail(false), 2000);
+                              }}
+                            >
+                              {copiedEmail ? "✓ Copied" : "Copy"}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                          }}
+                        >
+                          <span style={{ color: "var(--muted)", fontWeight: 500 }}>Initial / Standard Password:</span>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                            <code
+                              style={{
+                                background: "#f1f5f9",
+                                border: "1px solid #cbd5e1",
+                                padding: "0.2rem 0.5rem",
+                                borderRadius: "4px",
+                                fontWeight: 600,
+                                color: "#0f172a",
+                                fontSize: "0.85rem",
+                                letterSpacing: showPassword ? "normal" : "0.15em",
+                              }}
+                            >
+                              {showPassword ? `${viewingCommunity.code.toLowerCase().replace(/[^a-z0-9]/g, "")}@Gate2026!` : "••••••••••••"}
+                            </code>
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              style={{ fontSize: "0.7rem", padding: "0.15rem 0.45rem" }}
+                              onClick={() => setShowPassword(!showPassword)}
+                            >
+                              {showPassword ? "Hide" : "Show"}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              style={{ fontSize: "0.7rem", padding: "0.15rem 0.45rem" }}
+                              onClick={() => {
+                                const pwd = `${viewingCommunity.code.toLowerCase().replace(/[^a-z0-9]/g, "")}@Gate2026!`;
+                                navigator.clipboard.writeText(pwd);
+                                setCopiedPassword(true);
+                                setTimeout(() => setCopiedPassword(false), 2000);
+                              }}
+                            >
+                              {copiedPassword ? "✓ Copied" : "Copy"}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: "1rem", display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => {
+                          const codeSlug = viewingCommunity.code.toLowerCase().replace(/[^a-z0-9]/g, "");
+                          const email = viewingCommunity.admin_email || `admin.${codeSlug}@gatesphere.com`;
+                          const name = viewingCommunity.admin_name || `Admin (${viewingCommunity.name})`;
+                          const pwd = `${codeSlug}@Gate2026!`;
+                          const text = `GateSphere Enterprise - Community Admin Credentials\nCommunity: ${viewingCommunity.name} (${viewingCommunity.code})\nAdmin Name: ${name}\nLogin Email: ${email}\nInitial Password: ${pwd}\nRole: Community Admin\nPortal Link: ${window.location.origin}/login`;
+                          navigator.clipboard.writeText(text);
+                          setCopiedAll(true);
+                          setTimeout(() => setCopiedAll(false), 2000);
+                        }}
+                        style={{ fontSize: "0.8rem" }}
+                      >
+                        {copiedAll ? "✓ All Credentials Copied!" : "📋 Copy All Credentials"}
+                      </button>
+                      <a
+                        href="/login"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn btn-primary"
+                        style={{ fontSize: "0.8rem", textDecoration: "none" }}
+                      >
+                        🚀 Open Login Portal
+                      </a>
+                    </div>
                   </div>
                 )}
               </div>
