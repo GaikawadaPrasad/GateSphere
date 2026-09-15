@@ -19,7 +19,11 @@ from app.core.errors import BusinessRuleError, ForbiddenError
 from app.core.tenancy import TenantScope
 from app.modules.amenities.models import AmenityBooking
 from app.modules.billing.models import MaintenanceInvoice, Payment
-from app.modules.communication.models import Announcement
+from app.modules.communication.models import (
+    Announcement,
+    AnnouncementTarget,
+    ResidentGroupMember,
+)
 from app.modules.communities.models import Community, Tower, Unit
 from app.modules.complaints.models import ServiceTicket
 from app.modules.dashboards import schemas
@@ -265,11 +269,41 @@ class DashboardService:
             if unit_id
             else Decimal(0)
         )
-        announcements = await self._count(
-            Announcement,
+        tower_ids: list[uuid.UUID] = []
+        if unit_id:
+            t_id = await self.db.scalar(select(Unit.tower_id).where(Unit.id == unit_id))
+            if t_id:
+                tower_ids.append(t_id)
+
+        grp_ids = list(
+            await self.db.scalars(
+                select(ResidentGroupMember.group_id).where(
+                    ResidentGroupMember.user_id == self.actor.id
+                )
+            )
+        )
+        target_match = ~Announcement.targets.any() | Announcement.targets.any(
+            AnnouncementTarget.target_all_community.is_(True)
+        )
+        if unit_id:
+            target_match = target_match | Announcement.targets.any(
+                AnnouncementTarget.unit_id == unit_id
+            )
+        if tower_ids:
+            target_match = target_match | Announcement.targets.any(
+                AnnouncementTarget.tower_id.in_(tower_ids)
+            )
+        if grp_ids:
+            target_match = target_match | Announcement.targets.any(
+                AnnouncementTarget.resident_group_id.in_(grp_ids)
+            )
+
+        announcements_stmt = select(func.count(Announcement.id)).where(
             Announcement.community_id == cid,
             Announcement.is_published.is_(True),
+            target_match,
         )
+        announcements = (await self.db.scalar(announcements_stmt)) or 0
         return schemas.ResidentStats(
             community_id=cid,
             unit_id=unit_id,

@@ -193,6 +193,15 @@ async def get_ticket(ticket_id: uuid.UUID, svc: Svc = Depends(complaint_service)
 
 
 @router.get(
+    "/tickets/{ticket_id}/entry-pass",
+    response_model=Envelope[schemas.TicketEntryPassRead],
+    dependencies=[VIEW],
+)
+async def ticket_entry_pass(ticket_id: uuid.UUID, svc: Svc = Depends(complaint_service)) -> dict:
+    return ok(schemas.TicketEntryPassRead.model_validate(await svc.get_entry_pass(ticket_id)))
+
+
+@router.get(
     "/tickets/{ticket_id}/history",
     response_model=Envelope[list[schemas.HistoryRead]],
     dependencies=[VIEW],

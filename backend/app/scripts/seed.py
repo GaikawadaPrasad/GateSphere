@@ -334,6 +334,7 @@ def seed_domestic_staff(db: Session, communities: list[Community]) -> None:
                     ),
                     "full_name": name,
                     "staff_type": kind,
+                    "id_type": "aadhaar",
                     "police_verification_status": "verified",
                 },
             )
