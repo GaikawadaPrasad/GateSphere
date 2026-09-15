@@ -2099,7 +2099,7 @@ export function OwnerTenantDashboardView({
                         style={{ fontSize: "13px", fontWeight: 700, color: "var(--brand-primary)" }}
                       >
                         {amenity.price_per_hour > 0
-                          ? `$${amenity.price_per_hour}/hr`
+                          ? `${formatCurrency(amenity.price_per_hour)}/hr`
                           : "Free for Residents"}
                       </span>
                       <BrandButton
@@ -4001,7 +4001,7 @@ export function OwnerTenantDashboardView({
                 style={{ background: "#DBEAFE", color: "#1E40AF", fontWeight: 700 }}
               >
                 {selectedAmenity.price_per_hour > 0
-                  ? `$${selectedAmenity.price_per_hour}/hr`
+                  ? `${formatCurrency(selectedAmenity.price_per_hour)}/hr`
                   : "Free Access"}
               </span>
             </div>
@@ -4122,7 +4122,7 @@ export function OwnerTenantDashboardView({
                     const isFull = spotsLeft <= 0;
                     const startHour = parseInt((s.start_time || "06:00").split(":")[0], 10);
                     const periodName = startHour < 12 ? "Morning" : startHour < 17 ? "Afternoon" : "Evening";
-                    const feeText = s.fee && Number(s.fee) > 0 ? ` • $${s.fee}` : "";
+                    const feeText = s.fee && Number(s.fee) > 0 ? ` • ${formatCurrency(s.fee)}` : "";
                     const capacityStatus = isFull ? " (🔴 Fully Booked)" : ` (${spotsLeft} of ${slotCap} spots left)`;
 
                     return (
@@ -4169,7 +4169,7 @@ export function OwnerTenantDashboardView({
                       </div>
                       {activeSelectedSlot.fee && Number(activeSelectedSlot.fee) > 0 && (
                         <div style={{ fontSize: "12px", color: "#2563EB", marginTop: "0.15rem" }}>
-                          Slot Fee: ${activeSelectedSlot.fee}
+                          Slot Fee: {formatCurrency(activeSelectedSlot.fee)}
                         </div>
                       )}
                     </div>

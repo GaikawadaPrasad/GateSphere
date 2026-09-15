@@ -7,12 +7,12 @@ export function cn(...inputs: (string | boolean | null | undefined)[]): string {
 }
 
 export function formatCurrency(val: number | string | null | undefined): string {
-  if (val === null || val === undefined || val === "") return "$0.00";
+  if (val === null || val === undefined || val === "") return "₹0.00";
   const num = typeof val === "number" ? val : parseFloat(val);
-  if (isNaN(num)) return "$0.00";
-  return new Intl.NumberFormat("en-US", {
+  if (isNaN(num)) return "₹0.00";
+  return new Intl.NumberFormat("en-IN", {
     style: "currency",
-    currency: "USD",
+    currency: "INR",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(num);
