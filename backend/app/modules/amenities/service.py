@@ -264,13 +264,13 @@ class AmenityService(UnitScopedAccess):
         return obj
 
     async def delete_block(self, block_id: uuid.UUID) -> None:
-        obj = await self.blocks.get(block_id)
+        obj = await self.db.get(AmenityBlock, block_id)
         if obj is None:
-            raise NotFoundError("Block not found")
-        cid = obj.community_id
+            raise NotFoundError("Maintenance block not found")
         await self.db.delete(obj)
         await self.db.flush()
-        await self._audit("block.delete", cid, "amenity_block", block_id)
+        await self._audit("block.delete", obj.community_id, "amenity_block", obj.id)
+
 
     # -- bookings ------------------------------------- #
     async def list_bookings(

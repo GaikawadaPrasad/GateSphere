@@ -37,7 +37,7 @@ DELIVERY_TYPES = (
     "laundry",
     "other",
 )
-PROTOCOL_TYPES = ("leave_at_gate", "collect_at_gate", "direct_to_door", "call_resident")
+PROTOCOL_TYPES = ("leave_at_gate", "collect_at_gate", "direct_to_door", "call_resident", "direct_rejection")
 APPROVAL_STATUS = ("pending", "approved", "rejected", "auto_approved")
 DELIVERY_STATUS = (
     "expected",

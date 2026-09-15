@@ -457,6 +457,21 @@ class CommunicationService(UnitScopedAccess):
         )
 
     # -- polls -------------------------------------------- #
+    async def list_polls(
+        self, *, community_id: uuid.UUID | None, offset: int = 0, limit: int = 50
+    ) -> tuple[list[Poll], int]:
+        cid = self._one_community(community_id)
+        stmt = (
+            select(Poll)
+            .options(selectinload(Poll.options))
+            .where(Poll.community_id == cid)
+            .order_by(Poll.created_at.desc())
+        )
+        rows = list((await self.db.scalars(stmt.offset(offset).limit(limit))).all())
+        count_stmt = select(func.count(Poll.id)).where(Poll.community_id == cid)
+        total = (await self.db.scalar(count_stmt)) or 0
+        return rows, total
+
     async def create_poll(self, payload: schemas.PollCreate) -> Poll:
         ann = await self.get_announcement(payload.announcement_id)
         if ann.announcement_type not in ("poll", "survey"):

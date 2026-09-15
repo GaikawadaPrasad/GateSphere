@@ -16,12 +16,13 @@ from fastapi import Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.context import RequestContext
-from app.core.errors import AuthError
+from app.core.errors import AuthError, BusinessRuleError
 from app.core.security import (
     create_session,
     destroy_session,
     hash_password,
     needs_rehash,
+    revoke_all_user_sessions_async,
     user_permissions_async,
     verify_password,
 )
@@ -147,3 +148,33 @@ class AuthService:
             role_slug=getattr(request.state, "session_role", None),
             session_bucket=getattr(request.state, "session_bucket", None),
         )
+
+    async def change_password(
+        self,
+        request: Request,
+        response: Response,
+        user: User,
+        *,
+        current_password: str,
+        new_password: str,
+    ) -> None:
+        if not verify_password(current_password, user.password_hash):
+            raise AuthError("Current password incorrect", code="INVALID_CREDENTIALS")
+        if current_password == new_password:
+            raise BusinessRuleError(
+                "New password must be different from current password",
+                code="SAME_PASSWORD",
+            )
+        user.password_hash = hash_password(new_password)
+        await revoke_all_user_sessions_async(self.db, user.id)
+        await record_audit_async(
+            self.db,
+            module="auth",
+            action="password.changed",
+            actor=user,
+            entity_type="user",
+            entity_id=str(user.id),
+            ctx=RequestContext.from_request(request),
+            role_slug=getattr(request.state, "session_role", None),
+        )
+

@@ -741,6 +741,12 @@ class VisitorService(UnitScopedAccess):
         # blacklist re-check at the gate
         visitor = await self.db.get(Visitor, visitor_id)
         policy = await self._policy(req.community_id)
+        if policy.photo_required and not payload.entry_photo_url:
+            raise BusinessRuleError(
+                "Photo is required for visitor entry under community policy",
+                code="PHOTO_REQUIRED",
+                fields={"entry_photo_url": "required"},
+            )
         hit = (
             await self._blacklist_hit(req.community_id, visitor.phone, None, visitor.id_number_hash)
             if visitor
