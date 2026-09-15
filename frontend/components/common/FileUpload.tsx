@@ -66,7 +66,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
       const confirmRes = await uploadsApi.confirm(file_id);
       const confirmData: any = confirmRes;
       const confirmPayload = confirmData?.data || confirmData || {};
-      const finalUrl = confirmPayload.url || public_url;
+      const finalUrl = confirmPayload.file_url || confirmPayload.url || file_url || public_url;
 
       setPreviewUrl(finalUrl);
       onUploadComplete(finalUrl);

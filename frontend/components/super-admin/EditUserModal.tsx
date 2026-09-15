@@ -52,6 +52,7 @@ export function EditUserModal({
   const [isDeletingUser, setIsDeletingUser] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (user) {
@@ -65,8 +66,6 @@ export function EditUserModal({
   }, [user]);
 
   if (!user || !isOpen) return null;
-
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const validateProfile = () => {
     const errors: Record<string, string> = {};
