@@ -389,6 +389,8 @@ export const communitiesApi = {
   units: (floorId: string) => apiGet<Unit[]>(`/communities/floors/${floorId}/units`),
   communityUnits: (communityId: string, params?: Record<string, unknown>) =>
     apiGet<Unit[]>(`/communities/${communityId}/units`, { page_size: 100, ...params }),
+  provisionAdmin: (communityId: string, data: { email: string; password: string; full_name?: string; phone?: string }) =>
+    apiSend<{ id: string; user_id: string; email: string; full_name: string; role: string }>("POST", `/communities/${communityId}/admin`, data),
 };
 
 export const dashboardsApi = {

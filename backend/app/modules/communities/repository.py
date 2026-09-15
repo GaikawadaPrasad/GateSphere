@@ -27,20 +27,49 @@ class CommunityRepository:
             return stmt
         return stmt.where(Community.id.in_(self.scope.community_ids))
 
+    async def _populate_admin_info(self, comms: list[Community]) -> list[Community]:
+        if not comms:
+            return comms
+        from app.modules.users.models import User, UserRole, Role
+        comm_map = {c.id: c for c in comms}
+        stmt = (
+            select(UserRole.community_id, User.email, User.full_name)
+            .join(User, User.id == UserRole.user_id)
+            .join(Role, Role.id == UserRole.role_id)
+            .where(
+                Role.slug == "community_admin",
+                UserRole.community_id.in_(list(comm_map.keys())),
+            )
+        )
+        res = await self.db.execute(stmt)
+        for community_id, email, full_name in res.all():
+            if community_id in comm_map:
+                comm_map[community_id].admin_email = email
+                comm_map[community_id].admin_name = full_name
+        return comms
+
     async def get(self, community_id: uuid.UUID) -> Community | None:
-        return await self.db.scalar(
+        comm = await self.db.scalar(
             self._scoped(select(Community).where(Community.id == community_id))
         )
+        if comm:
+            await self._populate_admin_info([comm])
+        return comm
 
     async def get_by_code(self, code: str) -> Community | None:
-        return await self.db.scalar(select(Community).where(Community.code == code.lower()))
+        comm = await self.db.scalar(select(Community).where(Community.code == code.lower()))
+        if comm:
+            await self._populate_admin_info([comm])
+        return comm
 
     async def list(self, *, offset: int, limit: int, active: bool | None = None) -> list[Community]:
         stmt = select(Community)
         if active is not None:
             stmt = stmt.where(Community.is_active.is_(active))
         stmt = self._scoped(stmt).order_by(Community.name).offset(offset).limit(limit)
-        return list((await self.db.scalars(stmt)).all())
+        comms = list((await self.db.scalars(stmt)).all())
+        await self._populate_admin_info(comms)
+        return comms
 
     async def count(self, *, active: bool | None = None) -> int:
         stmt = select(func.count()).select_from(Community)

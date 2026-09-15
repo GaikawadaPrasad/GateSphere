@@ -75,6 +75,22 @@ class CommunityRead(_Read):
     admin_name: str | None = None
 
 
+class CommunityAdminProvision(_Write):
+    email: str = Field(min_length=3, max_length=255)
+    password: str = Field(min_length=8, max_length=128)
+    full_name: str | None = Field(default=None, max_length=255)
+    phone: str | None = Field(default=None, max_length=20)
+
+
+class CommunityAdminRead(_Read):
+    user_id: uuid.UUID
+    email: str
+    full_name: str
+    phone: str | None = None
+    role: str = "community_admin"
+    community_id: uuid.UUID
+
+
 # --- Gate ----------------------------------------------------------------- #
 class GateCreate(_Write):
     code: _Code

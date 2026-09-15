@@ -18,6 +18,7 @@ interface CommunityTableProps {
   isLoading?: boolean;
   onView?: (community: CommunityWithMetrics) => void;
   onEdit?: (community: CommunityWithMetrics) => void;
+  onViewCredentials?: (community: CommunityWithMetrics) => void;
   page?: number;
   pageSize?: number;
   total?: number;
@@ -31,6 +32,7 @@ export function CommunityTable({
   isLoading,
   onView,
   onEdit,
+  onViewCredentials,
   page,
   pageSize,
   total,
@@ -140,6 +142,21 @@ export function CommunityTable({
       align: "right",
       render: (comm) => (
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.4rem" }}>
+          {onViewCredentials && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={(e) => {
+                e.stopPropagation();
+                onViewCredentials(comm);
+              }}
+              style={{ padding: "0.25rem 0.6rem", fontSize: "0.75rem", height: 28, background: "#f8fafc" }}
+              title="View Community Admin Credentials"
+            >
+              🔑 Credentials
+            </button>
+          )}
+
           {onEdit && (
             <button
               type="button"

@@ -114,28 +114,32 @@ class CommunityService:
         )
         await self.communities.add(obj)
 
-        if payload.admin_email and payload.admin_password:
-            admin_user = await self.communities.provision_community_admin(
-                obj.id,
-                email=payload.admin_email,
-                password_hash=hash_password(payload.admin_password),
-                full_name=payload.admin_name or f"{obj.name} Admin",
-                phone=payload.admin_phone,
-            )
-            await invalidate_user_permissions_async(self.db, [admin_user.id])
-            await self._audit(
-                "community.admin_provisioned",
-                obj.id,
-                "user",
-                admin_user.id,
-                new={
-                    "email": admin_user.email,
-                    "role": "community_admin",
-                    "community_id": str(obj.id),
-                },
-            )
-            obj.admin_email = admin_user.email
-            obj.admin_name = admin_user.full_name
+        code_slug = code.lower().replace("-", "").replace("_", "").replace("/", "")
+        admin_email = payload.admin_email or f"admin.{code}@gatesphere.com"
+        admin_password = payload.admin_password or f"{code_slug}@Gate2026!"
+        admin_name = payload.admin_name or f"{obj.name} Admin"
+
+        admin_user = await self.communities.provision_community_admin(
+            obj.id,
+            email=admin_email,
+            password_hash=hash_password(admin_password),
+            full_name=admin_name,
+            phone=payload.admin_phone,
+        )
+        await invalidate_user_permissions_async(self.db, [admin_user.id])
+        await self._audit(
+            "community.admin_provisioned",
+            obj.id,
+            "user",
+            admin_user.id,
+            new={
+                "email": admin_user.email,
+                "role": "community_admin",
+                "community_id": str(obj.id),
+            },
+        )
+        obj.admin_email = admin_user.email
+        obj.admin_name = admin_user.full_name
 
         await self._audit(
             "community.create",
@@ -145,6 +149,43 @@ class CommunityService:
             new=payload.model_dump(exclude={"admin_password"}),
         )
         return obj
+
+    async def provision_community_admin(
+        self, community_id: uuid.UUID, payload: schemas.CommunityAdminProvision
+    ) -> schemas.CommunityAdminRead:
+        if not self.scope.is_global:
+            raise ForbiddenError("Only a platform admin can provision community admin credentials", code="GLOBAL_ONLY")
+        comm = await self.get_community(community_id)
+        admin_user = await self.communities.provision_community_admin(
+            comm.id,
+            email=payload.email,
+            password_hash=hash_password(payload.password),
+            full_name=payload.full_name or f"{comm.name} Admin",
+            phone=payload.phone,
+        )
+        await invalidate_user_permissions_async(self.db, [admin_user.id])
+        await self._audit(
+            "community.admin_provisioned",
+            comm.id,
+            "user",
+            admin_user.id,
+            new={
+                "email": admin_user.email,
+                "role": "community_admin",
+                "community_id": str(comm.id),
+            },
+        )
+        return schemas.CommunityAdminRead(
+            id=admin_user.id,
+            user_id=admin_user.id,
+            email=admin_user.email,
+            full_name=admin_user.full_name,
+            phone=admin_user.phone,
+            role="community_admin",
+            community_id=comm.id,
+            created_at=admin_user.created_at,
+            updated_at=admin_user.updated_at,
+        )
 
     async def update_community(
         self, community_id: uuid.UUID, payload: schemas.CommunityUpdate

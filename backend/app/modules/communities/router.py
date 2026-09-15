@@ -92,6 +92,23 @@ async def delete_community(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.post(
+    "/{community_id}/admin",
+    response_model=Envelope[schemas.CommunityAdminRead],
+    status_code=status.HTTP_200_OK,
+    dependencies=[CREATE],
+)
+async def provision_community_admin(
+    community_id: uuid.UUID,
+    payload: schemas.CommunityAdminProvision,
+    svc: CommunityService = Depends(community_service),
+) -> dict:
+    return ok(
+        await svc.provision_community_admin(community_id, payload),
+        message="Community Admin credentials provisioned successfully",
+    )
+
+
 # --- gates ------------------------------------------------------------- #
 @router.get(
     "/{community_id}/gates", response_model=Envelope[list[schemas.GateRead]], dependencies=[VIEW]
