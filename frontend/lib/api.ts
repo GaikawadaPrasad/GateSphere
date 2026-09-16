@@ -686,7 +686,7 @@ export const usersApi = {
   get: (id: string) => apiGet<Record<string, unknown>>(`/users/${id}`),
   create: (data: { email: string; full_name: string; password: string; phone?: string; role_slug?: string; community_id?: string }) =>
     apiSend<Record<string, unknown>>("POST", "/users", data),
-  update: (id: string, data: { full_name?: string; email?: string; phone?: string; is_active?: boolean }) =>
+  update: (id: string, data: { full_name?: string; email?: string; password?: string; phone?: string; is_active?: boolean }) =>
     apiSend<Record<string, unknown>>("PATCH", `/users/${id}`, data),
   delete: (id: string) => apiSend<void>("DELETE", `/users/${id}`),
   grantRole: (userId: string, data: { role_slug: string; community_id?: string }) =>

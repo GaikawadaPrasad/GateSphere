@@ -13,6 +13,7 @@ import { DataTable, type Column } from "@/components/tables/DataTable";
 import { FilterPanel } from "@/components/common/FilterPanel";
 import { AddOperationalStaffModal } from "@/components/community-admin/AddOperationalStaffModal";
 import { OperationalStaffDetailsModal } from "@/components/community-admin/OperationalStaffDetailsModal";
+import { UpdateUserCredentialsModal, type CredentialUser } from "@/components/common/UpdateUserCredentialsModal";
 import { formatDateTime } from "@/lib/utils";
 import { toast } from "@/store/toast";
 
@@ -29,6 +30,7 @@ export function OperationalStaffView({ embeddedInTab = false }: OperationalStaff
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<OperationalStaffUser | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [credentialStaff, setCredentialStaff] = useState<CredentialUser | null>(null);
 
   const { data: staffList = [], isLoading, refetch } = useOperationalStaff(
     activeCommunityId || undefined
@@ -226,6 +228,23 @@ export function OperationalStaffView({ embeddedInTab = false }: OperationalStaff
           </button>
           <button
             type="button"
+            className="btn btn-secondary"
+            style={{ fontSize: "0.75rem", padding: "0.3rem 0.6rem", background: "#f8fafc" }}
+            onClick={() =>
+              setCredentialStaff({
+                id: u.id,
+                full_name: u.full_name,
+                email: u.email,
+                phone: u.phone || "",
+                roleName: u.roles[0]?.role_slug || "Staff",
+              })
+            }
+            title="Update Credentials"
+          >
+            🔑 Credentials
+          </button>
+          <button
+            type="button"
             className={u.is_active ? "btn btn-secondary" : "btn btn-secondary"}
             style={{
               fontSize: "0.75rem",
@@ -382,6 +401,13 @@ export function OperationalStaffView({ embeddedInTab = false }: OperationalStaff
         staff={selectedStaff}
         communityId={activeCommunityId || undefined}
         onUpdated={() => refetch()}
+      />
+
+      <UpdateUserCredentialsModal
+        isOpen={Boolean(credentialStaff)}
+        onClose={() => setCredentialStaff(null)}
+        user={credentialStaff}
+        onSuccess={() => refetch()}
       />
     </div>
   );

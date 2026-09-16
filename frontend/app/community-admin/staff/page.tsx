@@ -19,6 +19,7 @@ import { DataTable, type Column } from "@/components/tables/DataTable";
 import { FilterPanel } from "@/components/common/FilterPanel";
 import { Modal } from "@/components/common/Modal";
 import { OperationalStaffView } from "@/components/community-admin/OperationalStaffView";
+import { UpdateUserCredentialsModal, type CredentialUser } from "@/components/common/UpdateUserCredentialsModal";
 import type {
   Staff,
   StaffAttendance,
@@ -32,6 +33,7 @@ import { formatDateTime } from "@/lib/utils";
 export default function CommunityAdminStaffPage() {
   const { activeCommunityId } = useUiStore();
   const [activeTab, setActiveTab] = useState<"directory" | "security" | "attendance">("directory");
+  const [credentialUser, setCredentialUser] = useState<CredentialUser | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -323,14 +325,33 @@ export default function CommunityAdminStaffPage() {
       key: "actions",
       header: "Action",
       render: (s) => (
-        <button
-          type="button"
-          className="btn btn-secondary"
-          style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem" }}
-          onClick={() => setSelectedStaff(s)}
-        >
-          View Profile →
-        </button>
+        <div style={{ display: "flex", gap: "0.4rem" }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem" }}
+            onClick={() => setSelectedStaff(s)}
+          >
+            View Profile →
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem", background: "#f8fafc" }}
+            onClick={() =>
+              setCredentialUser({
+                id: s.user_id || s.id,
+                full_name: s.full_name,
+                email: s.email || "",
+                phone: s.phone || "",
+                roleName: s.staff_type || "Domestic Staff",
+              })
+            }
+            title="Update Credentials"
+          >
+            🔑 Credentials
+          </button>
+        </div>
       ),
     },
   ];
@@ -1439,6 +1460,14 @@ export default function CommunityAdminStaffPage() {
           </div>
         </form>
       </Modal>
+
+      {/* Update Credentials Modal */}
+      <UpdateUserCredentialsModal
+        isOpen={Boolean(credentialUser)}
+        onClose={() => setCredentialUser(null)}
+        user={credentialUser}
+        onSuccess={() => refetchStaff()}
+      />
     </div>
   );
 }

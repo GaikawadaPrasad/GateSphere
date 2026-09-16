@@ -31,6 +31,7 @@ import type { ResidentProfile } from "@/types/residents";
 import { PasswordField } from "@/components/forms/PasswordField";
 import { generateInitialPassword } from "@/lib/utils";
 import { CreateCommunityModal } from "@/components/super-admin/CreateCommunityModal";
+import { toast } from "@/store/toast";
 
 export default function CommunitiesPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -39,16 +40,27 @@ export default function CommunitiesPage() {
   // Create modal state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createdAdminInfo, setCreatedAdminInfo] = useState<{
+    communityId?: string;
     communityName: string;
     communityCode: string;
     adminName: string;
     adminEmail: string;
     adminPassword?: string;
+    adminPhone?: string;
   } | null>(null);
   const [copiedEmail, setCopiedEmail] = useState(false);
   const [copiedPassword, setCopiedPassword] = useState(false);
   const [copiedAll, setCopiedAll] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  // Admin Credential Update State
+  const [isEditingAdminCredentials, setIsEditingAdminCredentials] = useState(false);
+  const [updateAdminEmail, setUpdateAdminEmail] = useState("");
+  const [updateAdminName, setUpdateAdminName] = useState("");
+  const [updateAdminPhone, setUpdateAdminPhone] = useState("");
+  const [updateAdminPassword, setUpdateAdminPassword] = useState("");
+  const [isUpdatingAdminCreds, setIsUpdatingAdminCreds] = useState(false);
+  const [updateAdminCredsError, setUpdateAdminCredsError] = useState("");
 
   // Edit & Delete modal state & validations
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -81,13 +93,63 @@ export default function CommunitiesPage() {
     setCopiedEmail(false);
     setCopiedPassword(false);
     setCopiedAll(false);
+    setIsEditingAdminCredentials(false);
+    setUpdateAdminEmail(email);
+    setUpdateAdminName(adminName);
+    setUpdateAdminPhone("");
+    setUpdateAdminPassword(pwd);
+    setUpdateAdminCredsError("");
+
     setCreatedAdminInfo({
+      communityId: comm.id,
       communityName: comm.name,
       communityCode: comm.code,
       adminName: adminName,
       adminEmail: email,
       adminPassword: pwd,
     });
+  };
+
+  const handleSaveAdminCredentials = async () => {
+    if (!createdAdminInfo?.communityId) return;
+    if (!updateAdminEmail || !updateAdminEmail.includes("@")) {
+      setUpdateAdminCredsError("Please enter a valid email address.");
+      return;
+    }
+    if (!updateAdminPassword || updateAdminPassword.length < 8) {
+      setUpdateAdminCredsError("Password must be at least 8 characters.");
+      return;
+    }
+
+    try {
+      setIsUpdatingAdminCreds(true);
+      setUpdateAdminCredsError("");
+      const res = await communitiesApi.provisionAdmin(createdAdminInfo.communityId, {
+        email: updateAdminEmail.trim(),
+        password: updateAdminPassword.trim(),
+        full_name: updateAdminName.trim() || undefined,
+        phone: updateAdminPhone.trim() || undefined,
+      });
+
+      setCreatedAdminInfo({
+        ...createdAdminInfo,
+        adminName: res.full_name || updateAdminName.trim(),
+        adminEmail: res.email || updateAdminEmail.trim(),
+        adminPassword: updateAdminPassword.trim(),
+      });
+
+      toast.success(
+        `Updated Community Admin credentials for ${createdAdminInfo.communityName}.`,
+        "Credentials Updated"
+      );
+      refetch();
+      setIsEditingAdminCredentials(false);
+    } catch (err: any) {
+      console.error("Failed to update community admin credentials:", err);
+      setUpdateAdminCredsError(err?.message || "Failed to update community admin credentials.");
+    } finally {
+      setIsUpdatingAdminCreds(false);
+    }
   };
 
   // Sub-modals for adding Tower, Floor, Unit, Resident, Gate
@@ -683,123 +745,196 @@ export default function CommunitiesPage() {
               >
                 🔑 Admin Credentials Card
               </h4>
-              <span className="badge badge-primary" style={{ fontSize: "0.7rem" }}>
-                community_admin
-              </span>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ fontSize: "0.75rem", padding: "0.2rem 0.6rem" }}
+                onClick={() => setIsEditingAdminCredentials(!isEditingAdminCredentials)}
+              >
+                {isEditingAdminCredentials ? "Cancel Edit" : "✏️ Update Credentials"}
+              </button>
             </div>
 
-            <div style={{ display: "grid", gap: "0.75rem", fontSize: "0.85rem" }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  paddingBottom: "0.4rem",
-                  borderBottom: "1px dashed #e2e8f0",
-                }}
-              >
-                <span style={{ color: "var(--muted)", fontWeight: 500 }}>Community Name & Code:</span>
-                <span style={{ fontWeight: 600, color: "var(--fg)" }}>
-                  {createdAdminInfo?.communityName} <code style={{ background: "#e2e8f0", padding: "0.1rem 0.35rem", borderRadius: 4 }}>{createdAdminInfo?.communityCode}</code>
-                </span>
+            {updateAdminCredsError && (
+              <div style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", padding: "0.5rem 0.75rem", borderRadius: "6px", fontSize: "0.8rem", marginBottom: "0.75rem" }}>
+                ⚠️ {updateAdminCredsError}
               </div>
+            )}
 
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  paddingBottom: "0.4rem",
-                  borderBottom: "1px dashed #e2e8f0",
-                }}
-              >
-                <span style={{ color: "var(--muted)", fontWeight: 500 }}>Admin Name:</span>
-                <span style={{ fontWeight: 600, color: "var(--fg)" }}>
-                  {createdAdminInfo?.adminName}
-                </span>
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  paddingBottom: "0.4rem",
-                  borderBottom: "1px dashed #e2e8f0",
-                }}
-              >
-                <span style={{ color: "var(--muted)", fontWeight: 500 }}>Login Email:</span>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <span style={{ fontWeight: 600, color: "#1e293b", fontFamily: "monospace" }}>
-                    {createdAdminInfo?.adminEmail}
-                  </span>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    style={{ fontSize: "0.7rem", padding: "0.15rem 0.45rem" }}
-                    onClick={() => {
-                      if (createdAdminInfo?.adminEmail) {
-                        navigator.clipboard.writeText(createdAdminInfo.adminEmail);
-                        setCopiedEmail(true);
-                        setTimeout(() => setCopiedEmail(false), 2000);
-                      }
-                    }}
-                  >
-                    {copiedEmail ? "✓ Copied" : "Copy"}
-                  </button>
+            {isEditingAdminCredentials ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", fontSize: "0.85rem" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "#475569", marginBottom: "0.2rem" }}>
+                    Admin Name
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={updateAdminName}
+                    onChange={(e) => setUpdateAdminName(e.target.value)}
+                    placeholder="Admin Full Name"
+                  />
                 </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "#475569", marginBottom: "0.2rem" }}>
+                      Login Email <span style={{ color: "var(--danger)" }}>*</span>
+                    </label>
+                    <input
+                      type="email"
+                      className="input-field"
+                      value={updateAdminEmail}
+                      onChange={(e) => setUpdateAdminEmail(e.target.value)}
+                      placeholder="admin@gatesphere.com"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "#475569", marginBottom: "0.2rem" }}>
+                      Phone
+                    </label>
+                    <input
+                      type="tel"
+                      className="input-field"
+                      value={updateAdminPhone}
+                      onChange={(e) => setUpdateAdminPhone(e.target.value)}
+                      placeholder="+91 98765 43210"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <PasswordField
+                    label="New Password"
+                    value={updateAdminPassword}
+                    onChange={(val) => setUpdateAdminPassword(val)}
+                    placeholder="Set new admin password"
+                    required
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ marginTop: "0.25rem", width: "100%" }}
+                  onClick={handleSaveAdminCredentials}
+                  disabled={isUpdatingAdminCreds}
+                >
+                  {isUpdatingAdminCreds ? "Updating Credentials…" : "💾 Save & Provision New Credentials"}
+                </button>
               </div>
-
-              {createdAdminInfo?.adminPassword && (
+            ) : (
+              <div style={{ display: "grid", gap: "0.75rem", fontSize: "0.85rem" }}>
                 <div
                   style={{
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
+                    paddingBottom: "0.4rem",
+                    borderBottom: "1px dashed #e2e8f0",
                   }}
                 >
-                  <span style={{ color: "var(--muted)", fontWeight: 500 }}>Admin Password:</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                    <code
-                      style={{
-                        background: "#f1f5f9",
-                        border: "1px solid #cbd5e1",
-                        padding: "0.2rem 0.5rem",
-                        borderRadius: "4px",
-                        fontWeight: 600,
-                        color: "#0f172a",
-                        fontSize: "0.85rem",
-                        letterSpacing: showPassword ? "normal" : "0.15em",
-                      }}
-                    >
-                      {showPassword ? createdAdminInfo.adminPassword : "••••••••••••"}
-                    </code>
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      style={{ fontSize: "0.7rem", padding: "0.15rem 0.45rem" }}
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? "Hide" : "Show"}
-                    </button>
+                  <span style={{ color: "var(--muted)", fontWeight: 500 }}>Community Name & Code:</span>
+                  <span style={{ fontWeight: 600, color: "var(--fg)" }}>
+                    {createdAdminInfo?.communityName} <code style={{ background: "#e2e8f0", padding: "0.1rem 0.35rem", borderRadius: 4 }}>{createdAdminInfo?.communityCode}</code>
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    paddingBottom: "0.4rem",
+                    borderBottom: "1px dashed #e2e8f0",
+                  }}
+                >
+                  <span style={{ color: "var(--muted)", fontWeight: 500 }}>Admin Name:</span>
+                  <span style={{ fontWeight: 600, color: "var(--fg)" }}>
+                    {createdAdminInfo?.adminName}
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    paddingBottom: "0.4rem",
+                    borderBottom: "1px dashed #e2e8f0",
+                  }}
+                >
+                  <span style={{ color: "var(--muted)", fontWeight: 500 }}>Login Email:</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <span style={{ fontWeight: 600, color: "#1e293b", fontFamily: "monospace" }}>
+                      {createdAdminInfo?.adminEmail}
+                    </span>
                     <button
                       type="button"
                       className="btn btn-secondary"
                       style={{ fontSize: "0.7rem", padding: "0.15rem 0.45rem" }}
                       onClick={() => {
-                        if (createdAdminInfo?.adminPassword) {
-                          navigator.clipboard.writeText(createdAdminInfo.adminPassword);
-                          setCopiedPassword(true);
-                          setTimeout(() => setCopiedPassword(false), 2000);
+                        if (createdAdminInfo?.adminEmail) {
+                          navigator.clipboard.writeText(createdAdminInfo.adminEmail);
+                          setCopiedEmail(true);
+                          setTimeout(() => setCopiedEmail(false), 2000);
                         }
                       }}
                     >
-                      {copiedPassword ? "✓ Copied" : "Copy"}
+                      {copiedEmail ? "✓ Copied" : "Copy"}
                     </button>
                   </div>
                 </div>
-              )}
-            </div>
+
+                {createdAdminInfo?.adminPassword && (
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <span style={{ color: "var(--muted)", fontWeight: 500 }}>Admin Password:</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                      <code
+                        style={{
+                          background: "#f1f5f9",
+                          border: "1px solid #cbd5e1",
+                          padding: "0.2rem 0.5rem",
+                          borderRadius: "4px",
+                          fontWeight: 600,
+                          color: "#0f172a",
+                          fontSize: "0.85rem",
+                          letterSpacing: showPassword ? "normal" : "0.15em",
+                        }}
+                      >
+                        {showPassword ? createdAdminInfo.adminPassword : "••••••••••••"}
+                      </code>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ fontSize: "0.7rem", padding: "0.15rem 0.45rem" }}
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? "Hide" : "Show"}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ fontSize: "0.7rem", padding: "0.15rem 0.45rem" }}
+                        onClick={() => {
+                          if (createdAdminInfo?.adminPassword) {
+                            navigator.clipboard.writeText(createdAdminInfo.adminPassword);
+                            setCopiedPassword(true);
+                            setTimeout(() => setCopiedPassword(false), 2000);
+                          }
+                        }}
+                      >
+                        {copiedPassword ? "✓ Copied" : "Copy"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <p

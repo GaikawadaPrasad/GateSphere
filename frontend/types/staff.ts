@@ -19,6 +19,7 @@ export interface Staff {
   full_name: string;
   staff_type: StaffType;
   phone: string;
+  email?: string | null;
   photo_url?: string | null;
   id_type?: string | null;
   id_number?: string | null;
