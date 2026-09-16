@@ -66,6 +66,7 @@ import { useAnnouncements, useEventRsvp } from "@/hooks/use-communication";
 import { useMyNotifications } from "@/hooks/use-notifications";
 import { useTableControls } from "@/hooks/use-table-controls";
 import { formatDate, formatCurrency } from "@/lib/utils";
+import { authApi } from "@/lib/api";
 import { useUiStore } from "@/store/ui";
 
 export type OwnerTenantTab =
@@ -128,6 +129,14 @@ export function OwnerTenantDashboardView({
   const [profileEmergencyPhone, setProfileEmergencyPhone] = useState("");
   const [profileEmergencyRel, setProfileEmergencyRel] = useState("Spouse");
   const [profileEmergencyNotes, setProfileEmergencyNotes] = useState("");
+
+  // Change Password state
+  const [changePasswordModalOpen, setChangePasswordModalOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
 
   // Visitor Pass form state
   const [passCategory, setPassCategory] = useState("Personal Guest");
@@ -1262,12 +1271,27 @@ export function OwnerTenantDashboardView({
                 Manage your personal identification, contact coordinates, and emergency escalation protocols.
               </p>
             </div>
-            <BrandButton
-              size="sm"
-              onClick={handleOpenEditProfile}
-            >
-              ✏️ Edit Profile
-            </BrandButton>
+            <div style={{ display: "flex", gap: "0.5rem" }}>
+              <BrandButton
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setPasswordError("");
+                  setCurrentPassword("");
+                  setNewPassword("");
+                  setConfirmPassword("");
+                  setChangePasswordModalOpen(true);
+                }}
+              >
+                🔒 Change Password
+              </BrandButton>
+              <BrandButton
+                size="sm"
+                onClick={handleOpenEditProfile}
+              >
+                ✏️ Edit Profile
+              </BrandButton>
+            </div>
           </div>
           {profile.isError ? (
             <ErrorState
@@ -4639,6 +4663,116 @@ export function OwnerTenantDashboardView({
             </BrandButton>
             <BrandButton type="submit" isLoading={profile.updateProfile.isPending}>
               Save Profile Changes
+            </BrandButton>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Change Password Modal */}
+      <Modal
+        isOpen={changePasswordModalOpen}
+        onClose={() => setChangePasswordModalOpen(false)}
+        title="🔒 Change Account Password"
+        size="sm"
+      >
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setPasswordError("");
+            if (newPassword.length < 8) {
+              setPasswordError("New password must be at least 8 characters long.");
+              return;
+            }
+            if (newPassword !== confirmPassword) {
+              setPasswordError("New password and confirmation do not match.");
+              return;
+            }
+            if (currentPassword === newPassword) {
+              setPasswordError("New password must be different from current password.");
+              return;
+            }
+            try {
+              setIsChangingPassword(true);
+              await authApi.changePassword({
+                current_password: currentPassword,
+                new_password: newPassword,
+              });
+              setChangePasswordModalOpen(false);
+              setCurrentPassword("");
+              setNewPassword("");
+              setConfirmPassword("");
+              toast.success("Your password was changed successfully.", "Password Updated");
+            } catch (err: any) {
+              setPasswordError(err?.message || "Failed to change password. Check your current password.");
+            } finally {
+              setIsChangingPassword(false);
+            }
+          }}
+          style={{ display: "flex", flexDirection: "column", gap: "1rem", padding: "0.25rem 0" }}
+        >
+          {passwordError && (
+            <div
+              style={{
+                padding: "0.6rem 0.8rem",
+                borderRadius: "6px",
+                background: "#FEF2F2",
+                border: "1px solid #FECACA",
+                color: "#991B1B",
+                fontSize: "13px",
+              }}
+            >
+              ⚠️ {passwordError}
+            </div>
+          )}
+
+          <div>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+              Current Password *
+            </label>
+            <input
+              type="password"
+              className="input-field"
+              placeholder="Enter current password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              required
+            />
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+              New Password *
+            </label>
+            <input
+              type="password"
+              className="input-field"
+              placeholder="At least 8 characters"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              required
+            />
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+              Confirm New Password *
+            </label>
+            <input
+              type="password"
+              className="input-field"
+              placeholder="Re-enter new password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+            />
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
+            <BrandButton type="button" variant="outline" onClick={() => setChangePasswordModalOpen(false)}>
+              Cancel
+            </BrandButton>
+            <BrandButton type="submit" isLoading={isChangingPassword}>
+              Update Password
             </BrandButton>
           </div>
         </form>

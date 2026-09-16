@@ -230,6 +230,7 @@ class BillingService(UnitScopedAccess):
             issue_date=payload.issue_date or date.today(),
             due_date=payload.due_date,
             discount=_money(payload.discount),
+            late_fee=Decimal("0.00"),
             status="draft",
         )
         subtotal = Decimal("0")
@@ -252,7 +253,8 @@ class BillingService(UnitScopedAccess):
         tax = _money(taxable_base * rule.tax_percent / Decimal("100"))
         inv.subtotal = _money(subtotal)
         inv.tax = tax
-        inv.total_amount = _money(subtotal - inv.discount + tax)
+        late_fee = inv.late_fee or Decimal("0.00")
+        inv.total_amount = _money(subtotal - inv.discount + tax + late_fee)
         inv.amount_paid = Decimal("0.00")
         inv.balance_due = inv.total_amount
         await self.invoices.add(inv)
@@ -361,11 +363,19 @@ class BillingService(UnitScopedAccess):
     async def record_payment(self, payload: schemas.PaymentCreate) -> Payment:
         cid = self._one_community(payload.community_id)
         _enum("payment_method", payload.payment_method)
+        rule = await self._rule(cid)
         alloc_total = sum((a.amount for a in payload.allocations), Decimal("0"))
-        if _money(alloc_total) != _money(payload.amount):
+        excess = _money(payload.amount) - _money(alloc_total)
+
+        if excess < Decimal("0"):
+            raise BusinessRuleError(
+                "Allocations exceed total payment amount", code="ALLOCATION_MISMATCH"
+            )
+        if excess > Decimal("0") and not rule.allow_advance_payment:
             raise BusinessRuleError(
                 "Allocations must sum to the payment amount", code="ALLOCATION_MISMATCH"
             )
+
         now = datetime.now(UTC)
         # a unit-restricted caller (plain resident) may only record their own payment —
         # never attribute one to another user.
@@ -390,11 +400,14 @@ class BillingService(UnitScopedAccess):
         )
         await self.payments.add(payment)
 
+        target_unit_id: uuid.UUID | None = payload.unit_id
         for line in payload.allocations:
             inv = await self.invoices.get(line.invoice_id)
             if inv is None or inv.community_id != cid:
                 raise NotFoundError("Invoice not found")
             await self._assert_unit_visible(inv.unit_id)
+            if not target_unit_id:
+                target_unit_id = inv.unit_id
             if inv.status not in ("posted", "partially_paid", "overdue"):
                 raise BusinessRuleError(
                     f"Invoice {inv.invoice_number} is '{inv.status}'", code="INVOICE_NOT_PAYABLE"
@@ -421,6 +434,22 @@ class BillingService(UnitScopedAccess):
                 source_id=payment.id,
                 narration=f"Payment {payment.payment_reference} -> {inv.invoice_number}",
             )
+
+        if excess > Decimal("0"):
+            # Post surplus as unallocated advance payment credit on the unit's ledger
+            if target_unit_id:
+                await self._assert_unit_visible(target_unit_id)
+            await self._ledger(
+                cid,
+                target_unit_id,
+                payment.payer_user_id,
+                "credit",
+                excess,
+                source_type="advance_payment",
+                source_id=payment.id,
+                narration=f"Advance payment surplus {payment.payment_reference}",
+            )
+
         await self.db.flush()
         await self._audit(
             "payment.record",

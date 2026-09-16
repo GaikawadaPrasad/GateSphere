@@ -106,12 +106,18 @@ export function useOperationalStaff(communityId?: string) {
         page_size: 100,
       });
 
-      if (!Array.isArray(res)) return [];
+      const rawList: any[] = Array.isArray(res)
+        ? res
+        : Array.isArray((res as any)?.data)
+        ? (res as any).data
+        : [];
+
+      if (rawList.length === 0) return [];
 
       const targetSlugs = new Set(["facility_manager", "security_supervisor", "security_guard"]);
 
       // Filter users that hold at least one of the operational roles in this community
-      const filtered = res
+      const filtered = rawList
         .map((u: any) => ({
           id: String(u.id),
           full_name: String(u.full_name || "Unknown"),

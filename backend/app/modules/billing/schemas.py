@@ -146,7 +146,8 @@ class PaymentCreate(_Write):
     amount: Decimal = Field(max_digits=12, decimal_places=2, gt=0)
     payment_method: str = "upi"
     payer_user_id: uuid.UUID | None = None
-    allocations: list[PaymentAllocationIn] = Field(min_length=1)
+    unit_id: uuid.UUID | None = None
+    allocations: list[PaymentAllocationIn] = Field(default_factory=list)
     remarks: str | None = Field(default=None, max_length=2000)
     community_id: uuid.UUID | None = None
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useUiStore } from "@/store/ui";
 import {
   useResidents,
@@ -19,10 +19,12 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { PasswordField } from "@/components/forms/PasswordField";
 import type { ResidentProfile, MoveRecord } from "@/types/residents";
 import { formatDateTime, generateInitialPassword } from "@/lib/utils";
+import { onboardingApi } from "@/lib/api";
+import { toast } from "@/store/toast";
 
 export default function CommunityAdminResidentsPage() {
   const { activeCommunityId } = useUiStore();
-  const [activeTab, setActiveTab] = useState<"directory" | "approvals">("directory");
+  const [activeTab, setActiveTab] = useState<"directory" | "approvals" | "invitations">("directory");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [selectedResident, setSelectedResident] = useState<ResidentProfile | null>(null);
@@ -45,6 +47,40 @@ export default function CommunityAdminResidentsPage() {
   const [residentToDelete, setResidentToDelete] = useState<ResidentProfile | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+
+  // Invitations State
+  const [invitations, setInvitations] = useState<any[]>([]);
+  const [invitationsLoading, setInvitationsLoading] = useState(false);
+  const [isCreateInviteOpen, setIsCreateInviteOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [invitePhone, setInvitePhone] = useState("");
+  const [inviteFullName, setInviteFullName] = useState("");
+  const [inviteTowerId, setInviteTowerId] = useState("");
+  const [inviteUnitId, setInviteUnitId] = useState("");
+  const [inviteRole, setInviteRole] = useState("primary_owner");
+  const [inviteIsPrimary, setInviteIsPrimary] = useState(true);
+  const [inviteMessage, setInviteMessage] = useState("");
+  const [isCreatingInvite, setIsCreatingInvite] = useState(false);
+  const [inviteError, setInviteError] = useState("");
+
+  const fetchInvitations = async () => {
+    if (!activeCommunityId) return;
+    try {
+      setInvitationsLoading(true);
+      const list = await onboardingApi.listInvitations(activeCommunityId);
+      setInvitations(Array.isArray(list) ? list : []);
+    } catch {
+      setInvitations([]);
+    } finally {
+      setInvitationsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "invitations" && activeCommunityId) {
+      fetchInvitations();
+    }
+  }, [activeTab, activeCommunityId]);
 
   // Queries
   const {
@@ -419,6 +455,41 @@ export default function CommunityAdminResidentsPage() {
             </span>
           )}
         </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("invitations")}
+          style={{
+            padding: "0.75rem 0",
+            border: "none",
+            background: "transparent",
+            fontSize: "0.95rem",
+            fontWeight: activeTab === "invitations" ? 700 : 500,
+            color: activeTab === "invitations" ? "var(--primary)" : "var(--muted)",
+            borderBottom:
+              activeTab === "invitations" ? "2px solid var(--primary)" : "2px solid transparent",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+          }}
+        >
+          <span>📨 Resident Invitations</span>
+          {invitations.filter((i) => i.status === "pending").length > 0 && (
+            <span
+              style={{
+                background: "var(--primary)",
+                color: "white",
+                fontSize: "0.7rem",
+                padding: "0.1rem 0.45rem",
+                borderRadius: "var(--radius-full)",
+                fontWeight: 700,
+              }}
+            >
+              {invitations.filter((i) => i.status === "pending").length}
+            </span>
+          )}
+        </button>
       </div>
 
       {activeTab === "directory" && (
@@ -456,6 +527,129 @@ export default function CommunityAdminResidentsPage() {
             isLoading={movesLoading}
             emptyTitle="No move records"
             emptyDescription="All resident move-in and move-out applications have been processed."
+            enableClientPagination={true}
+          />
+        </div>
+      )}
+
+      {activeTab === "invitations" && (
+        <div>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "1rem",
+              flexWrap: "wrap",
+              gap: "0.75rem",
+            }}
+          >
+            <div>
+              <h3 style={{ fontSize: "1rem", fontWeight: 700, margin: 0 }}>Active Resident Invitations</h3>
+              <p style={{ fontSize: "13px", color: "var(--muted)", margin: "0.2rem 0 0 0" }}>
+                Generate secure onboarding invitation links for new residents to join their unit.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                setInviteError("");
+                setInviteEmail("");
+                setInvitePhone("");
+                setInviteFullName("");
+                setInviteTowerId("");
+                setInviteUnitId("");
+                setInviteRole("primary_owner");
+                setInviteIsPrimary(true);
+                setInviteMessage("");
+                setIsCreateInviteOpen(true);
+              }}
+            >
+              ✉️ + Issue New Invitation
+            </button>
+          </div>
+
+          <DataTable
+            columns={[
+              {
+                key: "invited_email",
+                header: "Invited Resident",
+                render: (row: any) => (
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{row.full_name || row.invited_email}</div>
+                    <div style={{ fontSize: "12px", color: "var(--muted)" }}>
+                      {row.invited_email} {row.invited_phone ? `· ${row.invited_phone}` : ""}
+                    </div>
+                  </div>
+                ),
+              },
+              {
+                key: "unit",
+                header: "Target Unit",
+                render: (row: any) => (
+                  <span>
+                    Unit {row.unit_number || "—"} ({row.tower_name || "Tower"})
+                  </span>
+                ),
+              },
+              {
+                key: "occupancy_role",
+                header: "Occupancy Role",
+                render: (row: any) => (
+                  <span className="badge badge-primary" style={{ textTransform: "capitalize" }}>
+                    {(row.occupancy_role || "resident").replace(/_/g, " ")}
+                  </span>
+                ),
+              },
+              {
+                key: "status",
+                header: "Status",
+                render: (row: any) => <StatusBadge status={row.status || "pending"} />,
+              },
+              {
+                key: "actions",
+                header: "Actions",
+                render: (row: any) => (
+                  <div style={{ display: "flex", gap: "0.4rem" }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ fontSize: "12px", padding: "0.25rem 0.6rem" }}
+                      onClick={() => {
+                        const link = `${window.location.origin}/invitations/${row.token}`;
+                        navigator.clipboard.writeText(link);
+                        toast.success("Invitation activation link copied to clipboard!", "Copied");
+                      }}
+                    >
+                      📋 Copy Link
+                    </button>
+                    {row.status === "pending" && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ fontSize: "12px", padding: "0.25rem 0.6rem", color: "#DC2626" }}
+                        onClick={async () => {
+                          try {
+                            await onboardingApi.revokeInvitation(activeCommunityId!, row.id);
+                            toast.success("Invitation revoked.", "Revoked");
+                            fetchInvitations();
+                          } catch (err: any) {
+                            toast.error(err?.message || "Failed to revoke invitation", "Error");
+                          }
+                        }}
+                      >
+                        ✕ Revoke
+                      </button>
+                    )}
+                  </div>
+                ),
+              },
+            ]}
+            data={invitations}
+            isLoading={invitationsLoading}
+            emptyTitle="No invitations issued"
+            emptyDescription="Click '+ Issue New Invitation' to invite an owner or tenant."
             enableClientPagination={true}
           />
         </div>
@@ -1099,6 +1293,222 @@ export default function CommunityAdminResidentsPage() {
                 }}
               >
                 {isAdding ? "Registering..." : "👤 Register Resident"}
+              </button>
+            </div>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Issue Resident Invitation Modal */}
+      <Modal
+        isOpen={isCreateInviteOpen}
+        onClose={() => setIsCreateInviteOpen(false)}
+        title="📨 Issue Resident Invitation"
+        maxWidth={580}
+      >
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!activeCommunityId) return;
+            if (!inviteEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inviteEmail.trim())) {
+              setInviteError("Please enter a valid email address.");
+              return;
+            }
+            if (!inviteUnitId) {
+              setInviteError("Please select an assigned residential unit.");
+              return;
+            }
+
+            try {
+              setIsCreatingInvite(true);
+              setInviteError("");
+              const res = await onboardingApi.createInvitation(activeCommunityId, {
+                invited_email: inviteEmail.trim().toLowerCase(),
+                invited_phone: invitePhone.trim() || undefined,
+                full_name: inviteFullName.trim() || undefined,
+                unit_id: inviteUnitId,
+                occupancy_role: inviteRole,
+                is_primary: inviteIsPrimary,
+                message: inviteMessage.trim() || undefined,
+              });
+
+              setIsCreateInviteOpen(false);
+              toast.success("Resident invitation issued.", "Invitation Created");
+              if (res?.token) {
+                const link = `${window.location.origin}/invitations/${res.token}`;
+                navigator.clipboard.writeText(link);
+                toast.success("Activation link copied to clipboard!", "Link Copied");
+              }
+              fetchInvitations();
+            } catch (err: any) {
+              setInviteError(err?.message || "Failed to create invitation.");
+            } finally {
+              setIsCreatingInvite(false);
+            }
+          }}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <p style={{ margin: 0, fontSize: "0.825rem", color: "#64748b" }}>
+              Send an onboarding invitation link for a new owner or tenant to register their account.
+            </p>
+
+            {inviteError && (
+              <div
+                style={{
+                  padding: "0.6rem 0.8rem",
+                  background: "#fef2f2",
+                  border: "1px solid #fecaca",
+                  borderRadius: "6px",
+                  color: "#991b1b",
+                  fontSize: "0.8rem",
+                }}
+              >
+                ⚠️ {inviteError}
+              </div>
+            )}
+
+            <div>
+              <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#334155", marginBottom: "0.35rem" }}>
+                Invited Email Address *
+              </label>
+              <input
+                type="email"
+                className="input-field"
+                placeholder="resident@example.com"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                required
+              />
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#334155", marginBottom: "0.35rem" }}>
+                  Resident Full Name
+                </label>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="e.g. John Doe"
+                  value={inviteFullName}
+                  onChange={(e) => setInviteFullName(e.target.value)}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#334155", marginBottom: "0.35rem" }}>
+                  Phone Number
+                </label>
+                <input
+                  type="tel"
+                  className="input-field"
+                  placeholder="e.g. +91 98765 43210"
+                  value={invitePhone}
+                  onChange={(e) => setInvitePhone(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#334155", marginBottom: "0.35rem" }}>
+                  Filter Tower
+                </label>
+                <select
+                  className="select-field"
+                  value={inviteTowerId}
+                  onChange={(e) => {
+                    setInviteTowerId(e.target.value);
+                    setInviteUnitId("");
+                  }}
+                >
+                  <option value="">All Towers</option>
+                  {towers?.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#334155", marginBottom: "0.35rem" }}>
+                  Target Unit *
+                </label>
+                <select
+                  className="select-field"
+                  value={inviteUnitId}
+                  onChange={(e) => setInviteUnitId(e.target.value)}
+                  required
+                >
+                  <option value="">Select Unit</option>
+                  {(inviteTowerId
+                    ? (communityUnits || []).filter((u) => u.tower_id === inviteTowerId)
+                    : (communityUnits || [])
+                  ).map((u) => (
+                    <option key={u.id} value={u.id}>
+                      Unit {u.unit_number}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#334155", marginBottom: "0.35rem" }}>
+                  Occupancy Role
+                </label>
+                <select
+                  className="select-field"
+                  value={inviteRole}
+                  onChange={(e) => setInviteRole(e.target.value)}
+                >
+                  <option value="primary_owner">Primary Owner</option>
+                  <option value="secondary_owner">Co-Owner</option>
+                  <option value="tenant">Tenant</option>
+                  <option value="family">Family</option>
+                </select>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", paddingTop: "1.2rem" }}>
+                <input
+                  type="checkbox"
+                  id="inviteIsPrimary"
+                  checked={inviteIsPrimary}
+                  onChange={(e) => setInviteIsPrimary(e.target.checked)}
+                />
+                <label htmlFor="inviteIsPrimary" style={{ fontSize: "13px", fontWeight: 600, color: "#334155", cursor: "pointer" }}>
+                  Primary Contact for Unit
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#334155", marginBottom: "0.35rem" }}>
+                Welcome Note (Optional)
+              </label>
+              <textarea
+                className="input-field"
+                rows={2}
+                placeholder="Welcome to our community! Please complete your registration using this link."
+                value={inviteMessage}
+                onChange={(e) => setInviteMessage(e.target.value)}
+              />
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setIsCreateInviteOpen(false)}
+                disabled={isCreatingInvite}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={isCreatingInvite || !inviteUnitId}
+              >
+                {isCreatingInvite ? "Issuing..." : "✉️ Issue Invitation"}
               </button>
             </div>
           </div>

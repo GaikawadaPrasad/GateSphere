@@ -91,6 +91,7 @@ async def test_over_allocation_rejected(db, scope_for, community, unit, superadm
 
 async def test_allocation_sum_must_match(db, scope_for, community, unit, superadmin):
     svc = _svc(db, scope_for(community.id), superadmin)
+    await svc.update_rule(schemas.RuleUpdate(allow_advance_payment=False), community_id=community.id)
     inv = await _invoice(svc, unit)
     await svc.post_invoice(inv.id)
     with pytest.raises(BusinessRuleError) as exc:
@@ -102,6 +103,26 @@ async def test_allocation_sum_must_match(db, scope_for, community, unit, superad
             )
         )
     assert exc.value.code == "ALLOCATION_MISMATCH"
+
+
+async def test_advance_payment_credits_unit_ledger(db, scope_for, community, unit, superadmin):
+    svc = _svc(db, scope_for(community.id), superadmin)
+    await svc.update_rule(schemas.RuleUpdate(allow_advance_payment=True), community_id=community.id)
+    inv = await _invoice(svc, unit)
+    await svc.post_invoice(inv.id)
+    pay = await svc.record_payment(
+        schemas.PaymentCreate(
+            amount="2000.00",
+            allocations=[schemas.PaymentAllocationIn(invoice_id=inv.id, amount="1500.00")],
+            community_id=community.id,
+        )
+    )
+    assert pay.payment_status == "success"
+    ledger, _ = await svc.unit_ledger(unit.id, offset=0, limit=50)
+    advance_entries = [e for e in ledger if e.source_type == "advance_payment"]
+    assert len(advance_entries) == 1
+    assert advance_entries[0].amount == Decimal("500.00")
+    assert advance_entries[0].entry_type == "credit"
 
 
 async def test_cannot_cancel_invoice_with_payments(db, scope_for, community, unit, superadmin):

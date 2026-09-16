@@ -55,6 +55,10 @@ celery.conf.update(
             "task": "app.modules.billing.tasks.sweep_overdue_invoices",
             "schedule": crontab(hour=1, minute=0),
         },
+        "generate-monthly-invoices": {
+            "task": "app.modules.billing.tasks.generate_monthly_invoices",
+            "schedule": crontab(day_of_month=1, hour=0, minute=0),
+        },
         "send-dues-reminders": {
             "task": "app.modules.billing.tasks.send_dues_reminders",
             "schedule": crontab(day_of_week="mon", hour=9, minute=0),

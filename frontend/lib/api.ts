@@ -358,6 +358,8 @@ export const authApi = {
     }
   },
   me: (role?: string) => apiGet<CurrentUser>("/auth/me", undefined, role),
+  changePassword: (payload: { current_password: string; new_password: string }) =>
+    apiSend<{ status: string }>("POST", "/auth/password", payload),
 };
 
 export const communitiesApi = {
@@ -706,6 +708,19 @@ export const onboardingApi = {
     },
   ) => apiSend<any>("POST", `/communities/${communityId}/residents`, data),
   inviteResident: (
+    communityId: string,
+    data: {
+      unit_id: string;
+      invited_email: string;
+      invited_phone?: string;
+      full_name?: string;
+      occupancy_role?: string;
+      is_primary?: boolean;
+      agreement_reference?: string;
+      message?: string;
+    },
+  ) => apiSend<any>("POST", `/communities/${communityId}/invitations`, data),
+  createInvitation: (
     communityId: string,
     data: {
       unit_id: string;
