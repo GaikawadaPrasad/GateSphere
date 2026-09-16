@@ -65,7 +65,7 @@ import {
 import { useAnnouncements, useEventRsvp } from "@/hooks/use-communication";
 import { useMyNotifications } from "@/hooks/use-notifications";
 import { useTableControls } from "@/hooks/use-table-controls";
-import { formatDate, formatCurrency } from "@/lib/utils";
+import { formatDate, formatCurrency, getAmenityIcon } from "@/lib/utils";
 import { authApi } from "@/lib/api";
 import { useUiStore } from "@/store/ui";
 
@@ -427,6 +427,10 @@ export function OwnerTenantDashboardView({
       toast.error("Please select a visitor category.", "Category Required");
       return;
     }
+    if (!passVisitorName.trim()) {
+      toast.error("Please enter the visitor's name.", "Visitor Name Required");
+      return;
+    }
     const cleanPhone = passVisitorPhone.trim().replace(/[\s\-()]/g, "");
     if (!cleanPhone || cleanPhone.length < 5) {
       toast.error("Please enter a valid mobile number (at least 10 digits).", "Mobile Number Required");
@@ -436,7 +440,7 @@ export function OwnerTenantDashboardView({
     try {
       const activeUnitId = profile.data?.occupancies?.[0]?.unit_id;
       const res = await visitors.createPass.mutateAsync({
-        visitor_name: passVisitorName.trim() || "Guest Visitor",
+        visitor_name: passVisitorName.trim(),
         phone: cleanPhone,
         id_type: passIdNumber.trim() ? passIdType : undefined,
         id_number: passIdNumber.trim() ? passIdNumber.trim().toUpperCase() : undefined,
@@ -452,7 +456,7 @@ export function OwnerTenantDashboardView({
       setActivePassResult({
         token: res.token,
         pin: res.pin,
-        visitor_name: res.visitor_name || passVisitorName.trim() || "Visitor",
+        visitor_name: res.visitor_name || passVisitorName.trim(),
         category: res.category || passCategory,
         reason: res.reason || passReason.trim() || "Visitor Entry",
         valid_from: res.valid_from,
@@ -1119,7 +1123,7 @@ export function OwnerTenantDashboardView({
                 label="Booked Amenities"
                 value={stats?.upcoming_amenity_bookings ?? 0}
                 accentColor="#9333EA"
-                icon="🏊"
+                icon={nextBooking ? getAmenityIcon(nextBooking.amenity_name) : "🏊"}
                 description={
                   nextBooking
                     ? `${nextBooking.amenity_name} (${formatDate(nextBooking.date)})`
@@ -1948,7 +1952,16 @@ export function OwnerTenantDashboardView({
             ) : (
               <DataTable<AmenityBooking>
                 columns={[
-                  { key: "amenity_name", header: "Facility Name" },
+                  {
+                    key: "amenity_name",
+                    header: "Facility Name",
+                    render: (i) => (
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <span>{getAmenityIcon(i.amenity_name)}</span>
+                        <span style={{ fontWeight: 600 }}>{i.amenity_name}</span>
+                      </div>
+                    ),
+                  },
                   { key: "date", header: "Reserved Date" },
                   {
                     key: "start_time",
@@ -2073,7 +2086,9 @@ export function OwnerTenantDashboardView({
 
                   return (
                   <div key={amenity.id} className="gs-card card-hover">
-                    <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>🏊</div>
+                    <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>
+                      {getAmenityIcon(amenity.name, amenity.category, amenity.description)}
+                    </div>
                     <h4 style={{ fontWeight: 800, fontSize: "16px" }}>{amenity.name}</h4>
                     <p
                       style={{
@@ -3079,13 +3094,14 @@ export function OwnerTenantDashboardView({
                 marginBottom: "0.35rem",
               }}
             >
-              Visitor Name <span style={{ fontSize: "11.5px", color: "var(--muted)", fontWeight: 400 }}>(Optional)</span>
+              Visitor Name <span style={{ color: "var(--danger)" }}>*</span>
             </label>
             <input
               className="input-field"
               placeholder="e.g. Vikram Sharma"
               value={passVisitorName}
               onChange={(e) => setPassVisitorName(e.target.value)}
+              required
             />
           </div>
           <div>
@@ -4012,12 +4028,21 @@ export function OwnerTenantDashboardView({
                 alignItems: "center",
               }}
             >
-              <div>
-                <strong style={{ fontSize: "14px", color: "var(--brand-heading)" }}>
-                  {selectedAmenity.name}
-                </strong>
-                <div style={{ fontSize: "12px", color: "var(--brand-body)", marginTop: "0.15rem" }}>
-                  Max Total Capacity: {selectedAmenity.capacity} persons
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                <span style={{ fontSize: "1.75rem", lineHeight: 1 }}>
+                  {getAmenityIcon(
+                    selectedAmenity.name,
+                    selectedAmenity.category,
+                    selectedAmenity.description,
+                  )}
+                </span>
+                <div>
+                  <strong style={{ fontSize: "14px", color: "var(--brand-heading)" }}>
+                    {selectedAmenity.name}
+                  </strong>
+                  <div style={{ fontSize: "12px", color: "var(--brand-body)", marginTop: "0.15rem" }}>
+                    Max Total Capacity: {selectedAmenity.capacity} persons
+                  </div>
                 </div>
               </div>
               <span

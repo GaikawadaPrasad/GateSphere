@@ -25,6 +25,9 @@ export function StatusBadge({ status, label, className }: StatusBadgeProps) {
     case "approved":
     case "completed":
     case "checked_in":
+    case "entered":
+    case "inside":
+    case "admitted":
     case "on_track":
     case "verified":
     case "true":

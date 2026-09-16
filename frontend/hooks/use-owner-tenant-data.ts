@@ -204,7 +204,10 @@ export function useResidentVisitors() {
         );
       }
 
-      const cleanName = (payload.visitor_name || "").trim() || "Guest Visitor";
+      const cleanName = (payload.visitor_name || "").trim();
+      if (!cleanName) {
+        throw new Error("Visitor name is required to generate a gate pass.");
+      }
       let rawPhone = (payload.phone || "").trim().replace(/[\s\-()]/g, "");
       if (!rawPhone) {
         throw new Error("Visitor mobile number is required to generate a gate pass.");
