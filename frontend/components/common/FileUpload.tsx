@@ -21,10 +21,18 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentUrl || null);
+  const [localBlobUrl, setLocalBlobUrl] = useState<string | null>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Show local preview immediately for images
+    if (file.type.startsWith("image/")) {
+      const blob = URL.createObjectURL(file);
+      setLocalBlobUrl(blob);
+      setPreviewUrl(blob);
+    }
 
     setUploading(true);
     setError(null);
@@ -76,10 +84,14 @@ export const FileUpload: React.FC<FileUploadProps> = ({
       const confirmRes = await uploadsApi.confirm(file_id);
       const confirmData: any = confirmRes;
       const confirmPayload = confirmData?.data || confirmData || {};
-      const finalUrl = confirmPayload.file_url || confirmPayload.url || file_url || public_url;
+      let rawUrl = confirmPayload.file_url || confirmPayload.url || file_url || public_url || "";
+      // Strip any accidental quotes or whitespace
+      rawUrl = rawUrl.trim().replace(/^["']+|["']+$/g, "").replace(/[\r\n]/g, "").trim();
 
-      setPreviewUrl(finalUrl);
-      onUploadComplete(finalUrl);
+      if (rawUrl) {
+        setPreviewUrl(rawUrl);
+        onUploadComplete(rawUrl);
+      }
     } catch (err: any) {
       console.error("Upload error:", err);
       setError(err?.message || "File upload failed. Please try again.");
@@ -87,6 +99,12 @@ export const FileUpload: React.FC<FileUploadProps> = ({
       setUploading(false);
     }
   };
+
+  const activePreview = previewUrl || localBlobUrl;
+  const isImage =
+    Boolean(activePreview?.match(/\.(jpg|jpeg|png|webp|gif)/i)) ||
+    Boolean(activePreview?.startsWith("blob:")) ||
+    Boolean(activePreview?.startsWith("data:"));
 
   return (
     <div className="file-upload-container flex flex-col gap-2">
@@ -104,13 +122,22 @@ export const FileUpload: React.FC<FileUploadProps> = ({
 
       {error && <p className="text-xs text-red-600 font-medium">{error}</p>}
 
-      {previewUrl && (
+      {activePreview && (
         <div className="mt-1 flex items-center gap-2">
-          {previewUrl.match(/\.(jpg|jpeg|png|webp|gif)/i) ? (
-            <img src={previewUrl} alt="Upload preview" className="w-16 h-16 object-cover rounded border" />
+          {isImage ? (
+            <img
+              src={activePreview}
+              alt="Upload preview"
+              className="w-16 h-16 object-cover rounded border"
+              onError={(e) => {
+                if (localBlobUrl && e.currentTarget.src !== localBlobUrl) {
+                  e.currentTarget.src = localBlobUrl;
+                }
+              }}
+            />
           ) : (
             <a
-              href={previewUrl}
+              href={activePreview}
               target="_blank"
               rel="noopener noreferrer"
               className="text-xs text-blue-600 underline font-mono"

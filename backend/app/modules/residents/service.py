@@ -470,6 +470,8 @@ class ResidentService(UnitScopedAccess):
         obj = await self.contacts.get(contact_id)
         if obj is None:
             raise NotFoundError("Emergency contact not found")
+        self.scope.require(obj.community_id)
+        await self.get_profile(obj.resident_profile_id)
         cid = obj.community_id
         await self.db.delete(obj)
         await self.db.flush()

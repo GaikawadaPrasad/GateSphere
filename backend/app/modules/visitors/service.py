@@ -751,6 +751,12 @@ class VisitorService(UnitScopedAccess):
                 code="PHOTO_REQUIRED",
                 fields={"entry_photo_url": "required"},
             )
+        if policy.otp_required and not payload.pin:
+            raise BusinessRuleError(
+                "OTP / PIN is required for visitor entry under community policy",
+                code="OTP_REQUIRED",
+                fields={"pin": "required"},
+            )
         hit = (
             await self._blacklist_hit(req.community_id, visitor.phone, None, visitor.id_number_hash)
             if visitor
