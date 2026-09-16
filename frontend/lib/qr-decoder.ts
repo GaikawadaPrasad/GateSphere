@@ -1,4 +1,16 @@
-import jsQR from "jsqr";
+let jsQRImpl: any = null;
+
+function getJsQR(): any {
+  if (jsQRImpl) return jsQRImpl;
+  try {
+    const mod = require("jsqr");
+    jsQRImpl = typeof mod === "function" ? mod : (mod && mod.default) || mod;
+    return jsQRImpl;
+  } catch (err) {
+    console.warn("[qr-decoder] jsQR module not resolved dynamically:", err);
+    return null;
+  }
+}
 
 export interface ParsedQrData {
   raw: string;
@@ -95,61 +107,28 @@ export function parseQrPayload(raw: string): ParsedQrData {
     trimmed.startsWith("VEN-") ||
     trimmed.includes("TKT-")
   ) {
-    const parts = trimmed.split("-");
-    const tktIdx = parts.findIndex((p) => p.toUpperCase() === "TKT");
-    const tktNum =
-      tktIdx !== -1 && parts[tktIdx + 1]
-        ? `TKT-${parts[tktIdx + 1]}`
-        : parts[2]
-          ? `TKT-${parts[2]}`
-          : "Work Order";
     return {
       raw: trimmed,
       token: trimmed,
-      category: "Vendor / Service Technician",
-      reason: `Authorized Work Order (${tktNum})`,
+      category: "Service Technician",
+      reason: "Maintenance Ticket Service",
       visitorName: "Vendor Technician",
-      unitLabel: "Assigned Facility / Unit",
+      unitLabel: "Community Facility / Unit",
       type: "vendor",
     };
   }
 
-  // 4b. Delivery Pass Format: DEL-xxx or DELIVERY-xxx
-  if (
-    trimmed.startsWith("DEL-") ||
-    trimmed.startsWith("DELIVERY-") ||
-    trimmed.startsWith("PASS-DEL-")
-  ) {
+  // 5. Numeric PIN / OTP
+  const numericOnly = trimmed.replace(/\D/g, "");
+  if (numericOnly.length >= 4 && numericOnly.length <= 8) {
     return {
       raw: trimmed,
-      token: trimmed,
-      category: "Courier / Delivery",
-      reason: `Package Delivery (${trimmed})`,
-      visitorName: "Delivery Executive",
-      unitLabel: "Resident Unit",
-      type: "delivery",
-    };
-  }
-  const strippedPin = trimmed.replace(/^(OTP|PIN|PASS)-?/i, "").trim();
-  if (/^\d{4,12}$/.test(strippedPin)) {
-    return {
-      raw: trimmed,
-      pin: strippedPin,
+      pin: numericOnly,
       type: "pin",
     };
   }
 
-  // 6. QR-prefixed Token
-  if (trimmed.startsWith("QR-")) {
-    const token = trimmed.replace(/^QR-/, "");
-    return {
-      raw: trimmed,
-      token,
-      type: "token",
-    };
-  }
-
-  // 7. Generic Token / String
+  // 6. Generic Token / String
   return {
     raw: trimmed,
     token: trimmed,
@@ -166,6 +145,8 @@ export function decodeQrFromImageData(
   height: number
 ): string | null {
   try {
+    const jsQR = getJsQR();
+    if (!jsQR) return null;
     const code = jsQR(data, width, height, {
       inversionAttempts: "attemptBoth",
     });

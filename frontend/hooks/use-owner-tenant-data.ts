@@ -169,6 +169,7 @@ export function useResidentVisitors() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["resident", "visitors"] });
       queryClient.invalidateQueries({ queryKey: ["resident", "overview"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 
@@ -346,6 +347,7 @@ export function useResidentDeliveries() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["resident", "deliveries"] });
       queryClient.invalidateQueries({ queryKey: ["resident", "overview"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 
@@ -926,61 +928,113 @@ export interface ResidentVehicle {
 }
 
 export function useResidentVehicles() {
-  return useQuery<ResidentVehicle[]>({
+  const queryClient = useQueryClient();
+
+  const query = useQuery<{
+    vehicles: ResidentVehicle[];
+    allocations: any[];
+    violations: any[];
+  }>({
     queryKey: ["resident", "vehicles"],
     queryFn: async () => {
-      const me = await api.get<any>("/residents/me");
+      const me = await api.get<any>("/residents/me").catch(() => null);
       const communityId = me?.community_id;
       const params = communityId ? { community_id: communityId } : undefined;
       const [vehiclesRes, allocationsRes, slotsRes, violationsRes] = await Promise.all([
-        api.get<any[]>("/vehicles", params),
+        api.get<any[]>("/vehicles", params).catch(() => []),
         api.get<any[]>("/vehicles/parking/allocations", params).catch(() => []),
         api.get<any[]>("/vehicles/parking/slots", params).catch(() => []),
         api.get<any[]>("/vehicles/parking/violations", params).catch(() => []),
       ]);
 
-      const myVehicles = (Array.isArray(vehiclesRes) ? vehiclesRes : []).filter(
-        (v: any) => v.resident_profile_id === me?.id,
-      );
+      const rawVehicles = Array.isArray(vehiclesRes) ? vehiclesRes : [];
+      const rawAllocations = Array.isArray(allocationsRes) ? allocationsRes : [];
+      const rawSlots = Array.isArray(slotsRes) ? slotsRes : [];
+      const rawViolations = Array.isArray(violationsRes) ? violationsRes : [];
 
       const slotMap = new Map<string, string>();
-      if (Array.isArray(slotsRes)) {
-        for (const s of slotsRes) if (s?.id) slotMap.set(s.id, s.slot_code);
-      }
+      for (const s of rawSlots) if (s?.id) slotMap.set(s.id, s.slot_code);
 
       const allocationByVehicle = new Map<string, any>();
-      if (Array.isArray(allocationsRes)) {
-        for (const a of allocationsRes) {
-          if (a?.vehicle_id && a?.status === "active") allocationByVehicle.set(a.vehicle_id, a);
-        }
+      for (const a of rawAllocations) {
+        if (a?.vehicle_id && a?.status === "active") allocationByVehicle.set(a.vehicle_id, a);
       }
 
       const violationCountByVehicle = new Map<string, number>();
-      if (Array.isArray(violationsRes)) {
-        for (const v of violationsRes) {
-          if (v?.vehicle_id) {
-            violationCountByVehicle.set(
-              v.vehicle_id,
-              (violationCountByVehicle.get(v.vehicle_id) || 0) + 1,
-            );
-          }
+      for (const v of rawViolations) {
+        if (v?.vehicle_id) {
+          violationCountByVehicle.set(
+            v.vehicle_id,
+            (violationCountByVehicle.get(v.vehicle_id) || 0) + 1,
+          );
         }
       }
 
-      return myVehicles.map((v: any) => {
+      const vehiclesList: ResidentVehicle[] = rawVehicles.map((v: any) => {
         const alloc = allocationByVehicle.get(v.id);
         return {
           id: v.id,
-          plate: v.registration_number,
-          make_model: [v.make, v.model].filter(Boolean).join(" ") || v.vehicle_type,
-          vehicle_type: v.vehicle_type,
+          plate: v.registration_number || v.plate_number || "—",
+          make_model: [v.make, v.model].filter(Boolean).join(" ") || v.vehicle_type || "Vehicle",
+          vehicle_type: v.vehicle_type || "car",
           slot: alloc ? slotMap.get(alloc.slot_id) || "Allocated" : "Not Allocated",
           rfid_tag: v.sticker_number || "Not Issued",
           violations: violationCountByVehicle.get(v.id) || 0,
         };
       });
+
+      const parsedViolations = rawViolations.map((v: any) => ({
+        id: v.id,
+        violation_type: v.violation_type || "Parking Violation",
+        plate_number: v.plate_number || v.vehicle?.registration_number || "—",
+        slot_code: v.slot_id ? slotMap.get(v.slot_id) || "Unassigned Slot" : "General Parking",
+        notes: v.notes || v.reason || "Misparked / Flagged by security",
+        penalty_amount: Number(v.penalty_amount ?? 0),
+        status: v.status || "open",
+        created_at: v.created_at || v.reported_at || new Date().toISOString(),
+      }));
+
+      const parsedAllocations = rawAllocations.map((a: any) => ({
+        id: a.id,
+        slot_code: slotMap.get(a.slot_id) || a.slot_code || "Allocated Slot",
+        slot_type: a.slot_type || "Reserved Resident Slot",
+        status: a.status || "active",
+        valid_from: a.valid_from || a.created_at,
+      }));
+
+      return {
+        vehicles: vehiclesList,
+        allocations: parsedAllocations,
+        violations: parsedViolations,
+      };
     },
   });
+
+  const registerVehicleMutation = useMutation({
+    mutationFn: async (payload: {
+      registration_number: string;
+      vehicle_type?: string;
+      make?: string;
+      model?: string;
+      color?: string;
+      sticker_number?: string;
+      unit_id?: string;
+    }) => {
+      return await api.post("/vehicles", payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["resident", "vehicles"] });
+      queryClient.invalidateQueries({ queryKey: ["resident", "overview"] });
+    },
+  });
+
+  return {
+    ...query,
+    vehiclesList: query.data?.vehicles || [],
+    allocationsList: query.data?.allocations || [],
+    violationsList: query.data?.violations || [],
+    registerVehicle: registerVehicleMutation,
+  };
 }
 
 export interface AssignedDomesticStaff {

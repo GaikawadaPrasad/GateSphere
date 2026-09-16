@@ -62,6 +62,7 @@ import {
   AmenityBooking,
   ComplaintTicket,
   InvoiceItem,
+  ResidentVehicle,
 } from "@/hooks/use-owner-tenant-data";
 import { useAnnouncements, useEventRsvp } from "@/hooks/use-communication";
 import { useMyNotifications } from "@/hooks/use-notifications";
@@ -298,7 +299,7 @@ export function OwnerTenantDashboardView({
   });
 
   const vehicleControls = useTableControls<any>({
-    data: vehicles.data || [],
+    data: vehicles.vehiclesList || [],
     searchKeys: ["plate", "make_model", "slot", "rfid_tag"],
     initialPageSize: 10,
   });
@@ -405,6 +406,35 @@ export function OwnerTenantDashboardView({
       );
     } catch (err: any) {
       toast.error(err?.message || "Failed to record event RSVP.", "RSVP Error");
+    }
+  };
+
+  const handleRegisterVehicle = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const plate = vehRegNumber.trim().toUpperCase();
+    if (!plate) {
+      toast.error("Please enter a valid license plate number.", "Plate Required");
+      return;
+    }
+    try {
+      await registerVehicleMutation.mutateAsync({
+        registration_number: plate,
+        vehicle_type: vehType,
+        make: vehMake.trim() || undefined,
+        model: vehModel.trim() || undefined,
+        color: vehColor.trim() || undefined,
+      });
+      toast.success(
+        `Vehicle ${plate} registered successfully!`,
+        "Vehicle Registered",
+      );
+      setRegisterVehicleModalOpen(false);
+      setVehRegNumber("");
+      setVehMake("");
+      setVehModel("");
+      setVehColor("");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to register vehicle.", "Error");
     }
   };
 
@@ -1477,7 +1507,7 @@ export function OwnerTenantDashboardView({
                   Assigned Parking
                 </div>
                 <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>
-                  {(vehicles.data || []).find((v) => v.slot !== "Not Allocated")?.slot ||
+                  {(vehicles.vehiclesList || []).find((v: ResidentVehicle) => v.slot !== "Not Allocated")?.slot ||
                     "No slot allocated"}
                 </div>
               </div>
@@ -2136,32 +2166,32 @@ export function OwnerTenantDashboardView({
                         ? "Fully Booked Today"
                         : `${remaining} of ${totalCap} spots available today`}
                     </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                      }}
-                    >
-                      <span
-                        style={{ fontSize: "13px", fontWeight: 700, color: "var(--brand-primary)" }}
-                      >
-                        {amenity.price_per_hour > 0
-                          ? `${formatCurrency(amenity.price_per_hour)}/hr`
-                          : "Free for Residents"}
-                      </span>
-                      <BrandButton
-                        size="sm"
-                        disabled={remaining === 0}
-                        onClick={() => {
-                          setSelectedAmenity(amenity);
-                          setAmenityBookingModalOpen(true);
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
                         }}
                       >
-                        {remaining === 0 ? "Fully Booked" : "Reserve Slot"}
-                      </BrandButton>
+                        <span
+                          style={{ fontSize: "13px", fontWeight: 700, color: "var(--brand-primary)" }}
+                        >
+                          {amenity.price_per_hour > 0
+                            ? `${formatCurrency(amenity.price_per_hour)}/hr`
+                            : "Free for Residents"}
+                        </span>
+                        <BrandButton
+                          size="sm"
+                          disabled={remaining === 0}
+                          onClick={() => {
+                            setSelectedAmenity(amenity);
+                            setAmenityBookingModalOpen(true);
+                          }}
+                        >
+                          {remaining === 0 ? "Fully Booked" : "Reserve Slot"}
+                        </BrandButton>
+                      </div>
                     </div>
-                  </div>
                   );
                 })}
               </div>
@@ -2437,6 +2467,7 @@ export function OwnerTenantDashboardView({
       {/* TAB 10: VEHICLES & PARKING */}
       {activeTab === "vehicles" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+          {/* CARD 1: REGISTERED VEHICLES */}
           <div className="gs-card">
             <div
               style={{
@@ -2448,11 +2479,16 @@ export function OwnerTenantDashboardView({
                 gap: "0.75rem",
               }}
             >
-              <h3 className="card-h3" style={{ margin: 0 }}>
-                Registered Vehicles & Parking Allocation
-              </h3>
+              <div>
+                <h3 className="card-h3" style={{ margin: 0 }}>
+                  Registered Vehicles & Gate RFID
+                </h3>
+                <p style={{ color: "var(--brand-body)", fontSize: "13.5px", marginTop: "0.2rem" }}>
+                  Vehicles linked to your unit for gate boom barrier entry & parking allocation.
+                </p>
+              </div>
               <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-                <div style={{ width: "min(100%, 240px)" }}>
+                <div style={{ width: "min(100%, 220px)" }}>
                   <DebouncedInput
                     value={vehicleControls.searchTerm}
                     onChange={vehicleControls.setSearchTerm}
@@ -2465,6 +2501,8 @@ export function OwnerTenantDashboardView({
                   onChange={vehicleControls.setSortPreset}
                 />
                 <BrandButton
+                  variant="primary"
+                  size="sm"
                   onClick={() => {
                     setVehRegNumber("");
                     setVehType("car");
@@ -2473,12 +2511,12 @@ export function OwnerTenantDashboardView({
                     setVehColor("");
                     setRegisterVehicleModalOpen(true);
                   }}
-                  size="sm"
                 >
                   + Register Vehicle
                 </BrandButton>
               </div>
             </div>
+
             {vehicles.isError ? (
               <ErrorState
                 title="Failed to Load Vehicles"
@@ -2491,25 +2529,34 @@ export function OwnerTenantDashboardView({
                   {
                     key: "plate",
                     header: "License Plate",
-                    render: (i) => <code style={{ fontWeight: 800 }}>{i.plate}</code>,
+                    render: (i) => (
+                      <span style={{ fontFamily: "monospace", fontWeight: 800, color: "var(--brand-heading)" }}>
+                        🚗 {i.plate}
+                      </span>
+                    ),
                   },
                   { key: "make_model", header: "Make & Model" },
                   {
+                    key: "vehicle_type",
+                    header: "Category",
+                    render: (i) => <span style={{ textTransform: "capitalize" }}>{i.vehicle_type}</span>,
+                  },
+                  {
                     key: "slot",
-                    header: "Allocated Slot",
+                    header: "Allocated Parking Slot",
                     render: (i) => (
-                      <span style={{ fontWeight: 700, color: "var(--brand-primary)" }}>{i.slot}</span>
+                      <span style={{ fontWeight: 700, color: "var(--brand-primary)" }}>🅿️ {i.slot}</span>
                     ),
                   },
-                  { key: "rfid_tag", header: "Gate FastTag / RFID" },
+                  { key: "rfid_tag", header: "Gate FastTag / RFID Sticker" },
                   {
                     key: "violations",
-                    header: "Recorded Violations",
+                    header: "Violations Flagged",
                     render: (i) =>
                       i.violations === 0 ? (
                         <StatusBadge status="active" label="0 Violations" />
                       ) : (
-                        <StatusBadge status="warning" label={`${i.violations} Warning`} />
+                        <StatusBadge status="warning" label={`${i.violations} Violation(s)`} />
                       ),
                   },
                 ]}
@@ -2520,10 +2567,98 @@ export function OwnerTenantDashboardView({
                 total={vehicleControls.total}
                 onPageChange={vehicleControls.setPage}
                 onPageSizeChange={vehicleControls.setPageSize}
-                emptyTitle="No vehicles registered"
-                emptyDescription="Contact your facility office or community admin to link registered vehicles."
+                emptyTitle="No vehicles registered for your unit"
+                emptyDescription="Click '+ Register Vehicle' above to add your car or motorcycle to your unit."
               />
             )}
+          </div>
+
+          {/* CARD 2: PARKING SLOT ALLOCATIONS */}
+          <div className="gs-card">
+            <h3 className="card-h3" style={{ marginBottom: "0.25rem" }}>
+              Assigned Parking Slots
+            </h3>
+            <p style={{ color: "var(--brand-body)", fontSize: "13.5px", marginBottom: "1rem" }}>
+              Active parking space allocations assigned to your residential unit.
+            </p>
+            <DataTable
+              columns={[
+                {
+                  key: "slot_code",
+                  header: "Slot Number",
+                  render: (a) => (
+                    <span style={{ fontWeight: 800, color: "var(--brand-primary)" }}>
+                      🅿️ {a.slot_code}
+                    </span>
+                  ),
+                },
+                { key: "slot_type", header: "Slot Category" },
+                {
+                  key: "status",
+                  header: "Status",
+                  render: (a) => <StatusBadge status={a.status} />,
+                },
+                {
+                  key: "valid_from",
+                  header: "Allocated Date",
+                  render: (a) => formatDate(a.valid_from),
+                },
+              ]}
+              data={vehicles.allocationsList || []}
+              isLoading={vehicles.isLoading}
+              emptyTitle="No parking slots assigned"
+              emptyDescription="No parking slot allocation found for this unit."
+            />
+          </div>
+
+          {/* CARD 3: PARKING VIOLATIONS & GATE FLAGS LOG */}
+          <div className="gs-card">
+            <h3 className="card-h3" style={{ marginBottom: "0.25rem" }}>
+              Parking Violations & Gate Security Log
+            </h3>
+            <p style={{ color: "var(--brand-body)", fontSize: "13.5px", marginBottom: "1rem" }}>
+              Log of misparked vehicles, unauthorized parking, or security gate flags reported by guards.
+            </p>
+            <DataTable
+              columns={[
+                {
+                  key: "plate_number",
+                  header: "Vehicle Plate",
+                  render: (v) => (
+                    <span style={{ fontFamily: "monospace", fontWeight: 700 }}>{v.plate_number}</span>
+                  ),
+                },
+                { key: "violation_type", header: "Violation Type" },
+                { key: "slot_code", header: "Location / Slot" },
+                { key: "notes", header: "Guard Security Notes" },
+                {
+                  key: "penalty_amount",
+                  header: "Penalty / Fine",
+                  render: (v) =>
+                    v.penalty_amount > 0 ? (
+                      <span style={{ fontWeight: 700, color: "#DC2626" }}>
+                        {formatCurrency(v.penalty_amount)}
+                      </span>
+                    ) : (
+                      <span style={{ color: "var(--brand-body)" }}>Warning Only</span>
+                    ),
+                },
+                {
+                  key: "status",
+                  header: "Status",
+                  render: (v) => <StatusBadge status={v.status} />,
+                },
+                {
+                  key: "created_at",
+                  header: "Reported Time",
+                  render: (v) => formatDate(v.created_at),
+                },
+              ]}
+              data={vehicles.violationsList || []}
+              isLoading={vehicles.isLoading}
+              emptyTitle="No Parking Violations"
+              emptyDescription="No parking violations or gate flags recorded for your unit."
+            />
           </div>
         </div>
       )}
@@ -2944,41 +3079,95 @@ export function OwnerTenantDashboardView({
             <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>No notifications yet.</p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
-              {(myNotifications.data || []).map((n) => (
-                <div
-                  key={n.id}
-                  style={{
-                    padding: "1rem",
-                    border: n.is_read
-                      ? "1px solid var(--border-standard)"
-                      : "1px solid var(--brand-primary)",
-                    borderRadius: "8px",
-                    background: n.is_read ? "#F8FAFC" : "#EFF6FF",
-                  }}
-                >
+              {(myNotifications.data || []).map((n) => {
+                const isDeliveryNotif =
+                  n.reference_type === "delivery" || (n.notification_type && n.notification_type.includes("delivery"));
+                const isVisitorNotif =
+                  n.reference_type === "visitor_request" || (n.notification_type && n.notification_type.includes("visitor"));
+                const refId = n.reference_id;
+
+                return (
                   <div
+                    key={n.id}
                     style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      marginBottom: "0.25rem",
-                      flexWrap: "wrap",
-                      gap: "0.5rem",
+                      padding: "1rem",
+                      border: n.is_read
+                        ? "1px solid var(--border-standard)"
+                        : "1px solid var(--brand-primary)",
+                      borderRadius: "8px",
+                      background: n.is_read ? "#F8FAFC" : "#EFF6FF",
                     }}
                   >
-                    <h4
-                      style={{ fontWeight: 700, fontSize: "14px", color: "var(--brand-heading)", margin: 0 }}
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        marginBottom: "0.25rem",
+                        flexWrap: "wrap",
+                        gap: "0.5rem",
+                      }}
                     >
-                      {n.title}
-                    </h4>
-                    <span style={{ fontSize: "11px", color: "var(--brand-body)" }}>
-                      {formatDate(n.created_at)}
-                    </span>
+                      <h4
+                        style={{ fontWeight: 700, fontSize: "14px", color: "var(--brand-heading)", margin: 0 }}
+                      >
+                        {n.title}
+                      </h4>
+                      <span style={{ fontSize: "11px", color: "var(--brand-body)" }}>
+                        {formatDate(n.created_at)}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: "13px", color: "var(--brand-body)", margin: 0 }}>
+                      {n.body || (n as any).message}
+                    </p>
+
+                    {(isDeliveryNotif || isVisitorNotif) && refId && (
+                      <div style={{ marginTop: "0.75rem", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          style={{
+                            fontSize: "0.775rem",
+                            padding: "0.3rem 0.75rem",
+                            background: "#059669",
+                            borderColor: "#059669",
+                            color: "#FFFFFF",
+                            fontWeight: 700,
+                          }}
+                          onClick={async () => {
+                            if (isDeliveryNotif) {
+                              await handleDecideDelivery(refId, true);
+                            } else {
+                              await handleVisitorDecision(refId, true);
+                            }
+                            myNotifications.refetch();
+                          }}
+                        >
+                          ✓ Approve
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-danger"
+                          style={{
+                            fontSize: "0.775rem",
+                            padding: "0.3rem 0.75rem",
+                            fontWeight: 700,
+                          }}
+                          onClick={async () => {
+                            if (isDeliveryNotif) {
+                              await handleDecideDelivery(refId, false);
+                            } else {
+                              await handleVisitorDecision(refId, false);
+                            }
+                            myNotifications.refetch();
+                          }}
+                        >
+                          ✕ Reject
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <p style={{ fontSize: "13px", color: "var(--brand-body)", margin: 0 }}>
-                    {n.body}
-                  </p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -3191,8 +3380,8 @@ export function OwnerTenantDashboardView({
                   passIdType === "aadhaar"
                     ? "e.g. 1234 5678 9012"
                     : passIdType === "pan"
-                    ? "e.g. ABCDE1234F"
-                    : "Enter Govt ID number"
+                      ? "e.g. ABCDE1234F"
+                      : "Enter Govt ID number"
                 }
                 value={passIdNumber}
                 onChange={(e) => setPassIdNumber(e.target.value.toUpperCase())}

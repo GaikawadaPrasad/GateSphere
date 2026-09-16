@@ -23,6 +23,9 @@ export interface AppNotification {
   read?: boolean;
   message?: string;
   type?: string;
+  notification_type?: string;
+  reference_type?: string;
+  reference_id?: string;
   timestamp?: string;
 }
 
