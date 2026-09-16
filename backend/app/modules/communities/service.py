@@ -118,7 +118,6 @@ class CommunityService:
         admin_email = payload.admin_email or f"admin.{code}@gatesphere.com"
         admin_password = payload.admin_password or f"{code_slug}@Gate2026!"
         admin_name = payload.admin_name or f"{obj.name} Admin"
-
         admin_user = await self.communities.provision_community_admin(
             obj.id,
             email=admin_email,
@@ -126,20 +125,24 @@ class CommunityService:
             full_name=admin_name,
             phone=payload.admin_phone,
         )
-        await invalidate_user_permissions_async(self.db, [admin_user.id])
+        admin_id = admin_user.id
+        admin_user_email = admin_user.email
+        admin_user_name = admin_user.full_name
+
+        await invalidate_user_permissions_async(self.db, [admin_id])
         await self._audit(
             "community.admin_provisioned",
             obj.id,
             "user",
-            admin_user.id,
+            admin_id,
             new={
-                "email": admin_user.email,
+                "email": admin_user_email,
                 "role": "community_admin",
                 "community_id": str(obj.id),
             },
         )
-        obj.admin_email = admin_user.email
-        obj.admin_name = admin_user.full_name
+        obj.admin_email = admin_user_email
+        obj.admin_name = admin_user_name
 
         await self._audit(
             "community.create",
@@ -163,28 +166,35 @@ class CommunityService:
             full_name=payload.full_name or f"{comm.name} Admin",
             phone=payload.phone,
         )
-        await invalidate_user_permissions_async(self.db, [admin_user.id])
+        res_id = admin_user.id
+        res_email = admin_user.email
+        res_name = admin_user.full_name
+        res_phone = admin_user.phone
+        res_created_at = admin_user.created_at
+        res_updated_at = admin_user.updated_at
+
+        await invalidate_user_permissions_async(self.db, [res_id])
         await self._audit(
             "community.admin_provisioned",
             comm.id,
             "user",
-            admin_user.id,
+            res_id,
             new={
-                "email": admin_user.email,
+                "email": res_email,
                 "role": "community_admin",
                 "community_id": str(comm.id),
             },
         )
         return schemas.CommunityAdminRead(
-            id=admin_user.id,
-            user_id=admin_user.id,
-            email=admin_user.email,
-            full_name=admin_user.full_name,
-            phone=admin_user.phone,
+            id=res_id,
+            user_id=res_id,
+            email=res_email,
+            full_name=res_name,
+            phone=res_phone,
             role="community_admin",
             community_id=comm.id,
-            created_at=admin_user.created_at,
-            updated_at=admin_user.updated_at,
+            created_at=res_created_at,
+            updated_at=res_updated_at,
         )
 
     async def update_community(

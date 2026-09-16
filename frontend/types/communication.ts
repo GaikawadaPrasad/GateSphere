@@ -27,6 +27,7 @@ export interface Announcement {
   event_end_at?: string | null;
   is_published: boolean;
   published_at?: string | null;
+  is_expired?: boolean;
   targets: AnnouncementTarget[];
 }
 

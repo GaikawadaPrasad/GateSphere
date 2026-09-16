@@ -102,24 +102,33 @@ export class ApiError extends Error {
 export function getActiveRole(): string | null {
   if (typeof window !== "undefined") {
     const pathname = window.location.pathname;
-    if (pathname.startsWith("/super-admin") || pathname.startsWith("/dashboard/super-admin")) return "super_admin";
-    if (pathname.startsWith("/owner-tenant") || pathname.startsWith("/resident") || pathname.startsWith("/dashboard/owner-tenant")) return "resident";
-    if (pathname.startsWith("/auditor") || pathname.startsWith("/dashboard/auditor")) return "auditor";
-    if (pathname.startsWith("/domestic-staff") || pathname.startsWith("/dashboard/domestic-staff")) return "domestic_staff";
-    if (pathname.startsWith("/community-admin") || pathname.startsWith("/dashboard/community-admin")) return "community_admin";
-    if (pathname.startsWith("/security-guard") || pathname.startsWith("/dashboard/security-guard")) return "security_guard";
-    if (pathname.startsWith("/security-supervisor") || pathname.startsWith("/dashboard/security-supervisor")) return "security_supervisor";
-    if (pathname.startsWith("/facility-manager") || pathname.startsWith("/dashboard/facility-manager")) return "facility_manager";
-    if (pathname.startsWith("/association-committee") || pathname.startsWith("/dashboard/association-committee")) return "association_committee";
-    if (pathname.startsWith("/vendor-technician") || pathname.startsWith("/dashboard/vendor-technician")) return "vendor_technician";
+    let roleFromPath: string | null = null;
+    if (pathname.startsWith("/super-admin") || pathname.startsWith("/dashboard/super-admin")) roleFromPath = "super_admin";
+    else if (pathname.startsWith("/owner-tenant") || pathname.startsWith("/resident") || pathname.startsWith("/dashboard/owner-tenant")) roleFromPath = "resident";
+    else if (pathname.startsWith("/auditor") || pathname.startsWith("/dashboard/auditor")) roleFromPath = "auditor";
+    else if (pathname.startsWith("/domestic-staff") || pathname.startsWith("/dashboard/domestic-staff")) roleFromPath = "domestic_staff";
+    else if (pathname.startsWith("/community-admin") || pathname.startsWith("/dashboard/community-admin")) roleFromPath = "community_admin";
+    else if (pathname.startsWith("/security-guard") || pathname.startsWith("/dashboard/security-guard")) roleFromPath = "security_guard";
+    else if (pathname.startsWith("/security-supervisor") || pathname.startsWith("/dashboard/security-supervisor")) roleFromPath = "security_supervisor";
+    else if (pathname.startsWith("/facility-manager") || pathname.startsWith("/dashboard/facility-manager")) roleFromPath = "facility_manager";
+    else if (pathname.startsWith("/association-committee") || pathname.startsWith("/dashboard/association-committee")) roleFromPath = "association_committee";
+    else if (pathname.startsWith("/vendor-technician") || pathname.startsWith("/dashboard/vendor-technician")) roleFromPath = "vendor_technician";
+
+    if (roleFromPath) {
+      sessionStorage.setItem("gatesphere_tab_role", roleFromPath);
+      return roleFromPath;
+    }
+
+    const tabSaved = sessionStorage.getItem("gatesphere_tab_role");
+    if (tabSaved) return tabSaved;
 
     const saved = localStorage.getItem("gatesphere_active_role");
     if (saved) return saved;
 
     if (document.cookie) {
-      const match = document.cookie.match(/gatesphere_([a-z0-9_]+)_session/);
-      if (match) {
-        const bucket = match[1];
+      const matches = Array.from(document.cookie.matchAll(/gatesphere_([a-z0-9_]+)_session=([^;]+)/g));
+      if (matches.length === 1) {
+        const bucket = matches[0][1];
         if (bucket === "superadmin") return "super_admin";
         if (bucket === "security") return "security_guard";
         return bucket;
@@ -132,9 +141,11 @@ export function getActiveRole(): string | null {
 export function setActiveRole(role: string | null): void {
   if (typeof window !== "undefined") {
     if (role) {
+      sessionStorage.setItem("gatesphere_tab_role", role);
       localStorage.setItem("gatesphere_active_role", role);
       document.cookie = `gs_active_role=${role}; path=/; SameSite=Lax`;
     } else {
+      sessionStorage.removeItem("gatesphere_tab_role");
       localStorage.removeItem("gatesphere_active_role");
       document.cookie = `gs_active_role=; path=/; max-age=0; SameSite=Lax`;
     }

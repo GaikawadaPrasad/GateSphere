@@ -247,11 +247,19 @@ export default function CommunityAdminCommunicationPage() {
     {
       key: "is_published",
       header: "Status",
-      render: (a) => (
-        <span className={`badge ${a.is_published ? "badge-success" : "badge-warning"}`}>
-          {a.is_published ? "Published" : "Draft"}
-        </span>
-      ),
+      render: (a) => {
+        const isExpired = Boolean(
+          a.is_expired || (a.expires_at && new Date(a.expires_at).getTime() <= Date.now()),
+        );
+        if (isExpired) {
+          return <span className="badge badge-neutral">Expired</span>;
+        }
+        return (
+          <span className={`badge ${a.is_published ? "badge-success" : "badge-warning"}`}>
+            {a.is_published ? "Published" : "Draft"}
+          </span>
+        );
+      },
     },
     {
       key: "created_at",
@@ -261,30 +269,45 @@ export default function CommunityAdminCommunicationPage() {
     {
       key: "actions",
       header: "Action",
-      render: (a) => (
-        <div style={{ display: "flex", gap: "0.4rem" }}>
-          {!a.is_published && (
-            <button
-              type="button"
-              className="btn btn-primary"
+      render: (a) => {
+        const isExpired = Boolean(
+          a.is_expired || (a.expires_at && new Date(a.expires_at).getTime() <= Date.now()),
+        );
+        if (isExpired) {
+          return (
+            <span
+              className="badge badge-neutral"
               style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem" }}
-              onClick={() => handlePublish(a.id)}
             >
-              Publish
-            </button>
-          )}
-          {a.is_published && (
-            <button
-              type="button"
-              className="btn btn-secondary"
-              style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem" }}
-              onClick={() => handleExpire(a.id)}
-            >
-              Expire
-            </button>
-          )}
-        </div>
-      ),
+              Expired
+            </span>
+          );
+        }
+        return (
+          <div style={{ display: "flex", gap: "0.4rem" }}>
+            {!a.is_published && (
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem" }}
+                onClick={() => handlePublish(a.id)}
+              >
+                Publish
+              </button>
+            )}
+            {a.is_published && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem" }}
+                onClick={() => handleExpire(a.id)}
+              >
+                Expire
+              </button>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
