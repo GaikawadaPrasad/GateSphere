@@ -540,6 +540,10 @@ export const complaintsApi = {
   ) => apiSend<any>("POST", `/complaints/tickets/${ticketId}/attachments`, data),
   exportCsv: (params?: Record<string, unknown>) =>
     apiGet<string>("/complaints/tickets.csv", params),
+  getFeedback: (id: string) =>
+    apiGet<{ id: string; ticket_id: string; resident_user_id: string | null; rating: number; comments: string | null; created_at: string; updated_at: string } | null>(`/complaints/tickets/${id}/feedback`),
+  addFeedback: (id: string, data: { rating: number; comments?: string }) =>
+    apiSend<any>("POST", `/complaints/tickets/${id}/feedback`, data),
 };
 
 export const serviceRequestsApi = complaintsApi;

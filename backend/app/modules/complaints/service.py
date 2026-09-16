@@ -503,6 +503,12 @@ class ComplaintService(UnitScopedAccess):
             ).all()
         )
 
+    async def get_feedback(self, ticket_id: uuid.UUID) -> TicketFeedback | None:
+        await self.get_ticket(ticket_id)
+        return await self.db.scalar(
+            select(TicketFeedback).where(TicketFeedback.ticket_id == ticket_id)
+        )
+
     async def add_feedback(
         self, ticket_id: uuid.UUID, payload: schemas.FeedbackCreate
     ) -> TicketFeedback:
