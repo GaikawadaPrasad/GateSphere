@@ -59,6 +59,7 @@ export default function FacilityManagerComplaintsPage() {
   const [newMessage, setNewMessage] = useState("");
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [ticketFeedback, setTicketFeedback] = useState<{ rating: number; comments: string | null } | null>(null);
 
   const loadData = async (reset = true) => {
     const currentPage = reset ? 1 : page + 1;
@@ -139,17 +140,20 @@ export default function FacilityManagerComplaintsPage() {
     setMessages([]);
     setAttachments([]);
     setNewMessage("");
+    setTicketFeedback(null);
     setIsHistoryModalOpen(true);
     setHistoryLoading(true);
     try {
-      const [histRes, msgRes, attRes] = await Promise.allSettled([
+      const [histRes, msgRes, attRes, fbRes] = await Promise.allSettled([
         fetch(`/api/v1/complaints/tickets/${c.id}/history`, { credentials: "include", headers: { Accept: "application/json", "X-Session-Role": "facility_manager" } }).then(r => r.json()),
         fetch(`/api/v1/complaints/tickets/${c.id}/messages`, { credentials: "include", headers: { Accept: "application/json", "X-Session-Role": "facility_manager" } }).then(r => r.json()),
         complaintsApi.attachments(c.id),
+        complaintsApi.getFeedback(c.id),
       ]);
       if (histRes.status === "fulfilled") setHistory(histRes.value?.data || histRes.value || []);
       if (msgRes.status === "fulfilled") setMessages(msgRes.value?.data || msgRes.value || []);
       if (attRes.status === "fulfilled") setAttachments((attRes.value as any)?.data || (attRes.value as any) || []);
+      if (fbRes.status === "fulfilled" && fbRes.value) setTicketFeedback(fbRes.value);
     } catch {
       setHistory([]);
     } finally {
@@ -388,6 +392,18 @@ export default function FacilityManagerComplaintsPage() {
             <div style={{ marginBottom: "1rem", padding: "0.75rem", background: "var(--surface)", borderRadius: "var(--radius-sm)", fontSize: "0.85rem" }}>
               <strong>{historyTicket.subject}</strong>
               <span style={{ marginLeft: "0.75rem", color: "var(--muted)" }}>{categoryMap[historyTicket.category_id] || "—"}</span>
+              {ticketFeedback && (
+                <div style={{ marginTop: "0.5rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Resident Rating</span>
+                  <span style={{ color: "#f59e0b", fontSize: "1rem", letterSpacing: 1 }}>
+                    {"★".repeat(ticketFeedback.rating)}{"☆".repeat(5 - ticketFeedback.rating)}
+                  </span>
+                  <span style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--fg)" }}>{ticketFeedback.rating}/5</span>
+                  {ticketFeedback.comments && (
+                    <span style={{ fontSize: "0.8rem", color: "var(--muted)", fontStyle: "italic" }}>— {ticketFeedback.comments}</span>
+                  )}
+                </div>
+              )}
             </div>
           )}
           {historyLoading ? (

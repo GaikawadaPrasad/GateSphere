@@ -284,6 +284,15 @@ async def confirm_ticket(
     )
 
 
+@router.get(
+    "/tickets/{ticket_id}/feedback",
+    response_model=Envelope[schemas.FeedbackRead | None],
+    dependencies=[VIEW],
+)
+async def get_feedback(ticket_id: uuid.UUID, svc: Svc = Depends(complaint_service)) -> dict:
+    return ok(schemas.FeedbackRead.model_validate(fb) if (fb := await svc.get_feedback(ticket_id)) else None)
+
+
 @router.post(
     "/tickets/{ticket_id}/feedback",
     response_model=Envelope[schemas.FeedbackRead],
