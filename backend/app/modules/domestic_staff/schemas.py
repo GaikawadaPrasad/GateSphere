@@ -116,6 +116,8 @@ class AttendanceRead(_Read):
     check_in_at: datetime
     check_out_at: datetime | None
     attendance_status: str
+    is_overdue: bool = False
+    duration_hours: float | None = None
 
 
 # -- ratings ------------------------------------------------- #

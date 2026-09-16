@@ -6,6 +6,8 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
 import { SearchInput } from "@/components/forms/SearchInput";
 import { incidentsApi } from "@/lib/api";
+import { FileUpload } from "@/components/common/FileUpload";
+import { toast } from "@/store/toast";
 
 const INCIDENT_CATEGORIES = [
   { value: "breach", label: "Security Breach / Unauthorized Entry" },
@@ -66,6 +68,8 @@ export default function SecuritySupervisorIncidentsPage() {
   const [resolvingIncident, setResolvingIncident] = useState<SecurityIncident | null>(null);
   const [resolutionSummary, setResolutionSummary] = useState("");
   const [isResolving, setIsResolving] = useState(false);
+  const [evidenceUrl, setEvidenceUrl] = useState<string | null>(null);
+  const [resolveProofUrl, setResolveProofUrl] = useState<string | null>(null);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -111,16 +115,28 @@ export default function SecuritySupervisorIncidentsPage() {
     }
     setIsSubmitting(true);
     try {
-      await incidentsApi.create({
+      const created: any = await incidentsApi.create({
         incident_type: incidentType as any,
         severity: severity as any,
         location_text: locationText.trim() || undefined,
         description: title.trim(),
       });
+      if (created?.id && evidenceUrl) {
+        try {
+          await incidentsApi.addAttachment(created.id, {
+            file_url: evidenceUrl,
+            file_name: "Incident Evidence Photo / Document",
+          });
+        } catch {
+          // Non-fatal
+        }
+      }
       setIsModalOpen(false);
       setIncidentFieldErrors({});
       setTitle("");
       setLocationText("Main Gate Perimeter");
+      setEvidenceUrl(null);
+      toast.success("Security incident logged successfully");
       await loadData();
     } catch (err: any) {
       alert(err?.message || "Failed to log security incident.");
@@ -133,6 +149,7 @@ export default function SecuritySupervisorIncidentsPage() {
     if (newStatusSlug === "resolved") {
       setResolvingIncident(inc);
       setResolutionSummary("");
+      setResolveProofUrl(null);
       setIsResolveModalOpen(true);
       return;
     }
@@ -165,10 +182,22 @@ export default function SecuritySupervisorIncidentsPage() {
         resolution_summary: resolutionSummary.trim(),
         reason: "Supervisor incident resolution",
       });
+      if (resolvingIncident?.id && resolveProofUrl) {
+        try {
+          await incidentsApi.addAttachment(resolvingIncident.id, {
+            file_url: resolveProofUrl,
+            file_name: "Resolution Verification Proof",
+          });
+        } catch {
+          // Non-fatal
+        }
+      }
       setIsResolveModalOpen(false);
       setIncidentFieldErrors({});
       setResolvingIncident(null);
       setResolutionSummary("");
+      setResolveProofUrl(null);
+      toast.success("Incident resolved successfully");
       await loadData();
     } catch (err: any) {
       alert(err?.message || "Failed to resolve security incident.");
@@ -432,6 +461,18 @@ export default function SecuritySupervisorIncidentsPage() {
               onChange={(e) => setLocationText(e.target.value)}
             />
           </div>
+
+          <div style={{ marginTop: "1rem" }}>
+            <FileUpload
+              kind="incident_evidence"
+              label="Incident Evidence / Scene Photo (Optional)"
+              currentUrl={evidenceUrl || undefined}
+              onUploadComplete={(url) => {
+                setEvidenceUrl(url);
+                toast.success("Incident evidence uploaded");
+              }}
+            />
+          </div>
         </form>
       </Modal>
 
@@ -501,6 +542,18 @@ export default function SecuritySupervisorIncidentsPage() {
               value={resolutionSummary}
               onChange={(e) => setResolutionSummary(e.target.value)}
               required
+            />
+          </div>
+
+          <div style={{ marginTop: "1rem" }}>
+            <FileUpload
+              kind="incident_evidence"
+              label="Resolution Inspection Proof / Photo (Optional)"
+              currentUrl={resolveProofUrl || undefined}
+              onUploadComplete={(url) => {
+                setResolveProofUrl(url);
+                toast.success("Resolution proof uploaded");
+              }}
             />
           </div>
         </form>

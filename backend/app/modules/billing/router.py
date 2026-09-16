@@ -329,6 +329,21 @@ async def cancel_invoice(invoice_id: uuid.UUID, svc: Svc = Depends(billing_servi
     )
 
 
+@router.post(
+    "/penalties",
+    response_model=Envelope[schemas.InvoiceRead],
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[APPROVE],
+)
+async def assess_penalty(
+    payload: schemas.PenaltyCreate, svc: Svc = Depends(billing_service)
+) -> dict:
+    return ok(
+        schemas.InvoiceRead.model_validate(await svc.assess_penalty(payload)),
+        message="Penalty assessed and posted",
+    )
+
+
 # --- special assessments (Governance FR-09 / Association Committee) --- #
 _SPECIAL_ASSESSMENTS_STORE: dict[str, dict] = {}
 

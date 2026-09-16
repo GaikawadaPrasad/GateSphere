@@ -178,7 +178,7 @@ def test_community_admin_deletes_staff(as_role):
     admin = as_role("community_admin")
 
     # Create a staff member
-    r = admin.post(P, json={"full_name": "Temp Cleaner", "staff_type": "cleaner", "phone": _phone()})
+    r = admin.post(P, json={"full_name": "Temp Cleaner", "staff_type": "maid", "phone": _phone()})
     assert r.status_code == 201, r.text
     staff_id = r.json()["data"]["id"]
 

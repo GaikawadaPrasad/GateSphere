@@ -236,6 +236,42 @@ export function DomesticStaffDashboardView({
       {/* TAB 1: OVERVIEW */}
       {activeTab === "overview" && (
         <div>
+          {openAttendance?.is_overdue && (
+            <div
+              style={{
+                padding: "1rem 1.25rem",
+                marginBottom: "1.5rem",
+                background: "#FEF2F2",
+                border: "1.5px solid #EF4444",
+                borderRadius: "8px",
+                color: "#991B1B",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "1rem",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                <span style={{ fontSize: "1.5rem" }}>⚠️</span>
+                <div>
+                  <strong style={{ display: "block", fontSize: "14px" }}>
+                    Overdue Checkout Warning (&gt;12 Hours)
+                  </strong>
+                  <span style={{ fontSize: "12.5px", color: "#B91C1C" }}>
+                    Your shift started at {openAttendance.check_in_at} ({openAttendance.gate_name}) and has remained active for over 12 hours. Please report to the security gate to record your checkout.
+                  </span>
+                </div>
+              </div>
+              <BrandButton
+                size="sm"
+                variant="danger"
+                onClick={() => router.push("/domestic-staff/entry-exit")}
+              >
+                View Pass
+              </BrandButton>
+            </div>
+          )}
+
           {/* KPI Stat Cards */}
           <div
             style={{
@@ -861,6 +897,27 @@ export function DomesticStaffDashboardView({
           />
         ) : (
           <div>
+            {openAttendance?.is_overdue && (
+              <div
+                style={{
+                  padding: "0.85rem 1rem",
+                  background: "#FEF2F2",
+                  border: "1px solid #FCA5A5",
+                  borderRadius: "8px",
+                  marginBottom: "1rem",
+                  fontSize: "13.5px",
+                  color: "#991B1B",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                }}
+              >
+                <span>⚠️</span>
+                <span>
+                  <strong>Notice:</strong> Your open shift exceeds 12 hours. Please checkout at the security gate.
+                </span>
+              </div>
+            )}
             <div
               style={{
                 padding: "0.75rem 1rem",
@@ -910,7 +967,27 @@ export function DomesticStaffDashboardView({
                   {
                     key: "check_out_at",
                     header: "Gate Check-Out",
-                    render: (i) => i.check_out_at || <LiveDot label="ONGOING" />,
+                    render: (i) =>
+                      i.check_out_at || (
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                          <LiveDot label="ONGOING" />
+                          {i.is_overdue && (
+                            <span
+                              style={{
+                                fontSize: "11px",
+                                background: "#FEF2F2",
+                                color: "#DC2626",
+                                border: "1px solid #FCA5A5",
+                                borderRadius: "4px",
+                                padding: "2px 6px",
+                                fontWeight: 700,
+                              }}
+                            >
+                              ⚠️ &gt;12h Overdue
+                            </span>
+                          )}
+                        </div>
+                      ),
                   },
                   { key: "gate_name", header: "Gate Used" },
                   { key: "unit_number", header: "Units Served" },
@@ -922,7 +999,28 @@ export function DomesticStaffDashboardView({
                         ? `${Math.floor(i.duration_minutes / 60)}h ${i.duration_minutes % 60}m`
                         : "In Progress",
                   },
-                  { key: "status", header: "Status", render: (i) => <StatusBadge status={i.status} /> },
+                  {
+                    key: "status",
+                    header: "Status",
+                    render: (i) =>
+                      i.is_overdue ? (
+                        <span
+                          style={{
+                            fontSize: "11px",
+                            background: "#FEF2F2",
+                            color: "#DC2626",
+                            border: "1px solid #FCA5A5",
+                            borderRadius: "4px",
+                            padding: "2px 6px",
+                            fontWeight: 700,
+                          }}
+                        >
+                          ⚠️ OVERDUE
+                        </span>
+                      ) : (
+                        <StatusBadge status={i.status} />
+                      ),
+                  },
                 ]}
                 data={attControls.paginatedData}
                 isLoading={attLoading}

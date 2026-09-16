@@ -38,10 +38,13 @@ export interface AttendanceRecord {
   id: string;
   date: string;
   check_in_at: string;
+  raw_check_in_at?: string;
   check_out_at?: string | null;
   gate_name: string;
   unit_number: string;
   duration_minutes?: number | null;
+  duration_hours?: number | null;
+  is_overdue?: boolean;
   status: "open" | "completed";
 }
 
@@ -153,29 +156,39 @@ export function useStaffAttendance() {
     queryFn: async () => {
       const res = await api.get<any[]>("/domestic-staff/me/attendance");
       if (!Array.isArray(res)) return [];
-      return res.map((att: any) => ({
-        id: att.id,
-        date: att.check_in_at ? att.check_in_at.split("T")[0] : "",
-        check_in_at: att.check_in_at
-          ? new Date(att.check_in_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-          : "",
-        check_out_at: att.check_out_at
-          ? new Date(att.check_out_at).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })
-          : null,
-        gate_name: att.gate_id ? "Main Gate 1" : "Gate Operations",
-        unit_number: "Assigned Units",
-        duration_minutes:
-          att.check_out_at && att.check_in_at
-            ? Math.round(
-                (new Date(att.check_out_at).getTime() - new Date(att.check_in_at).getTime()) /
-                  60000,
-              )
+      return res.map((att: any) => {
+        const isOverdue =
+          att.is_overdue ??
+          (!att.check_out_at && att.check_in_at
+            ? (Date.now() - new Date(att.check_in_at).getTime()) / 3600000 > 12
+            : false);
+        return {
+          id: att.id,
+          date: att.check_in_at ? att.check_in_at.split("T")[0] : "",
+          raw_check_in_at: att.check_in_at,
+          check_in_at: att.check_in_at
+            ? new Date(att.check_in_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+            : "",
+          check_out_at: att.check_out_at
+            ? new Date(att.check_out_at).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })
             : null,
-        status: att.check_out_at ? ("completed" as const) : ("open" as const),
-      }));
+          gate_name: att.gate_id ? "Main Gate 1" : "Gate Operations",
+          unit_number: "Assigned Units",
+          duration_minutes:
+            att.check_out_at && att.check_in_at
+              ? Math.round(
+                  (new Date(att.check_out_at).getTime() - new Date(att.check_in_at).getTime()) /
+                    60000,
+                )
+              : null,
+          duration_hours: att.duration_hours ?? null,
+          is_overdue: isOverdue,
+          status: att.check_out_at ? ("completed" as const) : ("open" as const),
+        };
+      });
     },
   });
 }

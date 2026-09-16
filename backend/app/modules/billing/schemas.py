@@ -209,3 +209,12 @@ class LedgerRead(_Read):
     balance_after: Decimal
     entry_date: datetime
     narration: str | None
+
+
+# -- penalties --------------------------------------------------- #
+class PenaltyCreate(_Write):
+    unit_id: uuid.UUID
+    amount: Decimal = Field(..., max_digits=12, decimal_places=2, gt=0)
+    reason: str = Field(..., min_length=3, max_length=255)
+    violation_reference: str | None = Field(default=None, max_length=60)
+    due_date: date | None = None

@@ -25,6 +25,11 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Resolution modal state
+  const [isResolveModalOpen, setIsResolveModalOpen] = useState(false);
+  const [alertToResolve, setAlertToResolve] = useState<PanicAlert | null>(null);
+  const [resolutionSummary, setResolutionSummary] = useState("");
+
   const fetchAlerts = async () => {
     setIsLoading(true);
     const data = await gateApi.alerts();
@@ -79,13 +84,25 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
     }
   };
 
-  const handleResolve = async (id: string) => {
-    const summary = window.prompt("Resolution summary (optional):") || undefined;
+  const handleOpenResolve = (alertItem: PanicAlert) => {
+    setAlertToResolve(alertItem);
+    setResolutionSummary("");
+    setIsResolveModalOpen(true);
+  };
+
+  const handleConfirmResolve = async () => {
+    if (!alertToResolve || isSubmitting) return;
+    setIsSubmitting(true);
     try {
-      await gateApi.resolveAlert(id, summary);
-      fetchAlerts();
+      await gateApi.resolveAlert(alertToResolve.id, resolutionSummary.trim() || undefined);
+      setIsResolveModalOpen(false);
+      setAlertToResolve(null);
+      setResolutionSummary("");
+      await fetchAlerts();
     } catch (err: any) {
       alert(err?.message || "Failed to resolve alert.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -179,7 +196,7 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
                           <button
                             className="btn btn-primary"
                             style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}
-                            onClick={() => handleResolve(a.id)}
+                            onClick={() => handleOpenResolve(a)}
                           >
                             Resolve
                           </button>
@@ -295,6 +312,94 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
             />
           </div>
         </form>
+      </Modal>
+
+      {/* Resolve Incident Confirmation Modal */}
+      <Modal
+        isOpen={isResolveModalOpen}
+        onClose={() => !isSubmitting && setIsResolveModalOpen(false)}
+        title="🛡️ RESOLVE EMERGENCY INCIDENT"
+        maxWidth={500}
+        footer={
+          <>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                setIsResolveModalOpen(false);
+                setAlertToResolve(null);
+                setResolutionSummary("");
+              }}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleConfirmResolve}
+              disabled={isSubmitting}
+              style={{ fontWeight: 700 }}
+            >
+              {isSubmitting ? "Resolving..." : "Confirm Resolution"}
+            </button>
+          </>
+        }
+      >
+        <div>
+          {alertToResolve && (
+            <div
+              style={{
+                padding: "0.85rem 1rem",
+                background: "#f8fafc",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                marginBottom: "1rem",
+                fontSize: "0.85rem",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem" }}>
+                <span style={{ color: "var(--muted)" }}>Incident Ref:</span>
+                <strong style={{ fontFamily: "monospace" }}>
+                  SOS-{alertToResolve.id.slice(0, 8).toUpperCase()}
+                </strong>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem" }}>
+                <span style={{ color: "var(--muted)" }}>Category:</span>
+                <strong style={{ color: "var(--danger)", textTransform: "capitalize" }}>
+                  🚨 {alertToResolve.alert_type}
+                </strong>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: "var(--muted)" }}>Details:</span>
+                <span>{(alertToResolve as any).message || "—"}</span>
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
+              Resolution Summary / Actions Taken
+            </label>
+            <textarea
+              className="input-field"
+              rows={3}
+              placeholder="e.g. Attended by on-duty medical response, resident safe and stable."
+              value={resolutionSummary}
+              onChange={(e) => setResolutionSummary(e.target.value)}
+            />
+            <p style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.25rem" }}>
+              This summary will be permanently stamped on the emergency incident audit record.
+            </p>
+          </div>
+        </div>
       </Modal>
     </div>
   );

@@ -167,3 +167,46 @@ def test_payment_refund_reverses_invoice_and_ledger(as_role, seed_ids):
     assert admin.get(f"{P}/invoices/{iid}").json()["data"]["status"] in ("posted", "overdue")
     # a second refund is rejected
     assert admin.post(f"{P}/payments/{pid}/refund", json={"reason": "again"}).status_code == 422
+
+
+def test_assess_penalty(as_role, seed_ids):
+    P = "/api/v1/billing"
+    admin = as_role("community_admin")
+    cid = seed_ids["community_id"]
+    from sqlalchemy import select
+
+    from app.db.session import SessionLocal
+    from app.modules.communities.models import Unit
+
+    with SessionLocal() as db:
+        unit_id = str(
+            db.scalar(select(Unit.id).where(Unit.community_id == cid).order_by(Unit.unit_number))
+        )
+
+    res = admin.post(
+        f"{P}/penalties",
+        params={"community_id": cid},
+        json={
+            "unit_id": unit_id,
+            "amount": "250.00",
+            "reason": "Late night loud noise violation",
+            "violation_reference": "VIOL-001",
+        },
+    )
+    assert res.status_code == 201, res.text
+    data = res.json()["data"]
+    assert data["status"] == "posted"
+    assert data["total_amount"] == "250.00"
+    assert data["balance_due"] == "250.00"
+    assert data["invoice_number"].startswith("INV-PEN-")
+    assert len(data["items"]) == 1
+    assert "Penalty: Late night loud noise violation" in data["items"][0]["description"]
+
+    # Verify unit ledger reflects the penalty debit
+    ledger_res = admin.get(f"{P}/units/{unit_id}/ledger", params={"community_id": cid})
+    assert ledger_res.status_code == 200
+    ledger_items = ledger_res.json()["data"]
+    pen_entry = next((e for e in ledger_items if e["source_type"] == "penalty"), None)
+    assert pen_entry is not None
+    assert pen_entry["amount"] == "250.00"
+    assert pen_entry["entry_type"] == "debit"

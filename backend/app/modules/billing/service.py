@@ -359,6 +359,87 @@ class BillingService(UnitScopedAccess):
         await self._audit("invoice.cancel", inv.community_id, "invoice", inv.id)
         return await self.get_invoice(inv.id)
 
+    async def assess_penalty(self, payload: schemas.PenaltyCreate) -> MaintenanceInvoice:
+        if await self.is_unit_restricted():
+            raise ForbiddenError("Only community staff can assess penalties", code="STAFF_ONLY")
+        unit = await self._unit_in_scope(payload.unit_id)
+        now = datetime.now(UTC)
+        today = date.today()
+        seq = await self.invoices.next_sequence(unit.community_id)
+        inv_number = f"INV-PEN-{now.year}-{seq:05d}"
+        penalty_amount = _money(payload.amount)
+        due = payload.due_date or today
+
+        billed_user_id = await self._primary_billed_user(unit.id)
+
+        item = InvoiceItem(
+            description=f"Penalty: {payload.reason}"
+            + (f" (Ref: {payload.violation_reference})" if payload.violation_reference else ""),
+            quantity=Decimal("1"),
+            unit_rate=penalty_amount,
+            amount=penalty_amount,
+            taxable=False,
+        )
+
+        inv = MaintenanceInvoice(
+            community_id=unit.community_id,
+            unit_id=unit.id,
+            billed_to_user_id=billed_user_id,
+            invoice_number=inv_number,
+            billing_period_start=today,
+            billing_period_end=today,
+            issue_date=today,
+            due_date=due,
+            subtotal=penalty_amount,
+            discount=Decimal("0.00"),
+            late_fee=Decimal("0.00"),
+            tax=Decimal("0.00"),
+            total_amount=penalty_amount,
+            amount_paid=Decimal("0.00"),
+            balance_due=penalty_amount,
+            status="posted",
+            items=[item],
+        )
+        await self.invoices.add(inv)
+        await self._ledger(
+            unit.community_id,
+            unit.id,
+            billed_user_id,
+            "debit",
+            penalty_amount,
+            source_type="penalty",
+            source_id=inv.id,
+            narration=f"Penalty assessed: {payload.reason}",
+        )
+        await self.db.flush()
+        await self._audit(
+            "penalty.assess",
+            unit.community_id,
+            "invoice",
+            inv.id,
+            new={
+                "invoice_number": inv.invoice_number,
+                "amount": str(penalty_amount),
+                "reason": payload.reason,
+            },
+        )
+        if billed_user_id:
+            await notif_events.emit(
+                self.db,
+                self.scope,
+                self.actor,
+                self.ctx,
+                recipient_user_id=billed_user_id,
+                community_id=unit.community_id,
+                notification_type="billing.penalty_assessed",
+                title="Penalty Notice",
+                message=f"A penalty of {penalty_amount} has been assessed for {payload.reason}.",
+                reference_type="invoice",
+                reference_id=inv.id,
+                channels=["in_app", "email", "sms", "whatsapp", "push"],
+            )
+        return await self.get_invoice(inv.id)
+
     # -- payments --------------------------------------- #
     async def record_payment(self, payload: schemas.PaymentCreate) -> Payment:
         cid = self._one_community(payload.community_id)

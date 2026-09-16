@@ -6,6 +6,8 @@ Contract: docs/backend/api/domestic-staff.md.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+from typing import Any
 import uuid
 
 from fastapi import APIRouter, Depends, Response, status
@@ -153,6 +155,26 @@ async def end_assignment(
     )
 
 
+def _to_attendance_read(r: Any) -> schemas.AttendanceRead:
+    read = schemas.AttendanceRead.model_validate(r)
+    now = datetime.now(UTC)
+    check_in = r.check_in_at
+    if check_in.tzinfo is None:
+        check_in = check_in.replace(tzinfo=UTC)
+    if r.check_out_at is None:
+        elapsed_sec = max(0.0, (now - check_in).total_seconds())
+        read.duration_hours = round(elapsed_sec / 3600.0, 2)
+        read.is_overdue = elapsed_sec > 12.0 * 3600.0
+    else:
+        check_out = r.check_out_at
+        if check_out.tzinfo is None:
+            check_out = check_out.replace(tzinfo=UTC)
+        elapsed_sec = max(0.0, (check_out - check_in).total_seconds())
+        read.duration_hours = round(elapsed_sec / 3600.0, 2)
+        read.is_overdue = False
+    return read
+
+
 # --- attendance --------------------------------------------------- #
 @router.get(
     "/attendance", response_model=Envelope[list[schemas.AttendanceRead]], dependencies=[VIEW]
@@ -172,7 +194,7 @@ async def list_attendance(
         limit=params.page_size,
     )
     return paginated(
-        [schemas.AttendanceRead.model_validate(r) for r in rows], total=total, params=params
+        [_to_attendance_read(r) for r in rows], total=total, params=params
     )
 
 
@@ -186,7 +208,7 @@ async def check_in(
     payload: schemas.CheckInCreate, svc: Svc = Depends(domestic_staff_service)
 ) -> dict:
     return ok(
-        schemas.AttendanceRead.model_validate(await svc.check_in(payload)), message="Checked in"
+        _to_attendance_read(await svc.check_in(payload)), message="Checked in"
     )
 
 
@@ -197,7 +219,7 @@ async def check_in(
 )
 async def check_out(attendance_id: uuid.UUID, svc: Svc = Depends(domestic_staff_service)) -> dict:
     return ok(
-        schemas.AttendanceRead.model_validate(await svc.check_out(attendance_id)),
+        _to_attendance_read(await svc.check_out(attendance_id)),
         message="Checked out",
     )
 

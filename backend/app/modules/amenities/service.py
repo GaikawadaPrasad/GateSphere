@@ -38,10 +38,12 @@ from app.modules.amenities.repository import (
 )
 from app.modules.amenities.schemas import ALLOWED
 from app.modules.audit.service import record_audit_async
+from app.modules.communities.models import Community
 from app.modules.notifications import events as notif_events
 from app.modules.residents.access import UnitScopedAccess
 from app.modules.residents.models import ResidentProfile, UnitOccupancy
 from app.modules.users.models import User
+from zoneinfo import ZoneInfo
 
 
 def _enum(field: str, value: str | None) -> None:
@@ -88,6 +90,14 @@ class AmenityService(UnitScopedAccess):
         raise BusinessRuleError(
             "Specify a community", code="COMMUNITY_REQUIRED", fields={"community_id": "required"}
         )
+
+    async def _community_tz(self, community_id: uuid.UUID) -> ZoneInfo:
+        comm = await self.db.get(Community, community_id)
+        tz_str = getattr(comm, "timezone", "Asia/Kolkata") if comm else "Asia/Kolkata"
+        try:
+            return ZoneInfo(tz_str or "Asia/Kolkata")
+        except Exception:
+            return ZoneInfo("Asia/Kolkata")
 
     async def _amenity_in_scope(self, amenity_id: uuid.UUID) -> Amenity:
         obj = await self.amenities.get(amenity_id)
@@ -322,7 +332,8 @@ class AmenityService(UnitScopedAccess):
             raise BusinessRuleError(
                 "booking_date does not fall on the slot's weekday", code="SLOT_WEEKDAY_MISMATCH"
             )
-        today = date.today()
+        local_tz = await self._community_tz(amenity.community_id)
+        today = datetime.now(local_tz).date()
         if payload.booking_date < today:
             raise BusinessRuleError("booking_date is in the past", code="DATE_IN_PAST")
 
@@ -332,8 +343,10 @@ class AmenityService(UnitScopedAccess):
                 f"Bookings open only {max_adv} days ahead", code="TOO_FAR_AHEAD"
             )
 
-        start_at = datetime.combine(payload.booking_date, slot.start_time, tzinfo=UTC)
-        end_at = datetime.combine(payload.booking_date, slot.end_time, tzinfo=UTC)
+        start_local = datetime.combine(payload.booking_date, slot.start_time, tzinfo=local_tz)
+        end_local = datetime.combine(payload.booking_date, slot.end_time, tzinfo=local_tz)
+        start_at = start_local.astimezone(UTC)
+        end_at = end_local.astimezone(UTC)
 
         max_hours = await self._rule_int(amenity.id, "max_hours_per_booking")
         if max_hours is not None and (end_at - start_at).total_seconds() > max_hours * 3600:

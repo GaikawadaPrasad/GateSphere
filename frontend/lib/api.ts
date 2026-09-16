@@ -461,6 +461,8 @@ export const gateApi = {
     apiSend<any>("POST", `/gate/alerts/${alertId}/resolve`, {
       resolution_summary: resolutionSummary,
     }),
+  cancelAlert: (alertId: string) =>
+    apiSend<any>("POST", `/gate/alerts/${alertId}/cancel`),
   assignments: (params?: { gate_id?: string; active_only?: boolean }) =>
     apiGet<any[]>("/gate/assignments", params as Record<string, unknown>),
   createAssignment: (data: {
@@ -509,6 +511,22 @@ export const complaintsApi = {
     apiSend<any>("POST", `/complaints/tickets/${id}/assign`, { assigned_to_user_id: vendorUserId }),
   updateStatus: (id: string, status: string, notes?: string) =>
     apiSend<any>("POST", `/complaints/tickets/${id}/transition`, { status, remarks: notes }),
+  confirm: (id: string, data: { confirmation_status: string; remarks?: string }) =>
+    apiSend<any>("POST", `/complaints/tickets/${id}/confirm`, data),
+  feedback: (id: string, data: { rating: number; comments?: string }) =>
+    apiSend<any>("POST", `/complaints/tickets/${id}/feedback`, data),
+  attachments: (ticketId: string) =>
+    apiGet<any[]>(`/complaints/tickets/${ticketId}/attachments`),
+  addAttachment: (
+    ticketId: string,
+    data: {
+      file_url: string;
+      file_name?: string;
+      mime_type?: string;
+      file_size_bytes?: number;
+      message_id?: string;
+    },
+  ) => apiSend<any>("POST", `/complaints/tickets/${ticketId}/attachments`, data),
   exportCsv: (params?: Record<string, unknown>) =>
     apiGet<string>("/complaints/tickets.csv", params),
 };
@@ -535,6 +553,22 @@ export const billingApi = {
       taxable?: boolean;
     }>;
   }) => apiSend<MaintenanceInvoice>("POST", "/billing/invoices", data),
+  assessPenalty: (
+    data: {
+      unit_id: string;
+      amount: number | string;
+      reason: string;
+      violation_reference?: string;
+      due_date?: string;
+    },
+    communityId?: string,
+  ) =>
+    apiSend<MaintenanceInvoice>(
+      "POST",
+      "/billing/penalties",
+      data,
+      communityId ? { community_id: communityId } : undefined,
+    ),
   postInvoice: (invoiceId: string) =>
     apiSend<MaintenanceInvoice>("POST", `/billing/invoices/${invoiceId}/post`),
   cancelInvoice: (invoiceId: string) =>
@@ -1012,6 +1046,16 @@ export const incidentsApi = {
     apiSend<IncidentAction>("POST", `/incidents/${id}/actions`, payload),
   resolve: (id: string, data: Record<string, unknown>) =>
     apiSend<Incident>("PATCH", `/incidents/${id}/resolve`, data),
+  attachments: (id: string) => apiGet<any[]>(`/incidents/${id}/attachments`),
+  addAttachment: (
+    id: string,
+    data: {
+      file_url: string;
+      file_name?: string;
+      mime_type?: string;
+      file_size_bytes?: number;
+    },
+  ) => apiSend<any>("POST", `/incidents/${id}/attachments`, data),
 };
 
 export const notificationsApi = {

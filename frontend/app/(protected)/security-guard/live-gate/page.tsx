@@ -11,6 +11,7 @@ import {
 } from "@/lib/qr-decoder";
 import { visitorsApi, domesticStaffApi, gateApi } from "@/lib/api";
 import { WalkInVisitorModal } from "@/components/common/WalkInVisitorModal";
+import { FileUpload } from "@/components/common/FileUpload";
 import { toast } from "@/store/toast";
 
 interface VerifiedEntry {
@@ -45,6 +46,8 @@ export default function SecurityGuardLiveGatePage() {
   const [scannedBadge, setScannedBadge] = useState<string | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [isWalkInModalOpen, setIsWalkInModalOpen] = useState(false);
+  const [entryPhotoUrl, setEntryPhotoUrl] = useState<string | null>(null);
+  const [showPhotoPrompt, setShowPhotoPrompt] = useState(false);
 
   const directFileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -241,11 +244,25 @@ export default function SecurityGuardLiveGatePage() {
       setPendingStaffPassForExit(null);
 
       try {
-        const payload = isPin ? { pin: pinToUse } : { pass_token: tokenToUse || raw };
+        const payload: Record<string, unknown> = isPin ? { pin: pinToUse } : { pass_token: tokenToUse || raw };
+        if (entryPhotoUrl) {
+          payload.entry_photo_url = entryPhotoUrl;
+        }
         let entry: any = null;
         try {
           entry = await visitorsApi.recordEntry(payload);
         } catch (visErr: any) {
+          if (
+            visErr?.code === "PHOTO_REQUIRED" ||
+            visErr?.message?.toLowerCase().includes("photo")
+          ) {
+            setShowPhotoPrompt(true);
+            setErrorMessage(
+              "📸 VISITOR PHOTO REQUIRED: Community policy mandates visitor photograph before gate entry. Please attach photo below.",
+            );
+            setIsVerifying(false);
+            return;
+          }
           // Fallback: If 10-digit mobile number was entered, try domestic staff lookup by phone
           if (cleanDigits.length === 10 || cleanDigits.length === 12) {
             try {
@@ -313,13 +330,15 @@ export default function SecurityGuardLiveGatePage() {
         setSuccessMessage(`✅ Entry Approved & Recorded for ${visitorName} — QR/OTP is now EXPIRED.`);
         setPassInput("");
         setScannedBadge(null);
+        setEntryPhotoUrl(null);
+        setShowPhotoPrompt(false);
       } catch (err: any) {
         const msg = err?.message || "Invalid pass / PIN, or visitor is blacklisted";
         setErrorMessage(`❌ NO ENTRY ALLOWED: ${msg}`);
       }
       setIsVerifying(false);
     },
-    [passInput]
+    [passInput, entryPhotoUrl]
   );
 
   const handleVerifyPass = (e: React.FormEvent) => {
@@ -668,6 +687,70 @@ export default function SecurityGuardLiveGatePage() {
             </button>
           </div>
         )}
+
+        {/* Visitor Photograph Attachment (Supports Policy Enforcement & Guard Manual Capture) */}
+        <div
+          style={{
+            marginTop: "1.1rem",
+            padding: "0.85rem 1.1rem",
+            background: showPhotoPrompt ? "#fff7ed" : "#f8fafc",
+            borderRadius: "8px",
+            border: showPhotoPrompt ? "1.5px solid #f97316" : "1px solid #e2e8f0",
+            transition: "all 0.2s ease",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "0.5rem",
+              flexWrap: "wrap",
+              gap: "0.5rem",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "0.85rem",
+                fontWeight: 700,
+                color: showPhotoPrompt ? "#c2410c" : "#334155",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem",
+              }}
+            >
+              📷 Visitor Entry Photograph{" "}
+              {showPhotoPrompt && (
+                <span
+                  style={{
+                    color: "#dc2626",
+                    background: "#fee2e2",
+                    padding: "0.15rem 0.45rem",
+                    borderRadius: "4px",
+                    fontSize: "0.75rem",
+                  }}
+                >
+                  Required by Community Policy
+                </span>
+              )}
+            </span>
+            {entryPhotoUrl && (
+              <span style={{ fontSize: "0.75rem", color: "#16a34a", fontWeight: 700 }}>
+                ✓ Photograph Captured & Attached
+              </span>
+            )}
+          </div>
+          <FileUpload
+            kind="visitor_photo"
+            label="Upload or snap visitor photograph before admitting entry"
+            currentUrl={entryPhotoUrl || undefined}
+            onUploadComplete={(url) => {
+              setEntryPhotoUrl(url);
+              setErrorMessage("");
+              toast.success("Visitor photograph attached successfully");
+            }}
+          />
+        </div>
 
         {errorMessage && (
           <div
