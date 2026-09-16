@@ -77,6 +77,7 @@ class AuthService:
             id=str(user.id),
             email=user.email,
             full_name=user.full_name,
+            phone=user.phone,
             is_superadmin=user.is_superadmin,
             permissions=sorted(await user_permissions_async(self.db, user)),
             community_ids=sorted({str(c) for c in cids}),
@@ -148,6 +149,14 @@ class AuthService:
             role_slug=getattr(request.state, "session_role", None),
             session_bucket=getattr(request.state, "session_bucket", None),
         )
+
+    async def update_me(self, user: User, *, full_name: str | None, phone: str | None) -> User:
+        if full_name is not None:
+            user.full_name = full_name
+        if phone is not None:
+            user.phone = phone
+        await self.db.flush()
+        return user
 
     async def change_password(
         self,

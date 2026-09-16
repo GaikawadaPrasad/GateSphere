@@ -13,6 +13,7 @@ export default function VendorProfilePage() {
   const [specialization, setSpecialization] = useState("Facility Maintenance, Electrical & HVAC");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaved, setIsSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadProfile() {
@@ -23,7 +24,7 @@ export default function VendorProfilePage() {
           setCurrentUser(user);
           setContactPerson(user.full_name || "");
           setEmail(user.email || "");
-          setPhone(user.phone || "+91 98765 43210");
+          setPhone(user.phone || "");
         }
       } catch {
         // Fallback gracefully
@@ -34,10 +35,19 @@ export default function VendorProfilePage() {
     loadProfile();
   }, []);
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 2500);
+    setSaveError(null);
+    try {
+      const updated = await authApi.updateMe({ full_name: contactPerson, phone });
+      setCurrentUser(updated);
+      setContactPerson(updated.full_name || "");
+      setPhone(updated.phone || "");
+      setIsSaved(true);
+      setTimeout(() => setIsSaved(false), 2500);
+    } catch (err: any) {
+      setSaveError(err?.message || "Failed to save profile. Please try again.");
+    }
   };
 
   return (
@@ -47,6 +57,22 @@ export default function VendorProfilePage() {
         subtitle="Manage vendor technician details, official contact information, and service assignments"
         breadcrumbs={[{ label: "GateSphere" }, { label: "Vendor" }, { label: "Profile" }]}
       />
+
+      {saveError && (
+        <div
+          style={{
+            padding: "0.85rem",
+            marginBottom: "1.25rem",
+            background: "#fef2f2",
+            border: "1px solid #fca5a5",
+            borderRadius: "var(--radius-sm)",
+            color: "#991b1b",
+            fontWeight: 600,
+          }}
+        >
+          ❌ {saveError}
+        </div>
+      )}
 
       {isSaved && (
         <div

@@ -369,6 +369,8 @@ export const authApi = {
     }
   },
   me: (role?: string) => apiGet<CurrentUser>("/auth/me", undefined, role),
+  updateMe: (data: { full_name?: string; phone?: string }) =>
+    apiSend<CurrentUser>("PATCH", "/auth/me", data),
   changePassword: (payload: { current_password: string; new_password: string }) =>
     apiSend<{ status: string }>("POST", "/auth/password", payload),
 };
