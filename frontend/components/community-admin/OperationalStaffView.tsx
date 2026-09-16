@@ -40,6 +40,9 @@ export function OperationalStaffView({ embeddedInTab = false }: OperationalStaff
   // Metrics
   const metrics = useMemo(() => {
     const total = staffList.length;
+    const committeeMembers = staffList.filter((u) =>
+      u.roles.some((r) => r.role_slug === "association_committee")
+    ).length;
     const facilityManagers = staffList.filter((u) =>
       u.roles.some((r) => r.role_slug === "facility_manager")
     ).length;
@@ -53,7 +56,7 @@ export function OperationalStaffView({ embeddedInTab = false }: OperationalStaff
       u.roles.some((r) => r.role_slug === "auditor")
     ).length;
 
-    return { total, facilityManagers, supervisors, guards, auditors };
+    return { total, committeeMembers, facilityManagers, supervisors, guards, auditors };
   }, [staffList]);
 
   // Filtered staff
@@ -323,6 +326,18 @@ export function OperationalStaffView({ embeddedInTab = false }: OperationalStaff
 
         <div className="card" style={{ padding: "1rem" }}>
           <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase" }}>
+            🏛️ Association Committee
+          </div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.25rem" }}>
+            <span style={{ fontSize: "1.75rem", fontWeight: 800, color: "#0284c7" }}>
+              {metrics.committeeMembers}
+            </span>
+            <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>governance</span>
+          </div>
+        </div>
+
+        <div className="card" style={{ padding: "1rem" }}>
+          <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase" }}>
             🏢 Facility Managers
           </div>
           <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.25rem" }}>
@@ -379,6 +394,7 @@ export function OperationalStaffView({ embeddedInTab = false }: OperationalStaff
         onFilterChange={setRoleFilter}
         filterLabel="Filter Role"
         filterOptions={[
+          { label: "🏛️ Association Committee", value: "association_committee" },
           { label: "🏢 Facility Manager", value: "facility_manager" },
           { label: "🛡️ Security Supervisor", value: "security_supervisor" },
           { label: "👮 Security Guard", value: "security_guard" },

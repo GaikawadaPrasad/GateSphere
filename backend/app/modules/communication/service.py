@@ -13,7 +13,7 @@ import uuid
 from datetime import UTC, datetime
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -192,7 +192,7 @@ class CommunicationService(UnitScopedAccess):
 
     async def list_members(self, group_id: uuid.UUID) -> list[ResidentGroupMember]:
         await self._get_group(group_id)
-        return list(
+        members = list(
             (
                 await self.db.scalars(
                     select(ResidentGroupMember)
@@ -201,6 +201,19 @@ class CommunicationService(UnitScopedAccess):
                 )
             ).all()
         )
+        if members:
+            from app.modules.users.models import User
+            user_ids = [m.user_id for m in members]
+            users = list(
+                (await self.db.scalars(select(User).where(User.id.in_(user_ids)))).all()
+            )
+            user_map = {u.id: u for u in users}
+            for m in members:
+                u = user_map.get(m.user_id)
+                if u:
+                    m.user_name = u.full_name
+                    m.user_email = u.email
+        return members
 
     async def add_member(self, group_id: uuid.UUID, payload: schemas.GroupMemberIn):
         grp = await self._get_group(group_id)
@@ -216,12 +229,24 @@ class CommunicationService(UnitScopedAccess):
         m = ResidentGroupMember(group_id=grp.id, user_id=payload.user_id)
         self.db.add(m)
         await self.db.flush()
+        from app.modules.users.models import User
+        u = await self.db.get(User, payload.user_id)
+        if u:
+            m.user_name = u.full_name
+            m.user_email = u.email
         await self._audit("group.member_add", grp.community_id, "resident_group", grp.id)
         return m
 
     async def remove_member(self, group_id: uuid.UUID, member_id: uuid.UUID) -> None:
         grp = await self._get_group(group_id)
         m = await self.db.get(ResidentGroupMember, member_id)
+        if m is None:
+            m = await self.db.scalar(
+                select(ResidentGroupMember).where(
+                    ResidentGroupMember.group_id == grp.id,
+                    ResidentGroupMember.user_id == member_id,
+                )
+            )
         if m is None or m.group_id != grp.id:
             raise NotFoundError("Member not found")
         await self.db.delete(m)

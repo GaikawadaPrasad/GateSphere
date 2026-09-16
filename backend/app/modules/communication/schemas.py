@@ -87,6 +87,8 @@ class GroupMemberRead(_Read):
     group_id: uuid.UUID
     user_id: uuid.UUID
     added_at: datetime
+    user_name: str | None = None
+    user_email: str | None = None
 
 
 # -- announcements ----------------------------------------- #

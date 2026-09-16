@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 
 from app.core.context import RequestContext
 from app.core.responses import Response as Envelope
@@ -55,6 +55,24 @@ async def presign(
     payload: schemas.PresignRequest, svc: UploadService = Depends(upload_service)
 ) -> dict:
     return ok(await svc.presign(payload), message="Upload authorised")
+
+
+@router.post("/direct", response_model=Envelope[schemas.ConfirmResponse])
+async def direct_upload(
+    file: UploadFile = File(...),
+    kind: str = Form(...),
+    community_id: uuid.UUID | None = Form(None),
+    svc: UploadService = Depends(upload_service),
+) -> dict:
+    content = await file.read()
+    res = await svc.direct_upload(
+        file_bytes=content,
+        filename=file.filename or "photo.jpg",
+        content_type=file.content_type or "application/octet-stream",
+        kind_slug=kind,
+        community_id=community_id,
+    )
+    return ok(res, message="File uploaded and confirmed")
 
 
 @router.post("/{file_id}/confirm", response_model=Envelope[schemas.ConfirmResponse])

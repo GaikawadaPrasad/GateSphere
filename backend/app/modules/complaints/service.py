@@ -260,52 +260,13 @@ class ComplaintService(UnitScopedAccess):
             ticket.id,
             new={"ticket_number": ticket.ticket_number, "priority": priority},
         )
-        await self._populate_ticket_metadata([ticket])
         return ticket
-
-    async def _populate_ticket_metadata(self, tickets: list[ServiceTicket]) -> None:
-        if not tickets:
-            return
-        user_ids = {t.raised_by_user_id for t in tickets if t.raised_by_user_id}
-        unit_ids = {t.unit_id for t in tickets if t.unit_id}
-        cat_ids = {t.category_id for t in tickets if t.category_id}
-
-        user_map: dict[uuid.UUID, tuple[str, str | None, str]] = {}
-        if user_ids:
-            from app.modules.users.models import User
-            u_stmt = select(User.id, User.full_name, User.phone, User.email).where(User.id.in_(user_ids))
-            users_res = (await self.db.execute(u_stmt)).all()
-            user_map = {u[0]: (u[1], u[2], u[3]) for u in users_res}
-
-        unit_map: dict[uuid.UUID, str] = {}
-        if unit_ids:
-            u_stmt = select(Unit.id, Unit.unit_number).where(Unit.id.in_(unit_ids))
-            unit_res = (await self.db.execute(u_stmt)).all()
-            unit_map = {u[0]: u[1] for u in unit_res}
-
-        cat_map: dict[uuid.UUID, str] = {}
-        if cat_ids:
-            c_stmt = select(ServiceCategory.id, ServiceCategory.name).where(ServiceCategory.id.in_(cat_ids))
-            cat_res = (await self.db.execute(c_stmt)).all()
-            cat_map = {c[0]: c[1] for c in cat_res}
-
-        for t in tickets:
-            if t.raised_by_user_id in user_map:
-                name, phone, email = user_map[t.raised_by_user_id]
-                t.raised_by_name = name
-                t.raised_by_phone = phone
-                t.raised_by_email = email
-            if t.unit_id in unit_map:
-                t.unit_number = unit_map[t.unit_id]
-            if t.category_id in cat_map:
-                t.category_name = cat_map[t.category_id]
 
     async def get_ticket(self, ticket_id: uuid.UUID) -> ServiceTicket:
         obj = await self.tickets.get(ticket_id)
         if obj is None:
             raise NotFoundError("Ticket not found")
         await self._assert_unit_visible(obj.unit_id)
-        await self._populate_ticket_metadata([obj])
         return obj
 
     async def get_entry_pass(self, ticket_id: uuid.UUID) -> schemas.TicketEntryPassRead:
@@ -375,10 +336,9 @@ class ComplaintService(UnitScopedAccess):
                 ServiceTicket.unit_id,
                 or_owned=ServiceTicket.raised_by_user_id == self.actor.id,
             )
-        tickets = await self.tickets.list(offset=offset, limit=limit, extra=stmt)
-        total = await self.tickets.count(extra=stmt)
-        await self._populate_ticket_metadata(tickets)
-        return tickets, total
+        return await self.tickets.list(
+            offset=offset, limit=limit, extra=stmt
+        ), await self.tickets.count(extra=stmt)
 
     async def _mark_first_response(self, ticket: ServiceTicket) -> None:
         if ticket.first_responded_at is None:
@@ -473,11 +433,14 @@ class ComplaintService(UnitScopedAccess):
         self, ticket_id: uuid.UUID, payload: schemas.TicketConfirm
     ) -> ServiceTicket:
         ticket = await self.get_ticket(ticket_id)
-        if ticket.raised_by_user_id != self.actor.id:
-            raise ForbiddenError(
-                "Only the resident who raised the ticket may confirm",
-                code="NOT_TICKET_RAISER",
-            )
+        is_restricted = await self.is_unit_restricted()
+        if is_restricted:
+            scope = await self._unit_scope()
+            if ticket.raised_by_user_id != self.actor.id and (not scope or ticket.unit_id not in scope):
+                raise ForbiddenError(
+                    "Only a resident of the unit or authorized staff may confirm the ticket",
+                    code="NOT_AUTHORIZED",
+                )
         _enum("confirmation_status", payload.confirmation_status)
         if ticket.status != "resident_confirmation":
             raise BusinessRuleError(
@@ -608,6 +571,3 @@ class ComplaintService(UnitScopedAccess):
                 )
             ).all()
         )
-
-
-

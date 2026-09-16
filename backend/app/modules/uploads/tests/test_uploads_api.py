@@ -29,7 +29,9 @@ def test_presign_happy_path(as_role, seed_ids):
     assert d["kind"] == "visitor_photo"
     assert d["key"].startswith(f"visitors/photos/{seed_ids['community_id']}/")
     assert d["key"].endswith(".jpg")
-    assert d["file_url"].startswith("http://localhost:9000/gatesphere-local/")
+    from app.core.config import settings
+
+    assert settings.S3_BUCKET in d["file_url"]
     assert d["upload_url"].startswith("http")
     assert d["required_headers"]["Content-Type"] == "image/jpeg"
     assert d["file_id"] and d["confirm_url"].endswith(f"/uploads/{d['file_id']}/confirm")
@@ -206,3 +208,18 @@ def test_download_is_authorized_by_managed_file_not_just_key(as_role, seed_ids):
     assert guard.get(f"{P}/download", params={"key": "x/y/z.jpg"}).status_code == 404
     d2 = _presign(guard, seed_ids)
     assert guard.get(f"{P}/download", params={"key": d2["key"]}).status_code == 404
+
+
+def test_direct_upload_happy_path(as_role, seed_ids):
+    guard = as_role("security_guard")
+    img_data = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00" + b"x" * 100
+    r = guard.post(
+        f"{P}/direct",
+        data={"kind": "visitor_photo", "community_id": seed_ids["community_id"]},
+        files={"file": ("visitor.jpg", img_data, "image/jpeg")},
+    )
+    assert r.status_code == 200, r.text
+    data = r.json()["data"]
+    assert data["status"] == "confirmed"
+    assert data["detected_content_type"] == "image/jpeg"
+    assert data["file_url"].startswith("http")

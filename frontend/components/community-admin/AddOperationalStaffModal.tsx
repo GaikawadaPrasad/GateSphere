@@ -39,7 +39,9 @@ export function AddOperationalStaffModal({
     // Suggest an intuitive password if default was untouched
     if (password.startsWith("GateSphere2026!") || password.endsWith("@Gate2026!")) {
       const prefix =
-        slug === "facility_manager"
+        slug === "association_committee"
+          ? "Committee"
+          : slug === "facility_manager"
           ? "Facility"
           : slug === "security_supervisor"
           ? "Supervisor"

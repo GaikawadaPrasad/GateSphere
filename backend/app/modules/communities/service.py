@@ -262,7 +262,11 @@ class CommunityService:
         self, *, community_id: uuid.UUID, offset: int, limit: int
     ) -> tuple[list[Tower], int]:
         cid = self.scope.require(community_id)
-        return await self.towers.list_for_community(cid, offset=offset, limit=limit)
+        towers, count = await self.towers.list_for_community(cid, offset=offset, limit=limit)
+        counts = await self.units.counts_by_towers([t.id for t in towers])
+        for t in towers:
+            t.total_units = counts.get(t.id, 0)
+        return towers, count
 
     async def get_tower(self, tower_id: uuid.UUID) -> Tower:
         obj = await self.towers.get(tower_id)
@@ -303,7 +307,11 @@ class CommunityService:
         self, *, tower_id: uuid.UUID, offset: int, limit: int
     ) -> tuple[list[Floor], int]:
         tower = await self.get_tower(tower_id)
-        return await self.floors.list_for_tower(tower.id, offset=offset, limit=limit)
+        floors, count = await self.floors.list_for_tower(tower.id, offset=offset, limit=limit)
+        counts = await self.units.counts_by_floors([f.id for f in floors])
+        for f in floors:
+            f.total_units = counts.get(f.id, 0)
+        return floors, count
 
     async def get_floor(self, floor_id: uuid.UUID) -> Floor:
         obj = await self.floors.get(floor_id)

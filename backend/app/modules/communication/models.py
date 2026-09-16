@@ -27,7 +27,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base_class import Base, TenantMixin, TimestampMixin, pk
 
 ANNOUNCEMENT_TYPES = ("notice", "emergency", "poll", "event", "survey")
-PRIORITIES = ("low", "normal", "high", "urgent")
+PRIORITIES = ("low", "normal", "high", "urgent", "emergency")
 POLL_STATUS = ("draft", "open", "closed")
 RSVP_RESPONSES = ("going", "maybe", "not_going")
 

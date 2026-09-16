@@ -669,6 +669,14 @@ export const communicationApi = {
       data,
       communityId ? { community_id: communityId } : undefined,
     ),
+  groupMembers: (groupId: string) =>
+    apiGet<Array<{ group_id: string; user_id: string; added_at: string; user?: any }>>(
+      `/communication/groups/${groupId}/members`,
+    ),
+  addGroupMember: (groupId: string, data: { user_id: string }) =>
+    apiSend<any>("POST", `/communication/groups/${groupId}/members`, data),
+  removeGroupMember: (groupId: string, memberId: string) =>
+    apiSend<void>("DELETE", `/communication/groups/${groupId}/members/${memberId}`),
 };
 
 export const auditApi = {
@@ -1139,6 +1147,14 @@ export const notificationsApi = {
   preferences: () => apiGet<NotificationPreference[]>("/notifications/me/preferences"),
   setPreference: (data: Partial<NotificationPreference>) =>
     apiSend<NotificationPreference>("PUT", "/notifications/me/preferences", data),
+  dispatch: (data: {
+    community_id?: string;
+    recipient_user_id?: string;
+    title: string;
+    body: string;
+    category?: string;
+    action_url?: string;
+  }) => apiSend<AppNotification>("POST", "/notifications/dispatch", data),
 };
 
 export interface PresignUploadPayload {

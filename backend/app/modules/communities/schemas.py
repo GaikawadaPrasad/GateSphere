@@ -139,6 +139,7 @@ class TowerRead(_Read):
     name: str
     structure_type: str
     total_floors: int
+    total_units: int = 0
     is_active: bool
 
 
@@ -160,6 +161,7 @@ class FloorRead(_Read):
     floor_number: int
     label: str | None
     is_active: bool
+    total_units: int = 0
 
 
 # --- Unit ------------------------------------------------------------ #

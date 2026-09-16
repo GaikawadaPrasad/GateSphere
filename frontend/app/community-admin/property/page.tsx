@@ -18,6 +18,7 @@ import { DataTable, type Column } from "@/components/tables/DataTable";
 import { FilterPanel } from "@/components/common/FilterPanel";
 import { Modal } from "@/components/common/Modal";
 import type { Tower, Floor, Unit, Gate } from "@/types/communities";
+import { toast } from "@/store/toast";
 
 export default function CommunityAdminPropertyPage() {
   const { activeCommunityId } = useUiStore();
@@ -81,7 +82,7 @@ export default function CommunityAdminPropertyPage() {
     bedrooms: 2,
     area_sqft: 1200,
   });
-  const [gateForm, setGateForm] = useState({ name: "", code: "", gate_type: "both" });
+  const [gateForm, setGateForm] = useState({ name: "", code: "", gate_type: "main" });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -248,13 +249,16 @@ export default function CommunityAdminPropertyPage() {
           gate_type: gateForm.gate_type,
         },
       });
+      toast.success(`Security gate "${gateForm.name.trim()}" registered successfully.`, "Gate Created");
       setIsAddGateOpen(false);
       setPropertyFieldErrors({});
-      setGateForm({ name: "", code: "", gate_type: "both" });
+      setGateForm({ name: "", code: "", gate_type: "main" });
       refetchGates();
     } catch (err: unknown) {
       console.error(err);
-      setErrorMessage(err instanceof Error ? err.message : "Failed to create gate");
+      const msg = err instanceof Error ? err.message : "Failed to create security gate";
+      setErrorMessage(msg);
+      toast.error(msg, "Gate Creation Failed");
     } finally {
       setIsSubmitting(false);
     }
@@ -269,7 +273,18 @@ export default function CommunityAdminPropertyPage() {
       render: (t) => <span className="badge badge-neutral">{t.code || "–"}</span>,
     },
     { key: "total_floors", header: "Floors", render: (t) => t.total_floors ?? "–" },
-    { key: "total_units", header: "Units", render: (t) => t.total_units ?? "–" },
+    {
+      key: "total_units",
+      header: "Units",
+      render: (t) => (
+        <span
+          className={`badge ${t.total_units && t.total_units > 0 ? "badge-info" : "badge-neutral"}`}
+          style={{ fontSize: "0.8rem", fontWeight: 600 }}
+        >
+          {t.total_units !== undefined ? `${t.total_units} unit${t.total_units === 1 ? "" : "s"}` : "0 units"}
+        </span>
+      ),
+    },
     {
       key: "actions",
       header: "Action",
@@ -295,9 +310,25 @@ export default function CommunityAdminPropertyPage() {
     {
       key: "floor_number",
       header: "Floor #",
-      render: (f) => <strong>Floor {f.floor_number}</strong>,
+      render: (f) => (
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <strong>Floor {f.floor_number}</strong>
+          {(f as any).label && <span className="badge badge-neutral" style={{ fontSize: "0.75rem" }}>{(f as any).label}</span>}
+        </div>
+      ),
     },
-    { key: "total_units", header: "Total Units", render: (f) => f.total_units ?? "–" },
+    {
+      key: "total_units",
+      header: "Total Units",
+      render: (f) => (
+        <span
+          className={`badge ${f.total_units && f.total_units > 0 ? "badge-info" : "badge-neutral"}`}
+          style={{ fontSize: "0.8rem", fontWeight: 600 }}
+        >
+          {f.total_units !== undefined ? `${f.total_units} unit${f.total_units === 1 ? "" : "s"}` : "0 units"}
+        </span>
+      ),
+    },
     {
       key: "actions",
       header: "Action",
@@ -308,11 +339,12 @@ export default function CommunityAdminPropertyPage() {
           style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem" }}
           onClick={(e) => {
             e.stopPropagation();
+            if (f.tower_id) setSelectedTowerId(f.tower_id);
             setSelectedFloorId(f.id);
             setActiveTab("units");
           }}
         >
-          View Units →
+          View Units ({f.total_units ?? 0}) →
         </button>
       ),
     },
@@ -1161,10 +1193,14 @@ export default function CommunityAdminPropertyPage() {
                 value={gateForm.gate_type}
                 onChange={(e) => setGateForm({ ...gateForm, gate_type: e.target.value })}
               >
+                <option value="main">Main Gate (Entry &amp; Exit)</option>
+                <option value="service">Service Gate</option>
+                <option value="visitor">Visitor Gate</option>
+                <option value="pedestrian">Pedestrian Gate</option>
+                <option value="emergency">Emergency Gate</option>
                 <option value="both">Both (Entry &amp; Exit)</option>
                 <option value="entry">Entry Only</option>
                 <option value="exit">Exit Only</option>
-                <option value="pedestrian">Pedestrian Gate</option>
               </select>
             </div>
           </div>

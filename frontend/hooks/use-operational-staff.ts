@@ -7,7 +7,8 @@ export type OperationalRoleSlug =
   | "facility_manager"
   | "security_supervisor"
   | "security_guard"
-  | "auditor";
+  | "auditor"
+  | "association_committee";
 
 export interface OperationalStaffGrant {
   id: string;
@@ -46,6 +47,19 @@ export const OPERATIONAL_ROLES: {
   description: string;
   responsibilities: string[];
 }[] = [
+  {
+    slug: "association_committee",
+    name: "Association Committee",
+    icon: "🏛️",
+    badgeClass: "badge-primary",
+    description: "Executive oversight, financial governance, statutory compliance, and community policy administration.",
+    responsibilities: [
+      "Review financial ledgers, maintenance invoicing, and budget allocations",
+      "Monitor resident tickets, escalations, and facility contracts",
+      "Approve announcements, polls, and community broad policy decisions",
+      "Inspect audit trails and governance compliance reports",
+    ],
+  },
   {
     slug: "facility_manager",
     name: "Facility Manager",
@@ -132,6 +146,7 @@ export function useOperationalStaff(communityId?: string) {
       if (rawList.length === 0) return [];
 
       const targetSlugs = new Set([
+        "association_committee",
         "facility_manager",
         "security_supervisor",
         "security_guard",
