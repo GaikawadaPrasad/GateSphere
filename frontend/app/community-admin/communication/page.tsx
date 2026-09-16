@@ -1048,7 +1048,7 @@ export default function CommunityAdminCommunicationPage() {
                     fontSize: "0.85rem",
                   }}
                 >
-                  No residents have been added to this group yet. Select a resident above and click "+ Add to Group".
+                  No residents have been added to this group yet. Select a resident above and click &quot;+ Add to Group&quot;.
                 </div>
               ) : (
                 <div

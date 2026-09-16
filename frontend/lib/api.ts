@@ -299,6 +299,41 @@ export async function apiSend<T>(
   return handleResponse<T>(res);
 }
 
+export async function apiSendFormData<T>(
+  method: string,
+  path: string,
+  formData: FormData,
+  params?: Record<string, unknown>,
+  role?: string,
+): Promise<T> {
+  const url = buildUrl(path, params);
+  const activeRole = role || getActiveRole();
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+  };
+  if (activeRole) {
+    headers["X-Session-Role"] = activeRole;
+  }
+
+  const isMutation = ["POST", "PUT", "PATCH", "DELETE"].includes(method.toUpperCase());
+  if (isMutation) {
+    const csrf = getCsrfToken(activeRole || undefined);
+    if (csrf) {
+      headers["X-CSRF-Token"] = csrf;
+    }
+  }
+
+  // Note: Do NOT set Content-Type header so the browser sets multipart/form-data boundary automatically
+  const res = await fetch(url, {
+    method,
+    credentials: "include",
+    headers,
+    body: formData,
+  });
+
+  return handleResponse<T>(res);
+}
+
 export async function apiList<T>(
   path: string,
   params?: Record<string, unknown>,
@@ -1195,6 +1230,8 @@ export const uploadsApi = {
     apiSend<PresignUploadResponse>("POST", "/uploads", data),
   confirm: (fileId: string) =>
     apiSend<ConfirmUploadResponse>("POST", `/uploads/${fileId}/confirm`),
+  directUpload: (formData: FormData) =>
+    apiSendFormData<ConfirmUploadResponse>("POST", "/uploads/direct", formData),
   kinds: () =>
     apiGet<Record<string, { content_types: string[]; max_bytes: number; scope: string }>>("/uploads/kinds"),
   download: (key: string) =>
