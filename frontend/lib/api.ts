@@ -676,6 +676,8 @@ export const rbacApi = {
   permissions: () => apiGet<Permission[]>("/rbac/permissions"),
   updatePermission: (code: string, data: { description?: string }) =>
     apiSend<Permission>("PATCH", `/rbac/permissions/${encodeURIComponent(code)}`, data),
+  setRolePermissions: (slug: string, permissions: string[]) =>
+    apiSend<Role>("PUT", `/rbac/roles/${slug}/permissions`, { permissions }),
 };
 
 export const usersApi = {
