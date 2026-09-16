@@ -19,6 +19,7 @@ class CurrentUser(BaseModel):
     id: str
     email: EmailStr
     full_name: str
+    phone: str | None = None
     is_superadmin: bool
     permissions: list[str]
     community_ids: list[str]
@@ -35,4 +36,11 @@ class PasswordChangeRequest(BaseModel):
 
     current_password: str = Field(min_length=1, max_length=256)
     new_password: str = Field(min_length=8, max_length=256)
+
+
+class ProfileUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    full_name: str | None = Field(default=None, min_length=1, max_length=255)
+    phone: str | None = Field(default=None, max_length=20, pattern=r"^[+0-9][0-9 \-]{4,19}$")
 
