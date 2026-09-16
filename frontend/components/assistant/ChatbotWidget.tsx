@@ -49,9 +49,10 @@ function renderText(text: string) {
 }
 
 export function ChatbotWidget() {
-  const { data: user } = useMe();
   const router = useRouter();
   const pathname = usePathname();
+  const isPublicRoute = PUBLIC_ROUTES.has(pathname) || Boolean(pathname?.startsWith("/invitations"));
+  const { data: user } = useMe({ enabled: !isPublicRoute });
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -61,7 +62,7 @@ export function ChatbotWidget() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const canUseAssistant =
-    !PUBLIC_ROUTES.has(pathname) &&
+    !isPublicRoute &&
     Boolean(user) &&
     (user!.is_superadmin || user!.permissions?.includes("dashboards:view"));
   const communityId = user?.community_ids?.[0];
