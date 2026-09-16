@@ -151,6 +151,17 @@ async def update_amenity(
     )
 
 
+@router.delete(
+    "/{amenity_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    dependencies=[APPROVE],
+)
+async def delete_amenity(amenity_id: uuid.UUID, svc: Svc = Depends(amenity_service)) -> Response:
+    await svc.delete_amenity(amenity_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get(
     "/{amenity_id}/slots", response_model=Envelope[list[schemas.SlotRead]], dependencies=[VIEW]
 )

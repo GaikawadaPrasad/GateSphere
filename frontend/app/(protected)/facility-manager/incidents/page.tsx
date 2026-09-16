@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SearchInput } from "@/components/forms/SearchInput";
 import { StatusBadge } from "@/components/common/StatusBadge";
@@ -47,6 +47,11 @@ export default function FacilityManagerIncidentsPage() {
   const [actionType, setActionType] = useState<string>("note");
   const [actionDetails, setActionDetails] = useState("");
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Per-incident actions panel
+  const [expandedIncidentId, setExpandedIncidentId] = useState<string | null>(null);
+  const [incidentActions, setIncidentActions] = useState<Record<string, any[]>>({});
 
   const loadIncidents = async () => {
     setIsLoading(true);
@@ -116,10 +121,29 @@ export default function FacilityManagerIncidentsPage() {
     try {
       await incidentsApi.addAction(actionIncidentId, { action_type: actionType, details: actionDetails || undefined });
       setIsActionModalOpen(false);
+      setSuccessMsg(`Action "${actionType.replace(/_/g, " ")}" logged successfully.`);
+      setTimeout(() => setSuccessMsg(null), 4000);
+      // Refresh actions if this incident is expanded
+      if (expandedIncidentId === actionIncidentId) {
+        const actions = await incidentsApi.actions(actionIncidentId);
+        setIncidentActions((prev) => ({ ...prev, [actionIncidentId]: actions || [] }));
+      }
     } catch (err: any) {
       alert(err?.message || "Failed to log action.");
     } finally {
       setIsSubmittingAction(false);
+    }
+  };
+
+  const toggleActionsPanel = async (incidentId: string) => {
+    if (expandedIncidentId === incidentId) {
+      setExpandedIncidentId(null);
+      return;
+    }
+    setExpandedIncidentId(incidentId);
+    if (!incidentActions[incidentId]) {
+      const actions = await incidentsApi.actions(incidentId);
+      setIncidentActions((prev) => ({ ...prev, [incidentId]: actions || [] }));
     }
   };
 
@@ -150,6 +174,12 @@ export default function FacilityManagerIncidentsPage() {
           </button>
         }
       />
+
+      {successMsg && (
+        <div style={{ marginBottom: "1rem", padding: "0.75rem 1rem", background: "#dcfce7", border: "1px solid #86efac", borderRadius: 6, color: "#166534", fontSize: "0.875rem" }}>
+          ✅ {successMsg}
+        </div>
+      )}
 
       <div className="card">
         <div className="card-header" style={{ flexWrap: "wrap", gap: "0.75rem" }}>
@@ -231,7 +261,8 @@ export default function FacilityManagerIncidentsPage() {
                 </tr>
               ) : (
                 filtered.map((inc) => (
-                  <tr key={inc.id}>
+                  <React.Fragment key={inc.id}>
+                  <tr>
                     <td style={{ fontWeight: 600 }}>{inc.incident_number}</td>
                     <td style={{ textTransform: "capitalize" }}>
                       {inc.incident_type.replace(/_/g, " ")}
@@ -261,16 +292,55 @@ export default function FacilityManagerIncidentsPage() {
                             ))}
                           </select>
                         )}
-                        <button
+        <button
                           className="btn btn-secondary"
                           style={{ fontSize: "0.72rem", padding: "0.15rem 0.4rem", height: 28 }}
                           onClick={() => openActionModal(inc.id)}
                         >
                           + Action
                         </button>
+                        <button
+                          className="btn btn-secondary"
+                          style={{ fontSize: "0.72rem", padding: "0.15rem 0.4rem", height: 28 }}
+                          onClick={() => toggleActionsPanel(inc.id)}
+                        >
+                          {expandedIncidentId === inc.id ? "▲ Hide" : "▼ Log"}
+                        </button>
                       </div>
                     </td>
                   </tr>
+                  {expandedIncidentId === inc.id && (
+                    <tr key={`${inc.id}-actions`}>
+                      <td colSpan={7} style={{ background: "#f8fafc", padding: "0.75rem 1.25rem" }}>
+                        <strong style={{ fontSize: "0.8rem" }}>Logged Actions</strong>
+                        {!incidentActions[inc.id] ? (
+                          <p style={{ fontSize: "0.8rem", color: "var(--muted)", margin: "0.4rem 0 0" }}>Loading…</p>
+                        ) : incidentActions[inc.id].length === 0 ? (
+                          <p style={{ fontSize: "0.8rem", color: "var(--muted)", margin: "0.4rem 0 0" }}>No actions logged yet.</p>
+                        ) : (
+                          <table style={{ width: "100%", marginTop: "0.5rem", fontSize: "0.8rem", borderCollapse: "collapse" }}>
+                            <thead>
+                              <tr style={{ color: "var(--muted)", textAlign: "left" }}>
+                                <th style={{ padding: "0.2rem 0.5rem" }}>Type</th>
+                                <th style={{ padding: "0.2rem 0.5rem" }}>Details</th>
+                                <th style={{ padding: "0.2rem 0.5rem" }}>At</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {incidentActions[inc.id].map((a: any) => (
+                                <tr key={a.id} style={{ borderTop: "1px solid var(--border-standard)" }}>
+                                  <td style={{ padding: "0.3rem 0.5rem", textTransform: "capitalize", whiteSpace: "nowrap" }}>{a.action_type.replace(/_/g, " ")}</td>
+                                  <td style={{ padding: "0.3rem 0.5rem" }}>{a.details || "—"}</td>
+                                  <td style={{ padding: "0.3rem 0.5rem", whiteSpace: "nowrap" }}>{formatDate(a.action_at)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
                 ))
               )}
             </tbody>

@@ -156,6 +156,22 @@ class AmenityService(UnitScopedAccess):
         await self._audit("amenity.update", obj.community_id, "amenity", obj.id, new=patch)
         return obj
 
+    async def delete_amenity(self, amenity_id: uuid.UUID) -> None:
+        obj = await self._amenity_in_scope(amenity_id)
+        active_bookings = await self.db.scalar(
+            select(AmenityBooking)
+            .where(AmenityBooking.amenity_id == amenity_id, AmenityBooking.status == "confirmed")
+            .limit(1)
+        )
+        if active_bookings is not None:
+            raise BusinessRuleError(
+                "Cannot delete a facility with active bookings", code="HAS_ACTIVE_BOOKINGS"
+            )
+        community_id = obj.community_id
+        await self.db.delete(obj)
+        await self.db.flush()
+        await self._audit("amenity.delete", community_id, "amenity", amenity_id)
+
     # -- slots ------------------------------------------- #
     async def list_slots(self, amenity_id: uuid.UUID):
         await self._amenity_in_scope(amenity_id)

@@ -313,11 +313,29 @@ class ComplaintService(UnitScopedAccess):
             stmt = stmt.where(
                 ServiceTicket.ticket_number.ilike(like) | ServiceTicket.subject.ilike(like)
             )
-        stmt = await self._scope_unit_column(
-            stmt,
-            ServiceTicket.unit_id,
-            or_owned=ServiceTicket.raised_by_user_id == self.actor.id,
+        # vendor_technician only sees tickets assigned to them via TicketAssignment
+        from app.modules.users.models import Role, UserRole
+        is_vendor = await self.db.scalar(
+            select(UserRole.id)
+            .join(Role, Role.id == UserRole.role_id)
+            .where(UserRole.user_id == self.actor.id, Role.slug == "vendor_technician")
+            .limit(1)
         )
+        if is_vendor:
+            stmt = stmt.where(
+                ServiceTicket.id.in_(
+                    select(TicketAssignment.ticket_id).where(
+                        TicketAssignment.assigned_to_user_id == self.actor.id,
+                        TicketAssignment.is_active.is_(True),
+                    )
+                )
+            )
+        else:
+            stmt = await self._scope_unit_column(
+                stmt,
+                ServiceTicket.unit_id,
+                or_owned=ServiceTicket.raised_by_user_id == self.actor.id,
+            )
         return await self.tickets.list(
             offset=offset, limit=limit, extra=stmt
         ), await self.tickets.count(extra=stmt)

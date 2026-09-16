@@ -872,6 +872,8 @@ export const facilitiesApi = {
     apiGet<any[]>("/amenities", params as Record<string, unknown>),
   get: (id: string) => apiGet<any>(`/amenities/${id}`),
   create: (data: any) => apiSend<any>("POST", "/amenities", data),
+  update: (id: string, data: any) => apiSend<any>("PATCH", `/amenities/${id}`, data),
+  delete: (id: string) => apiSend<any>("DELETE", `/amenities/${id}`),
   updateStatus: (id: string, isActive: boolean) =>
     apiSend<any>("PATCH", `/amenities/${id}`, { is_active: isActive }),
 };
