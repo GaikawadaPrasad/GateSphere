@@ -1121,3 +1121,22 @@ export function useEndDomesticStaffAssignment() {
     },
   });
 }
+
+export function useRegisterVehicle() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: {
+      registration_number: string;
+      vehicle_type: string;
+      make?: string;
+      model?: string;
+      color?: string;
+      sticker_number?: string;
+    }) => {
+      return await api.post("/vehicles", payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["resident", "vehicles"] });
+    },
+  });
+}

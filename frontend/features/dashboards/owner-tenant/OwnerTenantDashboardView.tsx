@@ -48,6 +48,7 @@ import {
   useResidentProfile,
   useResidentDeliveryProtocols,
   useResidentVehicles,
+  useRegisterVehicle,
   useResidentDomesticStaff,
   useSubmitStaffRating,
   useAssignDomesticStaff,
@@ -203,6 +204,14 @@ export function OwnerTenantDashboardView({
   const endAssignmentMutation = useEndDomesticStaffAssignment();
   const { data: staffDirectory = [], isLoading: staffDirectoryLoading } = useCommunityStaffDirectory();
 
+  // Vehicle self-registration modal state
+  const [registerVehicleModalOpen, setRegisterVehicleModalOpen] = useState(false);
+  const [vehRegNumber, setVehRegNumber] = useState("");
+  const [vehType, setVehType] = useState("car");
+  const [vehMake, setVehMake] = useState("");
+  const [vehModel, setVehModel] = useState("");
+  const [vehColor, setVehColor] = useState("");
+  const registerVehicleMutation = useRegisterVehicle();
 
   // Payments view mode ("invoices" vs "ledger")
   const [paymentsViewMode, setPaymentsViewMode] = useState<"invoices" | "ledger">("invoices");
@@ -2440,6 +2449,19 @@ export function OwnerTenantDashboardView({
                   value={vehicleControls.sortPreset}
                   onChange={vehicleControls.setSortPreset}
                 />
+                <BrandButton
+                  onClick={() => {
+                    setVehRegNumber("");
+                    setVehType("car");
+                    setVehMake("");
+                    setVehModel("");
+                    setVehColor("");
+                    setRegisterVehicleModalOpen(true);
+                  }}
+                  size="sm"
+                >
+                  + Register Vehicle
+                </BrandButton>
               </div>
             </div>
             {vehicles.isError ? (
@@ -5095,6 +5117,123 @@ export function OwnerTenantDashboardView({
             </BrandButton>
             <BrandButton type="submit" isLoading={assignStaffMutation.isPending}>
               Assign Staff
+            </BrandButton>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Register Vehicle Modal */}
+      <Modal
+        isOpen={registerVehicleModalOpen}
+        onClose={() => setRegisterVehicleModalOpen(false)}
+        title="🚗 Register Vehicle"
+        size="md"
+      >
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const plate = vehRegNumber.trim().toUpperCase();
+            if (!plate) {
+              toast.error("Please enter a vehicle registration/plate number.");
+              return;
+            }
+            try {
+              await registerVehicleMutation.mutateAsync({
+                registration_number: plate,
+                vehicle_type: vehType,
+                make: vehMake.trim() || undefined,
+                model: vehModel.trim() || undefined,
+                color: vehColor.trim() || undefined,
+              });
+              setRegisterVehicleModalOpen(false);
+              toast.success(`Vehicle ${plate} registered successfully!`, "Vehicle Registered");
+            } catch (err: any) {
+              toast.error(err?.message || "Failed to register vehicle.");
+            }
+          }}
+          style={{ display: "flex", flexDirection: "column", gap: "1rem", padding: "0.25rem 0" }}
+        >
+          <div>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+              License Plate / Registration Number *
+            </label>
+            <input
+              type="text"
+              className="input-field"
+              placeholder="e.g. KA01AB1234"
+              value={vehRegNumber}
+              onChange={(e) => setVehRegNumber(e.target.value)}
+              required
+            />
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+              Vehicle Type *
+            </label>
+            <select
+              className="input-field"
+              value={vehType}
+              onChange={(e) => setVehType(e.target.value)}
+              required
+            >
+              <option value="car">Car (Sedan / Hatchback / SUV)</option>
+              <option value="bike">Motorcycle / Bike</option>
+              <option value="scooter">Scooter</option>
+              <option value="ev_car">Electric Car (EV)</option>
+              <option value="ev_bike">Electric 2-Wheeler (EV)</option>
+              <option value="bicycle">Bicycle</option>
+              <option value="commercial">Commercial / Van</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+            <div>
+              <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+                Make / Brand
+              </label>
+              <input
+                type="text"
+                className="input-field"
+                placeholder="e.g. Honda, Hyundai"
+                value={vehMake}
+                onChange={(e) => setVehMake(e.target.value)}
+              />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+                Model
+              </label>
+              <input
+                type="text"
+                className="input-field"
+                placeholder="e.g. City, Creta"
+                value={vehModel}
+                onChange={(e) => setVehModel(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+              Color
+            </label>
+            <input
+              type="text"
+              className="input-field"
+              placeholder="e.g. White, Silver, Black"
+              value={vehColor}
+              onChange={(e) => setVehColor(e.target.value)}
+            />
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
+            <BrandButton type="button" variant="outline" onClick={() => setRegisterVehicleModalOpen(false)}>
+              Cancel
+            </BrandButton>
+            <BrandButton type="submit" isLoading={registerVehicleMutation.isPending}>
+              Register Vehicle
             </BrandButton>
           </div>
         </form>

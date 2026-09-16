@@ -56,8 +56,8 @@ class VehicleCreate(_Write):
 
     @model_validator(mode="after")
     def _owner_xor(self) -> VehicleCreate:
-        if bool(self.resident_profile_id) == bool(self.visitor_id):
-            raise ValueError("exactly one of resident_profile_id / visitor_id is required")
+        if self.resident_profile_id is not None and self.visitor_id is not None:
+            raise ValueError("cannot specify both resident_profile_id and visitor_id")
         return self
 
 

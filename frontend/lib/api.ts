@@ -1029,18 +1029,42 @@ export const deliveriesApi = {
 export const vehiclesApi = {
   list: (params?: ListQueryParams) =>
     apiGet<Record<string, unknown>[]>("/vehicles", params as Record<string, unknown>),
-  register: (data: { plate_number: string; make_model?: string; vehicle_type?: string; sticker_number?: string }) =>
-    apiSend<Record<string, unknown>>("POST", "/vehicles", data),
+  register: (data: {
+    registration_number: string;
+    vehicle_type: string;
+    unit_id?: string;
+    resident_profile_id?: string;
+    make?: string;
+    model?: string;
+    color?: string;
+    sticker_number?: string;
+  }) => apiSend<Record<string, unknown>>("POST", "/vehicles", data),
+  slots: (params?: { community_id?: string; slot_status?: string }) =>
+    apiGet<Record<string, unknown>[]>("/vehicles/parking/slots", params as Record<string, unknown>),
   allocations: (params?: ListQueryParams) =>
     apiGet<Record<string, unknown>[]>(
       "/vehicles/parking/allocations",
       params as Record<string, unknown>,
     ),
+  allocate: (data: { slot_id: string; vehicle_id: string; unit_id?: string; allocated_to?: string }) =>
+    apiSend<Record<string, unknown>>("POST", "/vehicles/parking/allocations", data),
+  release: (allocationId: string) =>
+    apiSend<Record<string, unknown>>("POST", `/vehicles/parking/allocations/${allocationId}/release`),
   violations: (params?: ListQueryParams) =>
     apiGet<Record<string, unknown>[]>(
       "/vehicles/parking/violations",
       params as Record<string, unknown>,
     ),
+  reportViolation: (data: {
+    violation_type: string;
+    vehicle_id?: string;
+    parking_slot_id?: string;
+    description?: string;
+    evidence_url?: string;
+    fine_amount?: number;
+  }) => apiSend<Record<string, unknown>>("POST", "/vehicles/parking/violations", data),
+  transitionViolation: (violationId: string, newStatus: string) =>
+    apiSend<Record<string, unknown>>("POST", `/vehicles/parking/violations/${violationId}/status`, undefined, { new_status: newStatus }),
 };
 
 export const incidentsApi = {

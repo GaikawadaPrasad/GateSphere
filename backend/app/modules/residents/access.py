@@ -40,7 +40,6 @@ CROSS_UNIT_ROLES = frozenset(
         "security_supervisor",
         "security_guard",
         "auditor",
-        "vendor_technician",
     }
 )
 

@@ -7,7 +7,10 @@ import { toast } from "@/store/toast";
 
 interface Vehicle {
   id: string;
-  plate_number: string;
+  registration_number: string;
+  plate_number?: string;
+  make?: string;
+  model?: string;
   make_model?: string;
   vehicle_type: string;
   unit_id?: string;
@@ -24,7 +27,7 @@ export default function VehiclesPage() {
   const [showModal, setShowModal] = useState(false);
   const [plateNumber, setPlateNumber] = useState("");
   const [makeModel, setMakeModel] = useState("");
-  const [vehicleType, setVehicleType] = useState("four_wheeler");
+  const [vehicleType, setVehicleType] = useState("car");
   const [stickerNumber, setStickerNumber] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -33,7 +36,13 @@ export default function VehiclesPage() {
     try {
       const res = await vehiclesApi.list();
       const list = Array.isArray(res) ? res : [];
-      setVehicles(list as unknown as Vehicle[]);
+      setVehicles(
+        (list as any[]).map((v) => ({
+          ...v,
+          plate_number: v.registration_number || v.plate_number,
+          make_model: [v.make, v.model].filter(Boolean).join(" ") || v.make_model || "Vehicle",
+        })),
+      );
     } catch (err: any) {
       setError(err?.message || "Failed to load vehicles.");
     } finally {
@@ -58,8 +67,8 @@ export default function VehiclesPage() {
     setSubmitting(true);
     try {
       await vehiclesApi.register({
-        plate_number: cleanPlate,
-        make_model: makeModel.trim(),
+        registration_number: cleanPlate,
+        make: makeModel.trim() || undefined,
         vehicle_type: vehicleType,
         sticker_number: stickerNumber.trim() || undefined,
       });
@@ -155,9 +164,14 @@ export default function VehiclesPage() {
                 onChange={(e) => setVehicleType(e.target.value)}
                 className="w-full mt-1 p-2 border rounded-md bg-white dark:bg-slate-800"
               >
-                <option value="four_wheeler">Four Wheeler (Car)</option>
-                <option value="two_wheeler">Two Wheeler (Bike/Scooter)</option>
-                <option value="commercial">Commercial / EV</option>
+                <option value="car">Car / SUV</option>
+                <option value="bike">Motorcycle / Bike</option>
+                <option value="scooter">Scooter</option>
+                <option value="ev_car">Electric Car (EV)</option>
+                <option value="ev_bike">Electric 2-Wheeler (EV)</option>
+                <option value="bicycle">Bicycle</option>
+                <option value="commercial">Commercial / Van</option>
+                <option value="other">Other</option>
               </select>
             </div>
             <div>

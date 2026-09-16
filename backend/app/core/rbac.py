@@ -49,7 +49,6 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
     "community_admin": [p for p in PERMISSIONS if not p.startswith("audit:")],
     "association_committee": [
         "billing:view",
-        "billing:create",
         "billing:approve",
         "billing:export",
         "communication:view",

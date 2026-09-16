@@ -23,9 +23,16 @@ _s3 = boto3.client(
     config=Config(signature_version="s3v4"),
 )
 
-# Client-facing presign client: when the backend is inside Docker (e.g. endpoint http://minio:9000)
+def _is_internal_docker_host(url: str) -> bool:
+    return "://minio" in url or "://localhost" in url or "://127.0.0.1" in url
+
+
+# Client-facing presign client:
+# When the backend is inside a local Docker network (e.g. endpoint http://minio:9000)
 # but browsers run on host (e.g. public URL http://localhost:9000), generate presigned URLs using
 # the public/client-accessible host so the browser's DNS resolves and the SigV4 Host header matches.
+# For cloud S3 providers (Supabase *.storage.supabase.co, AWS S3, Cloudflare R2), S3_ENDPOINT_URL
+# is already the public S3 SigV4 endpoint and must be used directly by boto3.
 _client_endpoint = (settings.S3_PUBLIC_URL or "").rstrip("/")
 _s3_presign = (
     boto3.client(
@@ -36,7 +43,9 @@ _s3_presign = (
         aws_secret_access_key=settings.S3_SECRET_KEY,
         config=Config(signature_version="s3v4"),
     )
-    if _client_endpoint and _client_endpoint != settings.S3_ENDPOINT_URL.rstrip("/")
+    if _is_internal_docker_host(settings.S3_ENDPOINT_URL)
+    and _client_endpoint
+    and _client_endpoint != settings.S3_ENDPOINT_URL.rstrip("/")
     else _s3
 )
 
@@ -49,7 +58,7 @@ def ensure_bucket() -> None:
 
 def put_object(key: str, body: bytes, content_type: str) -> str:
     _s3.put_object(Bucket=settings.S3_BUCKET, Key=key, Body=body, ContentType=content_type)
-    return f"{settings.S3_PUBLIC_URL}/{settings.S3_BUCKET}/{key}"
+    return public_url(key)
 
 
 def presigned_get(key: str, expires: int = 3600) -> str:
@@ -93,7 +102,13 @@ def delete_object(key: str) -> None:
 
 
 def public_url(key: str) -> str:
-    return f"{settings.S3_PUBLIC_URL}/{settings.S3_BUCKET}/{key}"
+    base = (settings.S3_PUBLIC_URL or "").rstrip("/")
+    if "supabase.co" in base and not base.endswith("/object/public") and not base.endswith("/storage/v1/s3"):
+        if base.endswith("/storage/v1"):
+            base = f"{base}/object/public"
+        else:
+            base = f"{base}/storage/v1/object/public"
+    return f"{base}/{settings.S3_BUCKET}/{key}"
 
 
 PUBLIC_PREFIX = f"{settings.S3_PUBLIC_URL.rstrip('/')}/{settings.S3_BUCKET}/"

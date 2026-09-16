@@ -327,3 +327,13 @@ async def add_attachment(
         schemas.AttachmentRead.model_validate(await svc.add_attachment(ticket_id, payload)),
         message="Attached",
     )
+
+
+@router.get(
+    "/tickets/{ticket_id}/entry-pass",
+    response_model=Envelope[schemas.TicketEntryPassRead],
+    dependencies=[VIEW],
+)
+async def get_entry_pass(ticket_id: uuid.UUID, svc: Svc = Depends(complaint_service)) -> dict:
+    return ok(await svc.get_entry_pass(ticket_id))
+

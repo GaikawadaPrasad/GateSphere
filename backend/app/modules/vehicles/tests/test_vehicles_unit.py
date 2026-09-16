@@ -27,8 +27,13 @@ async def _vehicle(svc, community, plate="KA01AB0001"):
 
 
 async def test_owner_xor_enforced_by_schema():
-    with pytest.raises(ValueError, match="exactly one"):
-        schemas.VehicleCreate(vehicle_type="car", registration_number="KA01AB0002")
+    with pytest.raises(ValueError, match="cannot specify both"):
+        schemas.VehicleCreate(
+            vehicle_type="car",
+            registration_number="KA01AB0002",
+            resident_profile_id=uuid.uuid4(),
+            visitor_id=uuid.uuid4(),
+        )
 
 
 async def test_duplicate_plate_conflicts(db, scope_for, community, superadmin):

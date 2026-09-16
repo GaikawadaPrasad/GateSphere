@@ -55,7 +55,17 @@ export default function VendorEntryPassPage() {
           const assigned = tickets.find(
             (t) => t.status === "assigned" || t.status === "created",
           );
-          setActiveTicket(inProgress || acknowledged || assigned || null);
+          const matched = inProgress || acknowledged || assigned || null;
+          if (matched) {
+            try {
+              const pass = await vendorTicketsApi.getEntryPass(matched.id);
+              setActiveTicket({ ...matched, ...pass });
+            } catch {
+              setActiveTicket(matched);
+            }
+          } else {
+            setActiveTicket(null);
+          }
         }
       } catch {
         setActiveTicket(null);
@@ -66,11 +76,15 @@ export default function VendorEntryPassPage() {
     loadPass();
   }, []);
 
-  const passCode = activeTicket
+  const passCode = activeTicket?.pass_code
+    ? activeTicket.pass_code
+    : activeTicket
     ? `PASS-VEN-${activeTicket.ticket_number.replace(/\D/g, "").slice(-4) || "8812"}`
     : "NO-ACTIVE-PASS";
 
-  const qrData = activeTicket
+  const qrData = activeTicket?.qr_payload
+    ? activeTicket.qr_payload
+    : activeTicket
     ? `GS-PASS-${activeTicket.ticket_number}-${activeTicket.id.slice(0, 8).toUpperCase()}`
     : "NO-ACTIVE-WORK-ORDER";
 
