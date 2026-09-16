@@ -4,28 +4,35 @@ import { useState, useEffect, useMemo } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DataTable, type Column } from "@/components/tables/DataTable";
-import { complaintsApi, type ServiceTicket } from "@/lib/api";
+import { vendorTicketsApi, complaintsApi } from "@/lib/api";
 
 export default function VendorServiceHistoryPage() {
-  const [tickets, setTickets] = useState<ServiceTicket[]>([]);
+  const [tickets, setTickets] = useState<any[]>([]);
+  const [feedbackMap, setFeedbackMap] = useState<Record<string, number | null>>({});
   const [isLoading, setIsLoading] = useState(true);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const data = await complaintsApi.tickets({ page_size: 50 });
-      if (Array.isArray(data)) {
-        // Service history consists of completed, resolved, or resident confirmation tickets
-        const completed = data.filter(
-          (t) =>
-            t.status === "resolved" ||
-            t.status === "resident_confirmation" ||
-            t.status === "closed",
-        );
-        setTickets(completed);
-      } else {
-        setTickets([]);
-      }
+      const data = await vendorTicketsApi.list({ page_size: 50 });
+      const completed = (Array.isArray(data) ? data : []).filter(
+        (t: any) =>
+          t.status === "resolved" ||
+          t.status === "resident_confirmation" ||
+          t.status === "closed",
+      );
+      setTickets(completed);
+      // fetch feedback ratings for closed tickets
+      const closed = completed.filter((t: any) => t.status === "closed");
+      const results = await Promise.allSettled(
+        closed.map((t: any) => complaintsApi.getFeedback(t.id))
+      );
+      const map: Record<string, number | null> = {};
+      closed.forEach((t: any, i: number) => {
+        const r = results[i];
+        map[t.id] = r.status === "fulfilled" && r.value ? r.value.rating : null;
+      });
+      setFeedbackMap(map);
     } catch {
       setTickets([]);
     } finally {
@@ -37,7 +44,7 @@ export default function VendorServiceHistoryPage() {
     loadData();
   }, []);
 
-  const columns: Column<ServiceTicket>[] = useMemo(
+  const columns: Column<any>[] = useMemo(
     () => [
       {
         key: "ticket_number",
@@ -114,12 +121,25 @@ export default function VendorServiceHistoryPage() {
         ),
       },
       {
+        key: "rating",
+        header: "Resident Rating",
+        render: (h) => {
+          const r = feedbackMap[h.id];
+          if (r == null) return <span style={{ color: "var(--muted)", fontSize: "0.8rem" }}>—</span>;
+          return (
+            <span style={{ color: "#f59e0b", fontSize: "0.9rem", letterSpacing: 1 }}>
+              {"★".repeat(r)}{"☆".repeat(5 - r)}
+            </span>
+          );
+        },
+      },
+      {
         key: "status",
         header: "Workflow Status",
         render: (h) => <StatusBadge status={h.status} />,
       },
     ],
-    [],
+    [feedbackMap],
   );
 
   return (
@@ -145,7 +165,7 @@ export default function VendorServiceHistoryPage() {
           </button>
         </div>
 
-        <DataTable<ServiceTicket>
+        <DataTable<any>
           columns={columns}
           data={tickets}
           isLoading={isLoading}

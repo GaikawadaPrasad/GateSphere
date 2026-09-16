@@ -139,19 +139,29 @@ class AmenityService(UnitScopedAccess):
             raise ConflictError("That code exists", code="AMENITY_EXISTS")
         obj = Amenity(community_id=cid, **payload.model_dump())
         await self.amenities.add(obj)
-        # Auto-provision standard daily slots so the amenity is immediately bookable
+        # Auto-provision standard 2-hour slots (06:00–22:00) for every day of the week
+        _standard_slots = [
+            (time(6, 0), time(8, 0)),
+            (time(8, 0), time(10, 0)),
+            (time(10, 0), time(12, 0)),
+            (time(12, 0), time(14, 0)),
+            (time(14, 0), time(16, 0)),
+            (time(16, 0), time(18, 0)),
+            (time(18, 0), time(20, 0)),
+            (time(20, 0), time(22, 0)),
+        ]
         for day in range(7):
-            slot = AmenitySlot(
-                community_id=cid,
-                amenity_id=obj.id,
-                day_of_week=day,
-                start_time=time(6, 0),
-                end_time=time(22, 0),
-                capacity=obj.capacity or 20,
-                fee=Decimal("0"),
-                is_active=True,
-            )
-            self.db.add(slot)
+            for st, et in _standard_slots:
+                self.db.add(AmenitySlot(
+                    community_id=cid,
+                    amenity_id=obj.id,
+                    day_of_week=day,
+                    start_time=st,
+                    end_time=et,
+                    capacity=obj.capacity or 20,
+                    fee=Decimal("0"),
+                    is_active=True,
+                ))
         await self.db.flush()
         await self._audit("amenity.create", cid, "amenity", obj.id)
         return obj

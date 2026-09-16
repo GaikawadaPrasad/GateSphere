@@ -470,6 +470,33 @@ def seed_amenities(db: Session, communities: list[Community]) -> None:
 
     from app.modules.amenities.models import Amenity, AmenityRule, AmenitySlot
 
+    standard_slot_times = [
+        (time(6, 0), time(8, 0)),
+        (time(8, 0), time(10, 0)),
+        (time(10, 0), time(12, 0)),
+        (time(12, 0), time(14, 0)),
+        (time(14, 0), time(16, 0)),
+        (time(16, 0), time(18, 0)),
+        (time(18, 0), time(20, 0)),
+        (time(20, 0), time(22, 0)),
+    ]
+
+    def _provision_slots(db, amenity, cap):
+        """Add standard 2-hour slots for all 7 days if none exist yet."""
+        existing = db.scalar(select(AmenitySlot).where(AmenitySlot.amenity_id == amenity.id).limit(1))
+        if existing:
+            return
+        for dow in range(7):
+            for st, et in standard_slot_times:
+                db.add(AmenitySlot(
+                    community_id=amenity.community_id,
+                    amenity_id=amenity.id,
+                    day_of_week=dow,
+                    start_time=st,
+                    end_time=et,
+                    capacity=cap,
+                ))
+
     presets = [("CLUB", "Clubhouse", "clubhouse", 60), ("GYM", "Gym", "gym", 20)]
     for c in communities:
         for code, name, atype, cap in presets:
@@ -480,29 +507,8 @@ def seed_amenities(db: Session, communities: list[Community]) -> None:
                 code=code,
                 defaults={"name": name, "amenity_type": atype, "capacity": cap},
             )
+            _provision_slots(db, am, cap)
             if created:
-                standard_slot_times = [
-                    (time(6, 0), time(8, 0)),
-                    (time(8, 0), time(10, 0)),
-                    (time(10, 0), time(12, 0)),
-                    (time(12, 0), time(14, 0)),
-                    (time(14, 0), time(16, 0)),
-                    (time(16, 0), time(18, 0)),
-                    (time(18, 0), time(20, 0)),
-                    (time(20, 0), time(22, 0)),
-                ]
-                for dow in range(0, 7):
-                    for st, et in standard_slot_times:
-                        db.add(
-                            AmenitySlot(
-                                community_id=c.id,
-                                amenity_id=am.id,
-                                day_of_week=dow,
-                                start_time=st,
-                                end_time=et,
-                                capacity=cap,
-                            )
-                        )
                 db.add(
                     AmenityRule(
                         community_id=c.id,
@@ -519,6 +525,11 @@ def seed_amenities(db: Session, communities: list[Community]) -> None:
                         rule_value={"value": 3},
                     )
                 )
+
+        # Backfill slots for any amenity created via the UI that has none
+        all_amenities = db.scalars(select(Amenity).where(Amenity.community_id == c.id)).all()
+        for am in all_amenities:
+            _provision_slots(db, am, am.capacity or 20)
 
 
 def seed_communication(db: Session, communities: list[Community]) -> None:
