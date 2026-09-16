@@ -92,8 +92,8 @@ def upgrade() -> None:
                 (id, community_id, amenity_id, day_of_week, start_time, end_time,
                  capacity, fee, is_active)
             VALUES
-                (gen_random_uuid(), :community_id::uuid, :amenity_id::uuid,
-                 :dow, :st::time, :et::time, :cap, 0, true)
+                (gen_random_uuid(), CAST(:community_id AS uuid), CAST(:amenity_id AS uuid),
+                 :dow, CAST(:st AS time), CAST(:et AS time), :cap, 0, true)
             ON CONFLICT DO NOTHING
             """
         ),
