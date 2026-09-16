@@ -21,6 +21,7 @@ import type { ResidentProfile, MoveRecord } from "@/types/residents";
 import { formatDateTime, generateInitialPassword } from "@/lib/utils";
 import { onboardingApi } from "@/lib/api";
 import { toast } from "@/store/toast";
+import { UpdateUserCredentialsModal, type CredentialUser } from "@/components/common/UpdateUserCredentialsModal";
 
 export default function CommunityAdminResidentsPage() {
   const { activeCommunityId } = useUiStore();
@@ -28,6 +29,7 @@ export default function CommunityAdminResidentsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [selectedResident, setSelectedResident] = useState<ResidentProfile | null>(null);
+  const [credentialUser, setCredentialUser] = useState<CredentialUser | null>(null);
 
   // Add Resident Modal State
   const [isAddResidentOpen, setIsAddResidentOpen] = useState(false);
@@ -223,17 +225,37 @@ export default function CommunityAdminResidentsPage() {
       key: "actions",
       header: "Action",
       render: (r) => (
-        <button
-          type="button"
-          className="btn btn-secondary"
-          style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem" }}
-          onClick={(e) => {
-            e.stopPropagation();
-            setSelectedResident(r);
-          }}
-        >
-          View Profile →
-        </button>
+        <div style={{ display: "flex", gap: "0.4rem" }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem" }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedResident(r);
+            }}
+          >
+            View Profile →
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem", background: "#f8fafc" }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setCredentialUser({
+                id: r.user_id || r.id,
+                full_name: r.full_name,
+                email: r.email || "",
+                phone: r.phone || "",
+                roleName: r.resident_type || "Resident",
+              });
+            }}
+            title="Update Credentials"
+          >
+            🔑 Credentials
+          </button>
+        </div>
       ),
     },
   ];
@@ -1514,6 +1536,14 @@ export default function CommunityAdminResidentsPage() {
           </div>
         </form>
       </Modal>
+
+      {/* Update Credentials Modal */}
+      <UpdateUserCredentialsModal
+        isOpen={Boolean(credentialUser)}
+        onClose={() => setCredentialUser(null)}
+        user={credentialUser}
+        onSuccess={() => refetchResidents()}
+      />
     </div>
   );
 }

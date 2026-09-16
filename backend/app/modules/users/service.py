@@ -196,12 +196,28 @@ class UserService:
         user = await self._get_visible(user_id)
         patch = payload.model_dump(exclude_unset=True)
         was_active = user.is_active
+
+        if "email" in patch and patch["email"]:
+            new_email = str(patch.pop("email")).strip().lower()
+            if new_email != user.email:
+                existing = await self.db.scalar(
+                    select(User).where(User.email == new_email, User.id != user.id)
+                )
+                if existing:
+                    raise ConflictError("Email already registered", code="EMAIL_TAKEN")
+                user.email = new_email
+
+        if "password" in patch and patch["password"]:
+            raw_pwd = str(patch.pop("password"))
+            user.password_hash = hash_password(raw_pwd)
+            await revoke_all_user_sessions_async(self.db, user.id)
+
         for k, v in patch.items():
             setattr(user, k, v)
         await self.db.flush()
         if was_active and user.is_active is False:
             await revoke_all_user_sessions_async(self.db, user.id)
-        await self._audit("user.update", str(user.id), new=patch)
+        await self._audit("user.update", str(user.id), new=payload.model_dump(exclude_unset=True))
         return await self._get_visible(user_id)
 
     async def grant_role(self, user_id: uuid.UUID, payload: schemas.RoleGrantIn) -> UserRole:
