@@ -166,9 +166,9 @@ export function useResidentVisitors() {
         remarks: note || (approved ? "Approved by resident" : "Rejected by resident"),
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resident", "visitors"] });
-      queryClient.invalidateQueries({ queryKey: ["resident", "overview"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["resident", "visitors"], refetchType: "all" });
+      await queryClient.invalidateQueries({ queryKey: ["resident", "overview"], refetchType: "all" });
     },
   });
 
@@ -280,9 +280,9 @@ export function useResidentVisitors() {
         pin: passRes.pin,
       };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resident", "visitors"] });
-      queryClient.invalidateQueries({ queryKey: ["resident", "overview"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["resident", "visitors"], refetchType: "all" });
+      await queryClient.invalidateQueries({ queryKey: ["resident", "overview"], refetchType: "all" });
     },
   });
 
@@ -323,8 +323,8 @@ export function useResidentDeliveries() {
     mutationFn: async (payload: { category: string; protocol: string }) => {
       return await api.put("/deliveries/protocols", payload);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resident", "deliveries"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["resident", "deliveries"], refetchType: "all" });
     },
   });
 
@@ -343,9 +343,9 @@ export function useResidentDeliveries() {
         remarks: remarks || (approved ? "Approved by resident" : "Rejected by resident"),
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resident", "deliveries"] });
-      queryClient.invalidateQueries({ queryKey: ["resident", "overview"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["resident", "deliveries"], refetchType: "all" });
+      await queryClient.invalidateQueries({ queryKey: ["resident", "overview"], refetchType: "all" });
     },
   });
 
@@ -457,10 +457,11 @@ export function useResidentAmenities() {
         participant_count: payload.guests || 1,
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resident", "my-bookings"] });
-      queryClient.invalidateQueries({ queryKey: ["resident", "overview"] });
-      queryClient.invalidateQueries({ queryKey: ["resident", "amenity-slots"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["resident", "my-bookings"], refetchType: "all" });
+      await queryClient.invalidateQueries({ queryKey: ["resident", "overview"], refetchType: "all" });
+      await queryClient.invalidateQueries({ queryKey: ["resident", "amenity-slots"], refetchType: "all" });
+      await queryClient.invalidateQueries({ queryKey: ["resident", "amenities-list"], refetchType: "all" });
     },
   });
 
@@ -470,9 +471,11 @@ export function useResidentAmenities() {
         reason: "Resident requested cancellation",
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resident", "my-bookings"] });
-      queryClient.invalidateQueries({ queryKey: ["resident", "overview"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["resident", "my-bookings"], refetchType: "all" });
+      await queryClient.invalidateQueries({ queryKey: ["resident", "overview"], refetchType: "all" });
+      await queryClient.invalidateQueries({ queryKey: ["resident", "amenities-list"], refetchType: "all" });
+      await queryClient.invalidateQueries({ queryKey: ["resident", "amenity-slots"], refetchType: "all" });
     },
   });
 
@@ -557,9 +560,9 @@ export function useResidentComplaints() {
         priority: payload.priority || "medium",
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resident", "complaints"] });
-      queryClient.invalidateQueries({ queryKey: ["resident", "overview"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["resident", "complaints"], refetchType: "all" });
+      await queryClient.invalidateQueries({ queryKey: ["resident", "overview"], refetchType: "all" });
     },
   });
 
@@ -578,9 +581,9 @@ export function useResidentComplaints() {
         remarks: notes || (satisfied ? "Confirmed by resident" : "Disputed by resident"),
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resident", "complaints"] });
-      queryClient.invalidateQueries({ queryKey: ["resident", "overview"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["resident", "complaints"], refetchType: "all" });
+      await queryClient.invalidateQueries({ queryKey: ["resident", "overview"], refetchType: "all" });
     },
   });
 
@@ -599,8 +602,8 @@ export function useResidentComplaints() {
         comments: comments?.trim() || undefined,
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resident", "complaints"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["resident", "complaints"], refetchType: "all" });
     },
   });
 
@@ -700,10 +703,10 @@ export function useResidentPayments() {
       });
       return res;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resident", "invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["resident", "overview"] });
-      queryClient.invalidateQueries({ queryKey: ["resident", "ledger"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["resident", "invoices"], refetchType: "all" });
+      await queryClient.invalidateQueries({ queryKey: ["resident", "overview"], refetchType: "all" });
+      await queryClient.invalidateQueries({ queryKey: ["resident", "ledger"], refetchType: "all" });
     },
   });
 
@@ -797,9 +800,9 @@ export function useResidentFamilyMembers() {
         access_enabled: payload.access_enabled !== false,
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resident", "family-members"] });
-      queryClient.invalidateQueries({ queryKey: ["resident", "me-profile"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["resident", "family-members"], refetchType: "all" });
+      await queryClient.invalidateQueries({ queryKey: ["resident", "me-profile"], refetchType: "all" });
     },
   });
 
@@ -820,9 +823,9 @@ export function useResidentFamilyMembers() {
         access_enabled: payload.access_enabled,
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resident", "family-members"] });
-      queryClient.invalidateQueries({ queryKey: ["resident", "me-profile"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["resident", "family-members"], refetchType: "all" });
+      await queryClient.invalidateQueries({ queryKey: ["resident", "me-profile"], refetchType: "all" });
     },
   });
 
@@ -830,9 +833,9 @@ export function useResidentFamilyMembers() {
     mutationFn: async (id: string) => {
       return await api.delete(`/residents/family-members/${id}`);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resident", "family-members"] });
-      queryClient.invalidateQueries({ queryKey: ["resident", "me-profile"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["resident", "family-members"], refetchType: "all" });
+      await queryClient.invalidateQueries({ queryKey: ["resident", "me-profile"], refetchType: "all" });
     },
   });
 
@@ -866,9 +869,9 @@ export function useResidentProfile() {
     }) => {
       return await api.patch("/residents/me", data);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resident", "me-profile"] });
-      queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["resident", "me-profile"], refetchType: "all" });
+      await queryClient.invalidateQueries({ queryKey: ["auth", "me"], refetchType: "all" });
     },
   });
 
@@ -882,8 +885,9 @@ export function useResidentProfile() {
     }) => {
       return await api.post("/residents/family-members", data);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resident", "me-profile"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["resident", "family-members"], refetchType: "all" });
+      await queryClient.invalidateQueries({ queryKey: ["resident", "me-profile"], refetchType: "all" });
     },
   });
 
@@ -1063,8 +1067,8 @@ export function useSubmitStaffRating() {
         feedback: payload.feedback?.trim() || undefined,
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resident", "domestic-staff"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["resident", "domestic-staff"], refetchType: "all" });
     },
   });
 }
@@ -1107,8 +1111,9 @@ export function useAssignDomesticStaff() {
     }) => {
       return await api.post("/domestic-staff/assignments", payload);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resident", "domestic-staff"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["resident", "domestic-staff"], refetchType: "all" });
+      await queryClient.invalidateQueries({ queryKey: ["resident", "overview"], refetchType: "all" });
     },
   });
 }
@@ -1119,8 +1124,9 @@ export function useEndDomesticStaffAssignment() {
     mutationFn: async (assignmentId: string) => {
       return await api.post(`/domestic-staff/assignments/${assignmentId}/end`, {});
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resident", "domestic-staff"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["resident", "domestic-staff"], refetchType: "all" });
+      await queryClient.invalidateQueries({ queryKey: ["resident", "overview"], refetchType: "all" });
     },
   });
 }
@@ -1138,8 +1144,8 @@ export function useRegisterVehicle() {
     }) => {
       return await api.post("/vehicles", payload);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resident", "vehicles"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["resident", "vehicles"], refetchType: "all" });
     },
   });
 }

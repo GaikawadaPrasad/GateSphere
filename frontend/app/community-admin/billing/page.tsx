@@ -69,7 +69,7 @@ export default function CommunityAdminBillingPage() {
 
   // Queries
   const { data: financial } = useFinancialStats(activeCommunityId || undefined);
-  const { data: invoices, isLoading: invoicesLoading } = useInvoices({
+  const { data: invoices, isLoading: invoicesLoading, refetch: refetchInvoices } = useInvoices({
     community_id: activeCommunityId || undefined,
     page_size: 50,
   });
@@ -222,6 +222,7 @@ export default function CommunityAdminBillingPage() {
         await postInvoiceMutation.mutateAsync(newInvoice.id);
       }
 
+      await refetchInvoices();
       setIsCreateModalOpen(false);
     } catch (err: any) {
       setFormError(err?.message || "Failed to generate invoice.");
@@ -323,6 +324,7 @@ export default function CommunityAdminBillingPage() {
               onClick={async () => {
                 if (confirm(`Post invoice ${i.invoice_number} to unit ledger now?`)) {
                   await postInvoiceMutation.mutateAsync(i.id);
+                  await refetchInvoices();
                 }
               }}
               disabled={postInvoiceMutation.isPending}
@@ -339,6 +341,7 @@ export default function CommunityAdminBillingPage() {
                 onClick={async () => {
                   if (confirm(`Cancel invoice ${i.invoice_number}?`)) {
                     await cancelInvoiceMutation.mutateAsync(i.id);
+                    await refetchInvoices();
                   }
                 }}
                 disabled={cancelInvoiceMutation.isPending}

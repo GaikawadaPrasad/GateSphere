@@ -328,6 +328,8 @@ export function OwnerTenantDashboardView({
         approved,
         remarks: approved ? "Approved by resident from portal" : "Denied by resident from portal",
       });
+      await deliveries.refetch();
+      refetchStats?.();
       toast.success(
         approved
           ? "Delivery approved! Security guard notified to permit entry."
@@ -348,6 +350,7 @@ export function OwnerTenantDashboardView({
         rating: feedbackRating,
         comments: feedbackComments,
       });
+      await complaints.refetch();
       toast.success(
         `Thank you! You rated ticket ${feedbackTicket.ticket_number} with ${feedbackRating} star(s).`,
         "Feedback Recorded",
@@ -371,6 +374,7 @@ export function OwnerTenantDashboardView({
         feedback: staffFeedbackText,
         unit_id: myOccupancy?.unit_id,
       });
+      await domesticStaff.refetch();
       toast.success(
         `Thank you for rating ${selectedStaff.name} with ${staffRatingValue} star(s).`,
         "Staff Rated",
@@ -394,6 +398,7 @@ export function OwnerTenantDashboardView({
         response,
         guests: 1,
       });
+      await announcements.refetch();
       const labels: Record<string, string> = {
         going: "Going",
         maybe: "Maybe",
@@ -416,6 +421,8 @@ export function OwnerTenantDashboardView({
         );
       if (isUuid) {
         await visitors.decide.mutateAsync({ requestId, approved });
+        await visitors.refetch();
+        refetchStats?.();
       }
       setVisitorBannerDismissed(true);
       if (typeof window !== "undefined") {
@@ -461,6 +468,8 @@ export function OwnerTenantDashboardView({
         party_size: passPartySize,
         group_label: passGroupLabel.trim() || undefined,
       });
+      await visitors.refetch();
+      refetchStats?.();
       setVisitorPassModalOpen(false);
       setActivePassResult({
         token: res.token,
@@ -524,6 +533,8 @@ export function OwnerTenantDashboardView({
         description: ticketDescription.trim(),
         priority: ticketPriority || "medium",
       });
+      await complaints.refetch();
+      refetchStats?.();
       setTicketModalOpen(false);
       setTicketSubject("");
       setTicketDescription("");
@@ -613,6 +624,9 @@ export function OwnerTenantDashboardView({
         date: bookingDate,
         guests: bookingGuests,
       });
+      await amenities.bookings.refetch();
+      await amenities.amenities.refetch();
+      refetchStats?.();
       setAmenityBookingModalOpen(false);
       toast.success(
         `Booking confirmed for ${selectedAmenity.name} on ${bookingDate} (${bookingGuests} person(s))!`,
@@ -635,6 +649,9 @@ export function OwnerTenantDashboardView({
     if (!bookingToCancel) return;
     try {
       await amenities.cancelBooking.mutateAsync(bookingToCancel.id);
+      await amenities.bookings.refetch();
+      await amenities.amenities.refetch();
+      refetchStats?.();
       const amenityName = bookingToCancel.amenity_name;
       setBookingToCancel(null);
       toast.success(`Reservation for ${amenityName} has been cancelled.`, "Booking Cancelled");
@@ -656,6 +673,8 @@ export function OwnerTenantDashboardView({
         phone: newMemberPhone.trim(),
         access_enabled: newMemberAccess,
       });
+      await family.refetch();
+      await profile.refetch();
       setAddMemberModalOpen(false);
       const addedName = newMemberName;
       setNewMemberName("");
@@ -682,6 +701,8 @@ export function OwnerTenantDashboardView({
         phone: editingMember.phone,
         access_enabled: editingMember.access_enabled,
       });
+      await family.refetch();
+      await profile.refetch();
       const updatedName = editingMember.name;
       setEditingMember(null);
       toast.success(
@@ -715,6 +736,7 @@ export function OwnerTenantDashboardView({
         emergency_contact_phone: profileEmergencyPhone.trim() || undefined,
         emergency_contact_relationship: profileEmergencyRel.trim() || undefined,
       });
+      await profile.refetch();
       toast.success("Your resident profile and emergency contact details have been updated.", "Profile Saved");
       setEditProfileOpen(false);
     } catch (err: any) {
@@ -730,6 +752,9 @@ export function OwnerTenantDashboardView({
         amount: selectedInvoice.balance_due,
         method: "simulated_gateway",
       });
+      await payments.refetch();
+      await ledger.refetch();
+      refetchStats?.();
       const generatedRcp =
         res?.receipt_number ||
         (res?.id ? `RCP-${res.id.slice(0, 8).toUpperCase()}` : `RCP-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
@@ -2372,13 +2397,19 @@ export function OwnerTenantDashboardView({
                           <BrandButton
                             size="sm"
                             isLoading={complaints.confirmTicket.isPending}
-                            onClick={() =>
-                              complaints.confirmTicket.mutateAsync({
-                                ticketId: i.id,
-                                satisfied: true,
-                                notes: "Fix confirmed by resident",
-                              }).catch((e: any) => toast.error(e?.message || "Failed to confirm.", "Error"))
-                            }
+                            onClick={async () => {
+                              try {
+                                await complaints.confirmTicket.mutateAsync({
+                                  ticketId: i.id,
+                                  satisfied: true,
+                                  notes: "Fix confirmed by resident",
+                                });
+                                await complaints.refetch();
+                                refetchStats?.();
+                              } catch (e: any) {
+                                toast.error(e?.message || "Failed to confirm.", "Error");
+                              }
+                            }}
                           >
                             ✓ Confirm Fix
                           </BrandButton>
@@ -2387,13 +2418,19 @@ export function OwnerTenantDashboardView({
                             variant="outline"
                             style={{ borderColor: "#FECACA", color: "#DC2626" }}
                             isLoading={complaints.confirmTicket.isPending}
-                            onClick={() =>
-                              complaints.confirmTicket.mutateAsync({
-                                ticketId: i.id,
-                                satisfied: false,
-                                notes: "Issue not resolved — disputed by resident",
-                              }).catch((e: any) => toast.error(e?.message || "Failed to dispute.", "Error"))
-                            }
+                            onClick={async () => {
+                              try {
+                                await complaints.confirmTicket.mutateAsync({
+                                  ticketId: i.id,
+                                  satisfied: false,
+                                  notes: "Issue not resolved — disputed by resident",
+                                });
+                                await complaints.refetch();
+                                refetchStats?.();
+                              } catch (e: any) {
+                                toast.error(e?.message || "Failed to dispute.", "Error");
+                              }
+                            }}
                           >
                             ✗ Dispute
                           </BrandButton>
@@ -2640,6 +2677,8 @@ export function OwnerTenantDashboardView({
                             if (window.confirm(`Are you sure you want to end service for ${i.name}?`)) {
                               try {
                                 await endAssignmentMutation.mutateAsync(i.id);
+                                await domesticStaff.refetch();
+                                refetchStats?.();
                                 toast.success(`Service ended for ${i.name}`);
                               } catch (err: any) {
                                 toast.error(err?.message || "Failed to end service");
@@ -3921,6 +3960,9 @@ export function OwnerTenantDashboardView({
                 if (!memberToDelete) return;
                 try {
                   await family.removeMember.mutateAsync(memberToDelete.id);
+                  await family.refetch();
+                  await profile.refetch();
+                  refetchStats?.();
                   const removedName = memberToDelete.name;
                   setMemberToDelete(null);
                   toast.success(
@@ -5011,6 +5053,8 @@ export function OwnerTenantDashboardView({
                 time_to: assignTimeTo ? `${assignTimeTo}:00` : undefined,
                 days_of_week: assignDays.length > 0 ? assignDays : undefined,
               });
+              await domesticStaff.refetch();
+              refetchStats?.();
               toast.success("Domestic staff assigned to your unit successfully!");
               setAssignStaffModalOpen(false);
               setAssignStaffId("");
@@ -5170,6 +5214,7 @@ export function OwnerTenantDashboardView({
                 model: vehModel.trim() || undefined,
                 color: vehColor.trim() || undefined,
               });
+              await vehicles.refetch();
               setRegisterVehicleModalOpen(false);
               toast.success(`Vehicle ${plate} registered successfully!`, "Vehicle Registered");
             } catch (err: any) {

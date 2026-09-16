@@ -130,8 +130,8 @@ export default function SecuritySupervisorVisitorManagementPage() {
     setActionMessage(null);
     try {
       await visitorsApi.approve(id, "Approved by Security Supervisor");
-      setVisitors((prev) => prev.map((v) => (v.id === id ? { ...v, status: "Approved", rawStatus: "approved" } : v)));
       setActionMessage({ type: "success", text: `Visitor request approved for ${name}.` });
+      await loadData();
     } catch (err: any) {
       setActionMessage({ type: "error", text: err?.message || "Failed to approve visitor request." });
     }
@@ -141,8 +141,8 @@ export default function SecuritySupervisorVisitorManagementPage() {
     setActionMessage(null);
     try {
       await visitorsApi.reject(id, "Rejected by Security Supervisor");
-      setVisitors((prev) => prev.map((v) => (v.id === id ? { ...v, status: "Rejected", rawStatus: "rejected" } : v)));
       setActionMessage({ type: "success", text: `Visitor request rejected for ${name}.` });
+      await loadData();
     } catch (err: any) {
       setActionMessage({ type: "error", text: err?.message || "Failed to reject visitor request." });
     }
