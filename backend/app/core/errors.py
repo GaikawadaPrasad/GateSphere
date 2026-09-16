@@ -90,6 +90,15 @@ def _request_id(request: Request) -> str | None:
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def _app_error(request: Request, exc: AppError) -> JSONResponse:
+        if exc.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY:
+            log.warning(
+                "business_rule_violation",
+                url=str(request.url),
+                method=request.method,
+                code=exc.code,
+                message=exc.message,
+                fields=exc.fields,
+            )
         return JSONResponse(
             status_code=exc.status_code,
             content=_envelope(exc.code, exc.message, exc.fields),
@@ -102,6 +111,13 @@ def register_exception_handlers(app: FastAPI) -> None:
             ".".join(str(p) for p in err["loc"] if p not in ("body", "query", "path")): err["msg"]
             for err in exc.errors()
         }
+        log.warning(
+            "request_validation_failed",
+            url=str(request.url),
+            method=request.method,
+            errors=exc.errors(),
+            fields=fields,
+        )
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content=_envelope("VALIDATION_ERROR", "Request validation failed", fields),

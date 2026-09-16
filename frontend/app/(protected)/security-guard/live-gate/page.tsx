@@ -237,6 +237,15 @@ export default function SecurityGuardLiveGatePage() {
       const pinToUse = extractedPin || (/^\d{4,12}$/.test(cleanDigits) ? cleanDigits : "");
       const isPin = Boolean(pinToUse) && !tokenToUse;
 
+      // Visitor gate admittance requires mandatory photograph
+      if (!entryPhotoUrl && cleanDigits.length !== 10) {
+        setShowPhotoPrompt(true);
+        setErrorMessage(
+          "📸 VISITOR PHOTO REQUIRED: Security policy mandates capturing a visitor photograph before gate entry. Please attach or snap the visitor's photo below.",
+        );
+        return;
+      }
+
       setIsVerifying(true);
       setErrorMessage("");
       setSuccessMessage("");
@@ -719,7 +728,7 @@ export default function SecurityGuardLiveGatePage() {
                 gap: "0.4rem",
               }}
             >
-              📷 Visitor Entry Photograph{" "}
+              📷 Visitor Entry Photograph <span style={{ color: "#dc2626", fontWeight: 900 }}>* (Mandatory)</span>{" "}
               {showPhotoPrompt && (
                 <span
                   style={{
@@ -730,7 +739,7 @@ export default function SecurityGuardLiveGatePage() {
                     fontSize: "0.75rem",
                   }}
                 >
-                  Required by Community Policy
+                  Required Before Entry
                 </span>
               )}
             </span>

@@ -63,35 +63,41 @@ async def test_entry_requires_approved_request(db, scope_for, community, unit, s
     assert exc.value.code == "NOT_APPROVED"
 
 
-async def test_full_entry_exit_cycle(db, scope_for, community, unit, superadmin):
+async def test_full_entry_exit_cycle(db, scope_for, community, unit, superadmin, confirmed_upload):
     svc = _svc(db, scope_for(community.id), superadmin)
     req = await _req(svc, unit, visitor_type="recurring")  # auto-approved
-    entry = await svc.record_entry(schemas.EntryCreate(request_id=req.id))
+    photo_url = confirmed_upload("visitor_photo")
+    entry = await svc.record_entry(
+        schemas.EntryCreate(request_id=req.id, entry_photo_url=photo_url)
+    )
     assert entry.status == "inside" and entry.entry_at is not None
     await db.refresh(req)
     assert req.status == "entered"
     # second entry while inside -> conflict
     with pytest.raises(ConflictError):
-        await svc.record_entry(schemas.EntryCreate(request_id=req.id))
+        await svc.record_entry(schemas.EntryCreate(request_id=req.id, entry_photo_url=photo_url))
     done = await svc.record_exit(entry.id)
     assert done.status == "exited" and done.exit_at is not None
     await db.refresh(req)
     assert req.status == "completed"
 
 
-async def test_pass_issue_and_use(db, scope_for, community, unit, superadmin):
+async def test_pass_issue_and_use(db, scope_for, community, unit, superadmin, confirmed_upload):
     svc = _svc(db, scope_for(community.id), superadmin)
     req = await _req(svc, unit)  # pending
     vpass, token, _pin = await svc.create_pass(req.id, schemas.PassCreate(max_entries=1))
     await db.refresh(req)
     assert req.status == "approved"  # a pass pre-approves
-    entry = await svc.record_entry(schemas.EntryCreate(pass_token=token))
+    photo_url = confirmed_upload("visitor_photo")
+    entry = await svc.record_entry(
+        schemas.EntryCreate(pass_token=token, entry_photo_url=photo_url)
+    )
     assert entry.status == "inside"
     await db.refresh(vpass)
     assert vpass.entry_count == 1
     await svc.record_exit(entry.id)
     with pytest.raises(BusinessRuleError) as exc:
-        await svc.record_entry(schemas.EntryCreate(pass_token=token))
+        await svc.record_entry(schemas.EntryCreate(pass_token=token, entry_photo_url=photo_url))
     assert exc.value.code == "PASS_EXHAUSTED"
 
 

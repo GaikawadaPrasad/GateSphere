@@ -1001,6 +1001,7 @@ export const visitorsApi = {
     visitor_id?: string;
     gate_id?: string;
     vehicle_number?: string;
+    entry_photo_url?: string;
   }) => apiSend<Record<string, unknown>>("POST", "/visitors/entries", data),
   recordExit: (entryId: string) =>
     apiSend<Record<string, unknown>>("PATCH", `/visitors/entries/${entryId}/exit`),

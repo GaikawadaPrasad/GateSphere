@@ -23,6 +23,23 @@ _s3 = boto3.client(
     config=Config(signature_version="s3v4"),
 )
 
+# Client-facing presign client: when the backend is inside Docker (e.g. endpoint http://minio:9000)
+# but browsers run on host (e.g. public URL http://localhost:9000), generate presigned URLs using
+# the public/client-accessible host so the browser's DNS resolves and the SigV4 Host header matches.
+_client_endpoint = (settings.S3_PUBLIC_URL or "").rstrip("/")
+_s3_presign = (
+    boto3.client(
+        "s3",
+        endpoint_url=_client_endpoint,
+        region_name=settings.S3_REGION,
+        aws_access_key_id=settings.S3_ACCESS_KEY,
+        aws_secret_access_key=settings.S3_SECRET_KEY,
+        config=Config(signature_version="s3v4"),
+    )
+    if _client_endpoint and _client_endpoint != settings.S3_ENDPOINT_URL.rstrip("/")
+    else _s3
+)
+
 
 def ensure_bucket() -> None:
     buckets = {b["Name"] for b in _s3.list_buckets().get("Buckets", [])}
@@ -36,7 +53,7 @@ def put_object(key: str, body: bytes, content_type: str) -> str:
 
 
 def presigned_get(key: str, expires: int = 3600) -> str:
-    return _s3.generate_presigned_url(
+    return _s3_presign.generate_presigned_url(
         "get_object", Params={"Bucket": settings.S3_BUCKET, "Key": key}, ExpiresIn=expires
     )
 
@@ -44,7 +61,7 @@ def presigned_get(key: str, expires: int = 3600) -> str:
 def presigned_put(key: str, content_type: str, expires: int = 900) -> str:
     """A time-limited URL the client PUTs the file to directly (must send the same
     Content-Type header)."""
-    return _s3.generate_presigned_url(
+    return _s3_presign.generate_presigned_url(
         "put_object",
         Params={"Bucket": settings.S3_BUCKET, "Key": key, "ContentType": content_type},
         ExpiresIn=expires,
@@ -84,8 +101,16 @@ PUBLIC_PREFIX = f"{settings.S3_PUBLIC_URL.rstrip('/')}/{settings.S3_BUCKET}/"
 
 def key_from_url(url: str) -> str | None:
     """Return the object key for a URL that belongs to our managed bucket, else None."""
-    if url.startswith(PUBLIC_PREFIX):
-        return url[len(PUBLIC_PREFIX) :]
-    if url.startswith(f"s3://{settings.S3_BUCKET}/"):
-        return url[len(f"s3://{settings.S3_BUCKET}/") :]
+    if not url:
+        return None
+    clean_url = url.split("?")[0].split("#")[0].strip()
+    if clean_url.startswith(PUBLIC_PREFIX):
+        return clean_url[len(PUBLIC_PREFIX) :]
+    s3_prefix = f"s3://{settings.S3_BUCKET}/"
+    if clean_url.startswith(s3_prefix):
+        return clean_url[len(s3_prefix) :]
+    bucket_prefix = f"/{settings.S3_BUCKET}/"
+    idx = clean_url.find(bucket_prefix)
+    if idx != -1:
+        return clean_url[idx + len(bucket_prefix) :]
     return None

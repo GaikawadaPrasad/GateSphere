@@ -25,6 +25,7 @@ interface SupervisorVisitorRow {
   expected_at?: string;
   valid_until?: string;
   created_at?: string;
+  photo_url?: string;
 }
 
 export default function SecuritySupervisorVisitorManagementPage() {
@@ -83,6 +84,11 @@ export default function SecuritySupervisorVisitorManagementPage() {
             directoryVisitor?.phone ||
             "—";
           const unit = unitMap.get(v.unit_id) || (v.unit_id ? `Unit #${v.unit_id.slice(0, 6)}` : "—");
+          const photoUrl =
+            v.photo_url ||
+            v.visitor?.photo_url ||
+            directoryVisitor?.photo_url ||
+            undefined;
 
           return {
             id: v.id,
@@ -106,6 +112,7 @@ export default function SecuritySupervisorVisitorManagementPage() {
             expected_at: v.expected_at ? formatDateTime(v.expected_at) : "—",
             valid_until: v.valid_until ? formatDateTime(v.valid_until) : "—",
             created_at: v.created_at ? formatDateTime(v.created_at) : "—",
+            photo_url: photoUrl,
           };
         }),
       );
@@ -395,22 +402,156 @@ export default function SecuritySupervisorVisitorManagementPage() {
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                padding: "0.75rem",
+                padding: "0.85rem 1rem",
                 background: "var(--bg-subtle, #f8fafc)",
                 borderRadius: "var(--radius)",
                 border: "1px solid var(--border)",
+                gap: "1rem",
               }}
             >
-              <div>
-                <h4 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700, color: "var(--fg)" }}>
-                  👤 {selectedVisitor.name}
-                </h4>
-                <p style={{ margin: "0.2rem 0 0", fontSize: "0.85rem", color: "var(--muted)", fontFamily: "monospace" }}>
-                  {selectedVisitor.phone}
-                </p>
+              <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                {selectedVisitor.photo_url ? (
+                  <a
+                    href={selectedVisitor.photo_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Click to view full photograph"
+                    style={{ position: "relative", display: "inline-block", flexShrink: 0 }}
+                  >
+                    <img
+                      src={selectedVisitor.photo_url}
+                      alt={selectedVisitor.name}
+                      style={{
+                        width: "64px",
+                        height: "64px",
+                        borderRadius: "8px",
+                        objectFit: "cover",
+                        border: "2px solid #86efac",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+                        cursor: "pointer",
+                      }}
+                    />
+                    <span
+                      style={{
+                        position: "absolute",
+                        bottom: "-4px",
+                        right: "-4px",
+                        background: "#059669",
+                        color: "white",
+                        fontSize: "0.55rem",
+                        padding: "1px 4px",
+                        borderRadius: "3px",
+                        fontWeight: 700,
+                      }}
+                    >
+                      📷 PHOTO
+                    </span>
+                  </a>
+                ) : (
+                  <div
+                    style={{
+                      width: "64px",
+                      height: "64px",
+                      borderRadius: "8px",
+                      background: "#e2e8f0",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "1.5rem",
+                      color: "#94a3b8",
+                      border: "1px dashed #cbd5e1",
+                      flexShrink: 0,
+                    }}
+                    title="No photograph attached"
+                  >
+                    👤
+                  </div>
+                )}
+                <div>
+                  <h4 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700, color: "var(--fg)" }}>
+                    {selectedVisitor.name}
+                  </h4>
+                  <p style={{ margin: "0.2rem 0 0", fontSize: "0.85rem", color: "var(--muted)", fontFamily: "monospace" }}>
+                    {selectedVisitor.phone}
+                  </p>
+                  {selectedVisitor.photo_url ? (
+                    <span style={{ fontSize: "0.75rem", color: "#16a34a", fontWeight: 600, display: "block", marginTop: "0.2rem" }}>
+                      ✓ Verified Photo Attached
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: "0.75rem", color: "#d97706", fontWeight: 600, display: "block", marginTop: "0.2rem" }}>
+                      ⚠️ No Photo Attached
+                    </span>
+                  )}
+                </div>
               </div>
               <StatusBadge status={selectedVisitor.rawStatus || selectedVisitor.status} />
             </div>
+
+            {/* Dedicated Visitor Photograph Card */}
+            {selectedVisitor.photo_url && (
+              <div
+                style={{
+                  background: "#f0fdf4",
+                  border: "1px solid #bbf7d0",
+                  borderRadius: "8px",
+                  padding: "0.85rem 1rem",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "1rem",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
+                  <a
+                    href={selectedVisitor.photo_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Click to view full size"
+                  >
+                    <img
+                      src={selectedVisitor.photo_url}
+                      alt={selectedVisitor.name}
+                      style={{
+                        width: "80px",
+                        height: "80px",
+                        borderRadius: "8px",
+                        objectFit: "cover",
+                        border: "2px solid #86efac",
+                        cursor: "pointer",
+                      }}
+                    />
+                  </a>
+                  <div>
+                    <div style={{ fontSize: "0.875rem", fontWeight: 700, color: "#166534" }}>
+                      📷 Visitor Identity Photograph
+                    </div>
+                    <div style={{ fontSize: "0.75rem", color: "#15803d", marginTop: "0.15rem" }}>
+                      Mandatory face photo captured during gate registration
+                    </div>
+                  </div>
+                </div>
+                <a
+                  href={selectedVisitor.photo_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-sm"
+                  style={{
+                    fontSize: "0.75rem",
+                    padding: "0.4rem 0.75rem",
+                    background: "#059669",
+                    color: "#ffffff",
+                    textDecoration: "none",
+                    borderRadius: "6px",
+                    fontWeight: 600,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  🔍 View Full Size
+                </a>
+              </div>
+            )}
 
             <div
               style={{

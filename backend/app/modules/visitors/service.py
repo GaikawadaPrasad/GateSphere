@@ -96,6 +96,7 @@ _CATEGORY_ALIAS_MAP: dict[str, str] = {
     "staff": "recurring",
     "family": "relative",
     "event": "event_guest",
+    "other": "personal_guest",
 }
 
 
@@ -179,6 +180,9 @@ class VisitorService(UnitScopedAccess):
                 existing.vehicle_number = data.vehicle_number
             if data.full_name:
                 existing.full_name = data.full_name
+            if data.photo_url:
+                await ensure_confirmed_async(self.db, data.photo_url)
+                existing.photo_url = data.photo_url
             await self.db.flush()
             return existing
         await ensure_confirmed_async(self.db, data.photo_url)

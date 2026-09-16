@@ -51,7 +51,9 @@ def test_requests_list_needs_auth(client):
     assert client.get(f"{P}/requests").status_code == 401
 
 
-def test_guard_creates_request_resident_approves(as_role, seed_ids, unique_code, resident_unit_id):
+def test_guard_creates_request_resident_approves(
+    as_role, seed_ids, unique_code, resident_unit_id, confirmed_upload
+):
     guard = as_role("security_guard")
     unit_id = resident_unit_id  # the resident may only approve for a unit they occupy
     r = guard.post(
@@ -77,8 +79,9 @@ def test_guard_creates_request_resident_approves(as_role, seed_ids, unique_code,
     assert r.status_code == 200, r.text
     assert r.json()["data"]["status"] == "approved"
 
-    # record entry then exit
-    r = guard.post(f"{P}/entries", json={"request_id": req["id"]})
+    # record entry then exit (with required photo)
+    photo_url = confirmed_upload("visitor_photo", seed_ids["community_id"])
+    r = guard.post(f"{P}/entries", json={"request_id": req["id"], "entry_photo_url": photo_url})
     assert r.status_code == 201, r.text
     entry_id = r.json()["data"]["id"]
     assert guard.patch(f"{P}/entries/{entry_id}/exit").status_code == 200

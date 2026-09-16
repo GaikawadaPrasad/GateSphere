@@ -55,11 +55,21 @@ export const FileUpload: React.FC<FileUploadProps> = ({
         if (!uploadHeaders["Content-Type"]) {
           uploadHeaders["Content-Type"] = file.type || "application/octet-stream";
         }
-        await fetch(upload_url, {
+        const uploadRes = await fetch(upload_url, {
           method,
           headers: uploadHeaders,
           body: file,
         });
+        if (!uploadRes.ok) {
+          const errText = await uploadRes.text().catch(() => "");
+          throw new Error(
+            `Storage upload failed (${uploadRes.status} ${uploadRes.statusText || "Forbidden"}). ${
+              uploadRes.status === 403
+                ? "Check Supabase bucket RLS policies / S3 credentials / CORS."
+                : errText || ""
+            }`
+          );
+        }
       }
 
       // 3. Confirm upload
