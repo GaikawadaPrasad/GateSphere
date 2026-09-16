@@ -9,11 +9,12 @@ import { Modal } from "@/components/common/Modal";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { residentsApi } from "@/lib/api";
 import { useCommunities, useCommunityUnits, useTowers } from "@/hooks/use-communities";
-import { useAddResident } from "@/hooks/use-residents";
+import { useAddResident, useDeleteResident } from "@/hooks/use-residents";
 import type { ResidentProfile } from "@/types/residents";
 import type { Community } from "@/types/communities";
 import { PasswordField } from "@/components/forms/PasswordField";
 import { generateInitialPassword } from "@/lib/utils";
+import { toast } from "@/store/toast";
 
 export default function ResidentsPage() {
   const [search, setSearch] = useState("");
@@ -36,10 +37,16 @@ export default function ResidentsPage() {
   const [formError, setFormError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { data: communities } = useCommunities();
+  // Delete Resident State
+  const [residentToDelete, setResidentToDelete] = useState<ResidentProfile | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  const { data: communities } = useCommunities({ page_size: 100 });
   const { data: targetTowers } = useTowers(targetCommunityId || undefined);
   const { data: communityUnits } = useCommunityUnits(targetCommunityId || undefined);
   const addResidentMutation = useAddResident();
+  const deleteResidentMutation = useDeleteResident();
 
   const filteredUnits = useMemo(() => {
     if (!communityUnits) return [];
@@ -104,12 +111,32 @@ export default function ResidentsPage() {
           agreement_reference: agreementRef.trim() || undefined,
         },
       });
+      toast.success(`Resident ${fullName.trim()} registered successfully.`, "Resident Added");
       setIsAddResidentOpen(false);
       refetch();
     } catch (err: any) {
       setFormError(err?.message || "Failed to onboard resident.");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteResident = async () => {
+    if (!residentToDelete) return;
+    setIsDeleting(true);
+    setDeleteError("");
+    try {
+      await deleteResidentMutation.mutateAsync(residentToDelete.id);
+      toast.success(
+        `Resident ${residentToDelete.full_name} profile deleted successfully.`,
+        "Resident Deleted"
+      );
+      setResidentToDelete(null);
+      refetch();
+    } catch (err: any) {
+      setDeleteError(err?.message || "Failed to delete resident profile.");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -153,6 +180,34 @@ export default function ResidentsPage() {
       header: "Status",
       align: "center",
       render: (r) => <StatusBadge status={r.status || (r as any).profile_status || "active"} />,
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      align: "right",
+      render: (r) => (
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.4rem" }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{
+              padding: "0.25rem 0.6rem",
+              fontSize: "0.75rem",
+              height: 28,
+              color: "#dc2626",
+              borderColor: "#fca5a5",
+              background: "#fff",
+            }}
+            onClick={() => {
+              setDeleteError("");
+              setResidentToDelete(r);
+            }}
+            title="Delete Resident Profile"
+          >
+            🗑️ Delete
+          </button>
+        </div>
+      ),
     },
   ];
 
@@ -605,6 +660,77 @@ export default function ResidentsPage() {
           </div>
         </form>
       </Modal>
+
+      {/* Delete Confirmation Modal */}
+      {residentToDelete && (
+        <Modal
+          isOpen={!!residentToDelete}
+          onClose={() => {
+            if (!isDeleting) {
+              setResidentToDelete(null);
+              setDeleteError("");
+            }
+          }}
+          title="🗑️ Confirm Resident Removal"
+          maxWidth={480}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            {deleteError && (
+              <div
+                style={{
+                  padding: "0.75rem 1rem",
+                  background: "#fef2f2",
+                  border: "1px solid #fecaca",
+                  borderRadius: "8px",
+                  color: "#991b1b",
+                  fontSize: "0.85rem",
+                }}
+              >
+                ⚠️ {deleteError}
+              </div>
+            )}
+            <p style={{ margin: 0, fontSize: "0.9rem", color: "#334155", lineHeight: 1.5 }}>
+              Are you sure you want to delete resident profile for{" "}
+              <strong>{residentToDelete.full_name}</strong>
+              {residentToDelete.unit_number ? ` (Unit ${residentToDelete.unit_number})` : ""}?
+            </p>
+            <p style={{ margin: 0, fontSize: "0.8rem", color: "#64748b" }}>
+              This will remove their unit residency mapping, active visitor clearances, and portal access privileges.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.6rem", marginTop: "0.5rem" }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setResidentToDelete(null);
+                  setDeleteError("");
+                }}
+                disabled={isDeleting}
+                style={{ padding: "0.45rem 0.9rem", fontSize: "0.85rem" }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={handleDeleteResident}
+                disabled={isDeleting}
+                style={{
+                  padding: "0.45rem 1rem",
+                  fontSize: "0.85rem",
+                  background: "#dc2626",
+                  color: "#fff",
+                  fontWeight: 600,
+                  borderRadius: "6px",
+                  border: "none",
+                }}
+              >
+                {isDeleting ? "Deleting..." : "🗑️ Confirm Delete"}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

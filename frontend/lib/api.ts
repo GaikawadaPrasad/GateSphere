@@ -376,7 +376,8 @@ export const authApi = {
 };
 
 export const communitiesApi = {
-  list: (params?: { active?: boolean }) => apiGet<Community[]>("/communities", params),
+  list: (params?: { active?: boolean; page_size?: number; page?: number }) =>
+    apiGet<Community[]>("/communities", { page_size: 100, ...params }),
   get: (id: string) => apiGet<Community>(`/communities/${id}`),
   create: (data: Partial<Community> | CommunityCreate) =>
     apiSend<Community>("POST", "/communities", data),
@@ -625,10 +626,18 @@ export const assessmentsApi = {
       payload,
       communityId ? { community_id: communityId } : undefined,
     ),
-  approve: (id: string, notes?: string) =>
-    apiSend<any>("POST", `/billing/assessments/${id}/approve`, { notes }),
-  reject: (id: string, reason?: string) =>
-    apiSend<any>("POST", `/billing/assessments/${id}/reject`, { reason }),
+  approve: (id: string, payload?: { notes?: string; approved_by_user_id?: string; approved_by_name?: string } | string) =>
+    apiSend<any>(
+      "POST",
+      `/billing/assessments/${id}/approve`,
+      typeof payload === "string" ? { notes: payload } : payload || {},
+    ),
+  reject: (id: string, payload?: { reason?: string; rejected_by_user_id?: string; rejected_by_name?: string } | string) =>
+    apiSend<any>(
+      "POST",
+      `/billing/assessments/${id}/reject`,
+      typeof payload === "string" ? { reason: payload } : payload || {},
+    ),
 };
 
 export const communicationApi = {
@@ -668,6 +677,12 @@ export const communicationApi = {
       data,
       communityId ? { community_id: communityId } : undefined,
     ),
+  listGroupMembers: (groupId: string) =>
+    apiGet<any[]>(`/communication/groups/${groupId}/members`),
+  addGroupMember: (groupId: string, data: { user_id: string }) =>
+    apiSend<any>("POST", `/communication/groups/${groupId}/members`, data),
+  removeGroupMember: (groupId: string, memberId: string) =>
+    apiSend<void>("DELETE", `/communication/groups/${groupId}/members/${memberId}`),
 };
 
 export const auditApi = {
@@ -1135,6 +1150,14 @@ export const notificationsApi = {
     apiGet<AppNotification[]>("/notifications", params as Record<string, unknown>),
   markRead: (id: string) => apiSend<void>("POST", `/notifications/${id}/read`),
   markAllRead: () => apiSend<void>("POST", "/notifications/read-all"),
+  dispatch: (data: {
+    recipient_user_id: string;
+    notification_type: string;
+    title: string;
+    message: string;
+    community_id?: string;
+    channels?: string[];
+  }) => apiSend<AppNotification>("POST", "/notifications/dispatch", data),
   preferences: () => apiGet<NotificationPreference[]>("/notifications/me/preferences"),
   setPreference: (data: Partial<NotificationPreference>) =>
     apiSend<NotificationPreference>("PUT", "/notifications/me/preferences", data),

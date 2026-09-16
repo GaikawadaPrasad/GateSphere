@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useUiStore } from "@/store/ui";
 import { useCommunityDetails } from "@/hooks/use-communities";
+import { useMe } from "@/hooks/use-auth";
 import {
   useSpecialAssessments,
   useCreateAssessment,
@@ -20,6 +21,7 @@ import type { SpecialAssessment } from "@/types/governance";
 export default function SpecialAssessmentsPage() {
   const { activeCommunityId } = useUiStore();
   const { data: community } = useCommunityDetails(activeCommunityId || undefined);
+  const { data: currentUser } = useMe();
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
   // Selected assessment for review modal
@@ -35,6 +37,8 @@ export default function SpecialAssessmentsPage() {
   const [newDescription, setNewDescription] = useState("");
   const [newTargetAmount, setNewTargetAmount] = useState("25000");
   const [newUnitsCount, setNewUnitsCount] = useState(120);
+  const [newProposerDepartment, setNewProposerDepartment] = useState("Facility Operations & Maintenance");
+  const [newProposerName, setNewProposerName] = useState("");
   const [newEffectiveDate, setNewEffectiveDate] = useState(
     new Date(Date.now() + 15 * 86400000).toISOString().slice(0, 10)
   );
@@ -90,7 +94,6 @@ export default function SpecialAssessmentsPage() {
     try {
       await createMutation.mutateAsync({
         payload: {
-          community_id: cid,
           title: newTitle.trim(),
           purpose: newPurpose,
           description: newDescription.trim(),
@@ -99,6 +102,10 @@ export default function SpecialAssessmentsPage() {
           per_unit_amount: computedPerUnit,
           effective_date: newEffectiveDate,
           due_date: newDueDate,
+          proposed_by_user_id: currentUser?.id,
+          proposed_by_name: newProposerName.trim() || currentUser?.full_name || "Facility Operations",
+          proposer_department: newProposerDepartment,
+          proposer_role: currentUser?.active_role || "facility_manager",
         },
         communityId: cid,
       });
@@ -107,6 +114,7 @@ export default function SpecialAssessmentsPage() {
       setAssessmentFieldErrors({});
       setNewTitle("");
       setNewDescription("");
+      setNewProposerName("");
       alert("Special assessment proposed successfully and submitted for committee review.");
     } catch (err) {
       console.error("Failed to create assessment", err);
@@ -114,12 +122,27 @@ export default function SpecialAssessmentsPage() {
     }
   };
 
+  const isSelfProposal = (item: SpecialAssessment) => {
+    if (!currentUser) return false;
+    if (item.proposed_by_user_id && item.proposed_by_user_id === currentUser.id) {
+      return true;
+    }
+    return false;
+  };
+
   const handleApprove = async () => {
     if (!selectedAssessment) return;
+    if (isSelfProposal(selectedAssessment)) {
+      alert("Maker-Checker Violation: You cannot approve your own proposal. Another committee member must review and approve.");
+      return;
+    }
+
     try {
       await approveMutation.mutateAsync({
         id: selectedAssessment.id,
         notes: reviewNotes,
+        approved_by_user_id: currentUser?.id,
+        approved_by_name: currentUser?.full_name || "Association Committee Executive",
       });
       setSelectedAssessment(null);
       setReviewNotes("");
@@ -135,6 +158,8 @@ export default function SpecialAssessmentsPage() {
       await rejectMutation.mutateAsync({
         id: selectedAssessment.id,
         reason: rejectReason,
+        rejected_by_user_id: currentUser?.id,
+        rejected_by_name: currentUser?.full_name || "Association Committee Executive",
       });
       setSelectedAssessment(null);
       setIsRejectMode(false);
@@ -169,11 +194,44 @@ export default function SpecialAssessmentsPage() {
       ),
     },
     {
+      key: "proposed_by_name",
+      header: "Proposal Origin (Maker)",
+      render: (item) => {
+        const isSelf = isSelfProposal(item);
+        return (
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+              <span style={{ fontWeight: 600, color: "var(--fg)", fontSize: "0.825rem" }}>
+                {item.proposed_by_name || "Facility Management"}
+              </span>
+              {isSelf && (
+                <span
+                  style={{
+                    fontSize: "0.675rem",
+                    padding: "0.1rem 0.35rem",
+                    background: "#fef3c7",
+                    color: "#92400e",
+                    borderRadius: "var(--radius-sm)",
+                    fontWeight: 600,
+                  }}
+                >
+                  You (Maker)
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize: "0.725rem", color: "var(--muted)" }}>
+              {item.proposer_department || "Operations & Maintenance"}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
       key: "target_amount",
-      header: "Target Amount",
+      header: "Target Budget",
       align: "right",
       render: (item) => (
-        <span style={{ fontWeight: 700 }}>
+        <span style={{ fontWeight: 700, color: "var(--fg)" }}>
           {formatCurrency(parseFloat(item.target_amount || "0"))}
         </span>
       ),
@@ -182,7 +240,11 @@ export default function SpecialAssessmentsPage() {
       key: "per_unit_amount",
       header: "Per Unit",
       align: "right",
-      render: (item) => formatCurrency(parseFloat(item.per_unit_amount || "0")),
+      render: (item) => (
+        <span style={{ fontWeight: 600, color: "#2563eb" }}>
+          {formatCurrency(parseFloat(item.per_unit_amount || "0"))}
+        </span>
+      ),
     },
     {
       key: "amount_collected",
@@ -210,38 +272,79 @@ export default function SpecialAssessmentsPage() {
     {
       key: "status",
       header: "Status",
-      render: (item) => <StatusBadge status={item.status} />,
-    },
-    {
-      key: "actions",
-      header: "Action",
-      align: "right",
       render: (item) => (
-        <div style={{ display: "flex", gap: "0.4rem", justifyContent: "flex-end" }}>
-          <Link
-            href={`/association-committee/assessments/${item.id}`}
-            className="btn btn-secondary"
-            style={{ fontSize: "0.75rem", padding: "0.25rem 0.55rem", height: 28 }}
-          >
-            View
-          </Link>
-          {item.status === "under_review" && (
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedAssessment(item);
-                setIsRejectMode(false);
-              }}
-              className="btn btn-primary"
-              style={{ fontSize: "0.75rem", padding: "0.25rem 0.55rem", height: 28 }}
-            >
-              Review
-            </button>
+        <div>
+          <StatusBadge status={item.status} />
+          {item.approved_by_name && item.status === "approved" && (
+            <div style={{ fontSize: "0.7rem", color: "#059669", marginTop: "0.15rem" }}>
+              ✓ By {item.approved_by_name}
+            </div>
+          )}
+          {item.rejected_by_name && item.status === "rejected" && (
+            <div style={{ fontSize: "0.7rem", color: "#dc2626", marginTop: "0.15rem" }}>
+              ✕ By {item.rejected_by_name}
+            </div>
           )}
         </div>
       ),
     },
+    {
+      key: "actions",
+      header: "Committee Action",
+      align: "right",
+      render: (item) => {
+        const isSelf = isSelfProposal(item);
+        return (
+          <div style={{ display: "flex", gap: "0.4rem", justifyContent: "flex-end", alignItems: "center" }}>
+            <Link
+              href={`/association-committee/assessments/${item.id}`}
+              className="btn btn-secondary"
+              style={{ fontSize: "0.75rem", padding: "0.25rem 0.55rem", height: 28 }}
+            >
+              View
+            </Link>
+            {item.status === "under_review" && (
+              isSelf ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedAssessment(item);
+                    setIsRejectMode(false);
+                  }}
+                  className="btn btn-secondary"
+                  title="Maker-Checker Rule: You proposed this assessment. Another committee member must approve it."
+                  style={{
+                    fontSize: "0.725rem",
+                    padding: "0.25rem 0.55rem",
+                    height: 28,
+                    background: "#fef3c7",
+                    borderColor: "#fde68a",
+                    color: "#92400e",
+                  }}
+                >
+                  👁️ View (Self-Made)
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedAssessment(item);
+                    setIsRejectMode(false);
+                  }}
+                  className="btn btn-primary"
+                  style={{ fontSize: "0.75rem", padding: "0.25rem 0.55rem", height: 28 }}
+                >
+                  ⚖️ Review & Vote
+                </button>
+              )
+            )}
+          </div>
+        );
+      },
+    },
   ];
+
+  const isSelectedSelf = selectedAssessment ? isSelfProposal(selectedAssessment) : false;
 
   return (
     <div>
@@ -255,7 +358,10 @@ export default function SpecialAssessmentsPage() {
         actions={
           <button
             type="button"
-            onClick={() => setIsCreateModalOpen(true)}
+            onClick={() => {
+              setNewProposerName(currentUser?.full_name || "");
+              setIsCreateModalOpen(true);
+            }}
             className="btn btn-primary"
             style={{ fontSize: "0.85rem", padding: "0.45rem 0.9rem" }}
           >
@@ -264,7 +370,7 @@ export default function SpecialAssessmentsPage() {
         }
       />
 
-      {/* Overview Notice */}
+      {/* Governance & Maker-Checker Notice */}
       <div
         style={{
           background: "linear-gradient(135deg, #f8fafc, #f1f5f9)",
@@ -280,12 +386,11 @@ export default function SpecialAssessmentsPage() {
         }}
       >
         <div>
-          <div style={{ fontWeight: 600, fontSize: "0.875rem", color: "var(--fg)" }}>
-            Committee Approval Authority (PRD FR-09)
+          <div style={{ fontWeight: 700, fontSize: "0.875rem", color: "var(--fg)", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            <span>⚖️</span> Maker-Checker Governance & Committee Approval Authority (PRD FR-09)
           </div>
-          <p style={{ fontSize: "0.775rem", color: "var(--muted)", marginTop: "0.15rem" }}>
-            The Association Committee evaluates CapEx projects, equipment overhauls, and exceptional
-            infrastructure levies prior to unit billing.
+          <p style={{ fontSize: "0.775rem", color: "var(--muted)", marginTop: "0.2rem", maxWidth: 750 }}>
+            CapEx projects and special infrastructure levies are initiated by Facility Management or Operations, and require formal sign-off by the Association Committee. <strong>Segregation of Duties:</strong> A proposer cannot approve their own assessment proposal.
           </p>
         </div>
 
@@ -297,11 +402,11 @@ export default function SpecialAssessmentsPage() {
             style={{ width: "auto", fontSize: "0.8rem", height: 34 }}
           >
             <option value="all">All Statuses</option>
-            <option value="under_review">Awaiting Review</option>
-            <option value="approved">Approved</option>
-            <option value="active">Active</option>
+            <option value="under_review">Awaiting Committee Vote</option>
+            <option value="approved">Approved & Active</option>
+            <option value="active">In Collection</option>
             <option value="completed">Completed</option>
-            <option value="rejected">Rejected</option>
+            <option value="rejected">Rejected / Returned</option>
           </select>
         </div>
       </div>
@@ -327,8 +432,8 @@ export default function SpecialAssessmentsPage() {
             setSelectedAssessment(null);
             setIsRejectMode(false);
           }}
-          title={isRejectMode ? "Reject Special Assessment" : "Association Committee Review"}
-          maxWidth={560}
+          title={isRejectMode ? "Reject / Return Special Assessment" : "Association Committee Governance Review"}
+          maxWidth={600}
           footer={
             <div
               style={{
@@ -336,6 +441,7 @@ export default function SpecialAssessmentsPage() {
                 gap: "0.5rem",
                 width: "100%",
                 justifyContent: "space-between",
+                alignItems: "center",
               }}
             >
               <button
@@ -350,7 +456,11 @@ export default function SpecialAssessmentsPage() {
               </button>
 
               <div style={{ display: "flex", gap: "0.5rem" }}>
-                {!isRejectMode ? (
+                {isSelectedSelf ? (
+                  <div style={{ fontSize: "0.775rem", color: "#92400e", fontWeight: 600, display: "flex", alignItems: "center" }}>
+                    🔒 Self-approval restricted per Maker-Checker policy
+                  </div>
+                ) : !isRejectMode ? (
                   <>
                     <button
                       type="button"
@@ -365,7 +475,7 @@ export default function SpecialAssessmentsPage() {
                       disabled={approveMutation.isPending}
                       className="btn btn-primary"
                     >
-                      {approveMutation.isPending ? "Approving..." : "Approve Assessment"}
+                      {approveMutation.isPending ? "Approving..." : "✅ Approve Assessment"}
                     </button>
                   </>
                 ) : (
@@ -392,12 +502,60 @@ export default function SpecialAssessmentsPage() {
           }
         >
           <div>
+            {/* Maker-Checker Warning when viewing self-proposed item */}
+            {isSelectedSelf && (
+              <div
+                style={{
+                  background: "#fffbeb",
+                  border: "1px solid #fde68a",
+                  borderRadius: "var(--radius-sm)",
+                  padding: "0.75rem 1rem",
+                  marginBottom: "1rem",
+                  fontSize: "0.825rem",
+                  color: "#92400e",
+                }}
+              >
+                <div style={{ fontWeight: 700, marginBottom: "0.2rem" }}>
+                  ⚠️ Segregation of Duties (Maker-Checker Policy)
+                </div>
+                You submitted this special assessment proposal. Enterprise statutory standards prohibit a single person from both proposing and accepting a financial levy. Another Association Committee member or the President must review and approve this proposal.
+              </div>
+            )}
+
             <div style={{ marginBottom: "1rem" }}>
               <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--fg)" }}>
                 {selectedAssessment.title}
               </div>
               <div style={{ fontSize: "0.85rem", color: "var(--muted)", marginTop: "0.25rem" }}>
                 {selectedAssessment.purpose}
+              </div>
+            </div>
+
+            {/* Proposer Info Card */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "0.6rem 0.85rem",
+                background: "#f1f5f9",
+                borderRadius: "var(--radius-sm)",
+                border: "1px solid var(--border)",
+                marginBottom: "1rem",
+                fontSize: "0.8rem",
+              }}
+            >
+              <div>
+                <span style={{ color: "var(--muted)" }}>Proposed By: </span>
+                <span style={{ fontWeight: 600, color: "var(--fg)" }}>
+                  {selectedAssessment.proposed_by_name || "Facility Operations"}
+                </span>
+                <span style={{ color: "var(--muted)", marginLeft: "0.35rem" }}>
+                  ({selectedAssessment.proposer_department || "Management"})
+                </span>
+              </div>
+              <div style={{ color: "var(--muted)", fontSize: "0.75rem" }}>
+                Submitted: {formatDate(selectedAssessment.created_at)}
               </div>
             </div>
 
@@ -422,7 +580,7 @@ export default function SpecialAssessmentsPage() {
               </div>
               <div>
                 <span style={{ color: "var(--muted)" }}>Per Unit Assessment:</span>
-                <div style={{ fontWeight: 700, color: "var(--fg)" }}>
+                <div style={{ fontWeight: 700, color: "#2563eb" }}>
                   {formatCurrency(parseFloat(selectedAssessment.per_unit_amount || "0"))}
                 </div>
               </div>
@@ -445,13 +603,14 @@ export default function SpecialAssessmentsPage() {
                 <label
                   style={{ fontSize: "0.775rem", fontWeight: 600, color: "var(--fg-secondary)" }}
                 >
-                  Project Description & Justification
+                  Project Scope & Scope Justification
                 </label>
                 <p
                   style={{
                     fontSize: "0.85rem",
                     marginTop: "0.25rem",
                     color: "var(--fg-secondary)",
+                    lineHeight: 1.5,
                   }}
                 >
                   {selectedAssessment.description}
@@ -459,39 +618,41 @@ export default function SpecialAssessmentsPage() {
               </div>
             )}
 
-            {!isRejectMode ? (
-              <div>
-                <label
-                  style={{ fontSize: "0.775rem", fontWeight: 600, color: "var(--fg-secondary)" }}
-                >
-                  Committee Approval Notes (Optional)
-                </label>
-                <textarea
-                  value={reviewNotes}
-                  onChange={(e) => setReviewNotes(e.target.value)}
-                  placeholder="e.g. Approved pursuant to AGM Resolution #4. Execution scheduled for Q4."
-                  className="input-field"
-                  style={{ minHeight: 80, marginTop: "0.25rem", width: "100%" }}
-                />
-              </div>
-            ) : (
-              <div>
-                <label style={{ fontSize: "0.775rem", fontWeight: 600, color: "#dc2626" }}>
-                  Reason for Rejection / Modification Request
-                </label>
-                <textarea
-                  value={rejectReason}
-                  onChange={(e) => setRejectReason(e.target.value)}
-                  placeholder="Specify why this proposal is returned (e.g. Requires revised contractor quotes)."
-                  className="input-field"
-                  style={{
-                    minHeight: 80,
-                    marginTop: "0.25rem",
-                    width: "100%",
-                    borderColor: "#fca5a5",
-                  }}
-                />
-              </div>
+            {!isSelectedSelf && (
+              !isRejectMode ? (
+                <div>
+                  <label
+                    style={{ fontSize: "0.775rem", fontWeight: 600, color: "var(--fg-secondary)" }}
+                  >
+                    Committee Approval Resolution Notes (e.g. AGM Resolution #)
+                  </label>
+                  <textarea
+                    value={reviewNotes}
+                    onChange={(e) => setReviewNotes(e.target.value)}
+                    placeholder="e.g. Approved pursuant to AGM Resolution #4. Scheduled for next billing cycle."
+                    className="input-field"
+                    style={{ minHeight: 80, marginTop: "0.25rem", width: "100%" }}
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label style={{ fontSize: "0.775rem", fontWeight: 600, color: "#dc2626" }}>
+                    Reason for Rejection / Modification Request
+                  </label>
+                  <textarea
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value)}
+                    placeholder="Specify why this proposal is returned (e.g. Requires revised contractor quotes or scope adjustment)."
+                    className="input-field"
+                    style={{
+                      minHeight: 80,
+                      marginTop: "0.25rem",
+                      width: "100%",
+                      borderColor: "#fca5a5",
+                    }}
+                  />
+                </div>
+              )
             )}
           </div>
         </Modal>
@@ -502,11 +663,57 @@ export default function SpecialAssessmentsPage() {
         <Modal
           isOpen={isCreateModalOpen}
           onClose={() => setIsCreateModalOpen(false)}
-          title="Propose Special Assessment"
-          maxWidth={600}
+          title="Propose CapEx / Special Assessment"
+          maxWidth={620}
         >
           <form onSubmit={handleCreateAssessment}>
             <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <div
+                style={{
+                  background: "#f0fdf4",
+                  border: "1px solid #bbf7d0",
+                  borderRadius: "var(--radius-sm)",
+                  padding: "0.65rem 0.85rem",
+                  fontSize: "0.8rem",
+                  color: "#166534",
+                }}
+              >
+                <strong>Proposal Workflow:</strong> Submitting will enter the assessment into <em>Under Review</em> status. Per Maker-Checker governance, approval must be granted by another committee executive.
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                <div>
+                  <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--fg-secondary)", display: "block", marginBottom: "0.35rem" }}>
+                    Initiating Department / Entity *
+                  </label>
+                  <select
+                    value={newProposerDepartment}
+                    onChange={(e) => setNewProposerDepartment(e.target.value)}
+                    className="select-field"
+                  >
+                    <option value="Facility Operations & Maintenance">Facility Operations</option>
+                    <option value="Engineering & Infrastructure Committee">Engineering Committee</option>
+                    <option value="Managing Committee Executive">Managing Committee Board</option>
+                    <option value="Security & Surveillance Committee">Security Committee</option>
+                    <option value="Amenities & Landscaping Sub-committee">Amenities Committee</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--fg-secondary)", display: "block", marginBottom: "0.35rem" }}>
+                    Proposer Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newProposerName}
+                    onChange={(e) => setNewProposerName(e.target.value)}
+                    placeholder="e.g. Alex Rivera (Facility Manager)"
+                    className="input-field"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--fg-secondary)", display: "block", marginBottom: "0.35rem" }}>
                   Assessment Project Title *
@@ -623,7 +830,7 @@ export default function SpecialAssessmentsPage() {
 
               <div>
                 <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--fg-secondary)", display: "block", marginBottom: "0.35rem" }}>
-                  Project Description & Scope Justification
+                  Project Scope & Scope Justification
                 </label>
                 <textarea
                   rows={3}
@@ -648,7 +855,7 @@ export default function SpecialAssessmentsPage() {
                   disabled={createMutation.isPending}
                   className="btn btn-primary"
                 >
-                  {createMutation.isPending ? "Submitting..." : "Submit for Committee Review"}
+                  {createMutation.isPending ? "Submitting..." : "Submit Proposal for Committee Review"}
                 </button>
               </div>
             </div>

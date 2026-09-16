@@ -58,15 +58,56 @@ export default function GateTrafficPage() {
     {
       key: "shift_date",
       header: "Shift Date",
+      sortable: true,
     },
     {
       key: "time",
       header: "Shift Timing",
-      render: (item) => `${item.shift_start} - ${item.shift_end}`,
+      render: (item) => (
+        <span style={{ fontFamily: "monospace", fontSize: "0.85rem", fontWeight: 500 }}>
+          {item.shift_start} – {item.shift_end}
+        </span>
+      ),
+    },
+    {
+      key: "guard_user",
+      header: "Assigned Security Guard",
+      render: (item) => (
+        <div>
+          <div style={{ fontWeight: 600, color: "var(--fg)" }}>
+            👤 {item.guard_name || `Guard (${item.guard_user_id.slice(0, 8)})`}
+          </div>
+          <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.1rem" }}>
+            {item.guard_email || item.guard_phone || `ID: ${item.guard_user_id.slice(0, 8)}`}
+            {item.guard_phone && item.guard_email ? ` • ${item.guard_phone}` : ""}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "supervisor_user",
+      header: "Supervisor / In-Charge",
+      render: (item) => (
+        <div>
+          <span style={{ fontSize: "0.85rem", fontWeight: 500, color: item.supervisor_name ? "var(--fg)" : "var(--muted)" }}>
+            {item.supervisor_name ? `🛡️ ${item.supervisor_name}` : "Direct Dispatch"}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: "notes",
+      header: "Duty / Gate Notes",
+      render: (item) => (
+        <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>
+          {item.notes || "Standard Shift Duty"}
+        </span>
+      ),
     },
     {
       key: "status",
       header: "Status",
+      align: "center",
       render: (item) => <StatusBadge status={item.status} />,
     },
   ];

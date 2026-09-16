@@ -1,5 +1,5 @@
-export type AnnouncementPriority = "low" | "normal" | "urgent" | "emergency";
-export type AnnouncementType = "notice" | "event" | "emergency" | "maintenance" | "poll";
+export type AnnouncementPriority = "low" | "normal" | "high" | "urgent" | "emergency";
+export type AnnouncementType = "notice" | "event" | "emergency" | "maintenance" | "poll" | "survey";
 export type TargetAudienceType = "all" | "tower" | "resident_group" | "unit";
 
 /** Matches backend TargetIn schema */
@@ -83,4 +83,13 @@ export interface ResidentGroup {
   description?: string | null;
   is_active: boolean;
   member_count: number;
+}
+
+export interface ResidentGroupMember {
+  group_id: string;
+  user_id: string;
+  added_at: string;
+  full_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
 }

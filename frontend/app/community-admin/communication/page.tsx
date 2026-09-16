@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useUiStore } from "@/store/ui";
 import {
   useAnnouncements,
@@ -9,15 +9,23 @@ import {
   useExpireAnnouncement,
   useResidentGroups,
   useCreateResidentGroup,
+  useGroupMembers,
+  useAddGroupMember,
+  useRemoveGroupMember,
 } from "@/hooks/use-communication";
 import { useTowers } from "@/hooks/use-communities";
+import { useResidents } from "@/hooks/use-residents";
+import { communicationApi } from "@/lib/api";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { Modal } from "@/components/common/Modal";
+import { toast } from "@/store/toast";
+import { GroupMembersModal } from "@/components/community-admin/GroupMembersModal";
 import type {
   Announcement,
   AnnouncementType,
   ResidentGroup,
+  ResidentGroupMember,
   AnnouncementPriority,
   TargetAudienceType,
 } from "@/types/communication";
@@ -30,6 +38,15 @@ export default function CommunityAdminCommunicationPage() {
   );
   const [publishedFilter, setPublishedFilter] = useState<boolean | undefined>(undefined);
 
+  // Group Members Modal State
+  const [selectedGroup, setSelectedGroup] = useState<ResidentGroup | null>(null);
+  const [isManageMembersOpen, setIsManageMembersOpen] = useState(false);
+
+  // Create Group Resident Selection State
+  const [createGroupResidentIds, setCreateGroupResidentIds] = useState<string[]>([]);
+  const [createGroupSearch, setCreateGroupSearch] = useState<string>("");
+  const [createGroupTowerFilter, setCreateGroupTowerFilter] = useState<string>("");
+
   // Queries
   const {
     data: announcements,
@@ -40,12 +57,71 @@ export default function CommunityAdminCommunicationPage() {
     published_only: publishedFilter,
   });
 
-  const { data: towers } = useTowers(activeCommunityId || undefined);
+  const { data: towers = [] } = useTowers(activeCommunityId || undefined);
   const {
     data: groups,
     isLoading: groupsLoading,
     refetch: refetchGroups,
   } = useResidentGroups(activeCommunityId || undefined);
+
+  const { data: residentsData } = useResidents({
+    community_id: activeCommunityId || undefined,
+    page_size: 200,
+  });
+
+  const availableCommunityResidents = useMemo(() => {
+    if (!residentsData) return [];
+    const list = Array.isArray(residentsData)
+      ? residentsData
+      : Array.isArray((residentsData as any)?.data)
+      ? (residentsData as any).data
+      : Array.isArray((residentsData as any)?.items)
+      ? (residentsData as any).items
+      : [];
+
+    return list.map((r: any) => {
+      const uId = String(r.user_id || r.id);
+      const name = String(r.full_name || r.user?.full_name || "Resident");
+      const email = String(r.email || r.user?.email || "");
+      const phone = String(r.phone || r.user?.phone || "");
+      const unitNumber = r.unit_number ? String(r.unit_number) : "";
+      const towerName = r.tower_name ? String(r.tower_name) : "";
+      const towerId = r.tower_id ? String(r.tower_id) : "";
+      const unitDisplay = unitNumber ? `${towerName ? towerName + " · " : ""}Unit ${unitNumber}` : "";
+      const residentType = r.resident_type
+        ? r.resident_type.charAt(0).toUpperCase() + r.resident_type.slice(1)
+        : "";
+
+      return {
+        id: uId,
+        name,
+        email,
+        phone,
+        unitNumber,
+        towerName,
+        towerId,
+        unitDisplay,
+        residentType,
+      };
+    });
+  }, [residentsData]);
+
+  const filteredCreateGroupResidents = useMemo(() => {
+    return availableCommunityResidents.filter((r: { id: string; name: string; email: string; phone: string; towerId?: string; towerName?: string; unitDisplay: string; residentType: string }) => {
+      if (createGroupTowerFilter && r.towerId !== createGroupTowerFilter && r.towerName !== createGroupTowerFilter) {
+        return false;
+      }
+      if (createGroupSearch.trim()) {
+        const q = createGroupSearch.toLowerCase();
+        const nameMatch = r.name.toLowerCase().includes(q);
+        const emailMatch = r.email.toLowerCase().includes(q);
+        const phoneMatch = r.phone.toLowerCase().includes(q);
+        const unitMatch = r.unitDisplay.toLowerCase().includes(q);
+        if (!nameMatch && !emailMatch && !phoneMatch && !unitMatch) return false;
+      }
+      return true;
+    });
+  }, [availableCommunityResidents, createGroupTowerFilter, createGroupSearch]);
 
   // Mutations
   const createAnnouncement = useCreateAnnouncement();
@@ -56,6 +132,8 @@ export default function CommunityAdminCommunicationPage() {
   // Create Announcement Modal State
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
+  const [autoPublish, setAutoPublish] = useState(true);
+
   // Local UI state — converted to targets[] before sending to backend
   const [form, setForm] = useState<{
     title: string;
@@ -113,7 +191,7 @@ export default function CommunityAdminCommunicationPage() {
         targets = [{ target_all_community: true }];
       }
 
-      await createAnnouncement.mutateAsync({
+      const newAnn: any = await createAnnouncement.mutateAsync({
         payload: {
           announcement_type: form.announcement_type,
           title: form.title.trim(),
@@ -123,6 +201,22 @@ export default function CommunityAdminCommunicationPage() {
         },
         communityId: activeCommunityId,
       });
+
+      if (autoPublish && newAnn?.id) {
+        try {
+          await publishAnnouncement.mutateAsync(newAnn.id);
+        } catch {
+          // If auto-publish fails, the draft still exists
+        }
+      }
+
+      toast.success(
+        autoPublish
+          ? "Announcement created and broadcasted successfully!"
+          : "Announcement draft created.",
+        "Announcement Saved"
+      );
+
       setIsCreateOpen(false);
       setCommFieldErrors({});
       setForm({
@@ -134,8 +228,9 @@ export default function CommunityAdminCommunicationPage() {
         target_id: "",
       });
       refetchAnnouncements();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      toast.error(err?.message || "Failed to create announcement", "Error");
     } finally {
       setIsSubmitting(false);
     }
@@ -145,9 +240,11 @@ export default function CommunityAdminCommunicationPage() {
   const handlePublish = async (id: string) => {
     try {
       await publishAnnouncement.mutateAsync(id);
+      toast.success("Announcement published to target audience.", "Published");
       refetchAnnouncements();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      toast.error(err?.message || "Failed to publish announcement", "Error");
     }
   };
 
@@ -155,9 +252,11 @@ export default function CommunityAdminCommunicationPage() {
   const handleExpire = async (id: string) => {
     try {
       await expireAnnouncement.mutateAsync(id);
+      toast.success("Announcement has been marked as expired.", "Expired");
       refetchAnnouncements();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      toast.error(err?.message || "Failed to expire announcement", "Error");
     }
   };
 
@@ -173,19 +272,43 @@ export default function CommunityAdminCommunicationPage() {
 
     try {
       setIsSubmitting(true);
-      await createGroup.mutateAsync({
+      const newGroup: any = await createGroup.mutateAsync({
         payload: {
           name: groupForm.name.trim(),
           description: groupForm.description.trim() || undefined,
         },
         communityId: activeCommunityId,
       });
+
+      let addedCount = 0;
+      if (createGroupResidentIds.length > 0 && newGroup?.id) {
+        for (const uId of createGroupResidentIds) {
+          try {
+            await communicationApi.addGroupMember(newGroup.id, { user_id: uId });
+            addedCount++;
+          } catch (err) {
+            console.warn("Failed to add member to new group", err);
+          }
+        }
+      }
+
+      toast.success(
+        addedCount > 0
+          ? `Resident group "${groupForm.name.trim()}" created with ${addedCount} resident${addedCount > 1 ? "s" : ""}!`
+          : `Resident group "${groupForm.name.trim()}" created!`,
+        "Group Created"
+      );
+
       setIsGroupModalOpen(false);
       setCommFieldErrors({});
       setGroupForm({ name: "", description: "" });
+      setCreateGroupResidentIds([]);
+      setCreateGroupSearch("");
+      setCreateGroupTowerFilter("");
       refetchGroups();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      toast.error(err?.message || "Failed to create group", "Error");
     } finally {
       setIsSubmitting(false);
     }
@@ -231,17 +354,39 @@ export default function CommunityAdminCommunicationPage() {
       },
     },
     {
-      key: "targets",
-      header: "Audience",
+      key: "announcement_type",
+      header: "Category",
+      render: (a) => (
+        <span className="badge badge-primary" style={{ textTransform: "capitalize" }}>
+          {a.announcement_type}
+        </span>
+      ),
+    },
+    {
+      key: "target",
+      header: "Audience Target",
       render: (a) => {
-        const first = a.targets?.[0];
-        if (!first || first.target_all_community)
-          return <span className="badge badge-primary">🌐 Entire Community</span>;
-        if (first.tower_id) return <span className="badge badge-primary">🏢 Tower Specific</span>;
-        if (first.resident_group_id)
-          return <span className="badge badge-primary">👥 Resident Group</span>;
-        if (first.unit_id) return <span className="badge badge-primary">🚪 Unit Specific</span>;
-        return <span className="badge badge-neutral">Custom</span>;
+        if (!a.targets || a.targets.length === 0 || a.targets[0]?.target_all_community) {
+          return <span className="badge badge-neutral">🌐 Entire Community</span>;
+        }
+        const t = a.targets[0];
+        if (t.tower_id) {
+          const tower = towers.find((tw) => tw.id === t.tower_id);
+          return (
+            <span className="badge badge-info">
+              🏢 Tower: {tower ? tower.name : "Specific Tower"}
+            </span>
+          );
+        }
+        if (t.resident_group_id) {
+          const grp = groups?.find((g) => g.id === t.resident_group_id);
+          return (
+            <span className="badge badge-purple">
+              👥 Group: {grp ? grp.name : "Resident Group"}
+            </span>
+          );
+        }
+        return <span className="badge badge-neutral">Targeted</span>;
       },
     },
     {
@@ -313,12 +458,47 @@ export default function CommunityAdminCommunicationPage() {
 
   // Resident Groups Columns
   const groupColumns: Column<ResidentGroup>[] = [
-    { key: "name", header: "Group Name", render: (g) => <strong>{g.name}</strong> },
-    { key: "description", header: "Description", render: (g) => g.description || "–" },
+    {
+      key: "name",
+      header: "Group Name",
+      render: (g) => (
+        <div>
+          <strong style={{ fontSize: "0.95rem" }}>{g.name}</strong>
+          {g.description && (
+            <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.15rem" }}>
+              {g.description}
+            </div>
+          )}
+        </div>
+      ),
+    },
     {
       key: "member_count",
       header: "Members",
-      render: (g) => <span className="badge badge-neutral">{g.member_count || 0} residents</span>,
+      render: (g) => (
+        <button
+          type="button"
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            padding: 0,
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setSelectedGroup(g);
+            setIsManageMembersOpen(true);
+          }}
+          title="Click to view and manage members"
+        >
+          <span
+            className="badge badge-primary"
+            style={{ cursor: "pointer", fontSize: "0.75rem", padding: "0.25rem 0.6rem" }}
+          >
+            👥 {g.member_count || 0} residents
+          </span>
+        </button>
+      ),
     },
     {
       key: "is_active",
@@ -327,6 +507,54 @@ export default function CommunityAdminCommunicationPage() {
         <span className={`badge ${g.is_active ? "badge-success" : "badge-neutral"}`}>
           {g.is_active ? "Active" : "Archived"}
         </span>
+      ),
+    },
+    {
+      key: "actions",
+      header: "Action",
+      align: "right",
+      render: (g) => (
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.4rem" }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{
+              fontSize: "0.75rem",
+              padding: "0.3rem 0.65rem",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.3rem",
+              color: "var(--primary)",
+              borderColor: "rgba(37, 99, 235, 0.3)",
+              background: "rgba(37, 99, 235, 0.04)",
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedGroup(g);
+              setIsManageMembersOpen(true);
+            }}
+          >
+            ➕ Add Residents
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{
+              fontSize: "0.75rem",
+              padding: "0.3rem 0.65rem",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.3rem",
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedGroup(g);
+              setIsManageMembersOpen(true);
+            }}
+          >
+            👥 Manage ({g.member_count || 0})
+          </button>
+        </div>
       ),
     },
   ];
@@ -564,19 +792,21 @@ export default function CommunityAdminCommunicationPage() {
                   marginBottom: "0.25rem",
                 }}
               >
-                Priority
+                Announcement Category
               </label>
               <select
                 className="select-field"
-                value={form.priority}
+                value={form.announcement_type}
                 onChange={(e) =>
-                  setForm({ ...form, priority: e.target.value as typeof form.priority })
+                  setForm({ ...form, announcement_type: e.target.value as typeof form.announcement_type })
                 }
               >
-                <option value="normal">Normal</option>
-                <option value="low">Low</option>
-                <option value="urgent">Urgent</option>
-                <option value="emergency">Emergency 🚨</option>
+                <option value="notice">📢 General Notice</option>
+                <option value="maintenance">🔧 Maintenance Update</option>
+                <option value="event">🎉 Community Event</option>
+                <option value="emergency">🚨 Emergency Broadcast</option>
+                <option value="poll">📊 Resident Poll</option>
+                <option value="survey">📋 Feedback Survey</option>
               </select>
             </div>
 
@@ -589,24 +819,50 @@ export default function CommunityAdminCommunicationPage() {
                   marginBottom: "0.25rem",
                 }}
               >
-                Target Audience
+                Priority Level
               </label>
               <select
                 className="select-field"
-                value={form.target_type}
+                value={form.priority}
                 onChange={(e) =>
-                  setForm({
-                    ...form,
-                    target_type: e.target.value as typeof form.target_type,
-                    target_id: "",
-                  })
+                  setForm({ ...form, priority: e.target.value as typeof form.priority })
                 }
               >
-                <option value="all">Entire Community</option>
-                <option value="tower">Specific Tower</option>
-                <option value="resident_group">Resident Group</option>
+                <option value="normal">Normal</option>
+                <option value="low">Low</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+                <option value="emergency">Emergency 🚨</option>
               </select>
             </div>
+          </div>
+
+          <div>
+            <label
+              style={{
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                display: "block",
+                marginBottom: "0.25rem",
+              }}
+            >
+              Target Audience
+            </label>
+            <select
+              className="select-field"
+              value={form.target_type}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  target_type: e.target.value as typeof form.target_type,
+                  target_id: "",
+                })
+              }
+            >
+              <option value="all">🌐 Entire Community (All Residents &amp; Owners)</option>
+              <option value="tower">🏢 Specific Tower / Block</option>
+              <option value="resident_group">👥 Specific Resident Group</option>
+            </select>
           </div>
 
           {form.target_type === "tower" && (
@@ -658,7 +914,7 @@ export default function CommunityAdminCommunicationPage() {
                 <option value="">-- Choose Group --</option>
                 {groups?.map((g: any) => (
                   <option key={g.id} value={g.id}>
-                    {g.name}
+                    {g.name} ({g.member_count || 0} members)
                   </option>
                 ))}
               </select>
@@ -689,9 +945,31 @@ export default function CommunityAdminCommunicationPage() {
           <div
             style={{
               display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              padding: "0.5rem 0",
+              fontSize: "0.85rem",
+              color: "var(--fg)",
+            }}
+          >
+            <input
+              type="checkbox"
+              id="autoPublishCheck"
+              checked={autoPublish}
+              onChange={(e) => setAutoPublish(e.target.checked)}
+              style={{ width: 16, height: 16, cursor: "pointer" }}
+            />
+            <label htmlFor="autoPublishCheck" style={{ cursor: "pointer", fontWeight: 500 }}>
+              Broadcast / Publish immediately (visible to residents right away)
+            </label>
+          </div>
+
+          <div
+            style={{
+              display: "flex",
               justifyContent: "flex-end",
               gap: "0.5rem",
-              marginTop: "1rem",
+              marginTop: "0.5rem",
             }}
           >
             <button
@@ -702,17 +980,32 @@ export default function CommunityAdminCommunicationPage() {
               Cancel
             </button>
             <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-              {isSubmitting ? "Saving…" : "Save Announcement"}
+              {isSubmitting ? "Broadcasting…" : autoPublish ? "📢 Publish Announcement" : "Save Draft"}
             </button>
           </div>
         </form>
       </Modal>
 
+      {/* Group Members Management Modal */}
+      <GroupMembersModal
+        isOpen={isManageMembersOpen}
+        onClose={() => setIsManageMembersOpen(false)}
+        group={selectedGroup}
+        communityId={activeCommunityId || undefined}
+        onMembersUpdated={refetchGroups}
+      />
+
       {/* Create Group Modal */}
       <Modal
         isOpen={isGroupModalOpen}
-        onClose={() => setIsGroupModalOpen(false)}
+        onClose={() => {
+          setIsGroupModalOpen(false);
+          setCreateGroupResidentIds([]);
+          setCreateGroupSearch("");
+          setCreateGroupTowerFilter("");
+        }}
         title="Create Resident Group"
+        size="lg"
       >
         <form
           onSubmit={handleCreateGroup}
@@ -727,13 +1020,13 @@ export default function CommunityAdminCommunicationPage() {
                 marginBottom: "0.25rem",
               }}
             >
-              Group Name
+              Group Name <span style={{ color: "var(--danger)" }}>*</span>
             </label>
             <input
               type="text"
               className="input-field"
               required
-              placeholder="e.g. Garden Committee / Tower A Owners"
+              placeholder="e.g. Garden Committee / Tower A Owners / Yoga Club"
               value={groupForm.name}
               onChange={(e) => setGroupForm({ ...groupForm, name: e.target.value })}
             />
@@ -748,15 +1041,197 @@ export default function CommunityAdminCommunicationPage() {
                 marginBottom: "0.25rem",
               }}
             >
-              Description
+              Description <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>(optional)</span>
             </label>
             <input
               type="text"
               className="input-field"
-              placeholder="Purpose of this group..."
+              placeholder="Purpose or guidelines for this group..."
               value={groupForm.description}
               onChange={(e) => setGroupForm({ ...groupForm, description: e.target.value })}
             />
+          </div>
+
+          {/* Initial Residents Selection */}
+          <div
+            style={{
+              background: "var(--bg-muted)",
+              padding: "1rem",
+              borderRadius: "var(--radius-md)",
+              border: "1px solid var(--border)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "0.5rem",
+                flexWrap: "wrap",
+                gap: "0.5rem",
+              }}
+            >
+              <div>
+                <label
+                  style={{
+                    fontSize: "0.85rem",
+                    fontWeight: 600,
+                    margin: 0,
+                    display: "block",
+                    color: "var(--fg)",
+                  }}
+                >
+                  Add Initial Residents to Group <span style={{ fontSize: "0.75rem", color: "var(--muted)", fontWeight: 400 }}>(Optional)</span>
+                </label>
+                <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                  You can also add or remove members anytime later.
+                </span>
+              </div>
+
+              {availableCommunityResidents.length > 0 && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    const allFilteredIds = filteredCreateGroupResidents.map((r: { id: string }) => r.id);
+                    const areAllSelected = allFilteredIds.every((id: string) =>
+                      createGroupResidentIds.includes(id)
+                    );
+                    if (areAllSelected) {
+                      setCreateGroupResidentIds((prev) =>
+                        prev.filter((id) => !allFilteredIds.includes(id))
+                      );
+                    } else {
+                      setCreateGroupResidentIds((prev) =>
+                        Array.from(new Set([...prev, ...allFilteredIds]))
+                      );
+                    }
+                  }}
+                  style={{ fontSize: "0.72rem", padding: "0.2rem 0.5rem" }}
+                >
+                  {filteredCreateGroupResidents.length > 0 &&
+                  filteredCreateGroupResidents.every((r: { id: string }) => createGroupResidentIds.includes(r.id))
+                    ? "Deselect Filtered"
+                    : "Select All Filtered"}
+                </button>
+              )}
+            </div>
+
+            {/* Filter inputs */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: towers.length > 0 ? "1fr auto" : "1fr",
+                gap: "0.5rem",
+                marginBottom: "0.5rem",
+              }}
+            >
+              <input
+                type="text"
+                className="input-field"
+                placeholder="Search residents by name, unit, phone, email..."
+                value={createGroupSearch}
+                onChange={(e) => setCreateGroupSearch(e.target.value)}
+                style={{ fontSize: "0.8rem", padding: "0.3rem 0.6rem" }}
+              />
+
+              {towers.length > 0 && (
+                <select
+                  className="select-field"
+                  value={createGroupTowerFilter}
+                  onChange={(e) => setCreateGroupTowerFilter(e.target.value)}
+                  style={{ fontSize: "0.8rem", padding: "0.3rem 0.6rem" }}
+                >
+                  <option value="">All Towers</option>
+                  {towers.map((t: any) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {/* Scrollable list */}
+            <div
+              style={{
+                maxHeight: 160,
+                overflowY: "auto",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                background: "var(--bg)",
+                padding: "0.25rem 0.5rem",
+              }}
+            >
+              {availableCommunityResidents.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "1rem", fontSize: "0.8rem", color: "var(--muted)" }}>
+                  No residents registered in this community yet.
+                </div>
+              ) : filteredCreateGroupResidents.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "1rem", fontSize: "0.8rem", color: "var(--muted)" }}>
+                  No residents match your search filter.
+                </div>
+              ) : (
+                filteredCreateGroupResidents.map((r: { id: string; name: string; email: string; phone: string; unitDisplay: string; residentType: string }) => {
+                  const isChecked = createGroupResidentIds.includes(r.id);
+                  return (
+                    <label
+                      key={r.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "0.4rem 0.5rem",
+                        borderBottom: "1px solid rgba(0,0,0,0.04)",
+                        cursor: "pointer",
+                        borderRadius: "var(--radius-xs)",
+                        background: isChecked ? "rgba(37, 99, 235, 0.06)" : "transparent",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {
+                            setCreateGroupResidentIds((prev) =>
+                              prev.includes(r.id)
+                                ? prev.filter((id) => id !== r.id)
+                                : [...prev, r.id]
+                            );
+                          }}
+                          style={{ cursor: "pointer" }}
+                        />
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: "0.82rem", color: "var(--fg)" }}>
+                            {r.name}
+                          </div>
+                          <div style={{ fontSize: "0.7rem", color: "var(--muted)" }}>
+                            {r.email || r.phone || "No contact"}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                        {r.unitDisplay && (
+                          <span className="badge badge-neutral" style={{ fontSize: "0.68rem", padding: "0.1rem 0.35rem" }}>
+                            {r.unitDisplay}
+                          </span>
+                        )}
+                        {r.residentType && (
+                          <span className="badge badge-primary" style={{ fontSize: "0.65rem", padding: "0.1rem 0.35rem" }}>
+                            {r.residentType}
+                          </span>
+                        )}
+                      </div>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+
+            <div style={{ marginTop: "0.4rem", fontSize: "0.78rem", color: createGroupResidentIds.length > 0 ? "var(--primary)" : "var(--muted)", fontWeight: 500 }}>
+              {createGroupResidentIds.length} resident{createGroupResidentIds.length !== 1 ? "s" : ""} selected
+            </div>
           </div>
 
           <div
@@ -764,18 +1239,27 @@ export default function CommunityAdminCommunicationPage() {
               display: "flex",
               justifyContent: "flex-end",
               gap: "0.5rem",
-              marginTop: "1rem",
+              marginTop: "0.5rem",
             }}
           >
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={() => setIsGroupModalOpen(false)}
+              onClick={() => {
+                setIsGroupModalOpen(false);
+                setCreateGroupResidentIds([]);
+                setCreateGroupSearch("");
+                setCreateGroupTowerFilter("");
+              }}
             >
               Cancel
             </button>
             <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-              {isSubmitting ? "Creating…" : "Save Group"}
+              {isSubmitting
+                ? "Creating Group…"
+                : createGroupResidentIds.length > 0
+                ? `Save Group (+${createGroupResidentIds.length} Members)`
+                : "Save Group"}
             </button>
           </div>
         </form>

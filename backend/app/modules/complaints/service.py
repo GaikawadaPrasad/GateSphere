@@ -262,11 +262,48 @@ class ComplaintService(UnitScopedAccess):
         )
         return ticket
 
+    async def _enrich_tickets(self, tickets: list[ServiceTicket]) -> list[ServiceTicket]:
+        if not tickets:
+            return tickets
+        user_ids = {t.raised_by_user_id for t in tickets if t.raised_by_user_id}
+        unit_ids = {t.unit_id for t in tickets if t.unit_id}
+        cat_ids = {t.category_id for t in tickets if t.category_id}
+
+        users: dict[uuid.UUID, User] = {}
+        if user_ids:
+            u_stmt = select(User).where(User.id.in_(user_ids))
+            users = {u.id: u for u in (await self.db.scalars(u_stmt)).all()}
+
+        units: dict[uuid.UUID, Unit] = {}
+        if unit_ids:
+            un_stmt = select(Unit).where(Unit.id.in_(unit_ids))
+            units = {un.id: un for un in (await self.db.scalars(un_stmt)).all()}
+
+        cats: dict[uuid.UUID, ServiceCategory] = {}
+        if cat_ids:
+            c_stmt = select(ServiceCategory).where(ServiceCategory.id.in_(cat_ids))
+            cats = {c.id: c for c in (await self.db.scalars(c_stmt)).all()}
+
+        for t in tickets:
+            u = users.get(t.raised_by_user_id) if t.raised_by_user_id else None
+            if u:
+                t.raised_by_name = u.full_name
+                t.raised_by_email = u.email
+                t.raised_by_phone = u.phone
+            un = units.get(t.unit_id) if t.unit_id else None
+            if un:
+                t.unit_number = un.unit_number
+            cat = cats.get(t.category_id) if t.category_id else None
+            if cat:
+                t.category_name = cat.name
+        return tickets
+
     async def get_ticket(self, ticket_id: uuid.UUID) -> ServiceTicket:
         obj = await self.tickets.get(ticket_id)
         if obj is None:
             raise NotFoundError("Ticket not found")
         await self._assert_unit_visible(obj.unit_id)
+        await self._enrich_tickets([obj])
         return obj
 
     async def get_entry_pass(self, ticket_id: uuid.UUID) -> schemas.TicketEntryPassRead:
@@ -336,9 +373,10 @@ class ComplaintService(UnitScopedAccess):
                 ServiceTicket.unit_id,
                 or_owned=ServiceTicket.raised_by_user_id == self.actor.id,
             )
-        return await self.tickets.list(
-            offset=offset, limit=limit, extra=stmt
-        ), await self.tickets.count(extra=stmt)
+        rows = await self.tickets.list(offset=offset, limit=limit, extra=stmt)
+        total = await self.tickets.count(extra=stmt)
+        await self._enrich_tickets(rows)
+        return rows, total
 
     async def _mark_first_response(self, ticket: ServiceTicket) -> None:
         if ticket.first_responded_at is None:

@@ -63,3 +63,20 @@ export function useSetNotificationPreference() {
     },
   });
 }
+
+export function useDispatchNotification() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: {
+      recipient_user_id: string;
+      notification_type: string;
+      title: string;
+      message: string;
+      community_id?: string;
+      channels?: string[];
+    }) => notificationsApi.dispatch(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
+}

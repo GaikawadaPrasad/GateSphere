@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useUiStore } from "@/store/ui";
+import { useMe } from "@/hooks/use-auth";
 import {
   useSpecialAssessment,
   useApproveAssessment,
@@ -18,6 +19,7 @@ export default function AssessmentDetailPage() {
   const router = useRouter();
   const assessmentId = params?.assessmentId as string;
   const { activeCommunityId } = useUiStore();
+  const { data: currentUser } = useMe();
 
   const { data: assessment, isLoading } = useSpecialAssessment(assessmentId, activeCommunityId);
   const approveMutation = useApproveAssessment();
@@ -27,10 +29,24 @@ export default function AssessmentDetailPage() {
   const [rejectReason, setRejectReason] = useState("");
   const [showRejectBox, setShowRejectBox] = useState(false);
 
+  const isSelfProposal = currentUser && assessment?.proposed_by_user_id
+    ? assessment.proposed_by_user_id === currentUser.id
+    : false;
+
   const handleApprove = async () => {
+    if (isSelfProposal) {
+      alert("Maker-Checker Violation: You cannot approve your own proposal. Another committee member must review and approve.");
+      return;
+    }
+
     try {
-      await approveMutation.mutateAsync({ id: assessmentId, notes });
-      alert("Special assessment approved successfully.");
+      await approveMutation.mutateAsync({
+        id: assessmentId,
+        notes,
+        approved_by_user_id: currentUser?.id,
+        approved_by_name: currentUser?.full_name || "Association Committee Executive",
+      });
+      alert("Special assessment approved successfully by the Association Committee.");
       router.push("/association-committee/assessments");
     } catch {
       alert("Failed to approve assessment.");
@@ -39,8 +55,13 @@ export default function AssessmentDetailPage() {
 
   const handleReject = async () => {
     try {
-      await rejectMutation.mutateAsync({ id: assessmentId, reason: rejectReason });
-      alert("Special assessment rejected.");
+      await rejectMutation.mutateAsync({
+        id: assessmentId,
+        reason: rejectReason,
+        rejected_by_user_id: currentUser?.id,
+        rejected_by_name: currentUser?.full_name || "Association Committee Executive",
+      });
+      alert("Special assessment returned with rejection notes.");
       router.push("/association-committee/assessments");
     } catch {
       alert("Failed to reject assessment.");
@@ -82,7 +103,7 @@ export default function AssessmentDetailPage() {
     <div>
       <PageHeader
         title={assessment.title}
-        subtitle={`Special Assessment Review & CapEx Details · ${assessment.purpose}`}
+        subtitle={`Special Assessment Governance & CapEx Verification · ${assessment.purpose}`}
         breadcrumbs={[
           { label: "Association Committee", href: "/association-committee/governance" },
           { label: "Special Assessments", href: "/association-committee/assessments" },
@@ -114,6 +135,49 @@ export default function AssessmentDetailPage() {
                 Assessment Proposal Overview
               </div>
               <StatusBadge status={assessment.status} />
+            </div>
+
+            {/* Proposer Origin Card */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "0.75rem 1rem",
+                background: "#f1f5f9",
+                borderRadius: "var(--radius-sm)",
+                border: "1px solid var(--border)",
+                marginBottom: "1.25rem",
+                fontSize: "0.825rem",
+              }}
+            >
+              <div>
+                <span style={{ color: "var(--muted)" }}>Proposal Origin (Maker): </span>
+                <span style={{ fontWeight: 700, color: "var(--fg)" }}>
+                  {assessment.proposed_by_name || "Facility Operations & Maintenance"}
+                </span>
+                <span style={{ color: "var(--muted)", marginLeft: "0.4rem" }}>
+                  ({assessment.proposer_department || "Operations"})
+                </span>
+                {isSelfProposal && (
+                  <span
+                    style={{
+                      fontSize: "0.675rem",
+                      padding: "0.15rem 0.4rem",
+                      background: "#fef3c7",
+                      color: "#92400e",
+                      borderRadius: "var(--radius-sm)",
+                      fontWeight: 600,
+                      marginLeft: "0.5rem",
+                    }}
+                  >
+                    You (Maker)
+                  </span>
+                )}
+              </div>
+              <div style={{ color: "var(--muted)", fontSize: "0.775rem" }}>
+                Submitted: {formatDate(assessment.created_at)}
+              </div>
             </div>
 
             <div
@@ -251,7 +315,7 @@ export default function AssessmentDetailPage() {
                 </span>
               </div>
               <div>
-                <span style={{ color: "var(--muted)" }}>Created On: </span>
+                <span style={{ color: "var(--muted)" }}>Submission Date: </span>
                 <span style={{ fontWeight: 600 }}>{formatDate(assessment.created_at)}</span>
               </div>
             </div>
@@ -280,17 +344,36 @@ export default function AssessmentDetailPage() {
               >
                 <span>⚖️</span> Committee Governance Action
               </h2>
-              <p style={{ fontSize: "0.775rem", color: "var(--muted)", margin: "0.35rem 0 1rem" }}>
-                As an Association Committee member, approve or return this special assessment
-                proposal.
-              </p>
 
-              {!showRejectBox ? (
+              {isSelfProposal ? (
+                <div style={{ marginTop: "0.75rem" }}>
+                  <div
+                    style={{
+                      background: "#fffbeb",
+                      border: "1px solid #fde68a",
+                      borderRadius: "var(--radius-sm)",
+                      padding: "0.85rem 1rem",
+                      fontSize: "0.825rem",
+                      color: "#92400e",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    <div style={{ fontWeight: 700, marginBottom: "0.3rem" }}>
+                      🔒 Maker-Checker Segregation of Duties
+                    </div>
+                    You submitted this assessment proposal. Under statutory enterprise governance rules, the same individual cannot both propose and approve a special levy. Please have another Association Committee executive, the Treasurer, or President review and cast the vote.
+                  </div>
+                </div>
+              ) : !showRejectBox ? (
                 <div>
+                  <p style={{ fontSize: "0.775rem", color: "var(--muted)", margin: "0.35rem 0 1rem" }}>
+                    As an independent Association Committee member, review the project budget and cast the formal governance approval.
+                  </p>
+
                   <label
                     style={{ fontSize: "0.775rem", fontWeight: 600, color: "var(--fg-secondary)" }}
                   >
-                    Committee Approval Notes
+                    Committee Approval Notes / Resolution #
                   </label>
                   <textarea
                     value={notes}
@@ -328,13 +411,13 @@ export default function AssessmentDetailPage() {
                 </div>
               ) : (
                 <div>
-                  <label style={{ fontSize: "0.775rem", fontWeight: 600, color: "#dc2626" }}>
-                    Reason for Rejection
+                  <label style={{ fontSize: "0.775rem", fontWeight: 600, color: "#dc2626", marginTop: "0.5rem", display: "block" }}>
+                    Reason for Rejection / Modification Request
                   </label>
                   <textarea
                     value={rejectReason}
                     onChange={(e) => setRejectReason(e.target.value)}
-                    placeholder="Specify reason for returning proposal..."
+                    placeholder="Specify why this proposal is returned (e.g. Requires revised vendor quotations)..."
                     className="input-field"
                     style={{
                       minHeight: 90,
@@ -371,23 +454,25 @@ export default function AssessmentDetailPage() {
           ) : (
             <div className="card">
               <h2 className="card-title" style={{ marginBottom: "0.75rem" }}>
-                Governance Status
+                Governance Status & Audit
               </h2>
               <div
                 style={{
-                  padding: "0.75rem",
+                  padding: "0.85rem",
                   background: "#f8fafc",
                   borderRadius: "var(--radius-sm)",
+                  border: "1px solid var(--border)",
                   fontSize: "0.85rem",
                 }}
               >
                 <div>
                   <strong>Status:</strong>{" "}
-                  <span style={{ textTransform: "capitalize" }}>{assessment.status}</span>
+                  <span style={{ textTransform: "capitalize", fontWeight: 600 }}>{assessment.status}</span>
                 </div>
                 {assessment.approved_at && (
-                  <div style={{ marginTop: "0.4rem", color: "var(--muted)", fontSize: "0.775rem" }}>
+                  <div style={{ marginTop: "0.5rem", color: "var(--muted)", fontSize: "0.775rem" }}>
                     Approved on: {formatDate(assessment.approved_at)}
+                    {assessment.approved_by_name && <span> by <strong>{assessment.approved_by_name}</strong></span>}
                   </div>
                 )}
                 {assessment.approval_notes && (
@@ -396,9 +481,18 @@ export default function AssessmentDetailPage() {
                       marginTop: "0.4rem",
                       fontSize: "0.8rem",
                       color: "var(--fg-secondary)",
+                      background: "#ffffff",
+                      padding: "0.5rem",
+                      borderRadius: "var(--radius-sm)",
+                      border: "1px solid var(--border-light)",
                     }}
                   >
                     <em>&ldquo;{assessment.approval_notes}&rdquo;</em>
+                  </div>
+                )}
+                {assessment.rejected_by_name && assessment.status === "rejected" && (
+                  <div style={{ marginTop: "0.5rem", color: "#dc2626", fontSize: "0.775rem" }}>
+                    Rejected by <strong>{assessment.rejected_by_name}</strong>
                   </div>
                 )}
                 {assessment.rejection_reason && (

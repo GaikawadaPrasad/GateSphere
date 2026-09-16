@@ -32,11 +32,24 @@ export interface MaintenanceInvoice {
   items?: InvoiceItem[];
 }
 
+export interface PaymentAllocation {
+  id: string;
+  invoice_id: string;
+  allocated_amount: string;
+  invoice_number?: string;
+  unit_number?: string;
+}
+
 export interface Payment {
   id: string;
   community_id: string;
   payer_user_id: string;
   payer_name?: string;
+  payer_email?: string;
+  payer_phone?: string;
+  unit_number?: string;
+  tower_name?: string;
+  resident_type?: string;
   amount: string;
   payment_method: string;
   payment_reference: string;
@@ -45,6 +58,8 @@ export interface Payment {
   status: string;
   paid_at: string;
   refunded_at?: string | null;
+  remarks?: string | null;
+  allocations?: PaymentAllocation[];
 }
 
 export interface ChargeHead {

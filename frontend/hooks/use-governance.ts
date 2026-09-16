@@ -168,10 +168,20 @@ export function useCreateAssessment() {
 export function useApproveAssessment() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, notes }: { id: string; notes?: string }) => {
-      return await assessmentsApi.approve(id, notes);
+    mutationFn: async ({
+      id,
+      notes,
+      approved_by_user_id,
+      approved_by_name,
+    }: {
+      id: string;
+      notes?: string;
+      approved_by_user_id?: string;
+      approved_by_name?: string;
+    }) => {
+      return await assessmentsApi.approve(id, { notes, approved_by_user_id, approved_by_name });
     },
-    onSuccess: (_, vars) => {
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: governanceKeys.all });
       qc.invalidateQueries({ queryKey: ["billing"] });
     },
@@ -184,8 +194,18 @@ export function useApproveAssessment() {
 export function useRejectAssessment() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, reason }: { id: string; reason?: string }) => {
-      return await assessmentsApi.reject(id, reason);
+    mutationFn: async ({
+      id,
+      reason,
+      rejected_by_user_id,
+      rejected_by_name,
+    }: {
+      id: string;
+      reason?: string;
+      rejected_by_user_id?: string;
+      rejected_by_name?: string;
+    }) => {
+      return await assessmentsApi.reject(id, { reason, rejected_by_user_id, rejected_by_name });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: governanceKeys.all });

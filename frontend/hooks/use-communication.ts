@@ -112,6 +112,39 @@ export function useCreateResidentGroup() {
   });
 }
 
+export function useGroupMembers(groupId?: string) {
+  return useQuery({
+    queryKey: ["resident-group-members", groupId],
+    queryFn: () => (groupId ? communicationApi.listGroupMembers(groupId) : []),
+    enabled: Boolean(groupId),
+    staleTime: 30_000,
+  });
+}
+
+export function useAddGroupMember() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ groupId, userId }: { groupId: string; userId: string }) =>
+      communicationApi.addGroupMember(groupId, { user_id: userId }),
+    onSuccess: (_, { groupId }) => {
+      queryClient.invalidateQueries({ queryKey: ["resident-group-members", groupId] });
+      queryClient.invalidateQueries({ queryKey: ["resident-groups"] });
+    },
+  });
+}
+
+export function useRemoveGroupMember() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ groupId, memberId }: { groupId: string; memberId: string }) =>
+      communicationApi.removeGroupMember(groupId, memberId),
+    onSuccess: (_, { groupId }) => {
+      queryClient.invalidateQueries({ queryKey: ["resident-group-members", groupId] });
+      queryClient.invalidateQueries({ queryKey: ["resident-groups"] });
+    },
+  });
+}
+
 export function useEventRsvp() {
   const queryClient = useQueryClient();
   return useMutation({

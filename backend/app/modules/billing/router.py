@@ -365,6 +365,10 @@ def _get_default_assessments(community_id: str | None = None) -> list[dict]:
             "due_date": "2026-11-15",
             "affected_units_count": 120,
             "status": "under_review",
+            "proposed_by_user_id": "usr-fm-001",
+            "proposed_by_name": "Marcus Vance",
+            "proposer_role": "facility_manager",
+            "proposer_department": "Facility Operations & Energy Management",
             "created_at": now_iso,
             "updated_at": now_iso,
         },
@@ -381,6 +385,11 @@ def _get_default_assessments(community_id: str | None = None) -> list[dict]:
             "due_date": "2026-09-30",
             "affected_units_count": 120,
             "status": "approved",
+            "proposed_by_user_id": "usr-eng-002",
+            "proposed_by_name": "David Sterling",
+            "proposer_role": "facility_manager",
+            "proposer_department": "Engineering & Maintenance",
+            "approved_by_name": "Elena Rostova (Treasurer)",
             "approved_at": now_iso,
             "approval_notes": "Approved unanimously per AGM Resolution #4. Execution scheduled for Q4.",
             "created_at": now_iso,
@@ -399,6 +408,11 @@ def _get_default_assessments(community_id: str | None = None) -> list[dict]:
             "due_date": "2026-08-15",
             "affected_units_count": 120,
             "status": "active",
+            "proposed_by_user_id": "usr-sec-003",
+            "proposed_by_name": "Chief Security Officer",
+            "proposer_role": "security_supervisor",
+            "proposer_department": "Security & Surveillance",
+            "approved_by_name": "Managing Committee Board",
             "approved_at": now_iso,
             "approval_notes": "Security audit priority recommendation completed.",
             "created_at": now_iso,
@@ -480,6 +494,10 @@ async def create_assessment(
         "due_date": payload.get("due_date", ""),
         "affected_units_count": units_count,
         "status": "under_review",
+        "proposed_by_user_id": payload.get("proposed_by_user_id"),
+        "proposed_by_name": payload.get("proposed_by_name", "Operations & Management"),
+        "proposer_role": payload.get("proposer_role", "facility_manager"),
+        "proposer_department": payload.get("proposer_department", "Facility Operations"),
         "created_at": now_iso,
         "updated_at": now_iso,
     }
@@ -504,6 +522,11 @@ async def approve_assessment(
 
     sa["status"] = "approved"
     sa["approved_at"] = datetime.now(UTC).isoformat()
+    sa["approved_by_user_id"] = payload.get("approved_by_user_id") if payload else None
+    sa["approved_by_name"] = (
+        (payload.get("approved_by_name") if payload else None)
+        or "Association Committee Executive"
+    )
     sa["approval_notes"] = (
         payload.get("notes") if payload else None
     ) or "Approved by Association Committee"
@@ -527,6 +550,11 @@ async def reject_assessment(
         raise NotFoundError("Special assessment not found")
 
     sa["status"] = "rejected"
+    sa["rejected_by_user_id"] = payload.get("rejected_by_user_id") if payload else None
+    sa["rejected_by_name"] = (
+        (payload.get("rejected_by_name") if payload else None)
+        or "Association Committee Executive"
+    )
     sa["rejection_reason"] = (
         payload.get("reason") if payload else None
     ) or "Rejected by Association Committee"

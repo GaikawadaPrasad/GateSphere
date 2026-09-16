@@ -239,10 +239,24 @@ class GateService:
             stmt = stmt.where(GuardRoster.guard_user_id == guard_user_id)
         if roster_status:
             stmt = stmt.where(GuardRoster.status == roster_status)
-        stmt = stmt.order_by(GuardRoster.shift_date.desc(), GuardRoster.shift_start)
-        return await self.rosters.list(
-            offset=offset, limit=limit, extra=stmt
-        ), await self.rosters.count(extra=stmt)
+        rows = await self.rosters.list(offset=offset, limit=limit, extra=stmt)
+        total = await self.rosters.count(extra=stmt)
+        user_ids = {r.guard_user_id for r in rows if r.guard_user_id} | {
+            r.supervisor_user_id for r in rows if r.supervisor_user_id
+        }
+        if user_ids:
+            u_stmt = select(User).where(User.id.in_(user_ids))
+            users = {u.id: u for u in (await self.db.scalars(u_stmt)).all()}
+            for r in rows:
+                g = users.get(r.guard_user_id)
+                if g:
+                    r.guard_name = g.full_name
+                    r.guard_email = g.email
+                    r.guard_phone = g.phone
+                s = users.get(r.supervisor_user_id) if r.supervisor_user_id else None
+                if s:
+                    r.supervisor_name = s.full_name
+        return rows, total
 
     async def _get_roster(self, roster_id: uuid.UUID) -> GuardRoster:
         obj = await self.rosters.get(roster_id)
