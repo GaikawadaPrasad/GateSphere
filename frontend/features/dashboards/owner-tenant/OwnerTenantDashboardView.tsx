@@ -217,18 +217,9 @@ export function OwnerTenantDashboardView({
   // Payments view mode ("invoices" vs "ledger")
   const [paymentsViewMode, setPaymentsViewMode] = useState<"invoices" | "ledger">("invoices");
 
-  // Dismissed state for live visitor approval banner
-  const [visitorBannerDismissed, setVisitorBannerDismissed] = useState(false);
+  // Dismissed state for live visitor approval banner (per-visitor, not per-session)
+  const [dismissedVisitorId, setDismissedVisitorId] = useState<string | null>(null);
   const [deliveryBannerDismissed, setDeliveryBannerDismissed] = useState(false);
-
-  useEffect(() => {
-    if (
-      typeof window !== "undefined" &&
-      sessionStorage.getItem("gatesphere_gate_alert_dismissed") === "true"
-    ) {
-      setVisitorBannerDismissed(true);
-    }
-  }, []);
 
   // Data queries
   const { data: stats, isLoading: statsLoading, isError: statsError, refetch: refetchStats } = useResidentOverview(activeCommunityId);
@@ -263,6 +254,7 @@ export function OwnerTenantDashboardView({
   const nextBooking = (amenities.bookings.data || []).find((b) => b.status === "confirmed");
 
   const pendingVisitor = visitorList.find((v) => v.status === "pending");
+  const visitorBannerDismissed = Boolean(pendingVisitor && dismissedVisitorId === pendingVisitor.id);
   const pendingDelivery = deliveryList.find(
     (d) => d.status === "at_gate" || d.approval_status === "pending",
   );
@@ -454,10 +446,7 @@ export function OwnerTenantDashboardView({
         await visitors.refetch();
         refetchStats?.();
       }
-      setVisitorBannerDismissed(true);
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem("gatesphere_gate_alert_dismissed", "true");
-      }
+      if (pendingVisitor) setDismissedVisitorId(pendingVisitor.id);
       toast.success(
         approved ? "Visitor entry approved for Main Gate 1." : "Visitor entry request rejected.",
         approved ? "Gate Entry Approved" : "Gate Entry Rejected",
