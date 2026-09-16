@@ -9,7 +9,7 @@ export const authKeys = {
 };
 
 /** Current user. `null` when unauthenticated (a 401 is an expected result, not an error state). */
-export function useMe() {
+export function useMe(options?: { enabled?: boolean }) {
   return useQuery<CurrentUser | null>({
     queryKey: authKeys.me,
     queryFn: async () => {
@@ -30,6 +30,7 @@ export function useMe() {
       }
       return failureCount < 2;
     },
+    enabled: options?.enabled,
   });
 }
 
@@ -45,7 +46,7 @@ export function useLogin() {
       }
       // Seed the auth cache FIRST so navigating components see the user immediately.
       // Then clear all other stale data from any previous session so cross-tenant
-      // data can never leak (AGENTS.md §5.3).
+      // data can never leak (AGENTS.md ยง5.3).
       qc.setQueryData(authKeys.me, user);
       // Remove all queries except the auth/me key we just set
       qc.removeQueries({
