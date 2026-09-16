@@ -4,7 +4,8 @@ import React, { useMemo } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useUiStore } from "@/store/ui";
-import { useCommunityDetails, useTowers } from "@/hooks/use-communities";
+import { useMe } from "@/hooks/use-auth";
+import { useCommunityDetails, useTowers, useCommunities } from "@/hooks/use-communities";
 import { useOverviewStats, useFinancialStats } from "@/hooks/use-dashboards";
 import { useStaffList, useStaffAttendance } from "@/hooks/use-staff";
 import { useIncidents } from "@/hooks/use-incidents";
@@ -91,7 +92,19 @@ const IncidentListWidget = dynamic(
 );
 
 export default function CommunityAdminDashboardPage() {
-  const { activeCommunityId } = useUiStore();
+  const { activeCommunityId, setActiveCommunity } = useUiStore();
+  const { data: user } = useMe();
+  const { data: communities } = useCommunities();
+
+  React.useEffect(() => {
+    if (!activeCommunityId) {
+      if (user?.community_ids?.[0]) {
+        setActiveCommunity(user.community_ids[0]);
+      } else if (user?.is_superadmin && communities && communities.length > 0) {
+        setActiveCommunity(communities[0].id);
+      }
+    }
+  }, [activeCommunityId, user, communities, setActiveCommunity]);
 
   const { data: community, isLoading: communityLoading } = useCommunityDetails(
     activeCommunityId || undefined,

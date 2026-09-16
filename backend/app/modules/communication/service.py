@@ -401,9 +401,12 @@ class CommunicationService(UnitScopedAccess):
 
     async def expire_announcement(self, announcement_id: uuid.UUID) -> Announcement:
         ann = await self.get_announcement(announcement_id)
-        ann.expires_at = datetime.now(UTC)
-        await self.db.flush()
-        await self._audit("announcement.expire", ann.community_id, "announcement", ann.id)
+        now = datetime.now(UTC)
+        exp = ann.expires_at if (ann.expires_at and ann.expires_at.tzinfo) else (ann.expires_at.replace(tzinfo=UTC) if ann.expires_at else None)
+        if exp is None or exp > now:
+            ann.expires_at = now
+            await self.db.flush()
+            await self._audit("announcement.expire", ann.community_id, "announcement", ann.id)
         return await self.get_announcement(ann.id)
 
     async def list_announcements(

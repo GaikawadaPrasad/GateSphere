@@ -26,6 +26,7 @@ import type {
   StaffType,
   VerificationStatus,
 } from "@/types/staff";
+import { ApiError } from "@/lib/api";
 import { formatDateTime } from "@/lib/utils";
 
 export default function CommunityAdminStaffPage() {
@@ -216,7 +217,17 @@ export default function CommunityAdminStaffPage() {
       refetchStaff();
     } catch (err: unknown) {
       console.error(err);
-      setErrorMessage(err instanceof Error ? err.message : "Failed to register staff");
+      if (err instanceof ApiError && err.fields && Object.keys(err.fields).length > 0) {
+        const mappedErrors: Record<string, string> = {};
+        for (const [fKey, fVal] of Object.entries(err.fields)) {
+          const key = fKey.replace(/^body\./, "").replace(/^data\./, "");
+          mappedErrors[key] = Array.isArray(fVal) ? fVal.join(", ") : String(fVal);
+        }
+        setStaffFieldErrors(mappedErrors);
+        setErrorMessage(null);
+      } else {
+        setErrorMessage(err instanceof Error ? err.message : "Failed to register staff");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -1060,6 +1071,7 @@ export default function CommunityAdminStaffPage() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.85rem" }}>
               <div>
                 <label
+                  htmlFor="staff_full_name"
                   style={{
                     fontSize: "0.82rem",
                     fontWeight: 600,
@@ -1070,9 +1082,12 @@ export default function CommunityAdminStaffPage() {
                   Full Name <span style={{ color: "#EF4444" }}>*</span>
                 </label>
                 <input
+                  id="staff_full_name"
                   type="text"
                   className="input-field"
                   required
+                  aria-invalid={Boolean(staffFieldErrors.full_name)}
+                  aria-describedby={staffFieldErrors.full_name ? "staff_full_name_error" : undefined}
                   placeholder="e.g. Ramesh Kumar"
                   value={newStaffForm.full_name}
                   onChange={(e) => {
@@ -1092,14 +1107,20 @@ export default function CommunityAdminStaffPage() {
                   }}
                 />
                 {staffFieldErrors.full_name && (
-                  <span style={{ fontSize: "0.75rem", color: "#EF4444", marginTop: "0.25rem", display: "block" }}>
-                    {staffFieldErrors.full_name}
+                  <span
+                    id="staff_full_name_error"
+                    role="alert"
+                    title={staffFieldErrors.full_name}
+                    style={{ fontSize: "0.75rem", color: "#EF4444", marginTop: "0.25rem", display: "flex", alignItems: "center", gap: "0.25rem" }}
+                  >
+                    <span>⚠️</span> {staffFieldErrors.full_name}
                   </span>
                 )}
               </div>
 
               <div>
                 <label
+                  htmlFor="staff_phone"
                   style={{
                     fontSize: "0.82rem",
                     fontWeight: 600,
@@ -1110,9 +1131,12 @@ export default function CommunityAdminStaffPage() {
                   Phone Number <span style={{ color: "#EF4444" }}>*</span>
                 </label>
                 <input
+                  id="staff_phone"
                   type="tel"
                   className="input-field"
                   required
+                  aria-invalid={Boolean(staffFieldErrors.phone)}
+                  aria-describedby={staffFieldErrors.phone ? "staff_phone_error" : undefined}
                   placeholder="+91 9876543210"
                   value={newStaffForm.phone}
                   onChange={(e) => setNewStaffForm({ ...newStaffForm, phone: e.target.value })}
@@ -1121,8 +1145,13 @@ export default function CommunityAdminStaffPage() {
                   }}
                 />
                 {staffFieldErrors.phone && (
-                  <span style={{ fontSize: "0.75rem", color: "#EF4444", marginTop: "0.25rem", display: "block" }}>
-                    {staffFieldErrors.phone}
+                  <span
+                    id="staff_phone_error"
+                    role="alert"
+                    title={staffFieldErrors.phone}
+                    style={{ fontSize: "0.75rem", color: "#EF4444", marginTop: "0.25rem", display: "flex", alignItems: "center", gap: "0.25rem" }}
+                  >
+                    <span>⚠️</span> {staffFieldErrors.phone}
                   </span>
                 )}
               </div>
@@ -1131,6 +1160,7 @@ export default function CommunityAdminStaffPage() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.85rem" }}>
               <div>
                 <label
+                  htmlFor="staff_email"
                   style={{
                     fontSize: "0.82rem",
                     fontWeight: 600,
@@ -1141,8 +1171,11 @@ export default function CommunityAdminStaffPage() {
                   Email Address <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 400 }}>(For Dashboard Login)</span>
                 </label>
                 <input
+                  id="staff_email"
                   type="email"
                   className="input-field"
+                  aria-invalid={Boolean(staffFieldErrors.email)}
+                  aria-describedby={staffFieldErrors.email ? "staff_email_error" : undefined}
                   placeholder="e.g. ramesh.maid@gatesphere.com"
                   value={newStaffForm.email}
                   onChange={(e) => setNewStaffForm({ ...newStaffForm, email: e.target.value })}
@@ -1151,8 +1184,13 @@ export default function CommunityAdminStaffPage() {
                   }}
                 />
                 {staffFieldErrors.email && (
-                  <span style={{ fontSize: "0.75rem", color: "#EF4444", marginTop: "0.25rem", display: "block" }}>
-                    {staffFieldErrors.email}
+                  <span
+                    id="staff_email_error"
+                    role="alert"
+                    title={staffFieldErrors.email}
+                    style={{ fontSize: "0.75rem", color: "#EF4444", marginTop: "0.25rem", display: "flex", alignItems: "center", gap: "0.25rem" }}
+                  >
+                    <span>⚠️</span> {staffFieldErrors.email}
                   </span>
                 )}
               </div>
