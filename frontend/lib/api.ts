@@ -1028,21 +1028,42 @@ export const deliveriesApi = {
   markDelivered: (id: string) =>
     apiSend<Record<string, unknown>>("POST", `/deliveries/${id}/delivered`),
   cancel: (id: string) => apiSend<Record<string, unknown>>("POST", `/deliveries/${id}/cancel`),
+  decide: (id: string, decision: string, remarks?: string) =>
+    apiSend<Record<string, unknown>>("POST", `/deliveries/${id}/decision`, { decision, remarks }),
+  approve: (id: string, remarks?: string) =>
+    deliveriesApi.decide(id, "approved", remarks),
+  reject: (id: string, remarks?: string) =>
+    deliveriesApi.decide(id, "rejected", remarks),
 };
 
 export const vehiclesApi = {
   list: (params?: ListQueryParams) =>
     apiGet<Record<string, unknown>[]>("/vehicles", params as Record<string, unknown>),
   register: (data: {
-    registration_number: string;
-    vehicle_type: string;
-    unit_id?: string;
-    resident_profile_id?: string;
+    registration_number?: string;
+    plate_number?: string;
+    vehicle_type?: string;
     make?: string;
     model?: string;
     color?: string;
     sticker_number?: string;
-  }) => apiSend<Record<string, unknown>>("POST", "/vehicles", data),
+    unit_id?: string;
+    resident_profile_id?: string;
+    visitor_id?: string;
+  }) => {
+    const payload = {
+      registration_number: (data.registration_number || data.plate_number || "").toUpperCase().trim(),
+      vehicle_type: data.vehicle_type || "car",
+      make: data.make || undefined,
+      model: data.model || undefined,
+      color: data.color || undefined,
+      sticker_number: data.sticker_number || undefined,
+      unit_id: data.unit_id || undefined,
+      resident_profile_id: data.resident_profile_id || undefined,
+      visitor_id: data.visitor_id || undefined,
+    };
+    return apiSend<Record<string, unknown>>("POST", "/vehicles", payload);
+  },
   slots: (params?: { community_id?: string; slot_status?: string }) =>
     apiGet<Record<string, unknown>[]>("/vehicles/parking/slots", params as Record<string, unknown>),
   allocations: (params?: ListQueryParams) =>
@@ -1069,6 +1090,8 @@ export const vehiclesApi = {
   }) => apiSend<Record<string, unknown>>("POST", "/vehicles/parking/violations", data),
   transitionViolation: (violationId: string, newStatus: string) =>
     apiSend<Record<string, unknown>>("POST", `/vehicles/parking/violations/${violationId}/status`, undefined, { new_status: newStatus }),
+  delete: (id: string) =>
+    apiSend<void>("PATCH", `/vehicles/${id}`, { is_active: false }),
 };
 
 export const incidentsApi = {

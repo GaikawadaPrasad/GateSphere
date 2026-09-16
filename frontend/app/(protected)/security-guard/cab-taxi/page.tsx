@@ -7,10 +7,12 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { Modal } from "@/components/common/Modal";
 import { FileUpload } from "@/components/common/FileUpload";
-import { visitorsApi } from "@/lib/api";
+import { visitorsApi, communitiesApi, authApi } from "@/lib/api";
+import type { Unit } from "@/types/communities";
 
 interface CabMovement {
   id: string;
+  unit_number?: string;
   visitorName: string;
   vehicleNumber: string;
   purpose: string;
@@ -24,13 +26,26 @@ export default function SecurityGuardCabTaxiPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  
+  // Admit Cab photo modal state
   const [admitCab, setAdmitCab] = useState<CabMovement | null>(null);
   const [admitPhotoUrl, setAdmitPhotoUrl] = useState<string | null>(null);
   const [isAdmitting, setIsAdmitting] = useState(false);
   const [admitError, setAdmitError] = useState<string | null>(null);
 
-  const loadData = async () => {
-    setIsLoading(true);
+  // Log Cab Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [units, setUnits] = useState<Unit[]>([]);
+  const [selectedUnitId, setSelectedUnitId] = useState("");
+  const [driverName, setDriverName] = useState("");
+  const [driverPhone, setDriverPhone] = useState("");
+  const [vehicleNumber, setVehicleNumber] = useState("");
+  const [cabCompany, setCabCompany] = useState("Uber");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
+
+  const loadData = async (showLoading = true) => {
+    if (showLoading) setIsLoading(true);
     setLoadError(null);
     try {
       const [requests, directory, entries] = await Promise.all([
@@ -61,23 +76,109 @@ export default function SecurityGuardCabTaxiPage() {
             const openEntry = openEntryByRequest.get(r.id);
             return {
               id: r.id,
-              visitorName: visitor?.full_name || "Cab Driver",
-              vehicleNumber: r.vehicle_number || visitor?.vehicle_number || "—",
+              unit_number: r.unit_number || (r.unit ? `Unit ${r.unit.unit_number}` : "—"),
+              visitorName: r.visitor_name || r.visitor?.full_name || visitor?.full_name || "Cab Driver",
+              vehicleNumber: r.vehicle_number || r.visitor?.vehicle_number || visitor?.vehicle_number || "—",
               purpose: r.purpose || "Cab / Taxi",
-              status: r.status,
+              status: r.status || "pending",
               entryId: openEntry?.id,
             };
           }),
       );
     } catch (err: any) {
-      setLoadError(err?.message || "Failed to load cab/taxi movements.");
+      if (showLoading) setLoadError(err?.message || "Failed to load cab/taxi movements.");
     }
-    setIsLoading(false);
+    if (showLoading) setIsLoading(false);
   };
 
   useEffect(() => {
-    loadData();
+    loadData(true);
+    const interval = setInterval(() => {
+      loadData(false);
+    }, 5000);
+    return () => clearInterval(interval);
   }, []);
+
+  const loadUnits = async () => {
+    try {
+      const me = await authApi.me();
+      let cid = me?.community_ids?.[0] || (me as any)?.community_id;
+      if (!cid && me?.roles && Array.isArray(me.roles)) {
+        cid = me.roles.find((r: any) => r.community_id)?.community_id;
+      }
+      if (!cid) {
+        const comms: any = await communitiesApi.list({ active: true });
+        const list = Array.isArray(comms) ? comms : comms?.data || comms?.items || [];
+        if (list.length > 0) cid = list[0].id;
+      }
+      if (cid) {
+        const res: any = await communitiesApi.communityUnits(cid, { page_size: 100 });
+        const uList = Array.isArray(res) ? res : res?.data || res?.items || [];
+        if (Array.isArray(uList) && uList.length > 0) {
+          const sorted = [...uList].sort((a: any, b: any) =>
+            (a.unit_number || "").localeCompare(b.unit_number || "", undefined, {
+              numeric: true,
+              sensitivity: "base",
+            }),
+          );
+          setUnits(sorted);
+          if (sorted.length > 0) {
+            setSelectedUnitId(sorted[0].id);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load units for security guard cab modal:", err);
+    }
+  };
+
+  const handleOpenModal = () => {
+    setSelectedUnitId("");
+    setDriverName("");
+    setDriverPhone("");
+    setVehicleNumber("");
+    setCabCompany("Uber");
+    setModalError(null);
+    setIsModalOpen(true);
+    loadUnits();
+  };
+
+  const handleCreateCabArrival = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUnitId) {
+      setModalError("Please select a target resident unit.");
+      return;
+    }
+    if (!vehicleNumber.trim()) {
+      setModalError("Please enter vehicle plate number (e.g. KA-01-AB-1234).");
+      return;
+    }
+    setIsSubmitting(true);
+    setModalError(null);
+    try {
+      await visitorsApi.createRequest({
+        unit_id: selectedUnitId,
+        visitor_type: "cab_taxi",
+        vehicle_number: vehicleNumber.trim().toUpperCase(),
+        purpose: cabCompany || "Cab / Taxi Entry",
+        visitor: {
+          full_name: driverName.trim() || "Cab / Taxi Driver",
+          phone: driverPhone.trim() || "9999999999",
+          vehicle_number: vehicleNumber.trim().toUpperCase(),
+        },
+      });
+      setActionMessage({
+        type: "success",
+        text: `Cab entry ticket logged! Notification sent to resident for approval.`,
+      });
+      setIsModalOpen(false);
+      loadData(false);
+    } catch (err: any) {
+      setModalError(err?.message || "Failed to log cab arrival request.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleAllowEntry = (cab: CabMovement) => {
     setActionMessage(null);
@@ -105,7 +206,7 @@ export default function SecurityGuardCabTaxiPage() {
       setActionMessage({ type: "success", text: `Cab entry recorded for ${admitCab.vehicleNumber}` });
       setAdmitCab(null);
       setAdmitPhotoUrl(null);
-      loadData();
+      loadData(false);
     } catch (err: any) {
       setAdmitError(err?.message || "Failed to record cab entry.");
     } finally {
@@ -119,7 +220,7 @@ export default function SecurityGuardCabTaxiPage() {
     try {
       await visitorsApi.recordExit(cab.entryId);
       setActionMessage({ type: "success", text: `Cab exit recorded for ${cab.vehicleNumber}` });
-      loadData();
+      loadData(false);
     } catch (err: any) {
       setActionMessage({ type: "error", text: err?.message || "Failed to record cab exit." });
     }
@@ -128,7 +229,8 @@ export default function SecurityGuardCabTaxiPage() {
   const filteredCabs = cabs.filter(
     (c) =>
       c.vehicleNumber.toLowerCase().includes(search.toLowerCase()) ||
-      c.visitorName.toLowerCase().includes(search.toLowerCase()),
+      c.visitorName.toLowerCase().includes(search.toLowerCase()) ||
+      (c.unit_number && c.unit_number.toLowerCase().includes(search.toLowerCase())),
   );
 
   const columns: Column<CabMovement>[] = [
@@ -149,14 +251,20 @@ export default function SecurityGuardCabTaxiPage() {
       render: (c) => <span>{c.visitorName}</span>,
     },
     {
+      key: "unit_number",
+      header: "Destination Unit",
+      sortable: true,
+      render: (c) => <span style={{ fontWeight: 600 }}>{c.unit_number || "—"}</span>,
+    },
+    {
       key: "purpose",
-      header: "Purpose / Destination",
+      header: "Service / Purpose",
       sortable: true,
       render: (c) => <span>{c.purpose}</span>,
     },
     {
       key: "status",
-      header: "Status",
+      header: "Approval / Gate Status",
       sortable: true,
       render: (c) => <StatusBadge status={c.status} />,
     },
@@ -200,6 +308,11 @@ export default function SecurityGuardCabTaxiPage() {
           { label: "Security Guard" },
           { label: "Cab / Taxi" },
         ]}
+        actions={
+          <button className="btn btn-primary" onClick={handleOpenModal}>
+            + Log Cab / Taxi Arrival
+          </button>
+        }
       />
 
       {actionMessage && (
@@ -248,7 +361,7 @@ export default function SecurityGuardCabTaxiPage() {
             type="button"
             className="btn btn-secondary"
             style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}
-            onClick={loadData}
+            onClick={() => loadData(true)}
           >
             Retry
           </button>
@@ -409,6 +522,135 @@ export default function SecurityGuardCabTaxiPage() {
           </div>
         </Modal>
       )}
+
+      {/* LOG CAB / TAXI ARRIVAL MODAL */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title="🚖 Log Cab / Taxi Gate Arrival"
+        footer={
+          <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setIsModalOpen(false)}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleCreateCabArrival}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Logging Cab Arrival…" : "Log & Notify Resident"}
+            </button>
+          </div>
+        }
+      >
+        <form onSubmit={handleCreateCabArrival} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          {modalError && (
+            <div
+              style={{
+                padding: "0.75rem",
+                borderRadius: "var(--radius)",
+                background: "var(--danger-light)",
+                border: "1px solid var(--danger-border)",
+                color: "#991b1b",
+                fontSize: "0.875rem",
+                fontWeight: 600,
+              }}
+            >
+              ⚠️ {modalError}
+            </div>
+          )}
+
+          <div>
+            <label className="form-label" style={{ fontWeight: 600, marginBottom: "0.35rem", display: "block" }}>
+              Destination Resident Unit *
+            </label>
+            <select
+              className="form-control"
+              value={selectedUnitId}
+              onChange={(e) => setSelectedUnitId(e.target.value)}
+              required
+            >
+              {units.length === 0 ? (
+                <option value="">Loading units…</option>
+              ) : (
+                units.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    Unit {u.unit_number} {u.unit_type ? `(${u.unit_type})` : ""}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+            <div>
+              <label className="form-label" style={{ fontWeight: 600, marginBottom: "0.35rem", display: "block" }}>
+                Vehicle Plate Number *
+              </label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="e.g. KA-01-AB-1234"
+                value={vehicleNumber}
+                onChange={(e) => setVehicleNumber(e.target.value)}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="form-label" style={{ fontWeight: 600, marginBottom: "0.35rem", display: "block" }}>
+                Cab Provider / Service *
+              </label>
+              <select
+                className="form-control"
+                value={cabCompany}
+                onChange={(e) => setCabCompany(e.target.value)}
+              >
+                <option value="Uber">Uber</option>
+                <option value="Ola">Ola Cabs</option>
+                <option value="Rapido">Rapido Cab / Bike</option>
+                <option value="InDrive">InDrive</option>
+                <option value="Private Taxi">Private Taxi / Rental</option>
+                <option value="Airport Shuttle">Airport Taxi / Shuttle</option>
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+            <div>
+              <label className="form-label" style={{ fontWeight: 600, marginBottom: "0.35rem", display: "block" }}>
+                Driver Name (Optional)
+              </label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Driver full name"
+                value={driverName}
+                onChange={(e) => setDriverName(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label className="form-label" style={{ fontWeight: 600, marginBottom: "0.35rem", display: "block" }}>
+                Driver Phone (Optional)
+              </label>
+              <input
+                type="tel"
+                className="form-control"
+                placeholder="10-digit mobile"
+                value={driverPhone}
+                onChange={(e) => setDriverPhone(e.target.value)}
+              />
+            </div>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
