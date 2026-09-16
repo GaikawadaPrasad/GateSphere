@@ -172,7 +172,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
       }
 
       if (resolvedUrl) {
-        let cleanUrl = resolvedUrl.trim().replace(/^["']+|["']+$/g, "").replace(/[\r\n]/g, "").trim();
+        const cleanUrl = resolvedUrl.trim().replace(/^["']+|["']+$/g, "").replace(/[\r\n]/g, "").trim();
         setPreviewUrl(cleanUrl);
         onUploadComplete(cleanUrl);
       } else {
