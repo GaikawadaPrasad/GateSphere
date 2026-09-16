@@ -129,3 +129,214 @@ export function generateInitialPassword(fullName: string, defaultPrefix = "user"
   const firstName = cleanName.length > 0 ? cleanName.toLowerCase() : defaultPrefix;
   return `${firstName}@Gate2026!`;
 }
+
+/**
+ * Returns an appropriate emoji icon based on facility / amenity name, category, or description.
+ */
+export function getAmenityIcon(
+  name?: string | null,
+  category?: string | null,
+  description?: string | null,
+): string {
+  const text = `${name || ""} ${category || ""} ${description || ""}`.toLowerCase();
+
+  // Swimming / Aquatics
+  if (text.includes("swim") || text.includes("pool") || text.includes("aqua") || text.includes("jacuzzi")) {
+    return "🏊";
+  }
+
+  // Gym / Fitness
+  if (
+    text.includes("gym") ||
+    text.includes("fitness") ||
+    text.includes("workout") ||
+    text.includes("cardio") ||
+    text.includes("crossfit") ||
+    text.includes("weights") ||
+    text.includes("bodybuilding")
+  ) {
+    return "🏋️";
+  }
+
+  // Children / Kids / Play Area / Park
+  if (
+    text.includes("child") ||
+    text.includes("kid") ||
+    text.includes("park") ||
+    text.includes("playground") ||
+    text.includes("play area") ||
+    text.includes("toddler") ||
+    text.includes("creche")
+  ) {
+    return "🛝";
+  }
+
+  // Racquet / Ball Sports & Courts
+  if (text.includes("badminton") || text.includes("shuttle")) {
+    return "🏸";
+  }
+  if (text.includes("tennis")) {
+    return "🎾";
+  }
+  if (text.includes("table tennis") || text.includes("ping pong") || text.includes(" tt")) {
+    return "🏓";
+  }
+  if (text.includes("squash")) {
+    return "🎾";
+  }
+  if (text.includes("basketball") || text.includes("hoop")) {
+    return "🏀";
+  }
+  if (text.includes("cricket") || text.includes("pitch") || text.includes("nets")) {
+    return "🏏";
+  }
+  if (
+    text.includes("football") ||
+    text.includes("soccer") ||
+    text.includes("turf") ||
+    text.includes("futsal")
+  ) {
+    return "⚽";
+  }
+  if (text.includes("court")) {
+    return "🎾";
+  }
+
+  // Clubhouse / Lounge / Community Center
+  if (text.includes("clubhouse") || text.includes("club house") || text.includes("club")) {
+    return "🏛️";
+  }
+  if (text.includes("lounge") || text.includes("lobby")) {
+    return "🛋️";
+  }
+
+  // Halls, Events & Banquets
+  if (
+    text.includes("banquet") ||
+    text.includes("party") ||
+    text.includes("hall") ||
+    text.includes("celebration") ||
+    text.includes("event")
+  ) {
+    return "🎉";
+  }
+  if (
+    text.includes("amphitheater") ||
+    text.includes("amphitheatre") ||
+    text.includes("auditorium") ||
+    text.includes("stage")
+  ) {
+    return "🎭";
+  }
+  if (
+    text.includes("theater") ||
+    text.includes("theatre") ||
+    text.includes("cinema") ||
+    text.includes("movie") ||
+    text.includes("av room") ||
+    text.includes("screening")
+  ) {
+    return "🎬";
+  }
+
+  // Wellness, Yoga & Spa
+  if (text.includes("yoga") || text.includes("meditation") || text.includes("zen")) {
+    return "🧘";
+  }
+  if (
+    text.includes("spa") ||
+    text.includes("sauna") ||
+    text.includes("steam") ||
+    text.includes("massage")
+  ) {
+    return "🧖";
+  }
+
+  // Indoor Games & Recreation
+  if (text.includes("billiard") || text.includes("snooker") || text.includes("8 ball")) {
+    return "🎱";
+  }
+  if (
+    text.includes("game") ||
+    text.includes("arcade") ||
+    text.includes("gaming") ||
+    text.includes("playstation") ||
+    text.includes("xbox") ||
+    text.includes("board game")
+  ) {
+    return "🎮";
+  }
+  if (text.includes("skat") || text.includes("roller") || text.includes("rink")) {
+    return "🛼";
+  }
+
+  // Nature, Gardens & Outdoor
+  if (
+    text.includes("garden") ||
+    text.includes("lawn") ||
+    text.includes("green") ||
+    text.includes("botanical") ||
+    text.includes("flora")
+  ) {
+    return "🌳";
+  }
+  if (
+    text.includes("terrace") ||
+    text.includes("rooftop") ||
+    text.includes("deck") ||
+    text.includes("gazebo") ||
+    text.includes("viewpoint") ||
+    text.includes("sky")
+  ) {
+    return "🌇";
+  }
+  if (
+    text.includes("jog") ||
+    text.includes("running") ||
+    text.includes("track") ||
+    text.includes("walk")
+  ) {
+    return "🏃";
+  }
+  if (text.includes("bbq") || text.includes("barbecue") || text.includes("grill")) {
+    return "🍖";
+  }
+  if (text.includes("pet") || text.includes("dog")) {
+    return "🐕";
+  }
+
+  // Work & Education
+  if (
+    text.includes("library") ||
+    text.includes("reading") ||
+    text.includes("study") ||
+    text.includes("book")
+  ) {
+    return "📚";
+  }
+  if (
+    text.includes("cowork") ||
+    text.includes("business") ||
+    text.includes("meeting") ||
+    text.includes("conference") ||
+    text.includes("workstation") ||
+    text.includes("office")
+  ) {
+    return "💼";
+  }
+
+  // Dining & Food
+  if (
+    text.includes("cafe") ||
+    text.includes("coffee") ||
+    text.includes("canteen") ||
+    text.includes("cafeteria") ||
+    text.includes("dining") ||
+    text.includes("restaurant")
+  ) {
+    return "☕";
+  }
+
+  return "🏢";
+}
+
