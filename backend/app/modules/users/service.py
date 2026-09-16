@@ -226,7 +226,7 @@ class UserService:
         if role is None:
             raise NotFoundError("Role not found")
         self._require_community(payload.community_id)
-        if role.slug in ("super_admin", "auditor") and payload.community_id is not None:
+        if role.slug == "super_admin" and payload.community_id is not None:
             raise BusinessRuleError(
                 f"{role.slug} is a platform-global role", code="GLOBAL_ROLE_ONLY"
             )

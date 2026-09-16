@@ -376,7 +376,8 @@ export const authApi = {
 };
 
 export const communitiesApi = {
-  list: (params?: { active?: boolean }) => apiGet<Community[]>("/communities", params),
+  list: (params?: { active?: boolean; page_size?: number; page?: number }) =>
+    apiGet<Community[]>("/communities", { page_size: 100, ...params }),
   get: (id: string) => apiGet<Community>(`/communities/${id}`),
   create: (data: Partial<Community> | CommunityCreate) =>
     apiSend<Community>("POST", "/communities", data),

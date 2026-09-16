@@ -3,7 +3,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { usersApi } from "@/lib/api";
 
-export type OperationalRoleSlug = "facility_manager" | "security_supervisor" | "security_guard";
+export type OperationalRoleSlug =
+  | "facility_manager"
+  | "security_supervisor"
+  | "security_guard"
+  | "auditor";
 
 export interface OperationalStaffGrant {
   id: string;
@@ -81,6 +85,19 @@ export const OPERATIONAL_ROLES: {
       "Monitor vehicle entry/exit and record taxi arrivals",
     ],
   },
+  {
+    slug: "auditor",
+    name: "Statutory Auditor",
+    icon: "📋",
+    badgeClass: "badge-neutral",
+    description: "Statutory and compliance auditor with read-only access to audit logs, financial records, and gate logs.",
+    responsibilities: [
+      "Review immutable audit trail across community operations",
+      "Inspect financial ledgers, maintenance invoices, and reconciliation records",
+      "Audit gate entry/exit logs and visitor verification compliance",
+      "Export compliance reports and statutory verification records",
+    ],
+  },
 ];
 
 export function getRoleMeta(slug: string) {
@@ -114,7 +131,12 @@ export function useOperationalStaff(communityId?: string) {
 
       if (rawList.length === 0) return [];
 
-      const targetSlugs = new Set(["facility_manager", "security_supervisor", "security_guard"]);
+      const targetSlugs = new Set([
+        "facility_manager",
+        "security_supervisor",
+        "security_guard",
+        "auditor",
+      ]);
 
       // Filter users that hold at least one of the operational roles in this community
       const filtered = rawList

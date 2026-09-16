@@ -49,8 +49,11 @@ export function OperationalStaffView({ embeddedInTab = false }: OperationalStaff
     const guards = staffList.filter((u) =>
       u.roles.some((r) => r.role_slug === "security_guard")
     ).length;
+    const auditors = staffList.filter((u) =>
+      u.roles.some((r) => r.role_slug === "auditor")
+    ).length;
 
-    return { total, facilityManagers, supervisors, guards };
+    return { total, facilityManagers, supervisors, guards, auditors };
   }, [staffList]);
 
   // Filtered staff
@@ -119,12 +122,16 @@ export function OperationalStaffView({ embeddedInTab = false }: OperationalStaff
                     ? "#ede9fe"
                     : primaryRole === "security_supervisor"
                     ? "#fef3c7"
+                    : primaryRole === "auditor"
+                    ? "#f1f5f9"
                     : "#e0f2fe",
                 color:
                   primaryRole === "facility_manager"
                     ? "#6d28d9"
                     : primaryRole === "security_supervisor"
                     ? "#b45309"
+                    : primaryRole === "auditor"
+                    ? "#334155"
                     : "#0369a1",
                 display: "flex",
                 alignItems: "center",
@@ -157,6 +164,8 @@ export function OperationalStaffView({ embeddedInTab = false }: OperationalStaff
             ? { background: "#f3e8ff", color: "#6b21a8", border: "1px solid #d8b4fe" }
             : roleSlug === "security_supervisor"
             ? { background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a" }
+            : roleSlug === "auditor"
+            ? { background: "#f1f5f9", color: "#334155", border: "1px solid #cbd5e1" }
             : { background: "#e0f2fe", color: "#075985", border: "1px solid #bae6fd" };
 
         return (
@@ -275,10 +284,10 @@ export function OperationalStaffView({ embeddedInTab = false }: OperationalStaff
       >
         <div>
           <h2 style={{ fontSize: "1.25rem", fontWeight: 700, margin: 0, color: "var(--fg)" }}>
-            🛡️ Facility &amp; Security Personnel
+            🛡️ Operational &amp; Audit Personnel
           </h2>
           <p style={{ fontSize: "0.85rem", color: "var(--muted)", margin: "0.2rem 0 0" }}>
-            View and provision Facility Managers, Security Supervisors, and Security Guards.
+            View and provision Facility Managers, Security Personnel, and Statutory Auditors.
           </p>
         </div>
 
@@ -296,7 +305,7 @@ export function OperationalStaffView({ embeddedInTab = false }: OperationalStaff
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
           gap: "1rem",
         }}
       >
@@ -347,6 +356,18 @@ export function OperationalStaffView({ embeddedInTab = false }: OperationalStaff
             <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>gate ops</span>
           </div>
         </div>
+
+        <div className="card" style={{ padding: "1rem" }}>
+          <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase" }}>
+            📋 Statutory Auditors
+          </div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.25rem" }}>
+            <span style={{ fontSize: "1.75rem", fontWeight: 800, color: "#475569" }}>
+              {metrics.auditors}
+            </span>
+            <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>compliance</span>
+          </div>
+        </div>
       </div>
 
       {/* Filter and Search Panel */}
@@ -361,6 +382,7 @@ export function OperationalStaffView({ embeddedInTab = false }: OperationalStaff
           { label: "🏢 Facility Manager", value: "facility_manager" },
           { label: "🛡️ Security Supervisor", value: "security_supervisor" },
           { label: "👮 Security Guard", value: "security_guard" },
+          { label: "📋 Statutory Auditor", value: "auditor" },
         ]}
         secondaryFilterValue={statusFilter}
         onSecondaryFilterChange={setStatusFilter}
@@ -376,11 +398,11 @@ export function OperationalStaffView({ embeddedInTab = false }: OperationalStaff
         data={filteredStaff}
         columns={columns}
         isLoading={isLoading}
-        emptyTitle="No Facility or Security Personnel Found"
+        emptyTitle="No Personnel Found"
         emptyDescription={
           searchTerm || roleFilter || statusFilter
             ? "No personnel match your search and filter criteria."
-            : "No facility managers or security guards registered yet. Click '+ Add New Personnel' to get started."
+            : "No operational staff or auditors registered yet. Click '+ Add New Personnel' to get started."
         }
       />
 

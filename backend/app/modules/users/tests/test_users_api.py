@@ -104,3 +104,26 @@ def test_community_admin_cannot_grant_global_role(as_role, seed_ids):
         assert r.status_code == 403  # GLOBAL_ONLY
     finally:
         _cleanup_email(email)
+
+
+def test_community_admin_can_create_community_auditor(as_role, seed_ids):
+    admin = as_role("community_admin")
+    email = f"auditor-{uuid.uuid4().hex[:8]}@example.com"
+    try:
+        r = admin.post(
+            P,
+            json={
+                "email": email,
+                "full_name": "Community Statutory Auditor",
+                "password": "Auditor@Gate2026!",
+                "role_slug": "auditor",
+                "community_id": seed_ids["community_id"],
+            },
+        )
+        assert r.status_code == 201, r.text
+        data = r.json()["data"]
+        assert len(data["roles"]) == 1
+        assert data["roles"][0]["role_slug"] == "auditor"
+        assert data["roles"][0]["community_id"] == seed_ids["community_id"]
+    finally:
+        _cleanup_email(email)

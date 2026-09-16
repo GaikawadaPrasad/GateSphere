@@ -24,6 +24,8 @@ import {
 } from "@/hooks/use-auditor-data";
 import { useTableControls } from "@/hooks/use-table-controls";
 import { useUiStore } from "@/store/ui";
+import { useMe } from "@/hooks/use-auth";
+import { useCommunityDetails } from "@/hooks/use-communities";
 import { toast } from "@/store/toast";
 import { formatDate, formatDateTime, formatRelativeTime, formatCurrency } from "@/lib/utils";
 import { Modal } from "@/components/common/Modal";
@@ -48,24 +50,39 @@ interface AuditorDashboardViewProps {
 export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboardViewProps) {
   const router = useRouter();
   const activeTab = initialTab;
-  const { activeCommunityId } = useUiStore();
+  const { data: user } = useMe();
+  const { activeCommunityId, setActiveCommunity } = useUiStore();
 
-  const { data: stats, isLoading: statsLoading } = useAuditorOverview(activeCommunityId);
+  const assignedCommunityId =
+    user?.community_ids?.[0] ||
+    user?.roles?.find((r: any) => r.community_id)?.community_id ||
+    null;
+  const effectiveCommunityId = activeCommunityId || assignedCommunityId;
+
+  React.useEffect(() => {
+    if (assignedCommunityId && activeCommunityId !== assignedCommunityId) {
+      setActiveCommunity(assignedCommunityId);
+    }
+  }, [assignedCommunityId, activeCommunityId, setActiveCommunity]);
+
+  const { data: community } = useCommunityDetails(effectiveCommunityId || undefined);
+
+  const { data: stats, isLoading: statsLoading } = useAuditorOverview(effectiveCommunityId);
   const { data: rawLogs = [], isLoading: logsLoading } = useAuditorLogs({
-    community_id: activeCommunityId,
+    community_id: effectiveCommunityId,
   });
   const { data: gateEvents = [], isLoading: gateLoading } =
-    useAuditorGateActivity(activeCommunityId);
+    useAuditorGateActivity(effectiveCommunityId);
   const { data: visitorRecords = [], isLoading: visitorsLoading } =
-    useAuditorVisitorRecords(activeCommunityId);
+    useAuditorVisitorRecords(effectiveCommunityId);
   const { data: financialRecords = [], isLoading: finLoading } =
-    useAuditorFinancialLedger(activeCommunityId);
+    useAuditorFinancialLedger(effectiveCommunityId);
   const { data: complaintRecords = [], isLoading: complaintsLoading } =
-    useAuditorComplaints(activeCommunityId);
+    useAuditorComplaints(effectiveCommunityId);
   const { data: vendorRecords = [], isLoading: vendorsLoading } =
-    useAuditorVendors(activeCommunityId);
+    useAuditorVendors(effectiveCommunityId);
   const { data: incidentRecords = [], isLoading: incidentsLoading } =
-    useAuditorIncidents(activeCommunityId);
+    useAuditorIncidents(effectiveCommunityId);
 
   // Table controls for Audit Logs
   const logControls = useTableControls<AuditLogItem>({
@@ -326,6 +343,53 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
         </div>
       }
     >
+      {/* Community Scope Banner */}
+      {effectiveCommunityId && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: "0.75rem",
+            padding: "0.85rem 1.25rem",
+            background: "#F8FAFC",
+            border: "1px solid #E2E8F0",
+            borderRadius: "10px",
+            marginBottom: "1.5rem",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+            <span style={{ fontSize: "1.35rem" }}>🏢</span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: "0.95rem", color: "#1E293B" }}>
+                Auditing Community: <span style={{ color: "#2563EB" }}>{community?.name || "Assigned Community"}</span>
+                {community?.code ? ` (${community.code})` : ""}
+              </div>
+              <div style={{ fontSize: "0.8rem", color: "#64748B" }}>
+                Strict multi-tenant boundary active. Audit logs, financial transactions, and operational registers are scoped strictly to this community.
+              </div>
+            </div>
+          </div>
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.4rem",
+              fontSize: "0.75rem",
+              fontWeight: 700,
+              padding: "0.3rem 0.75rem",
+              borderRadius: "9999px",
+              background: "#ECFDF5",
+              color: "#065F46",
+              border: "1px solid #A7F3D0",
+            }}
+          >
+            <span>🔒</span> Single-Tenant Audit Scope Enforced
+          </div>
+        </div>
+      )}
+
       {/* TAB 1: OVERVIEW */}
       {activeTab === "overview" && (
         <div>

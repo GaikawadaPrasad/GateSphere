@@ -7,18 +7,19 @@ import type { Community, CommunityCreate } from "@/types/communities";
 export const communityKeys = {
   all: ["communities"] as const,
   lists: () => [...communityKeys.all, "list"] as const,
-  list: (params?: { active?: boolean }) => [...communityKeys.lists(), params] as const,
+  list: (params?: { active?: boolean; page_size?: number; page?: number }) =>
+    [...communityKeys.lists(), params] as const,
   details: () => [...communityKeys.all, "detail"] as const,
   detail: (id: string) => [...communityKeys.details(), id] as const,
 };
 
 export function useCommunities(
-  params?: { active?: boolean },
+  params?: { active?: boolean; page_size?: number; page?: number },
   options?: { enabled?: boolean },
 ) {
   return useQuery({
     queryKey: communityKeys.list(params),
-    queryFn: () => communitiesApi.list(params),
+    queryFn: () => communitiesApi.list({ page_size: 100, ...params }),
     staleTime: 60_000,
     enabled: options?.enabled !== undefined ? options.enabled : true,
   });

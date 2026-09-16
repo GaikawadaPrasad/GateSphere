@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Modal } from "@/components/common/Modal";
 import { usersApi } from "@/lib/api";
 import type { Role } from "@/types/rbac";
+import { toast } from "@/store/toast";
 
 export interface UserRoleGrant {
   id: string;
@@ -96,10 +97,13 @@ export function EditUserModal({
         phone: phone.trim() || undefined,
         is_active: isActive,
       });
+      toast.success(`Updated profile and access for ${fullName.trim()}.`, "User Updated");
       onSuccess();
       onClose();
     } catch (err: any) {
-      setErrorMessage(err?.message || "Failed to update user profile");
+      const msg = err?.message || "Failed to update user profile";
+      setErrorMessage(msg);
+      toast.error(msg, "Update Failed");
     } finally {
       setIsSubmitting(false);
     }
@@ -114,11 +118,17 @@ export function EditUserModal({
         role_slug: selectedRoleSlug,
         community_id: communityIdInput || undefined,
       });
+      toast.success(
+        `Role "${selectedRoleSlug}" granted to ${user.full_name}.`,
+        "Role Assigned"
+      );
       setSelectedRoleSlug("");
       setCommunityIdInput("");
       onSuccess();
     } catch (err: any) {
-      setErrorMessage(err?.message || "Failed to grant role");
+      const msg = err?.message || "Failed to grant role";
+      setErrorMessage(msg);
+      toast.error(msg, "Grant Role Failed");
     } finally {
       setIsGrantingRole(false);
     }
@@ -129,9 +139,12 @@ export function EditUserModal({
     setErrorMessage(null);
     try {
       await usersApi.revokeRole(user.id, grantId);
+      toast.success(`Role assignment revoked from ${user.full_name}.`, "Role Revoked");
       onSuccess();
     } catch (err: any) {
-      setErrorMessage(err?.message || "Failed to revoke role");
+      const msg = err?.message || "Failed to revoke role";
+      setErrorMessage(msg);
+      toast.error(msg, "Revoke Role Failed");
     } finally {
       setIsRevokingId(null);
     }
@@ -146,10 +159,13 @@ export function EditUserModal({
     setErrorMessage(null);
     try {
       await usersApi.delete(user.id);
+      toast.success(`User account for ${user.full_name} deleted.`, "User Deleted");
       onSuccess();
       onClose();
     } catch (err: any) {
-      setErrorMessage(err?.message || "Failed to delete user");
+      const msg = err?.message || "Failed to delete user";
+      setErrorMessage(msg);
+      toast.error(msg, "Delete User Failed");
     } finally {
       setIsDeletingUser(false);
     }

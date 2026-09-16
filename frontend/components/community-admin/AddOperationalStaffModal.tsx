@@ -38,7 +38,14 @@ export function AddOperationalStaffModal({
     setRoleSlug(slug);
     // Suggest an intuitive password if default was untouched
     if (password.startsWith("GateSphere2026!") || password.endsWith("@Gate2026!")) {
-      const prefix = slug === "facility_manager" ? "Facility" : slug === "security_supervisor" ? "Supervisor" : "Guard";
+      const prefix =
+        slug === "facility_manager"
+          ? "Facility"
+          : slug === "security_supervisor"
+          ? "Supervisor"
+          : slug === "auditor"
+          ? "Auditor"
+          : "Guard";
       setPassword(`${prefix}@Gate2026!`);
     }
   };
@@ -119,7 +126,7 @@ export function AddOperationalStaffModal({
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title="Add Facility or Security Staff"
+      title="Add Facility, Security, or Audit Staff"
       size="lg"
       footer={
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", width: "100%" }}>
@@ -145,7 +152,7 @@ export function AddOperationalStaffModal({
     >
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
         <p style={{ fontSize: "0.85rem", color: "var(--muted)", margin: 0 }}>
-          Provision an operational user with credentials to log into GateSphere for this community.
+          Provision an operational user or statutory auditor with credentials to log into GateSphere for this community.
         </p>
 
         {errorMessage && (

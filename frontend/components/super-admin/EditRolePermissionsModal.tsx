@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { Modal } from "@/components/common/Modal";
 import { rbacApi } from "@/lib/api";
 import type { Role, Permission } from "@/types/rbac";
+import { toast } from "@/store/toast";
 
 interface EditRolePermissionsModalProps {
   isOpen: boolean;
@@ -105,10 +106,16 @@ export function EditRolePermissionsModal({
     setErrorMessage(null);
     try {
       await rbacApi.setRolePermissions(role.slug, Array.from(selectedPermissions));
+      toast.success(
+        `Updated permissions for role "${role.name}" (${selectedPermissions.size} assigned).`,
+        "Role Permissions Saved"
+      );
       onSuccess();
       onClose();
     } catch (err: any) {
-      setErrorMessage(err?.message || "Failed to update role permissions.");
+      const msg = err?.message || "Failed to update role permissions.";
+      setErrorMessage(msg);
+      toast.error(msg, "Update Failed");
     } finally {
       setIsSubmitting(false);
     }

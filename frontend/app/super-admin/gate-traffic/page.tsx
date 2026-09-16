@@ -56,6 +56,26 @@ export default function GateTrafficPage() {
 
   const rosterColumns: Column<GuardRoster>[] = [
     {
+      key: "guard",
+      header: "Guard / Officer",
+      render: (item) => (
+        <div>
+          <div style={{ fontWeight: 600, color: "var(--fg)" }}>
+            {item.guard_name || `Guard #${item.guard_user_id.slice(0, 8)}`}
+          </div>
+          {item.guard_phone ? (
+            <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+              📞 {item.guard_phone}
+            </div>
+          ) : (
+            <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+              ID: {item.guard_user_id.slice(0, 8)}
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
       key: "shift_date",
       header: "Shift Date",
     },
