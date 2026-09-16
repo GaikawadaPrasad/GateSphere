@@ -1,16 +1,9 @@
-let jsQRImpl: any = null;
+import jsQR from "jsqr";
 
-function getJsQR(): any {
-  if (jsQRImpl) return jsQRImpl;
-  try {
-    const mod = require("jsqr");
-    jsQRImpl = typeof mod === "function" ? mod : (mod && mod.default) || mod;
-    return jsQRImpl;
-  } catch (err) {
-    console.warn("[qr-decoder] jsQR module not resolved dynamically:", err);
-    return null;
-  }
+function getJsQR(): typeof jsQR {
+  return typeof jsQR === "function" ? jsQR : (jsQR as any)?.default || jsQR;
 }
+
 
 export interface ParsedQrData {
   raw: string;
@@ -107,28 +100,63 @@ export function parseQrPayload(raw: string): ParsedQrData {
     trimmed.startsWith("VEN-") ||
     trimmed.includes("TKT-")
   ) {
+    const tktMatch = trimmed.match(/TKT-[\w\d]+/i);
     return {
       raw: trimmed,
       token: trimmed,
-      category: "Service Technician",
-      reason: "Maintenance Ticket Service",
+      category: "Vendor / Service Technician",
+      reason: tktMatch
+        ? `Maintenance Ticket Service (${tktMatch[0]})`
+        : "Maintenance Ticket Service",
       visitorName: "Vendor Technician",
       unitLabel: "Community Facility / Unit",
       type: "vendor",
     };
   }
 
-  // 5. Numeric PIN / OTP
-  const numericOnly = trimmed.replace(/\D/g, "");
-  if (numericOnly.length >= 4 && numericOnly.length <= 8) {
+  // 5. Delivery Pass Format: DEL-... or COURIER-... or PASS-DEL-...
+  if (
+    trimmed.startsWith("DEL-") ||
+    trimmed.startsWith("PASS-DEL-") ||
+    trimmed.startsWith("COURIER-")
+  ) {
     return {
       raw: trimmed,
-      pin: numericOnly,
-      type: "pin",
+      token: trimmed,
+      category: "Courier / Delivery",
+      reason: "Parcel Delivery",
+      visitorName: "Delivery Agent",
+      unitLabel: "Resident Unit",
+      type: "delivery",
     };
   }
 
-  // 6. Generic Token / String
+  // 6. QR-prefixed Token (e.g. "QR-sec-pass-uuid-999")
+  if (trimmed.startsWith("QR-")) {
+    return {
+      raw: trimmed,
+      token: trimmed.slice(3),
+      type: "token",
+    };
+  }
+
+  // 7. Numeric PIN / OTP (e.g. "987654", "OTP-8819", "PIN-654321")
+  if (
+    trimmed.startsWith("OTP-") ||
+    trimmed.startsWith("PIN-") ||
+    /^\d{4,8}$/.test(trimmed)
+  ) {
+    const numericOnly = trimmed.replace(/\D/g, "");
+    if (numericOnly.length >= 4 && numericOnly.length <= 8) {
+      return {
+        raw: trimmed,
+        pin: numericOnly,
+        type: "pin",
+      };
+    }
+  }
+
+  // 8. Generic Token / String
   return {
     raw: trimmed,
     token: trimmed,

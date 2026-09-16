@@ -200,6 +200,7 @@ export function useAuditorComplaints(communityId?: string | null) {
         status: t.status || "open",
         escalation_state: deriveTicketEscalationState(t),
         created_at: t.created_at,
+        resolution_due_at: t.resolution_due_at,
       }));
     },
   });
@@ -222,6 +223,8 @@ export function useAuditorVendors(communityId?: string | null) {
         technician: s.phone,
         passes_issued: `STF-${s.id.slice(0, 6)}`,
         verification_status: s.police_verification_status || "verified",
+        created_at: s.created_at,
+        verification_expiry: s.verification_expiry,
       }));
     },
   });

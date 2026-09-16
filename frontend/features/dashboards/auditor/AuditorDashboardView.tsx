@@ -25,7 +25,8 @@ import {
 import { useTableControls } from "@/hooks/use-table-controls";
 import { useUiStore } from "@/store/ui";
 import { toast } from "@/store/toast";
-import { formatDate, formatCurrency } from "@/lib/utils";
+import { formatDate, formatDateTime, formatRelativeTime, formatCurrency } from "@/lib/utils";
+import { Modal } from "@/components/common/Modal";
 
 export type AuditorTab =
   | "overview"
@@ -121,16 +122,22 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
 
   // Global search query state for Audit Search module
   const [globalSearchQuery, setGlobalSearchQuery] = useState("");
+  const [selectedAuditLog, setSelectedAuditLog] = useState<AuditLogItem | null>(null);
 
   const auditLogColumns: Column<AuditLogItem>[] = [
     {
       key: "occurred_at",
-      header: "Timestamp",
+      header: "Timestamp (Date & Time)",
       sortable: true,
       render: (item) => (
-        <span style={{ fontSize: "13px", fontFamily: "monospace", color: "var(--brand-heading)" }}>
-          {formatDate(item.occurred_at)}
-        </span>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
+          <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--brand-heading)" }}>
+            {formatDateTime(item.occurred_at)}
+          </span>
+          <span style={{ fontSize: "11px", color: "var(--brand-body)", fontFamily: "monospace" }}>
+            {formatRelativeTime(item.occurred_at)}
+          </span>
+        </div>
       ),
     },
     {
@@ -190,9 +197,24 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
       key: "ip_address",
       header: "IP Address",
       render: (item) => (
-        <span style={{ fontSize: "12px", color: "var(--brand-body)" }}>
+        <span style={{ fontSize: "12px", color: "var(--brand-body)", fontFamily: "monospace" }}>
           {item.ip_address || "127.0.0.1"}
         </span>
+      ),
+    },
+    {
+      key: "inspect",
+      header: "Details",
+      align: "right",
+      render: (item) => (
+        <BrandButton
+          size="sm"
+          variant="outline"
+          onClick={() => setSelectedAuditLog(item)}
+          style={{ fontSize: "11px", padding: "0.2rem 0.5rem" }}
+        >
+          🔍 Inspect
+        </BrandButton>
       ),
     },
   ];
@@ -407,11 +429,15 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
                       <div
                         style={{
                           fontSize: "11px",
-                          color: "var(--text-muted)",
+                          color: "var(--brand-heading)",
+                          fontWeight: 600,
                           marginTop: "0.2rem",
                         }}
                       >
-                        {formatDate(event.occurred_at)}
+                        {formatDateTime(event.occurred_at)}
+                      </div>
+                      <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>
+                        {formatRelativeTime(event.occurred_at)}
                       </div>
                     </div>
                   </div>
@@ -468,8 +494,18 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
                       >
                         {log.entity_type}
                       </span>
-                      <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>
-                        {formatDate(log.occurred_at)}
+                      <div
+                        style={{
+                          fontSize: "11px",
+                          color: "var(--brand-heading)",
+                          fontWeight: 600,
+                          marginTop: "0.2rem",
+                        }}
+                      >
+                        {formatDateTime(log.occurred_at)}
+                      </div>
+                      <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>
+                        {formatRelativeTime(log.occurred_at)}
                       </div>
                     </div>
                   </div>
@@ -587,9 +623,18 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
             columns={[
               {
                 key: "occurred_at",
-                header: "Time",
+                header: "Timestamp (Date & Time)",
                 sortable: true,
-                render: (i) => formatDate(i.occurred_at),
+                render: (i) => (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
+                    <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--brand-heading)" }}>
+                      {formatDateTime(i.occurred_at)}
+                    </span>
+                    <span style={{ fontSize: "11px", color: "var(--brand-body)", fontFamily: "monospace" }}>
+                      {formatRelativeTime(i.occurred_at)}
+                    </span>
+                  </div>
+                ),
               },
               {
                 key: "event_type",
@@ -656,8 +701,28 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
                 header: "Approval Status",
                 render: (i) => <StatusBadge status={i.status} />,
               },
-              { key: "entry_time", header: "Gate Entry", render: (i) => formatDate(i.entry_time) },
-              { key: "exit_time", header: "Gate Exit", render: (i) => formatDate(i.exit_time) },
+              {
+                key: "entry_time",
+                header: "Gate Entry (Date & Time)",
+                render: (i) => (
+                  <span style={{ fontSize: "12px", fontFamily: "monospace", fontWeight: 600 }}>
+                    {formatDateTime(i.entry_time)}
+                  </span>
+                ),
+              },
+              {
+                key: "exit_time",
+                header: "Gate Exit (Date & Time)",
+                render: (i) => (
+                  <span style={{ fontSize: "12px", fontFamily: "monospace" }}>
+                    {i.exit_time ? (
+                      formatDateTime(i.exit_time)
+                    ) : (
+                      <span style={{ color: "#D97706", fontWeight: 600 }}>Still Inside (No Exit)</span>
+                    )}
+                  </span>
+                ),
+              },
             ]}
             data={visitorControls.paginatedData}
             isLoading={visitorsLoading}
@@ -721,7 +786,29 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
                 header: "SLA Tracker",
                 render: (i) => <StatusBadge status={i.escalation_state} />,
               },
-              { key: "created_at", header: "Raised At", render: (i) => formatDate(i.created_at) },
+              {
+                key: "created_at",
+                header: "Raised (Date & Time)",
+                sortable: true,
+                render: (i) => (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 600 }}>{formatDateTime(i.created_at)}</span>
+                    <span style={{ fontSize: "11px", color: "var(--brand-body)", fontFamily: "monospace" }}>
+                      {formatRelativeTime(i.created_at)}
+                    </span>
+                  </div>
+                ),
+              },
+              {
+                key: "resolution_due_at",
+                header: "SLA Deadline (Date & Time)",
+                sortable: true,
+                render: (i) => (
+                  <span style={{ fontSize: "12px", fontFamily: "monospace" }}>
+                    {i.resolution_due_at ? formatDateTime(i.resolution_due_at) : "Standard SLA"}
+                  </span>
+                ),
+              },
             ]}
             data={complaintControls.paginatedData}
             isLoading={complaintsLoading}
@@ -775,6 +862,19 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
                 key: "verification_status",
                 header: "Insurance & KYC",
                 render: (i) => <StatusBadge status={i.verification_status} />,
+              },
+              {
+                key: "created_at",
+                header: "Enrolled (Date & Time)",
+                sortable: true,
+                render: (i) => (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 600 }}>{formatDateTime(i.created_at)}</span>
+                    <span style={{ fontSize: "11px", color: "var(--brand-body)", fontFamily: "monospace" }}>
+                      {formatRelativeTime(i.created_at)}
+                    </span>
+                  </div>
+                ),
               },
             ]}
             data={vendorControls.paginatedData}
@@ -834,8 +934,19 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
                 header: "Severity",
                 render: (i) => <StatusBadge status={i.severity} />,
               },
-              { key: "status", header: "Status", render: (i) => <StatusBadge status={i.status} /> },
-              { key: "created_at", header: "Logged At", render: (i) => formatDate(i.created_at) },
+              {
+                key: "created_at",
+                header: "Logged (Date & Time)",
+                sortable: true,
+                render: (i) => (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 600 }}>{formatDateTime(i.created_at)}</span>
+                    <span style={{ fontSize: "11px", color: "var(--brand-body)", fontFamily: "monospace" }}>
+                      {formatRelativeTime(i.created_at)}
+                    </span>
+                  </div>
+                ),
+              },
             ]}
             data={incidentControls.paginatedData}
             isLoading={incidentsLoading}
@@ -891,6 +1002,26 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
                 key: "status",
                 header: "Payment Status",
                 render: (i) => <StatusBadge status={i.status} />,
+              },
+              {
+                key: "issue_date",
+                header: "Issued (Date & Time)",
+                sortable: true,
+                render: (i) => (
+                  <span style={{ fontSize: "12px", fontFamily: "monospace" }}>
+                    {formatDateTime(i.issue_date)}
+                  </span>
+                ),
+              },
+              {
+                key: "due_date",
+                header: "Due Date",
+                sortable: true,
+                render: (i) => (
+                  <span style={{ fontSize: "12px", fontFamily: "monospace" }}>
+                    {formatDate(i.due_date)}
+                  </span>
+                ),
               },
               {
                 key: "receipt_number",
@@ -1011,6 +1142,112 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
             emptyDescription="Try searching for a different keyword, UUID, pass code, or ticket number."
           />
         </div>
+      )}
+
+      {/* Forensic Audit Log Inspection Modal */}
+      {selectedAuditLog && (
+        <Modal
+          isOpen={true}
+          onClose={() => setSelectedAuditLog(null)}
+          title={`Forensic Audit Inspection — ${selectedAuditLog.module.toUpperCase()}:${selectedAuditLog.action}`}
+          size="lg"
+          footer={
+            <BrandButton variant="outline" size="sm" onClick={() => setSelectedAuditLog(null)}>
+              Close Inspection
+            </BrandButton>
+          }
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: "0.85rem",
+                padding: "0.85rem",
+                background: "#F8FAFC",
+                borderRadius: "8px",
+                border: "1px solid #E2E8F0",
+              }}
+            >
+              <div>
+                <span style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>
+                  Date & Local Time
+                </span>
+                <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--brand-heading)", marginTop: "0.15rem" }}>
+                  {formatDateTime(selectedAuditLog.occurred_at)}
+                </div>
+              </div>
+              <div>
+                <span style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>
+                  UTC ISO 8601 Timestamp
+                </span>
+                <div style={{ fontSize: "12px", fontFamily: "monospace", color: "var(--brand-heading)", marginTop: "0.15rem" }}>
+                  {new Date(selectedAuditLog.occurred_at).toISOString()}
+                </div>
+              </div>
+              <div>
+                <span style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>
+                  Elapsed Duration
+                </span>
+                <div style={{ fontSize: "12px", color: "var(--brand-body)", fontFamily: "monospace", marginTop: "0.15rem" }}>
+                  {formatRelativeTime(selectedAuditLog.occurred_at)}
+                </div>
+              </div>
+              <div>
+                <span style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>
+                  Client IP Address
+                </span>
+                <div style={{ fontSize: "12px", fontFamily: "monospace", color: "var(--brand-heading)", marginTop: "0.15rem" }}>
+                  {selectedAuditLog.ip_address || "127.0.0.1"}
+                </div>
+              </div>
+              <div>
+                <span style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>
+                  Actor Identity & Role
+                </span>
+                <div style={{ fontSize: "13px", fontWeight: 600, marginTop: "0.15rem" }}>
+                  {selectedAuditLog.actor_email} ({selectedAuditLog.actor_role})
+                </div>
+                {selectedAuditLog.actor_user_id && (
+                  <div style={{ fontSize: "11px", fontFamily: "monospace", color: "var(--brand-body)" }}>
+                    UUID: {selectedAuditLog.actor_user_id}
+                  </div>
+                )}
+              </div>
+              <div>
+                <span style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>
+                  Target Entity Record
+                </span>
+                <div style={{ fontSize: "13px", fontWeight: 600, marginTop: "0.15rem" }}>
+                  {selectedAuditLog.entity_type}
+                </div>
+                <div style={{ fontSize: "11px", fontFamily: "monospace", color: "var(--brand-primary)" }}>
+                  {selectedAuditLog.entity_id}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--brand-heading)", display: "block", marginBottom: "0.4rem" }}>
+                Immutable Mutation Payload / State Diff (JSON)
+              </span>
+              <pre
+                style={{
+                  background: "#0F172A",
+                  color: "#38BDF8",
+                  padding: "0.85rem",
+                  borderRadius: "6px",
+                  fontSize: "12px",
+                  maxHeight: "220px",
+                  overflow: "auto",
+                  fontFamily: "monospace",
+                }}
+              >
+                {JSON.stringify(selectedAuditLog.changes || {}, null, 2)}
+              </pre>
+            </div>
+          </div>
+        </Modal>
       )}
     </DashboardShell>
   );
