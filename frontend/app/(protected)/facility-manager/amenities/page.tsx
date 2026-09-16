@@ -96,7 +96,7 @@ export default function FacilityManagerAmenitiesPage() {
       if (!amenity.block_id) return;
       await amenitiesApi.unblockSlot(amenity.block_id);
       setAmenities((prev) =>
-        prev.map((a: any) => (a.id === amenity.id ? { ...a, block_id: null } : a)),
+        prev.map((a: any) => (a.id === amenity.id ? { ...a, block_id: null, is_active: true } : a)),
       );
     } catch (err: any) {
       alert(err?.message || "Failed to unblock slot.");

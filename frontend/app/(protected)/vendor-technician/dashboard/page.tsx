@@ -8,7 +8,7 @@ import { KpiCard } from "@/components/dashboard/KpiCard";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
 import { DataTable, type Column } from "@/components/tables/DataTable";
-import { complaintsApi, authApi, type CurrentUser } from "@/lib/api";
+import { complaintsApi, vendorTicketsApi, authApi, type CurrentUser } from "@/lib/api";
 
 const QrCodeSvg = dynamic(
   () => import("@/components/common/QrCodeSvg").then((mod) => mod.QrCodeSvg),
@@ -46,7 +46,7 @@ export default function VendorDashboardPage() {
     setIsLoading(true);
     try {
       const [ticketsRes, meRes] = await Promise.allSettled([
-        complaintsApi.tickets({ page_size: 50 }),
+        vendorTicketsApi.list(),
         authApi.me("vendor_technician"),
       ]);
 

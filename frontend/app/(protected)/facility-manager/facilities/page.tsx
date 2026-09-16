@@ -23,6 +23,15 @@ export default function FacilityManagerFacilitiesPage() {
   const [location, setLocation] = useState("");
   const [capacity, setCapacity] = useState("50");
 
+  // Edit Facility Modal
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingFacility, setEditingFacility] = useState<Facility | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editType, setEditType] = useState("Community Hall");
+  const [editLocation, setEditLocation] = useState("");
+  const [editCapacity, setEditCapacity] = useState("50");
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
+
   const loadData = async () => {
     setIsLoading(true);
     setLoadError(null);
@@ -54,6 +63,64 @@ export default function FacilityManagerFacilitiesPage() {
   }, []);
 
   const [facilityFieldErrors, setFacilityFieldErrors] = useState<Record<string, string>>({});
+
+  const openEditModal = (f: Facility) => {
+    setEditingFacility(f);
+    setEditName(f.name);
+    setEditType(f.type || "Community Hall");
+    setEditLocation(f.location === "Community Grounds" ? "" : f.location);
+    setEditCapacity(String(f.capacity || 50));
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditFacility = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingFacility) return;
+    const cap = parseInt(editCapacity);
+    if (!editName.trim() || editName.trim().length < 2) {
+      alert("Facility name must be at least 2 characters.");
+      return;
+    }
+    if (isNaN(cap) || cap < 1) {
+      alert("Capacity must be a positive number.");
+      return;
+    }
+    setIsSubmittingEdit(true);
+    try {
+      const rawType = editType.toLowerCase();
+      let amenityType = "other";
+      if (rawType.includes("pool")) amenityType = "pool";
+      else if (rawType.includes("sport") || rawType.includes("tennis") || rawType.includes("court")) amenityType = "tennis";
+      else if (rawType.includes("gym") || rawType.includes("fitness")) amenityType = "gym";
+      else if (rawType.includes("club")) amenityType = "clubhouse";
+      else if (rawType.includes("guest") || rawType.includes("room")) amenityType = "guest_room";
+      else if (rawType.includes("park") || rawType.includes("ground")) amenityType = "park";
+      else if (rawType.includes("hall")) amenityType = "hall";
+      await facilitiesApi.update(editingFacility.id, {
+        name: editName.trim(),
+        amenity_type: amenityType,
+        location_text: editLocation || undefined,
+        capacity: cap,
+      });
+      setIsEditModalOpen(false);
+      setEditingFacility(null);
+      await loadData();
+    } catch (err: any) {
+      alert(err?.message || "Failed to update facility.");
+    } finally {
+      setIsSubmittingEdit(false);
+    }
+  };
+
+  const handleDeleteFacility = async (f: Facility) => {
+    if (!confirm(`Delete "${f.name}"? This cannot be undone.`)) return;
+    try {
+      await facilitiesApi.delete(f.id);
+      await loadData();
+    } catch (err: any) {
+      alert(err?.message || "Failed to delete facility.");
+    }
+  };
 
   const handleAddFacility = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -239,7 +306,7 @@ export default function FacilityManagerFacilitiesPage() {
               key: "actions",
               header: "Actions",
               render: (f: Facility) => (
-                <div style={{ display: "flex", gap: "0.4rem" }}>
+                <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
                   <select
                     className="select-field"
                     value={f.status}
@@ -251,6 +318,20 @@ export default function FacilityManagerFacilitiesPage() {
                     <option value="Under Maintenance">Under Maintenance</option>
                     <option value="Unavailable">Unavailable</option>
                   </select>
+                  <button
+                    className="btn btn-secondary"
+                    style={{ height: 28, fontSize: "0.75rem", padding: "0 0.5rem" }}
+                    onClick={() => openEditModal(f)}
+                  >
+                    ✏️ Edit
+                  </button>
+                  <button
+                    className="btn btn-secondary"
+                    style={{ height: 28, fontSize: "0.75rem", padding: "0 0.5rem", color: "var(--danger, #dc2626)" }}
+                    onClick={() => handleDeleteFacility(f)}
+                  >
+                    🗑️ Delete
+                  </button>
                 </div>
               ),
             },
@@ -375,6 +456,77 @@ export default function FacilityManagerFacilitiesPage() {
               placeholder="e.g. East Wing Level 1"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
+            />
+          </div>
+        </form>
+      </Modal>
+      {/* Edit Facility Modal */}
+      <Modal
+        isOpen={isEditModalOpen}
+        onClose={() => { setIsEditModalOpen(false); setEditingFacility(null); }}
+        title="Edit Facility"
+        footer={
+          <>
+            <button className="btn btn-secondary" onClick={() => { setIsEditModalOpen(false); setEditingFacility(null); }}>
+              Cancel
+            </button>
+            <button className="btn btn-primary" type="submit" form="edit-facility-form" disabled={isSubmittingEdit}>
+              {isSubmittingEdit ? "Saving…" : "Save Changes"}
+            </button>
+          </>
+        }
+      >
+        <form id="edit-facility-form" onSubmit={handleEditFacility}>
+          <div style={{ marginBottom: "1rem" }}>
+            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              Facility Name *
+            </label>
+            <input
+              type="text"
+              className="input-field"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              required
+            />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+            <div>
+              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+                Type
+              </label>
+              <select className="select-field" value={editType} onChange={(e) => setEditType(e.target.value)}>
+                <option value="Sports">Sports / Court</option>
+                <option value="Community Hall">Community Hall</option>
+                <option value="Swimming Pool">Swimming Pool</option>
+                <option value="Gym">Gym &amp; Fitness</option>
+                <option value="Clubhouse">Clubhouse</option>
+                <option value="Park">Park &amp; Ground</option>
+                <option value="Guest Room">Guest Room</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+                Max Capacity
+              </label>
+              <input
+                type="number"
+                className="input-field"
+                value={editCapacity}
+                onChange={(e) => setEditCapacity(e.target.value)}
+              />
+            </div>
+          </div>
+          <div>
+            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              Location / Block
+            </label>
+            <input
+              type="text"
+              className="input-field"
+              placeholder="e.g. East Wing Level 1"
+              value={editLocation}
+              onChange={(e) => setEditLocation(e.target.value)}
             />
           </div>
         </form>

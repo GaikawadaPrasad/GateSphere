@@ -150,7 +150,7 @@ export default function FacilityManagerDashboardPage() {
       setReqSubject("");
       setReqDescription("");
       loadData();
-      router.push("/facility-manager/service-requests");
+      router.push("/facility-manager/complaints");
     } catch (err: any) {
       alert(err?.message || "Failed to create ticket.");
     } finally {
@@ -318,7 +318,7 @@ export default function FacilityManagerDashboardPage() {
             highPriorityOpen.length > 0 ? `${highPriorityOpen.length} needs triage` : undefined
           }
           isLoading={isLoading}
-          onClick={() => router.push("/facility-manager/service-requests")}
+          onClick={() => router.push("/facility-manager/complaints")}
         />
         <KpiCard
           title="SLA At Risk / Breached"
@@ -329,7 +329,7 @@ export default function FacilityManagerDashboardPage() {
           trend={slaWarnings.length > 0 ? "danger" : undefined}
           trendValue={slaWarnings.length > 0 ? "Review now" : undefined}
           isLoading={isLoading}
-          onClick={() => router.push("/facility-manager/maintenance")}
+          onClick={() => router.push("/facility-manager/complaints")}
         />
         <KpiCard
           title="Amenity Bookings Today"
@@ -372,14 +372,14 @@ export default function FacilityManagerDashboardPage() {
           <button
             type="button"
             className="btn btn-secondary"
-            onClick={() => router.push("/facility-manager/maintenance")}
+            onClick={() => router.push("/facility-manager/complaints")}
           >
             🔧 Maintenance Tickets
           </button>
           <button
             type="button"
             className="btn btn-secondary"
-            onClick={() => router.push("/facility-manager/service-requests")}
+            onClick={() => router.push("/facility-manager/complaints")}
           >
             📋 Service Requests
           </button>
@@ -446,7 +446,7 @@ export default function FacilityManagerDashboardPage() {
                 type="button"
                 className="btn btn-secondary"
                 style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
-                onClick={() => router.push("/facility-manager/service-requests")}
+                onClick={() => router.push("/facility-manager/complaints")}
               >
                 View Full Queue ({openTickets.length}) →
               </button>
@@ -491,7 +491,7 @@ export default function FacilityManagerDashboardPage() {
                 type="button"
                 className="btn btn-secondary"
                 style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
-                onClick={() => router.push("/facility-manager/maintenance")}
+                onClick={() => router.push("/facility-manager/complaints")}
               >
                 Manage SLAs →
               </button>
@@ -562,7 +562,7 @@ export default function FacilityManagerDashboardPage() {
                         type="button"
                         className="btn btn-secondary"
                         style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem", flexShrink: 0 }}
-                        onClick={() => router.push("/facility-manager/service-requests")}
+                        onClick={() => router.push("/facility-manager/complaints")}
                       >
                         Triage →
                       </button>
