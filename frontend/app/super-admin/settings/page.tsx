@@ -6,11 +6,13 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { Modal } from "@/components/common/Modal";
 import { EditUserModal, type UserRecord } from "@/components/super-admin/EditUserModal";
+import { EditRolePermissionsModal } from "@/components/super-admin/EditRolePermissionsModal";
 import { rbacApi, usersApi } from "@/lib/api";
 import type { Role, Permission } from "@/types/rbac";
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
+  const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [editingPermission, setEditingPermission] = useState<Permission | null>(null);
   const [descriptionInput, setDescriptionInput] = useState<string>("");
 
@@ -96,6 +98,21 @@ export default function SettingsPage() {
       header: "Default Permissions Count",
       align: "center",
       render: (r) => <span>{r.default_permissions?.length ?? r.permissions?.length ?? 0}</span>,
+    },
+    {
+      key: "actions",
+      header: "Action",
+      align: "right",
+      render: (r) => (
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          style={{ fontSize: "0.75rem", padding: "0.25rem 0.65rem" }}
+          onClick={() => setEditingRole(r)}
+        >
+          Update Role Permissions
+        </button>
+      ),
     },
   ];
 
@@ -416,6 +433,20 @@ export default function SettingsPage() {
             Are you sure you want to delete <strong>{deletingUser.full_name}</strong> ({deletingUser.email})? This action will immediately revoke their access and delete their user profile.
           </p>
         </Modal>
+      )}
+
+      {/* Edit Role Permissions Modal */}
+      {editingRole && (
+        <EditRolePermissionsModal
+          isOpen={!!editingRole}
+          onClose={() => setEditingRole(null)}
+          role={editingRole}
+          allPermissions={permissions || []}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ["rbac", "roles"] });
+            queryClient.invalidateQueries({ queryKey: ["rbac", "permissions"] });
+          }}
+        />
       )}
     </div>
   );
