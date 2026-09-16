@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import uuid
 
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.context import RequestContext
@@ -303,7 +304,14 @@ class CommunityService:
         self, *, tower_id: uuid.UUID, offset: int, limit: int
     ) -> tuple[list[Floor], int]:
         tower = await self.get_tower(tower_id)
-        return await self.floors.list_for_tower(tower.id, offset=offset, limit=limit)
+        floors, total = await self.floors.list_for_tower(tower.id, offset=offset, limit=limit)
+        if floors:
+            floor_ids = [f.id for f in floors]
+            stmt = select(Unit.floor_id, func.count(Unit.id)).where(Unit.floor_id.in_(floor_ids)).group_by(Unit.floor_id)
+            counts = dict((await self.db.execute(stmt)).all())
+            for f in floors:
+                f.total_units = counts.get(f.id, 0)
+        return floors, total
 
     async def get_floor(self, floor_id: uuid.UUID) -> Floor:
         obj = await self.floors.get(floor_id)

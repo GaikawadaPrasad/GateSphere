@@ -64,7 +64,7 @@ export default function SuperAdminDashboardPage() {
     data: communities,
     isLoading: isCommunitiesLoading,
     refetch: refetchCommunities,
-  } = useCommunities();
+  } = useCommunities({ page_size: 100 });
 
   const { data: gateEvents, isLoading: isEventsLoading } = useGateEvents({ page_size: 6 });
   const { data: panicAlerts } = usePanicAlerts({ page_size: 5 });

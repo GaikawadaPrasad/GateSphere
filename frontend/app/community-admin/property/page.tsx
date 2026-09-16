@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useUiStore } from "@/store/ui";
 import {
   useCommunityDetails,
   useTowers,
   useFloors,
   useUnits,
+  useCommunityUnits,
   useGates,
   useCreateTower,
   useCreateFloor,
@@ -17,6 +18,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { FilterPanel } from "@/components/common/FilterPanel";
 import { Modal } from "@/components/common/Modal";
+import { toast } from "@/store/toast";
 import type { Tower, Floor, Unit, Gate } from "@/types/communities";
 
 export default function CommunityAdminPropertyPage() {
@@ -54,6 +56,29 @@ export default function CommunityAdminPropertyPage() {
     isLoading: unitsLoading,
     refetch: refetchUnits,
   } = useUnits(currentFloorId || undefined);
+
+  // All community units for accurate floor/tower aggregation
+  const { data: allCommunityUnits = [] } = useCommunityUnits(activeCommunityId || undefined);
+
+  const floorUnitCountMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const u of allCommunityUnits) {
+      if (u.floor_id) {
+        map[u.floor_id] = (map[u.floor_id] || 0) + 1;
+      }
+    }
+    return map;
+  }, [allCommunityUnits]);
+
+  const towerUnitCountMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const u of allCommunityUnits) {
+      if (u.tower_id) {
+        map[u.tower_id] = (map[u.tower_id] || 0) + 1;
+      }
+    }
+    return map;
+  }, [allCommunityUnits]);
 
   // Mutations
   const createTower = useCreateTower();
@@ -248,13 +273,16 @@ export default function CommunityAdminPropertyPage() {
           gate_type: gateForm.gate_type,
         },
       });
+      toast.success(`Gate "${gateForm.name.trim()}" created successfully.`, "Gate Added");
       setIsAddGateOpen(false);
       setPropertyFieldErrors({});
-      setGateForm({ name: "", code: "", gate_type: "both" });
+      setGateForm({ name: "", code: "", gate_type: "main" });
       refetchGates();
     } catch (err: unknown) {
       console.error(err);
-      setErrorMessage(err instanceof Error ? err.message : "Failed to create gate");
+      const msg = err instanceof Error ? err.message : "Failed to create gate";
+      setErrorMessage(msg);
+      toast.error(msg, "Error");
     } finally {
       setIsSubmitting(false);
     }
@@ -269,7 +297,14 @@ export default function CommunityAdminPropertyPage() {
       render: (t) => <span className="badge badge-neutral">{t.code || "–"}</span>,
     },
     { key: "total_floors", header: "Floors", render: (t) => t.total_floors ?? "–" },
-    { key: "total_units", header: "Units", render: (t) => t.total_units ?? "–" },
+    {
+      key: "total_units",
+      header: "Units",
+      render: (t) => {
+        const count = t.total_units && t.total_units > 0 ? t.total_units : towerUnitCountMap[t.id] || 0;
+        return <span className="badge badge-neutral">{count} units</span>;
+      },
+    },
     {
       key: "actions",
       header: "Action",
@@ -297,7 +332,21 @@ export default function CommunityAdminPropertyPage() {
       header: "Floor #",
       render: (f) => <strong>Floor {f.floor_number}</strong>,
     },
-    { key: "total_units", header: "Total Units", render: (f) => f.total_units ?? "–" },
+    {
+      key: "total_units",
+      header: "Total Units",
+      render: (f) => {
+        const count = f.total_units && f.total_units > 0 ? f.total_units : floorUnitCountMap[f.id] || 0;
+        return (
+          <span
+            className={count > 0 ? "badge badge-primary" : "badge badge-neutral"}
+            style={{ fontWeight: 600 }}
+          >
+            {count} {count === 1 ? "unit" : "units"}
+          </span>
+        );
+      },
+    },
     {
       key: "actions",
       header: "Action",
@@ -1161,10 +1210,14 @@ export default function CommunityAdminPropertyPage() {
                 value={gateForm.gate_type}
                 onChange={(e) => setGateForm({ ...gateForm, gate_type: e.target.value })}
               >
+                <option value="main">Main Gate (Primary Entry/Exit)</option>
                 <option value="both">Both (Entry &amp; Exit)</option>
-                <option value="entry">Entry Only</option>
-                <option value="exit">Exit Only</option>
+                <option value="entry">Entry Gate Only</option>
+                <option value="exit">Exit Gate Only</option>
+                <option value="visitor">Visitor &amp; Guest Gate</option>
                 <option value="pedestrian">Pedestrian Gate</option>
+                <option value="service">Service &amp; Vendor Gate</option>
+                <option value="emergency">Emergency Gate</option>
               </select>
             </div>
           </div>

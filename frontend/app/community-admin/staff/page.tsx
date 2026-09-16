@@ -20,6 +20,7 @@ import { FilterPanel } from "@/components/common/FilterPanel";
 import { Modal } from "@/components/common/Modal";
 import { OperationalStaffView } from "@/components/community-admin/OperationalStaffView";
 import { UpdateUserCredentialsModal, type CredentialUser } from "@/components/common/UpdateUserCredentialsModal";
+import { useOperationalStaff } from "@/hooks/use-operational-staff";
 import type {
   Staff,
   StaffAttendance,
@@ -32,15 +33,25 @@ import { formatDateTime } from "@/lib/utils";
 
 export default function CommunityAdminStaffPage() {
   const { activeCommunityId } = useUiStore();
-  const [activeTab, setActiveTab] = useState<"directory" | "security" | "attendance">("directory");
+  const [activeTab, setActiveTab] = useState<"directory" | "committee" | "security" | "attendance">("directory");
   const [credentialUser, setCredentialUser] = useState<CredentialUser | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const tab = params.get("tab");
-      if (tab === "security" || tab === "operational" || tab === "facility") {
+      if (
+        tab === "committee" ||
+        tab === "association" ||
+        tab === "association-committee" ||
+        tab === "association_committee" ||
+        tab === "associate-committee"
+      ) {
+        setActiveTab("committee");
+      } else if (tab === "security" || tab === "operational" || tab === "facility") {
         setActiveTab("security");
+      } else if (tab === "attendance") {
+        setActiveTab("attendance");
       }
     }
   }, []);
@@ -59,6 +70,14 @@ export default function CommunityAdminStaffPage() {
     q: searchTerm || undefined,
     page_size: 100,
   });
+
+  const { data: operationalStaff = [] } = useOperationalStaff(activeCommunityId || undefined);
+  const committeeMembers = operationalStaff.filter((u) =>
+    u.roles.some((r) => r.role_slug === "association_committee")
+  );
+  const facilityAndSecurityStaff = operationalStaff.filter((u) =>
+    u.roles.some((r) => r.role_slug !== "association_committee")
+  );
 
   const {
     data: attendance,
@@ -429,10 +448,60 @@ export default function CommunityAdminStaffPage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.75rem" }}>
       <PageHeader
-        title="Domestic &amp; Support Staff"
-        description="Workforce registry, daily gate attendance tracking, police verification, and unit service assignments."
+        title={
+          activeTab === "committee"
+            ? "Association Committee"
+            : activeTab === "security"
+            ? "Facility & Security Personnel"
+            : activeTab === "attendance"
+            ? "Live Attendance Log"
+            : "Domestic & Support Staff"
+        }
+        description={
+          activeTab === "committee"
+            ? "Governance oversight, elected committee members, assessment reviewers, and policy administrators."
+            : activeTab === "security"
+            ? "Facility managers, security supervisors, and gate guard personnel."
+            : activeTab === "attendance"
+            ? "Daily workforce check-in and check-out logs recorded at security checkpoints."
+            : "Workforce registry, daily gate attendance tracking, police verification, and unit service assignments."
+        }
         action={
-          <div style={{ display: "flex", gap: "0.5rem" }}>
+          activeTab === "directory" ? (
+            <div style={{ display: "flex", gap: "0.5rem" }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setErrorMessage(null);
+                  setIsCheckInModalOpen(true);
+                }}
+              >
+                ⏱️ Record Check-In
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  setErrorMessage(null);
+                  setNewStaffForm({
+                    full_name: "",
+                    phone: "",
+                    email: "",
+                    password: "staff@Gate2026!",
+                    staff_type: "maid",
+                    id_type: "Aadhaar",
+                    id_number: "",
+                    police_verification_status: "not_started",
+                  });
+                  setShowStaffPassword(true);
+                  setIsAddStaffModalOpen(true);
+                }}
+              >
+                + Register Staff
+              </button>
+            </div>
+          ) : activeTab === "attendance" ? (
             <button
               type="button"
               className="btn btn-secondary"
@@ -443,33 +512,12 @@ export default function CommunityAdminStaffPage() {
             >
               ⏱️ Record Check-In
             </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => {
-                setErrorMessage(null);
-                setNewStaffForm({
-                  full_name: "",
-                  phone: "",
-                  email: "",
-                  password: "staff@Gate2026!",
-                  staff_type: "maid",
-                  id_type: "Aadhaar",
-                  id_number: "",
-                  police_verification_status: "not_started",
-                });
-                setShowStaffPassword(true);
-                setIsAddStaffModalOpen(true);
-              }}
-            >
-              + Register Staff
-            </button>
-          </div>
+          ) : null
         }
       />
 
       {/* Navigation Tabs */}
-      <div style={{ display: "flex", borderBottom: "1px solid var(--border)", gap: "1.5rem" }}>
+      <div style={{ display: "flex", borderBottom: "1px solid var(--border)", gap: "1.5rem", overflowX: "auto" }}>
         <button
           type="button"
           onClick={() => setActiveTab("directory")}
@@ -483,9 +531,29 @@ export default function CommunityAdminStaffPage() {
             borderBottom:
               activeTab === "directory" ? "2px solid var(--primary)" : "2px solid transparent",
             cursor: "pointer",
+            whiteSpace: "nowrap",
           }}
         >
           🛠️ Domestic Staff ({staffList?.length || 0})
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("committee")}
+          style={{
+            padding: "0.75rem 0",
+            border: "none",
+            background: "transparent",
+            fontSize: "0.95rem",
+            fontWeight: activeTab === "committee" ? 700 : 500,
+            color: activeTab === "committee" ? "var(--primary)" : "var(--muted)",
+            borderBottom:
+              activeTab === "committee" ? "2px solid var(--primary)" : "2px solid transparent",
+            cursor: "pointer",
+            whiteSpace: "nowrap",
+          }}
+        >
+          🏛️ Association Committee ({committeeMembers.length})
         </button>
 
         <button
@@ -501,9 +569,10 @@ export default function CommunityAdminStaffPage() {
             borderBottom:
               activeTab === "security" ? "2px solid var(--primary)" : "2px solid transparent",
             cursor: "pointer",
+            whiteSpace: "nowrap",
           }}
         >
-          🛡️ Facility &amp; Security Personnel
+          🛡️ Facility &amp; Security Personnel ({facilityAndSecurityStaff.length})
         </button>
 
         <button
@@ -519,6 +588,7 @@ export default function CommunityAdminStaffPage() {
             borderBottom:
               activeTab === "attendance" ? "2px solid var(--primary)" : "2px solid transparent",
             cursor: "pointer",
+            whiteSpace: "nowrap",
           }}
         >
           ⏱️ Live Attendance Log ({attendance?.length || 0})
@@ -557,9 +627,29 @@ export default function CommunityAdminStaffPage() {
         </div>
       )}
 
+      {activeTab === "committee" && (
+        <div style={{ marginTop: "0.5rem" }}>
+          <OperationalStaffView
+            embeddedInTab={true}
+            allowedRoleSlugs={["association_committee"]}
+            title="🏛️ Association Committee Members"
+            description="View, register, and provision elected Association Committee members for community governance, budgets, assessments, and policy approvals."
+            addButtonText="+ Add Committee Member"
+            defaultAddRole="association_committee"
+          />
+        </div>
+      )}
+
       {activeTab === "security" && (
-        <div style={{ marginTop: "1rem" }}>
-          <OperationalStaffView embeddedInTab={true} />
+        <div style={{ marginTop: "0.5rem" }}>
+          <OperationalStaffView
+            embeddedInTab={true}
+            allowedRoleSlugs={["facility_manager", "security_supervisor", "security_guard"]}
+            title="🛡️ Facility & Security Personnel"
+            description="View and provision Facility Managers, Security Supervisors, and Security Guards for this community."
+            addButtonText="+ Add Personnel"
+            defaultAddRole="security_guard"
+          />
         </div>
       )}
 

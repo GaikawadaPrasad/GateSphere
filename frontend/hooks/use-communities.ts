@@ -13,7 +13,7 @@ export const communityKeys = {
 };
 
 export function useCommunities(
-  params?: { active?: boolean },
+  params?: { active?: boolean; page_size?: number; page?: number },
   options?: { enabled?: boolean },
 ) {
   return useQuery({

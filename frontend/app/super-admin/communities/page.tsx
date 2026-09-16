@@ -188,7 +188,7 @@ export default function CommunitiesPage() {
   const [gateCode, setGateCode] = useState("");
   const [gateType, setGateType] = useState<"entry" | "exit" | "both" | "pedestrian">("both");
 
-  const { data: communities, isLoading, refetch } = useCommunities();
+  const { data: communities, isLoading, refetch } = useCommunities({ page_size: 100 });
   const { data: metrics } = useSuperAdminDashboardMetrics();
   const { data: communityUnitsList, refetch: refetchUnits } = useCommunityUnits(
     viewingCommunity?.id || undefined

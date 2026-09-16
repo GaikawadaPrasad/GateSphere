@@ -43,6 +43,7 @@ from app.modules.communication.repository import (
 from app.modules.communication.schemas import ALLOWED
 from app.modules.communities.models import Tower, Unit
 from app.modules.residents.access import UnitScopedAccess, user_in_community
+from app.modules.users.models import Role, User
 from app.modules.residents.models import ResidentProfile, UnitOccupancy
 from app.modules.users.models import Role, User, UserRole
 
@@ -192,7 +193,7 @@ class CommunicationService(UnitScopedAccess):
 
     async def list_members(self, group_id: uuid.UUID) -> list[ResidentGroupMember]:
         await self._get_group(group_id)
-        return list(
+        members = list(
             (
                 await self.db.scalars(
                     select(ResidentGroupMember)
@@ -201,6 +202,21 @@ class CommunicationService(UnitScopedAccess):
                 )
             ).all()
         )
+        if members:
+            user_ids = [m.user_id for m in members]
+            users_map = {
+                u.id: u
+                for u in (
+                    await self.db.scalars(select(User).where(User.id.in_(user_ids)))
+                ).all()
+            }
+            for m in members:
+                u = users_map.get(m.user_id)
+                if u:
+                    m.full_name = u.full_name
+                    m.email = u.email
+                    m.phone = u.phone
+        return members
 
     async def add_member(self, group_id: uuid.UUID, payload: schemas.GroupMemberIn):
         grp = await self._get_group(group_id)
@@ -216,6 +232,11 @@ class CommunicationService(UnitScopedAccess):
         m = ResidentGroupMember(group_id=grp.id, user_id=payload.user_id)
         self.db.add(m)
         await self.db.flush()
+        u = await self.db.get(User, payload.user_id)
+        if u:
+            m.full_name = u.full_name
+            m.email = u.email
+            m.phone = u.phone
         await self._audit("group.member_add", grp.community_id, "resident_group", grp.id)
         return m
 

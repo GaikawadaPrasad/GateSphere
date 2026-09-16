@@ -3,7 +3,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { usersApi } from "@/lib/api";
 
-export type OperationalRoleSlug = "facility_manager" | "security_supervisor" | "security_guard";
+export type OperationalRoleSlug =
+  | "association_committee"
+  | "facility_manager"
+  | "security_supervisor"
+  | "security_guard";
 
 export interface OperationalStaffGrant {
   id: string;
@@ -42,6 +46,19 @@ export const OPERATIONAL_ROLES: {
   description: string;
   responsibilities: string[];
 }[] = [
+  {
+    slug: "association_committee",
+    name: "Association Committee",
+    icon: "🏛️",
+    badgeClass: "badge-primary",
+    description: "Elected association / committee member managing governance, budgets, assessments, and policy approvals.",
+    responsibilities: [
+      "Review and approve community budgets, assessments, and invoices",
+      "Oversee governance rules, vendor agreements, and incident escalations",
+      "Participate in association committee decisions and resolutions",
+      "Monitor resident complaints and facility maintenance projects",
+    ],
+  },
   {
     slug: "facility_manager",
     name: "Facility Manager",
@@ -114,7 +131,12 @@ export function useOperationalStaff(communityId?: string) {
 
       if (rawList.length === 0) return [];
 
-      const targetSlugs = new Set(["facility_manager", "security_supervisor", "security_guard"]);
+      const targetSlugs = new Set([
+        "association_committee",
+        "facility_manager",
+        "security_supervisor",
+        "security_guard",
+      ]);
 
       // Filter users that hold at least one of the operational roles in this community
       const filtered = rawList

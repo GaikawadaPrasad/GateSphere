@@ -29,9 +29,27 @@ export default function ComplaintsPage() {
       header: "Complaint / Ticket",
       render: (t) => (
         <div>
-          <div style={{ fontWeight: 600, color: "var(--fg)" }}>{t.title}</div>
-          <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-            {t.category_name || "General"} {t.unit_number ? `· Unit ${t.unit_number}` : ""}
+          <div style={{ fontWeight: 600, color: "var(--fg)" }}>{t.subject || t.title}</div>
+          <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.15rem" }}>
+            <span className="badge badge-neutral" style={{ fontSize: "0.7rem", padding: "0.1rem 0.4rem" }}>
+              {t.category_name || "General"}
+            </span>{" "}
+            {t.ticket_number ? `• #${t.ticket_number}` : ""} {t.unit_number ? `• Unit ${t.unit_number}` : ""}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "raised_by_name",
+      header: "Raised By (Resident)",
+      render: (t) => (
+        <div>
+          <div style={{ fontWeight: 600, color: "var(--fg)" }}>
+            👤 {t.raised_by_name || (t.raised_by_user_id ? `User (${t.raised_by_user_id.slice(0, 8)})` : "Resident")}
+          </div>
+          <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.1rem" }}>
+            {t.raised_by_email || t.raised_by_phone || (t.unit_number ? `Unit ${t.unit_number} Occupant` : "Resident")}
+            {t.raised_by_phone && t.raised_by_email ? ` • ${t.raised_by_phone}` : ""}
           </div>
         </div>
       ),
@@ -47,11 +65,6 @@ export default function ComplaintsPage() {
       header: "Status",
       align: "center",
       render: (t) => <StatusBadge status={t.status} />,
-    },
-    {
-      key: "raised_by_name",
-      header: "Raised By",
-      render: (t) => <span>{t.raised_by_name || "Resident"}</span>,
     },
     {
       key: "created_at",

@@ -9,6 +9,7 @@ import { EditUserModal, type UserRecord } from "@/components/super-admin/EditUse
 import { EditRolePermissionsModal } from "@/components/super-admin/EditRolePermissionsModal";
 import { rbacApi, usersApi } from "@/lib/api";
 import type { Role, Permission } from "@/types/rbac";
+import { toast } from "@/store/toast";
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
@@ -38,9 +39,16 @@ export default function SettingsPage() {
   const updateMutation = useMutation({
     mutationFn: ({ code, description }: { code: string; description: string }) =>
       rbacApi.updatePermission(code, { description }),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["rbac", "permissions"] });
+      toast.success(
+        `Permission description for "${variables.code}" updated successfully.`,
+        "Permission Saved"
+      );
       setEditingPermission(null);
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || "Failed to update permission.", "Save Failed");
     },
   });
 
@@ -64,9 +72,10 @@ export default function SettingsPage() {
     try {
       await usersApi.delete(deletingUser.id);
       queryClient.invalidateQueries({ queryKey: ["users"] });
+      toast.success(`User ${deletingUser.full_name} deleted successfully.`, "User Deleted");
       setDeletingUser(null);
     } catch (err: any) {
-      alert(err?.message || "Failed to delete user");
+      toast.error(err?.message || "Failed to delete user", "Delete Failed");
     } finally {
       setIsDeleting(false);
     }
