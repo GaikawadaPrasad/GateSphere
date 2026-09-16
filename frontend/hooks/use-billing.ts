@@ -28,7 +28,7 @@ export function useCreateInvoice() {
   return useMutation({
     mutationFn: (data: Parameters<typeof billingApi.createInvoice>[0]) =>
       billingApi.createInvoice(data),
-    onSuccess: (newInvoice) => {
+    onSuccess: async (newInvoice) => {
       qc.setQueriesData<MaintenanceInvoice[]>(
         { queryKey: billingKeys.all },
         (old) => {
@@ -37,8 +37,8 @@ export function useCreateInvoice() {
           return [newInvoice, ...old];
         },
       );
-      qc.invalidateQueries({ queryKey: billingKeys.all });
-      qc.invalidateQueries({ queryKey: ["dashboards"] });
+      await qc.invalidateQueries({ queryKey: billingKeys.all, refetchType: "all" });
+      await qc.invalidateQueries({ queryKey: ["dashboards"], refetchType: "all" });
     },
   });
 }
@@ -47,7 +47,7 @@ export function usePostInvoice() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (invoiceId: string) => billingApi.postInvoice(invoiceId),
-    onSuccess: (updated) => {
+    onSuccess: async (updated) => {
       qc.setQueriesData<MaintenanceInvoice[]>(
         { queryKey: billingKeys.all },
         (old) => {
@@ -55,8 +55,8 @@ export function usePostInvoice() {
           return old.map((i) => (i.id === updated.id ? { ...i, ...updated } : i));
         },
       );
-      qc.invalidateQueries({ queryKey: billingKeys.all });
-      qc.invalidateQueries({ queryKey: ["dashboards"] });
+      await qc.invalidateQueries({ queryKey: billingKeys.all, refetchType: "all" });
+      await qc.invalidateQueries({ queryKey: ["dashboards"], refetchType: "all" });
     },
   });
 }
@@ -65,7 +65,7 @@ export function useCancelInvoice() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (invoiceId: string) => billingApi.cancelInvoice(invoiceId),
-    onSuccess: (updated) => {
+    onSuccess: async (updated) => {
       qc.setQueriesData<MaintenanceInvoice[]>(
         { queryKey: billingKeys.all },
         (old) => {
@@ -73,8 +73,8 @@ export function useCancelInvoice() {
           return old.map((i) => (i.id === updated.id ? { ...i, ...updated } : i));
         },
       );
-      qc.invalidateQueries({ queryKey: billingKeys.all });
-      qc.invalidateQueries({ queryKey: ["dashboards"] });
+      await qc.invalidateQueries({ queryKey: billingKeys.all, refetchType: "all" });
+      await qc.invalidateQueries({ queryKey: ["dashboards"], refetchType: "all" });
     },
   });
 }

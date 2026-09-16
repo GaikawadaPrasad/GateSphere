@@ -101,17 +101,25 @@ def delete_object(key: str) -> None:
         _s3.delete_object(Bucket=settings.S3_BUCKET, Key=key)
 
 
-def public_url(key: str) -> str:
-    base = (settings.S3_PUBLIC_URL or "").rstrip("/")
-    if "supabase.co" in base and not base.endswith("/object/public") and not base.endswith("/storage/v1/s3"):
-        if base.endswith("/storage/v1"):
-            base = f"{base}/object/public"
+def _clean_public_base() -> str:
+    raw = (settings.S3_PUBLIC_URL or "").strip()
+    while (raw.startswith('"') and raw.endswith('"')) or (raw.startswith("'") and raw.endswith("'")):
+        raw = raw[1:-1].strip()
+    raw = raw.replace("\r", "").replace("\n", "").strip().rstrip("/")
+    if "supabase.co" in raw and not raw.endswith("/object/public") and not raw.endswith("/storage/v1/s3"):
+        if raw.endswith("/storage/v1"):
+            raw = f"{raw}/object/public"
         else:
-            base = f"{base}/storage/v1/object/public"
-    return f"{base}/{settings.S3_BUCKET}/{key}"
+            raw = f"{raw}/storage/v1/object/public"
+    return raw
 
 
-PUBLIC_PREFIX = f"{settings.S3_PUBLIC_URL.rstrip('/')}/{settings.S3_BUCKET}/"
+def public_url(key: str) -> str:
+    base = _clean_public_base()
+    return f"{base}/{settings.S3_BUCKET}/{key.lstrip('/')}"
+
+
+PUBLIC_PREFIX = f"{_clean_public_base()}/{settings.S3_BUCKET}/"
 
 
 def key_from_url(url: str) -> str | None:

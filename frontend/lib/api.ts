@@ -1111,8 +1111,11 @@ export const incidentsApi = {
     apiSend<Incident>("POST", `/incidents/${id}/transition`, payload),
   addAction: (id: string, payload: { action_type: string; details?: string }) =>
     apiSend<IncidentAction>("POST", `/incidents/${id}/actions`, payload),
-  resolve: (id: string, data: Record<string, unknown>) =>
-    apiSend<Incident>("PATCH", `/incidents/${id}/resolve`, data),
+  resolve: (id: string, data?: { summary?: string; resolution_summary?: string }) =>
+    apiSend<Incident>("POST", `/incidents/${id}/transition`, {
+      status: "resolved",
+      summary: data?.summary || data?.resolution_summary || "Resolved",
+    }),
   attachments: (id: string) => apiGet<any[]>(`/incidents/${id}/attachments`),
   addAttachment: (
     id: string,

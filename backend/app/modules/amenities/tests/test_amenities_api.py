@@ -141,3 +141,22 @@ def test_resident_amenity_bookings_are_own_only(as_role, seed_ids):
     else:
         # Resident still only saw their own
         assert all(b["resident_user_id"] == me for b in listed)
+
+
+def test_facility_manager_block_lifecycle(as_role, seed_ids):
+    fm = as_role("facility_manager")
+    am_id, _slot, _d = _amenity_and_slot(seed_ids["community_id"])
+    now_dt = date.today() + timedelta(days=5)
+    block_res = fm.post(
+        f"{P}/{am_id}/blocks",
+        json={
+            "blocked_from": f"{now_dt}T08:00:00Z",
+            "blocked_to": f"{now_dt}T18:00:00Z",
+            "reason": "Scheduled pool maintenance",
+        },
+    )
+    assert block_res.status_code == 201, block_res.text
+    block_id = block_res.json()["data"]["id"]
+
+    del_res = fm.delete(f"{P}/blocks/{block_id}")
+    assert del_res.status_code == 204, del_res.text

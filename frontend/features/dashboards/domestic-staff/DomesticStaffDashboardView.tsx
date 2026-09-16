@@ -636,7 +636,11 @@ export function DomesticStaffDashboardView({
                   Police Verification Status (Admin Locked)
                 </div>
                 <div style={{ marginTop: "0.25rem" }}>
-                  <StatusBadge status="verified" label="✓ Police Verified" />
+                  {profile?.police_verified ? (
+                    <StatusBadge status="verified" label="✓ Police Verified" />
+                  ) : (
+                    <StatusBadge status="pending" label="Verification In Progress" />
+                  )}
                 </div>
               </div>
               <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
@@ -658,7 +662,7 @@ export function DomesticStaffDashboardView({
                     color: "var(--brand-body)",
                   }}
                 >
-                  {profile?.verification_id}
+                  {profile?.verification_id || (profile?.police_verified ? "Verified on Record" : "Pending Verification Submission")}
                 </div>
               </div>
             </div>

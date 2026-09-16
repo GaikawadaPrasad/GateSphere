@@ -144,3 +144,83 @@ def test_community_admin_cannot_touch_other_community(as_role, seed_ids):
     other_unit = _a_unit_in(seed_ids["other_community_id"])
     r = ca.get(f"{P}/units/{other_unit}/occupancies")
     assert r.status_code == 404
+
+
+def test_family_members_authorization_and_scoping(as_role, seed_ids, resident_unit_id):
+    res_client = as_role("resident")
+    auditor = as_role("auditor")
+    guard = as_role("security_guard")
+    other_unit = _a_unit_in(seed_ids["other_community_id"])
+
+    # 1. Resident fetches own profile
+    me = res_client.get(f"{P}/me").json()["data"]
+    profile_id = me["id"]
+
+    # 2. Resident adds a family member to own unit -> 201
+    add_res = res_client.post(
+        f"{P}/family-members",
+        json={
+            "unit_id": resident_unit_id,
+            "primary_resident_profile_id": profile_id,
+            "full_name": "Jane Doe",
+            "relationship_type": "spouse",
+            "phone": "+91 91234 56789",
+        },
+    )
+    assert add_res.status_code == 201, add_res.text
+    member_id = add_res.json()["data"]["id"]
+
+    # 3. Resident can list family members for own unit -> 200
+    list_res = res_client.get(f"{P}/units/{resident_unit_id}/family-members")
+    assert list_res.status_code == 200
+    assert any(m["id"] == member_id for m in list_res.json()["data"])
+
+    # 4. Resident cannot list or add family members for another unit -> 404
+    assert res_client.get(f"{P}/units/{other_unit}/family-members").status_code == 404
+    bad_add = res_client.post(
+        f"{P}/family-members",
+        json={
+            "unit_id": other_unit,
+            "primary_resident_profile_id": profile_id,
+            "full_name": "Intruder",
+            "relationship_type": "child",
+        },
+    )
+    assert bad_add.status_code == 404
+
+    # 5. Auditor cannot create or delete family members -> 403
+    aud_add = auditor.post(
+        f"{P}/family-members",
+        json={
+            "unit_id": resident_unit_id,
+            "primary_resident_profile_id": profile_id,
+            "full_name": "Auditor Add",
+            "relationship_type": "child",
+        },
+    )
+    assert aud_add.status_code == 403
+    assert auditor.delete(f"{P}/family-members/{member_id}").status_code == 403
+
+    # 6. Guard cannot create or delete family members -> 403
+    guard_add = guard.post(
+        f"{P}/family-members",
+        json={
+            "unit_id": resident_unit_id,
+            "primary_resident_profile_id": profile_id,
+            "full_name": "Guard Add",
+            "relationship_type": "child",
+        },
+    )
+    assert guard_add.status_code == 403
+
+    # 7. Resident can update and delete their own family member
+    upd = res_client.patch(
+        f"{P}/family-members/{member_id}",
+        json={"phone": "+91 99999 88888"},
+    )
+    assert upd.status_code == 200
+    assert upd.json()["data"]["phone"] == "+91 99999 88888"
+
+    del_res = res_client.delete(f"{P}/family-members/{member_id}")
+    assert del_res.status_code == 204
+

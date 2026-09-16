@@ -170,7 +170,7 @@ export default function SecurityGuardVisitorsPage() {
       setActionMessage({ type: "success", text: `Gate entry recorded for ${admitVisitor.name}` });
       setAdmitVisitor(null);
       setAdmitPhotoUrl(null);
-      loadData();
+      await loadData();
     } catch (err: any) {
       setAdmitError(err?.message || "Failed to record gate entry.");
     } finally {
@@ -184,7 +184,7 @@ export default function SecurityGuardVisitorsPage() {
     try {
       await visitorsApi.recordExit(v.entryId);
       setActionMessage({ type: "success", text: `Exit recorded for ${v.name}` });
-      loadData();
+      await loadData();
     } catch (err: any) {
       setActionMessage({ type: "error", text: err?.message || "Failed to record exit." });
     }

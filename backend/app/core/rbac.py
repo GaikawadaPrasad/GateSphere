@@ -73,6 +73,9 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "amenities:create",
         "amenities:update",
         "amenities:approve",
+        "residents:view",
+        "residents:create",
+        "residents:update",
         "complaints:view",
         "complaints:create",
         "complaints:update",
@@ -89,6 +92,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "notifications:view",
     ],
     "security_supervisor": [
+        "residents:view",
         "visitors:view",
         "visitors:create",
         "visitors:approve",

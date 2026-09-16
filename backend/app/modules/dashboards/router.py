@@ -10,11 +10,14 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.errors import ForbiddenError
 from app.core.responses import Response as Envelope
 from app.core.responses import ok
-from app.core.security import require_platform_admin
-from app.core.tenancy import require_permission_async
+from app.core.security import require_auth_async, require_platform_admin
+from app.core.tenancy import TenantScope, get_tenant_scope_async, require_permission_async
+from app.db.session import get_async_db
 from app.modules.assistant import schemas as assistant_schemas
 from app.modules.assistant.deps import assistant_service
 from app.modules.assistant.service import AssistantService
@@ -22,6 +25,8 @@ from app.modules.dashboards import schemas
 from app.modules.dashboards.cache import get_cached, set_cached
 from app.modules.dashboards.deps import dashboard_service
 from app.modules.dashboards.service import DashboardService
+from app.modules.residents.access import actor_unit_scope
+from app.modules.users.models import User
 
 router = APIRouter(prefix="/dashboards", tags=["Dashboards"])
 
@@ -29,7 +34,26 @@ VIEW = Depends(require_permission_async("dashboards:view"))
 GATE_VIEW = Depends(require_permission_async("gate:view"))
 BILLING_VIEW = Depends(require_permission_async("billing:view"))
 PLATFORM_ADMIN = Depends(require_platform_admin)
+
+
+async def require_financial_dashboard_async(
+    scope: TenantScope = Depends(get_tenant_scope_async),
+    user: User = Depends(require_auth_async),
+    db: AsyncSession = Depends(get_async_db),
+) -> TenantScope:
+    if not scope.can("billing:view"):
+        raise ForbiddenError("Missing permission: billing:view", code="PERMISSION_DENIED")
+    unit_scope = await actor_unit_scope(db, user)
+    if unit_scope is not None:
+        raise ForbiddenError(
+            "Residents cannot access community financial totals", code="PERMISSION_DENIED"
+        )
+    return scope
+
+
+FINANCIAL_DASHBOARD = Depends(require_financial_dashboard_async)
 Svc = DashboardService
+
 
 
 @router.get("/health", summary="Dashboards module liveness")
@@ -78,7 +102,7 @@ async def security(
     return ok(data)
 
 
-@router.get("/financial", response_model=Envelope[schemas.FinancialStats], dependencies=[BILLING_VIEW])
+@router.get("/financial", response_model=Envelope[schemas.FinancialStats], dependencies=[FINANCIAL_DASHBOARD])
 async def financial(
     community_id: uuid.UUID | None = None, svc: Svc = Depends(dashboard_service)
 ) -> dict:

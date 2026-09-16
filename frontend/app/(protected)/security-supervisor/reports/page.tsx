@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { gateApi, visitorsApi, deliveriesApi, blacklistApi, auditApi } from "@/lib/api";
+import { gateApi, visitorsApi, deliveriesApi, blacklistApi, auditApi, incidentsApi } from "@/lib/api";
+import { BrandButton } from "@/components/common/BrandButton";
 
 export default function SecuritySupervisorReportsPage() {
   const [reportType, setReportType] = useState("gate_traffic");
@@ -27,6 +28,9 @@ export default function SecuritySupervisorReportsPage() {
         } else if (reportType === "blacklist_attempts") {
           const blRes = await blacklistApi.list({ page_size: 100 }).catch(() => []);
           items = Array.isArray(blRes) ? blRes : [];
+        } else if (reportType === "incident_reports") {
+          const incRes = await incidentsApi.list({ page_size: 100 }).catch(() => []);
+          items = Array.isArray(incRes) ? incRes : [];
         } else {
           const logsRes = await auditApi.logs({ page_size: 100 }).catch(() => []);
           items = Array.isArray(logsRes) ? logsRes : [];
@@ -153,10 +157,38 @@ export default function SecuritySupervisorReportsPage() {
       </div>
 
       <div className="card">
-        <div className="card-header">
-          <h3 className="card-title">
+        <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
+          <h3 className="card-title" style={{ margin: 0 }}>
             Security Analytics Data — {reportType.replace(/_/g, " ").toUpperCase()} ({timeframe})
           </h3>
+          <BrandButton
+            size="sm"
+            variant="outline"
+            disabled={reportData.length === 0}
+            onClick={() => {
+              if (reportData.length === 0) return;
+              let csvContent = "";
+              if (reportType === "gate_traffic") {
+                const headers = ["Gate / Zone", "Total Entries", "Total Exits", "Denied / Blocked", "Peak Hour"];
+                const rows = reportData.map((r) => [r.zone, r.entries, r.exits, r.denied, r.peak]);
+                csvContent = [headers.join(","), ...rows.map((row) => row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))].join("\n");
+              } else {
+                const headers = ["Reference / Subject", "Category / Type", "Status", "Logged Date"];
+                const rows = reportData.map((r) => [r.label, r.type, r.status, r.date]);
+                csvContent = [headers.join(","), ...rows.map((row) => row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))].join("\n");
+              }
+              const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement("a");
+              link.setAttribute("href", url);
+              link.setAttribute("download", `security_report_${reportType}_${timeframe}.csv`);
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            }}
+          >
+            📥 Export CSV
+          </BrandButton>
         </div>
 
         <div className="table-container">
