@@ -49,7 +49,7 @@ export function useStaffAttendance(params?: {
   return useQuery({
     queryKey: ["staff-attendance", params],
     queryFn: () => domesticStaffApi.attendance(params),
-    staleTime: 15_000,
+    staleTime: 60_000,
   });
 }
 

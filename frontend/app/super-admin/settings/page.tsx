@@ -320,7 +320,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Permissions Catalogue */}
-        <div className="card">
+        {/* <div className="card">
           <div className="card-header">
             <h3 className="card-title">Permissions Catalogue</h3>
             <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
@@ -337,7 +337,7 @@ export default function SettingsPage() {
             enableClientPagination
             pageSize={10}
           />
-        </div>
+        </div> */}
       </div>
 
       {/* Edit Permission Modal */}

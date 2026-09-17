@@ -28,7 +28,11 @@ export function CommunityAdminSidebar() {
   const { data: notifications } = useMyNotifications({ unread_only: true });
   const unreadCount = notifications?.length || 0;
 
-  const handleLinkClick = () => {
+  const handleLinkClick = (e: React.MouseEvent, href: string) => {
+    if (pathname === href) {
+      e.preventDefault();
+      return;
+    }
     // On small screens, close sidebar after clicking a nav link
     if (typeof window !== "undefined" && window.innerWidth < 768 && sidebarOpen) {
       toggleSidebar();
@@ -158,7 +162,7 @@ export function CommunityAdminSidebar() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  onClick={handleLinkClick}
+                  onClick={(e) => handleLinkClick(e, item.href)}
                   style={{
                     display: "flex",
                     alignItems: "center",

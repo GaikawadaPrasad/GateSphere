@@ -18,7 +18,10 @@ export function makeQueryClient(): QueryClient {
           return failureCount < 2;
         },
         refetchOnWindowFocus: false,
-        staleTime: 30_000,
+        refetchOnMount: false,
+        refetchOnReconnect: false,
+        staleTime: 60_000,
+        gcTime: 5 * 60_000,
       },
     },
   });

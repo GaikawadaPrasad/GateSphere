@@ -45,6 +45,7 @@ export default function SecurityGuardCabTaxiPage() {
   const [cabCompany, setCabCompany] = useState("Uber");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
+  const [cabFieldErrors, setCabFieldErrors] = useState<Record<string, string>>({});
 
   const loadData = async (showLoading = true) => {
     if (showLoading) setIsLoading(true);
@@ -141,6 +142,7 @@ export default function SecurityGuardCabTaxiPage() {
     setVehicleNumber("");
     setCabCompany("Uber");
     setModalError(null);
+    setCabFieldErrors({});
     setIsModalOpen(true);
     loadUnits();
   };
@@ -150,32 +152,36 @@ export default function SecurityGuardCabTaxiPage() {
     const cleanPlate = vehicleNumber.trim().toUpperCase();
     const trimmedDriverName = driverName.trim();
     const trimmedDriverPhone = driverPhone.trim();
+    const errors: Record<string, string> = {};
 
     if (!selectedUnitId) {
-      setModalError("Please select a target resident unit.");
-      return;
+      errors.unitId = "Please select a target resident unit.";
     }
     if (!cleanPlate) {
-      setModalError("Please enter vehicle plate number (e.g. KA-01-AB-1234).");
-      return;
-    }
-    const cleanPlateNoSpaces = cleanPlate.replace(/[\s\-]/g, "");
-    if (!/^[A-Z0-9]{4,15}$/.test(cleanPlateNoSpaces)) {
-      setModalError("Vehicle plate number must be 4-15 alphanumeric characters (e.g. KA01AB1234).");
-      return;
+      errors.vehicleNumber = "Please enter vehicle plate number (e.g. KA-01-AB-1234).";
+    } else {
+      const cleanPlateNoSpaces = cleanPlate.replace(/[\s\-]/g, "");
+      if (!/^[A-Z0-9]{4,15}$/.test(cleanPlateNoSpaces)) {
+        errors.vehicleNumber = "Vehicle plate number must be 4-15 alphanumeric characters (e.g. KA01AB1234).";
+      }
     }
     if (trimmedDriverName) {
       if (trimmedDriverName.length < 2 || !isValidPersonName(trimmedDriverName)) {
-        setModalError("Driver name must contain only alphabetic letters and spaces (min 2 characters).");
-        return;
+        errors.driverName = "Driver name must contain only alphabetic letters and spaces (min 2 characters).";
       }
     }
     if (trimmedDriverPhone) {
       const phoneDigits = trimmedDriverPhone.replace(/\D/g, "");
       if (!/^\+?[0-9\s\-()]{7,20}$/.test(trimmedDriverPhone) || phoneDigits.length < 10) {
-        setModalError("Please enter a valid mobile number for the driver (at least 10 digits).");
-        return;
+        errors.driverPhone = "Please enter a valid mobile number for the driver (at least 10 digits).";
       }
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setCabFieldErrors(errors);
+      setModalError("Please resolve the highlighted form errors.");
+      toast.error("Please resolve the highlighted form errors.");
+      return;
     }
 
     setIsSubmitting(true);
@@ -619,7 +625,12 @@ export default function SecurityGuardCabTaxiPage() {
             <select
               className="form-control"
               value={selectedUnitId}
-              onChange={(e) => setSelectedUnitId(e.target.value)}
+              onChange={(e) => {
+                setSelectedUnitId(e.target.value);
+                if (cabFieldErrors.unitId) {
+                  setCabFieldErrors((prev) => ({ ...prev, unitId: "" }));
+                }
+              }}
               required
             >
               {units.length === 0 ? (
@@ -632,6 +643,11 @@ export default function SecurityGuardCabTaxiPage() {
                 ))
               )}
             </select>
+            {cabFieldErrors.unitId && (
+              <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                {cabFieldErrors.unitId}
+              </span>
+            )}
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
@@ -644,9 +660,19 @@ export default function SecurityGuardCabTaxiPage() {
                 className="form-control"
                 placeholder="e.g. KA-01-AB-1234"
                 value={vehicleNumber}
-                onChange={(e) => setVehicleNumber(e.target.value)}
+                onChange={(e) => {
+                  setVehicleNumber(e.target.value);
+                  if (cabFieldErrors.vehicleNumber) {
+                    setCabFieldErrors((prev) => ({ ...prev, vehicleNumber: "" }));
+                  }
+                }}
                 required
               />
+              {cabFieldErrors.vehicleNumber && (
+                <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                  {cabFieldErrors.vehicleNumber}
+                </span>
+              )}
             </div>
 
             <div>
@@ -678,8 +704,18 @@ export default function SecurityGuardCabTaxiPage() {
                 className="form-control"
                 placeholder="Driver full name"
                 value={driverName}
-                onChange={(e) => setDriverName(e.target.value)}
+                onChange={(e) => {
+                  setDriverName(e.target.value);
+                  if (cabFieldErrors.driverName) {
+                    setCabFieldErrors((prev) => ({ ...prev, driverName: "" }));
+                  }
+                }}
               />
+              {cabFieldErrors.driverName && (
+                <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                  {cabFieldErrors.driverName}
+                </span>
+              )}
             </div>
 
             <div>
@@ -691,8 +727,18 @@ export default function SecurityGuardCabTaxiPage() {
                 className="form-control"
                 placeholder="10-digit mobile"
                 value={driverPhone}
-                onChange={(e) => setDriverPhone(e.target.value)}
+                onChange={(e) => {
+                  setDriverPhone(e.target.value);
+                  if (cabFieldErrors.driverPhone) {
+                    setCabFieldErrors((prev) => ({ ...prev, driverPhone: "" }));
+                  }
+                }}
               />
+              {cabFieldErrors.driverPhone && (
+                <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                  {cabFieldErrors.driverPhone}
+                </span>
+              )}
             </div>
           </div>
         </form>

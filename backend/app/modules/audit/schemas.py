@@ -14,7 +14,11 @@ class AuditLogRead(BaseModel):
     id: uuid.UUID
     created_at: datetime
     community_id: uuid.UUID | None
+    community_name: str | None = None
+    community_code: str | None = None
     user_id: uuid.UUID | None
+    user_name: str | None = None
+    user_email: str | None = None
     session_id: uuid.UUID | None
     role_slug: str | None
     module: str

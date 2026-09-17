@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useUiStore } from "@/store/ui";
 import {
   useResidents,
@@ -9,6 +10,7 @@ import {
   useEmergencyContacts,
   useAddResident,
   useDeleteResident,
+  useCommunityInvitations,
 } from "@/hooks/use-residents";
 import { useCommunityUnits, useTowers } from "@/hooks/use-communities";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -24,6 +26,7 @@ import { toast } from "@/store/toast";
 import { UpdateUserCredentialsModal, type CredentialUser } from "@/components/common/UpdateUserCredentialsModal";
 
 export default function CommunityAdminResidentsPage() {
+  const queryClient = useQueryClient();
   const { activeCommunityId } = useUiStore();
   const [activeTab, setActiveTab] = useState<"directory" | "approvals" | "invitations">("directory");
   const [searchTerm, setSearchTerm] = useState("");
@@ -51,8 +54,14 @@ export default function CommunityAdminResidentsPage() {
   const [deleteError, setDeleteError] = useState("");
 
   // Invitations State
-  const [invitations, setInvitations] = useState<any[]>([]);
-  const [invitationsLoading, setInvitationsLoading] = useState(false);
+  const {
+    data: rawInvitations,
+    isLoading: invitationsLoading,
+  } = useCommunityInvitations(activeCommunityId || undefined);
+  const invitations = useMemo(
+    () => (Array.isArray(rawInvitations) ? (rawInvitations as any[]) : []),
+    [rawInvitations]
+  );
   const [isCreateInviteOpen, setIsCreateInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [invitePhone, setInvitePhone] = useState("");
@@ -64,25 +73,78 @@ export default function CommunityAdminResidentsPage() {
   const [inviteMessage, setInviteMessage] = useState("");
   const [isCreatingInvite, setIsCreatingInvite] = useState(false);
   const [inviteError, setInviteError] = useState("");
+  const [selectedInvitation, setSelectedInvitation] = useState<any | null>(null);
 
-  const fetchInvitations = async () => {
-    if (!activeCommunityId) return;
+  const [viewedInviteIds, setViewedInviteIds] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set<string>();
     try {
-      setInvitationsLoading(true);
-      const list = await onboardingApi.listInvitations(activeCommunityId);
-      setInvitations(Array.isArray(list) ? list : []);
+      const stored = localStorage.getItem(
+        `gatesphere_viewed_invites_${activeCommunityId || "default"}`,
+      );
+      return stored ? new Set(JSON.parse(stored)) : new Set<string>();
     } catch {
-      setInvitations([]);
-    } finally {
-      setInvitationsLoading(false);
+      return new Set<string>();
     }
-  };
+  });
 
   useEffect(() => {
-    if (activeTab === "invitations" && activeCommunityId) {
-      fetchInvitations();
+    if (!activeCommunityId || typeof window === "undefined") return;
+    try {
+      const stored = localStorage.getItem(`gatesphere_viewed_invites_${activeCommunityId}`);
+      if (stored) {
+        setViewedInviteIds(new Set(JSON.parse(stored)));
+      } else {
+        setViewedInviteIds(new Set());
+      }
+    } catch {
+      setViewedInviteIds(new Set());
     }
-  }, [activeTab, activeCommunityId]);
+  }, [activeCommunityId]);
+
+  const markInvitationAsViewed = (inviteId: string) => {
+    setViewedInviteIds((prev) => {
+      const updated = new Set(prev);
+      updated.add(inviteId);
+      if (typeof window !== "undefined" && activeCommunityId) {
+        try {
+          localStorage.setItem(
+            `gatesphere_viewed_invites_${activeCommunityId}`,
+            JSON.stringify(Array.from(updated)),
+          );
+        } catch {
+          // Ignore localStorage errors
+        }
+      }
+      return updated;
+    });
+  };
+
+  const markAllInvitationsAsViewed = () => {
+    setViewedInviteIds((prev) => {
+      const updated = new Set(prev);
+      invitations.forEach((i) => updated.add(i.id));
+      if (typeof window !== "undefined" && activeCommunityId) {
+        try {
+          localStorage.setItem(
+            `gatesphere_viewed_invites_${activeCommunityId}`,
+            JSON.stringify(Array.from(updated)),
+          );
+        } catch {
+          // Ignore
+        }
+      }
+      return updated;
+    });
+    toast.success("All invitations marked as viewed.", "Updated");
+  };
+
+  const unviewedPendingCount = invitations.filter(
+    (i) => i.status === "pending" && !viewedInviteIds.has(i.id),
+  ).length;
+
+  const fetchInvitations = () => {
+    queryClient.invalidateQueries({ queryKey: ["community-invitations"] });
+  };
 
   // Queries
   const {
@@ -516,7 +578,7 @@ export default function CommunityAdminResidentsPage() {
           }}
         >
           <span>📨 Resident Invitations</span>
-          {invitations.filter((i) => i.status === "pending").length > 0 && (
+          {unviewedPendingCount > 0 && (
             <span
               style={{
                 background: "var(--primary)",
@@ -527,7 +589,7 @@ export default function CommunityAdminResidentsPage() {
                 fontWeight: 700,
               }}
             >
-              {invitations.filter((i) => i.status === "pending").length}
+              {unviewedPendingCount}
             </span>
           )}
         </button>
@@ -591,24 +653,36 @@ export default function CommunityAdminResidentsPage() {
                 Generate secure onboarding invitation links for new residents to join their unit.
               </p>
             </div>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => {
-                setInviteError("");
-                setInviteEmail("");
-                setInvitePhone("");
-                setInviteFullName("");
-                setInviteTowerId("");
-                setInviteUnitId("");
-                setInviteRole("primary_owner");
-                setInviteIsPrimary(true);
-                setInviteMessage("");
-                setIsCreateInviteOpen(true);
-              }}
-            >
-              ✉️ + Issue New Invitation
-            </button>
+            <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+              {unviewedPendingCount > 0 && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ fontSize: "12px", padding: "0.4rem 0.75rem" }}
+                  onClick={markAllInvitationsAsViewed}
+                >
+                  ✓ Mark All as Viewed
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  setInviteError("");
+                  setInviteEmail("");
+                  setInvitePhone("");
+                  setInviteFullName("");
+                  setInviteTowerId("");
+                  setInviteUnitId("");
+                  setInviteRole("primary_owner");
+                  setInviteIsPrimary(true);
+                  setInviteMessage("");
+                  setIsCreateInviteOpen(true);
+                }}
+              >
+                ✉️ + Issue New Invitation
+              </button>
+            </div>
           </div>
 
           <DataTable
@@ -616,14 +690,49 @@ export default function CommunityAdminResidentsPage() {
               {
                 key: "invited_email",
                 header: "Invited Resident",
-                render: (row: any) => (
-                  <div>
-                    <div style={{ fontWeight: 600 }}>{row.full_name || row.invited_email}</div>
-                    <div style={{ fontSize: "12px", color: "var(--muted)" }}>
-                      {row.invited_email} {row.invited_phone ? `· ${row.invited_phone}` : ""}
+                render: (row: any) => {
+                  const isUnviewed = row.status === "pending" && !viewedInviteIds.has(row.id);
+                  return (
+                    <div
+                      style={{ cursor: "pointer" }}
+                      onClick={() => {
+                        markInvitationAsViewed(row.id);
+                        setSelectedInvitation(row);
+                      }}
+                      title="Click to view invitation details"
+                    >
+                      <div
+                        style={{
+                          fontWeight: 600,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.4rem",
+                        }}
+                      >
+                        <span style={{ color: isUnviewed ? "var(--primary)" : "inherit" }}>
+                          {row.full_name || row.invited_email}
+                        </span>
+                        {isUnviewed && (
+                          <span
+                            style={{
+                              background: "var(--primary)",
+                              color: "white",
+                              fontSize: "0.65rem",
+                              padding: "0.05rem 0.35rem",
+                              borderRadius: "var(--radius-full)",
+                              fontWeight: 700,
+                            }}
+                          >
+                            NEW
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: "12px", color: "var(--muted)" }}>
+                        {row.invited_email} {row.invited_phone ? `· ${row.invited_phone}` : ""}
+                      </div>
                     </div>
-                  </div>
-                ),
+                  );
+                },
               },
               {
                 key: "unit",
@@ -658,6 +767,18 @@ export default function CommunityAdminResidentsPage() {
                       className="btn btn-secondary"
                       style={{ fontSize: "12px", padding: "0.25rem 0.6rem" }}
                       onClick={() => {
+                        markInvitationAsViewed(row.id);
+                        setSelectedInvitation(row);
+                      }}
+                    >
+                      👁️ View
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ fontSize: "12px", padding: "0.25rem 0.6rem" }}
+                      onClick={() => {
+                        markInvitationAsViewed(row.id);
                         const link = `${window.location.origin}/invitations/${row.token}`;
                         navigator.clipboard.writeText(link);
                         toast.success("Invitation activation link copied to clipboard!", "Copied");
@@ -1604,6 +1725,195 @@ export default function CommunityAdminResidentsPage() {
         user={credentialUser}
         onSuccess={() => refetchResidents()}
       />
+
+      {/* Resident Invitation Details Modal */}
+      <Modal
+        isOpen={Boolean(selectedInvitation)}
+        onClose={() => setSelectedInvitation(null)}
+        title={
+          selectedInvitation
+            ? `Invitation: ${selectedInvitation.full_name || selectedInvitation.invited_email}`
+            : "Resident Invitation Details"
+        }
+      >
+        {selectedInvitation && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "1rem",
+                background: "#f8fafc",
+                padding: "1rem",
+                borderRadius: "var(--radius-sm)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              <div>
+                <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Invited Resident</div>
+                <div style={{ fontWeight: 600, fontSize: "0.95rem", marginTop: "0.2rem" }}>
+                  {selectedInvitation.full_name || "–"}
+                </div>
+                <div style={{ fontSize: "0.8rem", color: "var(--muted)", marginTop: "0.1rem" }}>
+                  {selectedInvitation.invited_email}
+                  {selectedInvitation.invited_phone ? ` · ${selectedInvitation.invited_phone}` : ""}
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Status</div>
+                <div style={{ marginTop: "0.2rem" }}>
+                  <StatusBadge status={selectedInvitation.status || "pending"} />
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Target Unit</div>
+                <div style={{ fontWeight: 600, marginTop: "0.2rem" }}>
+                  Unit {selectedInvitation.unit_number || "–"}{" "}
+                  ({selectedInvitation.tower_name || "Tower"})
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Occupancy Role</div>
+                <div style={{ fontWeight: 600, textTransform: "capitalize", marginTop: "0.2rem" }}>
+                  {(selectedInvitation.occupancy_role || "resident").replace(/_/g, " ")}
+                  {selectedInvitation.is_primary ? " (Primary)" : ""}
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Expires At</div>
+                <div style={{ fontSize: "0.85rem", marginTop: "0.2rem" }}>
+                  {selectedInvitation.expires_at
+                    ? formatDateTime(selectedInvitation.expires_at)
+                    : "–"}
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Created On</div>
+                <div style={{ fontSize: "0.85rem", marginTop: "0.2rem" }}>
+                  {selectedInvitation.created_at
+                    ? formatDateTime(selectedInvitation.created_at)
+                    : "–"}
+                </div>
+              </div>
+            </div>
+
+            {/* Invitation Link Section */}
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.8rem",
+                  fontWeight: 600,
+                  marginBottom: "0.35rem",
+                }}
+              >
+                🔗 Secure Onboarding Invitation URL
+              </label>
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <input
+                  type="text"
+                  readOnly
+                  className="input-field"
+                  value={
+                    typeof window !== "undefined"
+                      ? `${window.location.origin}/invitations/${selectedInvitation.token}`
+                      : `/invitations/${selectedInvitation.token}`
+                  }
+                  style={{ flex: 1, fontSize: "0.8rem", background: "#f8fafc" }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ flexShrink: 0 }}
+                  onClick={() => {
+                    const link = `${window.location.origin}/invitations/${selectedInvitation.token}`;
+                    navigator.clipboard.writeText(link);
+                    toast.success("Invitation link copied to clipboard!", "Copied");
+                  }}
+                >
+                  📋 Copy Link
+                </button>
+              </div>
+            </div>
+
+            {selectedInvitation.message && (
+              <div>
+                <div
+                  style={{
+                    fontSize: "0.75rem",
+                    color: "var(--muted)",
+                    marginBottom: "0.25rem",
+                  }}
+                >
+                  Personal Welcome Note
+                </div>
+                <div
+                  style={{
+                    padding: "0.75rem",
+                    background: "#f8fafc",
+                    borderRadius: "6px",
+                    fontSize: "0.85rem",
+                    fontStyle: "italic",
+                    border: "1px solid var(--border)",
+                  }}
+                >
+                  &ldquo;{selectedInvitation.message}&rdquo;
+                </div>
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                borderTop: "1px solid var(--border)",
+                paddingTop: "1rem",
+              }}
+            >
+              <div>
+                {selectedInvitation.status === "pending" && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ color: "#DC2626", borderColor: "#fecaca" }}
+                    onClick={async () => {
+                      if (confirm("Are you sure you want to revoke this invitation?")) {
+                        try {
+                          await onboardingApi.revokeInvitation(
+                            activeCommunityId!,
+                            selectedInvitation.id,
+                          );
+                          toast.success("Invitation revoked successfully.", "Revoked");
+                          setSelectedInvitation(null);
+                          fetchInvitations();
+                        } catch (err: any) {
+                          toast.error(err?.message || "Failed to revoke invitation", "Error");
+                        }
+                      }
+                    }}
+                  >
+                    ✕ Revoke Invitation
+                  </button>
+                )}
+              </div>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setSelectedInvitation(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

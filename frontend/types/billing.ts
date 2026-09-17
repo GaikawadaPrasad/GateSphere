@@ -29,6 +29,11 @@ export interface MaintenanceInvoice {
   balance_due: string;
   due_date: string;
   created_at: string;
+  billing_period_start?: string;
+  billing_period_end?: string;
+  issue_date?: string;
+  discount?: string | number;
+  late_fee?: string | number;
   items?: InvoiceItem[];
 }
 
