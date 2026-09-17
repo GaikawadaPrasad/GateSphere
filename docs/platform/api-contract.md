@@ -18,9 +18,14 @@ Canonical, cross-application API rules. The FastAPI backend defines the contract
 |-------|---------|-------|
 | `page` | 1 | 1-based |
 | `page_size` | 20 | max 100 |
-| `sort` | module default | e.g. `-created_at`, `due_date` |
 | `q` | – | free-text search within the caller's scope |
 | module filters | – | e.g. `status=pending`, `community_id` (super_admin only), date ranges |
+
+List ordering is server-defined per endpoint (deterministic, typically `created_at`
+descending). There are deliberately no client `sort`/`order` parameters — removed in
+Sept 2026 after verification showed they were accepted but never applied, so no
+unvalidated sort field can ever reach a query. Clients that need a different order sort
+the returned page locally.
 
 ## Response envelope
 

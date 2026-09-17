@@ -26,6 +26,7 @@ x-backend-env: &backend-env
   SEED_ON_START: "${SEED_ON_START:-true}"
   RATE_LIMIT_ENABLED: "${RATE_LIMIT_ENABLED:-true}"
   RATE_LIMIT_LOGIN: "${RATE_LIMIT_LOGIN:-5/60}"
+  LOGIN_LOCKOUT_ENABLED: "${LOGIN_LOCKOUT_ENABLED:-true}"
 
 services:
   db:

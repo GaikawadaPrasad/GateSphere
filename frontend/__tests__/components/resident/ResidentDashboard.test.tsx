@@ -172,4 +172,77 @@ describe("Resident Dashboard Components & Architecture", () => {
       expect(screen.getByText("INV-2026-002")).toBeInTheDocument();
     });
   });
+
+  describe("Visitor Requests & Approval Actions (GS-004)", () => {
+    const mockVisitorRequests: VisitorRequest[] = [
+      {
+        id: "vis-pending-1",
+        visitor_name: "ASHOK",
+        phone: "+918765432109",
+        purpose: "Visitor at gate requesting entry",
+        status: "pending",
+        created_at: "2026-09-15T10:00:00Z",
+      },
+      {
+        id: "vis-approved-2",
+        visitor_name: "Dharma Raj",
+        phone: "+919182275672",
+        purpose: "dinner",
+        status: "approved",
+        created_at: "2026-09-13T18:00:00Z",
+      },
+    ];
+
+    it("renders Accept and Reject buttons for pending visitor requests", () => {
+      const handleDecision = vi.fn();
+
+      const columns: Column<VisitorRequest>[] = [
+        { key: "visitor_name", header: "Visitor Name" },
+        { key: "phone", header: "Phone" },
+        { key: "purpose", header: "Purpose" },
+        { key: "status", header: "Status", render: (i) => <StatusBadge status={i.status} /> },
+        {
+          key: "actions",
+          header: "Actions",
+          render: (i) => {
+            if (i.status === "pending") {
+              return (
+                <div style={{ display: "flex", gap: "0.4rem" }}>
+                  <button
+                    type="button"
+                    onClick={() => handleDecision(i.id, true)}
+                  >
+                    ✓ Accept
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDecision(i.id, false)}
+                  >
+                    ✕ Reject
+                  </button>
+                </div>
+              );
+            }
+            return <span>{i.status === "approved" ? "✓ Approved" : "—"}</span>;
+          },
+        },
+      ];
+
+      render(<DataTable<VisitorRequest> columns={columns} data={mockVisitorRequests} />);
+
+      expect(screen.getByText("ASHOK")).toBeInTheDocument();
+      const acceptBtn = screen.getByRole("button", { name: /accept/i });
+      const rejectBtn = screen.getByRole("button", { name: /reject/i });
+      expect(acceptBtn).toBeInTheDocument();
+      expect(rejectBtn).toBeInTheDocument();
+
+      fireEvent.click(acceptBtn);
+      expect(handleDecision).toHaveBeenCalledWith("vis-pending-1", true);
+
+      fireEvent.click(rejectBtn);
+      expect(handleDecision).toHaveBeenCalledWith("vis-pending-1", false);
+
+      expect(screen.getByText("✓ Approved")).toBeInTheDocument();
+    });
+  });
 });

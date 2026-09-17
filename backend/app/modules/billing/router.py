@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, status
 
-from app.core.errors import NotFoundError
+from app.core.errors import BusinessRuleError, ForbiddenError, NotFoundError
 from app.core.export import EXPORT_ROW_CAP, csv_response
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
@@ -263,6 +263,13 @@ async def export_payments(
         [
             "payment_reference",
             "receipt_number",
+            "payer_name",
+            "payer_email",
+            "payer_phone",
+            "unit_number",
+            "tower_name",
+            "resident_type",
+            "invoice_number",
             "amount",
             "payment_method",
             "payment_status",
@@ -273,6 +280,13 @@ async def export_payments(
             (
                 p.payment_reference,
                 p.receipt_number,
+                getattr(p, "payer_name", None),
+                getattr(p, "payer_email", None),
+                getattr(p, "payer_phone", None),
+                getattr(p, "unit_number", None),
+                getattr(p, "tower_name", None),
+                getattr(p, "resident_type", None),
+                getattr(p, "invoice_number", None),
                 p.amount,
                 p.payment_method,
                 p.payment_status,
@@ -345,7 +359,56 @@ async def assess_penalty(
 
 
 # --- special assessments (Governance FR-09 / Association Committee) --- #
+# NOTE: transitional in-memory store (no table yet). Tenant isolation is still
+# enforced per request: every community id is resolved through the caller's
+# TenantScope (unknown/out-of-scope → 404, never 403 — AGENTS.md §3), and rows
+# stamped with another community are invisible. Do not add endpoints here
+# without the same checks.
 _SPECIAL_ASSESSMENTS_STORE: dict[str, dict] = {}
+
+
+def _assessment_scope_id(svc: Svc, community_id: str | None) -> uuid.UUID:
+    """Resolve + authorize a community id for the assessments store.
+
+    Mirrors BillingService._one_community: an explicit id must be a UUID inside
+    the caller's grants (else 404); omitted → single-grant default, else 422.
+    """
+    if community_id is not None:
+        try:
+            cid = uuid.UUID(str(community_id))
+        except ValueError as err:
+            raise BusinessRuleError(
+                "Invalid community id",
+                code="INVALID_COMMUNITY",
+                fields={"community_id": "must be a UUID"},
+            ) from err
+        return svc.scope.require(cid)
+    return svc._one_community(None)
+
+
+def _assessment_visible(svc: Svc, sa: dict) -> bool:
+    """Row-level visibility for one stored assessment (applied before read)."""
+    raw = sa.get("community_id")
+    if raw in (None, "default"):
+        return True  # legacy seed template — identical for all communities, no tenant data
+    try:
+        cid = uuid.UUID(str(raw))
+    except ValueError:
+        return False
+    return svc.scope.is_global or cid in svc.scope.community_ids
+
+
+def _get_assessment_or_404(svc: Svc, assessment_id: str) -> dict:
+    sa = _SPECIAL_ASSESSMENTS_STORE.get(assessment_id)
+    if not sa:
+        for default_sa in _get_default_assessments():
+            if default_sa["id"] == assessment_id:
+                _SPECIAL_ASSESSMENTS_STORE[assessment_id] = default_sa
+                sa = default_sa
+                break
+    if not sa or not _assessment_visible(svc, sa):
+        raise NotFoundError("Special assessment not found")
+    return sa
 
 
 def _get_default_assessments(community_id: str | None = None) -> list[dict]:
@@ -365,6 +428,10 @@ def _get_default_assessments(community_id: str | None = None) -> list[dict]:
             "due_date": "2026-11-15",
             "affected_units_count": 120,
             "status": "under_review",
+            "proposed_by_user_id": "usr-fm-001",
+            "proposed_by_name": "Marcus Vance",
+            "proposer_role": "facility_manager",
+            "proposer_department": "Facility Operations & Energy Management",
             "created_at": now_iso,
             "updated_at": now_iso,
         },
@@ -381,6 +448,11 @@ def _get_default_assessments(community_id: str | None = None) -> list[dict]:
             "due_date": "2026-09-30",
             "affected_units_count": 120,
             "status": "approved",
+            "proposed_by_user_id": "usr-eng-002",
+            "proposed_by_name": "David Sterling",
+            "proposer_role": "facility_manager",
+            "proposer_department": "Engineering & Maintenance",
+            "approved_by_name": "Elena Rostova (Treasurer)",
             "approved_at": now_iso,
             "approval_notes": "Approved unanimously per AGM Resolution #4. Execution scheduled for Q4.",
             "created_at": now_iso,
@@ -399,6 +471,11 @@ def _get_default_assessments(community_id: str | None = None) -> list[dict]:
             "due_date": "2026-08-15",
             "affected_units_count": 120,
             "status": "active",
+            "proposed_by_user_id": "usr-sec-003",
+            "proposed_by_name": "Chief Security Officer",
+            "proposer_role": "security_supervisor",
+            "proposer_department": "Security & Surveillance",
+            "approved_by_name": "Managing Committee Board",
             "approved_at": now_iso,
             "approval_notes": "Security audit priority recommendation completed.",
             "created_at": now_iso,
@@ -413,8 +490,14 @@ async def list_assessments(
     status: str | None = None,
     page: int = 1,
     page_size: int = 50,
+    svc: Svc = Depends(billing_service),
 ) -> dict:
-    cid = str(community_id) if community_id else None
+    if community_id is not None:
+        cid = str(_assessment_scope_id(svc, community_id))
+    elif svc.scope.is_global:
+        cid = None
+    else:
+        cid = str(svc._one_community(None))
     key = cid or "all"
     if key not in _SPECIAL_ASSESSMENTS_STORE:
         for sa in _get_default_assessments(cid):
@@ -422,7 +505,9 @@ async def list_assessments(
 
     items = []
     for sa in _SPECIAL_ASSESSMENTS_STORE.values():
-        if cid and sa.get("community_id") != cid and sa.get("community_id") != "default":
+        if not _assessment_visible(svc, sa):
+            continue
+        if cid and sa.get("community_id") not in (cid, "default"):
             continue
         if status and status != "all" and sa.get("status") != status:
             continue
@@ -432,25 +517,20 @@ async def list_assessments(
 
 
 @router.get("/assessments/{assessment_id}", dependencies=[VIEW])
-async def get_assessment(assessment_id: str) -> dict:
-    sa = _SPECIAL_ASSESSMENTS_STORE.get(assessment_id)
-    if not sa:
-        for default_sa in _get_default_assessments():
-            if default_sa["id"] == assessment_id:
-                _SPECIAL_ASSESSMENTS_STORE[assessment_id] = default_sa
-                sa = default_sa
-                break
-    if not sa:
-        raise NotFoundError("Special assessment not found")
-    return ok(sa)
+async def get_assessment(
+    assessment_id: str,
+    svc: Svc = Depends(billing_service),
+) -> dict:
+    return ok(_get_assessment_or_404(svc, assessment_id))
 
 
 @router.post("/assessments", status_code=status.HTTP_201_CREATED, dependencies=[CREATE])
 async def create_assessment(
     payload: dict,
     community_id: str | None = None,
+    svc: Svc = Depends(billing_service),
 ) -> dict:
-    cid = str(community_id or payload.get("community_id") or "default")
+    cid = str(_assessment_scope_id(svc, community_id or payload.get("community_id")))
     sa_id = f"sa-{uuid.uuid4().hex[:8]}"
     now_iso = datetime.now(UTC).isoformat()
 
@@ -467,6 +547,13 @@ async def create_assessment(
     except (ValueError, TypeError):
         per_unit = "0.00"
 
+    proposer_id = str(svc.actor.id) if (svc and svc.actor) else payload.get("proposed_by_user_id")
+    proposer_name = (
+        svc.actor.full_name
+        if (svc and svc.actor and svc.actor.full_name)
+        else payload.get("proposed_by_name", "Operations & Management")
+    )
+
     new_sa = {
         "id": sa_id,
         "community_id": cid,
@@ -480,6 +567,10 @@ async def create_assessment(
         "due_date": payload.get("due_date", ""),
         "affected_units_count": units_count,
         "status": "under_review",
+        "proposed_by_user_id": proposer_id,
+        "proposed_by_name": proposer_name,
+        "proposer_role": payload.get("proposer_role", "association_committee"),
+        "proposer_department": payload.get("proposer_department", "Association Committee"),
         "created_at": now_iso,
         "updated_at": now_iso,
     }
@@ -491,19 +582,43 @@ async def create_assessment(
 async def approve_assessment(
     assessment_id: str,
     payload: dict | None = None,
+    svc: Svc = Depends(billing_service),
 ) -> dict:
-    sa = _SPECIAL_ASSESSMENTS_STORE.get(assessment_id)
-    if not sa:
-        for default_sa in _get_default_assessments():
-            if default_sa["id"] == assessment_id:
-                _SPECIAL_ASSESSMENTS_STORE[assessment_id] = default_sa
-                sa = default_sa
-                break
-    if not sa:
-        raise NotFoundError("Special assessment not found")
+    sa = _get_assessment_or_404(svc, assessment_id)
+
+    # Maker-Checker (Segregation of Duties) check:
+    # A user cannot approve their own assessment proposal.
+    actor_id = str(svc.actor.id) if (svc and svc.actor) else None
+    actor_name = (
+        svc.actor.full_name.strip() if (svc and svc.actor and svc.actor.full_name) else None
+    )
+    proposer_id = str(sa.get("proposed_by_user_id")) if sa.get("proposed_by_user_id") else None
+    proposer_name = (
+        str(sa.get("proposed_by_name")).strip() if sa.get("proposed_by_name") else None
+    )
+
+    is_self_approval = False
+    if actor_id and proposer_id and actor_id == proposer_id:
+        is_self_approval = True
+    elif actor_name and proposer_name and actor_name.lower() == proposer_name.lower():
+        is_self_approval = True
+
+    if is_self_approval:
+        raise ForbiddenError(
+            "Maker-Checker Violation: Proposer cannot approve their own assessment proposal. Another committee member must review and approve.",
+            code="MAKER_CHECKER_VIOLATION",
+        )
 
     sa["status"] = "approved"
     sa["approved_at"] = datetime.now(UTC).isoformat()
+    sa["approved_by_user_id"] = actor_id or (
+        payload.get("approved_by_user_id") if payload else None
+    )
+    sa["approved_by_name"] = (
+        actor_name
+        or (payload.get("approved_by_name") if payload else None)
+        or "Association Committee Executive"
+    )
     sa["approval_notes"] = (
         payload.get("notes") if payload else None
     ) or "Approved by Association Committee"
@@ -515,18 +630,24 @@ async def approve_assessment(
 async def reject_assessment(
     assessment_id: str,
     payload: dict | None = None,
+    svc: Svc = Depends(billing_service),
 ) -> dict:
-    sa = _SPECIAL_ASSESSMENTS_STORE.get(assessment_id)
-    if not sa:
-        for default_sa in _get_default_assessments():
-            if default_sa["id"] == assessment_id:
-                _SPECIAL_ASSESSMENTS_STORE[assessment_id] = default_sa
-                sa = default_sa
-                break
-    if not sa:
-        raise NotFoundError("Special assessment not found")
+    sa = _get_assessment_or_404(svc, assessment_id)
+
+    actor_id = str(svc.actor.id) if (svc and svc.actor) else None
+    actor_name = (
+        svc.actor.full_name.strip() if (svc and svc.actor and svc.actor.full_name) else None
+    )
 
     sa["status"] = "rejected"
+    sa["rejected_by_user_id"] = actor_id or (
+        payload.get("rejected_by_user_id") if payload else None
+    )
+    sa["rejected_by_name"] = (
+        actor_name
+        or (payload.get("rejected_by_name") if payload else None)
+        or "Association Committee Executive"
+    )
     sa["rejection_reason"] = (
         payload.get("reason") if payload else None
     ) or "Rejected by Association Committee"

@@ -60,7 +60,7 @@ CSRF (`verify_csrf`) checks `X-CSRF-Token` against **that bucket's** csrf cookie
 | `cookie_bucket` | which `gatesphere_<bucket>_*` cookie pair it lives in |
 | `community_id` | resolved active community for the role grant (NULL for global) |
 | `ip_address` (`INET`), `user_agent` | request context at creation |
-| `created_at`, `expires_at` | issue + idle-TTL expiry (`SESSION_TTL_SECONDS`, default 8h) |
+| `created_at`, `expires_at` | issue + absolute expiry (`SESSION_TTL_SECONDS`, default 8h — `last_activity_at` throttles writes but never extends expiry) |
 | `last_activity_at` | advanced on authed requests, at most once per `SESSION_ACTIVITY_REFRESH_SECONDS` (default 60s) |
 | `revoked_at` | set on logout / password / role / permission change |
 
@@ -76,6 +76,13 @@ CSRF (`verify_csrf`) checks `X-CSRF-Token` against **that bucket's** csrf cookie
   (`+ active_role, session_bucket`).
 - On failure: uniform `401 INVALID_CREDENTIALS`; `auth/login.failed` audited in its own
   transaction; rate-limited (`auth` path class, `app/core/ratelimit.py`, default `5/60`).
+- **Per-account lockout** (`app/core/login_lockout.py`, wired in `AuthService.login`):
+  `LOGIN_LOCKOUT_ATTEMPTS` (default 5) failures for one email inside
+  `LOGIN_LOCKOUT_WINDOW_SECONDS` (default 900) lock the account for
+  `LOGIN_LOCKOUT_SECONDS` (default 900) — even the correct password gets
+  `429 ACCOUNT_LOCKED` (+ `Retry-After`) until expiry; a successful login clears the
+  counter. Redis-backed, fails open. Verified by `backend/tests/test_login_lockout.py`
+  (threshold, correct-during-lock, reset-on-success, cross-account isolation, fail-open).
 
 ## Logout — isolation guarantee
 

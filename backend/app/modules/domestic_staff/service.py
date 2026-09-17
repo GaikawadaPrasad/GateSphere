@@ -51,6 +51,21 @@ _VERIFICATION_TRANSITIONS: dict[str, set[str]] = {
     "expired": {"pending"},
 }
 
+# Actors holding one of these roles see staff-wide data; anyone else resolved to a
+# staff row is restricted to their own rows. Compared against role slugs loaded with
+# an explicit query — never the lazy `User.roles` relationship (MissingGreenlet → 500
+# in async context; found by the Newman sweep on GET /attendance).
+_CROSS_UNIT_ROLE_SLUGS = frozenset(
+    {
+        "community_admin",
+        "super_admin",
+        "security_guard",
+        "security_supervisor",
+        "facility_manager",
+        "auditor",
+    }
+)
+
 
 def _enum(field: str, value: str | None) -> None:
     if value is not None and value not in ALLOWED[field]:
@@ -233,8 +248,13 @@ class DomesticStaffService(UnitScopedAccess):
         unit = await self._unit_in_scope(payload.unit_id, staff.community_id)
         await self._assert_unit_visible(payload.unit_id)
         _enum("work_type", payload.work_type)
+        today = datetime.now(UTC).date()
+        if payload.start_date and payload.start_date < today:
+            raise BusinessRuleError("start_date cannot be in the past", code="INVALID_START_DATE")
         if payload.start_date and payload.end_date and payload.start_date > payload.end_date:
             raise BusinessRuleError("start_date must be <= end_date", code="INVALID_DATE_RANGE")
+        if payload.time_from and payload.time_to and payload.time_to <= payload.time_from:
+            raise BusinessRuleError("time_to must be after time_from", code="INVALID_TIME_RANGE")
         if await self.assignments.active_for_pair(payload.staff_id, payload.unit_id):
             raise ConflictError("Staff is already assigned to that unit", code="ASSIGNMENT_EXISTS")
         days = payload.days_of_week or ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
@@ -448,18 +468,7 @@ class DomesticStaffService(UnitScopedAccess):
             my_staff_obj = None
             with contextlib.suppress(NotFoundError):
                 my_staff_obj = await self._resolve_my_staff()
-            if my_staff_obj is not None and not any(
-                r
-                in {
-                    "community_admin",
-                    "super_admin",
-                    "security_guard",
-                    "security_supervisor",
-                    "facility_manager",
-                    "auditor",
-                }
-                for r in getattr(self.actor, "roles", [])
-            ):
+            if my_staff_obj is not None and not await self._actor_has_cross_unit_role():
                 stmt = stmt.where(StaffAttendance.staff_id == my_staff_obj.id)
             elif staff_id:
                 stmt = stmt.where(StaffAttendance.staff_id == staff_id)
@@ -589,6 +598,21 @@ class DomesticStaffService(UnitScopedAccess):
             return fallback
 
         raise NotFoundError("Domestic staff profile not found")
+
+    async def _actor_has_cross_unit_role(self) -> bool:
+        """Whether the actor holds a staff-wide role, via an explicit query.
+
+        Never touch the lazy `User.roles` relationship here — in async context an
+        unloaded relationship raises MissingGreenlet (500 on GET /attendance).
+        """
+        from app.modules.users.models import Role, UserRole
+
+        slugs = await self.db.scalars(
+            select(Role.slug)
+            .join(UserRole, UserRole.role_id == Role.id)
+            .where(UserRole.user_id == self.actor.id)
+        )
+        return bool(set(slugs.all()) & _CROSS_UNIT_ROLE_SLUGS)
 
     async def get_my_profile(self) -> schemas.StaffMeRead:
         staff = await self._resolve_my_staff()

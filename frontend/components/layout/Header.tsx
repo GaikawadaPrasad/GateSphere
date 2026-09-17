@@ -2,6 +2,7 @@
 
 import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useMe, useLogout } from "@/hooks/use-auth";
 import { useCommunities, useCommunityDetails } from "@/hooks/use-communities";
 import { useUiStore } from "@/store/ui";
@@ -9,6 +10,7 @@ import type { Community } from "@/types/communities";
 
 export function Header() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: user } = useMe();
   const logout = useLogout();
   const isSuperAdmin = Boolean(user?.is_superadmin || user?.active_role === "super_admin");
@@ -128,7 +130,12 @@ export function Header() {
             <span style={{ fontSize: "12px", color: "var(--muted)", fontWeight: 600 }}>Scope:</span>
             <select
               value={activeCommunityId || ""}
-              onChange={(e) => setActiveCommunity(e.target.value || null)}
+              onChange={(e) => {
+                // AGENTS.md §5.3: a community switch is an identity change — drop
+                // every cached query so Tenant B never renders Tenant A's data.
+                queryClient.clear();
+                setActiveCommunity(e.target.value || null);
+              }}
               style={{
                 height: 28,
                 border: "none",

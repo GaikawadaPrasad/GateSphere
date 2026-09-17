@@ -16,7 +16,8 @@ from fastapi import Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.context import RequestContext
-from app.core.errors import AuthError, BusinessRuleError
+from app.core.errors import AuthError, BusinessRuleError, RateLimitedError
+from app.core.login_lockout import clear_failures, lock_remaining, record_failure
 from app.core.security import (
     create_session,
     destroy_session,
@@ -89,6 +90,13 @@ class AuthService:
     async def login(
         self, request: Request, response: Response, *, email: str, password: str, role: str | None
     ) -> CurrentUser:
+        locked_for = lock_remaining(email)
+        if locked_for:
+            raise RateLimitedError(
+                "Account temporarily locked after repeated failed logins — try again shortly.",
+                code="ACCOUNT_LOCKED",
+                retry_after=locked_for,
+            )
         user = await self.repo.user_by_email(email)
         if not user or not user.is_active or not verify_password(password, user.password_hash):
             # Failed logins are audited (FR-01) in their own transaction — the request
@@ -105,7 +113,17 @@ class AuthService:
                     ctx=RequestContext.from_request(request),
                 )
                 await audit_db.commit()
+            ttl = record_failure(email)
+            if ttl:
+                raise RateLimitedError(
+                    "Account temporarily locked after repeated failed logins — "
+                    "try again shortly.",
+                    code="ACCOUNT_LOCKED",
+                    retry_after=ttl,
+                )
             raise AuthError("Invalid email or password", code="INVALID_CREDENTIALS")
+
+        clear_failures(email)
 
         if needs_rehash(user.password_hash):
             user.password_hash = hash_password(password)
@@ -186,4 +204,3 @@ class AuthService:
             ctx=RequestContext.from_request(request),
             role_slug=getattr(request.state, "session_role", None),
         )
-

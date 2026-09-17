@@ -18,6 +18,117 @@ Format per entry:
 
 ---
 
+## 2026-09-16 — Review v2 continuation: lockout, sort-drop, attendance 500, races
+
+**By:** senior full-stack + security review (AI-assisted, continued)
+**Branch / commit:** working tree (uncommitted)
+**What changed:**
+- **Login lockout (SEC-001, was open):** new `backend/app/core/login_lockout.py`
+  (Redis `gs:loginfail:/gs:loginlock:` per normalized email, fail-open) wired into
+  `AuthService.login` (locked → `429 ACCOUNT_LOCKED` + `Retry-After` even with the
+  right password; success clears); new `RateLimitedError` in `errors.py` (+ handler
+  emits `Retry-After`); settings `LOGIN_LOCKOUT_*` in `config.py` (+ `.env.example`);
+  `RATE_LIMIT_LOGIN` code default `60/60` → `5/60` to match docs; conftest disables +
+  clears lockout keys globally, `tests/test_login_lockout.py` (6 tests) enables locally.
+  `docs/backend/AUTHENTICATION.md` documents it and fixes the "idle-TTL" wording
+  (expiry is absolute).
+- **sort/order removed (API gap, was open):** `PageParams`/`page_params`
+  (`core/responses.py`) no longer accept `sort`/`order` (were parsed, never applied;
+  no client sent them — frontend sorts client-side). Contract updated
+  (`docs/platform/api-contract.md`); Postman collection regenerated from the live
+  route table (333 requests, zero `sort`/`order` params); **Newman sweep 363 requests /
+  483 assertions / 0 failures** against this repo's code on a scratch port.
+- **Attendance 500 fixed (found by the sweep):** `GET /domestic-staff/attendance`
+  → `MissingGreenlet` when the actor resolved to a staff row (auto-heal) — service
+  read lazy `User.roles` in async context (`domestic_staff/service.py:466`). Fix:
+  `_CROSS_UNIT_ROLE_SLUGS` + explicit role-slug query (`_actor_has_cross_unit_role`).
+  Verified the new `test_attendance_list.py` FAILS on the old code and passes on the
+  fix; live probe now 200 with rows. Grep proves no other service touches lazy `roles`.
+- **Race tests (were open):** new `backend/tests/test_concurrency_races.py` — threaded
+  same-slot parking allocation ([201,409] + ≤1 active row), visitor double check-in
+  ([201,409] + exactly 1 open entry), concurrent mark-all-read (exact total, zero left).
+  Deterministic under serial or parallel timing; repeat runs green.
+- **Notification resilience (FUNC-001, was open):** new
+  `notifications/tests/test_notification_resilience.py` — duplicate dispatch keeps
+  distinct rows, disabled/quiet channels leave `skipped` delivery rows, cross-user
+  read → 404, unknown recipient → 404, missing content → 422, read idempotent,
+  empty mark-all-read → 0.
+- `docker-compose.yml` anchor += `LOGIN_LOCKOUT_ENABLED` (sweep parity with rate limit).
+- **Attendance 500 (found by the sweep, fixed):** `GET /domestic-staff/attendance` →
+  `MissingGreenlet` — service read lazy `User.roles` in async context
+  (`domestic_staff/service.py:466`, the only such access in any service). Fix:
+  `_CROSS_UNIT_ROLE_SLUGS` + explicit role-slug query. New
+  `test_attendance_list.py` fails pre-fix, passes post-fix; live 200.
+- **Duplicate-handover safety:** appended `test_duplicate_handover_is_rejected_without_double_effect`
+  to `test_deliveries_api.py` (second `delivered` → 422 `INVALID_TRANSITION`, single
+  `delivered` event row).
+- **Duplicate-payment safety:** appended `test_duplicate_payment_is_rejected_without_double_posting`
+  to `test_billing_api.py` (second identical `POST /payments` → 422, single allocation row;
+  full cleanup incl. ledger rows by `source_id`).
+**Verified:** full backend suite **367 passed, 0 failed (exit 0)** (349 + 18 new);
+  coverage TOTAL **80%**; ruff + black clean on all touched files; mypy clean on the new
+  module; `seed --reset` run after the sweep (IS-1 hygiene); scratch backend on :8001
+  stopped + removed afterwards.
+**Open / next:** prod P95 still UNVERIFIED (needs staging); coverage 80% vs 90/85
+  targets (rising, not there); password-reset/OTP routes still don't exist (scoped out
+  as unasked features — needs a product decision, not silent building); pre-existing
+  SIM114/black-hunk/mypy noise in others' uncommitted code left untouched.
+
+## 2026-09-16 — External code-review v1 verification pass (SEC/FUNC/QA/FE/PERF)
+
+**By:** senior full-stack + security review (AI-assisted)
+**Branch / commit:** working tree (uncommitted; on top of others' in-progress assessment-UI work)
+**What changed:**
+- `backend/app/modules/billing/router.py` — special-assessments store now tenant-scoped:
+  `_assessment_scope_id` / `_assessment_visible` / `_get_assessment_or_404` helpers;
+  `POST /assessments` gate `billing:view` → `billing:create`; list/get/approve/reject all
+  resolve community ids through `TenantScope` (out-of-scope → 404). Was the one SEC-002
+  violation in the sweep (in-memory store trusted client `community_id`, no scope check).
+- `backend/app/core/rbac.py` — granted `association_committee` `billing:create` (maker role:
+  committee proposes assessments; maker-checker still blocks self-approval). Seed reconciles
+  (`seed_rbac` upserts), DB reseeded via `docker compose run --rm backend seed`.
+- `backend/tests/test_billing_assessments_scope.py` — NEW, 6 tests (own-create 201,
+  foreign create via param/body 404, foreign list 404, foreign row invisible by id for
+  get/approve/reject, auditor create 403).
+- `docker-compose.yml` — `RATE_LIMIT_LOGIN` default `60/60` → `5/60` (matches
+  `backend/.env.example` + `docs/backend/AUTHENTICATION.md`; live env was 12x looser than
+  documented). Needs container recreate to take effect.
+- `frontend/components/layout/Header.tsx` — super-admin scope switch now calls
+  `queryClient.clear()` before `setActiveCommunity` (AGENTS.md §5.3 identity-change rule;
+  was a stale cross-tenant cache risk).
+- `frontend/package.json` (+ lock) — pinned `@vitest/coverage-v8@4.1.11` (== vitest),
+  added `test:coverage` script (QA-001: provider was never declared, so `--coverage`
+  failed with MISSING DEPENDENCY).
+- `docs/security/roles-permissions.md` — committee row now lists `billing:view/create/approve/export`.
+**Why:** external review v1 (14 Sept 2026, grade B) marked SEC-002/003, SEC-001, DEP-002,
+  API gaps, QA-001, FE-001, PERF-001, concurrency as "Not Verified". This pass verified each
+  against source + live containers and fixed the three genuine violations found.
+**Verified (actual runs, local Docker stack):**
+- `pytest` full backend suite: **349 passed, 0 failed (exit 0)** — incl. new 6 scope tests,
+  `test_cross_tenant_idor.py`, `test_tenant_isolation.py` (RLS), `test_auth_session.py`.
+- Coverage (full suite): TOTAL 79%; `core/errors.py` 78%, `core/ratelimit.py` 70%,
+  `core/security.py` 77%, `core/tenancy.py` 70%, `notifications/service.py` 87%,
+  `uploads/service.py` 72%, `uploads/guard.py` 72%, `uploads/sniff.py` 59%.
+- Live exploit probes (PowerShell HttpClient vs localhost:8000): unauth visitors → 401
+  `NOT_AUTHENTICATED`; foreign `community_id` list → 404 `NOT_FOUND`; forged
+  `X-Community-Id` → 403 `INVALID_SCOPE`; logout w/o CSRF → 403 `CSRF_INVALID`,
+  with CSRF → 204, reuse → 401; login `Set-Cookie` shows `HttpOnly; Max-Age=28800;
+  Path=/; SameSite=lax` (no `Secure` — local `COOKIE_SECURE=false` by design).
+- Rate limit live: `x-ratelimit-limit: 60` observed pre-fix (docs say 5) → compose default fixed.
+- Frontend: `vitest run` **17 files / 92 tests passed**; `vitest run --coverage` now works —
+  48.9% stmts; `tsc --noEmit` clean.
+- Perf (dev laptop, NOT prod): dashboard overview 229ms, visitors list 73ms, gate events 60ms.
+**Open / next:**
+- Pre-existing, NOT mine (left untouched per §20): ruff SIM114 + black reformat hunk in
+  billing router maker-checker block; mypy 44 errors incl. router.py:211,257 (untyped
+  pre-existing endpoints); frontend container bind-mounts `GateSphere_Internal/frontend`
+  (two-repo drift — container does not serve this tree); Header.tsx still prettier-dirty
+  on pre-existing lines.
+- Still open from v1: password-reset + mobile-OTP routes don't exist (only authenticated
+  change); per-account lockout missing (only sliding-window limit); `sort`/`order`
+  accepted but ignored; no `Idempotency-Key` mechanism (natural keys only); prod P95
+  UNVERIFIED (needs staging measurement).
+
 ## 2026-08-28 — Async migration COMPLETE (ADR-010)
 
 **By:** async stack migration — finished

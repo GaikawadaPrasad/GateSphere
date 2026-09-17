@@ -163,6 +163,13 @@ class PaymentAllocationRead(BaseModel):
 class PaymentRead(_Read):
     community_id: uuid.UUID
     payer_user_id: uuid.UUID | None
+    payer_name: str | None = None
+    payer_email: str | None = None
+    payer_phone: str | None = None
+    unit_number: str | None = None
+    tower_name: str | None = None
+    resident_type: str | None = None
+    invoice_number: str | None = None
     payment_reference: str
     receipt_number: str | None
     receipt_issued_at: datetime | None

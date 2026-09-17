@@ -42,7 +42,7 @@ from app.modules.billing.repository import (
     RuleRepository,
 )
 from app.modules.billing.schemas import ALLOWED
-from app.modules.communities.models import Unit
+from app.modules.communities.models import Tower, Unit
 from app.modules.notifications import events as notif_events
 from app.modules.residents.access import UnitScopedAccess
 from app.modules.residents.models import ResidentProfile, UnitOccupancy
@@ -541,12 +541,137 @@ class BillingService(UnitScopedAccess):
         )
         return await self.get_payment(payment.id)
 
+    async def _enrich_payments(self, payments: list[Payment]) -> list[Payment]:
+        if not payments:
+            return payments
+
+        payer_user_ids = {p.payer_user_id for p in payments if p.payer_user_id is not None}
+        invoice_ids = {
+            alloc.invoice_id
+            for p in payments
+            for alloc in (p.allocations or [])
+            if alloc.invoice_id is not None
+        }
+
+        # 1. Bulk load users
+        users_map: dict[uuid.UUID, User] = {}
+        if payer_user_ids:
+            res_users = await self.db.execute(select(User).where(User.id.in_(payer_user_ids)))
+            users_map = {u.id: u for u in res_users.scalars().all()}
+
+        # 2. Bulk load invoices
+        invoices_map: dict[uuid.UUID, MaintenanceInvoice] = {}
+        if invoice_ids:
+            res_invs = await self.db.execute(
+                select(MaintenanceInvoice).where(MaintenanceInvoice.id.in_(invoice_ids))
+            )
+            invoices_map = {inv.id: inv for inv in res_invs.scalars().all()}
+
+        # 3. Bulk load resident profiles and unit occupancies for payers
+        profiles_by_user: dict[uuid.UUID, uuid.UUID] = {}
+        occupancies_by_profile: dict[uuid.UUID, list[UnitOccupancy]] = {}
+        if payer_user_ids:
+            res_profiles = await self.db.execute(
+                select(ResidentProfile).where(ResidentProfile.user_id.in_(payer_user_ids))
+            )
+            profiles = res_profiles.scalars().all()
+            for prof in profiles:
+                profiles_by_user[prof.user_id] = prof.id
+
+            if profiles_by_user:
+                res_occs = await self.db.execute(
+                    select(UnitOccupancy).where(
+                        UnitOccupancy.resident_profile_id.in_(profiles_by_user.values()),
+                        UnitOccupancy.is_active.is_(True),
+                    )
+                )
+                for occ in res_occs.scalars().all():
+                    occupancies_by_profile.setdefault(occ.resident_profile_id, []).append(occ)
+
+        # 4. Collect all unit IDs from invoices and occupancies
+        unit_ids: set[uuid.UUID] = {
+            inv.unit_id for inv in invoices_map.values() if inv.unit_id is not None
+        }
+        for occs in occupancies_by_profile.values():
+            for occ in occs:
+                if occ.unit_id:
+                    unit_ids.add(occ.unit_id)
+
+        # 5. Bulk load units and joined towers
+        units_map: dict[uuid.UUID, tuple[Unit, Tower | None]] = {}
+        if unit_ids:
+            stmt_units = (
+                select(Unit, Tower)
+                .outerjoin(Tower, Unit.tower_id == Tower.id)
+                .where(Unit.id.in_(unit_ids))
+            )
+            res_u = await self.db.execute(stmt_units)
+            for unit_obj, tower_obj in res_u.all():
+                units_map[unit_obj.id] = (unit_obj, tower_obj)
+
+        # 6. Enrich each payment object
+        for pay in payments:
+            user = users_map.get(pay.payer_user_id) if pay.payer_user_id else None
+            payer_name = user.full_name if user else None
+            payer_email = user.email if user else None
+            payer_phone = user.phone if user else None
+
+            target_unit_id: uuid.UUID | None = None
+            invoice_num: str | None = None
+            resident_role: str | None = None
+
+            # Check from allocations -> invoice
+            if pay.allocations:
+                for alloc in pay.allocations:
+                    inv = invoices_map.get(alloc.invoice_id)
+                    if inv:
+                        if not invoice_num:
+                            invoice_num = inv.invoice_number
+                        if not target_unit_id and inv.unit_id:
+                            target_unit_id = inv.unit_id
+
+            # If no unit from allocations, fallback to user's primary occupancy
+            if pay.payer_user_id and pay.payer_user_id in profiles_by_user:
+                prof_id = profiles_by_user[pay.payer_user_id]
+                occs = occupancies_by_profile.get(prof_id, [])
+                if occs:
+                    primary_occ = next((o for o in occs if o.is_primary), occs[0])
+                    if not target_unit_id:
+                        target_unit_id = primary_occ.unit_id
+                    resident_role = primary_occ.occupancy_role
+
+            unit_number: str | None = None
+            tower_name: str | None = None
+            if target_unit_id and target_unit_id in units_map:
+                u_obj, t_obj = units_map[target_unit_id]
+                unit_number = u_obj.unit_number
+                tower_name = t_obj.name if t_obj else None
+
+            formatted_res_type = None
+            if resident_role:
+                formatted_res_type = resident_role.replace("_", " ").title()
+                if "Owner" in formatted_res_type:
+                    formatted_res_type = "Owner"
+                elif "Tenant" in formatted_res_type:
+                    formatted_res_type = "Tenant"
+
+            pay.payer_name = payer_name
+            pay.payer_email = payer_email
+            pay.payer_phone = payer_phone
+            pay.unit_number = unit_number
+            pay.tower_name = tower_name
+            pay.resident_type = formatted_res_type
+            pay.invoice_number = invoice_num
+
+        return payments
+
     async def get_payment(self, payment_id: uuid.UUID) -> Payment:
         obj = await self.payments.get(payment_id)
         if obj is None:
             raise NotFoundError("Payment not found")
         if (await self.is_unit_restricted()) and obj.payer_user_id != self.actor.id:
             raise NotFoundError("Payment not found")
+        await self._enrich_payments([obj])
         return obj
 
     async def get_receipt(self, payment_id: uuid.UUID) -> dict:
@@ -637,9 +762,10 @@ class BillingService(UnitScopedAccess):
             stmt = stmt.where(Payment.community_id == community_id)
         stmt = stmt.order_by(Payment.paid_at.desc())
         stmt = await self._scope_owned(stmt, Payment.payer_user_id)
-        return await self.payments.list(
-            offset=offset, limit=limit, extra=stmt
-        ), await self.payments.count(extra=stmt)
+        items = await self.payments.list(offset=offset, limit=limit, extra=stmt)
+        total = await self.payments.count(extra=stmt)
+        await self._enrich_payments(items)
+        return items, total
 
     # -- ledger --------------------------------------- #
     async def unit_ledger(self, unit_id: uuid.UUID, *, offset: int, limit: int):
