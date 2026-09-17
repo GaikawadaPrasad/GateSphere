@@ -8,6 +8,7 @@ import {
   useCreateOperationalStaff,
 } from "@/hooks/use-operational-staff";
 import { toast } from "@/store/toast";
+import { isValidPersonName } from "@/lib/utils";
 
 interface AddOperationalStaffModalProps {
   isOpen: boolean;
@@ -76,8 +77,13 @@ export function AddOperationalStaffModal({
     const trimmedEmail = email.trim().toLowerCase();
     const trimmedPhone = phone.trim();
 
-    if (!trimmedName) {
-      setErrorMessage("Please provide a full name.");
+    if (!trimmedName || trimmedName.length < 2) {
+      setErrorMessage("Please provide a full name (at least 2 characters).");
+      return;
+    }
+
+    if (!isValidPersonName(trimmedName)) {
+      setErrorMessage("Full name must contain only alphabetic letters and spaces.");
       return;
     }
 
@@ -254,7 +260,7 @@ export function AddOperationalStaffModal({
               Phone Number <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>(optional)</span>
             </label>
             <input
-              type="tel"
+              type="number"
               className="input"
               placeholder="e.g. +1 555-019-2834"
               value={phone}

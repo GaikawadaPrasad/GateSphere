@@ -1,18 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { formatDateTime } from "@/lib/utils";
 import { useGateEvents, usePanicAlerts, useGuardRosters } from "@/hooks/use-gate";
 import { useCommunities } from "@/hooks/use-communities";
+import { useUiStore } from "@/store/ui";
+import { ScopeBanner } from "@/components/common/ScopeBanner";
 import type { GateEvent, GuardRoster, PanicAlert } from "@/types/gate";
 import type { Community } from "@/types/communities";
 
 export default function GateTrafficPage() {
-  const [communityId, setCommunityId] = useState("");
+  const { activeCommunityId, setActiveCommunity } = useUiStore();
+  const [communityId, setCommunityId] = useState(activeCommunityId || "");
   const { data: communities } = useCommunities();
+
+  useEffect(() => {
+    setCommunityId(activeCommunityId || "");
+  }, [activeCommunityId]);
 
   const { data: events, isLoading: isEventsLoading } = useGateEvents({
     community_id: communityId || undefined,
@@ -95,7 +102,11 @@ export default function GateTrafficPage() {
     <div>
       <PageHeader
         title="Gate Traffic & Security Operations"
-        subtitle="Live gate events, active guard rosters, and panic alerts"
+        subtitle={
+          activeCommunityId
+            ? "Live gate events, guard rosters, and alerts for selected community"
+            : "Live gate events, active guard rosters, and panic alerts"
+        }
         breadcrumbs={[
           { label: "Super Admin", href: "/super-admin/dashboard" },
           { label: "Gate Traffic" },
@@ -104,7 +115,11 @@ export default function GateTrafficPage() {
           <select
             className="select-field"
             value={communityId}
-            onChange={(e) => setCommunityId(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setCommunityId(val);
+              setActiveCommunity(val || null);
+            }}
             style={{ width: "auto", height: 36, padding: "0.25rem 0.6rem", fontSize: "0.85rem" }}
           >
             <option value="">All Communities</option>
@@ -115,6 +130,12 @@ export default function GateTrafficPage() {
             ))}
           </select>
         }
+      />
+
+      {/* Active Scope Banner */}
+      <ScopeBanner
+        entityName="gate traffic & security"
+        onClear={() => setCommunityId("")}
       />
 
       {/* Panic Alerts Alert Box */}

@@ -1,20 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useInvoices, usePayments } from "@/hooks/use-billing";
 import { useCommunities } from "@/hooks/use-communities";
+import { useUiStore } from "@/store/ui";
+import { ScopeBanner } from "@/components/common/ScopeBanner";
 import type { MaintenanceInvoice, Payment } from "@/types/billing";
 import type { Community } from "@/types/communities";
 
 export default function BillingPage() {
+  const { activeCommunityId, setActiveCommunity } = useUiStore();
   const [activeTab, setActiveTab] = useState<"invoices" | "payments">("invoices");
-  const [communityId, setCommunityId] = useState("");
+  const [communityId, setCommunityId] = useState(activeCommunityId || "");
   const [page, setPage] = useState(1);
   const pageSize = 15;
+
+  useEffect(() => {
+    setCommunityId(activeCommunityId || "");
+    setPage(1);
+  }, [activeCommunityId]);
 
   const { data: communities } = useCommunities();
   const { data: invoices, isLoading: isInvoicesLoading } = useInvoices({
@@ -115,7 +123,11 @@ export default function BillingPage() {
     <div>
       <PageHeader
         title="Billing & Financial Overview"
-        subtitle="Global maintenance invoices, ledger health, and simulated payments"
+        subtitle={
+          activeCommunityId
+            ? "Maintenance invoices, ledger health, and simulated payments for selected community"
+            : "Global maintenance invoices, ledger health, and simulated payments"
+        }
         breadcrumbs={[
           { label: "Super Admin", href: "/super-admin/dashboard" },
           { label: "Billing & Finance" },
@@ -124,7 +136,12 @@ export default function BillingPage() {
           <select
             className="select-field"
             value={communityId}
-            onChange={(e) => setCommunityId(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setCommunityId(val);
+              setActiveCommunity(val || null);
+              setPage(1);
+            }}
             style={{ width: "auto", height: 36, padding: "0.25rem 0.6rem", fontSize: "0.85rem" }}
           >
             <option value="">All Communities</option>
@@ -135,6 +152,15 @@ export default function BillingPage() {
             ))}
           </select>
         }
+      />
+
+      {/* Active Scope Banner */}
+      <ScopeBanner
+        entityName="billing & financial records"
+        onClear={() => {
+          setCommunityId("");
+          setPage(1);
+        }}
       />
 
       {/* Tabs */}

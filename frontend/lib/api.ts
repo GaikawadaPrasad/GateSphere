@@ -445,7 +445,11 @@ export const communitiesApi = {
 };
 
 export const dashboardsApi = {
-  superAdmin: () => apiGet<SuperAdminDashboardMetrics>("/dashboards/super-admin"),
+  superAdmin: (communityId?: string) =>
+    apiGet<SuperAdminDashboardMetrics>(
+      "/dashboards/super-admin",
+      communityId ? { community_id: communityId } : undefined
+    ),
   overview: (communityId?: string) =>
     apiGet<OverviewStats>(
       "/dashboards/overview",

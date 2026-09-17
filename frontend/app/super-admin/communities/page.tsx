@@ -25,6 +25,7 @@ import {
   POPULAR_CITIES_BY_STATE,
   isValidCommunityName,
   isValidCityName,
+  isValidPersonName,
 } from "@/constants/locations";
 import type { Community, Tower, Gate, Floor } from "@/types/communities";
 import type { ResidentProfile } from "@/types/residents";
@@ -32,8 +33,11 @@ import { PasswordField } from "@/components/forms/PasswordField";
 import { generateInitialPassword } from "@/lib/utils";
 import { CreateCommunityModal } from "@/components/super-admin/CreateCommunityModal";
 import { toast } from "@/store/toast";
+import { useUiStore } from "@/store/ui";
+import { ScopeBanner } from "@/components/common/ScopeBanner";
 
 export default function CommunitiesPage() {
+  const { activeCommunityId } = useUiStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
 
@@ -112,12 +116,23 @@ export default function CommunitiesPage() {
 
   const handleSaveAdminCredentials = async () => {
     if (!createdAdminInfo?.communityId) return;
-    if (!updateAdminEmail || !updateAdminEmail.includes("@")) {
+    const trimmedName = updateAdminName.trim();
+    if (trimmedName && (trimmedName.length < 2 || !isValidPersonName(trimmedName))) {
+      setUpdateAdminCredsError("Admin full name must contain only alphabets and spaces (min 2 chars).");
+      return;
+    }
+    const trimmedEmail = updateAdminEmail.trim();
+    if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
       setUpdateAdminCredsError("Please enter a valid email address.");
       return;
     }
-    if (!updateAdminPassword || updateAdminPassword.length < 8) {
-      setUpdateAdminCredsError("Password must be at least 8 characters.");
+    if (!updateAdminPassword || updateAdminPassword.length < 10) {
+      setUpdateAdminCredsError("Password must be at least 10 characters.");
+      return;
+    }
+    const trimmedPhone = updateAdminPhone.trim();
+    if (trimmedPhone && !/^[+0-9][0-9 \-]{4,19}$/.test(trimmedPhone)) {
+      setUpdateAdminCredsError("Please enter a valid phone number (5-20 digits).");
       return;
     }
 
@@ -125,10 +140,10 @@ export default function CommunitiesPage() {
       setIsUpdatingAdminCreds(true);
       setUpdateAdminCredsError("");
       const res = await communitiesApi.provisionAdmin(createdAdminInfo.communityId, {
-        email: updateAdminEmail.trim(),
+        email: trimmedEmail,
         password: updateAdminPassword.trim(),
-        full_name: updateAdminName.trim() || undefined,
-        phone: updateAdminPhone.trim() || undefined,
+        full_name: trimmedName || undefined,
+        phone: trimmedPhone || undefined,
       });
 
       setCreatedAdminInfo({
@@ -182,6 +197,7 @@ export default function CommunitiesPage() {
   const [residentPassword, setResidentPassword] = useState("");
   const [residentRole, setResidentRole] = useState("primary_owner");
   const [residentIsPrimary, setResidentIsPrimary] = useState(true);
+  const [residentFormErrors, setResidentFormErrors] = useState<Record<string, string>>({});
 
   const [isAddGateOpen, setIsAddGateOpen] = useState(false);
   const [gateName, setGateName] = useState("");
@@ -189,7 +205,7 @@ export default function CommunitiesPage() {
   const [gateType, setGateType] = useState<"entry" | "exit" | "both" | "pedestrian">("both");
 
   const { data: communities, isLoading, refetch } = useCommunities();
-  const { data: metrics } = useSuperAdminDashboardMetrics();
+  const { data: metrics } = useSuperAdminDashboardMetrics(activeCommunityId);
   const { data: communityUnitsList, refetch: refetchUnits } = useCommunityUnits(
     viewingCommunity?.id || undefined
   );
@@ -247,6 +263,10 @@ export default function CommunitiesPage() {
     if (!communities) return [];
     return communities
       .filter((comm: Community) => {
+        if (activeCommunityId && comm.id !== activeCommunityId) {
+          return false;
+        }
+
         const matchesSearch =
           searchQuery === "" ||
           comm.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -271,7 +291,7 @@ export default function CommunitiesPage() {
           financialStatus: bd?.financialStatus ?? "Good",
         };
       });
-  }, [communities, searchQuery, statusFilter, metrics]);
+  }, [communities, searchQuery, statusFilter, metrics, activeCommunityId]);
 
   const handleOpenCreate = () => {
     setIsCreateModalOpen(true);
@@ -472,15 +492,41 @@ export default function CommunitiesPage() {
     setResidentPassword("resident@Gate2026!");
     setResidentRole("primary_owner");
     setResidentIsPrimary(true);
+    setResidentFormErrors({});
     setDetailsFeedback(null);
     setIsAddResidentOpen(true);
   };
 
   const handleSaveResident = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!viewingCommunity || !residentUnitId || !residentFullName.trim() || !residentEmail.trim() || !residentPhone.trim()) {
+    if (!viewingCommunity) return;
+
+    const errs: Record<string, string> = {};
+    if (!residentUnitId) errs.residentUnitId = "Please select a target residential unit.";
+    const trimmedResidentName = residentFullName.trim();
+    if (!trimmedResidentName || trimmedResidentName.length < 2) {
+      errs.residentFullName = "Full name is required (min 2 characters).";
+    } else if (!isValidPersonName(trimmedResidentName)) {
+      errs.residentFullName = "Name must contain only alphabets and spaces.";
+    }
+    if (!residentEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(residentEmail.trim())) {
+      errs.residentEmail = "Valid email address is required.";
+    }
+    if (!residentPhone.trim() || !/^[+0-9][0-9 \-]{4,19}$/.test(residentPhone.trim())) {
+      errs.residentPhone = "Enter a valid phone number (10-15 digits).";
+    }
+    if (residentPassword.trim() && residentPassword.trim().length < 10) {
+      errs.residentPassword = "Initial password must be at least 10 characters.";
+    }
+    setResidentFormErrors(errs);
+    if (Object.keys(errs).length > 0) {
+      setDetailsFeedback({
+        type: "error",
+        message: "Please fill in all required fields marked in red below.",
+      });
       return;
     }
+
     try {
       await addResidentMutation.mutateAsync({
         communityId: viewingCommunity.id,
@@ -495,6 +541,8 @@ export default function CommunitiesPage() {
         },
       });
       setIsAddResidentOpen(false);
+      setResidentFormErrors({});
+      toast.success(`Resident "${residentFullName.trim()}" onboarded successfully!`, "Resident Registered");
       setDetailsFeedback({
         type: "success",
         message: `Resident "${residentFullName}" onboarded successfully.`,
@@ -599,7 +647,11 @@ export default function CommunitiesPage() {
     <div>
       <PageHeader
         title="Community Management"
-        subtitle="Configure and manage all registered residential properties in the platform"
+        subtitle={
+          activeCommunityId
+            ? "Viewing scoped community property configuration and structure"
+            : "Configure and manage all registered residential properties in the platform"
+        }
         breadcrumbs={[
           { label: "Super Admin", href: "/super-admin/dashboard" },
           { label: "Communities" },
@@ -610,6 +662,9 @@ export default function CommunitiesPage() {
           </button>
         }
       />
+
+      {/* Active Scope Banner */}
+      <ScopeBanner entityName="community details" />
 
       <div className="card" style={{ marginBottom: "1.5rem" }}>
         <div className="card-header" style={{ flexWrap: "wrap", gap: "0.75rem" }}>
@@ -794,7 +849,7 @@ export default function CommunitiesPage() {
                       Phone
                     </label>
                     <input
-                      type="tel"
+                      type="number"
                       className="input-field"
                       value={updateAdminPhone}
                       onChange={(e) => setUpdateAdminPhone(e.target.value)}
@@ -2286,7 +2341,7 @@ export default function CommunitiesPage() {
               type="submit"
               form="add-resident-form"
               className="btn btn-primary"
-              disabled={addResidentMutation.isPending || !residentUnitId}
+              disabled={addResidentMutation.isPending}
             >
               {addResidentMutation.isPending ? "Registering…" : "👤 Register Resident"}
             </button>
@@ -2340,8 +2395,15 @@ export default function CommunitiesPage() {
                   <select
                     className="select-field"
                     value={residentUnitId}
-                    onChange={(e) => setResidentUnitId(e.target.value)}
-                    required
+                    onChange={(e) => {
+                      setResidentUnitId(e.target.value);
+                      if (residentFormErrors.residentUnitId) {
+                        setResidentFormErrors((prev) => ({ ...prev, residentUnitId: "" }));
+                      }
+                    }}
+                    style={{
+                      border: residentFormErrors.residentUnitId ? "1px solid var(--danger, #dc2626)" : undefined,
+                    }}
                   >
                     <option value="">Select Unit…</option>
                     {filteredResidentUnits.map((u) => (
@@ -2350,6 +2412,11 @@ export default function CommunitiesPage() {
                       </option>
                     ))}
                   </select>
+                  {residentFormErrors.residentUnitId && (
+                    <span style={{ fontSize: "0.75rem", color: "var(--danger, #dc2626)", marginTop: "0.25rem", display: "block" }}>
+                      {residentFormErrors.residentUnitId}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -2384,9 +2451,19 @@ export default function CommunitiesPage() {
                       const val = e.target.value;
                       setResidentFullName(val);
                       setResidentPassword(generateInitialPassword(val, "resident"));
+                      if (residentFormErrors.residentFullName) {
+                        setResidentFormErrors((prev) => ({ ...prev, residentFullName: "" }));
+                      }
                     }}
-                    required
+                    style={{
+                      border: residentFormErrors.residentFullName ? "1px solid var(--danger, #dc2626)" : undefined,
+                    }}
                   />
+                  {residentFormErrors.residentFullName && (
+                    <span style={{ fontSize: "0.75rem", color: "var(--danger, #dc2626)", marginTop: "0.25rem", display: "block" }}>
+                      {residentFormErrors.residentFullName}
+                    </span>
+                  )}
                 </div>
                 <div>
                   <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "#475569", marginBottom: "0.3rem" }}>
@@ -2415,9 +2492,21 @@ export default function CommunitiesPage() {
                     className="input-field"
                     placeholder="ananya@example.com"
                     value={residentEmail}
-                    onChange={(e) => setResidentEmail(e.target.value)}
-                    required
+                    onChange={(e) => {
+                      setResidentEmail(e.target.value);
+                      if (residentFormErrors.residentEmail) {
+                        setResidentFormErrors((prev) => ({ ...prev, residentEmail: "" }));
+                      }
+                    }}
+                    style={{
+                      border: residentFormErrors.residentEmail ? "1px solid var(--danger, #dc2626)" : undefined,
+                    }}
                   />
+                  {residentFormErrors.residentEmail && (
+                    <span style={{ fontSize: "0.75rem", color: "var(--danger, #dc2626)", marginTop: "0.25rem", display: "block" }}>
+                      {residentFormErrors.residentEmail}
+                    </span>
+                  )}
                 </div>
                 <div>
                   <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "#475569", marginBottom: "0.3rem" }}>
@@ -2428,19 +2517,41 @@ export default function CommunitiesPage() {
                     className="input-field"
                     placeholder="+91 98765 43210"
                     value={residentPhone}
-                    onChange={(e) => setResidentPhone(e.target.value)}
-                    required
+                    onChange={(e) => {
+                      setResidentPhone(e.target.value);
+                      if (residentFormErrors.residentPhone) {
+                        setResidentFormErrors((prev) => ({ ...prev, residentPhone: "" }));
+                      }
+                    }}
+                    style={{
+                      border: residentFormErrors.residentPhone ? "1px solid var(--danger, #dc2626)" : undefined,
+                    }}
                   />
+                  {residentFormErrors.residentPhone && (
+                    <span style={{ fontSize: "0.75rem", color: "var(--danger, #dc2626)", marginTop: "0.25rem", display: "block" }}>
+                      {residentFormErrors.residentPhone}
+                    </span>
+                  )}
                 </div>
               </div>
 
               <div>
                 <PasswordField
                   value={residentPassword}
-                  onChange={(val) => setResidentPassword(val)}
+                  onChange={(val) => {
+                    setResidentPassword(val);
+                    if (residentFormErrors.residentPassword) {
+                      setResidentFormErrors((prev) => ({ ...prev, residentPassword: "" }));
+                    }
+                  }}
                   placeholder="e.g. ananya@Gate2026!"
                   helperText="💡 Providing credentials allows this resident to sign in to the Resident Portal to approve visitors, receive delivery alerts, and book amenities."
                 />
+                {residentFormErrors.residentPassword && (
+                  <span style={{ fontSize: "0.75rem", color: "var(--danger, #dc2626)", marginTop: "0.25rem", display: "block" }}>
+                    {residentFormErrors.residentPassword}
+                  </span>
+                )}
               </div>
 
               <div

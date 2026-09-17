@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Modal } from "@/components/common/Modal";
+import { toast } from "@/store/toast";
 import {
   useCreateCommunity,
   useCreateTower,
@@ -11,8 +13,12 @@ import {
 import {
   INDIAN_STATES_AND_UTS,
   POPULAR_CITIES_BY_STATE,
+  getCitiesForState,
+  validateCityForState,
+  findStateForCity,
   isValidCommunityName,
   isValidCityName,
+  isValidPersonName,
 } from "@/constants/locations";
 import { PasswordField } from "@/components/forms/PasswordField";
 import { generateInitialPassword } from "@/lib/utils";
@@ -103,6 +109,7 @@ export function CreateCommunityModal({
   initialName = "",
   initialCode = "",
 }: CreateCommunityModalProps) {
+  const queryClient = useQueryClient();
   const [step, setStep] = useState<Step>("community");
   const [createdCommunityId, setCreatedCommunityId] = useState<string>("");
 
@@ -111,6 +118,8 @@ export function CreateCommunityModal({
   const [code, setCode] = useState(initialCode);
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
+  const [isCustomCity, setIsCustomCity] = useState(false);
+  const [customCity, setCustomCity] = useState("");
   const [adminName, setAdminName] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
@@ -128,6 +137,7 @@ export function CreateCommunityModal({
   const [autoGenerateAll, setAutoGenerateAll] = useState(true);
   const [addedTowers, setAddedTowers] = useState<TowerEntry[]>([]);
   const [towerError, setTowerError] = useState("");
+  const [towerTouched, setTowerTouched] = useState<Record<string, boolean>>({});
   const [isProcessingTower, setIsProcessingTower] = useState(false);
   const [creationProgressText, setCreationProgressText] = useState("");
 
@@ -168,6 +178,8 @@ export function CreateCommunityModal({
       setCode(initialCode);
       setCity(initialName ? "Bengaluru" : "");
       setState(initialName ? "Karnataka" : "");
+      setIsCustomCity(false);
+      setCustomCity("");
       setAdminName("");
       setAdminEmail("");
       setAdminPassword(generateInitialPassword("Admin"));
@@ -185,6 +197,7 @@ export function CreateCommunityModal({
       setTowerType("tower");
       setAutoGenerateAll(true);
       setTowerError("");
+      setTowerTouched({});
       setSelectedTowerId("");
       setFloorNumber(1);
       setFloorLabel("");
@@ -219,31 +232,75 @@ export function CreateCommunityModal({
     else if (trimmedCode.length < 2 || trimmedCode.length > 32) errs.code = "Code must be between 2 and 32 characters";
     else if (!/^[A-Z0-9][A-Z0-9_\-\/]*$/.test(trimmedCode)) errs.code = "Code must start with alphanumeric and only contain letters, numbers, hyphens or underscores";
 
-    const trimmedCity = city.trim();
-    if (trimmedCity && trimmedCity.length > 120) errs.city = "City cannot exceed 120 characters";
-    else if (trimmedCity && !isValidCityName(trimmedCity)) errs.city = "City must contain only alphabetical letters and spaces";
-
     const trimmedState = state.trim();
-    if (trimmedState && trimmedState.length > 120) errs.state = "State cannot exceed 120 characters";
+    if (!trimmedState) {
+      errs.state = "State / UT is required";
+    } else if (trimmedState.length > 120) {
+      errs.state = "State cannot exceed 120 characters";
+    }
+
+    const trimmedCity = city.trim();
+    if (!trimmedCity) {
+      errs.city = "City is required";
+    } else if (trimmedCity.length > 120) {
+      errs.city = "City cannot exceed 120 characters";
+    } else if (!isValidCityName(trimmedCity)) {
+      errs.city = "City must contain only alphabetical letters and spaces";
+    } else if (trimmedState) {
+      const stateMismatch = validateCityForState(trimmedCity, trimmedState);
+      if (stateMismatch) {
+        errs.city = stateMismatch;
+      }
+    }
+
+    // Community Admin Account is REQUIRED
+    const trimmedAdminName = adminName.trim();
+    if (!trimmedAdminName) {
+      errs.adminName = "Admin full name is required";
+    } else if (trimmedAdminName.length < 2) {
+      errs.adminName = "Admin name must be at least 2 characters";
+    } else if (!isValidPersonName(trimmedAdminName)) {
+      errs.adminName = "Admin name must contain only alphabetic letters and spaces";
+    }
 
     const trimmedAdminEmail = adminEmail.trim();
-    if (trimmedAdminEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedAdminEmail)) {
+    if (!trimmedAdminEmail) {
+      errs.adminEmail = "Admin email is required";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedAdminEmail)) {
       errs.adminEmail = "Please enter a valid email address";
     }
 
-    if (adminPassword && adminPassword.length < 8) {
-      errs.adminPassword = "Password must be at least 8 characters";
+    if (!adminPassword) {
+      errs.adminPassword = "Password is required for admin account";
+    } else if (adminPassword.length < 10) {
+      errs.adminPassword = "Password must be at least 10 characters";
+    } else if (adminPassword.length > 200) {
+      errs.adminPassword = "Password cannot exceed 200 characters";
+    }
+
+    const trimmedAdminPhone = adminPhone.trim();
+    if (trimmedAdminPhone && !/^[+0-9][0-9 \-]{4,19}$/.test(trimmedAdminPhone)) {
+      errs.adminPhone = "Phone must be 5-20 digits (e.g. +91 9876543210)";
     }
 
     return errs;
-  }, [name, code, city, state, adminEmail, adminPassword]);
+  }, [name, code, city, state, adminEmail, adminName, adminPassword, adminPhone]);
 
   const isCreateFormValid = Object.keys(createErrors).length === 0;
 
   const handleCreateCommunity = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
-    setTouched({ name: true, code: true, city: true, state: true, adminEmail: true, adminPassword: true });
+    setTouched({
+      name: true,
+      code: true,
+      city: true,
+      state: true,
+      adminName: true,
+      adminEmail: true,
+      adminPassword: true,
+      adminPhone: true,
+    });
     if (!isCreateFormValid) {
       setFormError(Object.values(createErrors)[0] || "Please fix validation errors.");
       return;
@@ -260,6 +317,12 @@ export function CreateCommunityModal({
         admin_phone: adminPhone.trim() || undefined,
       });
       setCreatedCommunityId(result.id);
+      toast.success(`Community "${name.trim()}" created successfully!`);
+      // Immediately invalidate queries so dashboard shows it without reload
+      await Promise.allSettled([
+        queryClient.invalidateQueries({ queryKey: ["communities"], refetchType: "all" }),
+        queryClient.invalidateQueries({ queryKey: ["dashboards"], refetchType: "all" }),
+      ]);
       setStep("towers");
     } catch (err: unknown) {
       setFormError(err instanceof Error ? err.message : "Failed to create community. Ensure code is unique.");
@@ -333,11 +396,33 @@ export function CreateCommunityModal({
     return { floors: createdFloors, units: createdUnits };
   };
 
+  const towerValidationErrors = useMemo(() => {
+    const errs: Record<string, string> = {};
+    const tName = towerName.trim();
+    if (!tName) errs.name = "Tower name is required";
+    else if (tName.length < 1 || tName.length > 100) errs.name = "Tower name must be between 1 and 100 characters";
+
+    const tCode = towerCode.trim().toUpperCase();
+    if (!tCode) errs.code = "Tower code is required";
+    else if (tCode.length < 1 || tCode.length > 20) errs.code = "Tower code must be between 1 and 20 characters";
+
+    if (!towerFloors || towerFloors < 1 || towerFloors > 150) {
+      errs.floors = "Total floors must be between 1 and 150";
+    }
+
+    if (!unitsPerFloorInput || unitsPerFloorInput < 1 || unitsPerFloorInput > 50) {
+      errs.units = "Units per floor must be between 1 and 50";
+    }
+
+    return errs;
+  }, [towerName, towerCode, towerFloors, unitsPerFloorInput]);
+
   // Add Tower + Auto Generate Floors & Units
   const handleAddTower = async (e?: React.FormEvent): Promise<TowerEntry | null> => {
     if (e) e.preventDefault();
-    if (!towerName.trim() || !towerCode.trim()) {
-      setTowerError("Tower name and code are required.");
+    setTowerTouched({ name: true, code: true, floors: true, units: true });
+    if (Object.keys(towerValidationErrors).length > 0) {
+      setTowerError(Object.values(towerValidationErrors)[0]);
       return null;
     }
     setTowerError("");
@@ -386,10 +471,12 @@ export function CreateCommunityModal({
         }
       }
 
+      toast.success(`Tower "${newTower.name}" created successfully!`);
       setTowerName("");
       setTowerCode("");
       setTowerFloors(11);
       setUnitsPerFloorInput(4);
+      setTowerTouched({});
       setIsProcessingTower(false);
       setCreationProgressText("");
       return newTower;
@@ -454,8 +541,8 @@ export function CreateCommunityModal({
               floor_id: floorRes.id,
               unit_number: uNum,
               unit_type: validUnitType,
-              bedrooms: 2,
-              area_sqft: 1200,
+              bedrooms: defaultBedrooms || undefined,
+              area_sqft: defaultSqft || undefined,
             });
             return {
               id: uRes.id,
@@ -469,17 +556,17 @@ export function CreateCommunityModal({
           }
         });
 
-        const resList = await Promise.all(unitPromises);
-        const createdUnits: UnitEntry[] = [];
-        resList.forEach((u) => {
-          if (u) createdUnits.push(u);
+        const unitResults = await Promise.all(unitPromises);
+        const newUnits: UnitEntry[] = [];
+        unitResults.forEach((u) => {
+          if (u) newUnits.push(u);
         });
-        setAddedUnits((prev) => [...prev, ...createdUnits]);
+        setAddedUnits((prev) => [...prev, ...newUnits]);
       }
 
-      setFloorNumber((n) => n + 1);
-      setFloorLabel("");
       setIsAddingFloorUnits(false);
+      setFloorNumber((prev) => prev + 1);
+      setFloorLabel("");
     } catch (err: unknown) {
       setIsAddingFloorUnits(false);
       setFloorError(err instanceof Error ? err.message : "Failed to add floor.");
@@ -521,7 +608,7 @@ export function CreateCommunityModal({
     }
   };
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
     const adminInfo = adminEmail
       ? {
           communityName: name.trim(),
@@ -531,8 +618,25 @@ export function CreateCommunityModal({
           adminPassword: adminPassword,
         }
       : undefined;
+
+    await Promise.allSettled([
+      queryClient.invalidateQueries({ queryKey: ["communities"], refetchType: "all" }),
+      queryClient.invalidateQueries({ queryKey: ["dashboards"], refetchType: "all" }),
+      queryClient.invalidateQueries({ queryKey: ["towers"], refetchType: "all" }),
+      queryClient.invalidateQueries({ queryKey: ["units"], refetchType: "all" }),
+    ]);
+
+    toast.success("Community setup completed successfully!");
     onSuccess?.(adminInfo);
     onClose();
+  };
+
+  const handleCloseModal = () => {
+    if (createdCommunityId) {
+      handleFinish();
+    } else {
+      onClose();
+    }
   };
 
   const stepIndex = STEP_LIST.indexOf(step);
@@ -651,6 +755,13 @@ export function CreateCommunityModal({
           >
             {addedTowers.length === 0 && !towerName.trim() ? "Skip Towers →" : "Next: Floors →"}
           </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={handleCloseModal}
+          >
+            Finish & Close
+          </button>
           {(addedTowers.length > 0 || (towerName.trim() && towerCode.trim())) && (
             <button
               type="button"
@@ -672,6 +783,13 @@ export function CreateCommunityModal({
         <>
           <button type="button" className="btn btn-secondary" onClick={() => setStep("towers")}>
             ← Back to Towers
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={handleCloseModal}
+          >
+            Finish & Close
           </button>
           <button
             type="button"
@@ -718,7 +836,7 @@ export function CreateCommunityModal({
   );
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={titles[step]} footer={renderFooter()} maxWidth={680}>
+    <Modal isOpen={isOpen} onClose={handleCloseModal} title={titles[step]} footer={renderFooter()} maxWidth={680}>
       <StepIndicator />
 
       {/* STEP 1: Community & Admin */}
@@ -810,18 +928,27 @@ export function CreateCommunityModal({
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "1.25rem" }}>
             <div>
               <label htmlFor="modal-comm-state" style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--fg)", display: "block", marginBottom: "0.35rem" }}>
-                State / UT
+                State / UT <span style={{ color: "var(--danger, #ef4444)" }}>*</span>
               </label>
               <select
                 id="modal-comm-state"
                 className="select-field"
                 value={state}
                 onChange={(e) => {
-                  setState(e.target.value);
+                  const newState = e.target.value;
+                  setState(newState);
                   if (!touched.state) setTouched((t) => ({ ...t, state: true }));
+                  // Clear city if not in new state
+                  const newCities = getCitiesForState(newState);
+                  if (city && !newCities.some((c) => c.toLowerCase() === city.trim().toLowerCase())) {
+                    setCity("");
+                    setCustomCity("");
+                    setIsCustomCity(false);
+                  }
                 }}
                 onBlur={() => setTouched((t) => ({ ...t, state: true }))}
                 style={{ borderColor: touched.state && createErrors.state ? "var(--danger, #ef4444)" : undefined }}
+                required
               >
                 <option value="">Select State / UT…</option>
                 {INDIAN_STATES_AND_UTS.map((s) => (
@@ -830,39 +957,76 @@ export function CreateCommunityModal({
                   </option>
                 ))}
               </select>
+              {touched.state && createErrors.state && (
+                <p style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", marginTop: "0.3rem", fontWeight: 500 }}>
+                  ✕ {createErrors.state}
+                </p>
+              )}
             </div>
             <div>
               <label htmlFor="modal-comm-city" style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--fg)", display: "block", marginBottom: "0.35rem" }}>
-                City
+                City <span style={{ color: "var(--danger, #ef4444)" }}>*</span>
               </label>
-              <input
+              <select
                 id="modal-comm-city"
-                type="text"
-                list="modal-city-suggestions"
-                className="input-field"
-                placeholder={state ? `e.g. ${stateCitySuggestions[0] || "City Name"}` : "e.g. Bengaluru"}
-                value={city}
+                className="select-field"
+                value={isCustomCity ? "__custom__" : city}
                 onChange={(e) => {
-                  setCity(e.target.value);
+                  const val = e.target.value;
+                  if (val === "__custom__") {
+                    setIsCustomCity(true);
+                    setCity(customCity || "");
+                  } else {
+                    setIsCustomCity(false);
+                    setCity(val);
+                  }
                   if (!touched.city) setTouched((t) => ({ ...t, city: true }));
                 }}
                 onBlur={() => setTouched((t) => ({ ...t, city: true }))}
                 style={{ borderColor: touched.city && createErrors.city ? "var(--danger, #ef4444)" : undefined }}
-              />
-              <datalist id="modal-city-suggestions">
-                {stateCitySuggestions.map((c) => (
-                  <option key={c} value={c} />
+                disabled={!state}
+                required
+              >
+                <option value="">{state ? `Select city in ${state}…` : "Select State / UT first…"}</option>
+                {getCitiesForState(state).map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
                 ))}
-              </datalist>
+                {state && <option value="__custom__">Other City / Town in {state}…</option>}
+              </select>
+              {isCustomCity && (
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder={`Enter city / town in ${state}`}
+                  value={customCity}
+                  onChange={(e) => {
+                    setCustomCity(e.target.value);
+                    setCity(e.target.value);
+                    if (!touched.city) setTouched((t) => ({ ...t, city: true }));
+                  }}
+                  onBlur={() => setTouched((t) => ({ ...t, city: true }))}
+                  style={{ marginTop: "0.4rem", borderColor: touched.city && createErrors.city ? "var(--danger, #ef4444)" : undefined }}
+                  required
+                />
+              )}
+              {touched.city && createErrors.city && (
+                <p style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", marginTop: "0.3rem", fontWeight: 500 }}>
+                  ✕ {createErrors.city}
+                </p>
+              )}
             </div>
           </div>
 
-          {/* Optional Admin Setup */}
+          {/* Admin Setup - REQUIRED */}
           <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "1rem", marginTop: "0.5rem" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
               <div>
                 <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "var(--fg)" }}>👤 Community Admin Account</span>
-                <span style={{ fontSize: "0.72rem", color: "var(--muted)", display: "block" }}>Optional: Create initial admin credentials</span>
+                <span style={{ fontSize: "0.72rem", color: "var(--muted)", display: "block" }}>
+                  Required: Primary administrator credentials for this community
+                </span>
               </div>
               <button
                 type="button"
@@ -875,23 +1039,45 @@ export function CreateCommunityModal({
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "0.75rem" }}>
               <div>
-                {inputLabel("Admin Full Name", false, true)}
+                {inputLabel("Admin Full Name", true)}
                 <input
                   className="input-field"
                   placeholder="e.g. Ramesh Sharma"
                   value={adminName}
-                  onChange={(e) => setAdminName(e.target.value)}
+                  onChange={(e) => {
+                    setAdminName(e.target.value);
+                    if (!touched.adminName) setTouched((t) => ({ ...t, adminName: true }));
+                  }}
+                  onBlur={() => setTouched((t) => ({ ...t, adminName: true }))}
+                  style={{ borderColor: touched.adminName && createErrors.adminName ? "var(--danger, #ef4444)" : undefined }}
+                  required
                 />
+                {touched.adminName && createErrors.adminName && (
+                  <p style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", marginTop: "0.3rem", fontWeight: 500 }}>
+                    ✕ {createErrors.adminName}
+                  </p>
+                )}
               </div>
               <div>
-                {inputLabel("Admin Email", false, true)}
+                {inputLabel("Admin Email", true)}
                 <input
                   type="email"
                   className="input-field"
                   placeholder="e.g. admin@example.com"
                   value={adminEmail}
-                  onChange={(e) => setAdminEmail(e.target.value)}
+                  onChange={(e) => {
+                    setAdminEmail(e.target.value);
+                    if (!touched.adminEmail) setTouched((t) => ({ ...t, adminEmail: true }));
+                  }}
+                  onBlur={() => setTouched((t) => ({ ...t, adminEmail: true }))}
+                  style={{ borderColor: touched.adminEmail && createErrors.adminEmail ? "var(--danger, #ef4444)" : undefined }}
+                  required
                 />
+                {touched.adminEmail && createErrors.adminEmail && (
+                  <p style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", marginTop: "0.3rem", fontWeight: 500 }}>
+                    ✕ {createErrors.adminEmail}
+                  </p>
+                )}
               </div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
@@ -900,19 +1086,35 @@ export function CreateCommunityModal({
                   id="modal-admin-pw"
                   label="Password"
                   value={adminPassword}
-                  onChange={setAdminPassword}
+                  onChange={(val) => {
+                    setAdminPassword(val);
+                    if (!touched.adminPassword) setTouched((t) => ({ ...t, adminPassword: true }));
+                  }}
+                  onBlur={() => setTouched((t) => ({ ...t, adminPassword: true }))}
                   placeholder="e.g. Admin@2026!"
-                  required={false}
+                  required={true}
+                  error={touched.adminPassword ? createErrors.adminPassword : undefined}
                 />
               </div>
               <div>
                 {inputLabel("Admin Phone", false, true)}
                 <input
+                  type="text"
                   className="input-field"
                   placeholder="e.g. +91 9876543210"
                   value={adminPhone}
-                  onChange={(e) => setAdminPhone(e.target.value)}
+                  onChange={(e) => {
+                    setAdminPhone(e.target.value);
+                    if (!touched.adminPhone) setTouched((t) => ({ ...t, adminPhone: true }));
+                  }}
+                  onBlur={() => setTouched((t) => ({ ...t, adminPhone: true }))}
+                  style={{ borderColor: touched.adminPhone && createErrors.adminPhone ? "var(--danger, #ef4444)" : undefined }}
                 />
+                {touched.adminPhone && createErrors.adminPhone && (
+                  <p style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", marginTop: "0.3rem", fontWeight: 500 }}>
+                    ✕ {createErrors.adminPhone}
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -983,9 +1185,19 @@ export function CreateCommunityModal({
                   className="input-field"
                   placeholder="e.g. 2 or Tower A"
                   value={towerName}
-                  onChange={(e) => setTowerName(e.target.value)}
+                  onChange={(e) => {
+                    setTowerName(e.target.value);
+                    if (!towerTouched.name) setTowerTouched((t) => ({ ...t, name: true }));
+                  }}
+                  onBlur={() => setTowerTouched((t) => ({ ...t, name: true }))}
+                  style={{ borderColor: towerTouched.name && towerValidationErrors.name ? "var(--danger, #ef4444)" : undefined }}
                   required
                 />
+                {towerTouched.name && towerValidationErrors.name && (
+                  <p style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", marginTop: "0.3rem", fontWeight: 500 }}>
+                    ✕ {towerValidationErrors.name}
+                  </p>
+                )}
               </div>
               <div>
                 {inputLabel("Tower Code", true)}
@@ -993,10 +1205,23 @@ export function CreateCommunityModal({
                   className="input-field"
                   placeholder="e.g. 87 or TWR-A"
                   value={towerCode}
-                  onChange={(e) => setTowerCode(e.target.value.toUpperCase())}
-                  style={{ textTransform: "uppercase", fontWeight: 600 }}
+                  onChange={(e) => {
+                    setTowerCode(e.target.value.toUpperCase());
+                    if (!towerTouched.code) setTowerTouched((t) => ({ ...t, code: true }));
+                  }}
+                  onBlur={() => setTowerTouched((t) => ({ ...t, code: true }))}
+                  style={{
+                    borderColor: towerTouched.code && towerValidationErrors.code ? "var(--danger, #ef4444)" : undefined,
+                    textTransform: "uppercase",
+                    fontWeight: 600,
+                  }}
                   required
                 />
+                {towerTouched.code && towerValidationErrors.code && (
+                  <p style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", marginTop: "0.3rem", fontWeight: 500 }}>
+                    ✕ {towerValidationErrors.code}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -1019,9 +1244,19 @@ export function CreateCommunityModal({
                   min={1}
                   max={150}
                   value={towerFloors}
-                  onChange={(e) => setTowerFloors(Number(e.target.value))}
+                  onChange={(e) => {
+                    setTowerFloors(Number(e.target.value));
+                    if (!towerTouched.floors) setTowerTouched((t) => ({ ...t, floors: true }));
+                  }}
+                  onBlur={() => setTowerTouched((t) => ({ ...t, floors: true }))}
+                  style={{ borderColor: towerTouched.floors && towerValidationErrors.floors ? "var(--danger, #ef4444)" : undefined }}
                   required
                 />
+                {towerTouched.floors && towerValidationErrors.floors && (
+                  <p style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", marginTop: "0.3rem", fontWeight: 500 }}>
+                    ✕ {towerValidationErrors.floors}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -1035,9 +1270,19 @@ export function CreateCommunityModal({
                   min={1}
                   max={50}
                   value={unitsPerFloorInput}
-                  onChange={(e) => setUnitsPerFloorInput(Math.max(1, Number(e.target.value)))}
+                  onChange={(e) => {
+                    setUnitsPerFloorInput(Math.max(1, Number(e.target.value)));
+                    if (!towerTouched.units) setTowerTouched((t) => ({ ...t, units: true }));
+                  }}
+                  onBlur={() => setTowerTouched((t) => ({ ...t, units: true }))}
+                  style={{ borderColor: towerTouched.units && towerValidationErrors.units ? "var(--danger, #ef4444)" : undefined }}
                   required
                 />
+                {towerTouched.units && towerValidationErrors.units && (
+                  <p style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", marginTop: "0.3rem", fontWeight: 500 }}>
+                    ✕ {towerValidationErrors.units}
+                  </p>
+                )}
               </div>
               <div>
                 {inputLabel("Unit Type")}

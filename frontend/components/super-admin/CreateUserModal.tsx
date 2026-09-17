@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Modal } from "@/components/common/Modal";
+import { toast } from "@/store/toast";
 import { usersApi, communitiesApi } from "@/lib/api";
 import type { Role } from "@/types/rbac";
+import { isValidPersonName } from "@/constants/locations";
 
 interface CreateUserModalProps {
   isOpen: boolean;
@@ -21,6 +23,7 @@ export function CreateUserModal({
   availableRoles = [],
   onSuccess,
 }: CreateUserModalProps) {
+  const queryClient = useQueryClient();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("GateSphere2026!");
@@ -44,6 +47,8 @@ export function CreateUserModal({
     const trimmedName = fullName.trim();
     if (!trimmedName || trimmedName.length < 2) {
       errors.fullName = "Full name must be at least 2 characters long.";
+    } else if (!isValidPersonName(trimmedName)) {
+      errors.fullName = "Full name must contain only alphabets and spaces.";
     }
 
     const trimmedEmail = email.trim();
@@ -51,14 +56,14 @@ export function CreateUserModal({
       errors.email = "Please enter a valid email address.";
     }
 
-    if (!password || password.length < 8) {
-      errors.password = "Password must be at least 8 characters long.";
+    if (!password || password.length < 10) {
+      errors.password = "Password must be at least 10 characters long.";
     } else if (!/^(?=.*[A-Za-z])(?=.*\d)/.test(password)) {
       errors.password = "Password must contain at least one letter and one digit.";
     }
 
-    if (phone.trim() && !/^\+?[0-9\s\-()]{7,20}$/.test(phone.trim())) {
-      errors.phone = "Invalid phone number format.";
+    if (phone.trim() && !/^[+0-9][0-9 \-]{4,19}$/.test(phone.trim())) {
+      errors.phone = "Phone must be 5-20 digits (e.g. +91 9876543210).";
     }
 
     if (roleSlug === "community_admin" && !communityId) {
@@ -99,6 +104,12 @@ export function CreateUserModal({
         });
       }
 
+      toast.success(`User "${fullName.trim()}" created successfully!`);
+      await Promise.allSettled([
+        queryClient.invalidateQueries({ queryKey: ["users"], refetchType: "all" }),
+        queryClient.invalidateQueries({ queryKey: ["dashboards"], refetchType: "all" }),
+      ]);
+
       onSuccess();
       onClose();
       // Reset form
@@ -108,7 +119,9 @@ export function CreateUserModal({
       setCommunityId("");
       setFieldErrors({});
     } catch (err: any) {
-      setErrorMessage(err?.message || "Failed to create admin / user");
+      const msg = err?.message || "Failed to create admin / user";
+      setErrorMessage(msg);
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }

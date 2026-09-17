@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { StatusBadge } from "@/components/common/StatusBadge";
@@ -8,13 +8,21 @@ import { SearchInput } from "@/components/forms/SearchInput";
 import { formatDate } from "@/lib/utils";
 import { useComplaints } from "@/hooks/use-complaints";
 import { useCommunities } from "@/hooks/use-communities";
+import { useUiStore } from "@/store/ui";
+import { ScopeBanner } from "@/components/common/ScopeBanner";
 import type { ServiceTicket } from "@/types/complaints";
 
 export default function ComplaintsPage() {
+  const { activeCommunityId, setActiveCommunity } = useUiStore();
   const [search, setSearch] = useState("");
-  const [communityId, setCommunityId] = useState("");
+  const [communityId, setCommunityId] = useState(activeCommunityId || "");
   const [page, setPage] = useState(1);
   const pageSize = 15;
+
+  useEffect(() => {
+    setCommunityId(activeCommunityId || "");
+    setPage(1);
+  }, [activeCommunityId]);
 
   const { data: communities } = useCommunities();
   const { data: tickets, isLoading } = useComplaints({
@@ -81,11 +89,24 @@ export default function ComplaintsPage() {
     <div>
       <PageHeader
         title="Complaints & Service Tickets"
-        subtitle="Global maintenance, facilities, and service requests tracker"
+        subtitle={
+          activeCommunityId
+            ? "Maintenance, facilities, and service tickets for selected community"
+            : "Global maintenance, facilities, and service requests tracker"
+        }
         breadcrumbs={[
           { label: "Super Admin", href: "/super-admin/dashboard" },
           { label: "Complaints" },
         ]}
+      />
+
+      {/* Active Scope Banner */}
+      <ScopeBanner
+        entityName="tickets & complaints"
+        onClear={() => {
+          setCommunityId("");
+          setPage(1);
+        }}
       />
 
       <div className="card">
@@ -106,7 +127,9 @@ export default function ComplaintsPage() {
               className="select-field"
               value={communityId}
               onChange={(e) => {
-                setCommunityId(e.target.value);
+                const val = e.target.value;
+                setCommunityId(val);
+                setActiveCommunity(val || null);
                 setPage(1);
               }}
               style={{ width: "auto", height: 36, padding: "0.25rem 0.6rem", fontSize: "0.85rem" }}

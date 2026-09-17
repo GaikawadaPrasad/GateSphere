@@ -28,7 +28,8 @@ import type {
   VerificationStatus,
 } from "@/types/staff";
 import { ApiError } from "@/lib/api";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime, isValidPersonName } from "@/lib/utils";
+import { toast } from "@/store/toast";
 
 export default function CommunityAdminStaffPage() {
   const { activeCommunityId } = useUiStore();
@@ -159,6 +160,8 @@ export default function CommunityAdminStaffPage() {
     const trimmedName = newStaffForm.full_name.trim();
     if (!trimmedName || trimmedName.length < 2) {
       errors.full_name = "Staff member name must be at least 2 characters.";
+    } else if (!isValidPersonName(trimmedName)) {
+      errors.full_name = "Staff name must contain only alphabetic letters and spaces.";
     }
 
     const trimmedPhone = newStaffForm.phone.trim();
@@ -203,6 +206,10 @@ export default function CommunityAdminStaffPage() {
         },
         communityId: activeCommunityId,
       });
+      toast.success(
+        `Staff member "${newStaffForm.full_name.trim()}" registered successfully.`,
+        "Staff Member Added"
+      );
       setIsAddStaffModalOpen(false);
       setShowStaffPassword(true);
       setStaffFieldErrors({});
@@ -241,11 +248,14 @@ export default function CommunityAdminStaffPage() {
     setDeleteError("");
     try {
       await deleteStaff.mutateAsync(staffToDelete.id);
+      toast.success("Staff profile removed successfully.", "Staff Removed");
       setStaffToDelete(null);
       setSelectedStaff(null);
       refetchStaff();
     } catch (err: any) {
-      setDeleteError(err?.message || "Failed to delete staff profile.");
+      const msg = err?.message || "Failed to delete staff profile.";
+      setDeleteError(msg);
+      toast.error(msg, "Action Failed");
     } finally {
       setIsDeleting(false);
     }

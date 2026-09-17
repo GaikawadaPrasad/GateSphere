@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Modal } from "@/components/common/Modal";
 import { rbacApi } from "@/lib/api";
 import type { Role, Permission } from "@/types/rbac";
@@ -21,6 +22,7 @@ export function EditRolePermissionsModal({
   allPermissions = [],
   onSuccess,
 }: EditRolePermissionsModalProps) {
+  const queryClient = useQueryClient();
   const [selectedPermissions, setSelectedPermissions] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedModule, setSelectedModule] = useState<string>("all");
@@ -110,6 +112,10 @@ export function EditRolePermissionsModal({
         `Updated permissions for role "${role.name}" (${selectedPermissions.size} assigned).`,
         "Role Permissions Saved"
       );
+      await Promise.allSettled([
+        queryClient.invalidateQueries({ queryKey: ["roles"], refetchType: "all" }),
+        queryClient.invalidateQueries({ queryKey: ["permissions"], refetchType: "all" }),
+      ]);
       onSuccess();
       onClose();
     } catch (err: any) {

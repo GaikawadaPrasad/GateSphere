@@ -1,21 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { formatDateTime } from "@/lib/utils";
 import { useAuditLogs } from "@/hooks/use-audit";
 import { useCommunities } from "@/hooks/use-communities";
 import { auditApi } from "@/lib/api";
+import { useUiStore } from "@/store/ui";
+import { ScopeBanner } from "@/components/common/ScopeBanner";
 import type { AuditLog } from "@/types/audit";
 import type { Community } from "@/types/communities";
 
 export default function AuditLogsPage() {
+  const { activeCommunityId, setActiveCommunity } = useUiStore();
   const [module, setModule] = useState("");
-  const [communityId, setCommunityId] = useState("");
+  const [communityId, setCommunityId] = useState(activeCommunityId || "");
   const [page, setPage] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
   const pageSize = 20;
+
+  useEffect(() => {
+    setCommunityId(activeCommunityId || "");
+    setPage(1);
+  }, [activeCommunityId]);
 
   const { data: communities } = useCommunities();
   const { data: logs, isLoading } = useAuditLogs({
@@ -87,7 +95,11 @@ export default function AuditLogsPage() {
     <div>
       <PageHeader
         title="Audit Logs"
-        subtitle="Immutable security trail and administrative activity tracking"
+        subtitle={
+          activeCommunityId
+            ? "Immutable security trail and activity tracking for selected community"
+            : "Immutable security trail and administrative activity tracking"
+        }
         breadcrumbs={[
           { label: "Super Admin", href: "/super-admin/dashboard" },
           { label: "Audit Logs" },
@@ -102,6 +114,15 @@ export default function AuditLogsPage() {
             {isExporting ? "Exporting…" : "📥 Export CSV"}
           </button>
         }
+      />
+
+      {/* Active Scope Banner */}
+      <ScopeBanner
+        entityName="audit trail"
+        onClear={() => {
+          setCommunityId("");
+          setPage(1);
+        }}
       />
 
       <div className="card">
@@ -138,7 +159,9 @@ export default function AuditLogsPage() {
               className="select-field"
               value={communityId}
               onChange={(e) => {
-                setCommunityId(e.target.value);
+                const val = e.target.value;
+                setCommunityId(val);
+                setActiveCommunity(val || null);
                 setPage(1);
               }}
               style={{ width: "auto", height: 36, padding: "0.25rem 0.6rem", fontSize: "0.85rem" }}

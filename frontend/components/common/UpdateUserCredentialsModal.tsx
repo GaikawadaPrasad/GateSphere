@@ -5,6 +5,7 @@ import { Modal } from "@/components/common/Modal";
 import { PasswordField } from "@/components/forms/PasswordField";
 import { usersApi } from "@/lib/api";
 import { toast } from "@/store/toast";
+import { isValidPersonName } from "@/lib/utils";
 
 export interface CredentialUser {
   id: string;
@@ -50,8 +51,11 @@ export function UpdateUserCredentialsModal({
 
   const validate = () => {
     const errs: Record<string, string> = {};
-    if (!fullName.trim() || fullName.trim().length < 2) {
+    const trimmed = fullName.trim();
+    if (!trimmed || trimmed.length < 2) {
       errs.fullName = "Full name must be at least 2 characters.";
+    } else if (!isValidPersonName(trimmed)) {
+      errs.fullName = "Full name must contain only alphabets and spaces.";
     }
     if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       errs.email = "Please enter a valid email address.";
@@ -189,7 +193,7 @@ export function UpdateUserCredentialsModal({
                 Phone Number
               </label>
               <input
-                type="tel"
+                type="number"
                 className="input-field"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}

@@ -20,17 +20,18 @@ export const dashboardKeys = {
     [...dashboardKeys.all, "financial", communityId] as const,
   resident: (communityId?: string | null) =>
     [...dashboardKeys.all, "resident", communityId] as const,
-  superAdmin: ["dashboards", "super-admin"] as const,
+  superAdmin: (communityId?: string | null) =>
+    [...dashboardKeys.all, "super-admin", communityId || "global"] as const,
 };
 
 /**
- * Super Admin global aggregated dashboard metrics across communities
+ * Super Admin dashboard metrics across all communities or scoped to a specific community
  */
-export function useSuperAdminDashboardMetrics() {
+export function useSuperAdminDashboardMetrics(communityId?: string | null) {
   return useQuery<SuperAdminDashboardMetrics>({
-    queryKey: dashboardKeys.superAdmin,
-    queryFn: () => dashboardsApi.superAdmin(),
-    staleTime: 30_000,
+    queryKey: dashboardKeys.superAdmin(communityId),
+    queryFn: () => dashboardsApi.superAdmin(communityId || undefined),
+    staleTime: 5_000,
   });
 }
 
@@ -38,7 +39,7 @@ export function useOverviewStats(communityId?: string | null) {
   return useQuery<OverviewStats>({
     queryKey: dashboardKeys.overview(communityId),
     queryFn: () => dashboardsApi.overview(communityId || undefined),
-    staleTime: 30_000,
+    staleTime: 5_000,
   });
 }
 
@@ -46,7 +47,7 @@ export function useSecurityStats(communityId?: string | null) {
   return useQuery<SecurityStats>({
     queryKey: dashboardKeys.security(communityId),
     queryFn: () => dashboardsApi.security(communityId || undefined),
-    staleTime: 10_000,
+    staleTime: 5_000,
   });
 }
 
@@ -54,7 +55,7 @@ export function useFinancialStats(communityId?: string | null) {
   return useQuery<FinancialStats>({
     queryKey: dashboardKeys.financial(communityId),
     queryFn: () => dashboardsApi.financial(communityId || undefined),
-    staleTime: 60_000,
+    staleTime: 5_000,
   });
 }
 
@@ -62,6 +63,6 @@ export function useResidentStats(communityId?: string | null) {
   return useQuery<ResidentStats>({
     queryKey: dashboardKeys.resident(communityId),
     queryFn: () => dashboardsApi.resident(communityId || undefined),
-    staleTime: 30_000,
+    staleTime: 5_000,
   });
 }

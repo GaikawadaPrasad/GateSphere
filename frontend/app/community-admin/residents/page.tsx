@@ -18,7 +18,7 @@ import { Modal } from "@/components/common/Modal";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { PasswordField } from "@/components/forms/PasswordField";
 import type { ResidentProfile, MoveRecord } from "@/types/residents";
-import { formatDateTime, generateInitialPassword } from "@/lib/utils";
+import { formatDateTime, generateInitialPassword, isValidPersonName } from "@/lib/utils";
 import { onboardingApi } from "@/lib/api";
 import { toast } from "@/store/toast";
 import { UpdateUserCredentialsModal, type CredentialUser } from "@/components/common/UpdateUserCredentialsModal";
@@ -363,6 +363,8 @@ export default function CommunityAdminResidentsPage() {
     const trimmedName = fullName.trim();
     if (!trimmedName || trimmedName.length < 2) {
       errors.fullName = "Resident full name must be at least 2 characters long.";
+    } else if (!isValidPersonName(trimmedName)) {
+      errors.fullName = "Name must contain only alphabetic letters and spaces.";
     }
     const trimmedEmail = email.trim();
     if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
@@ -403,6 +405,8 @@ export default function CommunityAdminResidentsPage() {
       });
       setIsAddResidentOpen(false);
       setResidentFieldErrors({});
+      toast.success(`Resident ${fullName.trim()} registered successfully!`, "Resident Onboarded");
+      resetAddForm();
       refetchResidents();
     } catch (err: any) {
       setAddError(err?.message || "Failed to onboard resident.");
@@ -1301,7 +1305,7 @@ export default function CommunityAdminResidentsPage() {
               <button
                 type="submit"
                 className="btn btn-primary"
-                disabled={isAdding || !targetUnitId}
+                disabled={isAdding}
                 style={{
                   padding: "0.5rem 1.25rem",
                   fontSize: "0.85rem",
@@ -1334,6 +1338,14 @@ export default function CommunityAdminResidentsPage() {
             if (!activeCommunityId) return;
             if (!inviteEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inviteEmail.trim())) {
               setInviteError("Please enter a valid email address.");
+              return;
+            }
+            if (invitePhone.trim() && !/^\+?[0-9\s\-()]{7,20}$/.test(invitePhone.trim())) {
+              setInviteError("Please enter a valid phone number (e.g. +91 98765 43210).");
+              return;
+            }
+            if (inviteFullName.trim() && !isValidPersonName(inviteFullName.trim())) {
+              setInviteError("Resident name must contain only alphabetic letters and spaces.");
               return;
             }
             if (!inviteUnitId) {

@@ -71,7 +71,7 @@ import {
 import { useAnnouncements, useEventRsvp } from "@/hooks/use-communication";
 import { useMyNotifications } from "@/hooks/use-notifications";
 import { useTableControls } from "@/hooks/use-table-controls";
-import { formatDate, formatCurrency, getAmenityIcon } from "@/lib/utils";
+import { formatDate, formatCurrency, getAmenityIcon, isValidPersonName } from "@/lib/utils";
 import { authApi } from "@/lib/api";
 import { useUiStore } from "@/store/ui";
 
@@ -319,6 +319,31 @@ export function OwnerTenantDashboardView({
     initialPageSize: 10,
   });
 
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleManualRefresh = async () => {
+    try {
+      setIsRefreshing(true);
+      await Promise.allSettled([
+        refetchStats?.(),
+        visitors.refetch(),
+        deliveries.refetch(),
+        amenities.bookings.refetch(),
+        amenities.amenities.refetch(),
+        complaints.refetch(),
+        payments.refetch(),
+        ledger.refetch(),
+        vehicles.refetch(),
+        domesticStaff.refetch(),
+        family.refetch(),
+        profile.refetch(),
+      ]);
+      toast.success("Resident operational data and alerts refreshed.", "Data Updated");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   const handleDecideDelivery = async (deliveryId: string, approved: boolean) => {
     try {
       await deliveries.decideDelivery.mutateAsync({
@@ -414,8 +439,8 @@ export function OwnerTenantDashboardView({
   const handleRegisterVehicle = async (e: React.FormEvent) => {
     e.preventDefault();
     const plate = vehRegNumber.trim().toUpperCase();
-    if (!plate) {
-      toast.error("Please enter a valid license plate number.", "Plate Required");
+    if (!plate || plate.length < 4 || !/^[A-Z0-9\s\-]+$/.test(plate)) {
+      toast.error("Please enter a valid license plate number (e.g. MH 12 AB 1234).", "Plate Required");
       return;
     }
     try {
@@ -426,6 +451,8 @@ export function OwnerTenantDashboardView({
         model: vehModel.trim() || undefined,
         color: vehColor.trim() || undefined,
       });
+      await vehicles.refetch();
+      refetchStats?.();
       toast.success(
         `Vehicle ${plate} registered successfully!`,
         "Vehicle Registered",
@@ -467,13 +494,18 @@ export function OwnerTenantDashboardView({
       toast.error("Please select a visitor category.", "Category Required");
       return;
     }
-    if (!passVisitorName.trim()) {
-      toast.error("Please enter the visitor's name.", "Visitor Name Required");
+    const trimmedVisitorName = passVisitorName.trim();
+    if (!trimmedVisitorName || trimmedVisitorName.length < 2) {
+      toast.error("Please enter the visitor's full name.", "Visitor Name Required");
+      return;
+    }
+    if (!isValidPersonName(trimmedVisitorName)) {
+      toast.error("Visitor name must contain only alphabetic letters and spaces.", "Validation Error");
       return;
     }
     const cleanPhone = passVisitorPhone.trim().replace(/[\s\-()]/g, "");
-    if (!cleanPhone || cleanPhone.length < 5) {
-      toast.error("Please enter a valid mobile number (at least 10 digits).", "Mobile Number Required");
+    if (!cleanPhone || !/^\+?[0-9]{7,15}$/.test(cleanPhone)) {
+      toast.error("Please enter a valid mobile number (7-15 digits).", "Mobile Number Required");
       return;
     }
 
@@ -546,15 +578,21 @@ export function OwnerTenantDashboardView({
 
   const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!ticketSubject.trim()) {
-      toast.error("Please enter a summary of the issue.", "Subject Required");
+    const subject = ticketSubject.trim();
+    if (!subject || subject.length < 3) {
+      toast.error("Please enter a summary of the issue (at least 3 characters).", "Subject Required");
+      return;
+    }
+    const desc = ticketDescription.trim();
+    if (!desc || desc.length < 5) {
+      toast.error("Please provide a description of the issue (at least 5 characters).", "Description Required");
       return;
     }
     try {
       await complaints.createTicket.mutateAsync({
-        subject: ticketSubject.trim(),
+        subject,
         category: ticketCategory,
-        description: ticketDescription.trim(),
+        description: desc,
         priority: ticketPriority || "medium",
       });
       await complaints.refetch();
@@ -686,21 +724,32 @@ export function OwnerTenantDashboardView({
 
   const handleSaveMember = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMemberName.trim() || !newMemberPhone.trim()) {
-      toast.error("Please enter a valid full name and mobile number.", "Validation Error");
+    const trimmedName = newMemberName.trim();
+    if (!trimmedName || trimmedName.length < 2) {
+      toast.error("Please enter family member's full name (at least 2 characters).", "Validation Error");
+      return;
+    }
+    if (!isValidPersonName(trimmedName)) {
+      toast.error("Family member name must contain only alphabetic letters and spaces.", "Validation Error");
+      return;
+    }
+    const cleanPhone = newMemberPhone.trim().replace(/[\s\-()]/g, "");
+    if (!cleanPhone || !/^\+?[0-9]{7,15}$/.test(cleanPhone)) {
+      toast.error("Please enter a valid mobile number (7-15 digits).", "Validation Error");
       return;
     }
     try {
       await family.addMember.mutateAsync({
-        name: newMemberName.trim(),
+        name: trimmedName,
         relation: newMemberRelation,
-        phone: newMemberPhone.trim(),
+        phone: cleanPhone,
         access_enabled: newMemberAccess,
       });
       await family.refetch();
       await profile.refetch();
+      refetchStats?.();
       setAddMemberModalOpen(false);
-      const addedName = newMemberName;
+      const addedName = trimmedName;
       setNewMemberName("");
       setNewMemberPhone("");
       setNewMemberRelation("Spouse");
@@ -717,17 +766,32 @@ export function OwnerTenantDashboardView({
   const handleUpdateMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingMember) return;
+    const trimmedName = (editingMember.name || "").trim();
+    if (!trimmedName || trimmedName.length < 2) {
+      toast.error("Please enter family member's full name (at least 2 characters).", "Validation Error");
+      return;
+    }
+    if (!isValidPersonName(trimmedName)) {
+      toast.error("Family member name must contain only alphabetic letters and spaces.", "Validation Error");
+      return;
+    }
+    const cleanPhone = (editingMember.phone || "").trim().replace(/[\s\-()]/g, "");
+    if (!cleanPhone || !/^\+?[0-9]{7,15}$/.test(cleanPhone)) {
+      toast.error("Please enter a valid mobile number (7-15 digits).", "Validation Error");
+      return;
+    }
     try {
       await family.updateMember.mutateAsync({
         id: editingMember.id,
-        name: editingMember.name,
+        name: trimmedName,
         relation: editingMember.relation,
-        phone: editingMember.phone,
+        phone: cleanPhone,
         access_enabled: editingMember.access_enabled,
       });
       await family.refetch();
       await profile.refetch();
-      const updatedName = editingMember.name;
+      refetchStats?.();
+      const updatedName = trimmedName;
       setEditingMember(null);
       toast.success(
         `${updatedName}'s record and gate pre-approval status updated.`,
@@ -751,16 +815,41 @@ export function OwnerTenantDashboardView({
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    const trimmedFullName = profileFullName.trim();
+    if (trimmedFullName && !isValidPersonName(trimmedFullName)) {
+      toast.error("Full name must contain only alphabetic letters and spaces.", "Validation Error");
+      return;
+    }
+
+    const trimmedEmergencyName = profileEmergencyName.trim();
+    if (trimmedEmergencyName && !isValidPersonName(trimmedEmergencyName)) {
+      toast.error("Emergency contact name must contain only alphabetic letters and spaces.", "Validation Error");
+      return;
+    }
+
+    const cleanPhone = profilePhone.trim().replace(/[\s\-()]/g, "");
+    if (cleanPhone && !/^\+?[0-9]{7,15}$/.test(cleanPhone)) {
+      toast.error("Please enter a valid primary phone number (7-15 digits).", "Validation Error");
+      return;
+    }
+
+    const cleanEmergencyPhone = profileEmergencyPhone.trim().replace(/[\s\-()]/g, "");
+    if (cleanEmergencyPhone && !/^\+?[0-9]{7,15}$/.test(cleanEmergencyPhone)) {
+      toast.error("Please enter a valid emergency contact phone number (7-15 digits).", "Validation Error");
+      return;
+    }
+
     try {
       await profile.updateProfile.mutateAsync({
-        full_name: profileFullName.trim() || undefined,
-        phone: profilePhone.trim() || undefined,
+        full_name: trimmedFullName || undefined,
+        phone: cleanPhone || undefined,
         emergency_notes: profileEmergencyNotes.trim() || undefined,
-        emergency_contact_name: profileEmergencyName.trim() || undefined,
-        emergency_contact_phone: profileEmergencyPhone.trim() || undefined,
+        emergency_contact_name: trimmedEmergencyName || undefined,
+        emergency_contact_phone: cleanEmergencyPhone || undefined,
         emergency_contact_relationship: profileEmergencyRel.trim() || undefined,
       });
       await profile.refetch();
+      refetchStats?.();
       toast.success("Your resident profile and emergency contact details have been updated.", "Profile Saved");
       setEditProfileOpen(false);
     } catch (err: any) {
@@ -908,8 +997,28 @@ export function OwnerTenantDashboardView({
       description={currentMeta.description}
       accentColor="#1D4ED8"
       headerActions={
-        <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", flexWrap: "wrap" }}>
           <LiveDot label="GATE RECOGNITION LIVE" />
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={handleManualRefresh}
+            disabled={isRefreshing}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.35rem",
+              fontSize: "0.8rem",
+              padding: "0.35rem 0.65rem",
+              background: "#FFFFFF",
+              border: "1px solid var(--border-standard)",
+              borderRadius: "6px",
+              cursor: isRefreshing ? "not-allowed" : "pointer",
+            }}
+          >
+            <span className={isRefreshing ? "spin" : ""}>🔄</span>
+            {isRefreshing ? "Refreshing…" : "Refresh"}
+          </button>
           <BrandButton variant="danger" size="sm" onClick={() => setSosModalOpen(true)}>
             🆘 One-Tap SOS
           </BrandButton>
@@ -3917,6 +4026,7 @@ export function OwnerTenantDashboardView({
               Mobile Phone
             </label>
             <input
+              type="tel"
               className="input-field"
               placeholder="+91 98765 43210"
               value={newMemberPhone}
@@ -4044,6 +4154,7 @@ export function OwnerTenantDashboardView({
                 Mobile Phone
               </label>
               <input
+                type="tel"
                 className="input-field"
                 value={editingMember.phone}
                 onChange={(e) => setEditingMember({ ...editingMember, phone: e.target.value })}

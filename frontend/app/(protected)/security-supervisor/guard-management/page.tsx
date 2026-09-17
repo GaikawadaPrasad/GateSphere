@@ -640,7 +640,7 @@ export default function SecuritySupervisorGuardManagementPage() {
                   Phone Number
                 </label>
                 <input
-                  type="tel"
+                  type="number"
                   className="input-field"
                   placeholder="+91 98765 43210"
                   value={guardPhone}
