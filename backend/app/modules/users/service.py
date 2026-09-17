@@ -136,7 +136,7 @@ class UserService:
                         UserRole.id.is_(None),
                     )
                 )
-        stmt = stmt.distinct().order_by(User.email)
+        stmt = stmt.distinct().order_by(User.created_at.desc(), User.email)
         total = int(
             await self.db.scalar(select(func.count()).select_from(stmt.order_by(None).subquery()))
             or 0

@@ -6,7 +6,7 @@ import { CommunityTable, type CommunityWithMetrics } from "@/components/tables/C
 import { SearchInput } from "@/components/forms/SearchInput";
 import { Modal } from "@/components/common/Modal";
 import { StatusBadge } from "@/components/common/StatusBadge";
-import { communitiesApi, residentsApi } from "@/lib/api";
+import { communitiesApi, residentsApi, usersApi } from "@/lib/api";
 import {
   useCommunities,
   useCreateCommunity,
@@ -32,6 +32,8 @@ import type { ResidentProfile } from "@/types/residents";
 import { PasswordField } from "@/components/forms/PasswordField";
 import { generateInitialPassword } from "@/lib/utils";
 import { CreateCommunityModal } from "@/components/super-admin/CreateCommunityModal";
+import { CreateUserModal } from "@/components/super-admin/CreateUserModal";
+import { EditUserModal, type UserRecord } from "@/components/super-admin/EditUserModal";
 import { toast } from "@/store/toast";
 import { useUiStore } from "@/store/ui";
 import { ScopeBanner } from "@/components/common/ScopeBanner";
@@ -80,10 +82,16 @@ export default function CommunitiesPage() {
   // View / Structure Details Modal state
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [viewingCommunity, setViewingCommunity] = useState<CommunityWithMetrics | null>(null);
-  const [activeTab, setActiveTab] = useState<"towers" | "units" | "residents" | "gates" | "credentials">("towers");
+  const [activeTab, setActiveTab] = useState<"towers" | "units" | "residents" | "gates" | "credentials" | "staff">("towers");
   const [communityTowers, setCommunityTowers] = useState<Tower[]>([]);
   const [communityGates, setCommunityGates] = useState<Gate[]>([]);
   const [communityResidents, setCommunityResidents] = useState<ResidentProfile[]>([]);
+  const [communityPersonnel, setCommunityPersonnel] = useState<UserRecord[]>([]);
+  const [personnelRoleFilter, setPersonnelRoleFilter] = useState<string>("");
+  const [personnelSearch, setPersonnelSearch] = useState<string>("");
+  const [isAddPersonnelOpen, setIsAddPersonnelOpen] = useState(false);
+  const [editingPersonnel, setEditingPersonnel] = useState<UserRecord | null>(null);
+  const [deletingPersonnel, setDeletingPersonnel] = useState<UserRecord | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [detailsFeedback, setDetailsFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
@@ -311,10 +319,11 @@ export default function CommunitiesPage() {
 
   const refreshCommunityDetails = async (commId: string) => {
     try {
-      const [towersRes, gatesRes, residentsRes] = await Promise.allSettled([
+      const [towersRes, gatesRes, residentsRes, personnelRes] = await Promise.allSettled([
         communitiesApi.towers(commId),
         communitiesApi.gates(commId),
         residentsApi.list({ community_id: commId, page: 1, page_size: 100 }),
+        usersApi.list({ community_id: commId, page_size: 100 }),
       ]);
       if (towersRes.status === "fulfilled") setCommunityTowers(towersRes.value || []);
       if (gatesRes.status === "fulfilled") setCommunityGates(gatesRes.value || []);
@@ -324,6 +333,10 @@ export default function CommunitiesPage() {
           ? (val as ResidentProfile[])
           : ((val as { items?: ResidentProfile[] })?.items || []);
         setCommunityResidents(resList);
+      }
+      if (personnelRes.status === "fulfilled") {
+        const pVal = personnelRes.value;
+        setCommunityPersonnel((Array.isArray(pVal) ? pVal : []) as unknown as UserRecord[]);
       }
       refetchUnits();
     } catch (err) {
@@ -339,6 +352,9 @@ export default function CommunitiesPage() {
     setCommunityTowers([]);
     setCommunityGates([]);
     setCommunityResidents([]);
+    setCommunityPersonnel([]);
+    setPersonnelRoleFilter("");
+    setPersonnelSearch("");
     setDetailsFeedback(null);
 
     try {
@@ -347,6 +363,24 @@ export default function CommunitiesPage() {
       setIsLoadingDetails(false);
     }
   };
+
+  const filteredPersonnel = useMemo(() => {
+    return communityPersonnel.filter((u) => {
+      if (personnelRoleFilter) {
+        const hasRole = u.roles?.some((r) => r.role_slug === personnelRoleFilter);
+        if (!hasRole) return false;
+      }
+      if (personnelSearch.trim()) {
+        const q = personnelSearch.toLowerCase().trim();
+        const matches =
+          u.full_name?.toLowerCase().includes(q) ||
+          u.email?.toLowerCase().includes(q) ||
+          u.phone?.toLowerCase().includes(q);
+        if (!matches) return false;
+      }
+      return true;
+    });
+  }, [communityPersonnel, personnelRoleFilter, personnelSearch]);
 
   const handleTowerSelectForUnit = async (tId: string) => {
     setUnitTowerId(tId);
@@ -1438,6 +1472,13 @@ export default function CommunitiesPage() {
               >
                 🔑 Admin Credentials
               </button>
+              <button
+                type="button"
+                className={`btn btn-sm ${activeTab === "staff" ? "btn-primary" : "btn-secondary"}`}
+                onClick={() => setActiveTab("staff")}
+              >
+                👔 Personnel & Admins ({communityPersonnel.length})
+              </button>
             </div>
 
             {isLoadingDetails ? (
@@ -2024,11 +2065,226 @@ export default function CommunitiesPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Tab 6: PERSONNEL & ADMINS */}
+                {activeTab === "staff" && (
+                  <div>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: "0.75rem",
+                        flexWrap: "wrap",
+                        marginBottom: "1rem",
+                      }}
+                    >
+                      <div style={{ display: "flex", gap: "0.5rem", flex: 1, minWidth: "260px" }}>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Search personnel by name, email, phone..."
+                          value={personnelSearch}
+                          onChange={(e) => setPersonnelSearch(e.target.value)}
+                          style={{ fontSize: "0.85rem", padding: "0.4rem 0.75rem" }}
+                        />
+                        <select
+                          className="form-control"
+                          value={personnelRoleFilter}
+                          onChange={(e) => setPersonnelRoleFilter(e.target.value)}
+                          style={{ fontSize: "0.85rem", padding: "0.4rem 0.65rem", width: "auto" }}
+                        >
+                          <option value="">All Assigned Roles</option>
+                          <option value="community_admin">Community Admin</option>
+                          <option value="association_committee">Association Committee</option>
+                          <option value="facility_manager">Facility Manager</option>
+                          <option value="vendor_technician">Vendor Technician</option>
+                          <option value="auditor">Auditor (Read-Only)</option>
+                          <option value="domestic_staff">Domestic Staff</option>
+                          <option value="security_supervisor">Security Supervisor</option>
+                          <option value="security_guard">Security Guard</option>
+                        </select>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={() => setIsAddPersonnelOpen(true)}
+                        style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}
+                      >
+                        <span>+</span> Add Personnel / Admin
+                      </button>
+                    </div>
+
+                    {filteredPersonnel.length === 0 ? (
+                      <div
+                        style={{
+                          textAlign: "center",
+                          padding: "2.5rem 1rem",
+                          background: "var(--surface-muted, #f8fafc)",
+                          borderRadius: "8px",
+                          border: "1px dashed var(--border)",
+                        }}
+                      >
+                        <p style={{ fontWeight: 600, color: "var(--brand-heading)", marginBottom: "0.25rem" }}>
+                          No personnel records found
+                        </p>
+                        <p style={{ fontSize: "0.825rem", color: "var(--muted)", marginBottom: "1rem" }}>
+                          No administrators or staff match the current filters for {viewingCommunity.name}.
+                        </p>
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          onClick={() => setIsAddPersonnelOpen(true)}
+                        >
+                          + Add Personnel to {viewingCommunity.name}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="table-responsive" style={{ maxHeight: "420px", overflowY: "auto" }}>
+                        <table className="table" style={{ width: "100%", fontSize: "0.85rem" }}>
+                          <thead>
+                            <tr>
+                              <th>Personnel / Admin</th>
+                              <th>Assigned Role(s)</th>
+                              <th>Status</th>
+                              <th style={{ textAlign: "right" }}>Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredPersonnel.map((u) => (
+                              <tr key={u.id}>
+                                <td>
+                                  <div>
+                                    <div style={{ fontWeight: 600, color: "var(--fg)" }}>{u.full_name}</div>
+                                    <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                                      {u.email} {u.phone ? `• ${u.phone}` : ""}
+                                    </div>
+                                  </div>
+                                </td>
+                                <td>
+                                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem" }}>
+                                    {u.roles && u.roles.length > 0 ? (
+                                      u.roles.map((r) => (
+                                        <span
+                                          key={r.id}
+                                          className="badge badge-primary"
+                                          style={{ fontSize: "0.725rem", textTransform: "capitalize" }}
+                                        >
+                                          {r.role_name || r.role_slug.replace(/_/g, " ")}
+                                        </span>
+                                      ))
+                                    ) : (
+                                      <span style={{ color: "var(--muted)", fontSize: "0.75rem" }}>Unassigned</span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td>
+                                  <span
+                                    className={`badge ${u.is_active !== false ? "badge-success" : "badge-neutral"}`}
+                                    style={{ fontSize: "0.725rem" }}
+                                  >
+                                    {u.is_active !== false ? "Active" : "Disabled"}
+                                  </span>
+                                </td>
+                                <td style={{ textAlign: "right" }}>
+                                  <div style={{ display: "flex", gap: "0.4rem", justifyContent: "flex-end" }}>
+                                    <button
+                                      type="button"
+                                      className="btn btn-secondary btn-sm"
+                                      style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}
+                                      onClick={() => setEditingPersonnel(u)}
+                                    >
+                                      Edit Access
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn btn-danger btn-sm"
+                                      style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}
+                                      onClick={() => setDeletingPersonnel(u)}
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
         )}
       </Modal>
+
+      {/* Personnel Sub-Modals */}
+      {isAddPersonnelOpen && viewingCommunity && (
+        <CreateUserModal
+          isOpen={isAddPersonnelOpen}
+          onClose={() => setIsAddPersonnelOpen(false)}
+          preselectedCommunityId={viewingCommunity.id}
+          lockCommunity={true}
+          onSuccess={() => {
+            refreshCommunityDetails(viewingCommunity.id);
+          }}
+        />
+      )}
+
+      {editingPersonnel && viewingCommunity && (
+        <EditUserModal
+          isOpen={!!editingPersonnel}
+          onClose={() => setEditingPersonnel(null)}
+          user={editingPersonnel}
+          onSuccess={() => {
+            refreshCommunityDetails(viewingCommunity.id);
+          }}
+        />
+      )}
+
+      {deletingPersonnel && (
+        <Modal
+          isOpen={true}
+          onClose={() => setDeletingPersonnel(null)}
+          title="Delete Personnel Account"
+          size="sm"
+          footer={
+            <>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setDeletingPersonnel(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={async () => {
+                  try {
+                    await usersApi.delete(deletingPersonnel.id);
+                    toast.success(`Personnel "${deletingPersonnel.full_name}" deleted.`);
+                    setDeletingPersonnel(null);
+                    if (viewingCommunity) refreshCommunityDetails(viewingCommunity.id);
+                  } catch (err: any) {
+                    toast.error(err?.message || "Failed to delete user");
+                  }
+                }}
+              >
+                Confirm Delete
+              </button>
+            </>
+          }
+        >
+          <p style={{ fontSize: "0.9rem" }}>
+            Are you sure you want to delete user <strong>{deletingPersonnel.full_name}</strong> ({deletingPersonnel.email})?
+            This will revoke all role grants and session tokens for this user.
+          </p>
+        </Modal>
+      )}
 
       {/* SUB-MODAL: Add Tower */}
       <Modal

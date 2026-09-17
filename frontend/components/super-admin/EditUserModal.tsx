@@ -24,6 +24,8 @@ export interface UserRecord {
   is_active?: boolean;
   is_superadmin?: boolean;
   roles?: UserRoleGrant[];
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface EditUserModalProps {
