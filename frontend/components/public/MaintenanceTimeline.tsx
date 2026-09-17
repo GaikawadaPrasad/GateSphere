@@ -292,7 +292,7 @@ export default function MaintenanceTimeline() {
       style={{ height: `${STEPS.length * 45}vh` }}
     >
       {/* ── STICKY PINNED PRESENTATION VIEWPORT ── */}
-      <div className="sticky top-14 sm:top-0 h-[calc(100dvh-3.5rem)] sm:h-screen w-full flex flex-col justify-between py-2 sm:py-6 lg:py-8 px-3 sm:px-6 lg:px-12 overflow-y-auto sm:overflow-hidden scrollbar-none">
+      <div className="sticky top-14 sm:top-0 h-[calc(100dvh-3.5rem)] sm:h-screen w-full flex flex-col justify-center gap-3 sm:gap-6 lg:gap-8 py-4 sm:py-8 px-3 sm:px-6 lg:px-12 overflow-y-auto sm:overflow-hidden scrollbar-none">
         {/* Background Ambient Glows */}
         {!prefersReducedMotion && (
           <>
@@ -330,7 +330,7 @@ export default function MaintenanceTimeline() {
         </div>
 
         {/* ── 2. PROCESS TIMELINE BAR (Horizontal with glowing progress) ── */}
-        <div className="max-w-5xl mx-auto w-full relative z-20 my-1 sm:my-auto shrink-0 py-1 sm:py-2">
+        <div className="max-w-5xl mx-auto w-full relative z-20 shrink-0 py-1 sm:py-2">
           <div className="relative">
             {/* Background Rail */}
             <div className="absolute top-1/2 -translate-y-1/2 left-6 right-6 h-[2px] bg-slate-800" />
@@ -407,7 +407,7 @@ export default function MaintenanceTimeline() {
         </div>
 
         {/* ── 3. MAIN WORKFLOW VISUAL & DEVICE SHOWCASE ── */}
-        <div className="max-w-5xl mx-auto w-full relative z-10 my-1 sm:my-auto">
+        <div className="max-w-5xl mx-auto w-full relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-8 items-center bg-[#0D1424]/80 backdrop-blur-xl border border-slate-800/90 rounded-2xl sm:rounded-3xl p-3.5 sm:p-8 shadow-2xl relative overflow-hidden">
             {/* ── LEFT: Stage Narrative & Action Card ── */}
             <div className="lg:col-span-6 flex flex-col justify-center">
@@ -627,24 +627,6 @@ export default function MaintenanceTimeline() {
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* ── 4. BOTTOM THREE METRIC STATS ── */}
-        <div className="max-w-5xl mx-auto w-full grid grid-cols-3 gap-2 sm:gap-4 shrink-0 mt-1 sm:mt-0">
-          <div className="bg-[#0D1424]/90 border border-slate-800 rounded-xl sm:rounded-2xl p-2 sm:p-4 text-center shadow-lg">
-            <div className="text-sm sm:text-2xl font-black text-cyan-400 leading-none" style={{ fontFamily: "'Outfit', sans-serif" }}>&lt; 4hr</div>
-            <div className="text-[8.5px] sm:text-[12px] font-medium text-slate-400 mt-0.5 sm:mt-1 truncate">Avg Resolution</div>
-          </div>
-
-          <div className="bg-[#0D1424]/90 border border-slate-800 rounded-xl sm:rounded-2xl p-2 sm:p-4 text-center shadow-lg">
-            <div className="text-sm sm:text-2xl font-black text-emerald-400 leading-none" style={{ fontFamily: "'Outfit', sans-serif" }}>98%</div>
-            <div className="text-[8.5px] sm:text-[12px] font-medium text-slate-400 mt-0.5 sm:mt-1 truncate">Closure Rate</div>
-          </div>
-
-          <div className="bg-[#0D1424]/90 border border-slate-800 rounded-xl sm:rounded-2xl p-2 sm:p-4 text-center shadow-lg">
-            <div className="text-sm sm:text-2xl font-black text-amber-400 leading-none" style={{ fontFamily: "'Outfit', sans-serif" }}>4.9★</div>
-            <div className="text-[8.5px] sm:text-[12px] font-medium text-slate-400 mt-0.5 sm:mt-1 truncate">Satisfaction</div>
           </div>
         </div>
       </div>

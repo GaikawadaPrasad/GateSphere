@@ -8,29 +8,29 @@ export default function Footer() {
 
   return (
     <footer
-      className="relative text-slate-300 pt-12 pb-6 border-t border-slate-800 overflow-hidden"
+      className="relative text-slate-300 pt-8 sm:pt-12 pb-6 border-t border-slate-800 overflow-hidden"
       style={{
         backgroundColor: "#090E1A",
       }}
     >
-      <div className="max-w-7xl mx-auto px-6 sm:px-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-8">
         {/* ── TOP SECTION: Brand + Services + Company + Contact + Action Button ── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-6 pb-12 border-b border-slate-800/80 items-start">
-          {/* Column 1: Brand (3.5 Cols) */}
-          <div className="lg:col-span-3 space-y-4">
+        <div className="grid grid-cols-2 lg:grid-cols-12 gap-5 sm:gap-8 lg:gap-6 pb-8 sm:pb-12 border-b border-slate-800/80 items-start">
+          {/* Column 1: Brand (full width on mobile, 3 cols on lg) */}
+          <div className="col-span-2 lg:col-span-3 space-y-3 sm:space-y-4">
             <Link href="/" className="inline-flex items-center gap-2.5 group cursor-pointer">
               <GateSphereLogo variant="light" className="group-hover:scale-105 transition-transform" />
             </Link>
 
             <p
-              className="text-[13px] text-slate-400 leading-relaxed max-w-xs"
+              className="text-[12.5px] sm:text-[13px] text-slate-400 leading-relaxed max-w-sm"
               style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
             >
               Coordinating gate security, visitor pre-approvals, society dues, and facility maintenance for premier townships.
             </p>
 
             {/* Social Icons */}
-            <div className="flex items-center gap-2 pt-1">
+            <div className="flex items-center gap-2 pt-0.5">
               {[
                 {
                   name: "X (Twitter)",
@@ -83,15 +83,15 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* Column 2: Platform Links (2.5 Cols) */}
-          <div className="lg:col-span-2 space-y-3">
+          {/* Column 2: Platform Links (1 col on mobile, 2 cols on lg) */}
+          <div className="col-span-1 lg:col-span-2 space-y-2.5 sm:space-y-3">
             <h4
-              className="text-[12px] font-bold uppercase tracking-wider text-white"
+              className="text-[11.5px] sm:text-[12px] font-bold uppercase tracking-wider text-white"
               style={{ fontFamily: "'Outfit', sans-serif" }}
             >
               PLATFORM
             </h4>
-            <ul className="space-y-2 text-[13px]">
+            <ul className="space-y-1.5 sm:space-y-2 text-[12px] sm:text-[13px]">
               {[
                 { label: "Platform Architecture", href: "/platform" },
                 { label: "Gate Security & Hardware", href: "/security" },
@@ -111,15 +111,15 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Column 3: Company Links (2.5 Cols) */}
-          <div className="lg:col-span-2 space-y-3">
+          {/* Column 3: Company Links (1 col on mobile, 2 cols on lg) */}
+          <div className="col-span-1 lg:col-span-2 space-y-2.5 sm:space-y-3">
             <h4
-              className="text-[12px] font-bold uppercase tracking-wider text-white"
+              className="text-[11.5px] sm:text-[12px] font-bold uppercase tracking-wider text-white"
               style={{ fontFamily: "'Outfit', sans-serif" }}
             >
               COMPANY
             </h4>
-            <ul className="space-y-2 text-[13px]">
+            <ul className="space-y-1.5 sm:space-y-2 text-[12px] sm:text-[13px]">
               {[
                 { label: "About GateSphere", href: "/about" },
                 { label: "Platform Architecture", href: "/platform" },
@@ -139,20 +139,20 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Column 4: Get In Touch (3 Cols) */}
-          <div className="lg:col-span-3 space-y-3">
+          {/* Column 4: Get In Touch (full width on mobile, 3 cols on lg) */}
+          <div className="col-span-2 lg:col-span-3 space-y-2.5 sm:space-y-3">
             <h4
-              className="text-[12px] font-bold uppercase tracking-wider text-white"
+              className="text-[11.5px] sm:text-[12px] font-bold uppercase tracking-wider text-white"
               style={{ fontFamily: "'Outfit', sans-serif" }}
             >
               GET IN TOUCH
             </h4>
-            <div className="space-y-2.5 text-[13px] text-slate-400">
+            <div className="space-y-2 text-[12.5px] sm:text-[13px] text-slate-400">
               <a
                 href="mailto:support@gatesphere.io"
                 className="flex items-center gap-2.5 hover:text-cyan-400 transition-colors cursor-pointer group"
               >
-                <div className="w-7 h-7 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-slate-300 group-hover:border-cyan-400/50">
+                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-slate-300 group-hover:border-cyan-400/50 text-xs">
                   ✉
                 </div>
                 <span>support@gatesphere.io</span>
@@ -161,30 +161,41 @@ export default function Footer() {
                 href="tel:+919876543210"
                 className="flex items-center gap-2.5 hover:text-cyan-400 transition-colors cursor-pointer group"
               >
-                <div className="w-7 h-7 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-slate-300 group-hover:border-cyan-400/50">
+                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-slate-300 group-hover:border-cyan-400/50 text-xs">
                   📞
                 </div>
                 <span>+91 98765 43210</span>
               </a>
               <a
-                href="https://maps.google.com/?q=Prestige+Tech+Park+Outer+Ring+Road+Bengaluru"
+                href="https://maps.google.com/?q=Bangalore+Karnataka"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-start gap-2.5 hover:text-cyan-400 transition-colors cursor-pointer group"
               >
-                <div className="w-7 h-7 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-slate-300 mt-0.5 group-hover:border-cyan-400/50">
+                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-slate-300 mt-0.5 group-hover:border-cyan-400/50 text-xs">
                   📍
                 </div>
-                <span className="leading-snug">Prestige Tech Park, Outer Ring Road, Bengaluru, Karnataka</span>
+                <span className="leading-snug">Bangalore, Karnataka</span>
               </a>
+            </div>
+
+            {/* Contact Button on mobile */}
+            <div className="pt-2 lg:hidden">
+              <Link
+                href="/demo"
+                className="inline-flex items-center justify-center px-5 py-2.5 rounded-full text-[12px] font-bold uppercase tracking-wider text-white bg-gradient-to-r from-red-600 to-rose-500 hover:from-red-500 hover:to-rose-400 transition-all shadow-lg shadow-red-500/25 whitespace-nowrap cursor-pointer hover:scale-105"
+                style={{ fontFamily: "'Outfit', sans-serif" }}
+              >
+                Contact Us
+              </Link>
             </div>
           </div>
 
-          {/* Column 5: Action Button (1.5 Cols) */}
-          <div className="lg:col-span-1 flex lg:justify-end">
+          {/* Column 5: Action Button (Desktop only, mobile is nested above) */}
+          <div className="hidden lg:flex lg:col-span-2 items-center lg:justify-end">
             <Link
               href="/demo"
-              className="inline-flex items-center justify-center px-4 py-2.5 rounded-full text-[12px] font-bold uppercase tracking-wider text-white bg-gradient-to-r from-red-600 to-rose-500 hover:from-red-500 hover:to-rose-400 transition-all shadow-lg shadow-red-500/25 whitespace-nowrap cursor-pointer hover:scale-105"
+              className="inline-flex items-center justify-center px-5 py-2.5 rounded-full text-[12px] font-bold uppercase tracking-wider text-white bg-gradient-to-r from-red-600 to-rose-500 hover:from-red-500 hover:to-rose-400 transition-all shadow-lg shadow-red-500/25 whitespace-nowrap cursor-pointer hover:scale-105"
               style={{ fontFamily: "'Outfit', sans-serif" }}
             >
               Contact Us
@@ -192,16 +203,14 @@ export default function Footer() {
           </div>
         </div>
 
-       
-
         {/* ── BOTTOM BAR: Copyright + Active Navigation Links ── */}
-        <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-[12px] text-slate-500 text-center sm:text-left">
+        <div className="pt-5 sm:pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 text-[11.5px] sm:text-[12px] text-slate-500 text-center sm:text-left">
           <div>
             © 2026 GateSphere Enterprise. All rights reserved.
           </div>
 
           {/* Direct Quick Links Bar */}
-          <div className="flex flex-nowrap items-center justify-center gap-3 text-xs font-medium">
+          <div className="flex flex-wrap sm:flex-nowrap items-center justify-center gap-2 sm:gap-3 text-[11px] sm:text-xs font-medium">
             <Link href="/" className="text-slate-400 hover:text-white transition-colors cursor-pointer">Home</Link>
             <span className="text-slate-700">·</span>
             <Link href="/platform" className="text-slate-400 hover:text-white transition-colors cursor-pointer">Platform</Link>
@@ -217,7 +226,7 @@ export default function Footer() {
             <Link href="/demo" className="text-slate-400 hover:text-white transition-colors cursor-pointer">Contact Us</Link>
           </div>
 
-          <div className="flex items-center gap-1.5 text-slate-400">
+          <div className="flex items-center gap-1.5 text-slate-400 text-[11px] sm:text-xs">
             <span>Built for premier communities</span>
             <span className="text-blue-400">🛡️</span>
           </div>
