@@ -661,10 +661,10 @@ export const assessmentsApi = {
       payload,
       communityId ? { community_id: communityId } : undefined,
     ),
-  approve: (id: string, notes?: string) =>
-    apiSend<any>("POST", `/billing/assessments/${id}/approve`, { notes }),
-  reject: (id: string, reason?: string) =>
-    apiSend<any>("POST", `/billing/assessments/${id}/reject`, { reason }),
+  approve: (id: string, notes?: string, approved_by_user_id?: string, approved_by_name?: string) =>
+    apiSend<any>("POST", `/billing/assessments/${id}/approve`, { notes, approved_by_user_id, approved_by_name }),
+  reject: (id: string, reason?: string, rejected_by_user_id?: string, rejected_by_name?: string) =>
+    apiSend<any>("POST", `/billing/assessments/${id}/reject`, { reason, rejected_by_user_id, rejected_by_name }),
 };
 
 export const communicationApi = {

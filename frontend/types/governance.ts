@@ -25,9 +25,17 @@ export interface SpecialAssessment {
   status: AssessmentStatus;
   created_at: string;
   updated_at: string;
+  proposed_by_user_id?: string;
+  proposed_by_name?: string;
+  proposer_role?: string;
+  proposer_department?: string;
   approved_by_user_id?: string;
+  approved_by_name?: string;
   approved_at?: string;
   approval_notes?: string;
+  rejected_by_user_id?: string;
+  rejected_by_name?: string;
+  rejected_at?: string;
   rejection_reason?: string;
 }
 
