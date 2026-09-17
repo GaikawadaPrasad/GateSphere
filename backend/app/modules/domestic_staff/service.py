@@ -637,7 +637,12 @@ class DomesticStaffService(UnitScopedAccess):
 
         for att in month_attendances:
             ci = att.check_in_at
-            co = att.check_out_at or now
+            if ci.tzinfo is None:
+                ci = ci.replace(tzinfo=UTC)
+            co = att.check_out_at
+            if co is not None and co.tzinfo is None:
+                co = co.replace(tzinfo=UTC)
+            co = co or now
             dur = max(0.0, (co - ci).total_seconds() / 3600.0)
             hours_month += dur
             if ci >= week_start:

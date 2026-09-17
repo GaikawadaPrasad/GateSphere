@@ -252,17 +252,17 @@ class NotificationService:
 
     # -- inbox ---------------------------------------- #
     async def list_mine(self, *, unread_only: bool, offset: int, limit: int):
-        stmt = (
-            select(Notification)
-            .options(selectinload(Notification.deliveries))
-            .where(Notification.recipient_user_id == self.actor.id)
-        )
+        base_stmt = select(Notification).where(Notification.recipient_user_id == self.actor.id)
         if unread_only:
-            stmt = stmt.where(Notification.is_read.is_(False))
-        stmt = stmt.order_by(Notification.created_at.desc())
+            base_stmt = base_stmt.where(Notification.is_read.is_(False))
+        stmt = (
+            base_stmt
+            .options(selectinload(Notification.deliveries))
+            .order_by(Notification.created_at.desc())
+        )
         return (
             await self.notifications.list(offset=offset, limit=limit, extra=stmt),
-            await self.notifications.count(extra=stmt),
+            await self.notifications.count(extra=base_stmt),
         )
 
     async def _mine(self, notification_id: uuid.UUID) -> Notification:
