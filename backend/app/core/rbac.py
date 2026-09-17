@@ -144,6 +144,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "communities:view",
     ],
     "resident": [
+        "communities:view",
         "visitors:view",
         "visitors:create",
         "visitors:approve",
@@ -172,6 +173,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "vehicles:update",
     ],
     "domestic_staff": [
+        "communities:view",
         "domestic_staff:view",
         "domestic_staff:update",
         "gate:view",
@@ -179,6 +181,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "incidents:create",
     ],
     "vendor_technician": [
+        "communities:view",
         "complaints:view",
         "complaints:update",
         "gate:view",
