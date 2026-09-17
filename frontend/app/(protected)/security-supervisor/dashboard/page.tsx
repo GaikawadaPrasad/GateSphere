@@ -20,6 +20,7 @@ import {
 import type { SecurityStats } from "@/types/dashboards";
 import type { GuardRoster, GateEvent, PanicAlert } from "@/types/gate";
 import { formatDateTime } from "@/lib/utils";
+import { toast } from "@/store/toast";
 
 // Real backend enum (backend/app/modules/gate/models.py ALERT_TYPES)
 const EMERGENCY_TYPES = [
@@ -39,6 +40,7 @@ export default function SecuritySupervisorDashboardPage() {
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
   const [emergencyType, setEmergencyType] = useState("medical");
   const [location, setLocation] = useState("");
+  const [locationError, setLocationError] = useState("");
 
   // Operational data
   const [isLoading, setIsLoading] = useState(true);
@@ -107,18 +109,31 @@ export default function SecuritySupervisorDashboardPage() {
     await queryClient.invalidateQueries();
     await loadData();
     setIsRefreshing(false);
+    toast.success("Security dashboard refreshed");
   };
 
   const handleTriggerEmergency = async (e: React.FormEvent) => {
     e.preventDefault();
-    await gateApi.triggerEmergency({
-      alert_type: emergencyType,
-      severity: "critical",
-      message: location.trim() ? `Location: ${location.trim()}` : undefined,
-    });
-    setIsEmergencyModalOpen(false);
-    setLocation("");
-    router.push("/security-supervisor/emergency-alerts");
+    const cleanLocation = location.trim();
+    if (!cleanLocation || cleanLocation.length < 3) {
+      setLocationError("Emergency location must be at least 3 characters.");
+      toast.error("Please specify a location for the emergency alert (min 3 characters).");
+      return;
+    }
+    try {
+      await gateApi.triggerEmergency({
+        alert_type: emergencyType,
+        severity: "critical",
+        message: `Location: ${cleanLocation}`,
+      });
+      toast.success("🚨 Emergency broadcast dispatched successfully!");
+      setIsEmergencyModalOpen(false);
+      setLocation("");
+      setLocationError("");
+      router.push("/security-supervisor/emergency-alerts");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to trigger emergency alert.");
+    }
   };
 
   const eventColumns: Column<GateEvent>[] = [
@@ -529,8 +544,17 @@ export default function SecuritySupervisorDashboardPage() {
               className="input-field"
               placeholder="e.g. Tower A Floor 8 / Clubhouse"
               value={location}
-              onChange={(e) => setLocation(e.target.value)}
+              onChange={(e) => {
+                setLocation(e.target.value);
+                if (locationError) setLocationError("");
+              }}
+              required
             />
+            {locationError && (
+              <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                {locationError}
+              </span>
+            )}
           </div>
         </form>
       </Modal>

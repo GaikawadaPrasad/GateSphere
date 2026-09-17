@@ -5,10 +5,11 @@ import { useSuperAdminDashboardMetrics } from "@/hooks/use-dashboards";
 import { formatCurrency } from "@/lib/utils";
 import { useUiStore } from "@/store/ui";
 import { ScopeBanner } from "@/components/common/ScopeBanner";
+import { Skeleton } from "@/components/common/LoadingSkeleton";
 
 export default function ReportsPage() {
   const { activeCommunityId } = useUiStore();
-  const { data: metrics } = useSuperAdminDashboardMetrics(activeCommunityId);
+  const { data: metrics, isLoading } = useSuperAdminDashboardMetrics(activeCommunityId);
 
   return (
     <div>
@@ -45,41 +46,50 @@ export default function ReportsPage() {
               style={{
                 display: "flex",
                 justifyContent: "space-between",
+                alignItems: "center",
                 borderBottom: "1px solid var(--border-light)",
                 paddingBottom: "0.5rem",
               }}
             >
               <span style={{ color: "var(--muted)" }}>Total Communities</span>
-              <span style={{ fontWeight: 600 }}>{metrics?.totalCommunities ?? "–"}</span>
+              <span style={{ fontWeight: 600 }}>
+                {isLoading ? <Skeleton width={45} height={18} /> : (metrics?.totalCommunities ?? "–")}
+              </span>
             </div>
             <div
               style={{
                 display: "flex",
                 justifyContent: "space-between",
+                alignItems: "center",
                 borderBottom: "1px solid var(--border-light)",
                 paddingBottom: "0.5rem",
               }}
             >
               <span style={{ color: "var(--muted)" }}>Active Units</span>
-              <span style={{ fontWeight: 600 }}>{metrics?.totalUnits ?? "–"}</span>
+              <span style={{ fontWeight: 600 }}>
+                {isLoading ? <Skeleton width={45} height={18} /> : (metrics?.totalUnits ?? "–")}
+              </span>
             </div>
             <div
               style={{
                 display: "flex",
                 justifyContent: "space-between",
+                alignItems: "center",
                 borderBottom: "1px solid var(--border-light)",
                 paddingBottom: "0.5rem",
               }}
             >
               <span style={{ color: "var(--muted)" }}>Total Verified Residents</span>
-              <span style={{ fontWeight: 600 }}>{metrics?.totalResidents ?? "–"}</span>
+              <span style={{ fontWeight: 600 }}>
+                {isLoading ? <Skeleton width={45} height={18} /> : (metrics?.totalResidents ?? "–")}
+              </span>
             </div>
             <div
-              style={{ display: "flex", justifyContent: "space-between", paddingBottom: "0.5rem" }}
+              style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "0.5rem" }}
             >
               <span style={{ color: "var(--muted)" }}>Global Occupancy Rate</span>
               <span style={{ fontWeight: 700, color: "var(--primary)" }}>
-                {metrics?.occupancyRate ?? 0}%
+                {isLoading ? <Skeleton width={45} height={18} /> : `${metrics?.occupancyRate ?? 0}%`}
               </span>
             </div>
           </div>
@@ -95,37 +105,46 @@ export default function ReportsPage() {
               style={{
                 display: "flex",
                 justifyContent: "space-between",
+                alignItems: "center",
                 borderBottom: "1px solid var(--border-light)",
                 paddingBottom: "0.5rem",
               }}
             >
               <span style={{ color: "var(--muted)" }}>Current Visitors Inside</span>
-              <span style={{ fontWeight: 600 }}>{metrics?.visitorsInside ?? 0}</span>
+              <span style={{ fontWeight: 600 }}>
+                {isLoading ? <Skeleton width={45} height={18} /> : (metrics?.visitorsInside ?? 0)}
+              </span>
             </div>
             <div
               style={{
                 display: "flex",
                 justifyContent: "space-between",
+                alignItems: "center",
                 borderBottom: "1px solid var(--border-light)",
                 paddingBottom: "0.5rem",
               }}
             >
               <span style={{ color: "var(--muted)" }}>Vehicles on Premises</span>
-              <span style={{ fontWeight: 600 }}>{metrics?.vehiclesInside ?? 0}</span>
+              <span style={{ fontWeight: 600 }}>
+                {isLoading ? <Skeleton width={45} height={18} /> : (metrics?.vehiclesInside ?? 0)}
+              </span>
             </div>
             <div
               style={{
                 display: "flex",
                 justifyContent: "space-between",
+                alignItems: "center",
                 borderBottom: "1px solid var(--border-light)",
                 paddingBottom: "0.5rem",
               }}
             >
               <span style={{ color: "var(--muted)" }}>Domestic Staff Inside</span>
-              <span style={{ fontWeight: 600 }}>{metrics?.staffInside ?? 0}</span>
+              <span style={{ fontWeight: 600 }}>
+                {isLoading ? <Skeleton width={45} height={18} /> : (metrics?.staffInside ?? 0)}
+              </span>
             </div>
             <div
-              style={{ display: "flex", justifyContent: "space-between", paddingBottom: "0.5rem" }}
+              style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "0.5rem" }}
             >
               <span style={{ color: "var(--muted)" }}>Active Panic Alerts</span>
               <span
@@ -134,7 +153,7 @@ export default function ReportsPage() {
                   color: (metrics?.activePanicAlerts ?? 0) > 0 ? "var(--danger)" : "var(--success)",
                 }}
               >
-                {metrics?.activePanicAlerts ?? 0}
+                {isLoading ? <Skeleton width={45} height={18} /> : (metrics?.activePanicAlerts ?? 0)}
               </span>
             </div>
           </div>
@@ -150,45 +169,50 @@ export default function ReportsPage() {
               style={{
                 display: "flex",
                 justifyContent: "space-between",
+                alignItems: "center",
                 borderBottom: "1px solid var(--border-light)",
                 paddingBottom: "0.5rem",
               }}
             >
               <span style={{ color: "var(--muted)" }}>Total Billed (Maintenance)</span>
-              <span style={{ fontWeight: 600 }}>{formatCurrency(metrics?.totalBilled)}</span>
+              <span style={{ fontWeight: 600 }}>
+                {isLoading ? <Skeleton width={80} height={18} /> : formatCurrency(metrics?.totalBilled)}
+              </span>
             </div>
             <div
               style={{
                 display: "flex",
                 justifyContent: "space-between",
+                alignItems: "center",
                 borderBottom: "1px solid var(--border-light)",
                 paddingBottom: "0.5rem",
               }}
             >
               <span style={{ color: "var(--muted)" }}>Total Collected</span>
               <span style={{ fontWeight: 600, color: "var(--success)" }}>
-                {formatCurrency(metrics?.totalCollected)}
+                {isLoading ? <Skeleton width={80} height={18} /> : formatCurrency(metrics?.totalCollected)}
               </span>
             </div>
             <div
               style={{
                 display: "flex",
                 justifyContent: "space-between",
+                alignItems: "center",
                 borderBottom: "1px solid var(--border-light)",
                 paddingBottom: "0.5rem",
               }}
             >
               <span style={{ color: "var(--muted)" }}>Total Outstanding Balance</span>
               <span style={{ fontWeight: 600, color: "var(--danger)" }}>
-                {formatCurrency(metrics?.totalOutstanding)}
+                {isLoading ? <Skeleton width={80} height={18} /> : formatCurrency(metrics?.totalOutstanding)}
               </span>
             </div>
             <div
-              style={{ display: "flex", justifyContent: "space-between", paddingBottom: "0.5rem" }}
+              style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "0.5rem" }}
             >
               <span style={{ color: "var(--muted)" }}>Collection Efficiency</span>
               <span style={{ fontWeight: 700, color: "var(--primary)" }}>
-                {metrics?.collectionRate ?? 0}%
+                {isLoading ? <Skeleton width={45} height={18} /> : `${metrics?.collectionRate ?? 0}%`}
               </span>
             </div>
           </div>

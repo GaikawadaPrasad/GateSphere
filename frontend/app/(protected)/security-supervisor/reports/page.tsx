@@ -11,82 +11,84 @@ export default function SecuritySupervisorReportsPage() {
   const [reportData, setReportData] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    (async () => {
-      setIsLoading(true);
-      try {
-        let items: any[] = [];
-        if (reportType === "gate_traffic") {
-          const eventsRes = await gateApi.events({ page_size: 100 }).catch(() => []);
-          items = Array.isArray(eventsRes) ? eventsRes : [];
-        } else if (reportType === "visitor_activity") {
-          const entriesRes = await visitorsApi.entries({ page_size: 100 }).catch(() => []);
-          items = Array.isArray(entriesRes) ? entriesRes : [];
-        } else if (reportType === "delivery_records") {
-          const delRes = await deliveriesApi.list({ page_size: 100 }).catch(() => []);
-          items = Array.isArray(delRes) ? delRes : [];
-        } else if (reportType === "blacklist_attempts") {
-          const blRes = await blacklistApi.list({ page_size: 100 }).catch(() => []);
-          items = Array.isArray(blRes) ? blRes : [];
-        } else if (reportType === "incident_reports") {
-          const incRes = await incidentsApi.list({ page_size: 100 }).catch(() => []);
-          items = Array.isArray(incRes) ? incRes : [];
-        } else {
-          const logsRes = await auditApi.logs({ page_size: 100 }).catch(() => []);
-          items = Array.isArray(logsRes) ? logsRes : [];
-        }
-
-        // Timeframe filtering
-        const now = new Date();
-        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-        const startOfWeek = startOfToday - 7 * 24 * 3600 * 1000;
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-
-        const filtered = items.filter((item) => {
-          const dt = item.created_at || item.occurred_at || item.entry_time;
-          if (!dt) return true;
-          const t = new Date(dt).getTime();
-          if (isNaN(t)) return true;
-
-          if (timeframe === "today") return t >= startOfToday;
-          if (timeframe === "this_week") return t >= startOfWeek;
-          if (timeframe === "this_month") return t >= startOfMonth;
-          return true;
-        });
-
-        if (reportType === "gate_traffic") {
-          const gateGroups = new Map<string, { zone: string; entries: number; exits: number; denied: number; peak: string }>();
-          for (const e of filtered) {
-            const zone = e.gate_name || e.gate?.name || (e.gate_id ? `Gate #${e.gate_id.slice(0, 8)}` : "Main Gate");
-            if (!gateGroups.has(zone)) {
-              gateGroups.set(zone, { zone, entries: 0, exits: 0, denied: 0, peak: "10:00 - 11:00" });
-            }
-            const group = gateGroups.get(zone)!;
-            const evType = (e.event_type || "").toLowerCase();
-            if (evType.includes("deny") || evType.includes("denied") || evType.includes("block")) {
-              group.denied++;
-            } else if (evType.includes("exit") || evType.includes("out")) {
-              group.exits++;
-            } else {
-              group.entries++;
-            }
-          }
-          setReportData(Array.from(gateGroups.values()));
-        } else {
-          setReportData(filtered.map((item, idx) => ({
-            id: item.id || String(idx),
-            label: item.visitor_name || item.courier_company || item.phone || item.action || `Record #${idx + 1}`,
-            type: item.visitor_type || item.delivery_type || item.event_type || reportType,
-            status: item.status || item.decision || "logged",
-            date: item.created_at || item.entry_time || item.occurred_at || "Recent",
-          })));
-        }
-      } catch {
-        setReportData([]);
-      } finally {
-        setIsLoading(false);
+  const loadData = async () => {
+    setIsLoading(true);
+    try {
+      let items: any[] = [];
+      if (reportType === "gate_traffic") {
+        const eventsRes = await gateApi.events({ page_size: 100 }).catch(() => []);
+        items = Array.isArray(eventsRes) ? eventsRes : [];
+      } else if (reportType === "visitor_activity") {
+        const entriesRes = await visitorsApi.entries({ page_size: 100 }).catch(() => []);
+        items = Array.isArray(entriesRes) ? entriesRes : [];
+      } else if (reportType === "delivery_records") {
+        const delRes = await deliveriesApi.list({ page_size: 100 }).catch(() => []);
+        items = Array.isArray(delRes) ? delRes : [];
+      } else if (reportType === "blacklist_attempts") {
+        const blRes = await blacklistApi.list({ page_size: 100 }).catch(() => []);
+        items = Array.isArray(blRes) ? blRes : [];
+      } else if (reportType === "incident_reports") {
+        const incRes = await incidentsApi.list({ page_size: 100 }).catch(() => []);
+        items = Array.isArray(incRes) ? incRes : [];
+      } else {
+        const logsRes = await auditApi.logs({ page_size: 100 }).catch(() => []);
+        items = Array.isArray(logsRes) ? logsRes : [];
       }
-    })();
+
+      // Timeframe filtering
+      const now = new Date();
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      const startOfWeek = startOfToday - 7 * 24 * 3600 * 1000;
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+
+      const filtered = items.filter((item) => {
+        const dt = item.created_at || item.occurred_at || item.entry_time;
+        if (!dt) return true;
+        const t = new Date(dt).getTime();
+        if (isNaN(t)) return true;
+
+        if (timeframe === "today") return t >= startOfToday;
+        if (timeframe === "this_week") return t >= startOfWeek;
+        if (timeframe === "this_month") return t >= startOfMonth;
+        return true;
+      });
+
+      if (reportType === "gate_traffic") {
+        const gateGroups = new Map<string, { zone: string; entries: number; exits: number; denied: number; peak: string }>();
+        for (const e of filtered) {
+          const zone = e.gate_name || e.gate?.name || (e.gate_id ? `Gate #${e.gate_id.slice(0, 8)}` : "Main Gate");
+          if (!gateGroups.has(zone)) {
+            gateGroups.set(zone, { zone, entries: 0, exits: 0, denied: 0, peak: "10:00 - 11:00" });
+          }
+          const group = gateGroups.get(zone)!;
+          const evType = (e.event_type || "").toLowerCase();
+          if (evType.includes("deny") || evType.includes("denied") || evType.includes("block")) {
+            group.denied++;
+          } else if (evType.includes("exit") || evType.includes("out")) {
+            group.exits++;
+          } else {
+            group.entries++;
+          }
+        }
+        setReportData(Array.from(gateGroups.values()));
+      } else {
+        setReportData(filtered.map((item, idx) => ({
+          id: item.id || String(idx),
+          label: item.visitor_name || item.courier_company || item.phone || item.action || `Record #${idx + 1}`,
+          type: item.visitor_type || item.delivery_type || item.event_type || reportType,
+          status: item.status || item.decision || "logged",
+          date: item.created_at || item.entry_time || item.occurred_at || "Recent",
+        })));
+      }
+    } catch {
+      setReportData([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
   }, [reportType, timeframe]);
 
   return (
@@ -99,6 +101,15 @@ export default function SecuritySupervisorReportsPage() {
           { label: "Security Supervisor" },
           { label: "Reports" },
         ]}
+        actions={
+          <button
+            className="btn btn-secondary"
+            onClick={loadData}
+            disabled={isLoading}
+          >
+            🔄 {isLoading ? "Refreshing…" : "Refresh"}
+          </button>
+        }
       />
 
       <div className="card" style={{ marginBottom: "1.75rem" }}>

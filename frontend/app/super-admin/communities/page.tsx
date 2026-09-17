@@ -671,7 +671,7 @@ export default function CommunitiesPage() {
           <div>
             <h3 className="card-title">All Communities</h3>
             <p style={{ fontSize: "0.775rem", color: "var(--muted)" }}>
-              Total {communities?.length || 0} registered communities
+              {isLoading ? "Loading registered communities…" : `Total ${communities?.length || 0} registered communities`}
             </p>
           </div>
 

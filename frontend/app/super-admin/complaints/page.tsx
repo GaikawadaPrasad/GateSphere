@@ -114,7 +114,7 @@ export default function ComplaintsPage() {
           <div>
             <h3 className="card-title">Service Tickets</h3>
             <p style={{ fontSize: "0.775rem", color: "var(--muted)" }}>
-              {tickets?.length || 0} tickets tracked
+              {isLoading ? "Loading tickets…" : `${tickets?.length || 0} tickets tracked`}
             </p>
           </div>
 

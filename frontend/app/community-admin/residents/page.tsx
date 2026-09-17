@@ -346,6 +346,7 @@ export default function CommunityAdminResidentsPage() {
     setIsPrimary(true);
     setAgreementRef("");
     setAddError("");
+    setResidentFieldErrors({});
   };
 
   const handleOpenAddResident = () => {
@@ -373,6 +374,17 @@ export default function CommunityAdminResidentsPage() {
     if (phone.trim() && !/^\+?[0-9\s\-()]{7,20}$/.test(phone.trim())) {
       errors.phone = "Invalid phone number format.";
     }
+    if (password && password.trim().length < 10) {
+      errors.password = "Initial password must be at least 10 characters.";
+    }
+    const trimmedAgreement = agreementRef.trim();
+    if (trimmedAgreement) {
+      if (trimmedAgreement.length < 3 || trimmedAgreement.length > 50) {
+        errors.agreementRef = "Agreement reference must be between 3 and 50 characters.";
+      } else if (!/^[A-Za-z0-9\-_/]+$/.test(trimmedAgreement)) {
+        errors.agreementRef = "Agreement reference can only contain letters, numbers, hyphens, underscores, or slashes (e.g. LEASE-2026-081).";
+      }
+    }
     setResidentFieldErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -384,7 +396,10 @@ export default function CommunityAdminResidentsPage() {
       return;
     }
 
-    if (!validateResidentForm()) return;
+    if (!validateResidentForm()) {
+      setAddError("Please correct highlighted errors before onboarding resident.");
+      return;
+    }
 
     setAddError("");
     setIsAdding(true);
@@ -964,11 +979,15 @@ export default function CommunityAdminResidentsPage() {
       {/* Onboard Resident Modal */}
       <Modal
         isOpen={isAddResidentOpen}
-        onClose={() => setIsAddResidentOpen(false)}
+        onClose={() => {
+          setIsAddResidentOpen(false);
+          setResidentFieldErrors({});
+          setAddError("");
+        }}
         title="👤 Onboard New Resident"
         maxWidth={640}
       >
-        <form onSubmit={handleAddResidentSubmit}>
+        <form onSubmit={handleAddResidentSubmit} noValidate>
           <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
             {/* Header Subtitle */}
             <p style={{ margin: 0, fontSize: "0.825rem", color: "#64748b" }}>
@@ -1185,7 +1204,17 @@ export default function CommunityAdminResidentsPage() {
                 <div>
                   <PasswordField
                     value={password}
-                    onChange={(val) => setPassword(val)}
+                    onChange={(val) => {
+                      setPassword(val);
+                      if (residentFieldErrors.password) {
+                        setResidentFieldErrors((prev) => {
+                          const n = { ...prev };
+                          delete n.password;
+                          return n;
+                        });
+                      }
+                    }}
+                    error={residentFieldErrors.password}
                     placeholder="e.g. ananya@Gate2026!"
                   />
                 </div>
@@ -1245,16 +1274,31 @@ export default function CommunityAdminResidentsPage() {
                     type="text"
                     className="input-field"
                     value={agreementRef}
-                    onChange={(e) => setAgreementRef(e.target.value)}
+                    aria-invalid={Boolean(residentFieldErrors.agreementRef)}
+                    onChange={(e) => {
+                      setAgreementRef(e.target.value);
+                      if (residentFieldErrors.agreementRef) {
+                        setResidentFieldErrors((prev) => {
+                          const n = { ...prev };
+                          delete n.agreementRef;
+                          return n;
+                        });
+                      }
+                    }}
                     placeholder="e.g. LEASE-2026-081"
                     style={{
                       width: "100%",
                       padding: "0.5rem 0.75rem",
                       fontSize: "0.85rem",
                       borderRadius: "6px",
-                      border: "1px solid #cbd5e1",
+                      border: `1px solid ${residentFieldErrors.agreementRef ? "#dc2626" : "#cbd5e1"}`,
                     }}
                   />
+                  {residentFieldErrors.agreementRef && (
+                    <span style={{ fontSize: "0.75rem", color: "#dc2626", marginTop: "0.25rem", display: "block" }}>
+                      {residentFieldErrors.agreementRef}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -1328,11 +1372,15 @@ export default function CommunityAdminResidentsPage() {
       {/* Issue Resident Invitation Modal */}
       <Modal
         isOpen={isCreateInviteOpen}
-        onClose={() => setIsCreateInviteOpen(false)}
+        onClose={() => {
+          setIsCreateInviteOpen(false);
+          setInviteError("");
+        }}
         title="📨 Issue Resident Invitation"
         maxWidth={580}
       >
         <form
+          noValidate
           onSubmit={async (e) => {
             e.preventDefault();
             if (!activeCommunityId) return;

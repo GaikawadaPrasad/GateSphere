@@ -107,6 +107,7 @@ export default function CommunityAdminPropertyPage() {
 
     if (Object.keys(errors).length > 0) {
       setPropertyFieldErrors(errors);
+      setErrorMessage(Object.values(errors)[0]);
       return;
     }
 
@@ -152,6 +153,7 @@ export default function CommunityAdminPropertyPage() {
     }
     if (Object.keys(errors).length > 0) {
       setPropertyFieldErrors(errors);
+      setErrorMessage(Object.values(errors)[0]);
       return;
     }
 
@@ -196,6 +198,7 @@ export default function CommunityAdminPropertyPage() {
     }
     if (Object.keys(errors).length > 0) {
       setPropertyFieldErrors(errors);
+      setErrorMessage(Object.values(errors)[0]);
       return;
     }
 
@@ -244,6 +247,7 @@ export default function CommunityAdminPropertyPage() {
     }
     if (Object.keys(errors).length > 0) {
       setPropertyFieldErrors(errors);
+      setErrorMessage(Object.values(errors)[0]);
       return;
     }
 

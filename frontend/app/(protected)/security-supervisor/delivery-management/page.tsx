@@ -131,6 +131,15 @@ export default function SecuritySupervisorDeliveryManagementPage() {
           { label: "Security Supervisor" },
           { label: "Delivery Management" },
         ]}
+        actions={
+          <button
+            className="btn btn-secondary"
+            onClick={loadData}
+            disabled={isLoading}
+          >
+            🔄 {isLoading ? "Refreshing…" : "Refresh"}
+          </button>
+        }
       />
 
       <div className="card">

@@ -7,6 +7,7 @@ import { FileUpload } from "@/components/common/FileUpload";
 import { visitorsApi, communitiesApi, authApi, blacklistApi } from "@/lib/api";
 import { useUiStore } from "@/store/ui";
 import type { Unit } from "@/types/communities";
+import { isValidPersonName } from "@/lib/utils";
 
 interface WalkInVisitorModalProps {
   isOpen: boolean;
@@ -124,8 +125,8 @@ export function WalkInVisitorModal({
         if (!trimmed) return "Visitor full name is required.";
         if (trimmed.length < 2) return "Visitor name must be at least 2 characters.";
         if (trimmed.length > 100) return "Visitor name cannot exceed 100 characters.";
-        if (!/^[a-zA-Z\s.\-']+$/.test(trimmed)) {
-          return "Visitor name must contain valid letters only (no numbers or special symbols).";
+        if (!isValidPersonName(trimmed)) {
+          return "Visitor name must contain only alphabetic letters and spaces (no numbers or symbols).";
         }
         return undefined;
       }
@@ -570,7 +571,7 @@ export function WalkInVisitorModal({
                 Mobile Number <span style={{ color: "red" }}>*</span>
               </label>
               <input
-                type="number"
+                type="tel"
                 className="input-field"
                 placeholder="e.g. 98765 43210"
                 value={visitorPhone}

@@ -41,7 +41,7 @@ import {
 } from "@/hooks/use-domestic-staff-data";
 import { useMyNotifications } from "@/hooks/use-notifications";
 import { useTableControls } from "@/hooks/use-table-controls";
-import { formatDate } from "@/lib/utils";
+import { formatDate, isValidPersonName } from "@/lib/utils";
 
 import { toast } from "@/store/toast";
 
@@ -67,8 +67,12 @@ export function DomesticStaffDashboardView({
   const activeTab = initialTab;
   const [sosModalOpen, setSosModalOpen] = useState(false);
   const [editProfileOpen, setEditProfileOpen] = useState(false);
+  const [fullNameInput, setFullNameInput] = useState("");
   const [phoneInput, setPhoneInput] = useState("");
-  const [emergencyInput, setEmergencyInput] = useState("");
+  const [emergencyNameInput, setEmergencyNameInput] = useState("");
+  const [emergencyPhoneInput, setEmergencyPhoneInput] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const {
     data: profile,
@@ -143,15 +147,87 @@ export function DomesticStaffDashboardView({
     }
   };
 
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        refetchProfile(),
+        refetchHomes(),
+        refetchAtt(),
+        refetchVisits(),
+        myNotifications.refetch(),
+      ]);
+      toast.success("Staff operations, schedule, and attendance data updated.", "Refreshed");
+    } catch {
+      toast.error("Failed to refresh staff data.", "Error");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
+
+    const errors: Record<string, string> = {};
+    const trimmedName = fullNameInput.trim();
+    const trimmedPhone = phoneInput.trim();
+    const trimmedEmergName = emergencyNameInput.trim();
+    const trimmedEmergPhone = emergencyPhoneInput.trim();
+
+    // Full Name validation
+    if (!trimmedName) {
+      errors.full_name = "Full name is required.";
+    } else if (trimmedName.length < 2) {
+      errors.full_name = "Full name must be at least 2 characters.";
+    } else if (!isValidPersonName(trimmedName)) {
+      errors.full_name = "Full name must contain only alphabetic letters and spaces.";
+    }
+
+    // Phone validation
+    const phoneRegex = /^\+?[0-9\s\-()]{7,20}$/;
+    const digitsOnly = trimmedPhone.replace(/\D/g, "");
+    if (!trimmedPhone) {
+      errors.phone = "Mobile phone number is required.";
+    } else if (!phoneRegex.test(trimmedPhone) || digitsOnly.length < 10) {
+      errors.phone = "Please enter a valid mobile phone number (at least 10 digits).";
+    }
+
+    // Emergency Contact Name validation
+    if (!trimmedEmergName) {
+      errors.emergency_name = "Emergency contact name is required.";
+    } else if (trimmedEmergName.length < 2) {
+      errors.emergency_name = "Emergency contact name must be at least 2 characters.";
+    } else if (!isValidPersonName(trimmedEmergName)) {
+      errors.emergency_name = "Emergency contact name must contain only alphabetic letters and spaces.";
+    }
+
+    // Emergency Contact Phone validation
+    const emergDigitsOnly = trimmedEmergPhone.replace(/\D/g, "");
+    if (!trimmedEmergPhone) {
+      errors.emergency_phone = "Emergency contact phone is required.";
+    } else if (!phoneRegex.test(trimmedEmergPhone) || emergDigitsOnly.length < 10) {
+      errors.emergency_phone = "Please enter a valid emergency phone number (at least 10 digits).";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      toast.error("Please resolve the highlighted form errors.", "Validation Error");
+      return;
+    }
+
+    setFieldErrors({});
     try {
+      const combinedEmergency = `${trimmedEmergName} (${trimmedEmergPhone})`;
       await updateProfile.mutateAsync({
         staffId: profile.id,
-        data: { phone: phoneInput, emergency_contact: emergencyInput },
+        data: {
+          full_name: trimmedName,
+          phone: trimmedPhone,
+          emergency_contact: combinedEmergency,
+        },
       });
-      toast.success("Your contact and emergency information was updated.", "Profile Saved");
+      toast.success("Your contact and profile details were updated.", "Profile Saved");
       setEditProfileOpen(false);
     } catch {
       toast.error("Failed to update profile. Please try again.", "Error");
@@ -227,6 +303,14 @@ export function DomesticStaffDashboardView({
       headerActions={
         <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
           <LiveDot label="DUTY CLOCK ACTIVE" />
+          <BrandButton
+            size="sm"
+            variant="outline"
+            onClick={handleManualRefresh}
+            isLoading={isRefreshing}
+          >
+            🔄 Refresh
+          </BrandButton>
           <BrandButton variant="danger" size="sm" onClick={() => setSosModalOpen(true)}>
             🆘 One-Tap SOS
           </BrandButton>
@@ -577,8 +661,18 @@ export function DomesticStaffDashboardView({
                 size="sm"
                 variant="outline"
                 onClick={() => {
+                  setFullNameInput(profile?.full_name || "");
                   setPhoneInput(profile?.phone || "");
-                  setEmergencyInput(profile?.emergency_contact || "");
+                  const rawEmergency = profile?.emergency_contact || "";
+                  const match = rawEmergency.match(/^(.*?)\s*[\(\-]\s*([+0-9\s\-]+)\s*\)?$/);
+                  if (match) {
+                    setEmergencyNameInput(match[1].trim());
+                    setEmergencyPhoneInput(match[2].trim());
+                  } else {
+                    setEmergencyNameInput(rawEmergency === "None specified" ? "" : rawEmergency);
+                    setEmergencyPhoneInput("");
+                  }
+                  setFieldErrors({});
                   setEditProfileOpen(true);
                 }}
               >
@@ -1303,11 +1397,15 @@ export function DomesticStaffDashboardView({
       {/* Edit Profile Modal */}
       <Modal
         isOpen={editProfileOpen}
-        onClose={() => setEditProfileOpen(false)}
-        title="Edit Contact Information"
+        onClose={() => {
+          setEditProfileOpen(false);
+          setFieldErrors({});
+        }}
+        title="Edit Staff Contact & Profile"
       >
         <form
           onSubmit={handleSaveProfile}
+          noValidate
           style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
         >
           <div>
@@ -1319,15 +1417,32 @@ export function DomesticStaffDashboardView({
                 marginBottom: "0.35rem",
               }}
             >
-              Mobile Phone Number
+              Full Name (Alphabets Only) <span style={{ color: "#EF4444" }}>*</span>
             </label>
             <input
               className="input-field"
-              value={phoneInput}
-              onChange={(e) => setPhoneInput(e.target.value)}
+              value={fullNameInput}
+              onChange={(e) => {
+                setFullNameInput(e.target.value);
+                if (fieldErrors.full_name) {
+                  setFieldErrors((prev) => ({ ...prev, full_name: "" }));
+                }
+              }}
+              placeholder="e.g. Ramesh Kumar"
+              aria-invalid={!!fieldErrors.full_name}
+              style={{
+                borderColor: fieldErrors.full_name ? "#EF4444" : undefined,
+                width: "100%",
+              }}
               required
             />
+            {fieldErrors.full_name && (
+              <span style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", display: "block" }}>
+                {fieldErrors.full_name}
+              </span>
+            )}
           </div>
+
           <div>
             <label
               style={{
@@ -1337,15 +1452,104 @@ export function DomesticStaffDashboardView({
                 marginBottom: "0.35rem",
               }}
             >
-              Emergency Contact Name & Phone
+              Mobile Phone Number <span style={{ color: "#EF4444" }}>*</span>
+            </label>
+            <input
+              type="tel"
+              className="input-field"
+              value={phoneInput}
+              onChange={(e) => {
+                setPhoneInput(e.target.value);
+                if (fieldErrors.phone) {
+                  setFieldErrors((prev) => ({ ...prev, phone: "" }));
+                }
+              }}
+              placeholder="+91 98765 43210"
+              aria-invalid={!!fieldErrors.phone}
+              style={{
+                borderColor: fieldErrors.phone ? "#EF4444" : undefined,
+                width: "100%",
+              }}
+              required
+            />
+            {fieldErrors.phone && (
+              <span style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", display: "block" }}>
+                {fieldErrors.phone}
+              </span>
+            )}
+          </div>
+
+          <div>
+            <label
+              style={{
+                display: "block",
+                fontSize: "13px",
+                fontWeight: 600,
+                marginBottom: "0.35rem",
+              }}
+            >
+              Emergency Contact Name (Alphabets Only) <span style={{ color: "#EF4444" }}>*</span>
             </label>
             <input
               className="input-field"
-              value={emergencyInput}
-              onChange={(e) => setEmergencyInput(e.target.value)}
+              value={emergencyNameInput}
+              onChange={(e) => {
+                setEmergencyNameInput(e.target.value);
+                if (fieldErrors.emergency_name) {
+                  setFieldErrors((prev) => ({ ...prev, emergency_name: "" }));
+                }
+              }}
+              placeholder="e.g. Sunita Kumar"
+              aria-invalid={!!fieldErrors.emergency_name}
+              style={{
+                borderColor: fieldErrors.emergency_name ? "#EF4444" : undefined,
+                width: "100%",
+              }}
               required
             />
+            {fieldErrors.emergency_name && (
+              <span style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", display: "block" }}>
+                {fieldErrors.emergency_name}
+              </span>
+            )}
           </div>
+
+          <div>
+            <label
+              style={{
+                display: "block",
+                fontSize: "13px",
+                fontWeight: 600,
+                marginBottom: "0.35rem",
+              }}
+            >
+              Emergency Contact Phone <span style={{ color: "#EF4444" }}>*</span>
+            </label>
+            <input
+              type="tel"
+              className="input-field"
+              value={emergencyPhoneInput}
+              onChange={(e) => {
+                setEmergencyPhoneInput(e.target.value);
+                if (fieldErrors.emergency_phone) {
+                  setFieldErrors((prev) => ({ ...prev, emergency_phone: "" }));
+                }
+              }}
+              placeholder="+91 91234 56789"
+              aria-invalid={!!fieldErrors.emergency_phone}
+              style={{
+                borderColor: fieldErrors.emergency_phone ? "#EF4444" : undefined,
+                width: "100%",
+              }}
+              required
+            />
+            {fieldErrors.emergency_phone && (
+              <span style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", display: "block" }}>
+                {fieldErrors.emergency_phone}
+              </span>
+            )}
+          </div>
+
           <div
             style={{
               display: "flex",
@@ -1354,7 +1558,14 @@ export function DomesticStaffDashboardView({
               marginTop: "1rem",
             }}
           >
-            <BrandButton type="button" variant="outline" onClick={() => setEditProfileOpen(false)}>
+            <BrandButton
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setEditProfileOpen(false);
+                setFieldErrors({});
+              }}
+            >
               Cancel
             </BrandButton>
             <BrandButton type="submit" isLoading={updateProfile.isPending}>

@@ -139,7 +139,7 @@ export default function SecuritySupervisorIncidentsPage() {
       toast.success("Security incident logged successfully");
       await loadData();
     } catch (err: any) {
-      alert(err?.message || "Failed to log security incident.");
+      toast.error(err?.message || "Failed to log security incident.");
     } finally {
       setIsSubmitting(false);
     }
@@ -159,11 +159,12 @@ export default function SecuritySupervisorIncidentsPage() {
         status: newStatusSlug as any,
         reason: "Supervisor status transition",
       });
+      toast.success(`Incident status updated to ${newStatusSlug}.`);
       setIncidents((prev) =>
         prev.map((item) => (item.id === inc.id ? { ...item, status: newStatusSlug } : item)),
       );
     } catch (err: any) {
-      alert(err?.message || "Failed to update incident status.");
+      toast.error(err?.message || "Failed to update incident status.");
     } finally {
       setUpdatingId(null);
     }
@@ -173,6 +174,7 @@ export default function SecuritySupervisorIncidentsPage() {
     e.preventDefault();
     if (!resolvingIncident || !resolutionSummary.trim() || resolutionSummary.trim().length < 5) {
       setIncidentFieldErrors({ resolution: "Resolution summary must be at least 5 characters long." });
+      toast.error("Please provide a detailed resolution summary (min 5 characters).");
       return;
     }
     setIsResolving(true);
@@ -200,7 +202,7 @@ export default function SecuritySupervisorIncidentsPage() {
       toast.success("Incident resolved successfully");
       await loadData();
     } catch (err: any) {
-      alert(err?.message || "Failed to resolve security incident.");
+      toast.error(err?.message || "Failed to resolve security incident.");
     } finally {
       setIsResolving(false);
     }
@@ -228,9 +230,18 @@ export default function SecuritySupervisorIncidentsPage() {
           { label: "Incidents" },
         ]}
         actions={
-          <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
-            ⚠️ Log Security Incident
-          </button>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+            <button
+              className="btn btn-secondary"
+              onClick={loadData}
+              disabled={isLoading}
+            >
+              🔄 {isLoading ? "Refreshing…" : "Refresh"}
+            </button>
+            <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
+              ⚠️ Log Security Incident
+            </button>
+          </div>
         }
       />
 
@@ -380,9 +391,19 @@ export default function SecuritySupervisorIncidentsPage() {
               className="input-field"
               placeholder="e.g. Unattended suspicious bag found at South Gate perimeter"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                if (incidentFieldErrors.title) {
+                  setIncidentFieldErrors((prev) => ({ ...prev, title: "" }));
+                }
+              }}
               required
             />
+            {incidentFieldErrors.title && (
+              <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                {incidentFieldErrors.title}
+              </span>
+            )}
           </div>
 
           <div
@@ -540,9 +561,19 @@ export default function SecuritySupervisorIncidentsPage() {
               rows={3}
               placeholder="e.g. Perimeter inspected by duty guards. Unattended item verified and returned to rightful owner. Area secured."
               value={resolutionSummary}
-              onChange={(e) => setResolutionSummary(e.target.value)}
+              onChange={(e) => {
+                setResolutionSummary(e.target.value);
+                if (incidentFieldErrors.resolution) {
+                  setIncidentFieldErrors((prev) => ({ ...prev, resolution: "" }));
+                }
+              }}
               required
             />
+            {incidentFieldErrors.resolution && (
+              <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                {incidentFieldErrors.resolution}
+              </span>
+            )}
           </div>
 
           <div style={{ marginTop: "1rem" }}>

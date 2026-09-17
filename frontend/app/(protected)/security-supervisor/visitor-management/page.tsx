@@ -9,6 +9,7 @@ import { DataTable, type Column } from "@/components/tables/DataTable";
 import { visitorsApi, communitiesApi, authApi, type VisitorRecord } from "@/lib/api";
 import { Modal } from "@/components/common/Modal";
 import { formatDateTime } from "@/lib/utils";
+import { toast } from "@/store/toast";
 
 interface SupervisorVisitorRow {
   id: string;
@@ -130,10 +131,14 @@ export default function SecuritySupervisorVisitorManagementPage() {
     setActionMessage(null);
     try {
       await visitorsApi.approve(id, "Approved by Security Supervisor");
-      setActionMessage({ type: "success", text: `Visitor request approved for ${name}.` });
+      const msg = `Visitor request approved for ${name}.`;
+      setActionMessage({ type: "success", text: msg });
+      toast.success(msg);
       await loadData();
     } catch (err: any) {
-      setActionMessage({ type: "error", text: err?.message || "Failed to approve visitor request." });
+      const errMsg = err?.message || "Failed to approve visitor request.";
+      setActionMessage({ type: "error", text: errMsg });
+      toast.error(errMsg);
     }
   };
 
@@ -141,10 +146,14 @@ export default function SecuritySupervisorVisitorManagementPage() {
     setActionMessage(null);
     try {
       await visitorsApi.reject(id, "Rejected by Security Supervisor");
-      setActionMessage({ type: "success", text: `Visitor request rejected for ${name}.` });
+      const msg = `Visitor request rejected for ${name}.`;
+      setActionMessage({ type: "success", text: msg });
+      toast.success(msg);
       await loadData();
     } catch (err: any) {
-      setActionMessage({ type: "error", text: err?.message || "Failed to reject visitor request." });
+      const errMsg = err?.message || "Failed to reject visitor request.";
+      setActionMessage({ type: "error", text: errMsg });
+      toast.error(errMsg);
     }
   };
 
@@ -273,9 +282,18 @@ export default function SecuritySupervisorVisitorManagementPage() {
           { label: "Visitor Management" },
         ]}
         actions={
-          <Link href="/security-supervisor/blacklist" className="btn btn-danger" style={{ fontSize: "0.85rem" }}>
-            🚫 Blacklist Registry & Restricted Entry
-          </Link>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+            <button
+              className="btn btn-secondary"
+              onClick={loadData}
+              disabled={isLoading}
+            >
+              🔄 {isLoading ? "Refreshing…" : "Refresh"}
+            </button>
+            <Link href="/security-supervisor/blacklist" className="btn btn-danger" style={{ fontSize: "0.85rem" }}>
+              🚫 Blacklist Registry & Restricted Entry
+            </Link>
+          </div>
         }
       />
 
