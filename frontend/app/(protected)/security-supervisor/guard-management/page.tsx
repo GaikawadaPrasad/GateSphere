@@ -646,8 +646,16 @@ export default function SecuritySupervisorGuardManagementPage() {
                     const val = e.target.value;
                     setGuardFullName(val);
                     setGuardPassword(generateInitialPassword(val, "guard"));
+                    if (guardFieldErrors.fullName) {
+                      setGuardFieldErrors((prev) => ({ ...prev, fullName: "" }));
+                    }
                   }}
                 />
+                {guardFieldErrors.fullName && (
+                  <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                    {guardFieldErrors.fullName}
+                  </span>
+                )}
               </div>
 
               <div>
@@ -666,8 +674,18 @@ export default function SecuritySupervisorGuardManagementPage() {
                   className="input-field"
                   placeholder="+91 98765 43210"
                   value={guardPhone}
-                  onChange={(e) => setGuardPhone(e.target.value)}
+                  onChange={(e) => {
+                    setGuardPhone(e.target.value);
+                    if (guardFieldErrors.phone) {
+                      setGuardFieldErrors((prev) => ({ ...prev, phone: "" }));
+                    }
+                  }}
                 />
+                {guardFieldErrors.phone && (
+                  <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                    {guardFieldErrors.phone}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -692,18 +710,38 @@ export default function SecuritySupervisorGuardManagementPage() {
                   required
                   placeholder="e.g. vikram.guard@gatesphere.com"
                   value={guardEmail}
-                  onChange={(e) => setGuardEmail(e.target.value)}
+                  onChange={(e) => {
+                    setGuardEmail(e.target.value);
+                    if (guardFieldErrors.email) {
+                      setGuardFieldErrors((prev) => ({ ...prev, email: "" }));
+                    }
+                  }}
                 />
+                {guardFieldErrors.email && (
+                  <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                    {guardFieldErrors.email}
+                  </span>
+                )}
               </div>
 
               <div>
                 <PasswordField
                   value={guardPassword}
-                  onChange={(val) => setGuardPassword(val)}
+                  onChange={(val) => {
+                    setGuardPassword(val);
+                    if (guardFieldErrors.password) {
+                      setGuardFieldErrors((prev) => ({ ...prev, password: "" }));
+                    }
+                  }}
                   placeholder="e.g. vikram@Gate2026!"
                   required
                   minLength={10}
                 />
+                {guardFieldErrors.password && (
+                  <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                    {guardFieldErrors.password}
+                  </span>
+                )}
               </div>
             </div>
 

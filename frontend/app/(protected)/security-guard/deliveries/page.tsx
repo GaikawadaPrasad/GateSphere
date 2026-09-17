@@ -43,6 +43,7 @@ export default function SecurityGuardDeliveriesPage() {
   const [trackingReference, setTrackingReference] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
+  const [deliveryFieldErrors, setDeliveryFieldErrors] = useState<Record<string, string>>({});
 
   const loadData = async (showLoading = true) => {
     if (showLoading) setIsLoading(true);
@@ -125,6 +126,7 @@ export default function SecurityGuardDeliveriesPage() {
     setExecutivePhone("");
     setTrackingReference("");
     setModalError(null);
+    setDeliveryFieldErrors({});
     setIsModalOpen(true);
     loadUnits();
   };
@@ -134,27 +136,31 @@ export default function SecurityGuardDeliveriesPage() {
     const trimmedProvider = providerName.trim();
     const trimmedExecName = executiveName.trim();
     const trimmedExecPhone = executivePhone.trim();
+    const errors: Record<string, string> = {};
 
     if (!selectedUnitId) {
-      setModalError("Please select a target resident unit.");
-      return;
+      errors.unitId = "Please select a target resident unit.";
     }
     if (!trimmedProvider || trimmedProvider.length < 2) {
-      setModalError("Please enter courier / provider name (min 2 characters).");
-      return;
+      errors.providerName = "Please enter courier / provider name (min 2 characters).";
     }
     if (trimmedExecName) {
       if (trimmedExecName.length < 2 || !isValidPersonName(trimmedExecName)) {
-        setModalError("Delivery executive name must contain only alphabetic letters and spaces (min 2 characters).");
-        return;
+        errors.executiveName = "Delivery executive name must contain only alphabetic letters and spaces (min 2 characters).";
       }
     }
     if (trimmedExecPhone) {
       const phoneDigits = trimmedExecPhone.replace(/\D/g, "");
       if (!/^\+?[0-9\s\-()]{7,20}$/.test(trimmedExecPhone) || phoneDigits.length < 10) {
-        setModalError("Please enter a valid mobile number for the delivery executive (at least 10 digits).");
-        return;
+        errors.executivePhone = "Please enter a valid mobile number for the delivery executive (at least 10 digits).";
       }
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setDeliveryFieldErrors(errors);
+      setModalError("Please resolve the highlighted delivery form errors.");
+      toast.error("Please resolve the highlighted delivery form errors.");
+      return;
     }
 
     setIsSubmitting(true);
@@ -480,7 +486,12 @@ export default function SecurityGuardDeliveriesPage() {
             <select
               className="form-control"
               value={selectedUnitId}
-              onChange={(e) => setSelectedUnitId(e.target.value)}
+              onChange={(e) => {
+                setSelectedUnitId(e.target.value);
+                if (deliveryFieldErrors.unitId) {
+                  setDeliveryFieldErrors((prev) => ({ ...prev, unitId: "" }));
+                }
+              }}
               required
             >
               {units.length === 0 ? (
@@ -493,6 +504,11 @@ export default function SecurityGuardDeliveriesPage() {
                 ))
               )}
             </select>
+            {deliveryFieldErrors.unitId && (
+              <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                {deliveryFieldErrors.unitId}
+              </span>
+            )}
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
@@ -522,9 +538,19 @@ export default function SecurityGuardDeliveriesPage() {
                 className="form-control"
                 placeholder="e.g. Amazon, Flipkart, Swiggy, Zomato"
                 value={providerName}
-                onChange={(e) => setProviderName(e.target.value)}
+                onChange={(e) => {
+                  setProviderName(e.target.value);
+                  if (deliveryFieldErrors.providerName) {
+                    setDeliveryFieldErrors((prev) => ({ ...prev, providerName: "" }));
+                  }
+                }}
                 required
               />
+              {deliveryFieldErrors.providerName && (
+                <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                  {deliveryFieldErrors.providerName}
+                </span>
+              )}
             </div>
           </div>
 
@@ -538,8 +564,18 @@ export default function SecurityGuardDeliveriesPage() {
                 className="form-control"
                 placeholder="Executive name"
                 value={executiveName}
-                onChange={(e) => setExecutiveName(e.target.value)}
+                onChange={(e) => {
+                  setExecutiveName(e.target.value);
+                  if (deliveryFieldErrors.executiveName) {
+                    setDeliveryFieldErrors((prev) => ({ ...prev, executiveName: "" }));
+                  }
+                }}
               />
+              {deliveryFieldErrors.executiveName && (
+                <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                  {deliveryFieldErrors.executiveName}
+                </span>
+              )}
             </div>
 
             <div>
@@ -551,8 +587,18 @@ export default function SecurityGuardDeliveriesPage() {
                 className="form-control"
                 placeholder="10-digit mobile"
                 value={executivePhone}
-                onChange={(e) => setExecutivePhone(e.target.value)}
+                onChange={(e) => {
+                  setExecutivePhone(e.target.value);
+                  if (deliveryFieldErrors.executivePhone) {
+                    setDeliveryFieldErrors((prev) => ({ ...prev, executivePhone: "" }));
+                  }
+                }}
               />
+              {deliveryFieldErrors.executivePhone && (
+                <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                  {deliveryFieldErrors.executivePhone}
+                </span>
+              )}
             </div>
           </div>
 
