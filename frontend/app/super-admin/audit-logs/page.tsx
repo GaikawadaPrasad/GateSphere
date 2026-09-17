@@ -476,7 +476,7 @@ export default function AuditLogsPage() {
               </div>
             </div>
 
-            {(selectedLog.new_values || selectedLog.old_values || selectedLog.changes) && (
+            {/* {(selectedLog.new_values || selectedLog.old_values || selectedLog.changes) && (
               <div>
                 <span
                   style={{
@@ -508,7 +508,7 @@ export default function AuditLogsPage() {
                   )}
                 </pre>
               </div>
-            )}
+            )} */}
           </div>
         </Modal>
       )}

@@ -12,6 +12,8 @@ interface CreateUserModalProps {
   isOpen: boolean;
   onClose: () => void;
   defaultRoleSlug?: string;
+  preselectedCommunityId?: string;
+  lockCommunity?: boolean;
   availableRoles?: Role[];
   onSuccess: () => void;
 }
@@ -20,6 +22,8 @@ export function CreateUserModal({
   isOpen,
   onClose,
   defaultRoleSlug = "community_admin",
+  preselectedCommunityId = "",
+  lockCommunity = false,
   availableRoles = [],
   onSuccess,
 }: CreateUserModalProps) {
@@ -29,11 +33,24 @@ export function CreateUserModal({
   const [password, setPassword] = useState("GateSphere2026!");
   const [phone, setPhone] = useState("");
   const [roleSlug, setRoleSlug] = useState(defaultRoleSlug);
-  const [communityId, setCommunityId] = useState("");
+  const [communityId, setCommunityId] = useState(preselectedCommunityId);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (isOpen) {
+      if (preselectedCommunityId) {
+        setCommunityId(preselectedCommunityId);
+      }
+      if (defaultRoleSlug) {
+        setRoleSlug(defaultRoleSlug);
+      }
+      setErrorMessage(null);
+      setFieldErrors({});
+    }
+  }, [isOpen, preselectedCommunityId, defaultRoleSlug]);
 
   const { data: communities } = useQuery({
     queryKey: ["communities"],
@@ -66,8 +83,8 @@ export function CreateUserModal({
       errors.phone = "Phone must be 5-20 digits (e.g. +91 9876543210).";
     }
 
-    if (roleSlug === "community_admin" && !communityId) {
-      errors.communityId = "A community must be assigned for Community Admin role.";
+    if (roleSlug !== "super_admin" && !communityId) {
+      errors.communityId = "A community must be selected for community-assigned roles.";
     }
 
     setFieldErrors(errors);
