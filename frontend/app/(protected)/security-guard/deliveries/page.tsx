@@ -502,7 +502,7 @@ export default function SecurityGuardDeliveriesPage() {
                 Executive Mobile Number
               </label>
               <input
-                type="tel"
+                type="number"
                 className="form-control"
                 placeholder="10-digit mobile"
                 value={executivePhone}

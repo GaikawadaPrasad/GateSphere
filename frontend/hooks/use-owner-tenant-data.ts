@@ -106,6 +106,7 @@ export interface InvoiceItem {
 export function useResidentOverview(communityId?: string | null) {
   return useQuery({
     queryKey: ["resident", "overview", communityId],
+    staleTime: 5_000,
     queryFn: async () => {
       const stats = await api.get<any>(
         `/dashboards/resident${communityId ? `?community_id=${communityId}` : ""}`,

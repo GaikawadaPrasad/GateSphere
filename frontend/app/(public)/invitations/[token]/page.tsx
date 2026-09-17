@@ -264,7 +264,7 @@ export default function AcceptInvitationPage() {
                   Phone Number
                 </label>
                 <input
-                  type="tel"
+                  type="number"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="+91 98765 43210"

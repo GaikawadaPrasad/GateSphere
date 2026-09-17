@@ -9,7 +9,7 @@ export function useResidents(params?: ListQueryParams) {
   return useQuery({
     queryKey: ["residents", params],
     queryFn: () => residentsApi.list(params),
-    staleTime: 30_000,
+    staleTime: 5_000,
   });
 }
 
@@ -18,7 +18,7 @@ export function useResidentDetails(id?: string) {
     queryKey: ["residents", id],
     queryFn: () => (id ? residentsApi.get(id) : null),
     enabled: Boolean(id),
-    staleTime: 60_000,
+    staleTime: 5_000,
   });
 }
 
@@ -27,7 +27,7 @@ export function useUnitOccupancies(unitId?: string) {
     queryKey: ["occupancies", unitId],
     queryFn: () => (unitId ? residentsApi.occupancies(unitId) : []),
     enabled: Boolean(unitId),
-    staleTime: 30_000,
+    staleTime: 5_000,
   });
 }
 
@@ -36,7 +36,7 @@ export function useFamilyMembers(unitId?: string) {
     queryKey: ["family-members", unitId],
     queryFn: () => (unitId ? residentsApi.family(unitId) : []),
     enabled: Boolean(unitId),
-    staleTime: 30_000,
+    staleTime: 5_000,
   });
 }
 
@@ -45,7 +45,7 @@ export function useEmergencyContacts(profileId?: string) {
     queryKey: ["emergency-contacts", profileId],
     queryFn: () => (profileId ? residentsApi.contacts(profileId) : []),
     enabled: Boolean(profileId),
-    staleTime: 60_000,
+    staleTime: 5_000,
   });
 }
 
@@ -58,7 +58,7 @@ export function useMoveRecords(params?: {
   return useQuery({
     queryKey: ["move-records", params],
     queryFn: () => residentsApi.moveRecords(params),
-    staleTime: 15_000,
+    staleTime: 5_000,
   });
 }
 
@@ -73,9 +73,9 @@ export function useTransitionMoveRecord() {
       data: { status: string; clearance_notes?: string; scheduled_at?: string };
     }) => residentsApi.transitionMove(moveId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["move-records"] });
-      queryClient.invalidateQueries({ queryKey: ["residents"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboards"] });
+      queryClient.invalidateQueries({ queryKey: ["move-records"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["residents"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["dashboards"], refetchType: "all" });
     },
   });
 }
@@ -92,7 +92,7 @@ export function useCreateResidentProfile() {
         }
         return old;
       });
-      queryClient.invalidateQueries({ queryKey: ["residents"] });
+      queryClient.invalidateQueries({ queryKey: ["residents"], refetchType: "all" });
     },
   });
 }
@@ -117,9 +117,9 @@ export function useAddResident() {
       };
     }) => residentsApi.addResident(communityId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["residents"] });
-      queryClient.invalidateQueries({ queryKey: ["community-units"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboards"] });
+      queryClient.invalidateQueries({ queryKey: ["residents"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["community-units"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["dashboards"], refetchType: "all" });
     },
   });
 }
@@ -129,9 +129,9 @@ export function useDeleteResident() {
   return useMutation({
     mutationFn: (residentId: string) => residentsApi.delete(residentId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["residents"] });
-      queryClient.invalidateQueries({ queryKey: ["community-units"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboards"] });
+      queryClient.invalidateQueries({ queryKey: ["residents"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["community-units"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["dashboards"], refetchType: "all" });
     },
   });
 }

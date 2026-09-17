@@ -122,13 +122,16 @@ export default function CommunityAdminPropertyPage() {
           total_floors: Number(towerForm.total_floors) || 0,
         },
       });
+      toast.success(`Tower "${towerForm.name.trim()}" created successfully.`, "Tower Created");
       setIsAddTowerOpen(false);
       setPropertyFieldErrors({});
       setTowerForm({ name: "", code: "", structure_type: "tower", total_floors: 10 });
       refetchTowers();
     } catch (err: unknown) {
       console.error(err);
-      setErrorMessage(err instanceof Error ? err.message : "Failed to create tower");
+      const msg = err instanceof Error ? err.message : "Failed to create tower";
+      setErrorMessage(msg);
+      toast.error(msg, "Tower Creation Failed");
     } finally {
       setIsSubmitting(false);
     }
@@ -160,13 +163,16 @@ export default function CommunityAdminPropertyPage() {
         floor_number: Number(floorForm.floor_number),
         label: floorForm.label ? floorForm.label.trim() : undefined,
       });
+      toast.success(`Floor #${floorForm.floor_number} added successfully.`, "Floor Added");
       setIsAddFloorOpen(false);
       setPropertyFieldErrors({});
       setFloorForm({ tower_id: "", floor_number: 1, label: "" });
       refetchFloors();
     } catch (err: unknown) {
       console.error(err);
-      setErrorMessage(err instanceof Error ? err.message : "Failed to create floor");
+      const msg = err instanceof Error ? err.message : "Failed to create floor";
+      setErrorMessage(msg);
+      toast.error(msg, "Floor Creation Failed");
     } finally {
       setIsSubmitting(false);
     }
@@ -203,6 +209,7 @@ export default function CommunityAdminPropertyPage() {
         bedrooms: unitForm.bedrooms ? Number(unitForm.bedrooms) : undefined,
         area_sqft: unitForm.area_sqft ? Number(unitForm.area_sqft) : undefined,
       });
+      toast.success(`Unit "${unitForm.unit_number.trim()}" created successfully.`, "Unit Created");
       setIsAddUnitOpen(false);
       setPropertyFieldErrors({});
       setUnitForm({
@@ -215,7 +222,9 @@ export default function CommunityAdminPropertyPage() {
       refetchUnits();
     } catch (err: unknown) {
       console.error(err);
-      setErrorMessage(err instanceof Error ? err.message : "Failed to create unit");
+      const msg = err instanceof Error ? err.message : "Failed to create unit";
+      setErrorMessage(msg);
+      toast.error(msg, "Unit Creation Failed");
     } finally {
       setIsSubmitting(false);
     }

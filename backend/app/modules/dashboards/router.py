@@ -66,23 +66,31 @@ async def module_health() -> dict:
     response_model=Envelope[schemas.SuperAdminDashboardStats],
     dependencies=[PLATFORM_ADMIN],
 )
-async def super_admin_stats(svc: Svc = Depends(dashboard_service)) -> dict:
-    cached = get_cached("super-admin", None)
-    if cached is not None:
-        return ok(cached)
-    result = await svc.super_admin_stats()
+async def super_admin_stats(
+    community_id: uuid.UUID | None = None,
+    refresh: bool = False,
+    svc: Svc = Depends(dashboard_service),
+) -> dict:
+    if not refresh:
+        cached = get_cached("super-admin", community_id)
+        if cached is not None:
+            return ok(cached)
+    result = await svc.super_admin_stats(community_id)
     data = result.model_dump(mode="json")
-    set_cached("super-admin", None, data)
+    set_cached("super-admin", community_id, data)
     return ok(data)
 
 
 @router.get("/overview", response_model=Envelope[schemas.OverviewStats], dependencies=[VIEW])
 async def overview(
-    community_id: uuid.UUID | None = None, svc: Svc = Depends(dashboard_service)
+    community_id: uuid.UUID | None = None,
+    refresh: bool = False,
+    svc: Svc = Depends(dashboard_service),
 ) -> dict:
-    cached = get_cached("overview", community_id)
-    if cached is not None:
-        return ok(cached)
+    if not refresh:
+        cached = get_cached("overview", community_id)
+        if cached is not None:
+            return ok(cached)
     result = await svc.overview(community_id)
     data = result.model_dump(mode="json")
     set_cached("overview", community_id, data)
@@ -91,11 +99,14 @@ async def overview(
 
 @router.get("/security", response_model=Envelope[schemas.SecurityStats], dependencies=[GATE_VIEW])
 async def security(
-    community_id: uuid.UUID | None = None, svc: Svc = Depends(dashboard_service)
+    community_id: uuid.UUID | None = None,
+    refresh: bool = False,
+    svc: Svc = Depends(dashboard_service),
 ) -> dict:
-    cached = get_cached("security", community_id)
-    if cached is not None:
-        return ok(cached)
+    if not refresh:
+        cached = get_cached("security", community_id)
+        if cached is not None:
+            return ok(cached)
     result = await svc.security(community_id)
     data = result.model_dump(mode="json")
     set_cached("security", community_id, data)
@@ -104,11 +115,14 @@ async def security(
 
 @router.get("/financial", response_model=Envelope[schemas.FinancialStats], dependencies=[FINANCIAL_DASHBOARD])
 async def financial(
-    community_id: uuid.UUID | None = None, svc: Svc = Depends(dashboard_service)
+    community_id: uuid.UUID | None = None,
+    refresh: bool = False,
+    svc: Svc = Depends(dashboard_service),
 ) -> dict:
-    cached = get_cached("financial", community_id)
-    if cached is not None:
-        return ok(cached)
+    if not refresh:
+        cached = get_cached("financial", community_id)
+        if cached is not None:
+            return ok(cached)
     result = await svc.financial(community_id)
     data = result.model_dump(mode="json")
     set_cached("financial", community_id, data)
@@ -117,13 +131,16 @@ async def financial(
 
 @router.get("/resident", response_model=Envelope[schemas.ResidentStats], dependencies=[VIEW])
 async def resident(
-    community_id: uuid.UUID | None = None, svc: Svc = Depends(dashboard_service)
+    community_id: uuid.UUID | None = None,
+    refresh: bool = False,
+    svc: Svc = Depends(dashboard_service),
 ) -> dict:
     # Resident dashboard is user-specific (my_open_tickets, my_balance, etc.)
     user_id = svc.actor.id if hasattr(svc, "actor") else None
-    cached = get_cached("resident", community_id, user_id=user_id)
-    if cached is not None:
-        return ok(cached)
+    if not refresh:
+        cached = get_cached("resident", community_id, user_id=user_id)
+        if cached is not None:
+            return ok(cached)
     result = await svc.resident(community_id)
     data = result.model_dump(mode="json")
     set_cached("resident", community_id, data, user_id=user_id)

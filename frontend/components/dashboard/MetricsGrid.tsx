@@ -7,9 +7,17 @@ interface MetricsGridProps {
   metrics: SuperAdminDashboardMetrics | undefined;
   isLoading?: boolean;
   onCardClick?: (key: string) => void;
+  activeCommunity?: {
+    id: string;
+    name: string;
+    code: string;
+    city?: string;
+    state?: string;
+    is_active?: boolean;
+  } | null;
 }
 
-export function MetricsGrid({ metrics, isLoading, onCardClick }: MetricsGridProps) {
+export function MetricsGrid({ metrics, isLoading, onCardClick, activeCommunity }: MetricsGridProps) {
   if (isLoading || !metrics) {
     return <MetricsSkeleton count={6} />;
   }
@@ -24,20 +32,27 @@ export function MetricsGrid({ metrics, isLoading, onCardClick }: MetricsGridProp
         marginBottom: "2rem",
       }}
     >
-      {/* 1. Total Communities */}
+      {/* 1. Total Communities / Scoped Community */}
       <KpiCard
-        title="Total Communities"
-        value={formatCompactNumber(metrics.totalCommunities)}
-        subtitle={`${metrics.activeCommunities} active · ${metrics.inactiveCommunities} inactive`}
+        title={activeCommunity ? "Scoped Community" : "Total Communities"}
+        value={activeCommunity ? activeCommunity.name : formatCompactNumber(metrics.totalCommunities)}
+        subtitle={
+          activeCommunity
+            ? `Code: ${activeCommunity.code} · ${activeCommunity.city || activeCommunity.state || "Active"}`
+            : `${metrics.activeCommunities} active · ${metrics.inactiveCommunities} inactive`
+        }
         icon="🏢"
         accent="primary"
-        badge={{ text: "Active", variant: "success" }}
+        badge={{
+          text: activeCommunity ? (activeCommunity.is_active ? "Active" : "Inactive") : "Active",
+          variant: (activeCommunity ? activeCommunity.is_active : true) ? "success" : "neutral",
+        }}
         onClick={() => onCardClick?.("communities")}
       />
 
       {/* 2. Total Residents */}
       <KpiCard
-        title="Total Residents"
+        title={activeCommunity ? "Community Residents" : "Total Residents"}
         value={formatCompactNumber(metrics.totalResidents)}
         subtitle={`Across ${metrics.totalUnits} registered units`}
         icon="👥"

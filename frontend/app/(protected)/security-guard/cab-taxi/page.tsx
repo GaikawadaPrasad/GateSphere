@@ -641,7 +641,7 @@ export default function SecurityGuardCabTaxiPage() {
                 Driver Phone (Optional)
               </label>
               <input
-                type="tel"
+                type="number"
                 className="form-control"
                 placeholder="10-digit mobile"
                 value={driverPhone}

@@ -570,7 +570,7 @@ export function WalkInVisitorModal({
                 Mobile Number <span style={{ color: "red" }}>*</span>
               </label>
               <input
-                type="tel"
+                type="number"
                 className="input-field"
                 placeholder="e.g. 98765 43210"
                 value={visitorPhone}

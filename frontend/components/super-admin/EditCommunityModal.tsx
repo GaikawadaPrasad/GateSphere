@@ -1,11 +1,16 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Modal } from "@/components/common/Modal";
+import { toast } from "@/store/toast";
 import { useUpdateCommunity, useDeleteCommunity } from "@/hooks/use-communities";
 import {
   INDIAN_STATES_AND_UTS,
   POPULAR_CITIES_BY_STATE,
+  getCitiesForState,
+  validateCityForState,
+  findStateForCity,
   isValidCommunityName,
   isValidCityName,
 } from "@/constants/locations";
@@ -24,9 +29,12 @@ export function EditCommunityModal({
   onSuccess,
   community,
 }: EditCommunityModalProps) {
+  const queryClient = useQueryClient();
   const [editName, setEditName] = useState("");
   const [editCity, setEditCity] = useState("");
   const [editState, setEditState] = useState("");
+  const [isEditCustomCity, setIsEditCustomCity] = useState(false);
+  const [editCustomCity, setEditCustomCity] = useState("");
   const [editIsActive, setEditIsActive] = useState(true);
   const [editError, setEditError] = useState("");
   const [editTouched, setEditTouched] = useState<Record<string, boolean>>({});
@@ -40,6 +48,8 @@ export function EditCommunityModal({
       setEditName(community.name);
       setEditCity(community.city || "");
       setEditState(community.state || "");
+      setIsEditCustomCity(false);
+      setEditCustomCity("");
       setEditIsActive(community.is_active);
       setEditError("");
       setEditTouched({});
@@ -62,18 +72,23 @@ export function EditCommunityModal({
       errs.name = "Community name contains invalid characters";
     }
 
+    const trimmedState = editState.trim();
+    if (trimmedState && trimmedState.length > 120) {
+      errs.state = "State cannot exceed 120 characters";
+    }
+
     const trimmedCity = editCity.trim();
     if (trimmedCity) {
       if (trimmedCity.length > 120) {
         errs.city = "City cannot exceed 120 characters";
       } else if (!isValidCityName(trimmedCity)) {
         errs.city = "City must contain only alphabetical letters and spaces";
+      } else if (trimmedState) {
+        const stateMismatch = validateCityForState(trimmedCity, trimmedState);
+        if (stateMismatch) {
+          errs.city = stateMismatch;
+        }
       }
-    }
-
-    const trimmedState = editState.trim();
-    if (trimmedState && trimmedState.length > 120) {
-      errs.state = "State cannot exceed 120 characters";
     }
 
     return errs;
@@ -104,6 +119,12 @@ export function EditCommunityModal({
         },
       });
 
+      toast.success(`Community "${editName.trim()}" updated successfully!`);
+      await Promise.allSettled([
+        queryClient.invalidateQueries({ queryKey: ["communities"], refetchType: "all" }),
+        queryClient.invalidateQueries({ queryKey: ["dashboards"], refetchType: "all" }),
+      ]);
+
       onClose();
       onSuccess?.();
     } catch (err: unknown) {
@@ -121,6 +142,11 @@ export function EditCommunityModal({
 
     try {
       await deleteCommunityMutation.mutateAsync(community.id);
+      toast.success(`Community "${community.name}" deleted successfully!`);
+      await Promise.allSettled([
+        queryClient.invalidateQueries({ queryKey: ["communities"], refetchType: "all" }),
+        queryClient.invalidateQueries({ queryKey: ["dashboards"], refetchType: "all" }),
+      ]);
       onClose();
       setIsConfirmingDelete(false);
       onSuccess?.();
@@ -330,8 +356,16 @@ export function EditCommunityModal({
                 className="select-field"
                 value={editState}
                 onChange={(e) => {
-                  setEditState(e.target.value);
+                  const newState = e.target.value;
+                  setEditState(newState);
                   if (!editTouched.state) setEditTouched((t) => ({ ...t, state: true }));
+                  // Clear city if not in new state
+                  const newCities = getCitiesForState(newState);
+                  if (editCity && !newCities.some((c) => c.toLowerCase() === editCity.trim().toLowerCase())) {
+                    setEditCity("");
+                    setEditCustomCity("");
+                    setIsEditCustomCity(false);
+                  }
                 }}
                 onBlur={() => setEditTouched((t) => ({ ...t, state: true }))}
                 style={{
@@ -366,26 +400,51 @@ export function EditCommunityModal({
               >
                 City
               </label>
-              <input
+              <select
                 id="edit-modal-comm-city"
-                type="text"
-                list="edit-modal-city-suggestions"
-                className="input-field"
-                value={editCity}
+                className="select-field"
+                value={isEditCustomCity ? "__custom__" : editCity}
                 onChange={(e) => {
-                  setEditCity(e.target.value);
+                  const val = e.target.value;
+                  if (val === "__custom__") {
+                    setIsEditCustomCity(true);
+                    setEditCity(editCustomCity || "");
+                  } else {
+                    setIsEditCustomCity(false);
+                    setEditCity(val);
+                  }
                   if (!editTouched.city) setEditTouched((t) => ({ ...t, city: true }));
                 }}
                 onBlur={() => setEditTouched((t) => ({ ...t, city: true }))}
                 style={{
-                  borderColor: editTouched.city && editErrors.city ? "var(--danger)" : undefined,
+                  borderColor:
+                    editTouched.city && editErrors.city ? "var(--danger)" : undefined,
                 }}
-              />
-              <datalist id="edit-modal-city-suggestions">
-                {editStateCitySuggestions.map((c) => (
-                  <option key={c} value={c} />
+                disabled={!editState}
+              >
+                <option value="">{editState ? `Select city in ${editState}…` : "Select State / UT first…"}</option>
+                {getCitiesForState(editState).map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
                 ))}
-              </datalist>
+                {editState && <option value="__custom__">Other City / Town in {editState}…</option>}
+              </select>
+              {isEditCustomCity && (
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder={`Enter city / town in ${editState}`}
+                  value={editCustomCity}
+                  onChange={(e) => {
+                    setEditCustomCity(e.target.value);
+                    setEditCity(e.target.value);
+                    if (!editTouched.city) setEditTouched((t) => ({ ...t, city: true }));
+                  }}
+                  onBlur={() => setEditTouched((t) => ({ ...t, city: true }))}
+                  style={{ marginTop: "0.4rem", borderColor: editTouched.city && editErrors.city ? "var(--danger)" : undefined }}
+                />
+              )}
               {editTouched.city && editErrors.city && (
                 <p style={{ color: "var(--danger)", fontSize: "0.75rem", marginTop: "0.3rem" }}>
                   ✕ {editErrors.city}

@@ -10,9 +10,12 @@ import { EditRolePermissionsModal } from "@/components/super-admin/EditRolePermi
 import { rbacApi, usersApi } from "@/lib/api";
 import type { Role, Permission } from "@/types/rbac";
 import { toast } from "@/store/toast";
+import { useUiStore } from "@/store/ui";
+import { ScopeBanner } from "@/components/common/ScopeBanner";
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
+  const { activeCommunityId } = useUiStore();
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [editingPermission, setEditingPermission] = useState<Permission | null>(null);
   const [descriptionInput, setDescriptionInput] = useState<string>("");
@@ -32,8 +35,8 @@ export default function SettingsPage() {
   });
 
   const { data: usersData, isLoading: isUsersLoading } = useQuery({
-    queryKey: ["users"],
-    queryFn: () => usersApi.list({ page_size: 100 }),
+    queryKey: ["users", activeCommunityId || "global"],
+    queryFn: () => usersApi.list({ page_size: 100, community_id: activeCommunityId || undefined }),
   });
 
   const updateMutation = useMutation({
@@ -261,12 +264,19 @@ export default function SettingsPage() {
     <div>
       <PageHeader
         title="System & RBAC Settings"
-        subtitle="Configure platform permissions, role hierarchies, and system definitions"
+        subtitle={
+          activeCommunityId
+            ? "Platform permissions, role hierarchies, and scoped user assignments"
+            : "Configure platform permissions, role hierarchies, and system definitions"
+        }
         breadcrumbs={[
           { label: "Super Admin", href: "/super-admin/dashboard" },
           { label: "System Settings" },
         ]}
       />
+
+      {/* Active Scope Banner */}
+      <ScopeBanner entityName="user accounts & permissions" />
 
       <div style={{ display: "flex", flexDirection: "column", gap: "1.75rem" }}>
         {/* User Access & RBAC Assignments Matrix */}

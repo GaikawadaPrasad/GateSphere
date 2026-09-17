@@ -3,20 +3,30 @@
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useSuperAdminDashboardMetrics } from "@/hooks/use-dashboards";
 import { formatCurrency } from "@/lib/utils";
+import { useUiStore } from "@/store/ui";
+import { ScopeBanner } from "@/components/common/ScopeBanner";
 
 export default function ReportsPage() {
-  const { data: metrics } = useSuperAdminDashboardMetrics();
+  const { activeCommunityId } = useUiStore();
+  const { data: metrics } = useSuperAdminDashboardMetrics(activeCommunityId);
 
   return (
     <div>
       <PageHeader
         title="Reports & Platform Analytics"
-        subtitle="Comprehensive operational summaries and platform KPI aggregates"
+        subtitle={
+          activeCommunityId
+            ? "Operational summaries and KPI aggregates for selected community"
+            : "Comprehensive operational summaries and platform KPI aggregates"
+        }
         breadcrumbs={[
           { label: "Super Admin", href: "/super-admin/dashboard" },
           { label: "Reports & Analytics" },
         ]}
       />
+
+      {/* Active Scope Banner */}
+      <ScopeBanner entityName="analytics & summaries" />
 
       <div
         style={{

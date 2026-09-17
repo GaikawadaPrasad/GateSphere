@@ -22,7 +22,7 @@ from app.core.redis import redis_client, rkey
 logger = logging.getLogger(__name__)
 
 # Default TTL for dashboard cache entries (seconds)
-DASHBOARD_CACHE_TTL = 60
+DASHBOARD_CACHE_TTL = 10
 
 
 class _DecimalEncoder(json.JSONEncoder):
@@ -91,9 +91,10 @@ def invalidate_dashboard_cache(community_id: uuid.UUID | None = None) -> None:
     is ``None`` the entire dashboard namespace is flushed (super-admin scope).
     """
     try:
-        pattern = rkey("dashboard", "*")
         if community_id:
-            pattern = rkey("dashboard", "*", str(community_id), "*")
+            pattern = f"{rkey('dashboard')}*{str(community_id)}*"
+        else:
+            pattern = f"{rkey('dashboard')}*"
         keys = redis_client.keys(pattern)
         if keys:
             redis_client.delete(*keys)

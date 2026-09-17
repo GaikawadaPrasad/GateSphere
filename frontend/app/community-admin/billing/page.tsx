@@ -22,6 +22,7 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import type { MaintenanceInvoice, Payment, ChargeHead, UnitLedgerEntry } from "@/types/billing";
 import { billingApi } from "@/lib/api";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
+import { toast } from "@/store/toast";
 
 interface LineItemForm {
   charge_head_id: string;
@@ -224,8 +225,16 @@ export default function CommunityAdminBillingPage() {
 
       await refetchInvoices();
       setIsCreateModalOpen(false);
+      toast.success(
+        postImmediately
+          ? "Invoice generated and posted to resident ledger."
+          : "Draft invoice generated successfully.",
+        "Invoice Created",
+      );
     } catch (err: any) {
-      setFormError(err?.message || "Failed to generate invoice.");
+      const errMsg = err?.message || "Failed to generate invoice.";
+      setFormError(errMsg);
+      toast.error(errMsg, "Billing Error");
     } finally {
       setIsSubmitting(false);
     }
@@ -323,8 +332,13 @@ export default function CommunityAdminBillingPage() {
               style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
               onClick={async () => {
                 if (confirm(`Post invoice ${i.invoice_number} to unit ledger now?`)) {
-                  await postInvoiceMutation.mutateAsync(i.id);
-                  await refetchInvoices();
+                  try {
+                    await postInvoiceMutation.mutateAsync(i.id);
+                    await refetchInvoices();
+                    toast.success(`Invoice ${i.invoice_number} posted successfully.`, "Invoice Posted");
+                  } catch (err: any) {
+                    toast.error(err?.message || "Failed to post invoice.", "Action Failed");
+                  }
                 }
               }}
               disabled={postInvoiceMutation.isPending}
@@ -340,8 +354,13 @@ export default function CommunityAdminBillingPage() {
                 style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem", color: "#dc2626" }}
                 onClick={async () => {
                   if (confirm(`Cancel invoice ${i.invoice_number}?`)) {
-                    await cancelInvoiceMutation.mutateAsync(i.id);
-                    await refetchInvoices();
+                    try {
+                      await cancelInvoiceMutation.mutateAsync(i.id);
+                      await refetchInvoices();
+                      toast.success(`Invoice ${i.invoice_number} cancelled.`, "Invoice Cancelled");
+                    } catch (err: any) {
+                      toast.error(err?.message || "Failed to cancel invoice.", "Action Failed");
+                    }
                   }
                 }}
                 disabled={cancelInvoiceMutation.isPending}

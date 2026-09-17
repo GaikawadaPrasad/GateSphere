@@ -20,7 +20,7 @@ export function useCommunities(
   return useQuery({
     queryKey: communityKeys.list(params),
     queryFn: () => communitiesApi.list({ page_size: 100, ...params }),
-    staleTime: 60_000,
+    staleTime: 5_000,
     enabled: options?.enabled !== undefined ? options.enabled : true,
   });
 }
@@ -37,7 +37,7 @@ export function useCommunity(id?: string) {
       }
     },
     enabled: Boolean(id),
-    staleTime: 60_000,
+    staleTime: 5_000,
     retry: false,
   });
 }
@@ -49,7 +49,7 @@ export function useTowers(communityId?: string) {
     queryKey: ["towers", communityId],
     queryFn: () => (communityId ? communitiesApi.towers(communityId) : []),
     enabled: Boolean(communityId),
-    staleTime: 60_000,
+    staleTime: 5_000,
   });
 }
 
@@ -58,7 +58,7 @@ export function useFloors(towerId?: string) {
     queryKey: ["floors", towerId],
     queryFn: () => (towerId ? communitiesApi.floors(towerId) : []),
     enabled: Boolean(towerId),
-    staleTime: 60_000,
+    staleTime: 5_000,
   });
 }
 
@@ -67,7 +67,7 @@ export function useUnits(floorId?: string) {
     queryKey: ["units", floorId],
     queryFn: () => (floorId ? communitiesApi.units(floorId) : []),
     enabled: Boolean(floorId),
-    staleTime: 60_000,
+    staleTime: 5_000,
   });
 }
 
@@ -76,7 +76,7 @@ export function useCommunityUnits(communityId?: string) {
     queryKey: ["community-units", communityId],
     queryFn: () => (communityId ? communitiesApi.communityUnits(communityId) : []),
     enabled: Boolean(communityId),
-    staleTime: 60_000,
+    staleTime: 5_000,
   });
 }
 
@@ -85,7 +85,7 @@ export function useGates(communityId?: string) {
     queryKey: ["gates", communityId],
     queryFn: () => (communityId ? communitiesApi.gates(communityId) : []),
     enabled: Boolean(communityId),
-    staleTime: 60_000,
+    staleTime: 5_000,
   });
 }
 
@@ -94,8 +94,8 @@ export function useCreateCommunity() {
   return useMutation({
     mutationFn: (data: Partial<Community> | CommunityCreate) => communitiesApi.create(data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: communityKeys.all });
-      qc.invalidateQueries({ queryKey: ["dashboards"] });
+      qc.invalidateQueries({ queryKey: communityKeys.all, refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["dashboards"], refetchType: "all" });
     },
   });
 }
@@ -106,9 +106,9 @@ export function useUpdateCommunity() {
     mutationFn: ({ id, data }: { id: string; data: Partial<Community> }) =>
       communitiesApi.update(id, data),
     onSuccess: (_, { id }) => {
-      qc.invalidateQueries({ queryKey: communityKeys.detail(id) });
-      qc.invalidateQueries({ queryKey: communityKeys.all });
-      qc.invalidateQueries({ queryKey: ["dashboards"] });
+      qc.invalidateQueries({ queryKey: communityKeys.detail(id), refetchType: "all" });
+      qc.invalidateQueries({ queryKey: communityKeys.all, refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["dashboards"], refetchType: "all" });
     },
   });
 }
@@ -118,8 +118,8 @@ export function useDeleteCommunity() {
   return useMutation({
     mutationFn: (id: string) => communitiesApi.delete(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: communityKeys.all });
-      qc.invalidateQueries({ queryKey: ["dashboards"] });
+      qc.invalidateQueries({ queryKey: communityKeys.all, refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["dashboards"], refetchType: "all" });
     },
   });
 }
@@ -135,9 +135,10 @@ export function useCreateTower() {
       data: { name: string; code: string; structure_type?: string; total_floors?: number };
     }) => communitiesApi.createTower(communityId, data),
     onSuccess: (_, { communityId }) => {
-      qc.invalidateQueries({ queryKey: ["towers", communityId] });
-      qc.invalidateQueries({ queryKey: ["dashboards"] });
-      qc.invalidateQueries({ queryKey: communityKeys.all });
+      qc.invalidateQueries({ queryKey: ["towers", communityId], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["towers"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["dashboards"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: communityKeys.all, refetchType: "all" });
     },
   });
 }
@@ -148,8 +149,10 @@ export function useCreateFloor() {
     mutationFn: (data: { tower_id: string; floor_number: number; label?: string }) =>
       communitiesApi.createFloor(data),
     onSuccess: (_, { tower_id }) => {
-      qc.invalidateQueries({ queryKey: ["floors", tower_id] });
-      qc.invalidateQueries({ queryKey: ["towers"] });
+      qc.invalidateQueries({ queryKey: ["floors", tower_id], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["floors"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["towers"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["dashboards"], refetchType: "all" });
     },
   });
 }
@@ -165,9 +168,12 @@ export function useCreateUnit() {
       area_sqft?: number;
     }) => communitiesApi.createUnit(data),
     onSuccess: (_, { floor_id }) => {
-      qc.invalidateQueries({ queryKey: ["units", floor_id] });
-      qc.invalidateQueries({ queryKey: ["floors"] });
-      qc.invalidateQueries({ queryKey: ["dashboards"] });
+      qc.invalidateQueries({ queryKey: ["units", floor_id], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["units"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["community-units"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["floors"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["dashboards"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: communityKeys.all, refetchType: "all" });
     },
   });
 }

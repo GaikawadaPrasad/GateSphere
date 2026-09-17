@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Modal } from "@/components/common/Modal";
 import { usersApi } from "@/lib/api";
 import type { Role } from "@/types/rbac";
 import { toast } from "@/store/toast";
+import { isValidPersonName } from "@/constants/locations";
 
 export interface UserRoleGrant {
   id: string;
@@ -39,6 +41,7 @@ export function EditUserModal({
   availableRoles = [],
   onSuccess,
 }: EditUserModalProps) {
+  const queryClient = useQueryClient();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -70,14 +73,17 @@ export function EditUserModal({
 
   const validateProfile = () => {
     const errors: Record<string, string> = {};
-    if (!fullName.trim() || fullName.trim().length < 2) {
+    const trimmedName = fullName.trim();
+    if (!trimmedName || trimmedName.length < 2) {
       errors.fullName = "Full name must be at least 2 characters long.";
+    } else if (!isValidPersonName(trimmedName)) {
+      errors.fullName = "Full name must contain only alphabets and spaces.";
     }
     if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       errors.email = "Please enter a valid email address.";
     }
-    if (phone.trim() && !/^\+?[0-9\s\-()]{7,20}$/.test(phone.trim())) {
-      errors.phone = "Invalid phone number format.";
+    if (phone.trim() && !/^[+0-9][0-9 \-]{4,19}$/.test(phone.trim())) {
+      errors.phone = "Phone must be 5-20 digits (e.g. +91 9876543210).";
     }
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
@@ -98,6 +104,7 @@ export function EditUserModal({
         is_active: isActive,
       });
       toast.success(`Updated profile and access for ${fullName.trim()}.`, "User Updated");
+      await queryClient.invalidateQueries({ queryKey: ["users"], refetchType: "all" });
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -124,6 +131,7 @@ export function EditUserModal({
       );
       setSelectedRoleSlug("");
       setCommunityIdInput("");
+      await queryClient.invalidateQueries({ queryKey: ["users"], refetchType: "all" });
       onSuccess();
     } catch (err: any) {
       const msg = err?.message || "Failed to grant role";
@@ -140,6 +148,7 @@ export function EditUserModal({
     try {
       await usersApi.revokeRole(user.id, grantId);
       toast.success(`Role assignment revoked from ${user.full_name}.`, "Role Revoked");
+      await queryClient.invalidateQueries({ queryKey: ["users"], refetchType: "all" });
       onSuccess();
     } catch (err: any) {
       const msg = err?.message || "Failed to revoke role";
@@ -160,6 +169,7 @@ export function EditUserModal({
     try {
       await usersApi.delete(user.id);
       toast.success(`User account for ${user.full_name} deleted.`, "User Deleted");
+      await queryClient.invalidateQueries({ queryKey: ["users"], refetchType: "all" });
       onSuccess();
       onClose();
     } catch (err: any) {

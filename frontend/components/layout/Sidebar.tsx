@@ -25,6 +25,18 @@ const SUPER_ADMIN_NAV_ITEMS: NavItem[] = [
   { id: "settings", label: "System Settings", href: "/super-admin/settings", icon: "⚙️" },
 ];
 
+const COMMUNITY_ADMIN_NAV_ITEMS: NavItem[] = [
+  { id: "dashboard", label: "Dashboard", href: "/community-admin/dashboard", icon: "🏢" },
+  { id: "property", label: "Property & Structure", href: "/community-admin/property", icon: "🏗️" },
+  { id: "residents", label: "Residents & Occupancy", href: "/community-admin/residents", icon: "👥" },
+  { id: "staff", label: "Operational Staff", href: "/community-admin/staff", icon: "👔" },
+  { id: "security-staff", label: "Security & Operations", href: "/community-admin/security-staff", icon: "🛡️" },
+  { id: "billing", label: "Billing & Finance", href: "/community-admin/billing", icon: "💳" },
+  { id: "communication", label: "Communications", href: "/community-admin/communication", icon: "📢" },
+  { id: "incidents", label: "Incidents & Safety", href: "/community-admin/incidents", icon: "🚨" },
+  { id: "notifications", label: "Notifications", href: "/community-admin/notifications", icon: "🔔" },
+];
+
 export function Sidebar() {
   const pathname = usePathname();
   const { sidebarOpen, toggleSidebar } = useUiStore();
@@ -80,9 +92,7 @@ export function Sidebar() {
       title: "GateSphere",
       roleLabel: "Community Admin",
       accentColor: "#2563EB",
-      items: [
-        { id: "dashboard", label: "Dashboard", href: "/community-admin/dashboard", icon: "🏢" },
-      ],
+      items: COMMUNITY_ADMIN_NAV_ITEMS,
     };
   } else if (
     pathname.startsWith("/security-guard") ||

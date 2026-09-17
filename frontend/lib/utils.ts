@@ -340,3 +340,12 @@ export function getAmenityIcon(
   return "🏢";
 }
 
+/**
+ * Validates that a person's full name contains only alphabetical characters, spaces,
+ * dots (e.g. initials), hyphens, and apostrophes (no numbers or special characters).
+ */
+export function isValidPersonName(name: string): boolean {
+  const trimmed = (name || "").trim();
+  if (trimmed.length < 2) return false;
+  return /^[a-zA-Z\s.\-']+$/.test(trimmed) && (trimmed.match(/[a-zA-Z]/g) || []).length >= 2;
+}
