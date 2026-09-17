@@ -18,6 +18,7 @@ export interface ListQueryParams {
   sort?: string;
   order?: "asc" | "desc";
   search?: string;
+  q?: string;
   community_id?: string;
   active?: boolean;
 }
