@@ -175,26 +175,35 @@ export default function CommunityAdminStaffPage() {
     }
 
     const trimmedId = (newStaffForm.id_number || "").trim();
+    const idType = (newStaffForm.id_type || "").trim();
+    const idTypeNorm = idType.toLowerCase();
+
     if (trimmedId) {
-      if (newStaffForm.id_type === "Aadhaar") {
+      if (idTypeNorm === "aadhaar" || idTypeNorm.includes("aadhaar")) {
         const cleanAadhaar = trimmedId.replace(/[\s-]/g, "");
         if (!/^\d{12}$/.test(cleanAadhaar)) {
-          errors.id_number = "Aadhaar number must be exactly 12 digits (e.g. 1234 5678 9012).";
+          errors.id_number = "Aadhaar number must be exactly 12 numeric digits (e.g. 1234 5678 9012).";
+        } else if (/^(\d)\1{11}$/.test(cleanAadhaar)) {
+          errors.id_number = "Aadhaar number cannot contain all identical repeating digits.";
         }
-      } else if (newStaffForm.id_type === "PAN Card") {
-        if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/i.test(trimmedId)) {
+      } else if (idTypeNorm === "pan card" || idTypeNorm === "pan") {
+        const cleanPan = trimmedId.replace(/[\s-]/g, "").toUpperCase();
+        if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(cleanPan)) {
           errors.id_number = "PAN Card must be 10 characters in format ABCDE1234F.";
         }
-      } else if (newStaffForm.id_type === "Voter ID") {
-        if (!/^[A-Z]{3}[0-9]{7}$/i.test(trimmedId)) {
+      } else if (idTypeNorm === "voter id" || idTypeNorm === "voter_id") {
+        const cleanVoter = trimmedId.replace(/[\s-]/g, "").toUpperCase();
+        if (!/^[A-Z]{3}[0-9]{7}$/.test(cleanVoter)) {
           errors.id_number = "Voter ID must be 10 characters (e.g. ABC1234567).";
         }
-      } else if (newStaffForm.id_type === "Passport") {
-        if (!/^[A-Z][0-9]{7,8}$/i.test(trimmedId)) {
+      } else if (idTypeNorm === "passport") {
+        const cleanPass = trimmedId.replace(/[\s-]/g, "").toUpperCase();
+        if (!/^[A-Z][0-9]{7,8}$/.test(cleanPass)) {
           errors.id_number = "Passport must be 1 letter followed by 7-8 digits (e.g. A1234567).";
         }
-      } else if (newStaffForm.id_type === "Driving License") {
-        if (!/^[A-Z]{2}[0-9A-Z\s\-]{8,18}$/i.test(trimmedId)) {
+      } else if (idTypeNorm === "driving license" || idTypeNorm === "driving_license" || idTypeNorm === "dl") {
+        const cleanDl = trimmedId.replace(/[\s-]/g, "").toUpperCase();
+        if (!/^[A-Z]{2}[0-9A-Z]{8,18}$/.test(cleanDl)) {
           errors.id_number = "Driving License must be valid (e.g. DL-1420110012345).";
         }
       } else if (trimmedId.length > 30) {
@@ -1088,6 +1097,7 @@ export default function CommunityAdminStaffPage() {
         maxWidth={680}
       >
         <form
+          noValidate
           onSubmit={handleAddStaff}
           style={{ display: "flex", flexDirection: "column", gap: "1.25rem", maxHeight: "80vh", overflowY: "auto", paddingRight: "0.25rem" }}
         >
@@ -1361,14 +1371,21 @@ export default function CommunityAdminStaffPage() {
                     <span>⚠️</span> {staffFieldErrors.password}
                   </span>
                 )}
+                <span
+                  style={{
+                    fontSize: "0.72rem",
+                    color: "var(--muted)",
+                    marginTop: "0.25rem",
+                    display: "block",
+                  }}
+                >
+                  Default: <code>[FirstName]@Gate2026!</code>
+                </span>
               </div>
             </div>
-            <p style={{ margin: 0, fontSize: "11.5px", color: "var(--muted)" }}>
-              💡 Providing an email allows this staff member to sign in to the <strong>Domestic Staff Dashboard</strong> to view unit assignments and check-in logs.
-            </p>
           </div>
 
-          {/* Section 2: Role & Government Identification */}
+          {/* Section 2: Role & Government Verification */}
           <div
             style={{
               padding: "1rem",
@@ -1392,7 +1409,7 @@ export default function CommunityAdminStaffPage() {
                 gap: "0.4rem",
               }}
             >
-              <span>🛠️</span> 2. Profession &amp; Identification
+              <span>🪪</span> 2. Staff Role &amp; Government Identification
             </div>
 
             <div>
@@ -1404,13 +1421,16 @@ export default function CommunityAdminStaffPage() {
                   marginBottom: "0.3rem",
                 }}
               >
-                Role / Profession <span style={{ color: "#EF4444" }}>*</span>
+                Staff Role / Type <span style={{ color: "#EF4444" }}>*</span>
               </label>
               <select
                 className="select-field"
                 value={newStaffForm.staff_type}
                 onChange={(e) =>
-                  setNewStaffForm({ ...newStaffForm, staff_type: e.target.value as StaffType })
+                  setNewStaffForm({
+                    ...newStaffForm,
+                    staff_type: e.target.value as StaffType,
+                  })
                 }
               >
                 <option value="maid">Maid / Housekeeper</option>
@@ -1427,6 +1447,7 @@ export default function CommunityAdminStaffPage() {
             <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: "0.85rem" }}>
               <div>
                 <label
+                  htmlFor="staff_id_type"
                   style={{
                     fontSize: "0.82rem",
                     fontWeight: 600,
@@ -1437,6 +1458,7 @@ export default function CommunityAdminStaffPage() {
                   Govt ID Type
                 </label>
                 <select
+                  id="staff_id_type"
                   className="select-field"
                   value={newStaffForm.id_type}
                   onChange={(e) => {
@@ -1459,6 +1481,7 @@ export default function CommunityAdminStaffPage() {
               </div>
               <div>
                 <label
+                  htmlFor="staff_id_number"
                   style={{
                     fontSize: "0.82rem",
                     fontWeight: 600,
@@ -1466,18 +1489,20 @@ export default function CommunityAdminStaffPage() {
                     marginBottom: "0.3rem",
                   }}
                 >
-                  ID Number
+                  Govt ID Number
                 </label>
                 <input
+                  id="staff_id_number"
                   type="text"
                   className="input-field"
                   aria-invalid={Boolean(staffFieldErrors.id_number)}
                   style={{
                     borderColor: staffFieldErrors.id_number ? "#EF4444" : undefined,
+                    boxShadow: staffFieldErrors.id_number ? "0 0 0 1px #EF4444" : undefined,
                   }}
                   placeholder={
                     newStaffForm.id_type === "Aadhaar"
-                      ? "e.g. 1234-5678-9012"
+                      ? "e.g. 1234 5678 9012"
                       : newStaffForm.id_type === "Voter ID"
                         ? "e.g. ABC1234567"
                         : newStaffForm.id_type === "PAN Card"
@@ -1485,7 +1510,7 @@ export default function CommunityAdminStaffPage() {
                           : newStaffForm.id_type === "Driving License"
                             ? "e.g. DL-1420110012345"
                             : newStaffForm.id_type === "Passport"
-                              ? "e.g. A12345678"
+                              ? "e.g. A1234567"
                               : "e.g. ID Document Number"
                   }
                   value={newStaffForm.id_number}
@@ -1500,7 +1525,7 @@ export default function CommunityAdminStaffPage() {
                     }
                   }}
                 />
-                {staffFieldErrors.id_number && (
+                {staffFieldErrors.id_number ? (
                   <span
                     role="alert"
                     title={staffFieldErrors.id_number}
@@ -1514,6 +1539,27 @@ export default function CommunityAdminStaffPage() {
                     }}
                   >
                     <span>⚠️</span> {staffFieldErrors.id_number}
+                  </span>
+                ) : (
+                  <span
+                    style={{
+                      fontSize: "0.75rem",
+                      color: "var(--muted)",
+                      marginTop: "0.25rem",
+                      display: "block",
+                    }}
+                  >
+                    {newStaffForm.id_type === "Aadhaar"
+                      ? "12-digit numeric Aadhaar (e.g. 1234 5678 9012)"
+                      : newStaffForm.id_type === "PAN Card"
+                        ? "10-character PAN (e.g. ABCDE1234F)"
+                        : newStaffForm.id_type === "Voter ID"
+                          ? "10-character Voter ID (e.g. ABC1234567)"
+                          : newStaffForm.id_type === "Driving License"
+                            ? "Valid DL format (e.g. DL-1420110012345)"
+                            : newStaffForm.id_type === "Passport"
+                              ? "1 letter + 7-8 digits (e.g. A1234567)"
+                              : "Optional Government ID number"}
                   </span>
                 )}
               </div>

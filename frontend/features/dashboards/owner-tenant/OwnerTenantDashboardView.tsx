@@ -509,6 +509,34 @@ export function OwnerTenantDashboardView({
       return;
     }
 
+    const trimmedId = passIdNumber.trim();
+    if (trimmedId) {
+      const idTypeNorm = passIdType.toLowerCase();
+      if (idTypeNorm === "aadhaar") {
+        const cleanAadhaar = trimmedId.replace(/[\s-]/g, "");
+        if (!/^\d{12}$/.test(cleanAadhaar)) {
+          toast.error("Aadhaar number must be exactly 12 numeric digits.", "Invalid Aadhaar");
+          return;
+        }
+        if (/^(\d)\1{11}$/.test(cleanAadhaar)) {
+          toast.error("Aadhaar number cannot contain all identical repeating digits.", "Invalid Aadhaar");
+          return;
+        }
+      } else if (idTypeNorm === "pan") {
+        const cleanPan = trimmedId.replace(/[\s-]/g, "").toUpperCase();
+        if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(cleanPan)) {
+          toast.error("PAN Card must be 10 characters in format ABCDE1234F.", "Invalid PAN");
+          return;
+        }
+      } else if (idTypeNorm === "voter_id") {
+        const cleanVoter = trimmedId.replace(/[\s-]/g, "").toUpperCase();
+        if (!/^[A-Z]{3}[0-9]{7}$/.test(cleanVoter)) {
+          toast.error("Voter ID must be 10 characters (e.g. ABC1234567).", "Invalid Voter ID");
+          return;
+        }
+      }
+    }
+
     try {
       const activeUnitId = profile.data?.occupancies?.[0]?.unit_id;
       const res = await visitors.createPass.mutateAsync({
