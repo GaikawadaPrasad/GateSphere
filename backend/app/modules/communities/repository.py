@@ -168,6 +168,11 @@ class TowerRepository(AsyncTenantRepository[Tower]):
             select(Tower).where(Tower.community_id == community_id, Tower.name == name)
         )
 
+    async def by_code(self, community_id: uuid.UUID, code: str) -> Tower | None:
+        return await self.db.scalar(
+            select(Tower).where(Tower.community_id == community_id, Tower.code == code)
+        )
+
     async def list_for_community(
         self, community_id: uuid.UUID, *, offset: int, limit: int
     ) -> tuple[list[Tower], int]:
