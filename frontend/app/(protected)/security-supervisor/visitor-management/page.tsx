@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { SearchInput } from "@/components/forms/SearchInput";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DataTable, type Column } from "@/components/tables/DataTable";
+import { Modal } from "@/components/common/Modal";
 import { visitorsApi, type VisitorRecord } from "@/lib/api";
 
 export default function SecuritySupervisorVisitorManagementPage() {
@@ -13,7 +14,7 @@ export default function SecuritySupervisorVisitorManagementPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
-  const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [selectedVisitor, setSelectedVisitor] = useState<VisitorRecord | null>(null);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -36,6 +37,13 @@ export default function SecuritySupervisorVisitorManagementPage() {
               : v.status
                 ? v.status.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
                 : "Expected",
+          rawStatus: v.status,
+          purpose: v.purpose || v.notes || "Personal Visit",
+          expected_at: v.expected_at ? new Date(v.expected_at).toLocaleString() : (v.valid_from ? new Date(v.valid_from).toLocaleString() : "—"),
+          valid_until: v.valid_until ? new Date(v.valid_until).toLocaleString() : (v.valid_to ? new Date(v.valid_to).toLocaleString() : "—"),
+          created_at: v.created_at ? new Date(v.created_at).toLocaleString() : "—",
+          vehicle_number: v.vehicle_number || "None",
+          photo_url: v.photo_url || v.visitor?.photo_url || undefined,
         })),
       );
     } catch {
@@ -47,28 +55,6 @@ export default function SecuritySupervisorVisitorManagementPage() {
   useEffect(() => {
     loadData();
   }, []);
-
-  const handleApprove = async (id: string, name: string) => {
-    setActionMessage(null);
-    try {
-      await visitorsApi.approve(id, "Approved by Security Supervisor");
-      setVisitors((prev) => prev.map((v) => (v.id === id ? { ...v, status: "Approved" } : v)));
-      setActionMessage({ type: "success", text: `Visitor request approved for ${name}.` });
-    } catch (err: any) {
-      setActionMessage({ type: "error", text: err?.message || "Failed to approve visitor request." });
-    }
-  };
-
-  const handleReject = async (id: string, name: string) => {
-    setActionMessage(null);
-    try {
-      await visitorsApi.reject(id, "Rejected by Security Supervisor");
-      setVisitors((prev) => prev.map((v) => (v.id === id ? { ...v, status: "Rejected" } : v)));
-      setActionMessage({ type: "success", text: `Visitor request rejected for ${name}.` });
-    } catch (err: any) {
-      setActionMessage({ type: "error", text: err?.message || "Failed to reject visitor request." });
-    }
-  };
 
   const filteredVisitors = visitors.filter((v) => {
     const q = search.toLowerCase();
@@ -126,26 +112,26 @@ export default function SecuritySupervisorVisitorManagementPage() {
       align: "right",
       render: (v) => (
         <div style={{ display: "flex", gap: "0.4rem", justifyContent: "flex-end" }}>
-          {v.status === "Pending Approval" ? (
-            <>
-              <button
-                className="btn btn-primary"
-                style={{ fontSize: "0.75rem", padding: "0.2rem 0.45rem" }}
-                onClick={() => handleApprove(v.id, v.name)}
-              >
-                Approve
-              </button>
-              <button
-                className="btn btn-danger"
-                style={{ fontSize: "0.75rem", padding: "0.2rem 0.45rem" }}
-                onClick={() => handleReject(v.id, v.name)}
-              >
-                Reject
-              </button>
-            </>
-          ) : (
-            <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>—</span>
-          )}
+          <button
+            type="button"
+            className="btn btn-outline"
+            style={{
+              fontSize: "0.75rem",
+              padding: "0.2rem 0.55rem",
+              border: "1px solid var(--border, #e2e8f0)",
+              background: "#ffffff",
+              color: "var(--fg, #0f172a)",
+              borderRadius: "6px",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.25rem",
+              cursor: "pointer",
+            }}
+            onClick={() => setSelectedVisitor(v)}
+          >
+            <span>👁</span>
+            <span>View</span>
+          </button>
         </div>
       ),
     },
@@ -167,33 +153,6 @@ export default function SecuritySupervisorVisitorManagementPage() {
           </Link>
         }
       />
-
-      {actionMessage && (
-        <div
-          style={{
-            padding: "0.75rem 1rem",
-            marginBottom: "1.25rem",
-            borderRadius: "var(--radius)",
-            background: actionMessage.type === "success" ? "var(--success-light)" : "var(--danger-light)",
-            border: `1px solid ${actionMessage.type === "success" ? "var(--success-border)" : "var(--danger-border)"}`,
-            color: actionMessage.type === "success" ? "#065f46" : "#991b1b",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>
-            {actionMessage.type === "success" ? "✅" : "⚠️"} {actionMessage.text}
-          </span>
-          <button
-            type="button"
-            onClick={() => setActionMessage(null)}
-            style={{ background: "none", border: "none", cursor: "pointer", fontWeight: 700 }}
-          >
-            ✕
-          </button>
-        </div>
-      )}
 
       <div className="card">
         <div className="card-header" style={{ flexWrap: "wrap", gap: "0.75rem" }}>
@@ -241,6 +200,146 @@ export default function SecuritySupervisorVisitorManagementPage() {
           emptyIcon="👥"
         />
       </div>
+
+      {selectedVisitor && (
+        <Modal
+          isOpen={Boolean(selectedVisitor)}
+          onClose={() => setSelectedVisitor(null)}
+          title="Visitor Pass Details"
+          size="md"
+          footer={
+            <div style={{ display: "flex", justifyContent: "flex-end", width: "100%" }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setSelectedVisitor(null)}
+              >
+                Close
+              </button>
+            </div>
+          }
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            {/* Header summary */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "0.85rem 1rem",
+                background: "var(--bg-subtle, #f8fafc)",
+                borderRadius: "var(--radius, 8px)",
+                border: "1px solid var(--border, #e2e8f0)",
+              }}
+            >
+              <div>
+                <h4 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700, color: "var(--fg)" }}>
+                  👤 {selectedVisitor.name}
+                </h4>
+                <p style={{ margin: "0.2rem 0 0", fontSize: "0.85rem", color: "var(--muted)", fontFamily: "monospace" }}>
+                  {selectedVisitor.phone}
+                </p>
+              </div>
+              <StatusBadge status={selectedVisitor.status} />
+            </div>
+
+            {/* Resident approval notice for pending passes */}
+            {selectedVisitor.status === "Pending Approval" && (
+              <div
+                style={{
+                  padding: "0.65rem 0.85rem",
+                  background: "#fffbeb",
+                  border: "1px solid #fef3c7",
+                  borderRadius: "6px",
+                  color: "#92400e",
+                  fontSize: "0.8rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                }}
+              >
+                <span>ℹ️</span>
+                <span>
+                  <strong>Pending Resident Approval:</strong> This visitor pass is awaiting confirmation from the resident/owner of {selectedVisitor.unit}. Approval and rejection actions are reserved for the respective resident.
+                </span>
+              </div>
+            )}
+
+            {/* Details Grid */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "0.75rem",
+                fontSize: "0.85rem",
+              }}
+            >
+              <div style={{ background: "var(--bg-subtle, #f8fafc)", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.725rem", textTransform: "uppercase", fontWeight: 600 }}>
+                  Pass Code
+                </div>
+                <div style={{ fontWeight: 600, fontFamily: "monospace", color: "var(--fg)", marginTop: "0.15rem" }}>
+                  {selectedVisitor.pass_code}
+                </div>
+              </div>
+
+              <div style={{ background: "var(--bg-subtle, #f8fafc)", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.725rem", textTransform: "uppercase", fontWeight: 600 }}>
+                  Destination Unit
+                </div>
+                <div style={{ fontWeight: 600, color: "var(--fg)", marginTop: "0.15rem" }}>
+                  🏢 {selectedVisitor.unit}
+                </div>
+              </div>
+
+              <div style={{ background: "var(--bg-subtle, #f8fafc)", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.725rem", textTransform: "uppercase", fontWeight: 600 }}>
+                  Visitor Type
+                </div>
+                <div style={{ fontWeight: 600, color: "var(--fg)", marginTop: "0.15rem" }}>
+                  {selectedVisitor.type}
+                </div>
+              </div>
+
+              <div style={{ background: "var(--bg-subtle, #f8fafc)", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.725rem", textTransform: "uppercase", fontWeight: 600 }}>
+                  Vehicle Number
+                </div>
+                <div style={{ fontWeight: 600, color: "var(--fg)", marginTop: "0.15rem" }}>
+                  🚗 {selectedVisitor.vehicle_number || "None"}
+                </div>
+              </div>
+
+              <div style={{ background: "var(--bg-subtle, #f8fafc)", padding: "0.6rem 0.8rem", borderRadius: "6px", gridColumn: "span 2" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.725rem", textTransform: "uppercase", fontWeight: 600 }}>
+                  Purpose of Visit
+                </div>
+                <div style={{ fontWeight: 500, color: "var(--fg)", marginTop: "0.15rem" }}>
+                  {selectedVisitor.purpose || "Personal Visit"}
+                </div>
+              </div>
+
+              <div style={{ background: "var(--bg-subtle, #f8fafc)", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.725rem", textTransform: "uppercase", fontWeight: 600 }}>
+                  Expected Arrival
+                </div>
+                <div style={{ fontWeight: 500, color: "var(--fg)", marginTop: "0.15rem", fontSize: "0.8rem" }}>
+                  {selectedVisitor.expected_at || "—"}
+                </div>
+              </div>
+
+              <div style={{ background: "var(--bg-subtle, #f8fafc)", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.725rem", textTransform: "uppercase", fontWeight: 600 }}>
+                  Valid Until
+                </div>
+                <div style={{ fontWeight: 500, color: "var(--fg)", marginTop: "0.15rem", fontSize: "0.8rem" }}>
+                  {selectedVisitor.valid_until || "—"}
+                </div>
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

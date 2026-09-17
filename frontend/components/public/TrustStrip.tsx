@@ -16,7 +16,7 @@ interface StatItem {
 const statsData: StatItem[] = [
   {
     icon: (
-      <svg className="w-5 h-5 text-blue-900" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <svg className="w-4 h-4 sm:w-5 sm:h-5 text-blue-900" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" strokeLinecap="round" strokeLinejoin="round" />
         <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
@@ -28,7 +28,7 @@ const statsData: StatItem[] = [
   },
   {
     icon: (
-      <svg className="w-5 h-5 text-blue-900" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <svg className="w-4 h-4 sm:w-5 sm:h-5 text-blue-900" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
@@ -40,7 +40,7 @@ const statsData: StatItem[] = [
   },
   {
     icon: (
-      <svg className="w-5 h-5 text-blue-900" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <svg className="w-4 h-4 sm:w-5 sm:h-5 text-blue-900" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <circle cx="12" cy="12" r="10" />
         <path d="M12 6v6l4 2" strokeLinecap="round" />
       </svg>
@@ -52,7 +52,7 @@ const statsData: StatItem[] = [
   },
   {
     icon: (
-      <svg className="w-5 h-5 text-blue-900" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <svg className="w-4 h-4 sm:w-5 sm:h-5 text-blue-900" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <rect x="2" y="5" width="20" height="14" rx="2" />
         <path d="M2 10h20" />
       </svg>
@@ -65,7 +65,7 @@ const statsData: StatItem[] = [
   },
   {
     icon: (
-      <svg className="w-5 h-5 text-blue-900" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <svg className="w-4 h-4 sm:w-5 sm:h-5 text-blue-900" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
         <circle cx="12" cy="7" r="4" />
       </svg>
@@ -77,37 +77,49 @@ const statsData: StatItem[] = [
   },
 ];
 
-function StatCard({ stat, visible }: { stat: StatItem; visible: boolean }) {
+function StatCard({
+  stat,
+  visible,
+  className = "",
+}: {
+  stat: StatItem;
+  visible: boolean;
+  className?: string;
+}) {
   const raw = useCountUp(stat.target, 1800, visible);
   const display = (stat.decimals ?? 0) > 0
     ? (raw / Math.pow(10, stat.decimals!)).toFixed(1)
     : raw.toString();
 
   return (
-    <div className="group relative flex flex-col items-center text-center p-6 sm:p-7 rounded-2xl bg-white border border-slate-200/80 shadow-xs hover:shadow-md hover:border-slate-300 transition-all duration-300">
-      {/* Top Soft Blue Icon Circle */}
-      <div className="w-11 h-11 rounded-full flex items-center justify-center mb-3.5 bg-blue-50/70 border border-blue-100/50 transition-transform duration-300 group-hover:scale-105">
-        {stat.icon}
-      </div>
+    <div
+      className={`group relative flex flex-col items-center justify-between text-center p-3.5 sm:p-6 lg:p-7 rounded-xl sm:rounded-2xl bg-white border border-slate-200/80 shadow-xs hover:shadow-md hover:border-slate-300 transition-all duration-300 h-full ${className}`}
+    >
+      <div className="flex flex-col items-center w-full">
+        {/* Top Soft Blue Icon Circle */}
+        <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-full flex items-center justify-center mb-2 sm:mb-3.5 bg-blue-50/70 border border-blue-100/50 transition-transform duration-300 group-hover:scale-105 shrink-0">
+          {stat.icon}
+        </div>
 
-      {/* Main Stat Number */}
-      <div
-        className="text-[32px] sm:text-[36px] font-bold tracking-tight text-slate-900 leading-none"
-        style={{ fontFamily: "'Outfit', 'Plus Jakarta Sans', sans-serif" }}
-      >
-        {stat.prefix}{display}{stat.suffix}
-      </div>
+        {/* Main Stat Number */}
+        <div
+          className="text-[22px] xs:text-[24px] sm:text-[32px] lg:text-[36px] font-bold tracking-tight text-slate-900 leading-none"
+          style={{ fontFamily: "'Outfit', 'Plus Jakarta Sans', sans-serif" }}
+        >
+          {stat.prefix}{display}{stat.suffix}
+        </div>
 
-      {/* Label / Title */}
-      <div
-        className="text-[13px] font-semibold text-slate-800 mt-2"
-        style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
-      >
-        {stat.title}
+        {/* Label / Title */}
+        <div
+          className="text-[12px] sm:text-[13px] font-semibold text-slate-800 mt-1.5 sm:mt-2 leading-tight"
+          style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+        >
+          {stat.title}
+        </div>
       </div>
 
       {/* Subtext Description */}
-      <div className="text-[11.5px] text-slate-400 font-normal mt-0.5 leading-snug">
+      <div className="text-[10px] sm:text-[11.5px] text-slate-400 font-normal mt-1 sm:mt-0.5 leading-snug">
         {stat.desc}
       </div>
     </div>
@@ -225,7 +237,7 @@ export default function TrustStrip() {
           "radial-gradient(ellipse at 15% 20%, rgba(254, 243, 199, 0.35) 0%, rgba(240, 249, 255, 0.45) 45%, rgba(250, 249, 247, 0.95) 85%)",
       }}
     >
-      <div className="max-w-7xl mx-auto px-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
         {/* ── HEADER ── */}
         <div className="text-center max-w-4xl mx-auto mb-8">
           <div
@@ -259,9 +271,14 @@ export default function TrustStrip() {
         </div>
 
         {/* ── STAT CARDS GRID ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 sm:gap-4 mb-10">
-          {statsData.map((stat) => (
-            <StatCard key={stat.title} stat={stat} visible={visible} />
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-10">
+          {statsData.map((stat, idx) => (
+            <StatCard
+              key={stat.title}
+              stat={stat}
+              visible={visible}
+              className={idx >= 4 ? "hidden lg:flex" : "flex"}
+            />
           ))}
         </div>
 
