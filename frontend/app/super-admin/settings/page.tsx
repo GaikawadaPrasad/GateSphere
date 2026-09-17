@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { Modal } from "@/components/common/Modal";
+import { CreateUserModal } from "@/components/super-admin/CreateUserModal";
 import { EditUserModal, type UserRecord } from "@/components/super-admin/EditUserModal";
 import { EditRolePermissionsModal } from "@/components/super-admin/EditRolePermissionsModal";
 import { rbacApi, usersApi } from "@/lib/api";
@@ -20,6 +21,7 @@ export default function SettingsPage() {
   const [editingPermission, setEditingPermission] = useState<Permission | null>(null);
   const [descriptionInput, setDescriptionInput] = useState<string>("");
 
+  const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
   const [deletingUser, setDeletingUser] = useState<UserRecord | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -281,11 +283,21 @@ export default function SettingsPage() {
       <div style={{ display: "flex", flexDirection: "column", gap: "1.75rem" }}>
         {/* User Access & RBAC Assignments Matrix */}
         <div className="card">
-          <div className="card-header">
-            <h3 className="card-title">User Access & RBAC Assignments Matrix</h3>
-            <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-              {isUsersLoading ? "Loading users…" : `${usersData?.length || 0} Registered Users`}
-            </span>
+          <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.75rem" }}>
+            <div>
+              <h3 className="card-title">User Access & RBAC Assignments Matrix</h3>
+              <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                {isUsersLoading ? "Loading users…" : `${usersData?.length || 0} Registered Users`}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => setIsAddUserOpen(true)}
+              style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}
+            >
+              <span>+</span> Add User / Personnel
+            </button>
           </div>
 
           <DataTable
@@ -464,6 +476,18 @@ export default function SettingsPage() {
             Are you sure you want to delete <strong>{deletingUser.full_name}</strong> ({deletingUser.email})? This action will immediately revoke their access and delete their user profile.
           </p>
         </Modal>
+      )}
+
+      {/* Create User Modal */}
+      {isAddUserOpen && (
+        <CreateUserModal
+          isOpen={isAddUserOpen}
+          onClose={() => setIsAddUserOpen(false)}
+          preselectedCommunityId={activeCommunityId || ""}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ["users"] });
+          }}
+        />
       )}
 
       {/* Edit Role Permissions Modal */}

@@ -16,6 +16,7 @@ import {
 const SUPER_ADMIN_NAV_ITEMS: NavItem[] = [
   { id: "dashboard", label: "Dashboard", href: "/super-admin/dashboard", icon: "📊" },
   { id: "communities", label: "Communities", href: "/super-admin/communities", icon: "🏢" },
+  { id: "users", label: "Users & Staff", href: "/super-admin/users", icon: "👔" },
   { id: "residents", label: "Residents", href: "/super-admin/residents", icon: "👥" },
   { id: "gate-traffic", label: "Gate Traffic", href: "/super-admin/gate-traffic", icon: "🛡️" },
   { id: "complaints", label: "Complaints", href: "/super-admin/complaints", icon: "🎫" },
