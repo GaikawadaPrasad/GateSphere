@@ -6,45 +6,116 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { SearchInput } from "@/components/forms/SearchInput";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DataTable, type Column } from "@/components/tables/DataTable";
+import { visitorsApi, communitiesApi, authApi, type VisitorRecord } from "@/lib/api";
 import { Modal } from "@/components/common/Modal";
-import { visitorsApi, type VisitorRecord } from "@/lib/api";
+import { formatDateTime } from "@/lib/utils";
+import { toast } from "@/store/toast";
+
+interface SupervisorVisitorRow {
+  id: string;
+  pass_code: string;
+  name: string;
+  phone: string;
+  type: string;
+  unit: string;
+  status: string;
+  rawStatus: string;
+  vehicle_number?: string;
+  purpose?: string;
+  party_size?: number;
+  expected_at?: string;
+  valid_until?: string;
+  created_at?: string;
+  photo_url?: string;
+}
 
 export default function SecuritySupervisorVisitorManagementPage() {
-  const [visitors, setVisitors] = useState<VisitorRecord[]>([]);
+  const [visitors, setVisitors] = useState<SupervisorVisitorRow[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedVisitor, setSelectedVisitor] = useState<VisitorRecord | null>(null);
+  const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [selectedVisitor, setSelectedVisitor] = useState<SupervisorVisitorRow | null>(null);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const res: any = await visitorsApi.requests({ page_size: 100 });
-      const data = Array.isArray(res) ? res : res?.data || [];
+      const [res, directoryRes, me] = await Promise.all([
+        visitorsApi.requests({ page_size: 100 }),
+        visitorsApi.directory({ page_size: 100 }).catch(() => []),
+        authApi.me().catch(() => null),
+      ]);
+      const data = Array.isArray(res) ? res : (res as any)?.data || [];
+      const directory = Array.isArray(directoryRes) ? directoryRes : (directoryRes as any)?.data || [];
+
+      let cid = me?.community_ids?.[0] || (me as any)?.community_id;
+      if (!cid && me?.roles && Array.isArray(me.roles)) {
+        cid = me.roles.find((r: any) => r.community_id)?.community_id;
+      }
+
+      const unitMap = new Map<string, string>();
+      if (cid) {
+        try {
+          const uRes: any = await communitiesApi.communityUnits(cid, { page_size: 100 });
+          const uList = Array.isArray(uRes) ? uRes : uRes?.data || uRes?.items || [];
+          for (const u of uList) {
+            if (u?.id) unitMap.set(u.id, u.unit_number);
+          }
+        } catch {
+          // unit fallback
+        }
+      }
+
+      const visitorMap = new Map<string, any>();
+      for (const v of directory || []) if ((v as any)?.id) visitorMap.set((v as any).id, v);
+
       setVisitors(
-        (data || []).map((v: any) => ({
-          id: v.id,
-          pass_code: v.id ? `REQ-${v.id.slice(0, 6).toUpperCase()}` : "PASS",
-          name: v.visitor_name || v.visitor?.full_name || v.full_name || "Visitor",
-          phone: v.phone || v.visitor?.phone || v.visitor_phone || "—",
-          type: v.visitor_type
-            ? v.visitor_type.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
-            : "Guest",
-          unit: `Unit ${v.unit_id ? v.unit_id.slice(0, 6) : "Direct"}`,
-          status:
-            v.status === "pending"
-              ? "Pending Approval"
-              : v.status
-                ? v.status.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
-                : "Expected",
-          rawStatus: v.status,
-          purpose: v.purpose || v.notes || "Personal Visit",
-          expected_at: v.expected_at ? new Date(v.expected_at).toLocaleString() : (v.valid_from ? new Date(v.valid_from).toLocaleString() : "—"),
-          valid_until: v.valid_until ? new Date(v.valid_until).toLocaleString() : (v.valid_to ? new Date(v.valid_to).toLocaleString() : "—"),
-          created_at: v.created_at ? new Date(v.created_at).toLocaleString() : "—",
-          vehicle_number: v.vehicle_number || "None",
-          photo_url: v.photo_url || v.visitor?.photo_url || undefined,
-        })),
+        (data || []).map((v: any) => {
+          const directoryVisitor = visitorMap.get(v.visitor_id);
+          const name =
+            v.visitor_name ||
+            v.visitor?.full_name ||
+            v.full_name ||
+            directoryVisitor?.full_name ||
+            "Visitor";
+          const phone =
+            v.phone ||
+            v.visitor?.phone ||
+            v.visitor_phone ||
+            directoryVisitor?.phone ||
+            "—";
+          const unit = unitMap.get(v.unit_id) || (v.unit_id ? `Unit #${v.unit_id.slice(0, 6)}` : "—");
+          const photoUrl =
+            v.photo_url ||
+            v.visitor?.photo_url ||
+            directoryVisitor?.photo_url ||
+            undefined;
+
+          return {
+            id: v.id,
+            pass_code: v.id ? `REQ-${v.id.slice(0, 6).toUpperCase()}` : "PASS",
+            name,
+            phone,
+            type: v.visitor_type
+              ? v.visitor_type.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
+              : "Guest",
+            unit,
+            status:
+              v.status === "pending"
+                ? "Pending Approval"
+                : v.status
+                  ? v.status.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
+                  : "Expected",
+            rawStatus: v.status || "pending",
+            vehicle_number: v.vehicle_number || v.visitor?.vehicle_number || "—",
+            purpose: v.purpose || "—",
+            party_size: v.party_size || 1,
+            expected_at: v.expected_at ? formatDateTime(v.expected_at) : "—",
+            valid_until: v.valid_until ? formatDateTime(v.valid_until) : "—",
+            created_at: v.created_at ? formatDateTime(v.created_at) : "—",
+            photo_url: photoUrl,
+          };
+        }),
       );
     } catch {
       setVisitors([]);
@@ -55,6 +126,36 @@ export default function SecuritySupervisorVisitorManagementPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  const handleApprove = async (id: string, name: string) => {
+    setActionMessage(null);
+    try {
+      await visitorsApi.approve(id, "Approved by Security Supervisor");
+      const msg = `Visitor request approved for ${name}.`;
+      setActionMessage({ type: "success", text: msg });
+      toast.success(msg);
+      await loadData();
+    } catch (err: any) {
+      const errMsg = err?.message || "Failed to approve visitor request.";
+      setActionMessage({ type: "error", text: errMsg });
+      toast.error(errMsg);
+    }
+  };
+
+  const handleReject = async (id: string, name: string) => {
+    setActionMessage(null);
+    try {
+      await visitorsApi.reject(id, "Rejected by Security Supervisor");
+      const msg = `Visitor request rejected for ${name}.`;
+      setActionMessage({ type: "success", text: msg });
+      toast.success(msg);
+      await loadData();
+    } catch (err: any) {
+      const errMsg = err?.message || "Failed to reject visitor request.";
+      setActionMessage({ type: "error", text: errMsg });
+      toast.error(errMsg);
+    }
+  };
 
   const filteredVisitors = visitors.filter((v) => {
     const q = search.toLowerCase();
@@ -69,24 +170,48 @@ export default function SecuritySupervisorVisitorManagementPage() {
     return matchSearch && matchStatus;
   });
 
-  const columns: Column<VisitorRecord>[] = [
+  const columns: Column<SupervisorVisitorRow>[] = [
     {
       key: "pass_code",
       header: "Pass Code",
       sortable: true,
-      render: (v) => <span style={{ fontWeight: 600, fontFamily: "monospace" }}>{v.pass_code}</span>,
+      render: (v) => (
+        <span style={{ fontWeight: 600, fontFamily: "monospace", color: "var(--primary, #2563eb)" }}>
+          {v.pass_code}
+        </span>
+      ),
     },
     {
       key: "name",
       header: "Visitor Name",
       sortable: true,
-      render: (v) => <span style={{ fontWeight: 600, color: "var(--fg)" }}>👤 {v.name}</span>,
+      render: (v) => (
+        <button
+          type="button"
+          onClick={() => setSelectedVisitor(v)}
+          style={{
+            background: "none",
+            border: "none",
+            padding: 0,
+            cursor: "pointer",
+            fontWeight: 600,
+            color: "var(--primary, #2563eb)",
+            textAlign: "left",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.25rem",
+          }}
+          title="Click to view full visitor details"
+        >
+          👤 {v.name}
+        </button>
+      ),
     },
     {
       key: "phone",
       header: "Contact Phone",
       sortable: true,
-      render: (v) => <span>{v.phone}</span>,
+      render: (v) => <span style={{ fontFamily: "monospace", fontWeight: 500 }}>{v.phone}</span>,
     },
     {
       key: "type",
@@ -98,40 +223,49 @@ export default function SecuritySupervisorVisitorManagementPage() {
       key: "unit",
       header: "Destination Unit",
       sortable: true,
-      render: (v) => <span>{v.unit}</span>,
+      render: (v) => <span style={{ fontWeight: 600, color: "var(--fg)" }}>🏢 {v.unit}</span>,
     },
     {
       key: "status",
       header: "Status",
       sortable: true,
-      render: (v) => <StatusBadge status={v.status} />,
+      render: (v) => <StatusBadge status={v.rawStatus || v.status} />,
     },
     {
       key: "actions",
       header: "Actions",
       align: "right",
       render: (v) => (
-        <div style={{ display: "flex", gap: "0.4rem", justifyContent: "flex-end" }}>
+        <div style={{ display: "flex", gap: "0.4rem", justifyContent: "flex-end", alignItems: "center" }}>
           <button
             type="button"
-            className="btn btn-outline"
-            style={{
-              fontSize: "0.75rem",
-              padding: "0.2rem 0.55rem",
-              border: "1px solid var(--border, #e2e8f0)",
-              background: "#ffffff",
-              color: "var(--fg, #0f172a)",
-              borderRadius: "6px",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "0.25rem",
-              cursor: "pointer",
-            }}
+            className="btn btn-secondary"
+            style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem", display: "inline-flex", alignItems: "center", gap: "0.2rem" }}
             onClick={() => setSelectedVisitor(v)}
+            title="View full visitor details"
           >
-            <span>👁</span>
-            <span>View</span>
+            👁️ View
           </button>
+          {v.status === "Pending Approval" ? (
+            <>
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
+                onClick={() => handleApprove(v.id, v.name)}
+              >
+                Approve
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
+                onClick={() => handleReject(v.id, v.name)}
+              >
+                Reject
+              </button>
+            </>
+          ) : null}
         </div>
       ),
     },
@@ -148,11 +282,47 @@ export default function SecuritySupervisorVisitorManagementPage() {
           { label: "Visitor Management" },
         ]}
         actions={
-          <Link href="/security-supervisor/blacklist" className="btn btn-danger" style={{ fontSize: "0.85rem" }}>
-            🚫 Blacklist Registry & Restricted Entry
-          </Link>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+            <button
+              className="btn btn-secondary"
+              onClick={loadData}
+              disabled={isLoading}
+            >
+              🔄 {isLoading ? "Refreshing…" : "Refresh"}
+            </button>
+            <Link href="/security-supervisor/blacklist" className="btn btn-danger" style={{ fontSize: "0.85rem" }}>
+              🚫 Blacklist Registry & Restricted Entry
+            </Link>
+          </div>
         }
       />
+
+      {actionMessage && (
+        <div
+          style={{
+            padding: "0.75rem 1rem",
+            marginBottom: "1.25rem",
+            borderRadius: "var(--radius)",
+            background: actionMessage.type === "success" ? "var(--success-light)" : "var(--danger-light)",
+            border: `1px solid ${actionMessage.type === "success" ? "var(--success-border)" : "var(--danger-border)"}`,
+            color: actionMessage.type === "success" ? "#065f46" : "#991b1b",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>
+            {actionMessage.type === "success" ? "✅" : "⚠️"} {actionMessage.text}
+          </span>
+          <button
+            type="button"
+            onClick={() => setActionMessage(null)}
+            style={{ background: "none", border: "none", cursor: "pointer", fontWeight: 700 }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       <div className="card">
         <div className="card-header" style={{ flexWrap: "wrap", gap: "0.75rem" }}>
@@ -201,14 +371,39 @@ export default function SecuritySupervisorVisitorManagementPage() {
         />
       </div>
 
+      {/* Supervisor Visitor Details Modal */}
       {selectedVisitor && (
         <Modal
-          isOpen={Boolean(selectedVisitor)}
+          isOpen={true}
           onClose={() => setSelectedVisitor(null)}
-          title="Visitor Pass Details"
+          title="Visitor Pass & Entry Details"
           size="md"
           footer={
-            <div style={{ display: "flex", justifyContent: "flex-end", width: "100%" }}>
+            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", width: "100%" }}>
+              {selectedVisitor.status === "Pending Approval" && (
+                <>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => {
+                      handleApprove(selectedVisitor.id, selectedVisitor.name);
+                      setSelectedVisitor(null);
+                    }}
+                  >
+                    Approve Request
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-danger"
+                    onClick={() => {
+                      handleReject(selectedVisitor.id, selectedVisitor.name);
+                      setSelectedVisitor(null);
+                    }}
+                  >
+                    Reject Request
+                  </button>
+                </>
+              )}
               <button
                 type="button"
                 className="btn btn-secondary"
@@ -220,7 +415,6 @@ export default function SecuritySupervisorVisitorManagementPage() {
           }
         >
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-            {/* Header summary */}
             <div
               style={{
                 display: "flex",
@@ -228,44 +422,155 @@ export default function SecuritySupervisorVisitorManagementPage() {
                 alignItems: "center",
                 padding: "0.85rem 1rem",
                 background: "var(--bg-subtle, #f8fafc)",
-                borderRadius: "var(--radius, 8px)",
-                border: "1px solid var(--border, #e2e8f0)",
+                borderRadius: "var(--radius)",
+                border: "1px solid var(--border)",
+                gap: "1rem",
               }}
             >
-              <div>
-                <h4 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700, color: "var(--fg)" }}>
-                  👤 {selectedVisitor.name}
-                </h4>
-                <p style={{ margin: "0.2rem 0 0", fontSize: "0.85rem", color: "var(--muted)", fontFamily: "monospace" }}>
-                  {selectedVisitor.phone}
-                </p>
+              <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                {selectedVisitor.photo_url ? (
+                  <a
+                    href={selectedVisitor.photo_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Click to view full photograph"
+                    style={{ position: "relative", display: "inline-block", flexShrink: 0 }}
+                  >
+                    <img
+                      src={selectedVisitor.photo_url}
+                      alt={selectedVisitor.name}
+                      style={{
+                        width: "64px",
+                        height: "64px",
+                        borderRadius: "8px",
+                        objectFit: "cover",
+                        border: "2px solid #86efac",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+                        cursor: "pointer",
+                      }}
+                    />
+                    <span
+                      style={{
+                        position: "absolute",
+                        bottom: "-4px",
+                        right: "-4px",
+                        background: "#059669",
+                        color: "white",
+                        fontSize: "0.55rem",
+                        padding: "1px 4px",
+                        borderRadius: "3px",
+                        fontWeight: 700,
+                      }}
+                    >
+                      📷 PHOTO
+                    </span>
+                  </a>
+                ) : (
+                  <div
+                    style={{
+                      width: "64px",
+                      height: "64px",
+                      borderRadius: "8px",
+                      background: "#e2e8f0",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "1.5rem",
+                      color: "#94a3b8",
+                      border: "1px dashed #cbd5e1",
+                      flexShrink: 0,
+                    }}
+                    title="No photograph attached"
+                  >
+                    👤
+                  </div>
+                )}
+                <div>
+                  <h4 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700, color: "var(--fg)" }}>
+                    {selectedVisitor.name}
+                  </h4>
+                  <p style={{ margin: "0.2rem 0 0", fontSize: "0.85rem", color: "var(--muted)", fontFamily: "monospace" }}>
+                    {selectedVisitor.phone}
+                  </p>
+                  {selectedVisitor.photo_url ? (
+                    <span style={{ fontSize: "0.75rem", color: "#16a34a", fontWeight: 600, display: "block", marginTop: "0.2rem" }}>
+                      ✓ Verified Photo Attached
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: "0.75rem", color: "#d97706", fontWeight: 600, display: "block", marginTop: "0.2rem" }}>
+                      ⚠️ No Photo Attached
+                    </span>
+                  )}
+                </div>
               </div>
-              <StatusBadge status={selectedVisitor.status} />
+              <StatusBadge status={selectedVisitor.rawStatus || selectedVisitor.status} />
             </div>
 
-            {/* Resident approval notice for pending passes */}
-            {selectedVisitor.status === "Pending Approval" && (
+            {/* Dedicated Visitor Photograph Card */}
+            {selectedVisitor.photo_url && (
               <div
                 style={{
-                  padding: "0.65rem 0.85rem",
-                  background: "#fffbeb",
-                  border: "1px solid #fef3c7",
-                  borderRadius: "6px",
-                  color: "#92400e",
-                  fontSize: "0.8rem",
+                  background: "#f0fdf4",
+                  border: "1px solid #bbf7d0",
+                  borderRadius: "8px",
+                  padding: "0.85rem 1rem",
                   display: "flex",
                   alignItems: "center",
-                  gap: "0.5rem",
+                  justifyContent: "space-between",
+                  gap: "1rem",
                 }}
               >
-                <span>ℹ️</span>
-                <span>
-                  <strong>Pending Resident Approval:</strong> This visitor pass is awaiting confirmation from the resident/owner of {selectedVisitor.unit}. Approval and rejection actions are reserved for the respective resident.
-                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
+                  <a
+                    href={selectedVisitor.photo_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Click to view full size"
+                  >
+                    <img
+                      src={selectedVisitor.photo_url}
+                      alt={selectedVisitor.name}
+                      style={{
+                        width: "80px",
+                        height: "80px",
+                        borderRadius: "8px",
+                        objectFit: "cover",
+                        border: "2px solid #86efac",
+                        cursor: "pointer",
+                      }}
+                    />
+                  </a>
+                  <div>
+                    <div style={{ fontSize: "0.875rem", fontWeight: 700, color: "#166534" }}>
+                      📷 Visitor Identity Photograph
+                    </div>
+                    <div style={{ fontSize: "0.75rem", color: "#15803d", marginTop: "0.15rem" }}>
+                      Mandatory face photo captured during gate registration
+                    </div>
+                  </div>
+                </div>
+                <a
+                  href={selectedVisitor.photo_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-sm"
+                  style={{
+                    fontSize: "0.75rem",
+                    padding: "0.4rem 0.75rem",
+                    background: "#059669",
+                    color: "#ffffff",
+                    textDecoration: "none",
+                    borderRadius: "6px",
+                    fontWeight: 600,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  🔍 View Full Size
+                </a>
               </div>
             )}
 
-            {/* Details Grid */}
             <div
               style={{
                 display: "grid",
@@ -274,17 +579,8 @@ export default function SecuritySupervisorVisitorManagementPage() {
                 fontSize: "0.85rem",
               }}
             >
-              <div style={{ background: "var(--bg-subtle, #f8fafc)", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
-                <div style={{ color: "var(--muted)", fontSize: "0.725rem", textTransform: "uppercase", fontWeight: 600 }}>
-                  Pass Code
-                </div>
-                <div style={{ fontWeight: 600, fontFamily: "monospace", color: "var(--fg)", marginTop: "0.15rem" }}>
-                  {selectedVisitor.pass_code}
-                </div>
-              </div>
-
-              <div style={{ background: "var(--bg-subtle, #f8fafc)", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
-                <div style={{ color: "var(--muted)", fontSize: "0.725rem", textTransform: "uppercase", fontWeight: 600 }}>
+              <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
                   Destination Unit
                 </div>
                 <div style={{ fontWeight: 600, color: "var(--fg)", marginTop: "0.15rem" }}>
@@ -292,48 +588,75 @@ export default function SecuritySupervisorVisitorManagementPage() {
                 </div>
               </div>
 
-              <div style={{ background: "var(--bg-subtle, #f8fafc)", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
-                <div style={{ color: "var(--muted)", fontSize: "0.725rem", textTransform: "uppercase", fontWeight: 600 }}>
+              <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
                   Visitor Type
                 </div>
-                <div style={{ fontWeight: 600, color: "var(--fg)", marginTop: "0.15rem" }}>
+                <div style={{ fontWeight: 600, color: "var(--fg)", marginTop: "0.15rem", textTransform: "capitalize" }}>
                   {selectedVisitor.type}
                 </div>
               </div>
 
-              <div style={{ background: "var(--bg-subtle, #f8fafc)", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
-                <div style={{ color: "var(--muted)", fontSize: "0.725rem", textTransform: "uppercase", fontWeight: 600 }}>
-                  Vehicle Number
+              <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                  Pass Code
                 </div>
-                <div style={{ fontWeight: 600, color: "var(--fg)", marginTop: "0.15rem" }}>
-                  🚗 {selectedVisitor.vehicle_number || "None"}
+                <div style={{ fontWeight: 600, color: "var(--primary, #2563eb)", marginTop: "0.15rem", fontFamily: "monospace" }}>
+                  {selectedVisitor.pass_code}
                 </div>
               </div>
 
-              <div style={{ background: "var(--bg-subtle, #f8fafc)", padding: "0.6rem 0.8rem", borderRadius: "6px", gridColumn: "span 2" }}>
-                <div style={{ color: "var(--muted)", fontSize: "0.725rem", textTransform: "uppercase", fontWeight: 600 }}>
+              <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                  Vehicle Number
+                </div>
+                <div style={{ fontWeight: 600, color: "var(--fg)", marginTop: "0.15rem", fontFamily: "monospace" }}>
+                  🚗 {selectedVisitor.vehicle_number}
+                </div>
+              </div>
+
+              <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                  Party Size
+                </div>
+                <div style={{ fontWeight: 600, color: "var(--fg)", marginTop: "0.15rem" }}>
+                  👥 {selectedVisitor.party_size} person(s)
+                </div>
+              </div>
+
+              <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                  Expected At
+                </div>
+                <div style={{ fontWeight: 500, color: "var(--fg)", marginTop: "0.15rem", fontSize: "0.8rem" }}>
+                  {selectedVisitor.expected_at}
+                </div>
+              </div>
+
+              <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px", gridColumn: "span 2" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
                   Purpose of Visit
                 </div>
                 <div style={{ fontWeight: 500, color: "var(--fg)", marginTop: "0.15rem" }}>
-                  {selectedVisitor.purpose || "Personal Visit"}
+                  {selectedVisitor.purpose}
                 </div>
               </div>
 
-              <div style={{ background: "var(--bg-subtle, #f8fafc)", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
-                <div style={{ color: "var(--muted)", fontSize: "0.725rem", textTransform: "uppercase", fontWeight: 600 }}>
-                  Expected Arrival
-                </div>
-                <div style={{ fontWeight: 500, color: "var(--fg)", marginTop: "0.15rem", fontSize: "0.8rem" }}>
-                  {selectedVisitor.expected_at || "—"}
-                </div>
-              </div>
-
-              <div style={{ background: "var(--bg-subtle, #f8fafc)", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
-                <div style={{ color: "var(--muted)", fontSize: "0.725rem", textTransform: "uppercase", fontWeight: 600 }}>
+              <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
                   Valid Until
                 </div>
                 <div style={{ fontWeight: 500, color: "var(--fg)", marginTop: "0.15rem", fontSize: "0.8rem" }}>
-                  {selectedVisitor.valid_until || "—"}
+                  {selectedVisitor.valid_until}
+                </div>
+              </div>
+
+              <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
+                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                  Pass Created
+                </div>
+                <div style={{ fontWeight: 500, color: "var(--fg)", marginTop: "0.15rem", fontSize: "0.8rem" }}>
+                  {selectedVisitor.created_at}
                 </div>
               </div>
             </div>
