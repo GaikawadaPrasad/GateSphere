@@ -181,8 +181,8 @@ class TicketRead(_Read):
     resolved_at: datetime | None
     closed_at: datetime | None
     raised_by_name: str | None = None
-    raised_by_email: str | None = None
     raised_by_phone: str | None = None
+    raised_by_email: str | None = None
     unit_number: str | None = None
     category_name: str | None = None
 

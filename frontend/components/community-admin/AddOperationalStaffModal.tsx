@@ -14,8 +14,6 @@ interface AddOperationalStaffModalProps {
   onClose: () => void;
   communityId: string;
   onSuccess?: () => void;
-  defaultRole?: OperationalRoleSlug;
-  allowedRoles?: OperationalRoleSlug[];
 }
 
 export function AddOperationalStaffModal({
@@ -23,27 +21,12 @@ export function AddOperationalStaffModal({
   onClose,
   communityId,
   onSuccess,
-  defaultRole,
-  allowedRoles,
 }: AddOperationalStaffModalProps) {
-  const initialRole = defaultRole || (allowedRoles && allowedRoles.length === 1 ? allowedRoles[0] : "security_guard");
-  const getDefaultPassword = (slug: OperationalRoleSlug) => {
-    const prefix =
-      slug === "association_committee"
-        ? "Committee"
-        : slug === "facility_manager"
-        ? "Facility"
-        : slug === "security_supervisor"
-        ? "Supervisor"
-        : "Guard";
-    return `${prefix}@Gate2026!`;
-  };
-
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [roleSlug, setRoleSlug] = useState<OperationalRoleSlug>(initialRole);
-  const [password, setPassword] = useState(getDefaultPassword(initialRole));
+  const [roleSlug, setRoleSlug] = useState<OperationalRoleSlug>("security_guard");
+  const [password, setPassword] = useState("GateSphere2026!");
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -55,7 +38,17 @@ export function AddOperationalStaffModal({
     setRoleSlug(slug);
     // Suggest an intuitive password if default was untouched
     if (password.startsWith("GateSphere2026!") || password.endsWith("@Gate2026!")) {
-      setPassword(getDefaultPassword(slug));
+      const prefix =
+        slug === "association_committee"
+          ? "Committee"
+          : slug === "facility_manager"
+          ? "Facility"
+          : slug === "security_supervisor"
+          ? "Supervisor"
+          : slug === "auditor"
+          ? "Auditor"
+          : "Guard";
+      setPassword(`${prefix}@Gate2026!`);
     }
   };
 
@@ -63,8 +56,8 @@ export function AddOperationalStaffModal({
     setFullName("");
     setEmail("");
     setPhone("");
-    setRoleSlug(initialRole);
-    setPassword(getDefaultPassword(initialRole));
+    setRoleSlug("security_guard");
+    setPassword("Guard@Gate2026!");
     setShowPassword(false);
     setErrorMessage(null);
   };
@@ -131,22 +124,11 @@ export function AddOperationalStaffModal({
     }
   };
 
-  const displayedRoles = allowedRoles && allowedRoles.length > 0
-    ? OPERATIONAL_ROLES.filter((r) => allowedRoles.includes(r.slug))
-    : OPERATIONAL_ROLES;
-
-  const modalTitle =
-    allowedRoles && allowedRoles.length === 1 && allowedRoles[0] === "association_committee"
-      ? "Add Association Committee Member"
-      : allowedRoles && !allowedRoles.includes("association_committee")
-      ? "Add Facility & Security Personnel"
-      : "Add Committee, Facility or Security Staff";
-
   return (
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title={modalTitle}
+      title="Add Facility, Security, or Audit Staff"
       size="lg"
       footer={
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", width: "100%" }}>
@@ -172,7 +154,7 @@ export function AddOperationalStaffModal({
     >
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
         <p style={{ fontSize: "0.85rem", color: "var(--muted)", margin: 0 }}>
-          Provision an operational user with credentials to log into GateSphere for this community.
+          Provision an operational user or statutory auditor with credentials to log into GateSphere for this community.
         </p>
 
         {errorMessage && (
@@ -192,48 +174,46 @@ export function AddOperationalStaffModal({
         )}
 
         {/* Role Selector Cards */}
-        {displayedRoles.length > 1 ? (
-          <div>
-            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.5rem" }}>
-              Operational Role <span style={{ color: "var(--danger)" }}>*</span>
-            </label>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                gap: "0.75rem",
-              }}
-            >
-              {displayedRoles.map((r) => {
-                const isSelected = roleSlug === r.slug;
-                return (
-                  <div
-                    key={r.slug}
-                    onClick={() => handleRoleSelect(r.slug)}
-                    style={{
-                      padding: "0.85rem",
-                      borderRadius: "var(--radius-md)",
-                      border: isSelected ? "2px solid var(--primary)" : "1px solid var(--border)",
-                      background: isSelected ? "rgba(37, 99, 235, 0.05)" : "var(--card-bg)",
-                      cursor: "pointer",
-                      transition: "all 0.15s ease",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.35rem" }}>
-                      <span style={{ fontSize: "1.2rem" }}>{r.icon}</span>
-                      <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--fg)" }}>
-                        {r.name}
-                      </span>
-                    </div>
-                    <p style={{ fontSize: "0.75rem", color: "var(--muted)", margin: 0, lineHeight: 1.3 }}>
-                      {r.description}
-                    </p>
+        <div>
+          <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.5rem" }}>
+            Operational Role <span style={{ color: "var(--danger)" }}>*</span>
+          </label>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+              gap: "0.75rem",
+            }}
+          >
+            {OPERATIONAL_ROLES.map((r) => {
+              const isSelected = roleSlug === r.slug;
+              return (
+                <div
+                  key={r.slug}
+                  onClick={() => handleRoleSelect(r.slug)}
+                  style={{
+                    padding: "0.85rem",
+                    borderRadius: "var(--radius-md)",
+                    border: isSelected ? "2px solid var(--primary)" : "1px solid var(--border)",
+                    background: isSelected ? "rgba(37, 99, 235, 0.05)" : "var(--card-bg)",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.35rem" }}>
+                    <span style={{ fontSize: "1.2rem" }}>{r.icon}</span>
+                    <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--fg)" }}>
+                      {r.name}
+                    </span>
                   </div>
-                );
-              })}
-            </div>
+                  <p style={{ fontSize: "0.75rem", color: "var(--muted)", margin: 0, lineHeight: 1.3 }}>
+                    {r.description}
+                  </p>
+                </div>
+              );
+            })}
           </div>
-        ) : null}
+        </div>
 
         {/* Basic Details */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>

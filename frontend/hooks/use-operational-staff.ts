@@ -4,10 +4,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { usersApi } from "@/lib/api";
 
 export type OperationalRoleSlug =
-  | "association_committee"
   | "facility_manager"
   | "security_supervisor"
-  | "security_guard";
+  | "security_guard"
+  | "auditor"
+  | "association_committee";
 
 export interface OperationalStaffGrant {
   id: string;
@@ -51,12 +52,12 @@ export const OPERATIONAL_ROLES: {
     name: "Association Committee",
     icon: "🏛️",
     badgeClass: "badge-primary",
-    description: "Elected association / committee member managing governance, budgets, assessments, and policy approvals.",
+    description: "Executive oversight, financial governance, statutory compliance, and community policy administration.",
     responsibilities: [
-      "Review and approve community budgets, assessments, and invoices",
-      "Oversee governance rules, vendor agreements, and incident escalations",
-      "Participate in association committee decisions and resolutions",
-      "Monitor resident complaints and facility maintenance projects",
+      "Review financial ledgers, maintenance invoicing, and budget allocations",
+      "Monitor resident tickets, escalations, and facility contracts",
+      "Approve announcements, polls, and community broad policy decisions",
+      "Inspect audit trails and governance compliance reports",
     ],
   },
   {
@@ -98,6 +99,19 @@ export const OPERATIONAL_ROLES: {
       "Monitor vehicle entry/exit and record taxi arrivals",
     ],
   },
+  {
+    slug: "auditor",
+    name: "Statutory Auditor",
+    icon: "📋",
+    badgeClass: "badge-neutral",
+    description: "Statutory and compliance auditor with read-only access to audit logs, financial records, and gate logs.",
+    responsibilities: [
+      "Review immutable audit trail across community operations",
+      "Inspect financial ledgers, maintenance invoices, and reconciliation records",
+      "Audit gate entry/exit logs and visitor verification compliance",
+      "Export compliance reports and statutory verification records",
+    ],
+  },
 ];
 
 export function getRoleMeta(slug: string) {
@@ -136,6 +150,7 @@ export function useOperationalStaff(communityId?: string) {
         "facility_manager",
         "security_supervisor",
         "security_guard",
+        "auditor",
       ]);
 
       // Filter users that hold at least one of the operational roles in this community

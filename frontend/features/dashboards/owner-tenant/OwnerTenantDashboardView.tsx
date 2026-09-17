@@ -15,6 +15,10 @@ import { BrandButton } from "@/components/common/BrandButton";
 import { Modal } from "@/components/common/Modal";
 import { Skeleton, KpiCardSkeleton, TableSkeleton, CardSkeleton } from "@/components/common/LoadingSkeleton";
 import { ErrorState } from "@/components/common/ErrorState";
+import {
+  FamilyMemberPassModal,
+  FamilyMemberPassData,
+} from "@/components/common/FamilyMemberPassModal";
 
 const QrCodeSvg = dynamic(
   () => import("@/components/common/QrCodeSvg").then((m) => m.QrCodeSvg),
@@ -118,6 +122,7 @@ export function OwnerTenantDashboardView({
   const [addMemberModalOpen, setAddMemberModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<FamilyMember | null>(null);
   const [memberToDelete, setMemberToDelete] = useState<FamilyMember | null>(null);
+  const [selectedFamilyPassMember, setSelectedFamilyPassMember] = useState<FamilyMemberPassData | null>(null);
   const [newMemberName, setNewMemberName] = useState("");
   const [newMemberRelation, setNewMemberRelation] = useState("Spouse");
   const [newMemberPhone, setNewMemberPhone] = useState("");
@@ -1546,8 +1551,7 @@ export function OwnerTenantDashboardView({
             <div>
               <h3 className="card-h3" style={{ margin: 0 }}>Family Members (Gate Pre-Approved)</h3>
               <p style={{ color: "var(--brand-body)", fontSize: "13.5px", margin: "0.25rem 0 0 0" }}>
-                Family members listed here feed the gate recognition system and automatically bypass
-                manual guard approval upon entry.
+                Family members have a permanent gate pass (reusable QR code & 6-digit gate PIN) that bypasses manual guard approval.
               </p>
             </div>
             <BrandButton
@@ -1661,6 +1665,31 @@ export function OwnerTenantDashboardView({
                   header: "Actions",
                   render: (m) => (
                     <div style={{ display: "flex", gap: "0.5rem" }}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{
+                          padding: "0.25rem 0.6rem",
+                          fontSize: "12px",
+                          color: "var(--brand-primary)",
+                          borderColor: "var(--brand-primary)",
+                          fontWeight: 600,
+                        }}
+                        onClick={() =>
+                          setSelectedFamilyPassMember({
+                            id: m.id,
+                            name: m.name,
+                            relation: m.relation,
+                            phone: m.phone,
+                            unit_number: m.unit_number || residentUnit,
+                            access_enabled: m.access_enabled,
+                            pass_token: m.pass_token,
+                            pin: m.pin,
+                          })
+                        }
+                      >
+                        🎫 View Pass
+                      </button>
                       <button
                         type="button"
                         className="btn btn-secondary"
@@ -4157,6 +4186,13 @@ export function OwnerTenantDashboardView({
           </div>
         </div>
       </Modal>
+
+      {/* Permanent Family Member Pass Modal (QR & OTP) */}
+      <FamilyMemberPassModal
+        isOpen={Boolean(selectedFamilyPassMember)}
+        onClose={() => setSelectedFamilyPassMember(null)}
+        member={selectedFamilyPassMember}
+      />
 
       {/* Ticket Modal */}
       <Modal

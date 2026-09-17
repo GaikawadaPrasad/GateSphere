@@ -9,7 +9,7 @@ import {
   parseQrPayload,
   type ParsedQrData,
 } from "@/lib/qr-decoder";
-import { visitorsApi, domesticStaffApi, gateApi } from "@/lib/api";
+import { visitorsApi, domesticStaffApi, gateApi, residentsApi } from "@/lib/api";
 import { WalkInVisitorModal } from "@/components/common/WalkInVisitorModal";
 import { FileUpload } from "@/components/common/FileUpload";
 import { toast } from "@/store/toast";
@@ -26,6 +26,7 @@ interface VerifiedEntry {
   isStaff?: boolean;
   isVendor?: boolean;
   isDelivery?: boolean;
+  isFamily?: boolean;
   ticketNumber?: string;
 }
 
@@ -231,6 +232,42 @@ export default function SecurityGuardLiveGatePage() {
         return;
       }
 
+      // 3b. Family Member Permanent Pass Check
+      const isFamilyPass =
+        parsedPayload?.type === "family" ||
+        raw.startsWith("GSE:FAMILY:") ||
+        raw.startsWith("GSE-FAM-") ||
+        raw.startsWith("PASS-FAM-");
+
+      if (isFamilyPass) {
+        setIsVerifying(true);
+        setErrorMessage("");
+        setSuccessMessage("");
+        setVerifiedEntry(null);
+        setPendingStaffPassForExit(null);
+        try {
+          const res = await residentsApi.verifyFamilyPass({ pass_code: raw });
+          setVerifiedEntry({
+            entryId: res.event_id || `family-gate-${Date.now()}`,
+            visitorName: res.full_name,
+            category: "Family Member (Household)",
+            reason: `Permanent Resident Access · Relationship: ${res.relationship} · Pre-Approved`,
+            unitLabel: res.unit_number ? `Unit ${res.unit_number}` : "Resident Household Unit",
+            vehicleNumber: null,
+            status: "admitted",
+            enteredAt: new Date().toISOString(),
+            isFamily: true,
+          });
+          setSuccessMessage(`✅ Family Entry Permitted: ${res.full_name} (${res.relationship}) from Unit ${res.unit_number}. Gate pass recorded.`);
+          setPassInput("");
+          setScannedBadge(null);
+        } catch (err: any) {
+          setErrorMessage(`❌ FAMILY ENTRY DENIED: ${err?.message || "Invalid family pass or access disabled"}`);
+        }
+        setIsVerifying(false);
+        return;
+      }
+
       // 4. Resident Visitor Pass / PIN Check
       const cleanDigits = raw.replace(/^(OTP|PIN|PASS)-?/i, "").trim();
       const tokenToUse = extractedToken || (raw.startsWith("QR-") ? raw.replace(/^QR-/, "") : "");
@@ -272,6 +309,29 @@ export default function SecurityGuardLiveGatePage() {
             setIsVerifying(false);
             return;
           }
+          // Fallback: If 6-digit PIN or phone was entered, try family member pass lookup
+          try {
+            const famRes = await residentsApi.verifyFamilyPass({ pass_code: raw });
+            setVerifiedEntry({
+              entryId: famRes.event_id || `family-gate-${Date.now()}`,
+              visitorName: famRes.full_name,
+              category: "Family Member (Household)",
+              reason: `Permanent Resident Access · Relationship: ${famRes.relationship} · Pre-Approved`,
+              unitLabel: famRes.unit_number ? `Unit ${famRes.unit_number}` : "Resident Household Unit",
+              vehicleNumber: null,
+              status: "admitted",
+              enteredAt: new Date().toISOString(),
+              isFamily: true,
+            });
+            setSuccessMessage(`✅ Family Entry Permitted: ${famRes.full_name} (${famRes.relationship}) from Unit ${famRes.unit_number}. Gate pass recorded.`);
+            setPassInput("");
+            setScannedBadge(null);
+            setIsVerifying(false);
+            return;
+          } catch {
+            // Not a family pass
+          }
+
           // Fallback: If 10-digit mobile number was entered, try domestic staff lookup by phone
           if (cleanDigits.length === 10 || cleanDigits.length === 12) {
             try {
@@ -842,10 +902,12 @@ export default function SecurityGuardLiveGatePage() {
           <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
               <span style={{ fontSize: "1.25rem" }}>
-                {verifiedEntry.isStaff ? "👷" : verifiedEntry.isVendor ? "🔧" : verifiedEntry.isDelivery ? "📦" : "🎟️"}
+                {verifiedEntry.isFamily ? "👨‍👩‍👧‍👦" : verifiedEntry.isStaff ? "👷" : verifiedEntry.isVendor ? "🔧" : verifiedEntry.isDelivery ? "📦" : "🎟️"}
               </span>
               <h3 className="card-title" style={{ margin: 0 }}>
-                {verifiedEntry.isStaff
+                {verifiedEntry.isFamily
+                  ? "Pre-Approved Family Member Gate Entry"
+                  : verifiedEntry.isStaff
                   ? "Domestic Staff Gate Entry Admitted"
                   : verifiedEntry.isVendor
                   ? "Vendor Technician Gate Entry Admitted"
@@ -859,14 +921,18 @@ export default function SecurityGuardLiveGatePage() {
                 style={{
                   padding: "0.25rem 0.6rem",
                   borderRadius: "6px",
-                  background: verifiedEntry.isStaff
+                  background: verifiedEntry.isFamily
+                    ? "#ECFDF5"
+                    : verifiedEntry.isStaff
                     ? "#EFF6FF"
                     : verifiedEntry.isVendor
                     ? "#FDF4FF"
                     : verifiedEntry.isDelivery
                     ? "#FFFBEB"
                     : "#FEF2F2",
-                  color: verifiedEntry.isStaff
+                  color: verifiedEntry.isFamily
+                    ? "#065F46"
+                    : verifiedEntry.isStaff
                     ? "#1D4ED8"
                     : verifiedEntry.isVendor
                     ? "#86198F"
@@ -875,7 +941,9 @@ export default function SecurityGuardLiveGatePage() {
                     : "#991B1B",
                   fontWeight: 700,
                   fontSize: "11.5px",
-                  border: verifiedEntry.isStaff
+                  border: verifiedEntry.isFamily
+                    ? "1px solid #A7F3D0"
+                    : verifiedEntry.isStaff
                     ? "1px solid #DBEAFE"
                     : verifiedEntry.isVendor
                     ? "1px solid #F5D0FE"
@@ -884,7 +952,9 @@ export default function SecurityGuardLiveGatePage() {
                     : "1px solid #FECACA",
                 }}
               >
-                {verifiedEntry.isStaff
+                {verifiedEntry.isFamily
+                  ? "♾️ PERMANENT FAMILY PASS"
+                  : verifiedEntry.isStaff
                   ? "🛡️ DIGITAL STAFF PASS"
                   : verifiedEntry.isVendor
                   ? "🔧 VENDOR WORK ORDER"
@@ -910,7 +980,9 @@ export default function SecurityGuardLiveGatePage() {
           >
             <div>
               <div style={{ fontSize: "0.75rem", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>
-                {verifiedEntry.isStaff
+                {verifiedEntry.isFamily
+                  ? "Family Member"
+                  : verifiedEntry.isStaff
                   ? "Staff Member"
                   : verifiedEntry.isVendor
                   ? "Technician / Vendor"

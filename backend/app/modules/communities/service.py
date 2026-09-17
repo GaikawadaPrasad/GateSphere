@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.context import RequestContext
@@ -263,7 +262,11 @@ class CommunityService:
         self, *, community_id: uuid.UUID, offset: int, limit: int
     ) -> tuple[list[Tower], int]:
         cid = self.scope.require(community_id)
-        return await self.towers.list_for_community(cid, offset=offset, limit=limit)
+        towers, count = await self.towers.list_for_community(cid, offset=offset, limit=limit)
+        counts = await self.units.counts_by_towers([t.id for t in towers])
+        for t in towers:
+            t.total_units = counts.get(t.id, 0)
+        return towers, count
 
     async def get_tower(self, tower_id: uuid.UUID) -> Tower:
         obj = await self.towers.get(tower_id)
@@ -304,14 +307,11 @@ class CommunityService:
         self, *, tower_id: uuid.UUID, offset: int, limit: int
     ) -> tuple[list[Floor], int]:
         tower = await self.get_tower(tower_id)
-        floors, total = await self.floors.list_for_tower(tower.id, offset=offset, limit=limit)
-        if floors:
-            floor_ids = [f.id for f in floors]
-            stmt = select(Unit.floor_id, func.count(Unit.id)).where(Unit.floor_id.in_(floor_ids)).group_by(Unit.floor_id)
-            counts = dict((await self.db.execute(stmt)).all())
-            for f in floors:
-                f.total_units = counts.get(f.id, 0)
-        return floors, total
+        floors, count = await self.floors.list_for_tower(tower.id, offset=offset, limit=limit)
+        counts = await self.units.counts_by_floors([f.id for f in floors])
+        for f in floors:
+            f.total_units = counts.get(f.id, 0)
+        return floors, count
 
     async def get_floor(self, floor_id: uuid.UUID) -> Floor:
         obj = await self.floors.get(floor_id)

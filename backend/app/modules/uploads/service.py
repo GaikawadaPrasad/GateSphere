@@ -48,11 +48,17 @@ class UploadService:
         self.actor = actor
         self.ctx = ctx
 
-    def _community(self, community_id: uuid.UUID | None) -> uuid.UUID:
+    async def _community(self, community_id: uuid.UUID | None) -> uuid.UUID:
         if community_id is not None:
             return self.scope.require(community_id)
-        if not self.scope.is_global and len(self.scope.community_ids) == 1:
+        if self.scope.community_ids:
             return next(iter(self.scope.community_ids))
+        if self.scope.is_global:
+            from app.modules.communities.models import Community
+
+            default_id = await self.db.scalar(select(Community.id).order_by(Community.created_at))
+            if default_id is not None:
+                return default_id
         raise BusinessRuleError(
             "Specify a community", code="COMMUNITY_REQUIRED", fields={"community_id": "required"}
         )
@@ -73,19 +79,19 @@ class UploadService:
                 code="FILE_TOO_LARGE",
                 fields={"size_bytes": f"<= {kind.max_bytes}"},
             )
-        ns = (
-            str(self._community(payload.community_id))
+        cid = (
+            await self._community(payload.community_id)
             if kind.scope == "community"
-            else str(self.actor.id)
+            else None
         )
+        ns = str(cid) if cid is not None else str(self.actor.id)
         ext = extension_for(payload.content_type)
         key = f"{kind.prefix}/{ns}/{uuid.uuid4().hex}-{_safe_stem(payload.filename)}{ext}"
         url = await to_thread.run_sync(
             storage.presigned_put, key, payload.content_type, _PRESIGN_TTL
         )
-        community_id = payload.community_id if kind.scope == "community" else None
         mf = ManagedFile(
-            community_id=community_id,
+            community_id=cid,
             object_key=key,
             kind=kind.slug,
             created_by_user_id=self.actor.id,
@@ -100,7 +106,7 @@ class UploadService:
             module="uploads",
             action="upload.presign",
             actor=self.actor,
-            community_id=community_id,
+            community_id=cid,
             entity_type="object",
             entity_id=uuid.uuid4().hex,
             ctx=self.ctx,
@@ -121,6 +127,71 @@ class UploadService:
             max_bytes=kind.max_bytes,
             expires_in=_PRESIGN_TTL,
             confirm_url=f"/api/v1/uploads/{mf.id}/confirm",
+        )
+
+    async def direct_upload(
+        self,
+        *,
+        file_bytes: bytes,
+        filename: str,
+        content_type: str,
+        kind_slug: str,
+        community_id: uuid.UUID | None = None,
+    ) -> schemas.ConfirmResponse:
+        kind = KINDS.get(kind_slug)
+        if kind is None:
+            raise NotFoundError("Unknown upload kind")
+
+        size = len(file_bytes)
+        if size > kind.max_bytes:
+            raise BusinessRuleError(
+                f"{kind.slug} files must be <= {kind.max_bytes} bytes",
+                code="FILE_TOO_LARGE",
+                fields={"size_bytes": f"<= {kind.max_bytes}"},
+            )
+
+        candidates = detect(file_bytes[:32] or b"")
+        detected = next(iter(candidates), None)
+        if candidates and not (candidates & set(kind.content_types)):
+            raise BusinessRuleError(
+                f"file contents ({sorted(candidates)}) not allowed for {kind.slug}",
+                code="CONTENT_TYPE_NOT_ALLOWED",
+            )
+        if not detected:
+            if content_type in kind.content_types:
+                detected = content_type
+            else:
+                detected = next(iter(kind.content_types))
+
+        cid = await self._community(community_id) if kind.scope == "community" else None
+        ns = str(cid) if cid is not None else str(self.actor.id)
+        ext = extension_for(detected) or extension_for(content_type) or ".jpg"
+        key = f"{kind.prefix}/{ns}/{uuid.uuid4().hex}-{_safe_stem(filename)}{ext}"
+
+        file_url = await to_thread.run_sync(storage.put_object, key, file_bytes, detected)
+
+        mf = ManagedFile(
+            community_id=cid,
+            object_key=key,
+            kind=kind.slug,
+            created_by_user_id=self.actor.id,
+            declared_content_type=content_type,
+            declared_size_bytes=size,
+            detected_content_type=detected,
+            size_bytes=size,
+            status="confirmed",
+            confirmed_at=datetime.now(UTC),
+        )
+        self.db.add(mf)
+        await self.db.flush()
+        await self._audit_confirm(mf, "upload.direct")
+
+        return schemas.ConfirmResponse(
+            file_id=mf.id,
+            status="confirmed",
+            file_url=file_url,
+            detected_content_type=detected,
+            size_bytes=size,
         )
 
     def _assert_can_access(self, mf: ManagedFile, *, label: str = "Upload") -> None:

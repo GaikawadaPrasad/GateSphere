@@ -230,6 +230,27 @@ async def delete_family(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.get(
+    "/family-members/{member_id}/pass",
+    response_model=Envelope[schemas.FamilyPassRead],
+    dependencies=[HOUSEHOLD_VIEW],
+)
+async def get_family_pass(
+    member_id: uuid.UUID, svc: ResidentService = Depends(resident_service)
+) -> dict:
+    return ok(await svc.get_family_pass(member_id))
+
+
+@router.post(
+    "/family-members/verify-pass",
+    response_model=Envelope[schemas.FamilyPassVerifyOut],
+)
+async def verify_family_pass(
+    payload: schemas.FamilyPassVerifyIn, svc: ResidentService = Depends(resident_service)
+) -> dict:
+    return ok(await svc.verify_family_pass(payload))
+
+
 # --- emergency contacts (delete-by-id) --------------------------------- #
 @router.delete(
     "/emergency-contacts/{contact_id}",

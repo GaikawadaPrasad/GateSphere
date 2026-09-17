@@ -40,14 +40,12 @@ export interface GuardRoster {
   id: string;
   community_id: string;
   guard_user_id: string;
-  guard_name?: string | null;
-  guard_email?: string | null;
-  guard_phone?: string | null;
   supervisor_user_id?: string | null;
-  supervisor_name?: string | null;
   shift_date: string;
   shift_start: string;
   shift_end: string;
   status: "planned" | "active" | "completed" | "cancelled";
   notes?: string | null;
+  guard_name?: string | null;
+  guard_phone?: string | null;
 }

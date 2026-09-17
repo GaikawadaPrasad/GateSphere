@@ -13,7 +13,7 @@ export interface ParsedQrData {
   reason?: string;
   visitorName?: string;
   unitLabel?: string;
-  type?: "token" | "pin" | "staff" | "vendor" | "delivery" | "unknown";
+  type?: "token" | "pin" | "staff" | "vendor" | "delivery" | "family" | "unknown";
 }
 
 /**
@@ -128,6 +128,26 @@ export function parseQrPayload(raw: string): ParsedQrData {
       visitorName: "Delivery Agent",
       unitLabel: "Resident Unit",
       type: "delivery",
+    };
+  }
+
+  // 5b. Family Member Permanent Pass: GSE:FAMILY:<id>:<pin> or GSE-FAM-... or PASS-FAM-...
+  if (
+    trimmed.startsWith("GSE:FAMILY:") ||
+    trimmed.startsWith("GSE-FAM-") ||
+    trimmed.startsWith("PASS-FAM-")
+  ) {
+    const parts = trimmed.split(":");
+    const pinPart = parts.length >= 4 ? parts[3] : undefined;
+    return {
+      raw: trimmed,
+      token: trimmed,
+      pin: pinPart,
+      category: "Pre-Approved Family Member",
+      reason: "Permanent Resident Household Access",
+      visitorName: "Family Member",
+      unitLabel: "Resident Household Unit",
+      type: "family",
     };
   }
 

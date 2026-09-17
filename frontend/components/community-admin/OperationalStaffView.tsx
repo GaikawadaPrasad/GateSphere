@@ -19,26 +19,12 @@ import { toast } from "@/store/toast";
 
 interface OperationalStaffViewProps {
   embeddedInTab?: boolean;
-  allowedRoleSlugs?: OperationalRoleSlug[];
-  initialRoleFilter?: string;
-  title?: string;
-  description?: string;
-  addButtonText?: string;
-  defaultAddRole?: OperationalRoleSlug;
 }
 
-export function OperationalStaffView({
-  embeddedInTab = false,
-  allowedRoleSlugs,
-  initialRoleFilter = "",
-  title,
-  description,
-  addButtonText,
-  defaultAddRole,
-}: OperationalStaffViewProps) {
+export function OperationalStaffView({ embeddedInTab = false }: OperationalStaffViewProps) {
   const { activeCommunityId } = useUiStore();
   const [searchTerm, setSearchTerm] = useState("");
-  const [roleFilter, setRoleFilter] = useState(initialRoleFilter);
+  const [roleFilter, setRoleFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -46,23 +32,14 @@ export function OperationalStaffView({
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [credentialStaff, setCredentialStaff] = useState<CredentialUser | null>(null);
 
-  const { data: rawStaffList = [], isLoading, refetch } = useOperationalStaff(
+  const { data: staffList = [], isLoading, refetch } = useOperationalStaff(
     activeCommunityId || undefined
   );
   const updateMutation = useUpdateOperationalStaff();
 
-  // Scope staff list by allowedRoleSlugs if provided
-  const staffList = useMemo(() => {
-    if (!allowedRoleSlugs || allowedRoleSlugs.length === 0) return rawStaffList;
-    const allowedSet = new Set(allowedRoleSlugs);
-    return rawStaffList.filter((u) => u.roles.some((r) => allowedSet.has(r.role_slug as OperationalRoleSlug)));
-  }, [rawStaffList, allowedRoleSlugs]);
-
   // Metrics
   const metrics = useMemo(() => {
     const total = staffList.length;
-    const activeCount = staffList.filter((u) => u.is_active).length;
-    const inactiveCount = staffList.filter((u) => !u.is_active).length;
     const committeeMembers = staffList.filter((u) =>
       u.roles.some((r) => r.role_slug === "association_committee")
     ).length;
@@ -75,8 +52,11 @@ export function OperationalStaffView({
     const guards = staffList.filter((u) =>
       u.roles.some((r) => r.role_slug === "security_guard")
     ).length;
+    const auditors = staffList.filter((u) =>
+      u.roles.some((r) => r.role_slug === "auditor")
+    ).length;
 
-    return { total, activeCount, inactiveCount, committeeMembers, facilityManagers, supervisors, guards };
+    return { total, committeeMembers, facilityManagers, supervisors, guards, auditors };
   }, [staffList]);
 
   // Filtered staff
@@ -141,20 +121,20 @@ export function OperationalStaffView({
                 height: 36,
                 borderRadius: "50%",
                 background:
-                  primaryRole === "association_committee"
-                    ? "#e0e7ff"
-                    : primaryRole === "facility_manager"
+                  primaryRole === "facility_manager"
                     ? "#ede9fe"
                     : primaryRole === "security_supervisor"
                     ? "#fef3c7"
+                    : primaryRole === "auditor"
+                    ? "#f1f5f9"
                     : "#e0f2fe",
                 color:
-                  primaryRole === "association_committee"
-                    ? "#4338ca"
-                    : primaryRole === "facility_manager"
+                  primaryRole === "facility_manager"
                     ? "#6d28d9"
                     : primaryRole === "security_supervisor"
                     ? "#b45309"
+                    : primaryRole === "auditor"
+                    ? "#334155"
                     : "#0369a1",
                 display: "flex",
                 alignItems: "center",
@@ -183,12 +163,12 @@ export function OperationalStaffView({
         const roleSlug = u.roles[0]?.role_slug || "security_guard";
         const meta = getRoleMeta(roleSlug);
         const badgeStyle =
-          roleSlug === "association_committee"
-            ? { background: "#e0e7ff", color: "#4338ca", border: "1px solid #c7d2fe" }
-            : roleSlug === "facility_manager"
+          roleSlug === "facility_manager"
             ? { background: "#f3e8ff", color: "#6b21a8", border: "1px solid #d8b4fe" }
             : roleSlug === "security_supervisor"
             ? { background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a" }
+            : roleSlug === "auditor"
+            ? { background: "#f1f5f9", color: "#334155", border: "1px solid #cbd5e1" }
             : { background: "#e0f2fe", color: "#075985", border: "1px solid #bae6fd" };
 
         return (
@@ -293,23 +273,9 @@ export function OperationalStaffView({
     },
   ];
 
-  const isCommitteeOnly =
-    allowedRoleSlugs?.length === 1 && allowedRoleSlugs[0] === "association_committee";
-
-  const allFilterOptions = [
-    { label: "🏛️ Association Committee", value: "association_committee" },
-    { label: "🏢 Facility Manager", value: "facility_manager" },
-    { label: "🛡️ Security Supervisor", value: "security_supervisor" },
-    { label: "👮 Security Guard", value: "security_guard" },
-  ];
-
-  const roleFilterOptions = allowedRoleSlugs && allowedRoleSlugs.length > 0
-    ? allFilterOptions.filter((opt) => allowedRoleSlugs.includes(opt.value as OperationalRoleSlug))
-    : allFilterOptions;
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-      {/* Top Header Controls */}
+      {/* Top Header Controls (if not embedded, or embedded with custom bar) */}
       <div
         style={{
           display: "flex",
@@ -321,11 +287,10 @@ export function OperationalStaffView({
       >
         <div>
           <h2 style={{ fontSize: "1.25rem", fontWeight: 700, margin: 0, color: "var(--fg)" }}>
-            {title || "🛡️ Facility, Committee & Security Personnel"}
+            🛡️ Operational &amp; Audit Personnel
           </h2>
           <p style={{ fontSize: "0.85rem", color: "var(--muted)", margin: "0.2rem 0 0" }}>
-            {description ||
-              "View and provision Association Committee Members, Facility Managers, Security Supervisors, and Security Guards."}
+            View and provision Facility Managers, Security Personnel, and Statutory Auditors.
           </p>
         </div>
 
@@ -335,7 +300,7 @@ export function OperationalStaffView({
           onClick={() => setIsAddModalOpen(true)}
           style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}
         >
-          <span>+</span> {addButtonText || (isCommitteeOnly ? "Add Committee Member" : "Add New Personnel")}
+          <span>+</span> Add New Personnel
         </button>
       </div>
 
@@ -347,130 +312,94 @@ export function OperationalStaffView({
           gap: "1rem",
         }}
       >
-        {isCommitteeOnly ? (
-          <>
-            <div className="card" style={{ padding: "1rem" }}>
-              <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase" }}>
-                🏛️ Total Committee Members
-              </div>
-              <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.25rem" }}>
-                <span style={{ fontSize: "1.75rem", fontWeight: 800, color: "#4f46e5" }}>
-                  {metrics.total}
-                </span>
-                <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>members</span>
-              </div>
-            </div>
+        <div className="card" style={{ padding: "1rem" }}>
+          <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase" }}>
+            Total Personnel
+          </div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.25rem" }}>
+            <span style={{ fontSize: "1.75rem", fontWeight: 800, color: "var(--fg)" }}>
+              {metrics.total}
+            </span>
+            <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>active team</span>
+          </div>
+        </div>
 
-            <div className="card" style={{ padding: "1rem" }}>
-              <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase" }}>
-                Active Members
-              </div>
-              <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.25rem" }}>
-                <span style={{ fontSize: "1.75rem", fontWeight: 800, color: "var(--success)" }}>
-                  {metrics.activeCount}
-                </span>
-                <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>in office</span>
-              </div>
-            </div>
+        <div className="card" style={{ padding: "1rem" }}>
+          <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase" }}>
+            🏛️ Association Committee
+          </div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.25rem" }}>
+            <span style={{ fontSize: "1.75rem", fontWeight: 800, color: "#0284c7" }}>
+              {metrics.committeeMembers}
+            </span>
+            <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>governance</span>
+          </div>
+        </div>
 
-            <div className="card" style={{ padding: "1rem" }}>
-              <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase" }}>
-                Inactive Members
-              </div>
-              <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.25rem" }}>
-                <span style={{ fontSize: "1.75rem", fontWeight: 800, color: "var(--muted)" }}>
-                  {metrics.inactiveCount}
-                </span>
-                <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>deactivated</span>
-              </div>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="card" style={{ padding: "1rem" }}>
-              <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase" }}>
-                Total Personnel
-              </div>
-              <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.25rem" }}>
-                <span style={{ fontSize: "1.75rem", fontWeight: 800, color: "var(--fg)" }}>
-                  {metrics.total}
-                </span>
-                <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>active team</span>
-              </div>
-            </div>
+        <div className="card" style={{ padding: "1rem" }}>
+          <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase" }}>
+            🏢 Facility Managers
+          </div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.25rem" }}>
+            <span style={{ fontSize: "1.75rem", fontWeight: 800, color: "#7c3aed" }}>
+              {metrics.facilityManagers}
+            </span>
+            <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>operations</span>
+          </div>
+        </div>
 
-            {(!allowedRoleSlugs || allowedRoleSlugs.includes("association_committee")) && (
-              <div className="card" style={{ padding: "1rem" }}>
-                <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase" }}>
-                  🏛️ Association Committee
-                </div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.25rem" }}>
-                  <span style={{ fontSize: "1.75rem", fontWeight: 800, color: "#4f46e5" }}>
-                    {metrics.committeeMembers}
-                  </span>
-                  <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>members</span>
-                </div>
-              </div>
-            )}
+        <div className="card" style={{ padding: "1rem" }}>
+          <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase" }}>
+            🛡️ Security Supervisors
+          </div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.25rem" }}>
+            <span style={{ fontSize: "1.75rem", fontWeight: 800, color: "#d97706" }}>
+              {metrics.supervisors}
+            </span>
+            <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>leads</span>
+          </div>
+        </div>
 
-            {(!allowedRoleSlugs || allowedRoleSlugs.includes("facility_manager")) && (
-              <div className="card" style={{ padding: "1rem" }}>
-                <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase" }}>
-                  🏢 Facility Managers
-                </div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.25rem" }}>
-                  <span style={{ fontSize: "1.75rem", fontWeight: 800, color: "#7c3aed" }}>
-                    {metrics.facilityManagers}
-                  </span>
-                  <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>operations</span>
-                </div>
-              </div>
-            )}
+        <div className="card" style={{ padding: "1rem" }}>
+          <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase" }}>
+            👮 Security Guards
+          </div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.25rem" }}>
+            <span style={{ fontSize: "1.75rem", fontWeight: 800, color: "#2563eb" }}>
+              {metrics.guards}
+            </span>
+            <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>gate ops</span>
+          </div>
+        </div>
 
-            {(!allowedRoleSlugs || allowedRoleSlugs.includes("security_supervisor")) && (
-              <div className="card" style={{ padding: "1rem" }}>
-                <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase" }}>
-                  🛡️ Security Supervisors
-                </div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.25rem" }}>
-                  <span style={{ fontSize: "1.75rem", fontWeight: 800, color: "#d97706" }}>
-                    {metrics.supervisors}
-                  </span>
-                  <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>leads</span>
-                </div>
-              </div>
-            )}
-
-            {(!allowedRoleSlugs || allowedRoleSlugs.includes("security_guard")) && (
-              <div className="card" style={{ padding: "1rem" }}>
-                <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase" }}>
-                  👮 Security Guards
-                </div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.25rem" }}>
-                  <span style={{ fontSize: "1.75rem", fontWeight: 800, color: "#2563eb" }}>
-                    {metrics.guards}
-                  </span>
-                  <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>gate ops</span>
-                </div>
-              </div>
-            )}
-          </>
-        )}
+        <div className="card" style={{ padding: "1rem" }}>
+          <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase" }}>
+            📋 Statutory Auditors
+          </div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.25rem" }}>
+            <span style={{ fontSize: "1.75rem", fontWeight: 800, color: "#475569" }}>
+              {metrics.auditors}
+            </span>
+            <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>compliance</span>
+          </div>
+        </div>
       </div>
 
       {/* Filter and Search Panel */}
       <FilterPanel
         searchValue={searchTerm}
         onSearchChange={setSearchTerm}
-        searchPlaceholder={
-          isCommitteeOnly
-            ? "Search committee members by name, email, or phone..."
-            : "Search personnel by name, email, or phone..."
-        }
-        filterValue={roleFilterOptions.length > 1 ? roleFilter : undefined}
-        onFilterChange={roleFilterOptions.length > 1 ? setRoleFilter : undefined}
-        filterLabel={roleFilterOptions.length > 1 ? "Filter Role" : undefined}
-        filterOptions={roleFilterOptions.length > 1 ? roleFilterOptions : undefined}
+        searchPlaceholder="Search personnel by name, email, or phone..."
+        filterValue={roleFilter}
+        onFilterChange={setRoleFilter}
+        filterLabel="Filter Role"
+        filterOptions={[
+          { label: "🏛️ Association Committee", value: "association_committee" },
+          { label: "🏢 Facility Manager", value: "facility_manager" },
+          { label: "🛡️ Security Supervisor", value: "security_supervisor" },
+          { label: "👮 Security Guard", value: "security_guard" },
+          { label: "📋 Statutory Auditor", value: "auditor" },
+        ]}
         secondaryFilterValue={statusFilter}
         onSecondaryFilterChange={setStatusFilter}
         secondaryFilterLabel="Status"
@@ -485,17 +414,11 @@ export function OperationalStaffView({
         data={filteredStaff}
         columns={columns}
         isLoading={isLoading}
-        emptyTitle={
-          isCommitteeOnly
-            ? "No Association Committee Members Found"
-            : "No Facility or Security Personnel Found"
-        }
+        emptyTitle="No Personnel Found"
         emptyDescription={
           searchTerm || roleFilter || statusFilter
             ? "No personnel match your search and filter criteria."
-            : isCommitteeOnly
-            ? "No committee members registered yet. Click '+ Add Committee Member' to provision an association leader."
-            : "No facility managers or security guards registered yet. Click '+ Add New Personnel' to get started."
+            : "No operational staff or auditors registered yet. Click '+ Add New Personnel' to get started."
         }
       />
 
@@ -505,8 +428,6 @@ export function OperationalStaffView({
         onClose={() => setIsAddModalOpen(false)}
         communityId={activeCommunityId || ""}
         onSuccess={() => refetch()}
-        defaultRole={defaultAddRole || (isCommitteeOnly ? "association_committee" : undefined)}
-        allowedRoles={allowedRoleSlugs}
       />
 
       <OperationalStaffDetailsModal

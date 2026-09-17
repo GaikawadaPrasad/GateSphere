@@ -25,16 +25,9 @@ export interface SpecialAssessment {
   status: AssessmentStatus;
   created_at: string;
   updated_at: string;
-  proposed_by_user_id?: string;
-  proposed_by_name?: string;
-  proposer_role?: string;
-  proposer_department?: string;
   approved_by_user_id?: string;
-  approved_by_name?: string;
   approved_at?: string;
   approval_notes?: string;
-  rejected_by_user_id?: string;
-  rejected_by_name?: string;
   rejection_reason?: string;
 }
 
@@ -45,12 +38,6 @@ export interface SpecialAssessmentCreate {
   target_amount: string;
   effective_date: string;
   due_date?: string;
-  affected_units_count?: number;
-  per_unit_amount?: string;
-  proposed_by_user_id?: string;
-  proposed_by_name?: string;
-  proposer_role?: string;
-  proposer_department?: string;
 }
 
 export interface GovernanceOverviewData {

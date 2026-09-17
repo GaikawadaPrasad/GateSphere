@@ -21,7 +21,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base, TenantMixin, TimestampMixin, pk
 
-GATE_TYPES = ("main", "service", "visitor", "pedestrian", "emergency", "entry", "exit", "both")
+GATE_TYPES = ("main", "service", "visitor", "pedestrian", "emergency", "both", "entry", "exit")
 STRUCTURE_TYPES = ("tower", "block", "villa_cluster", "wing")
 UNIT_TYPES = ("apartment", "villa", "penthouse", "studio", "shop", "office")
 

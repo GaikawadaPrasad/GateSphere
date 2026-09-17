@@ -139,6 +139,7 @@ class TowerRead(_Read):
     name: str
     structure_type: str
     total_floors: int
+    total_units: int = 0
     is_active: bool
 
 

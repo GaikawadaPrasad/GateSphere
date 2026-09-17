@@ -132,18 +132,12 @@ export function CollectionAuditCard({ summary, isLoading }: CollectionAuditCardP
                 }}
               >
                 <div>
-                  <div style={{ fontWeight: 600, color: "var(--fg)", display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                    <span>{p.payer_name || "Resident Payer"}</span>
-                    {p.unit_number && (
-                      <span style={{ fontSize: "0.725rem", color: "var(--primary)", fontWeight: 500 }}>
-                        ({p.tower_name ? `${p.tower_name} · ` : ""}Unit {p.unit_number})
-                      </span>
-                    )}
+                  <div style={{ fontWeight: 600, color: "var(--fg)" }}>
+                    Ref: {p.payment_reference}
                   </div>
-                  <div style={{ fontSize: "0.725rem", color: "var(--muted)", marginTop: "0.1rem" }}>
-                    Ref: <span style={{ fontFamily: "monospace" }}>{p.payment_reference}</span>
-                    {p.receipt_number ? ` · Receipt: ${p.receipt_number}` : ""}
-                    {` · ${formatDate(p.paid_at)} · ${p.payment_method.toUpperCase()}`}
+                  <div style={{ fontSize: "0.725rem", color: "var(--muted)" }}>
+                    {p.receipt_number ? `Receipt: ${p.receipt_number} · ` : ""}
+                    {formatDate(p.paid_at)} · {p.payment_method.toUpperCase()}
                   </div>
                 </div>
                 <div style={{ fontWeight: 700, color: "#059669" }}>

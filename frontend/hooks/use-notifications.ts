@@ -11,16 +11,27 @@ export function useMyNotifications(params?: {
 }) {
   return useQuery({
     queryKey: ["notifications", params],
-    queryFn: async () => {
-      try {
-        return await notificationsApi.list(params);
-      } catch {
-        return [];
-      }
-    },
+    queryFn: () => notificationsApi.list(params),
     staleTime: 10_000,
     refetchInterval: 30_000,
-    retry: false,
+    retry: 1,
+  });
+}
+
+export function useDispatchNotification() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      community_id?: string;
+      recipient_user_id?: string;
+      title: string;
+      body: string;
+      category?: string;
+      action_url?: string;
+    }) => notificationsApi.dispatch(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    },
   });
 }
 
@@ -60,23 +71,6 @@ export function useSetNotificationPreference() {
       notificationsApi.setPreference(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notification-preferences"] });
-    },
-  });
-}
-
-export function useDispatchNotification() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (payload: {
-      recipient_user_id: string;
-      notification_type: string;
-      title: string;
-      message: string;
-      community_id?: string;
-      channels?: string[];
-    }) => notificationsApi.dispatch(payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 }

@@ -134,8 +134,43 @@ class FamilyMemberRead(_Read):
     date_of_birth: date | None
     phone: str | None
     access_enabled: bool
+    unit_number: str | None = None
+    pass_token: str | None = None
+    pin: str | None = None
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+
+# --- Family Member Gate Pass & Verification ------------------------ #
+class FamilyPassRead(BaseModel):
+    member_id: uuid.UUID
+    community_id: uuid.UUID
+    unit_id: uuid.UUID
+    unit_number: str
+    full_name: str
+    relationship: str
+    phone: str | None
+    access_enabled: bool
+    pass_token: str
+    pin: str
+    qr_payload: str
+
+
+class FamilyPassVerifyIn(_Write):
+    pass_code: str
+    gate_id: uuid.UUID | None = None
+
+
+class FamilyPassVerifyOut(BaseModel):
+    success: bool
+    member_id: uuid.UUID
+    full_name: str
+    relationship: str
+    unit_number: str
+    unit_id: uuid.UUID
+    access_enabled: bool
+    event_id: str
+    message: str
 
 
 # --- EmergencyContact --------------------------------------------- #

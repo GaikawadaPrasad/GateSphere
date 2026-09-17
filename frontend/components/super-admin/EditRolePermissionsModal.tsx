@@ -107,7 +107,7 @@ export function EditRolePermissionsModal({
     try {
       await rbacApi.setRolePermissions(role.slug, Array.from(selectedPermissions));
       toast.success(
-        `Permissions for role "${role.name}" updated successfully (${selectedPermissions.size} assigned).`,
+        `Updated permissions for role "${role.name}" (${selectedPermissions.size} assigned).`,
         "Role Permissions Saved"
       );
       onSuccess();

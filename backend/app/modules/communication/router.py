@@ -9,13 +9,12 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, Response, status
-
-from app.core.responses import PageParams, ok, page_params, paginated
-from app.core.responses import Response as Envelope
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import ForbiddenError
+from app.core.responses import PageParams, ok, page_params, paginated
+from app.core.responses import Response as Envelope
 from app.core.security import require_auth_async
 from app.core.tenancy import TenantScope, get_tenant_scope_async, require_permission_async
 from app.db.session import get_async_db
@@ -207,19 +206,6 @@ async def create_poll(
         schemas.PollRead.model_validate(await svc.create_poll(payload)), message="Poll created"
     )
 
-
-@router.get("/polls", response_model=Envelope[list[schemas.PollRead]], dependencies=[VIEW])
-async def list_polls(
-    community_id: uuid.UUID | None = None,
-    params: PageParams = Depends(page_params),
-    svc: Svc = Depends(communication_service),
-) -> dict:
-    rows, total = await svc.list_polls(
-        community_id=community_id, offset=params.offset, limit=params.page_size
-    )
-    return paginated(
-        [schemas.PollRead.model_validate(r) for r in rows], total=total, params=params
-    )
 
 
 @router.get("/polls/{poll_id}", response_model=Envelope[schemas.PollRead], dependencies=[VIEW])

@@ -66,18 +66,18 @@ export default function FinancialSummaryPage() {
     const firstAlloc = p.allocations?.[0];
     const invoice = firstAlloc?.invoice_id ? invoiceMap.get(firstAlloc.invoice_id) : undefined;
 
-    const name = resident?.full_name || p.payer_name || "Resident Payer";
-    const email = resident?.email || p.payer_email || "";
-    const phone = resident?.phone || p.payer_phone || "";
-    const residentType = resident?.resident_type || p.resident_type || "";
+    const name = p.payer_name || resident?.full_name || "Resident Payer";
+    const email = p.payer_email || resident?.email || "";
+    const phone = p.payer_phone || resident?.phone || "";
+    const residentType = p.resident_type || resident?.resident_type || "";
 
     let unitDisplay = "–";
-    if (resident?.unit_number) {
+    if (p.unit_number) {
+      unitDisplay = `${p.tower_name ? `${p.tower_name} · ` : ""}Unit ${p.unit_number}`;
+    } else if (resident?.unit_number) {
       unitDisplay = `${resident.tower_name ? `${resident.tower_name} · ` : ""}Unit ${resident.unit_number}`;
     } else if (invoice?.unit_number) {
       unitDisplay = `Unit ${invoice.unit_number}`;
-    } else if (p.unit_number) {
-      unitDisplay = `${p.tower_name ? `${p.tower_name} · ` : ""}Unit ${p.unit_number}`;
     }
 
     return { name, email, phone, residentType, unitDisplay };

@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 _MB = 1024 * 1024
 
-_IMAGE = ("image/jpeg", "image/png", "image/webp")
+_IMAGE = ("image/jpeg", "image/png", "image/webp", "image/heic", "image/heif")
 _DOC = ("application/pdf",)
 _OFFICE = (
     "application/msword",
@@ -24,6 +24,8 @@ _EXT = {
     "image/jpeg": ".jpg",
     "image/png": ".png",
     "image/webp": ".webp",
+    "image/heic": ".heic",
+    "image/heif": ".heif",
     "application/pdf": ".pdf",
     "application/msword": ".doc",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",

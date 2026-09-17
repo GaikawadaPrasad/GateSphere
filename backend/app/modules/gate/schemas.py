@@ -103,9 +103,7 @@ class RosterRead(_Read):
     status: str
     notes: str | None
     guard_name: str | None = None
-    guard_email: str | None = None
     guard_phone: str | None = None
-    supervisor_name: str | None = None
 
 
 # -- gate assignments ---------------------------------------------- #

@@ -29,9 +29,16 @@ export default function AssessmentDetailPage() {
   const [rejectReason, setRejectReason] = useState("");
   const [showRejectBox, setShowRejectBox] = useState(false);
 
-  const isSelfProposal = currentUser && assessment?.proposed_by_user_id
-    ? assessment.proposed_by_user_id === currentUser.id
-    : false;
+  const isSelfProposal =
+    currentUser && assessment
+      ? Boolean(
+          (assessment.proposed_by_user_id && assessment.proposed_by_user_id === currentUser.id) ||
+            (assessment.proposed_by_name &&
+              currentUser.full_name &&
+              assessment.proposed_by_name.trim().toLowerCase() ===
+                currentUser.full_name.trim().toLowerCase())
+        )
+      : false;
 
   const handleApprove = async () => {
     if (isSelfProposal) {

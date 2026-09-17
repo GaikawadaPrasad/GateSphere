@@ -97,7 +97,7 @@ export function EditUserModal({
         phone: phone.trim() || undefined,
         is_active: isActive,
       });
-      toast.success(`User access profile for ${fullName.trim()} updated successfully.`, "Profile Saved");
+      toast.success(`Updated profile and access for ${fullName.trim()}.`, "User Updated");
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -119,8 +119,8 @@ export function EditUserModal({
         community_id: communityIdInput || undefined,
       });
       toast.success(
-        `Role "${selectedRoleSlug}" granted to ${user.full_name} successfully.`,
-        "Role Granted"
+        `Role "${selectedRoleSlug}" granted to ${user.full_name}.`,
+        "Role Assigned"
       );
       setSelectedRoleSlug("");
       setCommunityIdInput("");
@@ -128,7 +128,7 @@ export function EditUserModal({
     } catch (err: any) {
       const msg = err?.message || "Failed to grant role";
       setErrorMessage(msg);
-      toast.error(msg, "Grant Failed");
+      toast.error(msg, "Grant Role Failed");
     } finally {
       setIsGrantingRole(false);
     }
@@ -139,12 +139,12 @@ export function EditUserModal({
     setErrorMessage(null);
     try {
       await usersApi.revokeRole(user.id, grantId);
-      toast.success(`Role grant revoked for ${user.full_name}.`, "Role Revoked");
+      toast.success(`Role assignment revoked from ${user.full_name}.`, "Role Revoked");
       onSuccess();
     } catch (err: any) {
       const msg = err?.message || "Failed to revoke role";
       setErrorMessage(msg);
-      toast.error(msg, "Revoke Failed");
+      toast.error(msg, "Revoke Role Failed");
     } finally {
       setIsRevokingId(null);
     }
@@ -159,13 +159,13 @@ export function EditUserModal({
     setErrorMessage(null);
     try {
       await usersApi.delete(user.id);
-      toast.success(`User ${user.full_name} deleted successfully.`, "User Deleted");
+      toast.success(`User account for ${user.full_name} deleted.`, "User Deleted");
       onSuccess();
       onClose();
     } catch (err: any) {
       const msg = err?.message || "Failed to delete user";
       setErrorMessage(msg);
-      toast.error(msg, "Delete Failed");
+      toast.error(msg, "Delete User Failed");
     } finally {
       setIsDeletingUser(false);
     }

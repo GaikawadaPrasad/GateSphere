@@ -39,16 +39,13 @@ export default function SettingsPage() {
   const updateMutation = useMutation({
     mutationFn: ({ code, description }: { code: string; description: string }) =>
       rbacApi.updatePermission(code, { description }),
-    onSuccess: (_, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["rbac", "permissions"] });
-      toast.success(
-        `Permission description for "${variables.code}" updated successfully.`,
-        "Permission Saved"
-      );
+      toast.success("Permission updated successfully.", "Permission Saved");
       setEditingPermission(null);
     },
     onError: (err: any) => {
-      toast.error(err?.message || "Failed to update permission.", "Save Failed");
+      toast.error(err?.message || "Failed to update permission.", "Update Failed");
     },
   });
 
@@ -97,7 +94,10 @@ export default function SettingsPage() {
       header: "Scope",
       align: "center",
       render: (r) => (
-        <span className={`badge ${r.is_wildcard ? "badge-danger" : "badge-neutral"}`}>
+        <span
+          className={`badge ${r.is_wildcard ? "badge-danger" : "badge-neutral"}`}
+          title={r.is_wildcard ? "Wildcard access granted across all modules" : "Granular module-scoped permissions"}
+        >
           {r.is_wildcard ? "Wildcard (*)" : "Scoped"}
         </span>
       ),
@@ -118,6 +118,7 @@ export default function SettingsPage() {
           className="btn btn-secondary btn-sm"
           style={{ fontSize: "0.75rem", padding: "0.25rem 0.65rem" }}
           onClick={() => setEditingRole(r)}
+          title={`Configure and update granular permissions assigned to ${r.name}`}
         >
           Update Role Permissions
         </button>
@@ -162,6 +163,7 @@ export default function SettingsPage() {
           className="btn btn-secondary btn-sm"
           style={{ fontSize: "0.75rem", padding: "0.25rem 0.65rem" }}
           onClick={() => handleEditClick(p)}
+          title={`Edit description for ${p.code}`}
         >
           Update
         </button>
@@ -189,7 +191,12 @@ export default function SettingsPage() {
         <div style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem" }}>
           {u.roles && u.roles.length > 0 ? (
             u.roles.map((r) => (
-              <span key={r.id} className="badge badge-primary" style={{ fontSize: "0.75rem" }}>
+              <span
+                key={r.id}
+                className="badge badge-primary"
+                style={{ fontSize: "0.75rem" }}
+                title={`Role: ${r.role_slug}${r.community_id ? ` (Community: ${r.community_id.slice(0, 8)})` : " (Global)"}`}
+              >
                 {r.role_name || r.role_slug}
               </span>
             ))
@@ -204,7 +211,10 @@ export default function SettingsPage() {
       header: "Status",
       align: "center",
       render: (u) => (
-        <span className={`badge ${u.is_active !== false ? "badge-success" : "badge-neutral"}`}>
+        <span
+          className={`badge ${u.is_active !== false ? "badge-success" : "badge-neutral"}`}
+          title={u.is_active !== false ? "Account active and able to authenticate" : "Account disabled"}
+        >
           {u.is_active !== false ? "Active" : "Disabled"}
         </span>
       ),
@@ -220,6 +230,7 @@ export default function SettingsPage() {
             className="btn btn-secondary btn-sm"
             style={{ fontSize: "0.75rem", padding: "0.25rem 0.65rem" }}
             onClick={() => setEditingUser(u)}
+            title={`Manage RBAC role assignments, community scope, and credentials for ${u.full_name}`}
           >
             Edit Access
           </button>
@@ -228,6 +239,7 @@ export default function SettingsPage() {
             className="btn btn-danger btn-sm"
             style={{ fontSize: "0.75rem", padding: "0.25rem 0.65rem" }}
             onClick={() => setDeletingUser(u)}
+            title={`Delete user account for ${u.full_name}`}
           >
             Delete
           </button>

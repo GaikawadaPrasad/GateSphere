@@ -127,6 +127,13 @@ export default function SpecialAssessmentsPage() {
     if (item.proposed_by_user_id && item.proposed_by_user_id === currentUser.id) {
       return true;
     }
+    if (
+      item.proposed_by_name &&
+      currentUser.full_name &&
+      item.proposed_by_name.trim().toLowerCase() === currentUser.full_name.trim().toLowerCase()
+    ) {
+      return true;
+    }
     return false;
   };
 
@@ -809,6 +816,7 @@ export default function SpecialAssessmentsPage() {
                   <input
                     type="date"
                     required
+                    min={new Date().toISOString().slice(0, 10)}
                     value={newEffectiveDate}
                     onChange={(e) => setNewEffectiveDate(e.target.value)}
                     className="input-field"
@@ -821,6 +829,7 @@ export default function SpecialAssessmentsPage() {
                   </label>
                   <input
                     type="date"
+                    min={newEffectiveDate || new Date().toISOString().slice(0, 10)}
                     value={newDueDate}
                     onChange={(e) => setNewDueDate(e.target.value)}
                     className="input-field"

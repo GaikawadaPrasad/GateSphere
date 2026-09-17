@@ -81,12 +81,19 @@ class Settings(BaseSettings):
     # `<max requests>/<window seconds>` per path class. Identity = user:<id> when the
     # session cookie resolves, else ip:<addr>. Fails OPEN on a Redis error.
     RATE_LIMIT_ENABLED: bool = True
-    RATE_LIMIT_LOGIN: str = "60/60"  # the `auth` class — kept name for back-compat
+    RATE_LIMIT_LOGIN: str = "5/60"  # the `auth` class — kept name for back-compat
     RATE_LIMIT_SEARCH: str = "60/60"
     RATE_LIMIT_UPLOAD: str = "30/60"
     RATE_LIMIT_EXPORT: str = "20/60"
     RATE_LIMIT_WRITE: str = "120/60"
     RATE_LIMIT_DEFAULT: str = "600/60"
+
+    # --- per-account login lockout (AGENTS.md §7: 5 failed attempts → temporary lockout) ---
+    # Redis counters keyed by normalized email. Fails OPEN on a Redis error.
+    LOGIN_LOCKOUT_ENABLED: bool = True
+    LOGIN_LOCKOUT_ATTEMPTS: int = 5
+    LOGIN_LOCKOUT_WINDOW_SECONDS: int = 900  # failures counted inside this window
+    LOGIN_LOCKOUT_SECONDS: int = 900  # how long the account stays locked
 
     @model_validator(mode="after")
     def _production_safety(self) -> Settings:

@@ -299,6 +299,41 @@ export async function apiSend<T>(
   return handleResponse<T>(res);
 }
 
+export async function apiSendFormData<T>(
+  method: string,
+  path: string,
+  formData: FormData,
+  params?: Record<string, unknown>,
+  role?: string,
+): Promise<T> {
+  const url = buildUrl(path, params);
+  const activeRole = role || getActiveRole();
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+  };
+  if (activeRole) {
+    headers["X-Session-Role"] = activeRole;
+  }
+
+  const isMutation = ["POST", "PUT", "PATCH", "DELETE"].includes(method.toUpperCase());
+  if (isMutation) {
+    const csrf = getCsrfToken(activeRole || undefined);
+    if (csrf) {
+      headers["X-CSRF-Token"] = csrf;
+    }
+  }
+
+  // Note: Do NOT set Content-Type header so the browser sets multipart/form-data boundary automatically
+  const res = await fetch(url, {
+    method,
+    credentials: "include",
+    headers,
+    body: formData,
+  });
+
+  return handleResponse<T>(res);
+}
+
 export async function apiList<T>(
   path: string,
   params?: Record<string, unknown>,
@@ -626,18 +661,10 @@ export const assessmentsApi = {
       payload,
       communityId ? { community_id: communityId } : undefined,
     ),
-  approve: (id: string, payload?: { notes?: string; approved_by_user_id?: string; approved_by_name?: string } | string) =>
-    apiSend<any>(
-      "POST",
-      `/billing/assessments/${id}/approve`,
-      typeof payload === "string" ? { notes: payload } : payload || {},
-    ),
-  reject: (id: string, payload?: { reason?: string; rejected_by_user_id?: string; rejected_by_name?: string } | string) =>
-    apiSend<any>(
-      "POST",
-      `/billing/assessments/${id}/reject`,
-      typeof payload === "string" ? { reason: payload } : payload || {},
-    ),
+  approve: (id: string, notes?: string) =>
+    apiSend<any>("POST", `/billing/assessments/${id}/approve`, { notes }),
+  reject: (id: string, reason?: string) =>
+    apiSend<any>("POST", `/billing/assessments/${id}/reject`, { reason }),
 };
 
 export const communicationApi = {
@@ -677,8 +704,10 @@ export const communicationApi = {
       data,
       communityId ? { community_id: communityId } : undefined,
     ),
-  listGroupMembers: (groupId: string) =>
-    apiGet<any[]>(`/communication/groups/${groupId}/members`),
+  groupMembers: (groupId: string) =>
+    apiGet<Array<{ group_id: string; user_id: string; added_at: string; user?: any }>>(
+      `/communication/groups/${groupId}/members`,
+    ),
   addGroupMember: (groupId: string, data: { user_id: string }) =>
     apiSend<any>("POST", `/communication/groups/${groupId}/members`, data),
   removeGroupMember: (groupId: string, memberId: string) =>
@@ -759,6 +788,32 @@ export const residentsApi = {
     },
   ) => apiSend<any>("POST", `/communities/${communityId}/residents`, data),
   delete: (id: string) => apiSend<void>("DELETE", `/residents/${id}`),
+  getFamilyPass: (memberId: string) =>
+    apiGet<{
+      member_id: string;
+      community_id: string;
+      unit_id: string;
+      unit_number: string;
+      full_name: string;
+      relationship: string;
+      phone: string | null;
+      access_enabled: boolean;
+      pass_token: string;
+      pin: string;
+      qr_payload: string;
+    }>(`/residents/family-members/${memberId}/pass`),
+  verifyFamilyPass: (data: { pass_code: string; gate_id?: string }) =>
+    apiSend<{
+      success: boolean;
+      member_id: string;
+      full_name: string;
+      relationship: string;
+      unit_number: string;
+      unit_id: string;
+      access_enabled: boolean;
+      event_id: string;
+      message: string;
+    }>("POST", "/residents/family-members/verify-pass", data),
 };
 
 export const onboardingApi = {
@@ -1150,17 +1205,17 @@ export const notificationsApi = {
     apiGet<AppNotification[]>("/notifications", params as Record<string, unknown>),
   markRead: (id: string) => apiSend<void>("POST", `/notifications/${id}/read`),
   markAllRead: () => apiSend<void>("POST", "/notifications/read-all"),
-  dispatch: (data: {
-    recipient_user_id: string;
-    notification_type: string;
-    title: string;
-    message: string;
-    community_id?: string;
-    channels?: string[];
-  }) => apiSend<AppNotification>("POST", "/notifications/dispatch", data),
   preferences: () => apiGet<NotificationPreference[]>("/notifications/me/preferences"),
   setPreference: (data: Partial<NotificationPreference>) =>
     apiSend<NotificationPreference>("PUT", "/notifications/me/preferences", data),
+  dispatch: (data: {
+    community_id?: string;
+    recipient_user_id?: string;
+    title: string;
+    body: string;
+    category?: string;
+    action_url?: string;
+  }) => apiSend<AppNotification>("POST", "/notifications/dispatch", data),
 };
 
 export interface PresignUploadPayload {
@@ -1201,6 +1256,8 @@ export const uploadsApi = {
     apiSend<PresignUploadResponse>("POST", "/uploads", data),
   confirm: (fileId: string) =>
     apiSend<ConfirmUploadResponse>("POST", `/uploads/${fileId}/confirm`),
+  directUpload: (formData: FormData) =>
+    apiSendFormData<ConfirmUploadResponse>("POST", "/uploads/direct", formData),
   kinds: () =>
     apiGet<Record<string, { content_types: string[]; max_bytes: number; scope: string }>>("/uploads/kinds"),
   download: (key: string) =>

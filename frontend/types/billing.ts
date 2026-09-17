@@ -50,6 +50,7 @@ export interface Payment {
   unit_number?: string;
   tower_name?: string;
   resident_type?: string;
+  invoice_number?: string;
   amount: string;
   payment_method: string;
   payment_reference: string;

@@ -722,6 +722,9 @@ export interface FamilyMember {
   phone: string;
   access_enabled: boolean;
   unit_id?: string;
+  unit_number?: string;
+  pass_token?: string;
+  pin?: string;
   primary_resident_profile_id?: string;
   date_of_birth?: string;
   created_at?: string;
@@ -742,6 +745,9 @@ export function useResidentFamilyMembers() {
           phone: f.phone || "",
           access_enabled: f.access_enabled !== false,
           unit_id: f.unit_id,
+          unit_number: f.unit_number,
+          pass_token: f.pass_token,
+          pin: f.pin,
           primary_resident_profile_id: f.primary_resident_profile_id,
           date_of_birth: f.date_of_birth,
           created_at: f.created_at,
