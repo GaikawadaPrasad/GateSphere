@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import contextlib
+import re
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -178,6 +179,14 @@ class DomesticStaffService(UnitScopedAccess):
                     self.db.add(UserRole(user_id=user.id, role_id=ds_role.id, community_id=cid))
                     await self.db.flush()
 
+        clean_id_number = payload.id_number
+        if clean_id_number and payload.id_type:
+            id_type_norm = payload.id_type.strip().lower()
+            if id_type_norm in ("aadhaar", "aadhar"):
+                clean_id_number = re.sub(r"[\s-]", "", clean_id_number)
+            elif id_type_norm in ("pan", "pan card", "pan_card", "voter id", "voter_id", "passport", "driving license", "driving_license", "dl"):
+                clean_id_number = re.sub(r"[\s-]", "", clean_id_number).upper()
+
         obj = DomesticStaff(
             community_id=cid,
             user_id=user_id,
@@ -185,7 +194,7 @@ class DomesticStaffService(UnitScopedAccess):
             staff_type=payload.staff_type,
             phone=payload.phone,
             id_type=payload.id_type,
-            id_number_hash=digest_opt(payload.id_number),
+            id_number_hash=digest_opt(clean_id_number),
             photo_url=payload.photo_url,
             police_verification_status=payload.police_verification_status,
             verification_expiry=payload.verification_expiry,
@@ -229,6 +238,17 @@ class DomesticStaffService(UnitScopedAccess):
             )
         if "photo_url" in patch:
             await ensure_confirmed_async(self.db, patch["photo_url"])
+        if "id_number" in patch:
+            raw_id = patch.pop("id_number")
+            clean_id = raw_id
+            target_id_type = patch.get("id_type", obj.id_type)
+            if clean_id and target_id_type:
+                id_type_norm = target_id_type.strip().lower()
+                if id_type_norm in ("aadhaar", "aadhar"):
+                    clean_id = re.sub(r"[\s-]", "", clean_id)
+                elif id_type_norm in ("pan", "pan card", "pan_card", "voter id", "voter_id", "passport", "driving license", "driving_license", "dl"):
+                    clean_id = re.sub(r"[\s-]", "", clean_id).upper()
+            obj.id_number_hash = digest_opt(clean_id)
         for k, v in patch.items():
             setattr(obj, k, v)
         await self.db.flush()

@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import datetime as dt
+import re
 import uuid
 from datetime import date, datetime, time
+from typing import Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.core.files import ManagedFileUrl
 from app.modules.domestic_staff.models import (
@@ -23,6 +25,36 @@ ALLOWED = {
     "attendance_status": set(ATTENDANCE_STATUS),
 }
 _Phone = Field(min_length=5, max_length=20, pattern=r"^[+0-9][0-9 \-]{4,19}$")
+
+
+def _validate_id_doc(id_type: str | None, id_number: str | None) -> None:
+    if not id_number:
+        return
+    raw_id = id_number.strip()
+    id_type_norm = (id_type or "").strip().lower()
+
+    if id_type_norm in ("aadhaar", "aadhar"):
+        clean_aadhaar = re.sub(r"[\s-]", "", raw_id)
+        if not re.match(r"^\d{12}$", clean_aadhaar):
+            raise ValueError("Aadhaar number must be exactly 12 numeric digits (e.g. 1234 5678 9012)")
+        if re.match(r"^(\d)\1{11}$", clean_aadhaar):
+            raise ValueError("Aadhaar number cannot contain all identical repeating digits")
+    elif id_type_norm in ("pan", "pan card", "pan_card"):
+        clean_pan = re.sub(r"[\s-]", "", raw_id).upper()
+        if not re.match(r"^[A-Z]{5}[0-9]{4}[A-Z]{1}$", clean_pan):
+            raise ValueError("PAN Card must be 10 characters in format ABCDE1234F")
+    elif id_type_norm in ("voter id", "voter_id", "voterid"):
+        clean_voter = re.sub(r"[\s-]", "", raw_id).upper()
+        if not re.match(r"^[A-Z]{3}[0-9]{7}$", clean_voter):
+            raise ValueError("Voter ID must be 10 characters in format ABC1234567")
+    elif id_type_norm in ("passport",):
+        clean_passport = re.sub(r"[\s-]", "", raw_id).upper()
+        if not re.match(r"^[A-Z][0-9]{7,8}$", clean_passport):
+            raise ValueError("Passport number must be 1 letter followed by 7-8 digits (e.g. A1234567)")
+    elif id_type_norm in ("driving license", "driving_license", "dl"):
+        clean_dl = re.sub(r"[\s-]", "", raw_id).upper()
+        if not re.match(r"^[A-Z]{2}[0-9A-Z]{8,18}$", clean_dl):
+            raise ValueError("Driving License must be valid format (e.g. DL-1420110012345)")
 
 
 class _Write(BaseModel):
@@ -52,15 +84,27 @@ class StaffCreate(_Write):
     verification_expiry: date | None = None
     emergency_address: str | None = Field(default=None, max_length=2000)
 
+    @model_validator(mode="after")
+    def validate_id_document(self) -> Self:
+        _validate_id_doc(self.id_type, self.id_number)
+        return self
+
 
 class StaffUpdate(_Write):
     full_name: str | None = Field(default=None, max_length=180)
     staff_type: str | None = None
+    id_type: str | None = Field(default=None, max_length=30)
+    id_number: str | None = Field(default=None, max_length=40)
     photo_url: ManagedFileUrl | None = None
     police_verification_status: str | None = None
     verification_expiry: date | None = None
     emergency_address: str | None = Field(default=None, max_length=2000)
     is_active: bool | None = None
+
+    @model_validator(mode="after")
+    def validate_id_document(self) -> Self:
+        _validate_id_doc(self.id_type, self.id_number)
+        return self
 
 
 class StaffRead(_Read):
