@@ -153,6 +153,15 @@ export default function SecuritySupervisorDomesticStaffPage() {
           { label: "Security Supervisor" },
           { label: "Domestic Staff" },
         ]}
+        actions={
+          <button
+            className="btn btn-secondary"
+            onClick={loadData}
+            disabled={isLoading}
+          >
+            🔄 {isLoading ? "Refreshing…" : "Refresh"}
+          </button>
+        }
       />
 
       <div className="card">

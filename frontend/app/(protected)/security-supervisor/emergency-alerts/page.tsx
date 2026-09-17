@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
 import { gateApi, type PanicAlert } from "@/lib/api";
 import { formatDateTime } from "@/lib/utils";
+import { toast } from "@/store/toast";
 
 // Real backend enum (backend/app/modules/gate/models.py ALERT_TYPES)
 const ALERT_TYPES = [
@@ -29,6 +30,7 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
   const [isResolveModalOpen, setIsResolveModalOpen] = useState(false);
   const [alertToResolve, setAlertToResolve] = useState<PanicAlert | null>(null);
   const [resolutionSummary, setResolutionSummary] = useState("");
+  const [resolutionSummaryError, setResolutionSummaryError] = useState("");
 
   const fetchAlerts = async () => {
     setIsLoading(true);
@@ -49,6 +51,7 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
 
     if (!location.trim() && !description.trim()) {
       setAlertFieldError("Please specify either a location or description for the alert.");
+      toast.error("Please specify either a location or description for the alert.");
       return;
     }
 
@@ -64,12 +67,13 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
         severity: "critical",
         message: message || undefined,
       });
+      toast.success("🚨 Emergency broadcast dispatched to security network!");
       setIsModalOpen(false);
       setLocation("");
       setDescription("");
       await fetchAlerts();
     } catch (err: any) {
-      alert(err?.message || "Failed to broadcast emergency alert.");
+      toast.error(err?.message || "Failed to broadcast emergency alert.");
     } finally {
       setIsSubmitting(false);
     }
@@ -78,29 +82,39 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
   const handleAcknowledge = async (id: string) => {
     try {
       await gateApi.acknowledgeAlert(id);
+      toast.success("Emergency alert acknowledged.");
       fetchAlerts();
     } catch (err: any) {
-      alert(err?.message || "Failed to acknowledge alert.");
+      toast.error(err?.message || "Failed to acknowledge alert.");
     }
   };
 
   const handleOpenResolve = (alertItem: PanicAlert) => {
     setAlertToResolve(alertItem);
     setResolutionSummary("");
+    setResolutionSummaryError("");
     setIsResolveModalOpen(true);
   };
 
   const handleConfirmResolve = async () => {
     if (!alertToResolve || isSubmitting) return;
+    const cleanSummary = resolutionSummary.trim();
+    if (!cleanSummary || cleanSummary.length < 5) {
+      setResolutionSummaryError("Please provide a resolution summary (min 5 characters).");
+      toast.error("Resolution summary must be at least 5 characters.");
+      return;
+    }
     setIsSubmitting(true);
     try {
-      await gateApi.resolveAlert(alertToResolve.id, resolutionSummary.trim() || undefined);
+      await gateApi.resolveAlert(alertToResolve.id, cleanSummary);
+      toast.success("Emergency incident marked as resolved.");
       setIsResolveModalOpen(false);
       setAlertToResolve(null);
       setResolutionSummary("");
+      setResolutionSummaryError("");
       await fetchAlerts();
     } catch (err: any) {
-      alert(err?.message || "Failed to resolve alert.");
+      toast.error(err?.message || "Failed to resolve alert.");
     } finally {
       setIsSubmitting(false);
     }
@@ -117,9 +131,18 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
           { label: "Emergency Alerts" },
         ]}
         actions={
-          <button className="btn btn-danger" onClick={() => setIsModalOpen(true)}>
-            🚨 Broadcast Emergency Alert
-          </button>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+            <button
+              className="btn btn-secondary"
+              onClick={fetchAlerts}
+              disabled={isLoading}
+            >
+              🔄 {isLoading ? "Refreshing…" : "Refresh"}
+            </button>
+            <button className="btn btn-danger" onClick={() => setIsModalOpen(true)}>
+              🚨 Broadcast Emergency Alert
+            </button>
+          </div>
         }
       />
 
@@ -393,8 +416,16 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
               rows={3}
               placeholder="e.g. Attended by on-duty medical response, resident safe and stable."
               value={resolutionSummary}
-              onChange={(e) => setResolutionSummary(e.target.value)}
+              onChange={(e) => {
+                setResolutionSummary(e.target.value);
+                if (resolutionSummaryError) setResolutionSummaryError("");
+              }}
             />
+            {resolutionSummaryError && (
+              <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                {resolutionSummaryError}
+              </span>
+            )}
             <p style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.25rem" }}>
               This summary will be permanently stamped on the emergency incident audit record.
             </p>

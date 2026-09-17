@@ -174,6 +174,38 @@ export default function CommunityAdminStaffPage() {
       errors.email = "Please enter a valid email address.";
     }
 
+    const trimmedId = (newStaffForm.id_number || "").trim();
+    if (trimmedId) {
+      if (newStaffForm.id_type === "Aadhaar") {
+        const cleanAadhaar = trimmedId.replace(/[\s-]/g, "");
+        if (!/^\d{12}$/.test(cleanAadhaar)) {
+          errors.id_number = "Aadhaar number must be exactly 12 digits (e.g. 1234 5678 9012).";
+        }
+      } else if (newStaffForm.id_type === "PAN Card") {
+        if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/i.test(trimmedId)) {
+          errors.id_number = "PAN Card must be 10 characters in format ABCDE1234F.";
+        }
+      } else if (newStaffForm.id_type === "Voter ID") {
+        if (!/^[A-Z]{3}[0-9]{7}$/i.test(trimmedId)) {
+          errors.id_number = "Voter ID must be 10 characters (e.g. ABC1234567).";
+        }
+      } else if (newStaffForm.id_type === "Passport") {
+        if (!/^[A-Z][0-9]{7,8}$/i.test(trimmedId)) {
+          errors.id_number = "Passport must be 1 letter followed by 7-8 digits (e.g. A1234567).";
+        }
+      } else if (newStaffForm.id_type === "Driving License") {
+        if (!/^[A-Z]{2}[0-9A-Z\s\-]{8,18}$/i.test(trimmedId)) {
+          errors.id_number = "Driving License must be valid (e.g. DL-1420110012345).";
+        }
+      } else if (trimmedId.length > 30) {
+        errors.id_number = "ID number cannot exceed 30 characters.";
+      }
+    }
+
+    if (newStaffForm.password && newStaffForm.password.trim().length < 10) {
+      errors.password = "Initial password must be at least 10 characters.";
+    }
+
     setStaffFieldErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -183,7 +215,10 @@ export default function CommunityAdminStaffPage() {
     e.preventDefault();
     if (!activeCommunityId) return;
 
-    if (!validateStaffForm()) return;
+    if (!validateStaffForm()) {
+      setErrorMessage("Please correct the highlighted form errors before submitting.");
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -1244,10 +1279,23 @@ export default function CommunityAdminStaffPage() {
                   <input
                     type={showStaffPassword ? "text" : "password"}
                     className="input-field"
-                    style={{ paddingRight: "2.5rem" }}
+                    style={{
+                      paddingRight: "2.5rem",
+                      borderColor: staffFieldErrors.password ? "#EF4444" : undefined,
+                    }}
                     placeholder="e.g. ramesh@Gate2026!"
                     value={newStaffForm.password}
-                    onChange={(e) => setNewStaffForm({ ...newStaffForm, password: e.target.value })}
+                    aria-invalid={Boolean(staffFieldErrors.password)}
+                    onChange={(e) => {
+                      setNewStaffForm({ ...newStaffForm, password: e.target.value });
+                      if (staffFieldErrors.password) {
+                        setStaffFieldErrors((prev) => {
+                          const n = { ...prev };
+                          delete n.password;
+                          return n;
+                        });
+                      }
+                    }}
                   />
                   <button
                     type="button"
@@ -1297,6 +1345,22 @@ export default function CommunityAdminStaffPage() {
                     )}
                   </button>
                 </div>
+                {staffFieldErrors.password && (
+                  <span
+                    role="alert"
+                    title={staffFieldErrors.password}
+                    style={{
+                      fontSize: "0.75rem",
+                      color: "#EF4444",
+                      marginTop: "0.25rem",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.25rem",
+                    }}
+                  >
+                    <span>⚠️</span> {staffFieldErrors.password}
+                  </span>
+                )}
               </div>
             </div>
             <p style={{ margin: 0, fontSize: "11.5px", color: "var(--muted)" }}>
@@ -1375,7 +1439,16 @@ export default function CommunityAdminStaffPage() {
                 <select
                   className="select-field"
                   value={newStaffForm.id_type}
-                  onChange={(e) => setNewStaffForm({ ...newStaffForm, id_type: e.target.value })}
+                  onChange={(e) => {
+                    setNewStaffForm({ ...newStaffForm, id_type: e.target.value });
+                    if (staffFieldErrors.id_number) {
+                      setStaffFieldErrors((prev) => {
+                        const n = { ...prev };
+                        delete n.id_number;
+                        return n;
+                      });
+                    }
+                  }}
                 >
                   <option value="Aadhaar">Aadhaar</option>
                   <option value="Voter ID">Voter ID</option>
@@ -1398,6 +1471,10 @@ export default function CommunityAdminStaffPage() {
                 <input
                   type="text"
                   className="input-field"
+                  aria-invalid={Boolean(staffFieldErrors.id_number)}
+                  style={{
+                    borderColor: staffFieldErrors.id_number ? "#EF4444" : undefined,
+                  }}
                   placeholder={
                     newStaffForm.id_type === "Aadhaar"
                       ? "e.g. 1234-5678-9012"
@@ -1412,8 +1489,33 @@ export default function CommunityAdminStaffPage() {
                               : "e.g. ID Document Number"
                   }
                   value={newStaffForm.id_number}
-                  onChange={(e) => setNewStaffForm({ ...newStaffForm, id_number: e.target.value })}
+                  onChange={(e) => {
+                    setNewStaffForm({ ...newStaffForm, id_number: e.target.value });
+                    if (staffFieldErrors.id_number) {
+                      setStaffFieldErrors((prev) => {
+                        const n = { ...prev };
+                        delete n.id_number;
+                        return n;
+                      });
+                    }
+                  }}
                 />
+                {staffFieldErrors.id_number && (
+                  <span
+                    role="alert"
+                    title={staffFieldErrors.id_number}
+                    style={{
+                      fontSize: "0.75rem",
+                      color: "#EF4444",
+                      marginTop: "0.25rem",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.25rem",
+                    }}
+                  >
+                    <span>⚠️</span> {staffFieldErrors.id_number}
+                  </span>
+                )}
               </div>
             </div>
           </div>

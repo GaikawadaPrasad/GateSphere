@@ -17,6 +17,7 @@ import {
 } from "@/lib/api";
 import type { SecurityStats } from "@/types/dashboards";
 import { formatDateTime } from "@/lib/utils";
+import { toast } from "@/store/toast";
 
 // Real backend enum (backend/app/modules/gate/models.py ALERT_TYPES)
 const EMERGENCY_TYPES = [
@@ -96,6 +97,40 @@ export default function SecurityGuardDashboardPage() {
     };
   }, []);
 
+  const handleManualRefresh = async () => {
+    setIsLoadingStats(true);
+    try {
+      const [alertsRes, statsRes, visitorsRes, deliveriesRes, rostersRes] = await Promise.allSettled([
+        gateApi.alerts(),
+        dashboardsApi.security(),
+        visitorsApi.requests(),
+        deliveriesApi.list(),
+        gateApi.rosters(),
+      ]);
+      if (alertsRes.status === "fulfilled" && alertsRes.value?.length) {
+        const live = alertsRes.value.find((a) => a.status === "active" || a.status === "acknowledged");
+        setActiveSos(live || null);
+      }
+      if (statsRes.status === "fulfilled") setSecurityStats(statsRes.value);
+      if (visitorsRes.status === "fulfilled") {
+        setPendingVisitors((visitorsRes.value || []).filter((v: any) => v.status === "pending"));
+      }
+      if (deliveriesRes.status === "fulfilled") {
+        setPendingDeliveryCount(
+          (deliveriesRes.value || []).filter((d: any) => d.status === "expected" || d.status === "at_gate").length,
+        );
+      }
+      if (rostersRes.status === "fulfilled") {
+        setActiveRoster((rostersRes.value || []).find((r) => r.status === "active") || null);
+      }
+      toast.success("Security gate stats and live alerts updated.", "Refreshed");
+    } catch {
+      toast.error("Failed to refresh gate data.", "Error");
+    } finally {
+      setIsLoadingStats(false);
+    }
+  };
+
   const handleOpenForm = () => {
     setErrorMessage(null);
     setIsFormModalOpen(true);
@@ -103,8 +138,9 @@ export default function SecurityGuardDashboardPage() {
 
   const handleProceedToConfirmation = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!location.trim()) {
-      setErrorMessage("Please specify the emergency location.");
+    const trimmedLoc = location.trim();
+    if (!trimmedLoc || trimmedLoc.length < 3) {
+      setErrorMessage("Please specify an emergency location (at least 3 characters).");
       return;
     }
     setErrorMessage(null);
@@ -130,9 +166,9 @@ export default function SecurityGuardDashboardPage() {
 
       setActiveSos(sosRecord);
       setIsConfirmModalOpen(false);
-      setSuccessMessage(
-        `SOS Emergency Alert (${sosRecord.id.slice(0, 8).toUpperCase()}) dispatched successfully. Security Supervisor notified.`,
-      );
+      const successText = `SOS Emergency Alert (${sosRecord.id.slice(0, 8).toUpperCase()}) dispatched successfully. Security Supervisor notified.`;
+      setSuccessMessage(successText);
+      toast.success(successText, "🚨 Emergency Dispatched");
 
       // Reset optional fields
       setDescription("");
@@ -142,6 +178,7 @@ export default function SecurityGuardDashboardPage() {
           ? err.message
           : "Failed to dispatch SOS alert. Please check connection and retry.";
       setErrorMessage(msg);
+      toast.error(msg, "Dispatch Error");
     } finally {
       setIsSubmitting(false);
     }
@@ -191,18 +228,27 @@ export default function SecurityGuardDashboardPage() {
           { label: "Gate Console" },
         ]}
         actions={
-          <button
-            className="btn btn-danger"
-            style={{
-              fontWeight: 700,
-              padding: "0.6rem 1.25rem",
-              fontSize: "0.95rem",
-              boxShadow: "0 2px 8px rgba(239, 68, 68, 0.3)",
-            }}
-            onClick={handleOpenForm}
-          >
-            🚨 SOS / EMERGENCY ALERT
-          </button>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
+            <button
+              className="btn btn-secondary"
+              onClick={handleManualRefresh}
+              disabled={isLoadingStats}
+            >
+              🔄 {isLoadingStats ? "Refreshing…" : "Refresh"}
+            </button>
+            <button
+              className="btn btn-danger"
+              style={{
+                fontWeight: 700,
+                padding: "0.6rem 1.25rem",
+                fontSize: "0.95rem",
+                boxShadow: "0 2px 8px rgba(239, 68, 68, 0.3)",
+              }}
+              onClick={handleOpenForm}
+            >
+              🚨 SOS / EMERGENCY ALERT
+            </button>
+          </div>
         }
       />
 

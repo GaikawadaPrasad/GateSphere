@@ -289,7 +289,7 @@ export default function ResidentsPage() {
           <div>
             <h3 className="card-title">Resident Profiles</h3>
             <p style={{ fontSize: "0.775rem", color: "var(--muted)" }}>
-              {filteredResidents?.length || 0} residents listed
+              {isLoading ? "Loading residents…" : `${filteredResidents?.length || 0} residents listed`}
             </p>
           </div>
 

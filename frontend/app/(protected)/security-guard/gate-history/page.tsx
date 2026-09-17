@@ -90,6 +90,15 @@ export default function SecurityGuardGateHistoryPage() {
           { label: "Security Guard" },
           { label: "Gate History" },
         ]}
+        actions={
+          <button
+            className="btn btn-secondary"
+            onClick={loadData}
+            disabled={isLoading}
+          >
+            🔄 {isLoading ? "Refreshing…" : "Refresh"}
+          </button>
+        }
       />
 
       {loadError && (

@@ -139,6 +139,7 @@ class RatingRead(_Read):
 
 # -- staff me / portal --------------------------------------- #
 class StaffMeUpdate(_Write):
+    full_name: str | None = Field(default=None, min_length=2, max_length=180)
     phone: str | None = _Phone
     emergency_address: str | None = Field(default=None, max_length=2000)
     photo_url: ManagedFileUrl | None = None

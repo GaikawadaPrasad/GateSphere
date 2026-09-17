@@ -92,6 +92,15 @@ export default function SecuritySupervisorGateOperationsPage() {
           { label: "Security Supervisor" },
           { label: "Gate Operations" },
         ]}
+        actions={
+          <button
+            className="btn btn-secondary"
+            onClick={loadData}
+            disabled={isLoading}
+          >
+            🔄 {isLoading ? "Refreshing…" : "Refresh"}
+          </button>
+        }
       />
 
       <div className="card">

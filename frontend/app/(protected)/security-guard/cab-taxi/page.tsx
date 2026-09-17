@@ -9,6 +9,8 @@ import { Modal } from "@/components/common/Modal";
 import { FileUpload } from "@/components/common/FileUpload";
 import { visitorsApi, communitiesApi, authApi } from "@/lib/api";
 import type { Unit } from "@/types/communities";
+import { isValidPersonName } from "@/lib/utils";
+import { toast } from "@/store/toast";
 
 interface CabMovement {
   id: string;
@@ -145,36 +147,63 @@ export default function SecurityGuardCabTaxiPage() {
 
   const handleCreateCabArrival = async (e: React.FormEvent) => {
     e.preventDefault();
+    const cleanPlate = vehicleNumber.trim().toUpperCase();
+    const trimmedDriverName = driverName.trim();
+    const trimmedDriverPhone = driverPhone.trim();
+
     if (!selectedUnitId) {
       setModalError("Please select a target resident unit.");
       return;
     }
-    if (!vehicleNumber.trim()) {
+    if (!cleanPlate) {
       setModalError("Please enter vehicle plate number (e.g. KA-01-AB-1234).");
       return;
     }
+    const cleanPlateNoSpaces = cleanPlate.replace(/[\s\-]/g, "");
+    if (!/^[A-Z0-9]{4,15}$/.test(cleanPlateNoSpaces)) {
+      setModalError("Vehicle plate number must be 4-15 alphanumeric characters (e.g. KA01AB1234).");
+      return;
+    }
+    if (trimmedDriverName) {
+      if (trimmedDriverName.length < 2 || !isValidPersonName(trimmedDriverName)) {
+        setModalError("Driver name must contain only alphabetic letters and spaces (min 2 characters).");
+        return;
+      }
+    }
+    if (trimmedDriverPhone) {
+      const phoneDigits = trimmedDriverPhone.replace(/\D/g, "");
+      if (!/^\+?[0-9\s\-()]{7,20}$/.test(trimmedDriverPhone) || phoneDigits.length < 10) {
+        setModalError("Please enter a valid mobile number for the driver (at least 10 digits).");
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     setModalError(null);
     try {
       await visitorsApi.createRequest({
         unit_id: selectedUnitId,
         visitor_type: "cab_taxi",
-        vehicle_number: vehicleNumber.trim().toUpperCase(),
+        vehicle_number: cleanPlate,
         purpose: cabCompany || "Cab / Taxi Entry",
         visitor: {
-          full_name: driverName.trim() || "Cab / Taxi Driver",
-          phone: driverPhone.trim() || "9999999999",
-          vehicle_number: vehicleNumber.trim().toUpperCase(),
+          full_name: trimmedDriverName || "Cab / Taxi Driver",
+          phone: trimmedDriverPhone || "9999999999",
+          vehicle_number: cleanPlate,
         },
       });
+      const successText = `Cab entry ticket logged! Notification sent to resident for approval.`;
       setActionMessage({
         type: "success",
-        text: `Cab entry ticket logged! Notification sent to resident for approval.`,
+        text: successText,
       });
+      toast.success(successText);
       setIsModalOpen(false);
       loadData(false);
     } catch (err: any) {
-      setModalError(err?.message || "Failed to log cab arrival request.");
+      const errMsg = err?.message || "Failed to log cab arrival request.";
+      setModalError(errMsg);
+      toast.error(errMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -203,12 +232,16 @@ export default function SecurityGuardCabTaxiPage() {
         entry_photo_url: admitPhotoUrl,
         vehicle_number: admitCab.vehicleNumber !== "—" ? admitCab.vehicleNumber : undefined,
       });
-      setActionMessage({ type: "success", text: `Cab entry recorded for ${admitCab.vehicleNumber}` });
+      const successText = `Cab entry recorded for ${admitCab.vehicleNumber}`;
+      setActionMessage({ type: "success", text: successText });
+      toast.success(successText);
       setAdmitCab(null);
       setAdmitPhotoUrl(null);
       loadData(false);
     } catch (err: any) {
-      setAdmitError(err?.message || "Failed to record cab entry.");
+      const errMsg = err?.message || "Failed to record cab entry.";
+      setAdmitError(errMsg);
+      toast.error(errMsg);
     } finally {
       setIsAdmitting(false);
     }
@@ -219,10 +252,14 @@ export default function SecurityGuardCabTaxiPage() {
     setActionMessage(null);
     try {
       await visitorsApi.recordExit(cab.entryId);
-      setActionMessage({ type: "success", text: `Cab exit recorded for ${cab.vehicleNumber}` });
+      const successText = `Cab exit recorded for ${cab.vehicleNumber}`;
+      setActionMessage({ type: "success", text: successText });
+      toast.success(successText);
       loadData(false);
     } catch (err: any) {
-      setActionMessage({ type: "error", text: err?.message || "Failed to record cab exit." });
+      const errMsg = err?.message || "Failed to record cab exit.";
+      setActionMessage({ type: "error", text: errMsg });
+      toast.error(errMsg);
     }
   };
 
@@ -309,9 +346,18 @@ export default function SecurityGuardCabTaxiPage() {
           { label: "Cab / Taxi" },
         ]}
         actions={
-          <button className="btn btn-primary" onClick={handleOpenModal}>
-            + Log Cab / Taxi Arrival
-          </button>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+            <button
+              className="btn btn-secondary"
+              onClick={() => loadData(false)}
+              disabled={isLoading}
+            >
+              🔄 {isLoading ? "Refreshing…" : "Refresh"}
+            </button>
+            <button className="btn btn-primary" onClick={handleOpenModal}>
+              + Log Cab / Taxi Arrival
+            </button>
+          </div>
         }
       />
 
@@ -641,7 +687,7 @@ export default function SecurityGuardCabTaxiPage() {
                 Driver Phone (Optional)
               </label>
               <input
-                type="number"
+                type="tel"
                 className="form-control"
                 placeholder="10-digit mobile"
                 value={driverPhone}

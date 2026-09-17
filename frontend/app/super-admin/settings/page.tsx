@@ -284,7 +284,7 @@ export default function SettingsPage() {
           <div className="card-header">
             <h3 className="card-title">User Access & RBAC Assignments Matrix</h3>
             <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-              {usersData?.length || 0} Registered Users
+              {isUsersLoading ? "Loading users…" : `${usersData?.length || 0} Registered Users`}
             </span>
           </div>
 
@@ -304,7 +304,7 @@ export default function SettingsPage() {
           <div className="card-header">
             <h3 className="card-title">Configured System Roles</h3>
             <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-              {roles?.length || 10} Roles
+              {isRolesLoading ? "Loading roles…" : `${roles?.length || 10} Roles`}
             </span>
           </div>
 
@@ -324,7 +324,7 @@ export default function SettingsPage() {
           <div className="card-header">
             <h3 className="card-title">Permissions Catalogue</h3>
             <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-              {permissions?.length || 0} Permissions
+              {isPermissionsLoading ? "Loading permissions…" : `${permissions?.length || 0} Permissions`}
             </span>
           </div>
 

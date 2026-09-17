@@ -12,6 +12,7 @@ import { Modal } from "@/components/common/Modal";
 import { FileUpload } from "@/components/common/FileUpload";
 import { formatDateTime } from "@/lib/utils";
 import { communitiesApi, authApi } from "@/lib/api";
+import { toast } from "@/store/toast";
 
 interface VisitorRow {
   id: string;
@@ -154,9 +155,9 @@ export default function SecurityGuardVisitorsPage() {
   const handleConfirmAdmit = async () => {
     if (!admitVisitor) return;
     if (!admitPhotoUrl) {
-      setAdmitError(
-        "📸 VISITOR PHOTO REQUIRED: Security policy mandates capturing a visitor photograph before gate entry. Please attach photo."
-      );
+      const msg = "📸 VISITOR PHOTO REQUIRED: Security policy mandates capturing a visitor photograph before gate entry. Please attach photo.";
+      setAdmitError(msg);
+      toast.error(msg);
       return;
     }
     setIsAdmitting(true);
@@ -167,12 +168,16 @@ export default function SecurityGuardVisitorsPage() {
         entry_photo_url: admitPhotoUrl,
         vehicle_number: admitVisitor.vehicleNumber !== "—" ? admitVisitor.vehicleNumber : undefined,
       });
-      setActionMessage({ type: "success", text: `Gate entry recorded for ${admitVisitor.name}` });
+      const msg = `Gate entry recorded for ${admitVisitor.name}`;
+      setActionMessage({ type: "success", text: msg });
+      toast.success(msg);
       setAdmitVisitor(null);
       setAdmitPhotoUrl(null);
       await loadData();
     } catch (err: any) {
-      setAdmitError(err?.message || "Failed to record gate entry.");
+      const errMsg = err?.message || "Failed to record gate entry.";
+      setAdmitError(errMsg);
+      toast.error(errMsg);
     } finally {
       setIsAdmitting(false);
     }
@@ -183,10 +188,14 @@ export default function SecurityGuardVisitorsPage() {
     setActionMessage(null);
     try {
       await visitorsApi.recordExit(v.entryId);
-      setActionMessage({ type: "success", text: `Exit recorded for ${v.name}` });
+      const msg = `Exit recorded for ${v.name}`;
+      setActionMessage({ type: "success", text: msg });
+      toast.success(msg);
       await loadData();
     } catch (err: any) {
-      setActionMessage({ type: "error", text: err?.message || "Failed to record exit." });
+      const errMsg = err?.message || "Failed to record exit.";
+      setActionMessage({ type: "error", text: errMsg });
+      toast.error(errMsg);
     }
   };
 
@@ -300,6 +309,15 @@ export default function SecurityGuardVisitorsPage() {
         title="Visitor Gate Verification"
         subtitle="Review resident-approved visitor requests, and log visitor gate entry / exit"
         breadcrumbs={[{ label: "GateSphere" }, { label: "Security Guard" }, { label: "Visitors" }]}
+        actions={
+          <button
+            className="btn btn-secondary"
+            onClick={loadData}
+            disabled={isLoading}
+          >
+            🔄 {isLoading ? "Refreshing…" : "Refresh"}
+          </button>
+        }
       />
 
       {actionMessage && (

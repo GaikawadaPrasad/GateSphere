@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { gateApi, type PanicAlert } from "@/lib/api";
 import { formatDateTime } from "@/lib/utils";
+import { toast } from "@/store/toast";
 
 // Real backend enum (backend/app/modules/gate/models.py ALERT_TYPES)
 const EMERGENCY_TYPES = [
@@ -54,10 +55,28 @@ export default function SecurityGuardEmergencyPage() {
     };
   }, []);
 
+  const handleRefresh = async () => {
+    setIsLoading(true);
+    try {
+      const data = await gateApi.alerts();
+      if (data) {
+        setAlertsList(data);
+        const live = data.find((a) => a.status === "active" || a.status === "acknowledged");
+        setActiveSos(live || null);
+      }
+      toast.success("Emergency alerts refreshed.");
+    } catch {
+      toast.error("Failed to refresh emergency alerts.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleOpenConfirm = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!location.trim()) {
-      setErrorMessage("Please enter an emergency location.");
+    const trimmedLoc = location.trim();
+    if (!trimmedLoc || trimmedLoc.length < 3) {
+      setErrorMessage("Please enter an emergency location (at least 3 characters).");
       return;
     }
     setErrorMessage(null);
@@ -88,10 +107,12 @@ export default function SecurityGuardEmergencyPage() {
       });
       setIsConfirmModalOpen(false);
       setDescription("");
+      toast.success("Emergency SOS alert broadcasted to security console.", "🚨 SOS Alert Sent");
     } catch (err: unknown) {
       const msg =
         err instanceof Error ? err.message : "Failed to send SOS emergency alert. Please retry.";
       setErrorMessage(msg);
+      toast.error(msg, "Error");
     } finally {
       setIsSubmitting(false);
     }
@@ -192,6 +213,15 @@ export default function SecurityGuardEmergencyPage() {
         title="SOS Emergency & Panic Command Console"
         subtitle="Immediate emergency alert dispatch, active alert status monitoring, and Security Supervisor escalation"
         breadcrumbs={[{ label: "GateSphere" }, { label: "Security Guard" }, { label: "Emergency" }]}
+        actions={
+          <button
+            className="btn btn-secondary"
+            onClick={handleRefresh}
+            disabled={isLoading}
+          >
+            🔄 {isLoading ? "Refreshing…" : "Refresh"}
+          </button>
+        }
       />
 
       {/* ACTIVE SOS BANNER */}
