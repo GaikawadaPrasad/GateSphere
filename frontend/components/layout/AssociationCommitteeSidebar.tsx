@@ -32,7 +32,11 @@ export function AssociationCommitteeSidebar() {
   const pendingAssessments = govOverview?.pendingAssessmentsCount || 0;
   const openIncidents = govOverview?.openIncidentsCount || 0;
 
-  const handleLinkClick = () => {
+  const handleLinkClick = (e: React.MouseEvent, href: string) => {
+    if (pathname === href) {
+      e.preventDefault();
+      return;
+    }
     if (typeof window !== "undefined" && window.innerWidth < 768 && sidebarOpen) {
       toggleSidebar();
     }
@@ -190,7 +194,7 @@ export function AssociationCommitteeSidebar() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  onClick={handleLinkClick}
+                  onClick={(e) => handleLinkClick(e, item.href)}
                   style={{
                     display: "flex",
                     alignItems: "center",

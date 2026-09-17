@@ -20,7 +20,7 @@ export function useCommunities(
   return useQuery({
     queryKey: communityKeys.list(params),
     queryFn: () => communitiesApi.list({ page_size: 100, ...params }),
-    staleTime: 5_000,
+    staleTime: 120_000,
     enabled: options?.enabled !== undefined ? options.enabled : true,
   });
 }
@@ -37,7 +37,7 @@ export function useCommunity(id?: string) {
       }
     },
     enabled: Boolean(id),
-    staleTime: 5_000,
+    staleTime: 120_000,
     retry: false,
   });
 }
@@ -49,7 +49,7 @@ export function useTowers(communityId?: string) {
     queryKey: ["towers", communityId],
     queryFn: () => (communityId ? communitiesApi.towers(communityId) : []),
     enabled: Boolean(communityId),
-    staleTime: 5_000,
+    staleTime: 120_000,
   });
 }
 
@@ -58,7 +58,7 @@ export function useFloors(towerId?: string) {
     queryKey: ["floors", towerId],
     queryFn: () => (towerId ? communitiesApi.floors(towerId) : []),
     enabled: Boolean(towerId),
-    staleTime: 5_000,
+    staleTime: 120_000,
   });
 }
 
@@ -67,7 +67,7 @@ export function useUnits(floorId?: string) {
     queryKey: ["units", floorId],
     queryFn: () => (floorId ? communitiesApi.units(floorId) : []),
     enabled: Boolean(floorId),
-    staleTime: 5_000,
+    staleTime: 120_000,
   });
 }
 
@@ -76,7 +76,7 @@ export function useCommunityUnits(communityId?: string) {
     queryKey: ["community-units", communityId],
     queryFn: () => (communityId ? communitiesApi.communityUnits(communityId) : []),
     enabled: Boolean(communityId),
-    staleTime: 5_000,
+    staleTime: 120_000,
   });
 }
 
@@ -85,7 +85,7 @@ export function useGates(communityId?: string) {
     queryKey: ["gates", communityId],
     queryFn: () => (communityId ? communitiesApi.gates(communityId) : []),
     enabled: Boolean(communityId),
-    staleTime: 5_000,
+    staleTime: 120_000,
   });
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useUiStore } from "@/store/ui";
 import {
   useResidents,
@@ -9,6 +10,7 @@ import {
   useEmergencyContacts,
   useAddResident,
   useDeleteResident,
+  useCommunityInvitations,
 } from "@/hooks/use-residents";
 import { useCommunityUnits, useTowers } from "@/hooks/use-communities";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -24,6 +26,7 @@ import { toast } from "@/store/toast";
 import { UpdateUserCredentialsModal, type CredentialUser } from "@/components/common/UpdateUserCredentialsModal";
 
 export default function CommunityAdminResidentsPage() {
+  const queryClient = useQueryClient();
   const { activeCommunityId } = useUiStore();
   const [activeTab, setActiveTab] = useState<"directory" | "approvals" | "invitations">("directory");
   const [searchTerm, setSearchTerm] = useState("");
@@ -51,8 +54,14 @@ export default function CommunityAdminResidentsPage() {
   const [deleteError, setDeleteError] = useState("");
 
   // Invitations State
-  const [invitations, setInvitations] = useState<any[]>([]);
-  const [invitationsLoading, setInvitationsLoading] = useState(false);
+  const {
+    data: rawInvitations,
+    isLoading: invitationsLoading,
+  } = useCommunityInvitations(activeCommunityId || undefined);
+  const invitations = useMemo(
+    () => (Array.isArray(rawInvitations) ? (rawInvitations as any[]) : []),
+    [rawInvitations]
+  );
   const [isCreateInviteOpen, setIsCreateInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [invitePhone, setInvitePhone] = useState("");
@@ -133,24 +142,9 @@ export default function CommunityAdminResidentsPage() {
     (i) => i.status === "pending" && !viewedInviteIds.has(i.id),
   ).length;
 
-  const fetchInvitations = async () => {
-    if (!activeCommunityId) return;
-    try {
-      setInvitationsLoading(true);
-      const list = await onboardingApi.listInvitations(activeCommunityId);
-      setInvitations(Array.isArray(list) ? list : []);
-    } catch {
-      setInvitations([]);
-    } finally {
-      setInvitationsLoading(false);
-    }
+  const fetchInvitations = () => {
+    queryClient.invalidateQueries({ queryKey: ["community-invitations"] });
   };
-
-  useEffect(() => {
-    if (activeCommunityId) {
-      fetchInvitations();
-    }
-  }, [activeCommunityId, activeTab]);
 
   // Queries
   const {

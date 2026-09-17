@@ -12,9 +12,12 @@ export interface AuditLogItem {
   entity_type: string;
   entity_id: string;
   actor_user_id?: string;
+  actor_name?: string;
   actor_email?: string;
   actor_role?: string;
   community_id?: string;
+  community_name?: string;
+  community_code?: string;
   changes?: Record<string, any>;
   ip_address?: string;
 }
@@ -94,12 +97,16 @@ export function useAuditorLogs(filters: {
         entity_type: l.entity_type || "record",
         entity_id: l.entity_id || l.id,
         actor_user_id: l.user_id,
+        actor_name: l.user_name,
         actor_email:
+          l.user_email ||
           l.actor_email ||
           (l.role_slug ? `${l.role_slug}@gatesphere.com` : "system@gatesphere.com"),
         actor_role: l.role_slug || "system",
         community_id: l.community_id,
-        changes: l.new_values || l.changes || {},
+        community_name: l.community_name,
+        community_code: l.community_code,
+        changes: l.new_values || l.changes || l.old_values || {},
         ip_address: l.ip_address || "127.0.0.1",
       })) as AuditLogItem[];
     },

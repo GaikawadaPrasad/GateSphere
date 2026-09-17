@@ -32,7 +32,11 @@ export function RoleBasedSidebar() {
   const roleConfig = ROLE_CONFIGS[activeRoleKey] || ROLE_CONFIGS.super_admin;
   const navItems: NavItem[] = roleConfig.navItems;
 
-  const handleLinkClick = () => {
+  const handleLinkClick = (e: React.MouseEvent, href: string) => {
+    if (pathname === href) {
+      e.preventDefault();
+      return;
+    }
     if (typeof window !== "undefined" && window.innerWidth < 768 && sidebarOpen) {
       toggleSidebar();
     }
@@ -160,7 +164,7 @@ export function RoleBasedSidebar() {
               <Link
                 key={item.href}
                 href={item.href}
-                onClick={handleLinkClick}
+                onClick={(e) => handleLinkClick(e, item.href)}
                 style={{
                   display: "flex",
                   alignItems: "center",
