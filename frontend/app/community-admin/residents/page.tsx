@@ -433,18 +433,23 @@ export default function CommunityAdminResidentsPage() {
     if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
       errors.email = "Please enter a valid email address.";
     }
-    if (phone.trim() && !/^\+?[0-9\s\-()]{7,20}$/.test(phone.trim())) {
-      errors.phone = "Invalid phone number format.";
+    if (phone.trim()) {
+      const phoneDigits = phone.replace(/\D/g, "");
+      if (phoneDigits.length < 7 || phoneDigits.length > 15 || !/^\+?[0-9\s\-()]+$/.test(phone.trim())) {
+        errors.phone = "Invalid phone number format.";
+      }
     }
     if (password && password.trim().length < 10) {
       errors.password = "Initial password must be at least 10 characters.";
     }
     const trimmedAgreement = agreementRef.trim();
-    if (trimmedAgreement) {
+    if (occupancyRole === "tenant" && !trimmedAgreement) {
+      errors.agreementRef = "Agreement reference is required for tenants.";
+    } else if (trimmedAgreement) {
       if (trimmedAgreement.length < 3 || trimmedAgreement.length > 50) {
         errors.agreementRef = "Agreement reference must be between 3 and 50 characters.";
-      } else if (!/^[A-Za-z0-9\-_/]+$/.test(trimmedAgreement)) {
-        errors.agreementRef = "Agreement reference can only contain letters, numbers, hyphens, underscores, or slashes (e.g. LEASE-2026-081).";
+      } else if (!/^[A-Z0-9\-_/]+$/.test(trimmedAgreement)) {
+        errors.agreementRef = "Agreement reference must be uppercase letters, numbers, and allowed symbols (e.g. LEASE-2026-081).";
       }
     }
     setResidentFieldErrors(errors);
@@ -1389,7 +1394,7 @@ export default function CommunityAdminResidentsPage() {
 
                 <div>
                   <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#475569", marginBottom: "0.35rem" }}>
-                    Agreement Reference (Optional)
+                    Agreement Reference {occupancyRole === "tenant" ? <span style={{ color: "#dc2626" }}>*</span> : "(Optional)"}
                   </label>
                   <input
                     type="text"
