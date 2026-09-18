@@ -10,6 +10,7 @@ import {
   OWNER_TENANT_NAV,
   SECURITY_GUARD_NAV,
   VENDOR_TECHNICIAN_NAV,
+  FACILITY_MANAGER_NAV,
   NavItem,
 } from "@/config/dashboard-navigation";
 
@@ -128,14 +129,15 @@ export function Sidebar() {
         { id: "audit-logs", label: "Audit Logs", href: "/security-supervisor/audit-logs", icon: "📋" },
       ],
     };
-  } else if (pathname.startsWith("/dashboard/facility-manager")) {
+  } else if (
+    pathname.startsWith("/facility-manager") || 
+    pathname.startsWith("/dashboard/facility-manager")
+  ) {
     navConfig = {
       title: "GateSphere",
       roleLabel: "Facility Manager",
       accentColor: "#059669",
-      items: [
-        { id: "dashboard", label: "Dashboard", href: "/dashboard/facility-manager", icon: "🔧" },
-      ],
+      items: FACILITY_MANAGER_NAV.navItems,
     };
   } else if (pathname.startsWith("/dashboard/association-committee")) {
     navConfig = {

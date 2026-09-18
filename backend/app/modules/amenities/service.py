@@ -387,6 +387,18 @@ class AmenityService(UnitScopedAccess):
                 "Your unit has reached its active-booking limit", code="UNIT_BOOKING_LIMIT"
             )
 
+        # check for identical duplicate booking by the same user
+        existing_duplicate = await self.db.scalar(
+            select(AmenityBooking).where(
+                AmenityBooking.slot_id == slot.id,
+                AmenityBooking.booking_date == payload.booking_date,
+                AmenityBooking.resident_user_id == self.actor.id,
+                AmenityBooking.status == "confirmed"
+            )
+        )
+        if existing_duplicate is not None:
+            raise ConflictError("You already have a confirmed booking for this exact slot", code="DUPLICATE_BOOKING")
+
         # atomic conflict check
         await self.amenities.lock(amenity.id)
         if await self.blocks.overlapping(amenity.id, start_at, end_at):
