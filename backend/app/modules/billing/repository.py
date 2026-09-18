@@ -76,10 +76,8 @@ class PaymentRepository(AsyncTenantRepository[Payment]):
 class LedgerRepository(AsyncTenantRepository[LedgerEntry]):
     model = LedgerEntry
 
-    async def latest_balance(self, unit_id: uuid.UUID | None) -> object:
-        return await self.db.scalar(
-            select(LedgerEntry)
-            .where(LedgerEntry.unit_id == unit_id)
-            .order_by(LedgerEntry.entry_seq.desc())
-            .limit(1)
-        )
+    async def latest_balance(self, unit_id: uuid.UUID | None, lock: bool = False) -> object:
+        stmt = select(LedgerEntry).where(LedgerEntry.unit_id == unit_id).order_by(LedgerEntry.entry_seq.desc()).limit(1)
+        if lock:
+            stmt = stmt.with_for_update()
+        return await self.db.scalar(stmt)

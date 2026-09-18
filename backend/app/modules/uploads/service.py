@@ -161,7 +161,7 @@ class UploadService:
             if content_type in kind.content_types:
                 detected = content_type
             else:
-                detected = next(iter(kind.content_types))
+                raise BusinessRuleError("Unrecognized file format", code="UNRECOGNIZED_FORMAT")
 
         cid = await self._community(community_id) if kind.scope == "community" else None
         ns = str(cid) if cid is not None else str(self.actor.id)

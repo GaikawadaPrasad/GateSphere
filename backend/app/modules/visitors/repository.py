@@ -88,5 +88,9 @@ async def approval_row(db, request_id: uuid.UUID, approver_id: uuid.UUID) -> Vis
     )
 
 
-async def pass_by_hash(db, token_hash: str) -> VisitorPass | None:
-    return await db.scalar(select(VisitorPass).where(VisitorPass.token_hash == token_hash))
+async def pass_by_hash(db, token_hash: str, community_ids: set[uuid.UUID] | frozenset[uuid.UUID] | None = None) -> VisitorPass | None:
+    from app.modules.visitors.models import VisitorRequest
+    stmt = select(VisitorPass).where(VisitorPass.token_hash == token_hash)
+    if community_ids:
+        stmt = stmt.join(VisitorRequest, VisitorRequest.id == VisitorPass.request_id).where(VisitorRequest.community_id.in_(community_ids))
+    return await db.scalar(stmt)

@@ -803,7 +803,7 @@ class ResidentService(UnitScopedAccess):
             cid = next(iter(self.scope.community_ids))
             existing = await self.db.scalar(
                 select(ResidentProfile)
-                .where(ResidentProfile.community_id == cid)
+                .where(ResidentProfile.community_id == cid, ResidentProfile.user_id.is_(None))
                 .order_by(ResidentProfile.created_at)
             )
             if existing is not None:

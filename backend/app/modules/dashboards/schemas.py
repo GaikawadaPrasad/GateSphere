@@ -45,6 +45,9 @@ class SecurityStats(BaseModel):
     staff_inside: int
     active_panic_alerts: int
     expected_visitors: int
+    pending_visitor_approvals: int
+    open_incidents: int
+    guards_on_active_roster: int
 
 
 class FinancialStats(BaseModel):
