@@ -1492,7 +1492,7 @@ export default function CommunityAdminPropertyPage() {
         isOpen={isAddTowerOpen}
         onClose={() => {
           setIsAddTowerOpen(false);
-          setTowerErrors({});
+          setPropertyFieldErrors({});
           setErrorMessage(null);
         }}
         title="Add Residential Tower / Block"
@@ -1500,7 +1500,6 @@ export default function CommunityAdminPropertyPage() {
         <form
           noValidate
           onSubmit={handleCreateTower}
-          noValidate
           style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
         >
           {errorMessage && (
