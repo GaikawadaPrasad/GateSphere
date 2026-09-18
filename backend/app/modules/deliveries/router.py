@@ -163,3 +163,22 @@ async def cancel_delivery(delivery_id: uuid.UUID, svc: Svc = Depends(delivery_se
         schemas.DeliveryRead.model_validate(await svc.cancel_delivery(delivery_id)),
         message="Cancelled",
     )
+
+
+@router.post(
+    "/{delivery_id}/notify",
+    response_model=Envelope[schemas.DeliveryRead],
+    dependencies=[UPDATE],
+)
+async def notify_resident(
+    delivery_id: uuid.UUID,
+    payload: schemas.DeliveryNotify | None = None,
+    svc: Svc = Depends(delivery_service),
+) -> dict:
+    return ok(
+        schemas.DeliveryRead.model_validate(
+            await svc.notify_resident(delivery_id, payload or schemas.DeliveryNotify())
+        ),
+        message="Approval request sent to resident",
+    )
+

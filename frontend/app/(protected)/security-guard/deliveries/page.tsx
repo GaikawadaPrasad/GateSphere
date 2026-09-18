@@ -56,20 +56,28 @@ export default function SecurityGuardDeliveriesPage() {
       const protocolMap = new Map<string, string>();
       for (const p of protocols || [])
         if ((p as any)?.id) protocolMap.set((p as any).id, (p as any).protocol_type);
+      const unitMap = new Map<string, string>();
+      for (const u of units) {
+        if (u.id && u.unit_number) unitMap.set(u.id, u.unit_number);
+      }
       setDeliveries(
-        (data || []).map((d: any) => ({
-          id: d.id,
-          unit_number: d.unit_number || (d.unit ? `Unit ${d.unit.unit_number}` : "—"),
-          provider_name: d.provider_name || d.delivery_type?.toUpperCase() || "Courier",
-          delivery_type: d.delivery_type || "courier",
-          executive_name: d.executive_name || "—",
-          executive_phone: d.executive_phone || "",
-          tracking_reference: d.tracking_reference || d.id.slice(0, 8),
-          status: d.status || "expected",
-          approval_status: d.approval_status || "pending",
-          protocol_type: protocolMap.get(d.protocol_id) || "—",
-          arrived_at: d.arrived_at,
-        })),
+        (data || []).map((d: any) => {
+          const rawNum = d.unit_number || (d.unit ? d.unit.unit_number : unitMap.get(d.unit_id));
+          const unitStr = rawNum ? (String(rawNum).startsWith("Unit ") ? String(rawNum) : `Unit ${rawNum}`) : "—";
+          return {
+            id: d.id,
+            unit_number: unitStr,
+            provider_name: d.provider_name || d.delivery_type?.toUpperCase() || "Courier",
+            delivery_type: d.delivery_type || "courier",
+            executive_name: d.executive_name || "—",
+            executive_phone: d.executive_phone || "",
+            tracking_reference: d.tracking_reference || d.id.slice(0, 8),
+            status: d.status || "expected",
+            approval_status: d.approval_status || "pending",
+            protocol_type: protocolMap.get(d.protocol_id) || "—",
+            arrived_at: d.arrived_at,
+          };
+        }),
       );
     } catch (err: any) {
       if (showLoading) setLoadError(err?.message || "Failed to load deliveries.");
@@ -78,6 +86,7 @@ export default function SecurityGuardDeliveriesPage() {
   };
 
   useEffect(() => {
+    loadUnits();
     loadData(true);
     const interval = setInterval(() => {
       loadData(false);
@@ -191,15 +200,27 @@ export default function SecurityGuardDeliveriesPage() {
     }
   };
 
-  const handleRecordArrival = async (id: string) => {
+  const handleRecordArrival = async (id: string, unitLabel?: string) => {
     setActionMessage(null);
     try {
       await deliveriesApi.recordArrival(id);
-      const msg = "Courier arrival recorded at gate desk.";
+      const msg = `Courier arrival recorded at gate desk${unitLabel ? ` for ${unitLabel}` : ""}.`;
       setActionMessage({ type: "success", text: msg });
       toast.success(msg);
       loadData(false);
     } catch (err: any) {
+      if (err?.code === "NOT_APPROVED" || err?.message?.toLowerCase().includes("not approved")) {
+        try {
+          await deliveriesApi.sendApprovalRequest(id);
+          const msg = `Delivery requires resident approval. An instant approval request has been sent to the resident ${unitLabel ? `(${unitLabel})` : ""}!`;
+          setActionMessage({ type: "success", text: msg });
+          toast.success(msg);
+          loadData(false);
+          return;
+        } catch {
+          // fallback to error message
+        }
+      }
       const errMsg = err?.message || "Failed to record arrival.";
       setActionMessage({ type: "error", text: errMsg });
       toast.error(errMsg);
@@ -233,6 +254,26 @@ export default function SecurityGuardDeliveriesPage() {
       const errMsg = err?.message || "Failed to cancel delivery.";
       setActionMessage({ type: "error", text: errMsg });
       toast.error(errMsg);
+    }
+  };
+
+  const [notifyingId, setNotifyingId] = useState<string | null>(null);
+
+  const handleSendApprovalRequest = async (id: string, unitLabel?: string) => {
+    setActionMessage(null);
+    setNotifyingId(id);
+    try {
+      await deliveriesApi.sendApprovalRequest(id);
+      const msg = `Delivery approval request notification sent to resident ${unitLabel ? `(${unitLabel})` : ""}!`;
+      setActionMessage({ type: "success", text: msg });
+      toast.success(msg);
+      loadData(false);
+    } catch (err: any) {
+      const errMsg = err?.message || "Failed to send delivery approval request to resident.";
+      setActionMessage({ type: "error", text: errMsg });
+      toast.error(errMsg);
+    } finally {
+      setNotifyingId(null);
     }
   };
 
@@ -295,11 +336,32 @@ export default function SecurityGuardDeliveriesPage() {
       align: "right",
       render: (d) => (
         <div style={{ display: "flex", gap: "0.35rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
+          {!["delivered", "collected", "cancelled", "returned"].includes(d.status) && (
+            <button
+              className="btn btn-primary"
+              style={{
+                fontSize: "0.75rem",
+                padding: "0.25rem 0.5rem",
+                background: "#2563eb",
+                borderColor: "#1d4ed8",
+                color: "#ffffff",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.25rem",
+                fontWeight: 600,
+              }}
+              onClick={() => handleSendApprovalRequest(d.id, d.unit_number)}
+              disabled={notifyingId === d.id}
+              title="Send real-time delivery approval request notification to resident"
+            >
+              {notifyingId === d.id ? "Sending…" : "📲 Send Approval Request"}
+            </button>
+          )}
           {d.status === "expected" && (
             <button
               className="btn btn-primary"
               style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
-              onClick={() => handleRecordArrival(d.id)}
+              onClick={() => handleRecordArrival(d.id, d.unit_number)}
             >
               Arrival
             </button>
@@ -463,6 +525,20 @@ export default function SecurityGuardDeliveriesPage() {
         }
       >
         <form onSubmit={handleCreateDelivery} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <div
+            style={{
+              padding: "0.6rem 0.85rem",
+              borderRadius: "var(--radius)",
+              background: "#eff6ff",
+              border: "1px solid #bfdbfe",
+              color: "#1e40af",
+              fontSize: "0.825rem",
+              fontWeight: 500,
+            }}
+          >
+            📲 <strong>Real-Time Notification:</strong> Logging this delivery will immediately dispatch an approval and arrival prompt to the resident's mobile app.
+          </div>
+
           {modalError && (
             <div
               style={{

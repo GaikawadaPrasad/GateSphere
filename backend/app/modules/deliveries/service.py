@@ -237,6 +237,8 @@ class DeliveryService(UnitScopedAccess):
             status=del_status,
         )
         await self.deliveries.add(obj)
+        await self.db.flush()
+        obj.unit = unit
         await self._event(obj, "logged")
         await self._audit(
             "delivery.create",
@@ -262,7 +264,16 @@ class DeliveryService(UnitScopedAccess):
         return obj
 
     async def get_delivery(self, delivery_id: uuid.UUID) -> Delivery:
-        obj = await self.deliveries.get(delivery_id)
+        from sqlalchemy.orm import selectinload
+
+        stmt = (
+            select(Delivery)
+            .where(Delivery.id == delivery_id)
+            .options(selectinload(Delivery.unit))
+        )
+        if not self.scope.is_global:
+            stmt = stmt.where(Delivery.community_id.in_(self.scope.community_ids))
+        obj = await self.db.scalar(stmt)
         if obj is None:
             raise NotFoundError("Delivery not found")
         await self._assert_unit_visible(obj.unit_id)
@@ -279,9 +290,15 @@ class DeliveryService(UnitScopedAccess):
         offset: int,
         limit: int,
     ):
+        from sqlalchemy.orm import selectinload
+
         _enum("status", status)
         _enum("approval_status", approval_status)
-        stmt = select(Delivery)
+        stmt = (
+            select(Delivery)
+            .outerjoin(Unit, Delivery.unit_id == Unit.id)
+            .options(selectinload(Delivery.unit))
+        )
         if community_id is not None:
             self.scope.require(community_id)
             stmt = stmt.where(Delivery.community_id == community_id)
@@ -297,6 +314,7 @@ class DeliveryService(UnitScopedAccess):
                 Delivery.provider_name.ilike(like)
                 | Delivery.executive_name.ilike(like)
                 | Delivery.tracking_reference.ilike(like)
+                | Unit.unit_number.ilike(like)
             )
         stmt = stmt.order_by(Delivery.created_at.desc())
         stmt = await self._scope_unit_column(stmt, Delivery.unit_id)
@@ -396,6 +414,56 @@ class DeliveryService(UnitScopedAccess):
         await self._audit("delivery.cancel", obj.community_id, "delivery", obj.id)
         return obj
 
+    async def notify_resident(
+        self, delivery_id: uuid.UUID, payload: schemas.DeliveryNotify | None = None
+    ) -> Delivery:
+        obj = await self.get_delivery(delivery_id)
+        if obj.status in ("delivered", "collected", "returned", "cancelled"):
+            raise BusinessRuleError(
+                f"Delivery is '{obj.status}', cannot send approval request",
+                code="INVALID_TRANSITION",
+            )
+        if not obj.resident_user_id:
+            obj.resident_user_id = await self._primary_resident(obj.unit_id)
+            if obj.resident_user_id:
+                await self.db.flush()
+
+        if not obj.resident_user_id:
+            raise BusinessRuleError(
+                "No active resident found for this unit to send delivery approval request.",
+                code="NO_RESIDENT_FOUND",
+            )
+
+        remarks = (
+            payload.notes.strip()
+            if payload and payload.notes and payload.notes.strip()
+            else "Approval request sent to resident by security guard"
+        )
+        await self._event(obj, "notified", remarks=remarks)
+        await self.db.flush()
+        await self._audit(
+            "delivery.notify_resident",
+            obj.community_id,
+            "delivery",
+            obj.id,
+            new={"approval_status": obj.approval_status, "status": obj.status, "remarks": remarks},
+        )
+        await notif_events.emit(
+            self.db,
+            self.scope,
+            self.actor,
+            self.ctx,
+            recipient_user_id=obj.resident_user_id,
+            community_id=obj.community_id,
+            notification_type="delivery.approval_needed",
+            title="Delivery Approval / Instructions Request",
+            message=f"Security guard at gate has requested your approval/confirmation for {obj.delivery_type} package from {obj.provider_name or 'courier'}.",
+            reference_type="delivery",
+            reference_id=obj.id,
+        )
+        return obj
+
     async def list_events(self, delivery_id: uuid.UUID) -> list[DeliveryEvent]:
         await self.get_delivery(delivery_id)  # scope check
         return await delivery_events(self.db, delivery_id)
+

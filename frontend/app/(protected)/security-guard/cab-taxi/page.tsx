@@ -1,41 +1,53 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SearchInput } from "@/components/forms/SearchInput";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { Modal } from "@/components/common/Modal";
-import { FileUpload } from "@/components/common/FileUpload";
 import { visitorsApi, communitiesApi, authApi } from "@/lib/api";
 import type { Unit } from "@/types/communities";
-import { isValidPersonName } from "@/lib/utils";
+import { isValidPersonName, formatDateTime } from "@/lib/utils";
 import { toast } from "@/store/toast";
 
-interface CabMovement {
+export interface CabMovement {
   id: string;
+  unit_id?: string;
   unit_number?: string;
   visitorName: string;
+  visitorPhone?: string;
   vehicleNumber: string;
   purpose: string;
   status: string;
   entryId?: string;
+  enteredAt?: string;
+  exitedAt?: string;
+  expectedAt?: string;
+  createdAt?: string;
+  driverPhotoUrl?: string;
 }
 
 export default function SecurityGuardCabTaxiPage() {
   const [cabs, setCabs] = useState<CabMovement[]>([]);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved" | "entered" | "completed">("all");
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  
-  // Admit Cab photo modal state
-  const [admitCab, setAdmitCab] = useState<CabMovement | null>(null);
-  const [admitPhotoUrl, setAdmitPhotoUrl] = useState<string | null>(null);
-  const [isAdmitting, setIsAdmitting] = useState(false);
-  const [admitError, setAdmitError] = useState<string | null>(null);
 
-  // Log Cab Modal State
+  // Verification Modal State (Fast Lookup by Plate, Unit, Driver)
+  const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
+  const [verifySearchQuery, setVerifySearchQuery] = useState("");
+
+  // Selected Cab for Full Details Modal
+  const [selectedCabDetails, setSelectedCabDetails] = useState<CabMovement | null>(null);
+
+  // Sending Approval Request State
+  const [sendingApprovalId, setSendingApprovalId] = useState<string | null>(null);
+  const [admittingId, setAdmittingId] = useState<string | null>(null);
+
+  // Log Cab Arrival Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [units, setUnits] = useState<Unit[]>([]);
   const [selectedUnitId, setSelectedUnitId] = useState("");
@@ -51,18 +63,50 @@ export default function SecurityGuardCabTaxiPage() {
     if (showLoading) setIsLoading(true);
     setLoadError(null);
     try {
-      const [requests, directory, entries] = await Promise.all([
-        visitorsApi.requests(),
-        visitorsApi.directory(),
-        visitorsApi.entries(),
+      const [requestsRes, directoryRes, entriesRes, me] = await Promise.all([
+        visitorsApi.requests({ page_size: 100 }),
+        visitorsApi.directory({ page_size: 100 }),
+        visitorsApi.entries({ page_size: 100 }),
+        authApi.me().catch(() => null),
       ]);
+
+      const requests = Array.isArray(requestsRes) ? requestsRes : (requestsRes as any)?.data || [];
+      const directory = Array.isArray(directoryRes) ? directoryRes : (directoryRes as any)?.data || [];
+      const entries = Array.isArray(entriesRes) ? entriesRes : (entriesRes as any)?.data || [];
+
+      let cid = me?.community_ids?.[0] || (me as any)?.community_id;
+      if (!cid && me?.roles && Array.isArray(me.roles)) {
+        cid = me.roles.find((r: any) => r.community_id)?.community_id;
+      }
+
+      const unitMap = new Map<string, string>();
+      if (cid) {
+        try {
+          const uRes: any = await communitiesApi.communityUnits(cid, { page_size: 100 });
+          const uList = Array.isArray(uRes) ? uRes : uRes?.data || uRes?.items || [];
+          for (const u of uList) {
+            if (u?.id) unitMap.set(u.id, u.unit_number);
+          }
+        } catch {
+          // unit map fallback
+        }
+      }
+
       const visitorMap = new Map<string, any>();
-      for (const v of directory || [])
+      for (const v of directory || []) {
         if ((v as any)?.id) visitorMap.set((v as any).id as string, v);
+      }
+
       const openEntryByRequest = new Map<string, any>();
-      for (const e of entries || [])
-        if ((e as any).request_id && !(e as any).exit_at)
-          openEntryByRequest.set((e as any).request_id, e);
+      const latestEntryByRequest = new Map<string, any>();
+      for (const e of entries || []) {
+        if ((e as any).request_id) {
+          latestEntryByRequest.set((e as any).request_id, e);
+          if (!(e as any).exit_at) {
+            openEntryByRequest.set((e as any).request_id, e);
+          }
+        }
+      }
 
       setCabs(
         (requests || [])
@@ -72,19 +116,38 @@ export default function SecurityGuardCabTaxiPage() {
               r.purpose?.toLowerCase().includes("cab") ||
               r.purpose?.toLowerCase().includes("taxi") ||
               r.purpose?.toLowerCase().includes("uber") ||
-              r.purpose?.toLowerCase().includes("ola"),
+              r.purpose?.toLowerCase().includes("ola") ||
+              r.purpose?.toLowerCase().includes("rapido"),
           )
           .map((r: any) => {
             const visitor = visitorMap.get(r.visitor_id);
             const openEntry = openEntryByRequest.get(r.id);
+            const anyEntry = latestEntryByRequest.get(r.id);
+            const entryId = openEntry?.id || anyEntry?.id;
+            const enteredAt = openEntry?.entry_at || anyEntry?.entry_at;
+            const exitedAt = openEntry?.exit_at || anyEntry?.exit_at;
+            const unitNumberFromMap = unitMap.get(r.unit_id);
+            const displayUnit =
+              r.unit_number ||
+              (unitNumberFromMap ? `Unit ${unitNumberFromMap}` : "") ||
+              (r.unit ? `Unit ${r.unit.unit_number}` : "") ||
+              (r.unit_id ? `Unit #${r.unit_id.slice(0, 5)}` : "—");
+
             return {
               id: r.id,
-              unit_number: r.unit_number || (r.unit ? `Unit ${r.unit.unit_number}` : "—"),
+              unit_id: r.unit_id,
+              unit_number: displayUnit,
               visitorName: r.visitor_name || r.visitor?.full_name || visitor?.full_name || "Cab Driver",
+              visitorPhone: r.visitor_phone || r.visitor?.phone || visitor?.phone || undefined,
               vehicleNumber: r.vehicle_number || r.visitor?.vehicle_number || visitor?.vehicle_number || "—",
               purpose: r.purpose || "Cab / Taxi",
               status: r.status || "pending",
-              entryId: openEntry?.id,
+              entryId,
+              enteredAt,
+              exitedAt,
+              expectedAt: r.expected_at,
+              createdAt: r.created_at,
+              driverPhotoUrl: visitor?.photo_url || r.visitor?.photo_url,
             };
           }),
       );
@@ -125,7 +188,7 @@ export default function SecurityGuardCabTaxiPage() {
             }),
           );
           setUnits(sorted);
-          if (sorted.length > 0) {
+          if (sorted.length > 0 && !selectedUnitId) {
             setSelectedUnitId(sorted[0].id);
           }
         }
@@ -135,16 +198,21 @@ export default function SecurityGuardCabTaxiPage() {
     }
   };
 
-  const handleOpenModal = () => {
-    setSelectedUnitId("");
+  const handleOpenModal = (prefillPlate = "", prefillUnitId = "") => {
+    setSelectedUnitId(prefillUnitId);
     setDriverName("");
     setDriverPhone("");
-    setVehicleNumber("");
+    setVehicleNumber(prefillPlate);
     setCabCompany("Uber");
     setModalError(null);
     setCabFieldErrors({});
     setIsModalOpen(true);
     loadUnits();
+  };
+
+  const handleOpenVerifyModal = () => {
+    setVerifySearchQuery("");
+    setIsVerifyModalOpen(true);
   };
 
   const handleCreateCabArrival = async (e: React.FormEvent) => {
@@ -198,7 +266,7 @@ export default function SecurityGuardCabTaxiPage() {
           vehicle_number: cleanPlate,
         },
       });
-      const successText = `Cab entry ticket logged! Notification sent to resident for approval.`;
+      const successText = `🚖 Cab arrival logged! Notification sent to resident for approval.`;
       setActionMessage({
         type: "success",
         text: successText,
@@ -215,50 +283,61 @@ export default function SecurityGuardCabTaxiPage() {
     }
   };
 
-  const handleAllowEntry = (cab: CabMovement) => {
+  // Direct 1-Click Allow Entry (No photo capture required for cabs)
+  const handleAllowEntry = async (cab: CabMovement) => {
     setActionMessage(null);
-    setAdmitError(null);
-    setAdmitPhotoUrl(null);
-    setAdmitCab(cab);
-  };
-
-  const handleConfirmAdmitCab = async () => {
-    if (!admitCab) return;
-    if (!admitPhotoUrl) {
-      setAdmitError(
-        "📸 CAB / VEHICLE PHOTO REQUIRED: Security policy mandates capturing a photograph before gate entry."
-      );
-      return;
-    }
-    setIsAdmitting(true);
-    setAdmitError(null);
+    setAdmittingId(cab.id);
     try {
       await visitorsApi.recordEntry({
-        request_id: admitCab.id,
-        entry_photo_url: admitPhotoUrl,
-        vehicle_number: admitCab.vehicleNumber !== "—" ? admitCab.vehicleNumber : undefined,
+        request_id: cab.id,
+        vehicle_number: cab.vehicleNumber !== "—" ? cab.vehicleNumber : undefined,
       });
-      const successText = `Cab entry recorded for ${admitCab.vehicleNumber}`;
+      const successText = `✅ Gate entry recorded for cab ${cab.vehicleNumber}! Timestamp logged.`;
       setActionMessage({ type: "success", text: successText });
       toast.success(successText);
-      setAdmitCab(null);
-      setAdmitPhotoUrl(null);
+      setIsVerifyModalOpen(false);
+      setSelectedCabDetails(null);
       loadData(false);
     } catch (err: any) {
-      const errMsg = err?.message || "Failed to record cab entry.";
-      setAdmitError(errMsg);
+      const errMsg = err?.message || "Failed to record cab gate entry.";
+      setActionMessage({ type: "error", text: errMsg });
       toast.error(errMsg);
     } finally {
-      setIsAdmitting(false);
+      setAdmittingId(null);
+    }
+  };
+
+  const handleSendApprovalRequest = async (cab: CabMovement) => {
+    setSendingApprovalId(cab.id);
+    setActionMessage(null);
+    try {
+      if ((visitorsApi as any).sendApprovalRequest) {
+        await (visitorsApi as any).sendApprovalRequest(cab.id);
+      } else {
+        await visitorsApi.notifyResident(cab.id);
+      }
+      const successText = `Approval request notification dispatched to resident for cab ${cab.vehicleNumber} (${cab.unit_number})!`;
+      setActionMessage({ type: "success", text: successText });
+      toast.success(successText);
+      loadData(false);
+    } catch (err: any) {
+      const errMsg = err?.message || "Failed to send approval request to resident.";
+      setActionMessage({ type: "error", text: errMsg });
+      toast.error(errMsg);
+    } finally {
+      setSendingApprovalId(null);
     }
   };
 
   const handleMarkExit = async (cab: CabMovement) => {
-    if (!cab.entryId) return;
+    if (!cab.entryId) {
+      toast.error("No active gate entry record found for this cab.");
+      return;
+    }
     setActionMessage(null);
     try {
       await visitorsApi.recordExit(cab.entryId);
-      const successText = `Cab exit recorded for ${cab.vehicleNumber}`;
+      const successText = `🚪 Gate exit recorded for cab ${cab.vehicleNumber}! Exit timestamp logged.`;
       setActionMessage({ type: "success", text: successText });
       toast.success(successText);
       loadData(false);
@@ -269,12 +348,53 @@ export default function SecurityGuardCabTaxiPage() {
     }
   };
 
-  const filteredCabs = cabs.filter(
-    (c) =>
-      c.vehicleNumber.toLowerCase().includes(search.toLowerCase()) ||
-      c.visitorName.toLowerCase().includes(search.toLowerCase()) ||
-      (c.unit_number && c.unit_number.toLowerCase().includes(search.toLowerCase())),
-  );
+  // Filtered cabs list
+  const filteredCabs = useMemo(() => {
+    return cabs.filter((c) => {
+      // 1. Status Filter Tab
+      if (statusFilter === "pending" && c.status !== "pending") return false;
+      if (statusFilter === "approved" && c.status !== "approved") return false;
+      if (statusFilter === "entered" && c.status !== "entered") return false;
+      if (statusFilter === "completed" && c.status !== "completed" && c.status !== "rejected" && c.status !== "cancelled")
+        return false;
+
+      // 2. Search Text
+      const q = search.toLowerCase().trim();
+      if (!q) return true;
+      return (
+        c.vehicleNumber.toLowerCase().includes(q) ||
+        c.visitorName.toLowerCase().includes(q) ||
+        (c.visitorPhone && c.visitorPhone.includes(q)) ||
+        (c.unit_number && c.unit_number.toLowerCase().includes(q)) ||
+        c.purpose.toLowerCase().includes(q)
+      );
+    });
+  }, [cabs, search, statusFilter]);
+
+  // Verification matched cabs
+  const verifiedMatches = useMemo(() => {
+    const q = verifySearchQuery.toLowerCase().trim();
+    if (!q) return [];
+    return cabs.filter(
+      (c) =>
+        c.vehicleNumber.toLowerCase().includes(q) ||
+        (c.unit_number && c.unit_number.toLowerCase().includes(q)) ||
+        c.visitorName.toLowerCase().includes(q) ||
+        (c.visitorPhone && c.visitorPhone.includes(q)),
+    );
+  }, [cabs, verifySearchQuery]);
+
+  const counts = useMemo(() => {
+    return {
+      all: cabs.length,
+      pending: cabs.filter((c) => c.status === "pending").length,
+      approved: cabs.filter((c) => c.status === "approved").length,
+      entered: cabs.filter((c) => c.status === "entered").length,
+      completed: cabs.filter(
+        (c) => c.status === "completed" || c.status === "rejected" || c.status === "cancelled",
+      ).length,
+    };
+  }, [cabs]);
 
   const columns: Column<CabMovement>[] = [
     {
@@ -282,28 +402,106 @@ export default function SecurityGuardCabTaxiPage() {
       header: "Vehicle Plate #",
       sortable: true,
       render: (c) => (
-        <span style={{ fontFamily: "monospace", fontWeight: 700, color: "var(--fg)" }}>
-          🚖 {c.vehicleNumber}
-        </span>
+        <button
+          type="button"
+          onClick={() => setSelectedCabDetails(c)}
+          style={{
+            background: "none",
+            border: "none",
+            padding: 0,
+            cursor: "pointer",
+            textAlign: "left",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.35rem",
+          }}
+          title="Click to view full ticket & driver details"
+        >
+          <span
+            style={{
+              fontFamily: "monospace",
+              fontWeight: 800,
+              fontSize: "0.875rem",
+              color: "var(--primary, #2563eb)",
+              padding: "0.15rem 0.4rem",
+              background: "#eff6ff",
+              border: "1px solid #bfdbfe",
+              borderRadius: "4px",
+            }}
+          >
+            🚖 {c.vehicleNumber}
+          </span>
+        </button>
       ),
     },
     {
       key: "visitorName",
       header: "Driver / Passenger",
       sortable: true,
-      render: (c) => <span>{c.visitorName}</span>,
+      render: (c) => (
+        <div>
+          <div style={{ fontWeight: 600, color: "var(--fg)" }}>{c.visitorName}</div>
+          {c.visitorPhone && (
+            <div style={{ fontSize: "0.75rem", color: "var(--muted)", fontFamily: "monospace" }}>
+              📞 {c.visitorPhone}
+            </div>
+          )}
+        </div>
+      ),
     },
     {
       key: "unit_number",
       header: "Destination Unit",
       sortable: true,
-      render: (c) => <span style={{ fontWeight: 600 }}>{c.unit_number || "—"}</span>,
+      render: (c) => (
+        <span
+          style={{
+            fontWeight: 700,
+            color: "var(--fg)",
+            padding: "0.2rem 0.5rem",
+            background: "#f1f5f9",
+            borderRadius: "4px",
+            fontSize: "0.825rem",
+          }}
+        >
+          {c.unit_number || "—"}
+        </span>
+      ),
     },
     {
       key: "purpose",
-      header: "Service / Purpose",
+      header: "Service Provider",
       sortable: true,
-      render: (c) => <span>{c.purpose}</span>,
+      render: (c) => {
+        const pLower = c.purpose.toLowerCase();
+        let badgeColor = "#475569";
+        let badgeBg = "#f8fafc";
+        if (pLower.includes("uber")) {
+          badgeColor = "#000000";
+          badgeBg = "#f1f5f9";
+        } else if (pLower.includes("ola")) {
+          badgeColor = "#059669";
+          badgeBg = "#ecfdf5";
+        } else if (pLower.includes("rapido")) {
+          badgeColor = "#d97706";
+          badgeBg = "#fffbeb";
+        }
+        return (
+          <span
+            style={{
+              fontWeight: 700,
+              fontSize: "0.775rem",
+              padding: "0.2rem 0.5rem",
+              borderRadius: "4px",
+              color: badgeColor,
+              background: badgeBg,
+              border: "1px solid rgba(0,0,0,0.08)",
+            }}
+          >
+            {c.purpose}
+          </span>
+        );
+      },
     },
     {
       key: "status",
@@ -312,29 +510,114 @@ export default function SecurityGuardCabTaxiPage() {
       render: (c) => <StatusBadge status={c.status} />,
     },
     {
+      key: "enteredAt",
+      header: "Gate Activity / Time",
+      sortable: true,
+      render: (c) => {
+        if (c.status === "entered" && c.enteredAt) {
+          return (
+            <div style={{ fontSize: "0.775rem" }}>
+              <span style={{ color: "#059669", fontWeight: 700 }}>🟢 Entered:</span>{" "}
+              {formatDateTime(c.enteredAt)}
+            </div>
+          );
+        }
+        if (c.status === "completed" && c.exitedAt) {
+          return (
+            <div style={{ fontSize: "0.775rem" }}>
+              <span style={{ color: "#64748b", fontWeight: 700 }}>🏁 Exited:</span>{" "}
+              {formatDateTime(c.exitedAt)}
+            </div>
+          );
+        }
+        if (c.expectedAt) {
+          return (
+            <div style={{ fontSize: "0.775rem", color: "var(--muted)" }}>
+              ⏱️ Expected: {formatDateTime(c.expectedAt)}
+            </div>
+          );
+        }
+        return <span style={{ fontSize: "0.775rem", color: "var(--muted)" }}>{c.createdAt ? formatDateTime(c.createdAt) : "—"}</span>;
+      },
+    },
+    {
       key: "actions",
-      header: "Actions",
+      header: "Gate Action",
       align: "right",
       render: (c) => (
-        <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
-          {c.status === "approved" ? (
+        <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", alignItems: "center" }}>
+          {c.status === "approved" && (
             <button
               className="btn btn-primary"
-              style={{ fontSize: "0.75rem", padding: "0.25rem 0.55rem" }}
+              style={{
+                fontSize: "0.75rem",
+                padding: "0.3rem 0.75rem",
+                fontWeight: 700,
+                background: "#059669",
+                borderColor: "#059669",
+              }}
               onClick={() => handleAllowEntry(c)}
+              disabled={admittingId === c.id}
+              title="Allow gate entry directly"
             >
-              Allow Entry
+              {admittingId === c.id ? "Admitting…" : "✅ Allow Entry"}
             </button>
-          ) : c.status === "entered" && c.entryId ? (
+          )}
+
+          {c.status === "pending" && (
+            <div style={{ display: "flex", gap: "0.35rem" }}>
+              <button
+                className="btn btn-secondary"
+                style={{
+                  fontSize: "0.75rem",
+                  padding: "0.3rem 0.6rem",
+                  fontWeight: 600,
+                  color: "#d97706",
+                  borderColor: "#fde68a",
+                  background: "#fffdf0",
+                }}
+                onClick={() => handleSendApprovalRequest(c)}
+                disabled={sendingApprovalId === c.id}
+                title="Send real-time approval request notification to resident"
+              >
+                📲 {sendingApprovalId === c.id ? "Sending…" : "Send Approval Request"}
+              </button>
+              <button
+                className="btn btn-secondary"
+                style={{ fontSize: "0.75rem", padding: "0.3rem 0.55rem" }}
+                onClick={() => handleAllowEntry(c)}
+                disabled={admittingId === c.id}
+                title="Security override / Admit directly"
+              >
+                Allow Entry
+              </button>
+            </div>
+          )}
+
+          {c.status === "entered" && (
             <button
               className="btn btn-secondary"
-              style={{ fontSize: "0.75rem", padding: "0.25rem 0.55rem" }}
+              style={{
+                fontSize: "0.75rem",
+                padding: "0.3rem 0.65rem",
+                fontWeight: 700,
+                color: "#1e293b",
+              }}
               onClick={() => handleMarkExit(c)}
+              title="Log exit timestamp for this vehicle"
             >
-              Mark Exit
+              🚪 Mark Exit
             </button>
-          ) : (
-            <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>—</span>
+          )}
+
+          {(c.status === "completed" || c.status === "rejected" || c.status === "cancelled") && (
+            <button
+              className="btn btn-secondary"
+              style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
+              onClick={() => setSelectedCabDetails(c)}
+            >
+              👁️ View
+            </button>
           )}
         </div>
       ),
@@ -360,7 +643,19 @@ export default function SecurityGuardCabTaxiPage() {
             >
               🔄 {isLoading ? "Refreshing…" : "Refresh"}
             </button>
-            <button className="btn btn-primary" onClick={handleOpenModal}>
+            <button
+              className="btn btn-secondary"
+              style={{
+                fontWeight: 700,
+                color: "var(--primary, #2563eb)",
+                borderColor: "var(--primary, #2563eb)",
+                background: "#eff6ff",
+              }}
+              onClick={handleOpenVerifyModal}
+            >
+              🔍 Verify Cab / Taxi
+            </button>
+            <button className="btn btn-primary" onClick={() => handleOpenModal()}>
               + Log Cab / Taxi Arrival
             </button>
           </div>
@@ -420,20 +715,117 @@ export default function SecurityGuardCabTaxiPage() {
         </div>
       )}
 
-      <div className="card">
-        <div className="card-header" style={{ flexWrap: "wrap", gap: "0.75rem" }}>
+      {/* Quick Verification Banner for Security Guards */}
+      <div
+        style={{
+          background: "linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)",
+          color: "#ffffff",
+          padding: "1rem 1.25rem",
+          borderRadius: "10px",
+          marginBottom: "1.25rem",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: "1rem",
+          boxShadow: "0 2px 4px rgba(0,0,0,0.06)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          <div
+            style={{
+              fontSize: "1.5rem",
+              background: "rgba(255, 255, 255, 0.2)",
+              padding: "0.5rem",
+              borderRadius: "8px",
+            }}
+          >
+            🚖
+          </div>
           <div>
-            <h3 className="card-title">Commercial Cab Movements</h3>
-            <p style={{ fontSize: "0.775rem", color: "var(--muted)" }}>
-              {filteredCabs.length} cabs registered
+            <h4 style={{ margin: 0, fontSize: "1rem", fontWeight: 700 }}>
+              Live Gate Cab & Commercial Taxi Verification
+            </h4>
+            <p style={{ margin: 0, fontSize: "0.825rem", opacity: 0.9 }}>
+              Verify arriving cabs against resident approvals and log instant gate entry and exit timestamps.
             </p>
           </div>
+        </div>
 
-          <div style={{ width: "100%", maxWidth: 240 }}>
+        <div style={{ display: "flex", gap: "0.5rem" }}>
+          <button
+            type="button"
+            className="btn"
+            onClick={handleOpenVerifyModal}
+            style={{
+              background: "#ffffff",
+              color: "#1e3a8a",
+              fontWeight: 700,
+              fontSize: "0.85rem",
+              padding: "0.45rem 1rem",
+              border: "none",
+            }}
+          >
+            🔍 Fast Verification
+          </button>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-header" style={{ flexWrap: "wrap", gap: "0.75rem" }}>
+          {/* Status Filter Tabs */}
+          <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap" }}>
+            {[
+              { id: "all", label: "All Movements", count: counts.all },
+              { id: "pending", label: "Pending Approval", count: counts.pending },
+              { id: "approved", label: "Approved / Expected", count: counts.approved },
+              { id: "entered", label: "Inside Premises", count: counts.entered },
+              { id: "completed", label: "Exited / Closed", count: counts.completed },
+            ].map((tab) => {
+              const active = statusFilter === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setStatusFilter(tab.id as any)}
+                  style={{
+                    border: "1px solid",
+                    borderColor: active ? "var(--primary, #2563eb)" : "var(--border, #e2e8f0)",
+                    background: active ? "var(--primary, #2563eb)" : "#ffffff",
+                    color: active ? "#ffffff" : "var(--fg, #334155)",
+                    padding: "0.35rem 0.75rem",
+                    borderRadius: "6px",
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.35rem",
+                  }}
+                >
+                  <span>{tab.label}</span>
+                  <span
+                    style={{
+                      background: active ? "rgba(255,255,255,0.25)" : "#f1f5f9",
+                      color: active ? "#ffffff" : "var(--muted, #64748b)",
+                      padding: "0.05rem 0.4rem",
+                      borderRadius: "10px",
+                      fontSize: "0.725rem",
+                      fontWeight: 700,
+                    }}
+                  >
+                    {tab.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div style={{ width: "100%", maxWidth: 260 }}>
             <SearchInput
               value={search}
               onChange={setSearch}
-              placeholder="Search vehicle/passenger…"
+              placeholder="Search plate, unit, driver…"
             />
           </div>
         </div>
@@ -445,130 +837,280 @@ export default function SecurityGuardCabTaxiPage() {
           enableClientPagination={true}
           pageSize={10}
           emptyTitle="No Cab / Taxi Records"
-          emptyDescription="No cab or taxi entries currently match your search criteria."
+          emptyDescription="No cab or taxi entries currently match your filter criteria."
           emptyIcon="🚖"
         />
       </div>
 
-      {/* Admit Cab Modal with Mandatory Photo */}
-      {admitCab && (
+      {/* FAST CAB VERIFICATION MODAL */}
+      <Modal
+        isOpen={isVerifyModalOpen}
+        onClose={() => setIsVerifyModalOpen(false)}
+        title="🔍 Verify Cab or Taxi Gate Arrival"
+        size="lg"
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+          {/* Instructions banner */}
+          <div
+            style={{
+              padding: "0.75rem 1rem",
+              borderRadius: "8px",
+              background: "#eff6ff",
+              border: "1px solid #bfdbfe",
+              fontSize: "0.85rem",
+              color: "#1e40af",
+            }}
+          >
+            💡 <strong>Quick Gate Verification:</strong> Search by Vehicle Plate number, Destination Unit, or Driver name to confirm resident approval and admit vehicle.
+          </div>
+
+          {/* Search by Plate / Unit */}
+          <div>
+            <label className="form-label" style={{ fontWeight: 700, marginBottom: "0.35rem", display: "block" }}>
+              Search Active Cab Bookings (Vehicle Plate / Unit # / Driver)
+            </label>
+            <input
+              type="text"
+              className="form-control"
+              placeholder="e.g. KA-01-AB-1234 or Unit 101 or Driver name"
+              value={verifySearchQuery}
+              onChange={(e) => setVerifySearchQuery(e.target.value)}
+              autoFocus
+            />
+          </div>
+
+          {/* Search Results Preview */}
+          {verifySearchQuery.trim().length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--muted)" }}>
+                MATCHED CAB BOOKINGS ({verifiedMatches.length})
+              </div>
+
+              {verifiedMatches.length === 0 ? (
+                <div
+                  style={{
+                    padding: "1.25rem",
+                    borderRadius: "8px",
+                    background: "#f8fafc",
+                    border: "1px dashed #cbd5e1",
+                    textAlign: "center",
+                  }}
+                >
+                  <p style={{ margin: 0, fontWeight: 600, color: "var(--fg)" }}>
+                    No pre-approved cab bookings match &quot;{verifySearchQuery}&quot;.
+                  </p>
+                  <p style={{ margin: "0.25rem 0 0.75rem", fontSize: "0.8rem", color: "var(--muted)" }}>
+                    You can log this arrival immediately for the destination unit.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    style={{ fontSize: "0.825rem", padding: "0.35rem 0.85rem" }}
+                    onClick={() => {
+                      setIsVerifyModalOpen(false);
+                      handleOpenModal(verifySearchQuery);
+                    }}
+                  >
+                    + Log New Arrival For &quot;{verifySearchQuery}&quot;
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                  {verifiedMatches.map((cab) => (
+                    <div
+                      key={cab.id}
+                      style={{
+                        padding: "0.85rem 1rem",
+                        borderRadius: "8px",
+                        border: "1px solid var(--border, #e2e8f0)",
+                        background: "#ffffff",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: "1rem",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.25rem" }}>
+                          <span style={{ fontFamily: "monospace", fontWeight: 800, fontSize: "0.95rem" }}>
+                            🚖 {cab.vehicleNumber}
+                          </span>
+                          <span
+                            style={{
+                              padding: "0.15rem 0.4rem",
+                              background: "#f1f5f9",
+                              borderRadius: "4px",
+                              fontSize: "0.75rem",
+                              fontWeight: 700,
+                            }}
+                          >
+                            {cab.purpose}
+                          </span>
+                          <StatusBadge status={cab.status} />
+                        </div>
+                        <div style={{ fontSize: "0.825rem", color: "var(--muted)" }}>
+                          Destination: <strong style={{ color: "var(--fg)" }}>{cab.unit_number}</strong> · Driver:{" "}
+                          <strong>{cab.visitorName}</strong> {cab.visitorPhone ? `(${cab.visitorPhone})` : ""}
+                        </div>
+                      </div>
+
+                      <div style={{ display: "flex", gap: "0.5rem" }}>
+                        {cab.status === "approved" && (
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            style={{ fontSize: "0.8rem", padding: "0.35rem 0.75rem", background: "#059669", borderColor: "#059669" }}
+                            onClick={() => {
+                              handleAllowEntry(cab);
+                            }}
+                            disabled={admittingId === cab.id}
+                          >
+                            {admittingId === cab.id ? "Admitting…" : "✅ Allow Entry"}
+                          </button>
+                        )}
+                        {cab.status === "pending" && (
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            style={{ fontSize: "0.8rem", padding: "0.35rem 0.75rem", color: "#d97706", borderColor: "#fde68a" }}
+                            onClick={() => {
+                              handleSendApprovalRequest(cab);
+                            }}
+                            disabled={sendingApprovalId === cab.id}
+                          >
+                            📲 {sendingApprovalId === cab.id ? "Sending…" : "Send Approval"}
+                          </button>
+                        )}
+                        {cab.status === "entered" && (
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            style={{ fontSize: "0.8rem", padding: "0.35rem 0.75rem" }}
+                            onClick={() => {
+                              handleMarkExit(cab);
+                              setIsVerifyModalOpen(false);
+                            }}
+                          >
+                            🚪 Mark Exit
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      {/* FULL CAB DETAILS MODAL */}
+      {selectedCabDetails && (
         <Modal
           isOpen={true}
-          onClose={() => {
-            if (!isAdmitting) {
-              setAdmitCab(null);
-              setAdmitPhotoUrl(null);
-              setAdmitError(null);
-            }
-          }}
-          title="🚖 Allow Cab Entry — Photograph Required"
+          onClose={() => setSelectedCabDetails(null)}
+          title={`🚖 Cab Ticket Details: ${selectedCabDetails.vehicleNumber}`}
           size="md"
         >
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-            {admitError && (
-              <div
-                style={{
-                  padding: "0.75rem 1rem",
-                  borderRadius: "6px",
-                  background: "#fee2e2",
-                  border: "1px solid #fca5a5",
-                  color: "#991b1b",
-                  fontSize: "0.875rem",
-                  fontWeight: 600,
-                }}
-              >
-                ⚠️ {admitError}
-              </div>
-            )}
-
             <div
               style={{
-                padding: "0.85rem 1rem",
-                borderRadius: "8px",
-                background: "#f8fafc",
-                border: "1px solid #e2e8f0",
                 display: "grid",
                 gridTemplateColumns: "1fr 1fr",
-                gap: "0.75rem",
-                fontSize: "0.875rem",
-              }}
-            >
-              <div>
-                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>Vehicle / Cab</span>
-                <strong style={{ fontFamily: "monospace", color: "var(--fg)" }}>🚗 {admitCab.vehicleNumber}</strong>
-              </div>
-              <div>
-                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>Driver / Service</span>
-                <strong>{admitCab.visitorName}</strong>
-              </div>
-              <div style={{ gridColumn: "span 2" }}>
-                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>Purpose</span>
-                <span>{admitCab.purpose}</span>
-              </div>
-            </div>
-
-            <div
-              style={{
+                gap: "1rem",
                 padding: "1rem",
+                background: "#f8fafc",
                 borderRadius: "8px",
-                background: admitPhotoUrl ? "#f0fdf4" : "#fffbeb",
-                border: admitPhotoUrl ? "1px solid #86efac" : "2px solid #f59e0b",
+                border: "1px solid #e2e8f0",
               }}
             >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: "0.5rem",
-                }}
-              >
-                <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "#1e293b" }}>
-                  📷 Cab / Vehicle Photograph <span style={{ color: "#dc2626", fontWeight: 900 }}>* (Mandatory)</span>
-                </span>
-                {admitPhotoUrl ? (
-                  <span style={{ fontSize: "0.75rem", color: "#16a34a", fontWeight: 700 }}>
-                    ✓ Photograph Attached
-                  </span>
-                ) : (
-                  <span style={{ fontSize: "0.75rem", color: "#b45309", fontWeight: 700 }}>
-                    Required Before Admitting
-                  </span>
-                )}
+              <div>
+                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>Vehicle Plate #</span>
+                <strong style={{ fontFamily: "monospace", fontSize: "1rem", color: "var(--fg)" }}>
+                  {selectedCabDetails.vehicleNumber}
+                </strong>
               </div>
-              <FileUpload
-                kind="visitor_photo"
-                label="Snap or upload cab / driver photograph before gate entry"
-                currentUrl={admitPhotoUrl || undefined}
-                onUploadComplete={(url) => {
-                  setAdmitPhotoUrl(url);
-                  setAdmitError(null);
-                }}
-              />
+              <div>
+                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>Gate Status</span>
+                <StatusBadge status={selectedCabDetails.status} />
+              </div>
+              <div>
+                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>Destination Unit</span>
+                <strong style={{ color: "var(--fg)" }}>{selectedCabDetails.unit_number}</strong>
+              </div>
+              <div>
+                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>Service Provider</span>
+                <strong>{selectedCabDetails.purpose}</strong>
+              </div>
+              <div>
+                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>Driver Name</span>
+                <span>{selectedCabDetails.visitorName}</span>
+              </div>
+              <div>
+                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>Driver Phone</span>
+                <span style={{ fontFamily: "monospace" }}>{selectedCabDetails.visitorPhone || "—"}</span>
+              </div>
+              {selectedCabDetails.enteredAt && (
+                <div>
+                  <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>Entered Timestamp</span>
+                  <span style={{ fontWeight: 600, color: "#059669" }}>{formatDateTime(selectedCabDetails.enteredAt)}</span>
+                </div>
+              )}
+              {selectedCabDetails.exitedAt && (
+                <div>
+                  <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>Exited Timestamp</span>
+                  <span style={{ fontWeight: 600, color: "#64748b" }}>{formatDateTime(selectedCabDetails.exitedAt)}</span>
+                </div>
+              )}
             </div>
 
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "0.75rem" }}>
+              {selectedCabDetails.status === "approved" && (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ background: "#059669", borderColor: "#059669" }}
+                  onClick={() => {
+                    handleAllowEntry(selectedCabDetails);
+                  }}
+                  disabled={admittingId === selectedCabDetails.id}
+                >
+                  {admittingId === selectedCabDetails.id ? "Admitting…" : "✅ Allow Entry"}
+                </button>
+              )}
+              {selectedCabDetails.status === "pending" && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ color: "#d97706", borderColor: "#fde68a" }}
+                  onClick={() => {
+                    handleSendApprovalRequest(selectedCabDetails);
+                  }}
+                  disabled={sendingApprovalId === selectedCabDetails.id}
+                >
+                  📲 {sendingApprovalId === selectedCabDetails.id ? "Sending…" : "Send Approval Request"}
+                </button>
+              )}
+              {selectedCabDetails.status === "entered" && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    const c = selectedCabDetails;
+                    setSelectedCabDetails(null);
+                    handleMarkExit(c);
+                  }}
+                >
+                  🚪 Mark Exit
+                </button>
+              )}
               <button
                 type="button"
                 className="btn btn-secondary"
-                onClick={() => setAdmitCab(null)}
-                disabled={isAdmitting}
+                onClick={() => setSelectedCabDetails(null)}
               >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={handleConfirmAdmitCab}
-                disabled={isAdmitting}
-                style={{
-                  padding: "0.5rem 1.25rem",
-                  fontWeight: 700,
-                  background: admitPhotoUrl ? "#059669" : undefined,
-                  borderColor: admitPhotoUrl ? "#059669" : undefined,
-                }}
-              >
-                {isAdmitting ? "Recording Entry…" : "🚪 ALLOW CAB ENTRY"}
+                Close
               </button>
             </div>
           </div>

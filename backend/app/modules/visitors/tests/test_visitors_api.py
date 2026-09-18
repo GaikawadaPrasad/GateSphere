@@ -213,3 +213,62 @@ def test_supervisor_blacklist_by_id_blocks_request(as_role, seed_ids):
     )
     assert r.status_code == 403
     assert r.json()["error"]["code"] == "VISITOR_BLACKLISTED"
+
+
+def test_duplicate_request_blocked_while_visitor_inside(
+    as_role, seed_ids, resident_unit_id, confirmed_upload
+):
+    guard = as_role("security_guard")
+    resident = as_role("resident")
+    phone = _phone()
+    unit_id = resident_unit_id
+
+    # 1. Create first request
+    r = guard.post(
+        f"{P}/requests",
+        json={
+            "unit_id": unit_id,
+            "visitor": {"full_name": "Active Visitor", "phone": phone},
+            "visitor_type": "personal_guest",
+        },
+    )
+    assert r.status_code == 201, r.text
+    req1 = r.json()["data"]
+
+    # 2. Resident approves
+    r = resident.post(f"{P}/requests/{req1['id']}/decision", json={"decision": "approved"})
+    assert r.status_code == 200, r.text
+
+    # 3. Guard records entry -> visitor is now status == 'inside'
+    photo_url = confirmed_upload("visitor_photo", seed_ids["community_id"])
+    r = guard.post(f"{P}/entries", json={"request_id": req1["id"], "entry_photo_url": photo_url})
+    assert r.status_code == 201, r.text
+    entry_id = r.json()["data"]["id"]
+
+    # 4. Attempt to create another request for the same visitor while inside -> 409 Conflict with code VISITOR_ALREADY_INSIDE
+    r_dup = guard.post(
+        f"{P}/requests",
+        json={
+            "unit_id": unit_id,
+            "visitor": {"full_name": "Active Visitor", "phone": phone},
+            "visitor_type": "personal_guest",
+        },
+    )
+    assert r_dup.status_code == 409, r_dup.text
+    assert r_dup.json()["error"]["code"] == "VISITOR_ALREADY_INSIDE"
+
+    # 5. Visitor exits
+    r_exit = guard.patch(f"{P}/entries/{entry_id}/exit")
+    assert r_exit.status_code == 200, r_exit.text
+
+    # 6. Now creating a new request succeeds
+    r_after = guard.post(
+        f"{P}/requests",
+        json={
+            "unit_id": unit_id,
+            "visitor": {"full_name": "Active Visitor", "phone": phone},
+            "visitor_type": "personal_guest",
+        },
+    )
+    assert r_after.status_code == 201, r_after.text
+
