@@ -42,8 +42,8 @@ async def resolve_login_role(
 
     - Super Admin always resolves to `super_admin` (global), regardless of `requested`.
     - `requested` given: must be a role the user actually holds -> that grant.
-    - `requested` omitted: the user's sole distinct role, else 422 (the caller must choose,
-      so the right `gatesphere_<bucket>_session` cookie is written).
+    - `requested` omitted: defaults to the user's first role grant to ensure a 
+      smooth login UX for users who hold multiple roles (BUG-006).
     """
     if user.is_superadmin:
         return "super_admin", None
@@ -55,14 +55,7 @@ async def resolve_login_role(
         if not matches:
             raise AuthError(f"You do not hold the '{requested}' role", code="ROLE_NOT_GRANTED")
         return matches[0]
-    distinct = {g[0] for g in grants}
-    if len(distinct) == 1:
-        return grants[0]
-    raise AuthError(
-        "This account holds multiple roles — pass `role` to choose which session to open",
-        code="ROLE_REQUIRED",
-        fields={"role": f"one of {sorted(distinct)}"},
-    )
+    return grants[0]
 
 
 class AuthService:
