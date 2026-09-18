@@ -23,6 +23,7 @@ _s3 = boto3.client(
     config=Config(signature_version="s3v4"),
 )
 
+
 def _is_internal_docker_host(url: str) -> bool:
     return "://minio" in url or "://localhost" in url or "://127.0.0.1" in url
 
@@ -103,10 +104,16 @@ def delete_object(key: str) -> None:
 
 def _clean_public_base() -> str:
     raw = (settings.S3_PUBLIC_URL or "").strip()
-    while (raw.startswith('"') and raw.endswith('"')) or (raw.startswith("'") and raw.endswith("'")):
+    while (raw.startswith('"') and raw.endswith('"')) or (
+        raw.startswith("'") and raw.endswith("'")
+    ):
         raw = raw[1:-1].strip()
     raw = raw.replace("\r", "").replace("\n", "").strip().rstrip("/")
-    if "supabase.co" in raw and not raw.endswith("/object/public") and not raw.endswith("/storage/v1/s3"):
+    if (
+        "supabase.co" in raw
+        and not raw.endswith("/object/public")
+        and not raw.endswith("/storage/v1/s3")
+    ):
         if raw.endswith("/storage/v1"):
             raw = f"{raw}/object/public"
         else:
@@ -136,4 +143,11 @@ def key_from_url(url: str) -> str | None:
     idx = clean_url.find(bucket_prefix)
     if idx != -1:
         return clean_url[idx + len(bucket_prefix) :]
+    if settings.ENVIRONMENT != "production":
+        for b in ("gatesphere-local", "gatesphere-production"):
+            if b != settings.S3_BUCKET:
+                p = f"/{b}/"
+                idx = clean_url.find(p)
+                if idx != -1:
+                    return clean_url[idx + len(p) :]
     return None

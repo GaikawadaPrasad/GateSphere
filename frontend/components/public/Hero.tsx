@@ -9,7 +9,7 @@ export default function Hero() {
         loop
         muted
         playsInline
-        preload="auto"
+        preload="metadata"
         suppressHydrationWarning
         className="absolute inset-0 w-full h-full object-cover object-center"
       >
