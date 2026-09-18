@@ -6,6 +6,7 @@ import { SearchInput } from "@/components/forms/SearchInput";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { staffApi } from "@/lib/api";
+import { toast } from "@/store/toast";
 
 interface StaffRow {
   id: string;
@@ -104,9 +105,13 @@ export default function SecurityGuardStaffAttendancePage() {
             : s,
         ),
       );
-      setActionMessage({ type: "success", text: `Check-in recorded for ${name} at ${now}` });
+      const msg = `Check-in recorded for ${name} at ${now}`;
+      setActionMessage({ type: "success", text: msg });
+      toast.success(msg);
     } catch (err: any) {
-      setActionMessage({ type: "error", text: err?.message || "Failed to check in staff." });
+      const errMsg = err?.message || "Failed to check in staff.";
+      setActionMessage({ type: "error", text: errMsg });
+      toast.error(errMsg);
     }
   };
 
@@ -123,9 +128,13 @@ export default function SecurityGuardStaffAttendancePage() {
             : item,
         ),
       );
-      setActionMessage({ type: "success", text: `Check-out recorded for ${s.name} at ${now}` });
+      const msg = `Check-out recorded for ${s.name} at ${now}`;
+      setActionMessage({ type: "success", text: msg });
+      toast.success(msg);
     } catch (err: any) {
-      setActionMessage({ type: "error", text: err?.message || "Failed to check out staff." });
+      const errMsg = err?.message || "Failed to check out staff.";
+      setActionMessage({ type: "error", text: errMsg });
+      toast.error(errMsg);
     }
   };
 
@@ -226,6 +235,15 @@ export default function SecurityGuardStaffAttendancePage() {
           { label: "Security Guard" },
           { label: "Staff Attendance" },
         ]}
+        actions={
+          <button
+            className="btn btn-secondary"
+            onClick={loadData}
+            disabled={isLoading}
+          >
+            🔄 {isLoading ? "Refreshing…" : "Refresh"}
+          </button>
+        }
       />
 
       {actionMessage && (

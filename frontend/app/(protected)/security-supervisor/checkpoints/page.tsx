@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
 import { checkpointsApi, gateApi, communitiesApi, authApi } from "@/lib/api";
+import { toast } from "@/store/toast";
 
 interface CheckpointItem {
   id: string;
@@ -30,6 +31,7 @@ export default function SecuritySupervisorCheckpointsPage() {
   // Override Modal
   const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false);
   const [overrideReason, setOverrideReason] = useState("");
+  const [overrideReasonError, setOverrideReasonError] = useState("");
 
   const loadData = async () => {
     setIsLoading(true);
@@ -105,36 +107,46 @@ export default function SecuritySupervisorCheckpointsPage() {
       setIsModalOpen(false);
       return;
     }
+    const gid = guardUserId || guardsList[0]?.id;
+    if (!gid) {
+      toast.error("Please select a guard to assign.");
+      return;
+    }
     try {
-      const gid = guardUserId || guardsList[0]?.id;
-      if (gid) {
-        await gateApi.createAssignment({
-          guard_user_id: gid,
-          gate_id: selectedCp.gate_id,
-        });
-      }
+      await gateApi.createAssignment({
+        guard_user_id: gid,
+        gate_id: selectedCp.gate_id,
+      });
+      toast.success("Duty guard assigned to checkpoint successfully.");
       setIsModalOpen(false);
       loadData();
     } catch (err: any) {
-      alert(err?.message || "Failed to assign guard to checkpoint.");
+      toast.error(err?.message || "Failed to assign guard to checkpoint.");
     }
   };
 
   const handleCheckpointOverride = async () => {
-    if (!selectedCp || !overrideReason.trim()) return;
+    if (!selectedCp) return;
+    const cleanReason = overrideReason.trim();
+    if (!cleanReason || cleanReason.length < 5) {
+      setOverrideReasonError("Please provide an override reason (min 5 characters).");
+      toast.error("Override reason must be at least 5 characters.");
+      return;
+    }
     try {
       if (selectedCp.gate_id) {
         await checkpointsApi.override({
           gate_id: selectedCp.gate_id,
-          reason: overrideReason.trim(),
+          reason: cleanReason,
         });
-        alert("Checkpoint override successfully logged to audit trail.");
+        toast.success("Checkpoint override successfully logged to audit trail.");
       }
       setIsOverrideModalOpen(false);
       setOverrideReason("");
+      setOverrideReasonError("");
       loadData();
     } catch (err: any) {
-      alert(err?.message || "Failed to execute checkpoint override.");
+      toast.error(err?.message || "Failed to execute checkpoint override.");
     }
   };
 
@@ -148,6 +160,15 @@ export default function SecuritySupervisorCheckpointsPage() {
           { label: "Security Supervisor" },
           { label: "Checkpoints" },
         ]}
+        actions={
+          <button
+            className="btn btn-secondary"
+            onClick={loadData}
+            disabled={isLoading}
+          >
+            🔄 {isLoading ? "Refreshing…" : "Refresh"}
+          </button>
+        }
       />
 
       <div className="card">
@@ -305,9 +326,17 @@ export default function SecuritySupervisorCheckpointsPage() {
             className="input-field"
             placeholder="e.g. Emergency vehicle perimeter access"
             value={overrideReason}
-            onChange={(e) => setOverrideReason(e.target.value)}
+            onChange={(e) => {
+              setOverrideReason(e.target.value);
+              if (overrideReasonError) setOverrideReasonError("");
+            }}
             required
           />
+          {overrideReasonError && (
+            <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+              {overrideReasonError}
+            </span>
+          )}
         </div>
       </Modal>
     </div>

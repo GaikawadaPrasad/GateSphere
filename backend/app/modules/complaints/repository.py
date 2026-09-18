@@ -53,6 +53,62 @@ class TicketRepository(AsyncTenantRepository[ServiceTicket]):
         )
         return int(n or 0) + 1
 
+    async def enrich_tickets(self, tickets: list[ServiceTicket]) -> None:
+        if not tickets:
+            return
+
+        user_ids = {t.raised_by_user_id for t in tickets if t.raised_by_user_id}
+        comm_ids = {t.community_id for t in tickets if t.community_id}
+        unit_ids = {t.unit_id for t in tickets if t.unit_id}
+        category_ids = {t.category_id for t in tickets if t.category_id}
+
+        user_map: dict[uuid.UUID, tuple[str, str | None, str | None]] = {}
+        if user_ids:
+            from app.modules.users.models import User
+
+            stmt = select(User.id, User.full_name, User.email, User.phone).where(
+                User.id.in_(user_ids)
+            )
+            res = (await self.db.execute(stmt)).all()
+            for uid, name, email, phone in res:
+                user_map[uid] = (name, email, phone)
+
+        comm_map: dict[uuid.UUID, str] = {}
+        if comm_ids:
+            from app.modules.communities.models import Community
+
+            stmt = select(Community.id, Community.name).where(Community.id.in_(comm_ids))
+            res = (await self.db.execute(stmt)).all()
+            for cid, name in res:
+                comm_map[cid] = name
+
+        unit_map: dict[uuid.UUID, str] = {}
+        if unit_ids:
+            from app.modules.communities.models import Unit
+
+            stmt = select(Unit.id, Unit.unit_number).where(Unit.id.in_(unit_ids))
+            res = (await self.db.execute(stmt)).all()
+            for uid, num in res:
+                unit_map[uid] = num
+
+        cat_map: dict[uuid.UUID, str] = {}
+        if category_ids:
+            stmt = select(ServiceCategory.id, ServiceCategory.name).where(
+                ServiceCategory.id.in_(category_ids)
+            )
+            res = (await self.db.execute(stmt)).all()
+            for cid, name in res:
+                cat_map[cid] = name
+
+        for t in tickets:
+            u_info = user_map.get(t.raised_by_user_id) if t.raised_by_user_id else None
+            t.raised_by_name = u_info[0] if u_info else None
+            t.raised_by_email = u_info[1] if u_info else None
+            t.raised_by_phone = u_info[2] if u_info else None
+            t.community_name = comm_map.get(t.community_id)
+            t.unit_number = unit_map.get(t.unit_id)
+            t.category_name = cat_map.get(t.category_id)
+
 
 async def active_assignment(db, ticket_id: uuid.UUID) -> TicketAssignment | None:
     return await db.scalar(

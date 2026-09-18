@@ -158,3 +158,58 @@ def test_session_row_records_role_and_activity():
         assert row.last_activity_at is not None
         assert row.expires_at > row.created_at
     c.close()
+
+
+def test_change_password_and_session_revocation(client):
+    """Changing password verifies old password, rejects same password, updates hash,
+    and revokes existing sessions."""
+    # Login
+    r = client.post("/api/v1/auth/login", json={"email": DEMO_EMAIL, "password": DEMO_PASSWORD})
+    assert r.status_code == 200
+    csrf = csrf_cookie_value(client)
+
+    # Wrong old password -> 401
+    r = client.post(
+        "/api/v1/auth/password",
+        headers={"X-CSRF-Token": csrf},
+        json={"current_password": "WrongPassword123!", "new_password": "newPassword@Gate2026!"},
+    )
+    assert r.status_code == 401
+    assert r.json()["error"]["code"] == "INVALID_CREDENTIALS"
+
+    # Same password -> 422 SAME_PASSWORD
+    r = client.post(
+        "/api/v1/auth/password",
+        headers={"X-CSRF-Token": csrf},
+        json={"current_password": DEMO_PASSWORD, "new_password": DEMO_PASSWORD},
+    )
+    assert r.status_code == 422
+    assert r.json()["error"]["code"] == "SAME_PASSWORD"
+
+    # Success change
+    NEW_PW = "updatedPassword@Gate2026!"
+    r = client.post(
+        "/api/v1/auth/password",
+        headers={"X-CSRF-Token": csrf},
+        json={"current_password": DEMO_PASSWORD, "new_password": NEW_PW},
+    )
+    assert r.status_code == 200
+    assert r.json()["success"] is True
+
+    # Previous session is now revoked
+    r = client.get("/api/v1/auth/me")
+    assert r.status_code == 401
+
+    # Login with new password works
+    r2 = client.post("/api/v1/auth/login", json={"email": DEMO_EMAIL, "password": NEW_PW})
+    assert r2.status_code == 200
+
+    # Restore original password so subsequent test runs aren't disrupted
+    csrf2 = csrf_cookie_value(client)
+    r3 = client.post(
+        "/api/v1/auth/password",
+        headers={"X-CSRF-Token": csrf2},
+        json={"current_password": NEW_PW, "new_password": DEMO_PASSWORD},
+    )
+    assert r3.status_code == 200
+

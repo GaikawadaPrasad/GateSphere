@@ -10,6 +10,7 @@ const navItems = [
   { label: "Property", href: "/community-admin/property", icon: "🏢" },
   { label: "Residents", href: "/community-admin/residents", icon: "👥" },
   { label: "Staff", href: "/community-admin/staff", icon: "🛠️" },
+  { label: "Facility & Security", href: "/community-admin/security-staff", icon: "🛡️" },
   { label: "Communication", href: "/community-admin/communication", icon: "📢" },
   { label: "Billing & Finance", href: "/community-admin/billing", icon: "💳" },
   { label: "Incidents", href: "/community-admin/incidents", icon: "🚨" },
@@ -27,7 +28,11 @@ export function CommunityAdminSidebar() {
   const { data: notifications } = useMyNotifications({ unread_only: true });
   const unreadCount = notifications?.length || 0;
 
-  const handleLinkClick = () => {
+  const handleLinkClick = (e: React.MouseEvent, href: string) => {
+    if (pathname === href) {
+      e.preventDefault();
+      return;
+    }
     // On small screens, close sidebar after clicking a nav link
     if (typeof window !== "undefined" && window.innerWidth < 768 && sidebarOpen) {
       toggleSidebar();
@@ -157,7 +162,7 @@ export function CommunityAdminSidebar() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  onClick={handleLinkClick}
+                  onClick={(e) => handleLinkClick(e, item.href)}
                   style={{
                     display: "flex",
                     alignItems: "center",

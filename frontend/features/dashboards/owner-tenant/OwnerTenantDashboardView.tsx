@@ -15,6 +15,10 @@ import { BrandButton } from "@/components/common/BrandButton";
 import { Modal } from "@/components/common/Modal";
 import { Skeleton, KpiCardSkeleton, TableSkeleton, CardSkeleton } from "@/components/common/LoadingSkeleton";
 import { ErrorState } from "@/components/common/ErrorState";
+import {
+  FamilyMemberPassModal,
+  FamilyMemberPassData,
+} from "@/components/common/FamilyMemberPassModal";
 
 const QrCodeSvg = dynamic(
   () => import("@/components/common/QrCodeSvg").then((m) => m.QrCodeSvg),
@@ -48,6 +52,7 @@ import {
   useResidentProfile,
   useResidentDeliveryProtocols,
   useResidentVehicles,
+  useRegisterVehicle,
   useResidentDomesticStaff,
   useSubmitStaffRating,
   useAssignDomesticStaff,
@@ -61,11 +66,13 @@ import {
   AmenityBooking,
   ComplaintTicket,
   InvoiceItem,
+  ResidentVehicle,
 } from "@/hooks/use-owner-tenant-data";
 import { useAnnouncements, useEventRsvp } from "@/hooks/use-communication";
 import { useMyNotifications } from "@/hooks/use-notifications";
 import { useTableControls } from "@/hooks/use-table-controls";
-import { formatDate, formatCurrency } from "@/lib/utils";
+import { formatDate, formatCurrency, getAmenityIcon, isValidPersonName } from "@/lib/utils";
+import { authApi } from "@/lib/api";
 import { useUiStore } from "@/store/ui";
 
 export type OwnerTenantTab =
@@ -115,6 +122,7 @@ export function OwnerTenantDashboardView({
   const [addMemberModalOpen, setAddMemberModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<FamilyMember | null>(null);
   const [memberToDelete, setMemberToDelete] = useState<FamilyMember | null>(null);
+  const [selectedFamilyPassMember, setSelectedFamilyPassMember] = useState<FamilyMemberPassData | null>(null);
   const [newMemberName, setNewMemberName] = useState("");
   const [newMemberRelation, setNewMemberRelation] = useState("Spouse");
   const [newMemberPhone, setNewMemberPhone] = useState("");
@@ -128,6 +136,14 @@ export function OwnerTenantDashboardView({
   const [profileEmergencyPhone, setProfileEmergencyPhone] = useState("");
   const [profileEmergencyRel, setProfileEmergencyRel] = useState("Spouse");
   const [profileEmergencyNotes, setProfileEmergencyNotes] = useState("");
+
+  // Change Password state
+  const [changePasswordModalOpen, setChangePasswordModalOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
 
   // Visitor Pass form state
   const [passCategory, setPassCategory] = useState("Personal Guest");
@@ -194,22 +210,21 @@ export function OwnerTenantDashboardView({
   const endAssignmentMutation = useEndDomesticStaffAssignment();
   const { data: staffDirectory = [], isLoading: staffDirectoryLoading } = useCommunityStaffDirectory();
 
+  // Vehicle self-registration modal state
+  const [registerVehicleModalOpen, setRegisterVehicleModalOpen] = useState(false);
+  const [vehRegNumber, setVehRegNumber] = useState("");
+  const [vehType, setVehType] = useState("car");
+  const [vehMake, setVehMake] = useState("");
+  const [vehModel, setVehModel] = useState("");
+  const [vehColor, setVehColor] = useState("");
+  const registerVehicleMutation = useRegisterVehicle();
 
   // Payments view mode ("invoices" vs "ledger")
   const [paymentsViewMode, setPaymentsViewMode] = useState<"invoices" | "ledger">("invoices");
 
-  // Dismissed state for live visitor approval banner
-  const [visitorBannerDismissed, setVisitorBannerDismissed] = useState(false);
+  // Dismissed state for live visitor approval banner (per-visitor, not per-session)
+  const [dismissedVisitorId, setDismissedVisitorId] = useState<string | null>(null);
   const [deliveryBannerDismissed, setDeliveryBannerDismissed] = useState(false);
-
-  useEffect(() => {
-    if (
-      typeof window !== "undefined" &&
-      sessionStorage.getItem("gatesphere_gate_alert_dismissed") === "true"
-    ) {
-      setVisitorBannerDismissed(true);
-    }
-  }, []);
 
   // Data queries
   const { data: stats, isLoading: statsLoading, isError: statsError, refetch: refetchStats } = useResidentOverview(activeCommunityId);
@@ -244,6 +259,7 @@ export function OwnerTenantDashboardView({
   const nextBooking = (amenities.bookings.data || []).find((b) => b.status === "confirmed");
 
   const pendingVisitor = visitorList.find((v) => v.status === "pending");
+  const visitorBannerDismissed = Boolean(pendingVisitor && dismissedVisitorId === pendingVisitor.id);
   const pendingDelivery = deliveryList.find(
     (d) => d.status === "at_gate" || d.approval_status === "pending",
   );
@@ -280,7 +296,7 @@ export function OwnerTenantDashboardView({
   });
 
   const vehicleControls = useTableControls<any>({
-    data: vehicles.data || [],
+    data: vehicles.vehiclesList || [],
     searchKeys: ["plate", "make_model", "slot", "rfid_tag"],
     initialPageSize: 10,
   });
@@ -303,6 +319,31 @@ export function OwnerTenantDashboardView({
     initialPageSize: 10,
   });
 
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleManualRefresh = async () => {
+    try {
+      setIsRefreshing(true);
+      await Promise.allSettled([
+        refetchStats?.(),
+        visitors.refetch(),
+        deliveries.refetch(),
+        amenities.bookings.refetch(),
+        amenities.amenities.refetch(),
+        complaints.refetch(),
+        payments.refetch(),
+        ledger.refetch(),
+        vehicles.refetch(),
+        domesticStaff.refetch(),
+        family.refetch(),
+        profile.refetch(),
+      ]);
+      toast.success("Resident operational data and alerts refreshed.", "Data Updated");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   const handleDecideDelivery = async (deliveryId: string, approved: boolean) => {
     try {
       await deliveries.decideDelivery.mutateAsync({
@@ -310,6 +351,8 @@ export function OwnerTenantDashboardView({
         approved,
         remarks: approved ? "Approved by resident from portal" : "Denied by resident from portal",
       });
+      await deliveries.refetch();
+      refetchStats?.();
       toast.success(
         approved
           ? "Delivery approved! Security guard notified to permit entry."
@@ -330,6 +373,7 @@ export function OwnerTenantDashboardView({
         rating: feedbackRating,
         comments: feedbackComments,
       });
+      await complaints.refetch();
       toast.success(
         `Thank you! You rated ticket ${feedbackTicket.ticket_number} with ${feedbackRating} star(s).`,
         "Feedback Recorded",
@@ -353,6 +397,7 @@ export function OwnerTenantDashboardView({
         feedback: staffFeedbackText,
         unit_id: myOccupancy?.unit_id,
       });
+      await domesticStaff.refetch();
       toast.success(
         `Thank you for rating ${selectedStaff.name} with ${staffRatingValue} star(s).`,
         "Staff Rated",
@@ -376,6 +421,7 @@ export function OwnerTenantDashboardView({
         response,
         guests: 1,
       });
+      await announcements.refetch();
       const labels: Record<string, string> = {
         going: "Going",
         maybe: "Maybe",
@@ -390,6 +436,37 @@ export function OwnerTenantDashboardView({
     }
   };
 
+  const handleRegisterVehicle = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const plate = vehRegNumber.trim().toUpperCase();
+    if (!plate || plate.length < 4 || !/^[A-Z0-9\s\-]+$/.test(plate)) {
+      toast.error("Please enter a valid license plate number (e.g. MH 12 AB 1234).", "Plate Required");
+      return;
+    }
+    try {
+      await registerVehicleMutation.mutateAsync({
+        registration_number: plate,
+        vehicle_type: vehType,
+        make: vehMake.trim() || undefined,
+        model: vehModel.trim() || undefined,
+        color: vehColor.trim() || undefined,
+      });
+      await vehicles.refetch();
+      refetchStats?.();
+      toast.success(
+        `Vehicle ${plate} registered successfully!`,
+        "Vehicle Registered",
+      );
+      setRegisterVehicleModalOpen(false);
+      setVehRegNumber("");
+      setVehMake("");
+      setVehModel("");
+      setVehColor("");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to register vehicle.", "Error");
+    }
+  };
+
   const handleVisitorDecision = async (requestId: string, approved: boolean) => {
     try {
       const isUuid =
@@ -398,11 +475,10 @@ export function OwnerTenantDashboardView({
         );
       if (isUuid) {
         await visitors.decide.mutateAsync({ requestId, approved });
+        await visitors.refetch();
+        refetchStats?.();
       }
-      setVisitorBannerDismissed(true);
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem("gatesphere_gate_alert_dismissed", "true");
-      }
+      if (pendingVisitor) setDismissedVisitorId(pendingVisitor.id);
       toast.success(
         approved ? "Visitor entry approved for Main Gate 1." : "Visitor entry request rejected.",
         approved ? "Gate Entry Approved" : "Gate Entry Rejected",
@@ -418,16 +494,53 @@ export function OwnerTenantDashboardView({
       toast.error("Please select a visitor category.", "Category Required");
       return;
     }
-    const cleanPhone = passVisitorPhone.trim().replace(/[\s\-()]/g, "");
-    if (!cleanPhone || cleanPhone.length < 5) {
-      toast.error("Please enter a valid mobile number (at least 10 digits).", "Mobile Number Required");
+    const trimmedVisitorName = passVisitorName.trim();
+    if (!trimmedVisitorName || trimmedVisitorName.length < 2) {
+      toast.error("Please enter the visitor's full name.", "Visitor Name Required");
       return;
+    }
+    if (!isValidPersonName(trimmedVisitorName)) {
+      toast.error("Visitor name must contain only alphabetic letters and spaces.", "Validation Error");
+      return;
+    }
+    const cleanPhone = passVisitorPhone.trim().replace(/[\s\-()]/g, "");
+    if (!cleanPhone || !/^\+?[0-9]{7,15}$/.test(cleanPhone)) {
+      toast.error("Please enter a valid mobile number (7-15 digits).", "Mobile Number Required");
+      return;
+    }
+
+    const trimmedId = passIdNumber.trim();
+    if (trimmedId) {
+      const idTypeNorm = passIdType.toLowerCase();
+      if (idTypeNorm === "aadhaar") {
+        const cleanAadhaar = trimmedId.replace(/[\s-]/g, "");
+        if (!/^\d{12}$/.test(cleanAadhaar)) {
+          toast.error("Aadhaar number must be exactly 12 numeric digits.", "Invalid Aadhaar");
+          return;
+        }
+        if (/^(\d)\1{11}$/.test(cleanAadhaar)) {
+          toast.error("Aadhaar number cannot contain all identical repeating digits.", "Invalid Aadhaar");
+          return;
+        }
+      } else if (idTypeNorm === "pan") {
+        const cleanPan = trimmedId.replace(/[\s-]/g, "").toUpperCase();
+        if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(cleanPan)) {
+          toast.error("PAN Card must be 10 characters in format ABCDE1234F.", "Invalid PAN");
+          return;
+        }
+      } else if (idTypeNorm === "voter_id") {
+        const cleanVoter = trimmedId.replace(/[\s-]/g, "").toUpperCase();
+        if (!/^[A-Z]{3}[0-9]{7}$/.test(cleanVoter)) {
+          toast.error("Voter ID must be 10 characters (e.g. ABC1234567).", "Invalid Voter ID");
+          return;
+        }
+      }
     }
 
     try {
       const activeUnitId = profile.data?.occupancies?.[0]?.unit_id;
       const res = await visitors.createPass.mutateAsync({
-        visitor_name: passVisitorName.trim() || "Guest Visitor",
+        visitor_name: passVisitorName.trim(),
         phone: cleanPhone,
         id_type: passIdNumber.trim() ? passIdType : undefined,
         id_number: passIdNumber.trim() ? passIdNumber.trim().toUpperCase() : undefined,
@@ -439,11 +552,13 @@ export function OwnerTenantDashboardView({
         party_size: passPartySize,
         group_label: passGroupLabel.trim() || undefined,
       });
+      await visitors.refetch();
+      refetchStats?.();
       setVisitorPassModalOpen(false);
       setActivePassResult({
         token: res.token,
         pin: res.pin,
-        visitor_name: res.visitor_name || passVisitorName.trim() || "Visitor",
+        visitor_name: res.visitor_name || passVisitorName.trim(),
         category: res.category || passCategory,
         reason: res.reason || passReason.trim() || "Visitor Entry",
         valid_from: res.valid_from,
@@ -491,17 +606,25 @@ export function OwnerTenantDashboardView({
 
   const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!ticketSubject.trim()) {
-      toast.error("Please enter a summary of the issue.", "Subject Required");
+    const subject = ticketSubject.trim();
+    if (!subject || subject.length < 3) {
+      toast.error("Please enter a summary of the issue (at least 3 characters).", "Subject Required");
+      return;
+    }
+    const desc = ticketDescription.trim();
+    if (!desc || desc.length < 5) {
+      toast.error("Please provide a description of the issue (at least 5 characters).", "Description Required");
       return;
     }
     try {
       await complaints.createTicket.mutateAsync({
-        subject: ticketSubject.trim(),
+        subject,
         category: ticketCategory,
-        description: ticketDescription.trim(),
+        description: desc,
         priority: ticketPriority || "medium",
       });
+      await complaints.refetch();
+      refetchStats?.();
       setTicketModalOpen(false);
       setTicketSubject("");
       setTicketDescription("");
@@ -526,44 +649,10 @@ export function OwnerTenantDashboardView({
     (s) => s.is_active && s.day_of_week === currentDayOfWeek
   );
 
-  // If backend returns only 1 wide monolithic slot (>=6 hrs) or no slots, provide standard 2-hr slots
+  // Real database slots filtered for the selected reservation day of week
   const availableDaySlots: AmenitySlot[] = React.useMemo(() => {
-    const isMonolithic = rawDaySlots.length === 1 && (() => {
-      const s = rawDaySlots[0];
-      const startH = parseInt((s.start_time || "06:00").split(":")[0], 10);
-      const endH = parseInt((s.end_time || "22:00").split(":")[0], 10);
-      return (endH - startH) >= 6;
-    })();
-
-    if (rawDaySlots.length > 1 && !isMonolithic) {
-      return rawDaySlots;
-    }
-
-    // Standard 2-hour slots from 06:00 to 22:00
-    const standardIntervals = [
-      { start: "06:00", end: "08:00" },
-      { start: "08:00", end: "10:00" },
-      { start: "10:00", end: "12:00" },
-      { start: "12:00", end: "14:00" },
-      { start: "14:00", end: "16:00" },
-      { start: "16:00", end: "18:00" },
-      { start: "18:00", end: "20:00" },
-      { start: "20:00", end: "22:00" },
-    ];
-
-    const baseSlot = rawDaySlots[0];
-    return standardIntervals.map((interval, idx) => ({
-      id: baseSlot?.id && idx === 0 ? baseSlot.id : (baseSlot ? `${baseSlot.id}_slot_${idx}` : `slot_${currentDayOfWeek}_${idx}`),
-      community_id: baseSlot?.community_id || activeCommunityId || "",
-      amenity_id: selectedAmenity?.id || "",
-      day_of_week: currentDayOfWeek,
-      start_time: interval.start,
-      end_time: interval.end,
-      capacity: baseSlot?.capacity || selectedAmenity?.capacity || 20,
-      fee: baseSlot?.fee || "0",
-      is_active: true,
-    }));
-  }, [rawDaySlots, selectedAmenity, currentDayOfWeek, activeCommunityId]);
+    return rawDaySlots;
+  }, [rawDaySlots]);
 
   useEffect(() => {
     if (availableDaySlots.length > 0) {
@@ -625,6 +714,9 @@ export function OwnerTenantDashboardView({
         date: bookingDate,
         guests: bookingGuests,
       });
+      await amenities.bookings.refetch();
+      await amenities.amenities.refetch();
+      refetchStats?.();
       setAmenityBookingModalOpen(false);
       toast.success(
         `Booking confirmed for ${selectedAmenity.name} on ${bookingDate} (${bookingGuests} person(s))!`,
@@ -647,6 +739,9 @@ export function OwnerTenantDashboardView({
     if (!bookingToCancel) return;
     try {
       await amenities.cancelBooking.mutateAsync(bookingToCancel.id);
+      await amenities.bookings.refetch();
+      await amenities.amenities.refetch();
+      refetchStats?.();
       const amenityName = bookingToCancel.amenity_name;
       setBookingToCancel(null);
       toast.success(`Reservation for ${amenityName} has been cancelled.`, "Booking Cancelled");
@@ -657,19 +752,32 @@ export function OwnerTenantDashboardView({
 
   const handleSaveMember = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMemberName.trim() || !newMemberPhone.trim()) {
-      toast.error("Please enter a valid full name and mobile number.", "Validation Error");
+    const trimmedName = newMemberName.trim();
+    if (!trimmedName || trimmedName.length < 2) {
+      toast.error("Please enter family member's full name (at least 2 characters).", "Validation Error");
+      return;
+    }
+    if (!isValidPersonName(trimmedName)) {
+      toast.error("Family member name must contain only alphabetic letters and spaces.", "Validation Error");
+      return;
+    }
+    const cleanPhone = newMemberPhone.trim().replace(/[\s\-()]/g, "");
+    if (!cleanPhone || !/^\+?[0-9]{7,15}$/.test(cleanPhone)) {
+      toast.error("Please enter a valid mobile number (7-15 digits).", "Validation Error");
       return;
     }
     try {
       await family.addMember.mutateAsync({
-        name: newMemberName.trim(),
+        name: trimmedName,
         relation: newMemberRelation,
-        phone: newMemberPhone.trim(),
+        phone: cleanPhone,
         access_enabled: newMemberAccess,
       });
+      await family.refetch();
+      await profile.refetch();
+      refetchStats?.();
       setAddMemberModalOpen(false);
-      const addedName = newMemberName;
+      const addedName = trimmedName;
       setNewMemberName("");
       setNewMemberPhone("");
       setNewMemberRelation("Spouse");
@@ -686,15 +794,32 @@ export function OwnerTenantDashboardView({
   const handleUpdateMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingMember) return;
+    const trimmedName = (editingMember.name || "").trim();
+    if (!trimmedName || trimmedName.length < 2) {
+      toast.error("Please enter family member's full name (at least 2 characters).", "Validation Error");
+      return;
+    }
+    if (!isValidPersonName(trimmedName)) {
+      toast.error("Family member name must contain only alphabetic letters and spaces.", "Validation Error");
+      return;
+    }
+    const cleanPhone = (editingMember.phone || "").trim().replace(/[\s\-()]/g, "");
+    if (!cleanPhone || !/^\+?[0-9]{7,15}$/.test(cleanPhone)) {
+      toast.error("Please enter a valid mobile number (7-15 digits).", "Validation Error");
+      return;
+    }
     try {
       await family.updateMember.mutateAsync({
         id: editingMember.id,
-        name: editingMember.name,
+        name: trimmedName,
         relation: editingMember.relation,
-        phone: editingMember.phone,
+        phone: cleanPhone,
         access_enabled: editingMember.access_enabled,
       });
-      const updatedName = editingMember.name;
+      await family.refetch();
+      await profile.refetch();
+      refetchStats?.();
+      const updatedName = trimmedName;
       setEditingMember(null);
       toast.success(
         `${updatedName}'s record and gate pre-approval status updated.`,
@@ -718,15 +843,41 @@ export function OwnerTenantDashboardView({
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    const trimmedFullName = profileFullName.trim();
+    if (trimmedFullName && !isValidPersonName(trimmedFullName)) {
+      toast.error("Full name must contain only alphabetic letters and spaces.", "Validation Error");
+      return;
+    }
+
+    const trimmedEmergencyName = profileEmergencyName.trim();
+    if (trimmedEmergencyName && !isValidPersonName(trimmedEmergencyName)) {
+      toast.error("Emergency contact name must contain only alphabetic letters and spaces.", "Validation Error");
+      return;
+    }
+
+    const cleanPhone = profilePhone.trim().replace(/[\s\-()]/g, "");
+    if (cleanPhone && !/^\+?[0-9]{7,15}$/.test(cleanPhone)) {
+      toast.error("Please enter a valid primary phone number (7-15 digits).", "Validation Error");
+      return;
+    }
+
+    const cleanEmergencyPhone = profileEmergencyPhone.trim().replace(/[\s\-()]/g, "");
+    if (cleanEmergencyPhone && !/^\+?[0-9]{7,15}$/.test(cleanEmergencyPhone)) {
+      toast.error("Please enter a valid emergency contact phone number (7-15 digits).", "Validation Error");
+      return;
+    }
+
     try {
       await profile.updateProfile.mutateAsync({
-        full_name: profileFullName.trim() || undefined,
-        phone: profilePhone.trim() || undefined,
+        full_name: trimmedFullName || undefined,
+        phone: cleanPhone || undefined,
         emergency_notes: profileEmergencyNotes.trim() || undefined,
-        emergency_contact_name: profileEmergencyName.trim() || undefined,
-        emergency_contact_phone: profileEmergencyPhone.trim() || undefined,
+        emergency_contact_name: trimmedEmergencyName || undefined,
+        emergency_contact_phone: cleanEmergencyPhone || undefined,
         emergency_contact_relationship: profileEmergencyRel.trim() || undefined,
       });
+      await profile.refetch();
+      refetchStats?.();
       toast.success("Your resident profile and emergency contact details have been updated.", "Profile Saved");
       setEditProfileOpen(false);
     } catch (err: any) {
@@ -742,6 +893,9 @@ export function OwnerTenantDashboardView({
         amount: selectedInvoice.balance_due,
         method: "simulated_gateway",
       });
+      await payments.refetch();
+      await ledger.refetch();
+      refetchStats?.();
       const generatedRcp =
         res?.receipt_number ||
         (res?.id ? `RCP-${res.id.slice(0, 8).toUpperCase()}` : `RCP-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
@@ -871,8 +1025,28 @@ export function OwnerTenantDashboardView({
       description={currentMeta.description}
       accentColor="#1D4ED8"
       headerActions={
-        <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", flexWrap: "wrap" }}>
           <LiveDot label="GATE RECOGNITION LIVE" />
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={handleManualRefresh}
+            disabled={isRefreshing}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.35rem",
+              fontSize: "0.8rem",
+              padding: "0.35rem 0.65rem",
+              background: "#FFFFFF",
+              border: "1px solid var(--border-standard)",
+              borderRadius: "6px",
+              cursor: isRefreshing ? "not-allowed" : "pointer",
+            }}
+          >
+            <span className={isRefreshing ? "spin" : ""}>🔄</span>
+            {isRefreshing ? "Refreshing…" : "Refresh"}
+          </button>
           <BrandButton variant="danger" size="sm" onClick={() => setSosModalOpen(true)}>
             🆘 One-Tap SOS
           </BrandButton>
@@ -1144,7 +1318,7 @@ export function OwnerTenantDashboardView({
                 label="Booked Amenities"
                 value={stats?.upcoming_amenity_bookings ?? 0}
                 accentColor="#9333EA"
-                icon="🏊"
+                icon={nextBooking ? getAmenityIcon(nextBooking.amenity_name) : "🏊"}
                 description={
                   nextBooking
                     ? `${nextBooking.amenity_name} (${formatDate(nextBooking.date)})`
@@ -1296,12 +1470,27 @@ export function OwnerTenantDashboardView({
                 Manage your personal identification, contact coordinates, and emergency escalation protocols.
               </p>
             </div>
-            <BrandButton
-              size="sm"
-              onClick={handleOpenEditProfile}
-            >
-              ✏️ Edit Profile
-            </BrandButton>
+            <div style={{ display: "flex", gap: "0.5rem" }}>
+              <BrandButton
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setPasswordError("");
+                  setCurrentPassword("");
+                  setNewPassword("");
+                  setConfirmPassword("");
+                  setChangePasswordModalOpen(true);
+                }}
+              >
+                🔒 Change Password
+              </BrandButton>
+              <BrandButton
+                size="sm"
+                onClick={handleOpenEditProfile}
+              >
+                ✏️ Edit Profile
+              </BrandButton>
+            </div>
           </div>
           {profile.isError ? (
             <ErrorState
@@ -1474,7 +1663,7 @@ export function OwnerTenantDashboardView({
                   Assigned Parking
                 </div>
                 <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>
-                  {(vehicles.data || []).find((v) => v.slot !== "Not Allocated")?.slot ||
+                  {(vehicles.vehiclesList || []).find((v: ResidentVehicle) => v.slot !== "Not Allocated")?.slot ||
                     "No slot allocated"}
                 </div>
               </div>
@@ -1499,8 +1688,7 @@ export function OwnerTenantDashboardView({
             <div>
               <h3 className="card-h3" style={{ margin: 0 }}>Family Members (Gate Pre-Approved)</h3>
               <p style={{ color: "var(--brand-body)", fontSize: "13.5px", margin: "0.25rem 0 0 0" }}>
-                Family members listed here feed the gate recognition system and automatically bypass
-                manual guard approval upon entry.
+                Family members have a permanent gate pass (reusable QR code & 6-digit gate PIN) that bypasses manual guard approval.
               </p>
             </div>
             <BrandButton
@@ -1614,6 +1802,31 @@ export function OwnerTenantDashboardView({
                   header: "Actions",
                   render: (m) => (
                     <div style={{ display: "flex", gap: "0.5rem" }}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{
+                          padding: "0.25rem 0.6rem",
+                          fontSize: "12px",
+                          color: "var(--brand-primary)",
+                          borderColor: "var(--brand-primary)",
+                          fontWeight: 600,
+                        }}
+                        onClick={() =>
+                          setSelectedFamilyPassMember({
+                            id: m.id,
+                            name: m.name,
+                            relation: m.relation,
+                            phone: m.phone,
+                            unit_number: m.unit_number || residentUnit,
+                            access_enabled: m.access_enabled,
+                            pass_token: m.pass_token,
+                            pin: m.pin,
+                          })
+                        }
+                      >
+                        🎫 View Pass
+                      </button>
                       <button
                         type="button"
                         className="btn btn-secondary"
@@ -1958,7 +2171,16 @@ export function OwnerTenantDashboardView({
             ) : (
               <DataTable<AmenityBooking>
                 columns={[
-                  { key: "amenity_name", header: "Facility Name" },
+                  {
+                    key: "amenity_name",
+                    header: "Facility Name",
+                    render: (i) => (
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <span>{getAmenityIcon(i.amenity_name)}</span>
+                        <span style={{ fontWeight: 600 }}>{i.amenity_name}</span>
+                      </div>
+                    ),
+                  },
                   { key: "date", header: "Reserved Date" },
                   {
                     key: "start_time",
@@ -2061,45 +2283,97 @@ export function OwnerTenantDashboardView({
                   gap: "1.25rem",
                 }}
               >
-                {(amenities.amenities.data || []).map((amenity) => (
+                {(amenities.amenities.data || []).map((amenity) => {
+                  // Dynamic capacity: count today's confirmed bookings for this amenity
+                  const todayStr = new Date().toISOString().split("T")[0];
+                  const todayBooked = (amenities.bookings.data || [])
+                    .filter(
+                      (b) =>
+                        b.amenity_id === amenity.id &&
+                        b.date === todayStr &&
+                        b.status !== "cancelled"
+                    )
+                    .reduce((sum, b) => sum + (b.guests_count || 1), 0);
+                  const totalCap = amenity.capacity || 20;
+                  const remaining = Math.max(0, totalCap - todayBooked);
+                  const capColor =
+                    remaining === 0
+                      ? "#dc2626"
+                      : remaining <= Math.ceil(totalCap * 0.25)
+                        ? "#f59e0b"
+                        : "#16a34a";
+
+                  return (
                   <div key={amenity.id} className="gs-card card-hover">
-                    <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>🏊</div>
+                    <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>
+                      {getAmenityIcon(amenity.name, amenity.category, amenity.description)}
+                    </div>
                     <h4 style={{ fontWeight: 800, fontSize: "16px" }}>{amenity.name}</h4>
                     <p
                       style={{
                         fontSize: "13px",
                         color: "var(--brand-body)",
-                        margin: "0.5rem 0 1rem 0",
+                        margin: "0.5rem 0 0.5rem 0",
                       }}
                     >
                       {amenity.description}
                     </p>
+                    {/* Dynamic remaining capacity badge */}
                     <div
                       style={{
-                        display: "flex",
-                        justifyContent: "space-between",
+                        display: "inline-flex",
                         alignItems: "center",
+                        gap: "0.35rem",
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        color: capColor,
+                        background: `${capColor}14`,
+                        borderRadius: "6px",
+                        padding: "3px 8px",
+                        marginBottom: "0.75rem",
                       }}
                     >
                       <span
-                        style={{ fontSize: "13px", fontWeight: 700, color: "var(--brand-primary)" }}
-                      >
-                        {amenity.price_per_hour > 0
-                          ? `${formatCurrency(amenity.price_per_hour)}/hr`
-                          : "Free for Residents"}
-                      </span>
-                      <BrandButton
-                        size="sm"
-                        onClick={() => {
-                          setSelectedAmenity(amenity);
-                          setAmenityBookingModalOpen(true);
+                        style={{
+                          width: "7px",
+                          height: "7px",
+                          borderRadius: "50%",
+                          background: capColor,
+                          display: "inline-block",
+                        }}
+                      />
+                      {remaining === 0
+                        ? "Fully Booked Today"
+                        : `${remaining} of ${totalCap} spots available today`}
+                    </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
                         }}
                       >
-                        Reserve Slot
-                      </BrandButton>
+                        <span
+                          style={{ fontSize: "13px", fontWeight: 700, color: "var(--brand-primary)" }}
+                        >
+                          {amenity.price_per_hour > 0
+                            ? `${formatCurrency(amenity.price_per_hour)}/hr`
+                            : "Free for Residents"}
+                        </span>
+                        <BrandButton
+                          size="sm"
+                          disabled={remaining === 0}
+                          onClick={() => {
+                            setSelectedAmenity(amenity);
+                            setAmenityBookingModalOpen(true);
+                          }}
+                        >
+                          {remaining === 0 ? "Fully Booked" : "Reserve Slot"}
+                        </BrandButton>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -2308,13 +2582,19 @@ export function OwnerTenantDashboardView({
                           <BrandButton
                             size="sm"
                             isLoading={complaints.confirmTicket.isPending}
-                            onClick={() =>
-                              complaints.confirmTicket.mutateAsync({
-                                ticketId: i.id,
-                                satisfied: true,
-                                notes: "Fix confirmed by resident",
-                              }).catch((e: any) => toast.error(e?.message || "Failed to confirm.", "Error"))
-                            }
+                            onClick={async () => {
+                              try {
+                                await complaints.confirmTicket.mutateAsync({
+                                  ticketId: i.id,
+                                  satisfied: true,
+                                  notes: "Fix confirmed by resident",
+                                });
+                                await complaints.refetch();
+                                refetchStats?.();
+                              } catch (e: any) {
+                                toast.error(e?.message || "Failed to confirm.", "Error");
+                              }
+                            }}
                           >
                             ✓ Confirm Fix
                           </BrandButton>
@@ -2323,13 +2603,19 @@ export function OwnerTenantDashboardView({
                             variant="outline"
                             style={{ borderColor: "#FECACA", color: "#DC2626" }}
                             isLoading={complaints.confirmTicket.isPending}
-                            onClick={() =>
-                              complaints.confirmTicket.mutateAsync({
-                                ticketId: i.id,
-                                satisfied: false,
-                                notes: "Issue not resolved — disputed by resident",
-                              }).catch((e: any) => toast.error(e?.message || "Failed to dispute.", "Error"))
-                            }
+                            onClick={async () => {
+                              try {
+                                await complaints.confirmTicket.mutateAsync({
+                                  ticketId: i.id,
+                                  satisfied: false,
+                                  notes: "Issue not resolved — disputed by resident",
+                                });
+                                await complaints.refetch();
+                                refetchStats?.();
+                              } catch (e: any) {
+                                toast.error(e?.message || "Failed to dispute.", "Error");
+                              }
+                            }}
                           >
                             ✗ Dispute
                           </BrandButton>
@@ -2373,6 +2659,7 @@ export function OwnerTenantDashboardView({
       {/* TAB 10: VEHICLES & PARKING */}
       {activeTab === "vehicles" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+          {/* CARD 1: REGISTERED VEHICLES */}
           <div className="gs-card">
             <div
               style={{
@@ -2384,11 +2671,16 @@ export function OwnerTenantDashboardView({
                 gap: "0.75rem",
               }}
             >
-              <h3 className="card-h3" style={{ margin: 0 }}>
-                Registered Vehicles & Parking Allocation
-              </h3>
+              <div>
+                <h3 className="card-h3" style={{ margin: 0 }}>
+                  Registered Vehicles & Gate RFID
+                </h3>
+                <p style={{ color: "var(--brand-body)", fontSize: "13.5px", marginTop: "0.2rem" }}>
+                  Vehicles linked to your unit for gate boom barrier entry & parking allocation.
+                </p>
+              </div>
               <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-                <div style={{ width: "min(100%, 240px)" }}>
+                <div style={{ width: "min(100%, 220px)" }}>
                   <DebouncedInput
                     value={vehicleControls.searchTerm}
                     onChange={vehicleControls.setSearchTerm}
@@ -2400,8 +2692,23 @@ export function OwnerTenantDashboardView({
                   value={vehicleControls.sortPreset}
                   onChange={vehicleControls.setSortPreset}
                 />
+                <BrandButton
+                  variant="primary"
+                  size="sm"
+                  onClick={() => {
+                    setVehRegNumber("");
+                    setVehType("car");
+                    setVehMake("");
+                    setVehModel("");
+                    setVehColor("");
+                    setRegisterVehicleModalOpen(true);
+                  }}
+                >
+                  + Register Vehicle
+                </BrandButton>
               </div>
             </div>
+
             {vehicles.isError ? (
               <ErrorState
                 title="Failed to Load Vehicles"
@@ -2414,25 +2721,34 @@ export function OwnerTenantDashboardView({
                   {
                     key: "plate",
                     header: "License Plate",
-                    render: (i) => <code style={{ fontWeight: 800 }}>{i.plate}</code>,
+                    render: (i) => (
+                      <span style={{ fontFamily: "monospace", fontWeight: 800, color: "var(--brand-heading)" }}>
+                        🚗 {i.plate}
+                      </span>
+                    ),
                   },
                   { key: "make_model", header: "Make & Model" },
                   {
+                    key: "vehicle_type",
+                    header: "Category",
+                    render: (i) => <span style={{ textTransform: "capitalize" }}>{i.vehicle_type}</span>,
+                  },
+                  {
                     key: "slot",
-                    header: "Allocated Slot",
+                    header: "Allocated Parking Slot",
                     render: (i) => (
-                      <span style={{ fontWeight: 700, color: "var(--brand-primary)" }}>{i.slot}</span>
+                      <span style={{ fontWeight: 700, color: "var(--brand-primary)" }}>🅿️ {i.slot}</span>
                     ),
                   },
-                  { key: "rfid_tag", header: "Gate FastTag / RFID" },
+                  { key: "rfid_tag", header: "Gate FastTag / RFID Sticker" },
                   {
                     key: "violations",
-                    header: "Recorded Violations",
+                    header: "Violations Flagged",
                     render: (i) =>
                       i.violations === 0 ? (
                         <StatusBadge status="active" label="0 Violations" />
                       ) : (
-                        <StatusBadge status="warning" label={`${i.violations} Warning`} />
+                        <StatusBadge status="warning" label={`${i.violations} Violation(s)`} />
                       ),
                   },
                 ]}
@@ -2443,10 +2759,98 @@ export function OwnerTenantDashboardView({
                 total={vehicleControls.total}
                 onPageChange={vehicleControls.setPage}
                 onPageSizeChange={vehicleControls.setPageSize}
-                emptyTitle="No vehicles registered"
-                emptyDescription="Contact your facility office or community admin to link registered vehicles."
+                emptyTitle="No vehicles registered for your unit"
+                emptyDescription="Click '+ Register Vehicle' above to add your car or motorcycle to your unit."
               />
             )}
+          </div>
+
+          {/* CARD 2: PARKING SLOT ALLOCATIONS */}
+          <div className="gs-card">
+            <h3 className="card-h3" style={{ marginBottom: "0.25rem" }}>
+              Assigned Parking Slots
+            </h3>
+            <p style={{ color: "var(--brand-body)", fontSize: "13.5px", marginBottom: "1rem" }}>
+              Active parking space allocations assigned to your residential unit.
+            </p>
+            <DataTable
+              columns={[
+                {
+                  key: "slot_code",
+                  header: "Slot Number",
+                  render: (a) => (
+                    <span style={{ fontWeight: 800, color: "var(--brand-primary)" }}>
+                      🅿️ {a.slot_code}
+                    </span>
+                  ),
+                },
+                { key: "slot_type", header: "Slot Category" },
+                {
+                  key: "status",
+                  header: "Status",
+                  render: (a) => <StatusBadge status={a.status} />,
+                },
+                {
+                  key: "valid_from",
+                  header: "Allocated Date",
+                  render: (a) => formatDate(a.valid_from),
+                },
+              ]}
+              data={vehicles.allocationsList || []}
+              isLoading={vehicles.isLoading}
+              emptyTitle="No parking slots assigned"
+              emptyDescription="No parking slot allocation found for this unit."
+            />
+          </div>
+
+          {/* CARD 3: PARKING VIOLATIONS & GATE FLAGS LOG */}
+          <div className="gs-card">
+            <h3 className="card-h3" style={{ marginBottom: "0.25rem" }}>
+              Parking Violations & Gate Security Log
+            </h3>
+            <p style={{ color: "var(--brand-body)", fontSize: "13.5px", marginBottom: "1rem" }}>
+              Log of misparked vehicles, unauthorized parking, or security gate flags reported by guards.
+            </p>
+            <DataTable
+              columns={[
+                {
+                  key: "plate_number",
+                  header: "Vehicle Plate",
+                  render: (v) => (
+                    <span style={{ fontFamily: "monospace", fontWeight: 700 }}>{v.plate_number}</span>
+                  ),
+                },
+                { key: "violation_type", header: "Violation Type" },
+                { key: "slot_code", header: "Location / Slot" },
+                { key: "notes", header: "Guard Security Notes" },
+                {
+                  key: "penalty_amount",
+                  header: "Penalty / Fine",
+                  render: (v) =>
+                    v.penalty_amount > 0 ? (
+                      <span style={{ fontWeight: 700, color: "#DC2626" }}>
+                        {formatCurrency(v.penalty_amount)}
+                      </span>
+                    ) : (
+                      <span style={{ color: "var(--brand-body)" }}>Warning Only</span>
+                    ),
+                },
+                {
+                  key: "status",
+                  header: "Status",
+                  render: (v) => <StatusBadge status={v.status} />,
+                },
+                {
+                  key: "created_at",
+                  header: "Reported Time",
+                  render: (v) => formatDate(v.created_at),
+                },
+              ]}
+              data={vehicles.violationsList || []}
+              isLoading={vehicles.isLoading}
+              emptyTitle="No Parking Violations"
+              emptyDescription="No parking violations or gate flags recorded for your unit."
+            />
           </div>
         </div>
       )}
@@ -2563,6 +2967,8 @@ export function OwnerTenantDashboardView({
                             if (window.confirm(`Are you sure you want to end service for ${i.name}?`)) {
                               try {
                                 await endAssignmentMutation.mutateAsync(i.id);
+                                await domesticStaff.refetch();
+                                refetchStats?.();
                                 toast.success(`Service ended for ${i.name}`);
                               } catch (err: any) {
                                 toast.error(err?.message || "Failed to end service");
@@ -2867,41 +3273,95 @@ export function OwnerTenantDashboardView({
             <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>No notifications yet.</p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
-              {(myNotifications.data || []).map((n) => (
-                <div
-                  key={n.id}
-                  style={{
-                    padding: "1rem",
-                    border: n.is_read
-                      ? "1px solid var(--border-standard)"
-                      : "1px solid var(--brand-primary)",
-                    borderRadius: "8px",
-                    background: n.is_read ? "#F8FAFC" : "#EFF6FF",
-                  }}
-                >
+              {(myNotifications.data || []).map((n) => {
+                const isDeliveryNotif =
+                  n.reference_type === "delivery" || (n.notification_type && n.notification_type.includes("delivery"));
+                const isVisitorNotif =
+                  n.reference_type === "visitor_request" || (n.notification_type && n.notification_type.includes("visitor"));
+                const refId = n.reference_id;
+
+                return (
                   <div
+                    key={n.id}
                     style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      marginBottom: "0.25rem",
-                      flexWrap: "wrap",
-                      gap: "0.5rem",
+                      padding: "1rem",
+                      border: n.is_read
+                        ? "1px solid var(--border-standard)"
+                        : "1px solid var(--brand-primary)",
+                      borderRadius: "8px",
+                      background: n.is_read ? "#F8FAFC" : "#EFF6FF",
                     }}
                   >
-                    <h4
-                      style={{ fontWeight: 700, fontSize: "14px", color: "var(--brand-heading)", margin: 0 }}
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        marginBottom: "0.25rem",
+                        flexWrap: "wrap",
+                        gap: "0.5rem",
+                      }}
                     >
-                      {n.title}
-                    </h4>
-                    <span style={{ fontSize: "11px", color: "var(--brand-body)" }}>
-                      {formatDate(n.created_at)}
-                    </span>
+                      <h4
+                        style={{ fontWeight: 700, fontSize: "14px", color: "var(--brand-heading)", margin: 0 }}
+                      >
+                        {n.title}
+                      </h4>
+                      <span style={{ fontSize: "11px", color: "var(--brand-body)" }}>
+                        {formatDate(n.created_at)}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: "13px", color: "var(--brand-body)", margin: 0 }}>
+                      {n.body || (n as any).message}
+                    </p>
+
+                    {(isDeliveryNotif || isVisitorNotif) && refId && (
+                      <div style={{ marginTop: "0.75rem", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          style={{
+                            fontSize: "0.775rem",
+                            padding: "0.3rem 0.75rem",
+                            background: "#059669",
+                            borderColor: "#059669",
+                            color: "#FFFFFF",
+                            fontWeight: 700,
+                          }}
+                          onClick={async () => {
+                            if (isDeliveryNotif) {
+                              await handleDecideDelivery(refId, true);
+                            } else {
+                              await handleVisitorDecision(refId, true);
+                            }
+                            myNotifications.refetch();
+                          }}
+                        >
+                          ✓ Approve
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-danger"
+                          style={{
+                            fontSize: "0.775rem",
+                            padding: "0.3rem 0.75rem",
+                            fontWeight: 700,
+                          }}
+                          onClick={async () => {
+                            if (isDeliveryNotif) {
+                              await handleDecideDelivery(refId, false);
+                            } else {
+                              await handleVisitorDecision(refId, false);
+                            }
+                            myNotifications.refetch();
+                          }}
+                        >
+                          ✕ Reject
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <p style={{ fontSize: "13px", color: "var(--brand-body)", margin: 0 }}>
-                    {n.body}
-                  </p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -3039,13 +3499,14 @@ export function OwnerTenantDashboardView({
                 marginBottom: "0.35rem",
               }}
             >
-              Visitor Name <span style={{ fontSize: "11.5px", color: "var(--muted)", fontWeight: 400 }}>(Optional)</span>
+              Visitor Name <span style={{ color: "var(--danger)" }}>*</span>
             </label>
             <input
               className="input-field"
               placeholder="e.g. Vikram Sharma"
               value={passVisitorName}
               onChange={(e) => setPassVisitorName(e.target.value)}
+              required
             />
           </div>
           <div>
@@ -3113,8 +3574,8 @@ export function OwnerTenantDashboardView({
                   passIdType === "aadhaar"
                     ? "e.g. 1234 5678 9012"
                     : passIdType === "pan"
-                    ? "e.g. ABCDE1234F"
-                    : "Enter Govt ID number"
+                      ? "e.g. ABCDE1234F"
+                      : "Enter Govt ID number"
                 }
                 value={passIdNumber}
                 onChange={(e) => setPassIdNumber(e.target.value.toUpperCase())}
@@ -3593,6 +4054,7 @@ export function OwnerTenantDashboardView({
               Mobile Phone
             </label>
             <input
+              type="tel"
               className="input-field"
               placeholder="+91 98765 43210"
               value={newMemberPhone}
@@ -3720,6 +4182,7 @@ export function OwnerTenantDashboardView({
                 Mobile Phone
               </label>
               <input
+                type="tel"
                 className="input-field"
                 value={editingMember.phone}
                 onChange={(e) => setEditingMember({ ...editingMember, phone: e.target.value })}
@@ -3843,6 +4306,9 @@ export function OwnerTenantDashboardView({
                 if (!memberToDelete) return;
                 try {
                   await family.removeMember.mutateAsync(memberToDelete.id);
+                  await family.refetch();
+                  await profile.refetch();
+                  refetchStats?.();
                   const removedName = memberToDelete.name;
                   setMemberToDelete(null);
                   toast.success(
@@ -3859,6 +4325,13 @@ export function OwnerTenantDashboardView({
           </div>
         </div>
       </Modal>
+
+      {/* Permanent Family Member Pass Modal (QR & OTP) */}
+      <FamilyMemberPassModal
+        isOpen={Boolean(selectedFamilyPassMember)}
+        onClose={() => setSelectedFamilyPassMember(null)}
+        member={selectedFamilyPassMember}
+      />
 
       {/* Ticket Modal */}
       <Modal
@@ -3972,12 +4445,21 @@ export function OwnerTenantDashboardView({
                 alignItems: "center",
               }}
             >
-              <div>
-                <strong style={{ fontSize: "14px", color: "var(--brand-heading)" }}>
-                  {selectedAmenity.name}
-                </strong>
-                <div style={{ fontSize: "12px", color: "var(--brand-body)", marginTop: "0.15rem" }}>
-                  Max Total Capacity: {selectedAmenity.capacity} persons
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                <span style={{ fontSize: "1.75rem", lineHeight: 1 }}>
+                  {getAmenityIcon(
+                    selectedAmenity.name,
+                    selectedAmenity.category,
+                    selectedAmenity.description,
+                  )}
+                </span>
+                <div>
+                  <strong style={{ fontSize: "14px", color: "var(--brand-heading)" }}>
+                    {selectedAmenity.name}
+                  </strong>
+                  <div style={{ fontSize: "12px", color: "var(--brand-body)", marginTop: "0.15rem" }}>
+                    Max Total Capacity: {selectedAmenity.capacity} persons
+                  </div>
                 </div>
               </div>
               <span
@@ -4628,6 +5110,116 @@ export function OwnerTenantDashboardView({
         </form>
       </Modal>
 
+      {/* Change Password Modal */}
+      <Modal
+        isOpen={changePasswordModalOpen}
+        onClose={() => setChangePasswordModalOpen(false)}
+        title="🔒 Change Account Password"
+        size="sm"
+      >
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setPasswordError("");
+            if (newPassword.length < 8) {
+              setPasswordError("New password must be at least 8 characters long.");
+              return;
+            }
+            if (newPassword !== confirmPassword) {
+              setPasswordError("New password and confirmation do not match.");
+              return;
+            }
+            if (currentPassword === newPassword) {
+              setPasswordError("New password must be different from current password.");
+              return;
+            }
+            try {
+              setIsChangingPassword(true);
+              await authApi.changePassword({
+                current_password: currentPassword,
+                new_password: newPassword,
+              });
+              setChangePasswordModalOpen(false);
+              setCurrentPassword("");
+              setNewPassword("");
+              setConfirmPassword("");
+              toast.success("Your password was changed successfully.", "Password Updated");
+            } catch (err: any) {
+              setPasswordError(err?.message || "Failed to change password. Check your current password.");
+            } finally {
+              setIsChangingPassword(false);
+            }
+          }}
+          style={{ display: "flex", flexDirection: "column", gap: "1rem", padding: "0.25rem 0" }}
+        >
+          {passwordError && (
+            <div
+              style={{
+                padding: "0.6rem 0.8rem",
+                borderRadius: "6px",
+                background: "#FEF2F2",
+                border: "1px solid #FECACA",
+                color: "#991B1B",
+                fontSize: "13px",
+              }}
+            >
+              ⚠️ {passwordError}
+            </div>
+          )}
+
+          <div>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+              Current Password *
+            </label>
+            <input
+              type="password"
+              className="input-field"
+              placeholder="Enter current password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              required
+            />
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+              New Password *
+            </label>
+            <input
+              type="password"
+              className="input-field"
+              placeholder="At least 8 characters"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              required
+            />
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+              Confirm New Password *
+            </label>
+            <input
+              type="password"
+              className="input-field"
+              placeholder="Re-enter new password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+            />
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
+            <BrandButton type="button" variant="outline" onClick={() => setChangePasswordModalOpen(false)}>
+              Cancel
+            </BrandButton>
+            <BrandButton type="submit" isLoading={isChangingPassword}>
+              Update Password
+            </BrandButton>
+          </div>
+        </form>
+      </Modal>
+
       {/* Rate Maintenance Complaint Modal */}
       <Modal
         isOpen={feedbackModalOpen}
@@ -4814,6 +5406,8 @@ export function OwnerTenantDashboardView({
                 time_to: assignTimeTo ? `${assignTimeTo}:00` : undefined,
                 days_of_week: assignDays.length > 0 ? assignDays : undefined,
               });
+              await domesticStaff.refetch();
+              refetchStats?.();
               toast.success("Domestic staff assigned to your unit successfully!");
               setAssignStaffModalOpen(false);
               setAssignStaffId("");
@@ -4945,6 +5539,124 @@ export function OwnerTenantDashboardView({
             </BrandButton>
             <BrandButton type="submit" isLoading={assignStaffMutation.isPending}>
               Assign Staff
+            </BrandButton>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Register Vehicle Modal */}
+      <Modal
+        isOpen={registerVehicleModalOpen}
+        onClose={() => setRegisterVehicleModalOpen(false)}
+        title="🚗 Register Vehicle"
+        size="md"
+      >
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const plate = vehRegNumber.trim().toUpperCase();
+            if (!plate) {
+              toast.error("Please enter a vehicle registration/plate number.");
+              return;
+            }
+            try {
+              await registerVehicleMutation.mutateAsync({
+                registration_number: plate,
+                vehicle_type: vehType,
+                make: vehMake.trim() || undefined,
+                model: vehModel.trim() || undefined,
+                color: vehColor.trim() || undefined,
+              });
+              await vehicles.refetch();
+              setRegisterVehicleModalOpen(false);
+              toast.success(`Vehicle ${plate} registered successfully!`, "Vehicle Registered");
+            } catch (err: any) {
+              toast.error(err?.message || "Failed to register vehicle.");
+            }
+          }}
+          style={{ display: "flex", flexDirection: "column", gap: "1rem", padding: "0.25rem 0" }}
+        >
+          <div>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+              License Plate / Registration Number *
+            </label>
+            <input
+              type="text"
+              className="input-field"
+              placeholder="e.g. KA01AB1234"
+              value={vehRegNumber}
+              onChange={(e) => setVehRegNumber(e.target.value)}
+              required
+            />
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+              Vehicle Type *
+            </label>
+            <select
+              className="input-field"
+              value={vehType}
+              onChange={(e) => setVehType(e.target.value)}
+              required
+            >
+              <option value="car">Car (Sedan / Hatchback / SUV)</option>
+              <option value="bike">Motorcycle / Bike</option>
+              <option value="scooter">Scooter</option>
+              <option value="ev_car">Electric Car (EV)</option>
+              <option value="ev_bike">Electric 2-Wheeler (EV)</option>
+              <option value="bicycle">Bicycle</option>
+              <option value="commercial">Commercial / Van</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+            <div>
+              <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+                Make / Brand
+              </label>
+              <input
+                type="text"
+                className="input-field"
+                placeholder="e.g. Honda, Hyundai"
+                value={vehMake}
+                onChange={(e) => setVehMake(e.target.value)}
+              />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+                Model
+              </label>
+              <input
+                type="text"
+                className="input-field"
+                placeholder="e.g. City, Creta"
+                value={vehModel}
+                onChange={(e) => setVehModel(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+              Color
+            </label>
+            <input
+              type="text"
+              className="input-field"
+              placeholder="e.g. White, Silver, Black"
+              value={vehColor}
+              onChange={(e) => setVehColor(e.target.value)}
+            />
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
+            <BrandButton type="button" variant="outline" onClick={() => setRegisterVehicleModalOpen(false)}>
+              Cancel
+            </BrandButton>
+            <BrandButton type="submit" isLoading={registerVehicleMutation.isPending}>
+              Register Vehicle
             </BrandButton>
           </div>
         </form>

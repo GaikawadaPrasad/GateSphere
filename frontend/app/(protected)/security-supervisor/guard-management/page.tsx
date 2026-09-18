@@ -7,7 +7,8 @@ import { Modal } from "@/components/common/Modal";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { gateApi, guardsApi } from "@/lib/api";
 import { PasswordField } from "@/components/forms/PasswordField";
-import { generateInitialPassword } from "@/lib/utils";
+import { generateInitialPassword, isValidPersonName } from "@/lib/utils";
+import { toast } from "@/store/toast";
 
 interface GuardRosterItem {
   id: string;
@@ -61,12 +62,42 @@ export default function SecuritySupervisorGuardManagementPage() {
     setIsRegisterGuardOpen(true);
   };
 
+  const [guardFieldErrors, setGuardFieldErrors] = useState<Record<string, string>>({});
+
+  const validateGuardForm = () => {
+    const errors: Record<string, string> = {};
+    const nameTrim = guardFullName.trim();
+    if (!nameTrim || nameTrim.length < 2) {
+      errors.fullName = "Guard full name must be at least 2 characters long.";
+    } else if (!isValidPersonName(nameTrim)) {
+      errors.fullName = "Guard full name must contain only alphabetic letters and spaces.";
+    }
+    const emailTrim = guardEmail.trim();
+    if (!emailTrim || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrim)) {
+      errors.email = "Please enter a valid email address.";
+    }
+    const phoneTrim = guardPhone.trim();
+    if (phoneTrim) {
+      const phoneDigits = phoneTrim.replace(/\D/g, "");
+      if (!/^\+?[0-9\s\-()]{7,20}$/.test(phoneTrim) || phoneDigits.length < 10) {
+        errors.phone = "Please enter a valid phone number (at least 10 digits).";
+      }
+    }
+    const pwd = guardPassword.trim();
+    if (pwd && pwd.length < 8) {
+      errors.password = "Password must be at least 8 characters long.";
+    }
+    setGuardFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleRegisterGuard = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!guardFullName.trim() || !guardEmail.trim()) {
-      setRegisterError("Guard full name and email are required.");
+    if (!validateGuardForm()) {
+      toast.error("Please resolve the highlighted validation errors.");
       return;
     }
+
     const finalPassword = guardPassword.trim() || generateInitialPassword(guardFullName, "guard");
     setIsRegistering(true);
     setRegisterError("");
@@ -77,10 +108,14 @@ export default function SecuritySupervisorGuardManagementPage() {
         password: finalPassword,
         phone: guardPhone.trim() || undefined,
       });
+      toast.success(`Security guard "${guardFullName.trim()}" registered successfully.`, "Guard Created");
       setIsRegisterGuardOpen(false);
+      setGuardFieldErrors({});
       await loadData();
     } catch (err: any) {
-      setRegisterError(err?.message || "Failed to register security guard.");
+      const msg = err?.message || "Failed to register security guard.";
+      setRegisterError(msg);
+      toast.error(msg);
     } finally {
       setIsRegistering(false);
     }
@@ -165,10 +200,11 @@ export default function SecuritySupervisorGuardManagementPage() {
     try {
       const statusSlug = newStatus.toLowerCase().replace(/\s+/g, "_");
       await gateApi.transitionRoster(selectedGuard.id, statusSlug, "Supervisor duty status update");
+      toast.success(`Guard shift status updated to "${newStatus}".`);
       setIsStatusModalOpen(false);
       await loadData();
     } catch (err: any) {
-      alert(err?.message || "Failed to update guard shift status.");
+      toast.error(err?.message || "Failed to update guard shift status.");
     } finally {
       setIsUpdating(false);
     }
@@ -178,7 +214,7 @@ export default function SecuritySupervisorGuardManagementPage() {
     e.preventDefault();
     const gid = selectedGuardId || manualGuardId.trim();
     if (!gid) {
-      alert("Please select or enter a Guard User ID.");
+      toast.error("Please select or enter a Guard User ID.");
       return;
     }
     setIsCreating(true);
@@ -190,11 +226,12 @@ export default function SecuritySupervisorGuardManagementPage() {
         shift_end: shiftEnd,
         notes: shiftNotes.trim() || undefined,
       });
+      toast.success("Guard shift roster scheduled successfully.");
       setIsCreateModalOpen(false);
       setShiftNotes("");
       await loadData();
     } catch (err: any) {
-      alert(err?.message || "Failed to schedule guard shift roster.");
+      toast.error(err?.message || "Failed to schedule guard shift roster.");
     } finally {
       setIsCreating(false);
     }
@@ -264,7 +301,14 @@ export default function SecuritySupervisorGuardManagementPage() {
           { label: "Guard Management" },
         ]}
         actions={
-          <div style={{ display: "flex", gap: "0.5rem" }}>
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+            <button
+              className="btn btn-secondary"
+              onClick={loadData}
+              disabled={isLoading}
+            >
+              🔄 {isLoading ? "Refreshing…" : "Refresh"}
+            </button>
             <button className="btn btn-secondary" onClick={handleOpenRegisterGuard}>
               👮 + Register Security Guard
             </button>
@@ -602,8 +646,16 @@ export default function SecuritySupervisorGuardManagementPage() {
                     const val = e.target.value;
                     setGuardFullName(val);
                     setGuardPassword(generateInitialPassword(val, "guard"));
+                    if (guardFieldErrors.fullName) {
+                      setGuardFieldErrors((prev) => ({ ...prev, fullName: "" }));
+                    }
                   }}
                 />
+                {guardFieldErrors.fullName && (
+                  <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                    {guardFieldErrors.fullName}
+                  </span>
+                )}
               </div>
 
               <div>
@@ -622,8 +674,18 @@ export default function SecuritySupervisorGuardManagementPage() {
                   className="input-field"
                   placeholder="+91 98765 43210"
                   value={guardPhone}
-                  onChange={(e) => setGuardPhone(e.target.value)}
+                  onChange={(e) => {
+                    setGuardPhone(e.target.value);
+                    if (guardFieldErrors.phone) {
+                      setGuardFieldErrors((prev) => ({ ...prev, phone: "" }));
+                    }
+                  }}
                 />
+                {guardFieldErrors.phone && (
+                  <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                    {guardFieldErrors.phone}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -648,18 +710,38 @@ export default function SecuritySupervisorGuardManagementPage() {
                   required
                   placeholder="e.g. vikram.guard@gatesphere.com"
                   value={guardEmail}
-                  onChange={(e) => setGuardEmail(e.target.value)}
+                  onChange={(e) => {
+                    setGuardEmail(e.target.value);
+                    if (guardFieldErrors.email) {
+                      setGuardFieldErrors((prev) => ({ ...prev, email: "" }));
+                    }
+                  }}
                 />
+                {guardFieldErrors.email && (
+                  <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                    {guardFieldErrors.email}
+                  </span>
+                )}
               </div>
 
               <div>
                 <PasswordField
                   value={guardPassword}
-                  onChange={(val) => setGuardPassword(val)}
+                  onChange={(val) => {
+                    setGuardPassword(val);
+                    if (guardFieldErrors.password) {
+                      setGuardFieldErrors((prev) => ({ ...prev, password: "" }));
+                    }
+                  }}
                   placeholder="e.g. vikram@Gate2026!"
                   required
                   minLength={10}
                 />
+                {guardFieldErrors.password && (
+                  <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                    {guardFieldErrors.password}
+                  </span>
+                )}
               </div>
             </div>
 

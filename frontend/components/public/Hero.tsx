@@ -9,7 +9,8 @@ export default function Hero() {
         loop
         muted
         playsInline
-        preload="auto"
+        preload="metadata"
+        poster="/images/hero-building.webp"
         suppressHydrationWarning
         className="absolute inset-0 w-full h-full object-cover object-center"
       >

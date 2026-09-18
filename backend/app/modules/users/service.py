@@ -136,7 +136,7 @@ class UserService:
                         UserRole.id.is_(None),
                     )
                 )
-        stmt = stmt.distinct().order_by(User.email)
+        stmt = stmt.distinct().order_by(User.created_at.desc(), User.email)
         total = int(
             await self.db.scalar(select(func.count()).select_from(stmt.order_by(None).subquery()))
             or 0
@@ -196,12 +196,28 @@ class UserService:
         user = await self._get_visible(user_id)
         patch = payload.model_dump(exclude_unset=True)
         was_active = user.is_active
+
+        if "email" in patch and patch["email"]:
+            new_email = str(patch.pop("email")).strip().lower()
+            if new_email != user.email:
+                existing = await self.db.scalar(
+                    select(User).where(User.email == new_email, User.id != user.id)
+                )
+                if existing:
+                    raise ConflictError("Email already registered", code="EMAIL_TAKEN")
+                user.email = new_email
+
+        if "password" in patch and patch["password"]:
+            raw_pwd = str(patch.pop("password"))
+            user.password_hash = hash_password(raw_pwd)
+            await revoke_all_user_sessions_async(self.db, user.id)
+
         for k, v in patch.items():
             setattr(user, k, v)
         await self.db.flush()
         if was_active and user.is_active is False:
             await revoke_all_user_sessions_async(self.db, user.id)
-        await self._audit("user.update", str(user.id), new=patch)
+        await self._audit("user.update", str(user.id), new=payload.model_dump(exclude_unset=True))
         return await self._get_visible(user_id)
 
     async def grant_role(self, user_id: uuid.UUID, payload: schemas.RoleGrantIn) -> UserRole:
@@ -210,7 +226,7 @@ class UserService:
         if role is None:
             raise NotFoundError("Role not found")
         self._require_community(payload.community_id)
-        if role.slug in ("super_admin", "auditor") and payload.community_id is not None:
+        if role.slug == "super_admin" and payload.community_id is not None:
             raise BusinessRuleError(
                 f"{role.slug} is a platform-global role", code="GLOBAL_ROLE_ONLY"
             )
@@ -247,3 +263,13 @@ class UserService:
         await self.db.flush()
         await invalidate_user_permissions_async(self.db, [user.id])
         await self._audit("role.revoke", str(user.id), community_id=ur.community_id)
+
+    async def delete_user(self, user_id: uuid.UUID) -> None:
+        user = await self._get_visible(user_id)
+        if user.id == self.actor.id:
+            raise BusinessRuleError("Cannot delete yourself", code="CANNOT_DELETE_SELF")
+        await revoke_all_user_sessions_async(self.db, user.id)
+        await self.db.delete(user)
+        await self.db.flush()
+        await self._audit("user.delete", str(user_id))
+

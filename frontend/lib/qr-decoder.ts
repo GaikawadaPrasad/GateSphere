@@ -1,5 +1,10 @@
 import jsQR from "jsqr";
 
+function getJsQR(): typeof jsQR {
+  return typeof jsQR === "function" ? jsQR : (jsQR as any)?.default || jsQR;
+}
+
+
 export interface ParsedQrData {
   raw: string;
   token?: string;
@@ -8,7 +13,7 @@ export interface ParsedQrData {
   reason?: string;
   visitorName?: string;
   unitLabel?: string;
-  type?: "token" | "pin" | "staff" | "vendor" | "delivery" | "unknown";
+  type?: "token" | "pin" | "staff" | "vendor" | "delivery" | "family" | "unknown";
 }
 
 /**
@@ -95,61 +100,83 @@ export function parseQrPayload(raw: string): ParsedQrData {
     trimmed.startsWith("VEN-") ||
     trimmed.includes("TKT-")
   ) {
-    const parts = trimmed.split("-");
-    const tktIdx = parts.findIndex((p) => p.toUpperCase() === "TKT");
-    const tktNum =
-      tktIdx !== -1 && parts[tktIdx + 1]
-        ? `TKT-${parts[tktIdx + 1]}`
-        : parts[2]
-          ? `TKT-${parts[2]}`
-          : "Work Order";
+    const tktMatch = trimmed.match(/TKT-[\w\d]+/i);
     return {
       raw: trimmed,
       token: trimmed,
       category: "Vendor / Service Technician",
-      reason: `Authorized Work Order (${tktNum})`,
+      reason: tktMatch
+        ? `Maintenance Ticket Service (${tktMatch[0]})`
+        : "Maintenance Ticket Service",
       visitorName: "Vendor Technician",
-      unitLabel: "Assigned Facility / Unit",
+      unitLabel: "Community Facility / Unit",
       type: "vendor",
     };
   }
 
-  // 4b. Delivery Pass Format: DEL-xxx or DELIVERY-xxx
+  // 5. Delivery Pass Format: DEL-... or COURIER-... or PASS-DEL-...
   if (
     trimmed.startsWith("DEL-") ||
-    trimmed.startsWith("DELIVERY-") ||
-    trimmed.startsWith("PASS-DEL-")
+    trimmed.startsWith("PASS-DEL-") ||
+    trimmed.startsWith("COURIER-")
   ) {
     return {
       raw: trimmed,
       token: trimmed,
       category: "Courier / Delivery",
-      reason: `Package Delivery (${trimmed})`,
-      visitorName: "Delivery Executive",
+      reason: "Parcel Delivery",
+      visitorName: "Delivery Agent",
       unitLabel: "Resident Unit",
       type: "delivery",
     };
   }
-  const strippedPin = trimmed.replace(/^(OTP|PIN|PASS)-?/i, "").trim();
-  if (/^\d{4,12}$/.test(strippedPin)) {
+
+  // 5b. Family Member Permanent Pass: GSE:FAMILY:<id>:<pin> or GSE-FAM-... or PASS-FAM-...
+  if (
+    trimmed.startsWith("GSE:FAMILY:") ||
+    trimmed.startsWith("GSE-FAM-") ||
+    trimmed.startsWith("PASS-FAM-")
+  ) {
+    const parts = trimmed.split(":");
+    const pinPart = parts.length >= 4 ? parts[3] : undefined;
     return {
       raw: trimmed,
-      pin: strippedPin,
-      type: "pin",
+      token: trimmed,
+      pin: pinPart,
+      category: "Pre-Approved Family Member",
+      reason: "Permanent Resident Household Access",
+      visitorName: "Family Member",
+      unitLabel: "Resident Household Unit",
+      type: "family",
     };
   }
 
-  // 6. QR-prefixed Token
+  // 6. QR-prefixed Token (e.g. "QR-sec-pass-uuid-999")
   if (trimmed.startsWith("QR-")) {
-    const token = trimmed.replace(/^QR-/, "");
     return {
       raw: trimmed,
-      token,
+      token: trimmed.slice(3),
       type: "token",
     };
   }
 
-  // 7. Generic Token / String
+  // 7. Numeric PIN / OTP (e.g. "987654", "OTP-8819", "PIN-654321")
+  if (
+    trimmed.startsWith("OTP-") ||
+    trimmed.startsWith("PIN-") ||
+    /^\d{4,8}$/.test(trimmed)
+  ) {
+    const numericOnly = trimmed.replace(/\D/g, "");
+    if (numericOnly.length >= 4 && numericOnly.length <= 8) {
+      return {
+        raw: trimmed,
+        pin: numericOnly,
+        type: "pin",
+      };
+    }
+  }
+
+  // 8. Generic Token / String
   return {
     raw: trimmed,
     token: trimmed,
@@ -166,6 +193,8 @@ export function decodeQrFromImageData(
   height: number
 ): string | null {
   try {
+    const jsQR = getJsQR();
+    if (!jsQR) return null;
     const code = jsQR(data, width, height, {
       inversionAttempts: "attemptBoth",
     });

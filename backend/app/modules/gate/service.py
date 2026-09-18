@@ -219,7 +219,7 @@ class GateService:
         )
         await self.rosters.add(obj)
         await self._audit("roster.create", cid, "guard_roster", obj.id)
-        return obj
+        return await self._populate_guard_info(obj)
 
     async def list_rosters(
         self,
@@ -240,9 +240,26 @@ class GateService:
         if roster_status:
             stmt = stmt.where(GuardRoster.status == roster_status)
         stmt = stmt.order_by(GuardRoster.shift_date.desc(), GuardRoster.shift_start)
-        return await self.rosters.list(
-            offset=offset, limit=limit, extra=stmt
-        ), await self.rosters.count(extra=stmt)
+        rosters = await self.rosters.list(offset=offset, limit=limit, extra=stmt)
+        total = await self.rosters.count(extra=stmt)
+        guard_ids = {r.guard_user_id for r in rosters if r.guard_user_id}
+        if guard_ids:
+            u_stmt = select(User.id, User.full_name, User.phone).where(User.id.in_(guard_ids))
+            users_res = (await self.db.execute(u_stmt)).all()
+            user_map = {u[0]: (u[1], u[2]) for u in users_res}
+            for r in rosters:
+                if r.guard_user_id in user_map:
+                    r.guard_name, r.guard_phone = user_map[r.guard_user_id]
+        return rosters, total
+
+    async def _populate_guard_info(self, obj: GuardRoster) -> GuardRoster:
+        if obj and obj.guard_user_id:
+            u_stmt = select(User.id, User.full_name, User.phone).where(User.id == obj.guard_user_id)
+            user_res = (await self.db.execute(u_stmt)).first()
+            if user_res:
+                obj.guard_name = user_res[1]
+                obj.guard_phone = user_res[2]
+        return obj
 
     async def _get_roster(self, roster_id: uuid.UUID) -> GuardRoster:
         obj = await self.rosters.get(roster_id)
@@ -259,7 +276,7 @@ class GateService:
             setattr(obj, k, v)
         await self.db.flush()
         await self._audit("roster.update", obj.community_id, "guard_roster", obj.id, new=patch)
-        return obj
+        return await self._populate_guard_info(obj)
 
     async def transition_roster(
         self, roster_id: uuid.UUID, new_status: str, reason=None
@@ -278,7 +295,7 @@ class GateService:
             old={"status": old},
             new={"status": new_status, "reason": reason},
         )
-        return obj
+        return await self._populate_guard_info(obj)
 
     # -- gate assignments ----------------------------------- #
     async def create_assignment(self, payload, *, community_id: uuid.UUID | None) -> GateAssignment:

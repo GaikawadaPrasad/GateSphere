@@ -39,7 +39,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.errors import AuthError, ForbiddenError
-from app.core.redis import redis_client
+from app.core.redis import redis_client, rkey
 from app.db.session import get_async_db
 from app.modules.auth.models import UserSession
 from app.modules.users.models import (
@@ -205,7 +205,9 @@ async def create_session(
     now = datetime.now(UTC)
     expires_at = now + timedelta(seconds=settings.SESSION_TTL_SECONDS)
 
+    session_id = uuid.uuid4()
     session = UserSession(
+        id=session_id,
         user_id=user.id,
         session_key_hash=token_hash,
         csrf_token=csrf,
@@ -219,12 +221,11 @@ async def create_session(
         last_activity_at=now,
     )
     db.add(session)
-    await db.flush()
 
     _cache_put(
         token_hash,
         {
-            "session_id": str(session.id),
+            "session_id": str(session_id),
             "user_id": str(user.id),
             "csrf": csrf,
             "bucket": bucket,
@@ -409,15 +410,43 @@ async def user_permissions_async(
     if user.is_superadmin:
         return {"*"}
 
-    grants = (
-        await db.execute(
-            select(UserRole.role_id, UserRole.community_id).where(UserRole.user_id == user.id)
-        )
-    ).all()
-    if community_id is None:
-        role_ids = {rid for (rid, _c) in grants}
+    # Redis permission cache (AGENTS.md §3) keyed by user, community, and permission_version.
+    # When permission_version is bumped on any role change, existing entries automatically orphan.
+    cache_key = rkey(
+        "perms",
+        str(user.id),
+        str(community_id or "global"),
+        str(user.permission_version or 0),
+    )
+    try:
+        cached = redis_client.get(cache_key)
+        if cached:
+            return set(json.loads(cached))
+    except Exception:
+        pass
+
+    # If user.roles is already loaded, reuse it to avoid a UserRole DB query
+    roles_loaded = "roles" in user.__dict__
+    if roles_loaded and user.roles is not None:
+        if community_id is None:
+            role_ids = {r.role_id for r in user.roles}
+        else:
+            role_ids = {
+                r.role_id
+                for r in user.roles
+                if r.community_id is None or r.community_id == community_id
+            }
     else:
-        role_ids = {rid for (rid, c) in grants if c is None or c == community_id}
+        grants = (
+            await db.execute(
+                select(UserRole.role_id, UserRole.community_id).where(UserRole.user_id == user.id)
+            )
+        ).all()
+        if community_id is None:
+            role_ids = {rid for (rid, _c) in grants}
+        else:
+            role_ids = {rid for (rid, c) in grants if c is None or c == community_id}
+
     if not role_ids:
         return set()
 
@@ -430,24 +459,28 @@ async def user_permissions_async(
             )
         ).all()
     )
-    if community_id is None:
-        return perms
+    if community_id is not None:
+        overrides = (
+            await db.execute(
+                select(Permission.code, CommunityRolePermission.effect)
+                .join(
+                    CommunityRolePermission,
+                    CommunityRolePermission.permission_id == Permission.id,
+                )
+                .where(
+                    CommunityRolePermission.community_id == community_id,
+                    CommunityRolePermission.role_id.in_(role_ids),
+                )
+            )
+        ).all()
+        for code, effect in overrides:
+            perms.add(code) if effect == "allow" else perms.discard(code)
 
-    overrides = (
-        await db.execute(
-            select(Permission.code, CommunityRolePermission.effect)
-            .join(
-                CommunityRolePermission,
-                CommunityRolePermission.permission_id == Permission.id,
-            )
-            .where(
-                CommunityRolePermission.community_id == community_id,
-                CommunityRolePermission.role_id.in_(role_ids),
-            )
-        )
-    ).all()
-    for code, effect in overrides:
-        perms.add(code) if effect == "allow" else perms.discard(code)
+    try:
+        redis_client.setex(cache_key, 300, json.dumps(sorted(perms)))
+    except Exception:
+        pass
+
     return perms
 
 

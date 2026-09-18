@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useUiStore } from "@/store/ui";
-import { useCommunityDetails, useTowers } from "@/hooks/use-communities";
+import { useMe } from "@/hooks/use-auth";
+import { useCommunityDetails, useTowers, useCommunities } from "@/hooks/use-communities";
 import { useOverviewStats, useFinancialStats } from "@/hooks/use-dashboards";
 import { useStaffList, useStaffAttendance } from "@/hooks/use-staff";
 import { useIncidents } from "@/hooks/use-incidents";
@@ -14,6 +15,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { Skeleton } from "@/components/common/LoadingSkeleton";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
+import { toast } from "@/store/toast";
 
 // Lazy-loaded components with skeletal loading fallbacks
 const FinancialHealthCard = dynamic(
@@ -91,36 +93,100 @@ const IncidentListWidget = dynamic(
 );
 
 export default function CommunityAdminDashboardPage() {
-  const { activeCommunityId } = useUiStore();
+  const { activeCommunityId, setActiveCommunity } = useUiStore();
+  const { data: user } = useMe();
+  const { data: communities } = useCommunities();
 
-  const { data: community, isLoading: communityLoading } = useCommunityDetails(
-    activeCommunityId || undefined,
-  );
-  const { data: towers, isLoading: towersLoading } = useTowers(activeCommunityId || undefined);
-  const { data: overview, isLoading: overviewLoading } = useOverviewStats(
-    activeCommunityId || undefined,
-  );
-  const { data: financial, isLoading: financialLoading } = useFinancialStats(
-    activeCommunityId || undefined,
-  );
-  const { data: staffList, isLoading: staffListLoading } = useStaffList({
+  React.useEffect(() => {
+    if (!activeCommunityId) {
+      if (user?.community_ids?.[0]) {
+        setActiveCommunity(user.community_ids[0]);
+      } else if (user?.is_superadmin && communities && communities.length > 0) {
+        setActiveCommunity(communities[0].id);
+      }
+    }
+  }, [activeCommunityId, user, communities, setActiveCommunity]);
+
+  const {
+    data: community,
+    isLoading: communityLoading,
+    refetch: refetchCommunity,
+  } = useCommunityDetails(activeCommunityId || undefined);
+  const {
+    data: towers,
+    isLoading: towersLoading,
+    refetch: refetchTowers,
+  } = useTowers(activeCommunityId || undefined);
+  const {
+    data: overview,
+    isLoading: overviewLoading,
+    refetch: refetchOverview,
+  } = useOverviewStats(activeCommunityId || undefined);
+  const {
+    data: financial,
+    isLoading: financialLoading,
+    refetch: refetchFinancial,
+  } = useFinancialStats(activeCommunityId || undefined);
+  const {
+    data: staffList,
+    isLoading: staffListLoading,
+    refetch: refetchStaffList,
+  } = useStaffList({
     community_id: activeCommunityId || undefined,
   });
-  const { data: attendance, isLoading: attendanceLoading } = useStaffAttendance({
+  const {
+    data: attendance,
+    isLoading: attendanceLoading,
+    refetch: refetchAttendance,
+  } = useStaffAttendance({
     community_id: activeCommunityId || undefined,
     open_only: false,
   });
-  const { data: incidents, isLoading: incidentsLoading } = useIncidents({
+  const {
+    data: incidents,
+    isLoading: incidentsLoading,
+    refetch: refetchIncidents,
+  } = useIncidents({
     community_id: activeCommunityId || undefined,
   });
-  const { data: pendingMoves, isLoading: movesLoading } = useMoveRecords({
+  const {
+    data: pendingMoves,
+    isLoading: movesLoading,
+    refetch: refetchMoves,
+  } = useMoveRecords({
     community_id: activeCommunityId || undefined,
     move_status: "requested",
   });
-  const { data: announcements, isLoading: announcementsLoading } = useAnnouncements({
+  const {
+    data: announcements,
+    isLoading: announcementsLoading,
+    refetch: refetchAnnouncements,
+  } = useAnnouncements({
     community_id: activeCommunityId || undefined,
     published_only: true,
   });
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleManualRefresh = async () => {
+    try {
+      setIsRefreshing(true);
+      await Promise.allSettled([
+        refetchOverview(),
+        refetchFinancial(),
+        refetchStaffList(),
+        refetchAttendance(),
+        refetchIncidents(),
+        refetchMoves(),
+        refetchAnnouncements(),
+        refetchCommunity(),
+        refetchTowers(),
+      ]);
+      toast.success("Community operational metrics refreshed.", "Dashboard Updated");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const sortedAnnouncements = useMemo(() => {
     if (!announcements) return [];
@@ -130,7 +196,6 @@ export default function CommunityAdminDashboardPage() {
       return bTime - aTime;
     });
   }, [announcements]);
-
 
   // Calculated metrics
   const totalTowers = towers?.length ?? community?.total_towers ?? 0;
@@ -163,13 +228,84 @@ export default function CommunityAdminDashboardPage() {
         title="Community Overview"
         description={`Live operations, property health, and resident management for ${community?.name || "your community"}.`}
         action={
-          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={handleManualRefresh}
+              disabled={isRefreshing}
+              style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}
+            >
+              <span className={isRefreshing ? "spin" : ""}>🔄</span>
+              {isRefreshing ? "Refreshing…" : "Refresh"}
+            </button>
             <Link href="/community-admin/communication" className="btn btn-primary">
               📢 Broadcast Announcement
             </Link>
           </div>
         }
       />
+
+      {/* Quick Action Navigation Bar */}
+      <div
+        style={{
+          display: "flex",
+          gap: "0.6rem",
+          overflowX: "auto",
+          paddingBottom: "0.25rem",
+          flexWrap: "wrap",
+        }}
+      >
+        <Link
+          href="/community-admin/communication"
+          className="btn btn-secondary btn-sm"
+          style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
+        >
+          <span>📢</span> Broadcast Notice
+        </Link>
+        <Link
+          href="/community-admin/residents"
+          className="btn btn-secondary btn-sm"
+          style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
+        >
+          <span>👥</span> Onboard Resident
+        </Link>
+        <Link
+          href="/community-admin/property"
+          className="btn btn-secondary btn-sm"
+          style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
+        >
+          <span>🏗️</span> Property & Towers
+        </Link>
+        <Link
+          href="/community-admin/staff"
+          className="btn btn-secondary btn-sm"
+          style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
+        >
+          <span>👔</span> Operational Staff
+        </Link>
+        <Link
+          href="/community-admin/security-staff"
+          className="btn btn-secondary btn-sm"
+          style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
+        >
+          <span>🛡️</span> Security & Guards
+        </Link>
+        <Link
+          href="/community-admin/billing"
+          className="btn btn-secondary btn-sm"
+          style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
+        >
+          <span>💳</span> Invoices & Finance
+        </Link>
+        <Link
+          href="/community-admin/incidents"
+          className="btn btn-secondary btn-sm"
+          style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
+        >
+          <span>🚨</span> Report Incident
+        </Link>
+      </div>
 
       {/* KPI Grid with Responsive Auto-fit & Shimmer Skeletons */}
       <div

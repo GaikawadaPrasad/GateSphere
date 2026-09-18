@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
 
 from app.modules.communication.models import ANNOUNCEMENT_TYPES, POLL_STATUS, PRIORITIES
 
@@ -87,6 +87,8 @@ class GroupMemberRead(_Read):
     group_id: uuid.UUID
     user_id: uuid.UUID
     added_at: datetime
+    user_name: str | None = None
+    user_email: str | None = None
 
 
 # -- announcements ----------------------------------------- #
@@ -126,6 +128,14 @@ class AnnouncementRead(_Read):
     event_end_at: datetime | None
     is_published: bool
     targets: list[TargetRead] = []
+
+    @computed_field
+    @property
+    def is_expired(self) -> bool:
+        if self.expires_at is None:
+            return False
+        exp = self.expires_at if self.expires_at.tzinfo else self.expires_at.replace(tzinfo=UTC)
+        return exp <= datetime.now(UTC)
 
 
 # -- polls ------------------------------------------------ #

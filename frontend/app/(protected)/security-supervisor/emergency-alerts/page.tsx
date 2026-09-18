@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
 import { gateApi, type PanicAlert } from "@/lib/api";
 import { formatDateTime } from "@/lib/utils";
+import { toast } from "@/store/toast";
 
 // Real backend enum (backend/app/modules/gate/models.py ALERT_TYPES)
 const ALERT_TYPES = [
@@ -25,6 +26,12 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Resolution modal state
+  const [isResolveModalOpen, setIsResolveModalOpen] = useState(false);
+  const [alertToResolve, setAlertToResolve] = useState<PanicAlert | null>(null);
+  const [resolutionSummary, setResolutionSummary] = useState("");
+  const [resolutionSummaryError, setResolutionSummaryError] = useState("");
+
   const fetchAlerts = async () => {
     setIsLoading(true);
     const data = await gateApi.alerts();
@@ -36,10 +43,20 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
     fetchAlerts();
   }, []);
 
+  const [alertFieldError, setAlertFieldError] = useState<string | null>(null);
+
   const handleTriggerAlert = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
+
+    if (!location.trim() && !description.trim()) {
+      setAlertFieldError("Please specify either a location or description for the alert.");
+      toast.error("Please specify either a location or description for the alert.");
+      return;
+    }
+
     setIsSubmitting(true);
+    setAlertFieldError(null);
 
     try {
       const message = [location.trim() && `Location: ${location.trim()}`, description.trim()]
@@ -50,12 +67,13 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
         severity: "critical",
         message: message || undefined,
       });
+      toast.success("🚨 Emergency broadcast dispatched to security network!");
       setIsModalOpen(false);
       setLocation("");
       setDescription("");
       await fetchAlerts();
     } catch (err: any) {
-      alert(err?.message || "Failed to broadcast emergency alert.");
+      toast.error(err?.message || "Failed to broadcast emergency alert.");
     } finally {
       setIsSubmitting(false);
     }
@@ -64,19 +82,41 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
   const handleAcknowledge = async (id: string) => {
     try {
       await gateApi.acknowledgeAlert(id);
+      toast.success("Emergency alert acknowledged.");
       fetchAlerts();
     } catch (err: any) {
-      alert(err?.message || "Failed to acknowledge alert.");
+      toast.error(err?.message || "Failed to acknowledge alert.");
     }
   };
 
-  const handleResolve = async (id: string) => {
-    const summary = window.prompt("Resolution summary (optional):") || undefined;
+  const handleOpenResolve = (alertItem: PanicAlert) => {
+    setAlertToResolve(alertItem);
+    setResolutionSummary("");
+    setResolutionSummaryError("");
+    setIsResolveModalOpen(true);
+  };
+
+  const handleConfirmResolve = async () => {
+    if (!alertToResolve || isSubmitting) return;
+    const cleanSummary = resolutionSummary.trim();
+    if (!cleanSummary || cleanSummary.length < 5) {
+      setResolutionSummaryError("Please provide a resolution summary (min 5 characters).");
+      toast.error("Resolution summary must be at least 5 characters.");
+      return;
+    }
+    setIsSubmitting(true);
     try {
-      await gateApi.resolveAlert(id, summary);
-      fetchAlerts();
+      await gateApi.resolveAlert(alertToResolve.id, cleanSummary);
+      toast.success("Emergency incident marked as resolved.");
+      setIsResolveModalOpen(false);
+      setAlertToResolve(null);
+      setResolutionSummary("");
+      setResolutionSummaryError("");
+      await fetchAlerts();
     } catch (err: any) {
-      alert(err?.message || "Failed to resolve alert.");
+      toast.error(err?.message || "Failed to resolve alert.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -91,9 +131,18 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
           { label: "Emergency Alerts" },
         ]}
         actions={
-          <button className="btn btn-danger" onClick={() => setIsModalOpen(true)}>
-            🚨 Broadcast Emergency Alert
-          </button>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+            <button
+              className="btn btn-secondary"
+              onClick={fetchAlerts}
+              disabled={isLoading}
+            >
+              🔄 {isLoading ? "Refreshing…" : "Refresh"}
+            </button>
+            <button className="btn btn-danger" onClick={() => setIsModalOpen(true)}>
+              🚨 Broadcast Emergency Alert
+            </button>
+          </div>
         }
       />
 
@@ -170,7 +219,7 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
                           <button
                             className="btn btn-primary"
                             style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}
-                            onClick={() => handleResolve(a.id)}
+                            onClick={() => handleOpenResolve(a)}
                           >
                             Resolve
                           </button>
@@ -286,6 +335,102 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
             />
           </div>
         </form>
+      </Modal>
+
+      {/* Resolve Incident Confirmation Modal */}
+      <Modal
+        isOpen={isResolveModalOpen}
+        onClose={() => !isSubmitting && setIsResolveModalOpen(false)}
+        title="🛡️ RESOLVE EMERGENCY INCIDENT"
+        maxWidth={500}
+        footer={
+          <>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                setIsResolveModalOpen(false);
+                setAlertToResolve(null);
+                setResolutionSummary("");
+              }}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleConfirmResolve}
+              disabled={isSubmitting}
+              style={{ fontWeight: 700 }}
+            >
+              {isSubmitting ? "Resolving..." : "Confirm Resolution"}
+            </button>
+          </>
+        }
+      >
+        <div>
+          {alertToResolve && (
+            <div
+              style={{
+                padding: "0.85rem 1rem",
+                background: "#f8fafc",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                marginBottom: "1rem",
+                fontSize: "0.85rem",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem" }}>
+                <span style={{ color: "var(--muted)" }}>Incident Ref:</span>
+                <strong style={{ fontFamily: "monospace" }}>
+                  SOS-{alertToResolve.id.slice(0, 8).toUpperCase()}
+                </strong>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem" }}>
+                <span style={{ color: "var(--muted)" }}>Category:</span>
+                <strong style={{ color: "var(--danger)", textTransform: "capitalize" }}>
+                  🚨 {alertToResolve.alert_type}
+                </strong>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: "var(--muted)" }}>Details:</span>
+                <span>{(alertToResolve as any).message || "—"}</span>
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
+              Resolution Summary / Actions Taken
+            </label>
+            <textarea
+              className="input-field"
+              rows={3}
+              placeholder="e.g. Attended by on-duty medical response, resident safe and stable."
+              value={resolutionSummary}
+              onChange={(e) => {
+                setResolutionSummary(e.target.value);
+                if (resolutionSummaryError) setResolutionSummaryError("");
+              }}
+            />
+            {resolutionSummaryError && (
+              <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                {resolutionSummaryError}
+              </span>
+            )}
+            <p style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.25rem" }}>
+              This summary will be permanently stamped on the emergency incident audit record.
+            </p>
+          </div>
+        </div>
       </Modal>
     </div>
   );

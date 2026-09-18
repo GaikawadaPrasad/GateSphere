@@ -24,12 +24,16 @@ x-backend-env: &backend-env
   BREVO_API_KEY: "${BREVO_API_KEY:-}"
   EMAIL_FROM: "${EMAIL_FROM:-no-reply@gatesphere.com}"
   SEED_ON_START: "${SEED_ON_START:-true}"
+  DB_POOL_SIZE: "${DB_POOL_SIZE:-30}"
+  DB_MAX_OVERFLOW: "${DB_MAX_OVERFLOW:-60}"
+  DB_POOL_TIMEOUT_SECONDS: "${DB_POOL_TIMEOUT_SECONDS:-30}"
   RATE_LIMIT_ENABLED: "${RATE_LIMIT_ENABLED:-true}"
   RATE_LIMIT_LOGIN: "${RATE_LIMIT_LOGIN:-5/60}"
 
 services:
   db:
     image: postgres:16-alpine
+    command: postgres -c max_connections=250 -c shared_buffers=256MB
     environment:
       POSTGRES_USER: gatesphere
       POSTGRES_PASSWORD: gatesphere

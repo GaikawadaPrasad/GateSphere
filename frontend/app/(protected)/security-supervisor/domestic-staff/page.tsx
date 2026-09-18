@@ -35,6 +35,12 @@ export default function SecuritySupervisorDomesticStaffPage() {
         (staffList || []).map((s: any) => {
           const att = latestAttByStaff.get(s.id);
           const isInside = att && !att.check_out_at;
+          const isOverdue =
+            isInside &&
+            (att.is_overdue ??
+              (att.check_in_at
+                ? (Date.now() - new Date(att.check_in_at).getTime()) / 3600000 > 12
+                : false));
           return {
             id: s.id,
             name: s.full_name || "Domestic Staff",
@@ -54,7 +60,8 @@ export default function SecuritySupervisorDomesticStaffPage() {
                   minute: "2-digit",
                 })
               : null,
-            status: isInside ? "Inside Premises" : "Checked Out",
+            is_overdue: isOverdue,
+            status: isOverdue ? "Overdue Checkout (>12h)" : isInside ? "Inside Premises" : "Checked Out",
           };
         }),
       );
@@ -111,7 +118,28 @@ export default function SecuritySupervisorDomesticStaffPage() {
       key: "status",
       header: "Attendance Status",
       sortable: true,
-      render: (s) => <StatusBadge status={s.status === "Inside Premises" ? "approved" : "completed"} label={s.status} />,
+      render: (s) => (
+        s.is_overdue ? (
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.3rem",
+              background: "#FEF2F2",
+              color: "#DC2626",
+              border: "1px solid #FCA5A5",
+              borderRadius: "var(--radius-full)",
+              padding: "0.25rem 0.65rem",
+              fontSize: "0.75rem",
+              fontWeight: 700,
+            }}
+          >
+            ⚠️ Overdue Checkout (&gt;12h)
+          </span>
+        ) : (
+          <StatusBadge status={s.status === "Inside Premises" ? "approved" : "completed"} label={s.status} />
+        )
+      ),
     },
   ];
 
@@ -125,6 +153,15 @@ export default function SecuritySupervisorDomesticStaffPage() {
           { label: "Security Supervisor" },
           { label: "Domestic Staff" },
         ]}
+        actions={
+          <button
+            className="btn btn-secondary"
+            onClick={loadData}
+            disabled={isLoading}
+          >
+            🔄 {isLoading ? "Refreshing…" : "Refresh"}
+          </button>
+        }
       />
 
       <div className="card">

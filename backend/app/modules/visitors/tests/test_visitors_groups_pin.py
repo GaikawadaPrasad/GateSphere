@@ -24,7 +24,7 @@ def _unit_in(community_id: str) -> str:
         return str(u.id)
 
 
-def test_pin_pass_admits_visitor(as_role, seed_ids):
+def test_pin_pass_admits_visitor(as_role, seed_ids, confirmed_upload):
     admin = as_role("community_admin")
     unit_id = _unit_in(seed_ids["community_id"])
     req = admin.post(
@@ -45,16 +45,17 @@ def test_pin_pass_admits_visitor(as_role, seed_ids):
     bad = guard.post(f"{P}/entries", json={"pin": "000000", "request_id": req["id"]})
     assert bad.status_code == 404
 
-    ok_entry = guard.post(f"{P}/entries", json={"pin": pin})
+    photo_url = confirmed_upload("visitor_photo", seed_ids["community_id"])
+    ok_entry = guard.post(f"{P}/entries", json={"pin": pin, "entry_photo_url": photo_url})
     assert ok_entry.status_code == 201, ok_entry.text
     assert ok_entry.json()["data"]["status"] == "inside"
 
     # single-use PIN is now exhausted
-    again = guard.post(f"{P}/entries", json={"pin": pin})
+    again = guard.post(f"{P}/entries", json={"pin": pin, "entry_photo_url": photo_url})
     assert again.status_code in (404, 409)
 
 
-def test_group_members_share_one_approval(as_role, seed_ids, resident_unit_id):
+def test_group_members_share_one_approval(as_role, seed_ids, resident_unit_id, confirmed_upload):
     admin = as_role("community_admin")
     unit_id = resident_unit_id  # so the resident below may approve it
     req = admin.post(
@@ -84,7 +85,15 @@ def test_group_members_share_one_approval(as_role, seed_ids, resident_unit_id):
 
     guard = as_role("security_guard")
     # the added group member can enter on the same request
-    e = guard.post(f"{P}/entries", json={"request_id": req["id"], "visitor_id": member_visitor_id})
+    photo_url = confirmed_upload("visitor_photo", seed_ids["community_id"])
+    e = guard.post(
+        f"{P}/entries",
+        json={
+            "request_id": req["id"],
+            "visitor_id": member_visitor_id,
+            "entry_photo_url": photo_url,
+        },
+    )
     assert e.status_code == 201, e.text
     assert e.json()["data"]["visitor_id"] == member_visitor_id
 
@@ -94,3 +103,50 @@ def test_group_members_share_one_approval(as_role, seed_ids, resident_unit_id):
     )
     assert stranger.status_code in (400, 404, 422)
     assert stranger.json()["error"]["code"] == "NOT_IN_GROUP"
+
+
+def test_visitor_entry_otp_required_policy(as_role, seed_ids, confirmed_upload):
+    admin = as_role("community_admin")
+    guard = as_role("security_guard")
+    unit_id = _unit_in(seed_ids["community_id"])
+
+    # Enable otp_required on policy
+    pol_res = admin.patch(f"{P}/policy", json={"otp_required": True})
+    assert pol_res.status_code == 200, pol_res.text
+    assert pol_res.json()["data"]["otp_required"] is True
+
+    try:
+        req = admin.post(
+            f"{P}/requests",
+            json={
+                "unit_id": unit_id,
+                "visitor": {"full_name": "OTP Test Guest", "phone": _phone()},
+                "visitor_type": "personal_guest",
+            },
+        ).json()["data"]
+
+        p = admin.post(f"{P}/requests/{req['id']}/passes", json={"pass_type": "pin", "max_entries": 1})
+        assert p.status_code == 201, p.text
+        pin = p.json()["data"]["pin"]
+
+        photo_url = confirmed_upload("visitor_photo", seed_ids["community_id"])
+
+        # Attempt entry with request_id and photo, but WITHOUT pin/otp
+        no_pin = guard.post(
+            f"{P}/entries",
+            json={"request_id": req["id"], "entry_photo_url": photo_url},
+        )
+        assert no_pin.status_code in (400, 422)
+        assert no_pin.json()["error"]["code"] == "OTP_REQUIRED"
+
+        # Entry with correct PIN succeeds
+        ok_entry = guard.post(
+            f"{P}/entries",
+            json={"pin": pin, "entry_photo_url": photo_url},
+        )
+        assert ok_entry.status_code == 201, ok_entry.text
+        assert ok_entry.json()["data"]["status"] == "inside"
+    finally:
+        # Revert policy
+        admin.patch(f"{P}/policy", json={"otp_required": False})
+

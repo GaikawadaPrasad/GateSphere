@@ -102,6 +102,8 @@ class RosterRead(_Read):
     shift_end: time
     status: str
     notes: str | None
+    guard_name: str | None = None
+    guard_phone: str | None = None
 
 
 # -- gate assignments ---------------------------------------------- #

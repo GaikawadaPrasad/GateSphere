@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useUiStore } from "@/store/ui";
 import {
   useStaffList,
@@ -11,12 +11,15 @@ import {
   useCreateStaff,
   useCreateStaffAssignment,
   useEndStaffAssignment,
+  useDeleteStaff,
 } from "@/hooks/use-staff";
 import { useGates, useCommunityUnits } from "@/hooks/use-communities";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { FilterPanel } from "@/components/common/FilterPanel";
 import { Modal } from "@/components/common/Modal";
+import { OperationalStaffView } from "@/components/community-admin/OperationalStaffView";
+import { UpdateUserCredentialsModal, type CredentialUser } from "@/components/common/UpdateUserCredentialsModal";
 import type {
   Staff,
   StaffAttendance,
@@ -24,11 +27,25 @@ import type {
   StaffType,
   VerificationStatus,
 } from "@/types/staff";
-import { formatDateTime } from "@/lib/utils";
+import { ApiError } from "@/lib/api";
+import { formatDateTime, isValidPersonName } from "@/lib/utils";
+import { toast } from "@/store/toast";
 
 export default function CommunityAdminStaffPage() {
   const { activeCommunityId } = useUiStore();
-  const [activeTab, setActiveTab] = useState<"directory" | "attendance">("directory");
+  const [activeTab, setActiveTab] = useState<"directory" | "security" | "attendance">("directory");
+  const [credentialUser, setCredentialUser] = useState<CredentialUser | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get("tab");
+      if (tab === "security" || tab === "operational" || tab === "facility") {
+        setActiveTab("security");
+      }
+    }
+  }, []);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
@@ -62,6 +79,7 @@ export default function CommunityAdminStaffPage() {
   const createStaff = useCreateStaff();
   const createAssignment = useCreateStaffAssignment();
   const endAssignment = useEndStaffAssignment();
+  const deleteStaff = useDeleteStaff();
   const { data: communityUnits } = useCommunityUnits(activeCommunityId || undefined);
 
   // Modals state
@@ -98,6 +116,11 @@ export default function CommunityAdminStaffPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Delete Staff State
+  const [staffToDelete, setStaffToDelete] = useState<Staff | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
   // Handle Check-in
   const handleCheckIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,10 +153,82 @@ export default function CommunityAdminStaffPage() {
     }
   };
 
+  const [staffFieldErrors, setStaffFieldErrors] = useState<Record<string, string>>({});
+
+  const validateStaffForm = () => {
+    const errors: Record<string, string> = {};
+    const trimmedName = newStaffForm.full_name.trim();
+    if (!trimmedName || trimmedName.length < 2) {
+      errors.full_name = "Staff member name must be at least 2 characters.";
+    } else if (!isValidPersonName(trimmedName)) {
+      errors.full_name = "Staff name must contain only alphabetic letters and spaces.";
+    }
+
+    const trimmedPhone = newStaffForm.phone.trim();
+    if (!trimmedPhone || !/^\+?[0-9\s\-()]{7,20}$/.test(trimmedPhone)) {
+      errors.phone = "Please enter a valid phone number.";
+    }
+
+    const trimmedEmail = newStaffForm.email.trim();
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      errors.email = "Please enter a valid email address.";
+    }
+
+    const trimmedId = (newStaffForm.id_number || "").trim();
+    const idType = (newStaffForm.id_type || "").trim();
+    const idTypeNorm = idType.toLowerCase();
+
+    if (trimmedId) {
+      if (idTypeNorm === "aadhaar" || idTypeNorm.includes("aadhaar")) {
+        const cleanAadhaar = trimmedId.replace(/[\s-]/g, "");
+        if (!/^\d{12}$/.test(cleanAadhaar)) {
+          errors.id_number = "Aadhaar number must be exactly 12 numeric digits (e.g. 1234 5678 9012).";
+        } else if (/^(\d)\1{11}$/.test(cleanAadhaar)) {
+          errors.id_number = "Aadhaar number cannot contain all identical repeating digits.";
+        }
+      } else if (idTypeNorm === "pan card" || idTypeNorm === "pan") {
+        const cleanPan = trimmedId.replace(/[\s-]/g, "").toUpperCase();
+        if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(cleanPan)) {
+          errors.id_number = "PAN Card must be 10 characters in format ABCDE1234F.";
+        }
+      } else if (idTypeNorm === "voter id" || idTypeNorm === "voter_id") {
+        const cleanVoter = trimmedId.replace(/[\s-]/g, "").toUpperCase();
+        if (!/^[A-Z]{3}[0-9]{7}$/.test(cleanVoter)) {
+          errors.id_number = "Voter ID must be 10 characters (e.g. ABC1234567).";
+        }
+      } else if (idTypeNorm === "passport") {
+        const cleanPass = trimmedId.replace(/[\s-]/g, "").toUpperCase();
+        if (!/^[A-Z][0-9]{7,8}$/.test(cleanPass)) {
+          errors.id_number = "Passport must be 1 letter followed by 7-8 digits (e.g. A1234567).";
+        }
+      } else if (idTypeNorm === "driving license" || idTypeNorm === "driving_license" || idTypeNorm === "dl") {
+        const cleanDl = trimmedId.replace(/[\s-]/g, "").toUpperCase();
+        if (!/^[A-Z]{2}[0-9A-Z]{8,18}$/.test(cleanDl)) {
+          errors.id_number = "Driving License must be valid (e.g. DL-1420110012345).";
+        }
+      } else if (trimmedId.length > 30) {
+        errors.id_number = "ID number cannot exceed 30 characters.";
+      }
+    }
+
+    if (newStaffForm.password && newStaffForm.password.trim().length < 10) {
+      errors.password = "Initial password must be at least 10 characters.";
+    }
+
+    setStaffFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   // Handle Add Staff
   const handleAddStaff = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeCommunityId) return;
+
+    if (!validateStaffForm()) {
+      setErrorMessage("Please correct the highlighted form errors before submitting.");
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setErrorMessage(null);
@@ -155,8 +250,13 @@ export default function CommunityAdminStaffPage() {
         },
         communityId: activeCommunityId,
       });
+      toast.success(
+        `Staff member "${newStaffForm.full_name.trim()}" registered successfully.`,
+        "Staff Member Added"
+      );
       setIsAddStaffModalOpen(false);
       setShowStaffPassword(true);
+      setStaffFieldErrors({});
       setNewStaffForm({
         full_name: "",
         phone: "",
@@ -170,9 +270,38 @@ export default function CommunityAdminStaffPage() {
       refetchStaff();
     } catch (err: unknown) {
       console.error(err);
-      setErrorMessage(err instanceof Error ? err.message : "Failed to register staff");
+      if (err instanceof ApiError && err.fields && Object.keys(err.fields).length > 0) {
+        const mappedErrors: Record<string, string> = {};
+        for (const [fKey, fVal] of Object.entries(err.fields)) {
+          const key = fKey.replace(/^body\./, "").replace(/^data\./, "");
+          mappedErrors[key] = Array.isArray(fVal) ? fVal.join(", ") : String(fVal);
+        }
+        setStaffFieldErrors(mappedErrors);
+        setErrorMessage(null);
+      } else {
+        setErrorMessage(err instanceof Error ? err.message : "Failed to register staff");
+      }
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteStaff = async () => {
+    if (!staffToDelete) return;
+    setIsDeleting(true);
+    setDeleteError("");
+    try {
+      await deleteStaff.mutateAsync(staffToDelete.id);
+      toast.success("Staff profile removed successfully.", "Staff Removed");
+      setStaffToDelete(null);
+      setSelectedStaff(null);
+      refetchStaff();
+    } catch (err: any) {
+      const msg = err?.message || "Failed to delete staff profile.";
+      setDeleteError(msg);
+      toast.error(msg, "Action Failed");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -250,14 +379,33 @@ export default function CommunityAdminStaffPage() {
       key: "actions",
       header: "Action",
       render: (s) => (
-        <button
-          type="button"
-          className="btn btn-secondary"
-          style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem" }}
-          onClick={() => setSelectedStaff(s)}
-        >
-          View Profile →
-        </button>
+        <div style={{ display: "flex", gap: "0.4rem" }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem" }}
+            onClick={() => setSelectedStaff(s)}
+          >
+            View Profile →
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem", background: "#f8fafc" }}
+            onClick={() =>
+              setCredentialUser({
+                id: s.user_id || s.id,
+                full_name: s.full_name,
+                email: s.email || "",
+                phone: s.phone || "",
+                roleName: s.staff_type || "Domestic Staff",
+              })
+            }
+            title="Update Credentials"
+          >
+            🔑 Credentials
+          </button>
+        </div>
       ),
     },
   ];
@@ -391,7 +539,25 @@ export default function CommunityAdminStaffPage() {
             cursor: "pointer",
           }}
         >
-          🛠️ Staff Directory ({staffList?.length || 0})
+          🛠️ Domestic Staff ({staffList?.length || 0})
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("security")}
+          style={{
+            padding: "0.75rem 0",
+            border: "none",
+            background: "transparent",
+            fontSize: "0.95rem",
+            fontWeight: activeTab === "security" ? 700 : 500,
+            color: activeTab === "security" ? "var(--primary)" : "var(--muted)",
+            borderBottom:
+              activeTab === "security" ? "2px solid var(--primary)" : "2px solid transparent",
+            cursor: "pointer",
+          }}
+        >
+          🛡️ Facility &amp; Security Personnel
         </button>
 
         <button
@@ -442,6 +608,12 @@ export default function CommunityAdminStaffPage() {
             emptyDescription="Register domestic helpers and support technicians for this community."
             enableClientPagination={true}
           />
+        </div>
+      )}
+
+      {activeTab === "security" && (
+        <div style={{ marginTop: "1rem" }}>
+          <OperationalStaffView embeddedInTab={true} />
         </div>
       )}
 
@@ -574,6 +746,107 @@ export default function CommunityAdminStaffPage() {
                   No residential units currently assigned.
                 </div>
               )}
+            </div>
+
+            {/* Danger Zone — Delete Profile */}
+            <div
+              style={{
+                borderTop: "1px solid #fecaca",
+                paddingTop: "1rem",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "0.75rem",
+              }}
+            >
+              <div style={{ fontSize: "0.775rem", color: "#b91c1c" }}>
+                ⚠️ Permanently removes this staff profile and all associated access records.
+              </div>
+              <button
+                type="button"
+                className="btn btn-danger"
+                style={{ fontSize: "0.8rem", padding: "0.35rem 0.85rem", flexShrink: 0 }}
+                onClick={() => setStaffToDelete(selectedStaff)}
+              >
+                🗑️ Delete Profile
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Delete Staff Confirmation Modal */}
+      <Modal
+        isOpen={Boolean(staffToDelete)}
+        onClose={() => {
+          setStaffToDelete(null);
+          setDeleteError("");
+        }}
+        title="⚠️ Delete Staff Profile"
+      >
+        {staffToDelete && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+            <div
+              style={{
+                background: "#fef2f2",
+                border: "1px solid #fecaca",
+                borderRadius: "var(--radius-sm)",
+                padding: "1rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <span style={{ fontSize: "1.5rem" }}>🗑️</span>
+                <strong style={{ fontSize: "0.95rem", color: "#991b1b" }}>
+                  This action is permanent and cannot be undone.
+                </strong>
+              </div>
+              <p style={{ fontSize: "0.85rem", color: "#7f1d1d", margin: 0, lineHeight: 1.5 }}>
+                You are about to permanently delete the profile of{" "}
+                <strong>{staffToDelete.full_name}</strong> ({staffToDelete.staff_type}).
+              </p>
+              <p style={{ fontSize: "0.8rem", color: "#991b1b", margin: 0 }}>
+                This will remove their gate access, attendance records, and all unit assignments.
+              </p>
+            </div>
+
+            {deleteError && (
+              <div
+                style={{
+                  padding: "0.6rem 0.85rem",
+                  background: "#fef2f2",
+                  border: "1px solid #fecaca",
+                  borderRadius: "var(--radius-sm)",
+                  color: "#b91c1c",
+                  fontSize: "0.85rem",
+                }}
+              >
+                {deleteError}
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setStaffToDelete(null);
+                  setDeleteError("");
+                }}
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={handleDeleteStaff}
+                disabled={isDeleting}
+              >
+                {isDeleting ? "Deleting…" : "Yes, Delete Permanently"}
+              </button>
             </div>
           </div>
         )}
@@ -824,6 +1097,7 @@ export default function CommunityAdminStaffPage() {
         maxWidth={680}
       >
         <form
+          noValidate
           onSubmit={handleAddStaff}
           style={{ display: "flex", flexDirection: "column", gap: "1.25rem", maxHeight: "80vh", overflowY: "auto", paddingRight: "0.25rem" }}
         >
@@ -873,6 +1147,7 @@ export default function CommunityAdminStaffPage() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.85rem" }}>
               <div>
                 <label
+                  htmlFor="staff_full_name"
                   style={{
                     fontSize: "0.82rem",
                     fontWeight: 600,
@@ -883,9 +1158,12 @@ export default function CommunityAdminStaffPage() {
                   Full Name <span style={{ color: "#EF4444" }}>*</span>
                 </label>
                 <input
+                  id="staff_full_name"
                   type="text"
                   className="input-field"
                   required
+                  aria-invalid={Boolean(staffFieldErrors.full_name)}
+                  aria-describedby={staffFieldErrors.full_name ? "staff_full_name_error" : undefined}
                   placeholder="e.g. Ramesh Kumar"
                   value={newStaffForm.full_name}
                   onChange={(e) => {
@@ -900,11 +1178,25 @@ export default function CommunityAdminStaffPage() {
                       password: newPwd,
                     }));
                   }}
+                  style={{
+                    borderColor: staffFieldErrors.full_name ? "#EF4444" : undefined,
+                  }}
                 />
+                {staffFieldErrors.full_name && (
+                  <span
+                    id="staff_full_name_error"
+                    role="alert"
+                    title={staffFieldErrors.full_name}
+                    style={{ fontSize: "0.75rem", color: "#EF4444", marginTop: "0.25rem", display: "flex", alignItems: "center", gap: "0.25rem" }}
+                  >
+                    <span>⚠️</span> {staffFieldErrors.full_name}
+                  </span>
+                )}
               </div>
 
               <div>
                 <label
+                  htmlFor="staff_phone"
                   style={{
                     fontSize: "0.82rem",
                     fontWeight: 600,
@@ -915,19 +1207,36 @@ export default function CommunityAdminStaffPage() {
                   Phone Number <span style={{ color: "#EF4444" }}>*</span>
                 </label>
                 <input
+                  id="staff_phone"
                   type="tel"
                   className="input-field"
                   required
+                  aria-invalid={Boolean(staffFieldErrors.phone)}
+                  aria-describedby={staffFieldErrors.phone ? "staff_phone_error" : undefined}
                   placeholder="+91 9876543210"
                   value={newStaffForm.phone}
                   onChange={(e) => setNewStaffForm({ ...newStaffForm, phone: e.target.value })}
+                  style={{
+                    borderColor: staffFieldErrors.phone ? "#EF4444" : undefined,
+                  }}
                 />
+                {staffFieldErrors.phone && (
+                  <span
+                    id="staff_phone_error"
+                    role="alert"
+                    title={staffFieldErrors.phone}
+                    style={{ fontSize: "0.75rem", color: "#EF4444", marginTop: "0.25rem", display: "flex", alignItems: "center", gap: "0.25rem" }}
+                  >
+                    <span>⚠️</span> {staffFieldErrors.phone}
+                  </span>
+                )}
               </div>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.85rem" }}>
               <div>
                 <label
+                  htmlFor="staff_email"
                   style={{
                     fontSize: "0.82rem",
                     fontWeight: 600,
@@ -938,12 +1247,28 @@ export default function CommunityAdminStaffPage() {
                   Email Address <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 400 }}>(For Dashboard Login)</span>
                 </label>
                 <input
+                  id="staff_email"
                   type="email"
                   className="input-field"
+                  aria-invalid={Boolean(staffFieldErrors.email)}
+                  aria-describedby={staffFieldErrors.email ? "staff_email_error" : undefined}
                   placeholder="e.g. ramesh.maid@gatesphere.com"
                   value={newStaffForm.email}
                   onChange={(e) => setNewStaffForm({ ...newStaffForm, email: e.target.value })}
+                  style={{
+                    borderColor: staffFieldErrors.email ? "#EF4444" : undefined,
+                  }}
                 />
+                {staffFieldErrors.email && (
+                  <span
+                    id="staff_email_error"
+                    role="alert"
+                    title={staffFieldErrors.email}
+                    style={{ fontSize: "0.75rem", color: "#EF4444", marginTop: "0.25rem", display: "flex", alignItems: "center", gap: "0.25rem" }}
+                  >
+                    <span>⚠️</span> {staffFieldErrors.email}
+                  </span>
+                )}
               </div>
 
               <div>
@@ -964,10 +1289,23 @@ export default function CommunityAdminStaffPage() {
                   <input
                     type={showStaffPassword ? "text" : "password"}
                     className="input-field"
-                    style={{ paddingRight: "2.5rem" }}
+                    style={{
+                      paddingRight: "2.5rem",
+                      borderColor: staffFieldErrors.password ? "#EF4444" : undefined,
+                    }}
                     placeholder="e.g. ramesh@Gate2026!"
                     value={newStaffForm.password}
-                    onChange={(e) => setNewStaffForm({ ...newStaffForm, password: e.target.value })}
+                    aria-invalid={Boolean(staffFieldErrors.password)}
+                    onChange={(e) => {
+                      setNewStaffForm({ ...newStaffForm, password: e.target.value });
+                      if (staffFieldErrors.password) {
+                        setStaffFieldErrors((prev) => {
+                          const n = { ...prev };
+                          delete n.password;
+                          return n;
+                        });
+                      }
+                    }}
                   />
                   <button
                     type="button"
@@ -1017,14 +1355,37 @@ export default function CommunityAdminStaffPage() {
                     )}
                   </button>
                 </div>
+                {staffFieldErrors.password && (
+                  <span
+                    role="alert"
+                    title={staffFieldErrors.password}
+                    style={{
+                      fontSize: "0.75rem",
+                      color: "#EF4444",
+                      marginTop: "0.25rem",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.25rem",
+                    }}
+                  >
+                    <span>⚠️</span> {staffFieldErrors.password}
+                  </span>
+                )}
+                <span
+                  style={{
+                    fontSize: "0.72rem",
+                    color: "var(--muted)",
+                    marginTop: "0.25rem",
+                    display: "block",
+                  }}
+                >
+                  Default: <code>[FirstName]@Gate2026!</code>
+                </span>
               </div>
             </div>
-            <p style={{ margin: 0, fontSize: "11.5px", color: "var(--muted)" }}>
-              💡 Providing an email allows this staff member to sign in to the <strong>Domestic Staff Dashboard</strong> to view unit assignments and check-in logs.
-            </p>
           </div>
 
-          {/* Section 2: Role & Government Identification */}
+          {/* Section 2: Role & Government Verification */}
           <div
             style={{
               padding: "1rem",
@@ -1048,7 +1409,7 @@ export default function CommunityAdminStaffPage() {
                 gap: "0.4rem",
               }}
             >
-              <span>🛠️</span> 2. Profession &amp; Identification
+              <span>🪪</span> 2. Staff Role &amp; Government Identification
             </div>
 
             <div>
@@ -1060,13 +1421,16 @@ export default function CommunityAdminStaffPage() {
                   marginBottom: "0.3rem",
                 }}
               >
-                Role / Profession <span style={{ color: "#EF4444" }}>*</span>
+                Staff Role / Type <span style={{ color: "#EF4444" }}>*</span>
               </label>
               <select
                 className="select-field"
                 value={newStaffForm.staff_type}
                 onChange={(e) =>
-                  setNewStaffForm({ ...newStaffForm, staff_type: e.target.value as StaffType })
+                  setNewStaffForm({
+                    ...newStaffForm,
+                    staff_type: e.target.value as StaffType,
+                  })
                 }
               >
                 <option value="maid">Maid / Housekeeper</option>
@@ -1083,6 +1447,7 @@ export default function CommunityAdminStaffPage() {
             <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: "0.85rem" }}>
               <div>
                 <label
+                  htmlFor="staff_id_type"
                   style={{
                     fontSize: "0.82rem",
                     fontWeight: 600,
@@ -1093,9 +1458,19 @@ export default function CommunityAdminStaffPage() {
                   Govt ID Type
                 </label>
                 <select
+                  id="staff_id_type"
                   className="select-field"
                   value={newStaffForm.id_type}
-                  onChange={(e) => setNewStaffForm({ ...newStaffForm, id_type: e.target.value })}
+                  onChange={(e) => {
+                    setNewStaffForm({ ...newStaffForm, id_type: e.target.value });
+                    if (staffFieldErrors.id_number) {
+                      setStaffFieldErrors((prev) => {
+                        const n = { ...prev };
+                        delete n.id_number;
+                        return n;
+                      });
+                    }
+                  }}
                 >
                   <option value="Aadhaar">Aadhaar</option>
                   <option value="Voter ID">Voter ID</option>
@@ -1106,6 +1481,7 @@ export default function CommunityAdminStaffPage() {
               </div>
               <div>
                 <label
+                  htmlFor="staff_id_number"
                   style={{
                     fontSize: "0.82rem",
                     fontWeight: 600,
@@ -1113,14 +1489,20 @@ export default function CommunityAdminStaffPage() {
                     marginBottom: "0.3rem",
                   }}
                 >
-                  ID Number
+                  Govt ID Number
                 </label>
                 <input
+                  id="staff_id_number"
                   type="text"
                   className="input-field"
+                  aria-invalid={Boolean(staffFieldErrors.id_number)}
+                  style={{
+                    borderColor: staffFieldErrors.id_number ? "#EF4444" : undefined,
+                    boxShadow: staffFieldErrors.id_number ? "0 0 0 1px #EF4444" : undefined,
+                  }}
                   placeholder={
                     newStaffForm.id_type === "Aadhaar"
-                      ? "e.g. 1234-5678-9012"
+                      ? "e.g. 1234 5678 9012"
                       : newStaffForm.id_type === "Voter ID"
                         ? "e.g. ABC1234567"
                         : newStaffForm.id_type === "PAN Card"
@@ -1128,12 +1510,58 @@ export default function CommunityAdminStaffPage() {
                           : newStaffForm.id_type === "Driving License"
                             ? "e.g. DL-1420110012345"
                             : newStaffForm.id_type === "Passport"
-                              ? "e.g. A12345678"
+                              ? "e.g. A1234567"
                               : "e.g. ID Document Number"
                   }
                   value={newStaffForm.id_number}
-                  onChange={(e) => setNewStaffForm({ ...newStaffForm, id_number: e.target.value })}
+                  onChange={(e) => {
+                    setNewStaffForm({ ...newStaffForm, id_number: e.target.value });
+                    if (staffFieldErrors.id_number) {
+                      setStaffFieldErrors((prev) => {
+                        const n = { ...prev };
+                        delete n.id_number;
+                        return n;
+                      });
+                    }
+                  }}
                 />
+                {staffFieldErrors.id_number ? (
+                  <span
+                    role="alert"
+                    title={staffFieldErrors.id_number}
+                    style={{
+                      fontSize: "0.75rem",
+                      color: "#EF4444",
+                      marginTop: "0.25rem",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.25rem",
+                    }}
+                  >
+                    <span>⚠️</span> {staffFieldErrors.id_number}
+                  </span>
+                ) : (
+                  <span
+                    style={{
+                      fontSize: "0.75rem",
+                      color: "var(--muted)",
+                      marginTop: "0.25rem",
+                      display: "block",
+                    }}
+                  >
+                    {newStaffForm.id_type === "Aadhaar"
+                      ? "12-digit numeric Aadhaar (e.g. 1234 5678 9012)"
+                      : newStaffForm.id_type === "PAN Card"
+                        ? "10-character PAN (e.g. ABCDE1234F)"
+                        : newStaffForm.id_type === "Voter ID"
+                          ? "10-character Voter ID (e.g. ABC1234567)"
+                          : newStaffForm.id_type === "Driving License"
+                            ? "Valid DL format (e.g. DL-1420110012345)"
+                            : newStaffForm.id_type === "Passport"
+                              ? "1 letter + 7-8 digits (e.g. A1234567)"
+                              : "Optional Government ID number"}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -1190,6 +1618,14 @@ export default function CommunityAdminStaffPage() {
           </div>
         </form>
       </Modal>
+
+      {/* Update Credentials Modal */}
+      <UpdateUserCredentialsModal
+        isOpen={Boolean(credentialUser)}
+        onClose={() => setCredentialUser(null)}
+        user={credentialUser}
+        onSuccess={() => refetchStaff()}
+      />
     </div>
   );
 }

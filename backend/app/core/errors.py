@@ -76,6 +76,25 @@ class BusinessRuleError(AppError):
     code = "BUSINESS_RULE_VIOLATION"
 
 
+class RateLimitedError(AppError):
+    """429 with an optional `Retry-After`. Raised for per-account login lockout
+    (`ACCOUNT_LOCKED`); the middleware's sliding-window limiter (`RATE_LIMITED`)
+    answers directly without going through this class."""
+
+    status_code = status.HTTP_429_TOO_MANY_REQUESTS
+    code = "RATE_LIMITED"
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str | None = None,
+        retry_after: int | None = None,
+    ) -> None:
+        super().__init__(message, code=code, status_code=status.HTTP_429_TOO_MANY_REQUESTS)
+        self.retry_after = retry_after
+
+
 def _envelope(code: str, message: str, fields: dict[str, str] | None = None) -> dict:
     error: dict = {"code": code}
     if fields:
@@ -87,13 +106,30 @@ def _request_id(request: Request) -> str | None:
     return getattr(request.state, "request_id", None) or request.headers.get("X-Request-ID")
 
 
+def _error_headers(request: Request, exc: AppError) -> dict[str, str]:
+    headers = {"X-Request-ID": _request_id(request) or ""}
+    retry_after = getattr(exc, "retry_after", None)
+    if retry_after is not None:
+        headers["Retry-After"] = str(max(1, int(retry_after)))
+    return headers
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def _app_error(request: Request, exc: AppError) -> JSONResponse:
+        if exc.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY:
+            log.warning(
+                "business_rule_violation",
+                url=str(request.url),
+                method=request.method,
+                code=exc.code,
+                message=exc.message,
+                fields=exc.fields,
+            )
         return JSONResponse(
             status_code=exc.status_code,
             content=_envelope(exc.code, exc.message, exc.fields),
-            headers={"X-Request-ID": _request_id(request) or ""},
+            headers=_error_headers(request, exc),
         )
 
     @app.exception_handler(RequestValidationError)
@@ -102,6 +138,13 @@ def register_exception_handlers(app: FastAPI) -> None:
             ".".join(str(p) for p in err["loc"] if p not in ("body", "query", "path")): err["msg"]
             for err in exc.errors()
         }
+        log.warning(
+            "request_validation_failed",
+            url=str(request.url),
+            method=request.method,
+            errors=exc.errors(),
+            fields=fields,
+        )
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content=_envelope("VALIDATION_ERROR", "Request validation failed", fields),

@@ -24,6 +24,7 @@ import type {
   IncidentType,
 } from "@/types/incidents";
 import { formatDateTime } from "@/lib/utils";
+import { toast } from "@/store/toast";
 
 const ALLOWED_TRANSITIONS: Record<IncidentStatus, IncidentStatus[]> = {
   reported: ["acknowledged", "false_alarm"],
@@ -95,6 +96,16 @@ export default function CommunityAdminIncidentsPage() {
   // Handle Create Incident
   const handleCreateIncident = async (e: React.FormEvent) => {
     e.preventDefault();
+    const desc = newIncidentForm.description.trim();
+    if (!desc || desc.length < 5) {
+      setErrorMessage("Incident description must be at least 5 characters long.");
+      return;
+    }
+    if (!/[a-zA-Z]{3,}/.test(desc)) {
+      setErrorMessage("Incident description must contain readable text (at least 3 alphabetic letters).");
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setErrorMessage(null);
@@ -104,7 +115,7 @@ export default function CommunityAdminIncidentsPage() {
         location_text: newIncidentForm.location_text
           ? newIncidentForm.location_text.trim()
           : undefined,
-        description: newIncidentForm.description.trim(),
+        description: desc,
         community_id: activeCommunityId || undefined,
       });
       setIsCreateModalOpen(false);
@@ -114,10 +125,13 @@ export default function CommunityAdminIncidentsPage() {
         location_text: "",
         description: "",
       });
+      toast.success("Incident logged successfully.", "Incident Created");
       refetchIncidents();
     } catch (err: unknown) {
       console.error(err);
-      setErrorMessage(err instanceof Error ? err.message : "Failed to log incident");
+      const msg = err instanceof Error ? err.message : "Failed to log incident";
+      setErrorMessage(msg);
+      toast.error(msg, "Error");
     } finally {
       setIsSubmitting(false);
     }
@@ -147,12 +161,15 @@ export default function CommunityAdminIncidentsPage() {
       setIsTransitionModalOpen(false);
       setTransitionReason("");
       setResolutionSummary("");
+      toast.success(`Incident status updated to ${transitionStatus.replace("_", " ")}.`, "Status Updated");
       refetchIncidents();
       refetchDetail();
       refetchHistory();
     } catch (err: unknown) {
       console.error(err);
-      setErrorMessage(err instanceof Error ? err.message : "Failed to update status");
+      const msg = err instanceof Error ? err.message : "Failed to update status";
+      setErrorMessage(msg);
+      toast.error(msg, "Error");
     } finally {
       setIsSubmitting(false);
     }
@@ -171,9 +188,11 @@ export default function CommunityAdminIncidentsPage() {
         },
       });
       setNewActionText("");
+      toast.success("Action note recorded.", "Log Updated");
       refetchActions();
     } catch (err) {
       console.error(err);
+      toast.error("Failed to add action log.", "Error");
     }
   };
 

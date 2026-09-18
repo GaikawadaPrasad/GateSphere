@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { gateApi, type PanicAlert } from "@/lib/api";
 import { formatDateTime } from "@/lib/utils";
+import { toast } from "@/store/toast";
 
 // Real backend enum (backend/app/modules/gate/models.py ALERT_TYPES)
 const EMERGENCY_TYPES = [
@@ -27,6 +28,8 @@ export default function SecurityGuardEmergencyPage() {
   const [description, setDescription] = useState("");
 
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [isDismissModalOpen, setIsDismissModalOpen] = useState(false);
+  const [alertToDismiss, setAlertToDismiss] = useState<PanicAlert | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [dispatchedAlert, setDispatchedAlert] = useState<PanicAlert | null>(null);
@@ -52,10 +55,28 @@ export default function SecurityGuardEmergencyPage() {
     };
   }, []);
 
+  const handleRefresh = async () => {
+    setIsLoading(true);
+    try {
+      const data = await gateApi.alerts();
+      if (data) {
+        setAlertsList(data);
+        const live = data.find((a) => a.status === "active" || a.status === "acknowledged");
+        setActiveSos(live || null);
+      }
+      toast.success("Emergency alerts refreshed.");
+    } catch {
+      toast.error("Failed to refresh emergency alerts.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleOpenConfirm = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!location.trim()) {
-      setErrorMessage("Please enter an emergency location.");
+    const trimmedLoc = location.trim();
+    if (!trimmedLoc || trimmedLoc.length < 3) {
+      setErrorMessage("Please enter an emergency location (at least 3 characters).");
       return;
     }
     setErrorMessage(null);
@@ -86,9 +107,34 @@ export default function SecurityGuardEmergencyPage() {
       });
       setIsConfirmModalOpen(false);
       setDescription("");
+      toast.success("Emergency SOS alert broadcasted to security console.", "🚨 SOS Alert Sent");
     } catch (err: unknown) {
       const msg =
         err instanceof Error ? err.message : "Failed to send SOS emergency alert. Please retry.";
+      setErrorMessage(msg);
+      toast.error(msg, "Error");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCancelAlert = async () => {
+    if (!alertToDismiss || isSubmitting) return;
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    try {
+      await gateApi.cancelAlert(alertToDismiss.id);
+      setAlertsList((prev) =>
+        prev.map((a) => (a.id === alertToDismiss.id ? { ...a, status: "cancelled" } : a)),
+      );
+      if (activeSos?.id === alertToDismiss.id) {
+        setActiveSos(null);
+      }
+      setIsDismissModalOpen(false);
+      setAlertToDismiss(null);
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "Failed to cancel emergency alert. Please retry.";
       setErrorMessage(msg);
     } finally {
       setIsSubmitting(false);
@@ -139,6 +185,26 @@ export default function SecurityGuardEmergencyPage() {
       sortable: true,
       render: (a) => <StatusBadge status={a.status} />,
     },
+    {
+      key: "actions",
+      header: "Actions",
+      render: (a) =>
+        a.status === "active" ? (
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ fontSize: "0.75rem", padding: "0.2rem 0.55rem", color: "#DC2626", borderColor: "#FCA5A5" }}
+            onClick={() => {
+              setAlertToDismiss(a);
+              setIsDismissModalOpen(true);
+            }}
+          >
+            ✕ Dismiss
+          </button>
+        ) : (
+          <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>—</span>
+        ),
+    },
   ];
 
   return (
@@ -147,6 +213,15 @@ export default function SecurityGuardEmergencyPage() {
         title="SOS Emergency & Panic Command Console"
         subtitle="Immediate emergency alert dispatch, active alert status monitoring, and Security Supervisor escalation"
         breadcrumbs={[{ label: "GateSphere" }, { label: "Security Guard" }, { label: "Emergency" }]}
+        actions={
+          <button
+            className="btn btn-secondary"
+            onClick={handleRefresh}
+            disabled={isLoading}
+          >
+            🔄 {isLoading ? "Refreshing…" : "Refresh"}
+          </button>
+        }
       />
 
       {/* ACTIVE SOS BANNER */}
@@ -226,6 +301,27 @@ export default function SecurityGuardEmergencyPage() {
                 Current Escalation
               </span>
               <strong style={{ textTransform: "capitalize" }}>🛡️ {activeSos.status}</strong>
+            </div>
+            <div style={{ display: "flex", alignItems: "flex-end" }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setAlertToDismiss(activeSos);
+                  setIsDismissModalOpen(true);
+                }}
+                style={{
+                  background: "rgba(255, 255, 255, 0.2)",
+                  border: "1px solid rgba(255, 255, 255, 0.4)",
+                  color: "white",
+                  padding: "0.35rem 0.8rem",
+                  borderRadius: "var(--radius-sm)",
+                  fontSize: "0.8rem",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                ✕ Dismiss Alert
+              </button>
             </div>
           </div>
         </div>
@@ -490,6 +586,89 @@ export default function SecurityGuardEmergencyPage() {
               <strong>📍 {location}</strong>
             </div>
           </div>
+        </div>
+      </Modal>
+
+      {/* Alert Dismissal / Cancellation Confirmation Modal */}
+      <Modal
+        isOpen={isDismissModalOpen}
+        onClose={() => !isSubmitting && setIsDismissModalOpen(false)}
+        title="⚠️ CONFIRM ALERT DISMISSAL / CANCELLATION"
+        maxWidth={480}
+        footer={
+          <>
+            <button
+              className="btn btn-secondary"
+              onClick={() => {
+                setIsDismissModalOpen(false);
+                setAlertToDismiss(null);
+              }}
+              disabled={isSubmitting}
+            >
+              Back
+            </button>
+            <button
+              className="btn btn-danger"
+              onClick={handleCancelAlert}
+              disabled={isSubmitting}
+              style={{ fontWeight: 700 }}
+            >
+              {isSubmitting ? "Dismissing..." : "Yes, Dismiss Alert"}
+            </button>
+          </>
+        }
+      >
+        <div>
+          <div
+            style={{
+              padding: "1rem",
+              background: "var(--danger-light)",
+              border: "1.5px solid var(--danger-border)",
+              borderRadius: "var(--radius-sm)",
+              color: "#991b1b",
+              marginBottom: "1rem",
+            }}
+          >
+            <p style={{ fontWeight: 700, fontSize: "0.95rem", marginBottom: "0.35rem" }}>
+              Are you sure you want to dismiss this emergency alert?
+            </p>
+            <p style={{ fontSize: "0.85rem", color: "#b91c1c" }}>
+              This will stand down active panic response for this incident and mark the alert as cancelled in the security command logs.
+            </p>
+          </div>
+
+          {alertToDismiss && (
+            <div
+              style={{
+                background: "#f8fafc",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                padding: "0.85rem",
+                fontSize: "0.85rem",
+              }}
+            >
+              <div
+                style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.4rem" }}
+              >
+                <span style={{ color: "var(--muted)" }}>Alert ID:</span>
+                <strong style={{ fontFamily: "monospace" }}>
+                  SOS-{alertToDismiss.id.slice(0, 8).toUpperCase()}
+                </strong>
+              </div>
+              <div
+                style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.4rem" }}
+              >
+                <span style={{ color: "var(--muted)" }}>Type:</span>
+                <strong style={{ color: "var(--danger)", textTransform: "capitalize" }}>
+                  🚨 {alertToDismiss.alert_type}
+                </strong>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: "var(--muted)" }}>Triggered:</span>
+                <span>⏱️ {formatDateTime((alertToDismiss as any).triggered_at)}</span>
+              </div>
+            </div>
+          )}
         </div>
       </Modal>
     </div>

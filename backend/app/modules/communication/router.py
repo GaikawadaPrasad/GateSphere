@@ -9,13 +9,19 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, Response, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.errors import ForbiddenError
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
-from app.core.tenancy import require_permission_async
+from app.core.security import require_auth_async
+from app.core.tenancy import TenantScope, get_tenant_scope_async, require_permission_async
+from app.db.session import get_async_db
 from app.modules.communication import schemas
 from app.modules.communication.deps import communication_service
 from app.modules.communication.service import CommunicationService
+from app.modules.users.models import Role, User, UserRole
 
 router = APIRouter(prefix="/communication", tags=["Communication & Broadcasts"])
 
@@ -23,6 +29,43 @@ VIEW = Depends(require_permission_async("communication:view"))
 CREATE = Depends(require_permission_async("communication:create"))
 UPDATE = Depends(require_permission_async("communication:update"))
 APPROVE = Depends(require_permission_async("communication:approve"))
+
+
+async def require_participate_async(
+    scope: TenantScope = Depends(get_tenant_scope_async),
+    user: User = Depends(require_auth_async),
+    db: AsyncSession = Depends(get_async_db),
+) -> TenantScope:
+    if not scope.can("communication:view"):
+        raise ForbiddenError("Missing permission: communication:view", code="PERMISSION_DENIED")
+    if not user.is_superadmin:
+        roles = list(
+            (
+                await db.scalars(
+                    select(Role.slug)
+                    .join(UserRole, UserRole.role_id == Role.id)
+                    .where(UserRole.user_id == user.id)
+                )
+            ).all()
+        )
+        if "auditor" in roles and not any(
+            r in (
+                "resident",
+                "community_admin",
+                "association_committee",
+                "facility_manager",
+                "security_supervisor",
+                "security_guard",
+                "domestic_staff",
+            )
+            for r in roles
+        ):
+            raise ForbiddenError("Auditors are strictly read-only", code="AUDITOR_READ_ONLY")
+    return scope
+
+
+PARTICIPATE = Depends(require_participate_async)
+
 
 Svc = CommunicationService
 
@@ -132,6 +175,24 @@ async def expire_announcement(
 
 
 # --- polls ------------------------------------------------------- #
+@router.get(
+    "/polls",
+    response_model=Envelope[list[schemas.PollRead]],
+    dependencies=[VIEW],
+)
+async def list_polls(
+    community_id: uuid.UUID | None = None,
+    params: PageParams = Depends(page_params),
+    svc: Svc = Depends(communication_service),
+) -> dict:
+    rows, total = await svc.list_polls(
+        community_id=community_id, offset=params.offset, limit=params.page_size
+    )
+    return paginated(
+        [schemas.PollRead.model_validate(r) for r in rows], total=total, params=params
+    )
+
+
 @router.post(
     "/polls",
     response_model=Envelope[schemas.PollRead],
@@ -146,16 +207,18 @@ async def create_poll(
     )
 
 
+
 @router.get("/polls/{poll_id}", response_model=Envelope[schemas.PollRead], dependencies=[VIEW])
 async def get_poll(poll_id: uuid.UUID, svc: Svc = Depends(communication_service)) -> dict:
     return ok(schemas.PollRead.model_validate(await svc.get_poll(poll_id)))
+
 
 
 # -- event RSVP (GAP-2) ------------------------------------- #
 @router.post(
     "/announcements/{announcement_id}/rsvp",
     response_model=Envelope[schemas.RsvpRead],
-    dependencies=[VIEW],
+    dependencies=[PARTICIPATE],
 )
 async def rsvp_event(
     announcement_id: uuid.UUID,
@@ -202,7 +265,7 @@ async def set_poll_status(
     "/polls/{poll_id}/vote",
     response_model=Envelope[schemas.PollResults],
     status_code=status.HTTP_201_CREATED,
-    dependencies=[VIEW],
+    dependencies=[PARTICIPATE],
 )
 async def vote(
     poll_id: uuid.UUID, payload: schemas.VoteIn, svc: Svc = Depends(communication_service)

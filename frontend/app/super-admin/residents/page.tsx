@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SearchInput } from "@/components/forms/SearchInput";
@@ -9,17 +9,27 @@ import { Modal } from "@/components/common/Modal";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { residentsApi } from "@/lib/api";
 import { useCommunities, useCommunityUnits, useTowers } from "@/hooks/use-communities";
-import { useAddResident } from "@/hooks/use-residents";
+import { useAddResident, useDeleteResident } from "@/hooks/use-residents";
 import type { ResidentProfile } from "@/types/residents";
 import type { Community } from "@/types/communities";
 import { PasswordField } from "@/components/forms/PasswordField";
 import { generateInitialPassword } from "@/lib/utils";
+import { toast } from "@/store/toast";
+import { useUiStore } from "@/store/ui";
+import { ScopeBanner } from "@/components/common/ScopeBanner";
+import { isValidPersonName } from "@/constants/locations";
 
 export default function ResidentsPage() {
+  const { activeCommunityId, setActiveCommunity } = useUiStore();
   const [search, setSearch] = useState("");
-  const [communityId, setCommunityId] = useState("");
+  const [communityId, setCommunityId] = useState(activeCommunityId || "");
   const [page, setPage] = useState(1);
   const pageSize = 15;
+
+  useEffect(() => {
+    setCommunityId(activeCommunityId || "");
+    setPage(1);
+  }, [activeCommunityId]);
 
   // Add Resident Modal State
   const [isAddResidentOpen, setIsAddResidentOpen] = useState(false);
@@ -34,12 +44,19 @@ export default function ResidentsPage() {
   const [isPrimary, setIsPrimary] = useState(true);
   const [agreementRef, setAgreementRef] = useState("");
   const [formError, setFormError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { data: communities } = useCommunities();
   const { data: targetTowers } = useTowers(targetCommunityId || undefined);
   const { data: communityUnits } = useCommunityUnits(targetCommunityId || undefined);
   const addResidentMutation = useAddResident();
+  const deleteResidentMutation = useDeleteResident();
+
+  // Delete Resident State
+  const [residentToDelete, setResidentToDelete] = useState<ResidentProfile | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   const filteredUnits = useMemo(() => {
     if (!communityUnits) return [];
@@ -54,7 +71,7 @@ export default function ResidentsPage() {
   });
 
   const resetForm = () => {
-    const defaultComm = communities?.[0]?.id || "";
+    const defaultComm = communityId || communities?.[0]?.id || "";
     setTargetCommunityId(defaultComm);
     setTargetTowerId("");
     setTargetUnitId("");
@@ -66,6 +83,7 @@ export default function ResidentsPage() {
     setIsPrimary(true);
     setAgreementRef("");
     setFormError("");
+    setFieldErrors({});
   };
 
   const handleOpenAddModal = () => {
@@ -73,18 +91,46 @@ export default function ResidentsPage() {
     setIsAddResidentOpen(true);
   };
 
-  const handleAddResidentSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const validateForm = () => {
+    const errs: Record<string, string> = {};
     if (!targetCommunityId) {
-      setFormError("Please select a community.");
-      return;
+      errs.targetCommunityId = "Please select a community.";
     }
     if (!targetUnitId) {
-      setFormError("Please select a residential unit.");
-      return;
+      errs.targetUnitId = "Please select a residential unit.";
     }
-    if (!fullName.trim() || !email.trim()) {
-      setFormError("Full name and email are required.");
+    const trimmedName = fullName.trim();
+    if (!trimmedName || trimmedName.length < 2) {
+      errs.fullName = "Resident full name is required (min 2 characters).";
+    } else if (!isValidPersonName(trimmedName)) {
+      errs.fullName = "Resident name must contain only alphabets and spaces.";
+    }
+    if (!email.trim()) {
+      errs.email = "Email address is required.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      errs.email = "Please enter a valid email address (e.g. resident@example.com).";
+    }
+    if (phone.trim() && !/^[+0-9][0-9 \-]{4,19}$/.test(phone.trim())) {
+      errs.phone = "Enter a valid phone number (10-15 digits).";
+    }
+    if (password.trim() && password.trim().length < 10) {
+      errs.password = "Initial password must be at least 10 characters.";
+    }
+    setFieldErrors(errs);
+    return errs;
+  };
+
+  const handleAddResidentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const errs = validateForm();
+    if (Object.keys(errs).length > 0) {
+      setFormError("Please fill in all required fields marked below.");
+      const firstKey = Object.keys(errs)[0];
+      const el = document.getElementById(`resident-form-${firstKey}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.focus();
+      }
       return;
     }
 
@@ -104,12 +150,33 @@ export default function ResidentsPage() {
           agreement_reference: agreementRef.trim() || undefined,
         },
       });
+      toast.success(`Resident "${fullName.trim()}" onboarded successfully!`, "Resident Registered");
       setIsAddResidentOpen(false);
-      refetch();
+      resetForm();
+      await refetch();
     } catch (err: any) {
       setFormError(err?.message || "Failed to onboard resident.");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteResident = async () => {
+    if (!residentToDelete) return;
+    setIsDeleting(true);
+    setDeleteError("");
+    try {
+      await deleteResidentMutation.mutateAsync(residentToDelete.id);
+      toast.success(
+        `Deleted resident profile for ${residentToDelete.full_name}.`,
+        "Resident Deleted"
+      );
+      setResidentToDelete(null);
+      await refetch();
+    } catch (err: any) {
+      setDeleteError(err?.message || "Failed to delete resident profile.");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -154,6 +221,28 @@ export default function ResidentsPage() {
       align: "center",
       render: (r) => <StatusBadge status={r.status || (r as any).profile_status || "active"} />,
     },
+    {
+      key: "actions",
+      header: "Action",
+      align: "center",
+      render: (r) => (
+        <div style={{ display: "flex", justifyContent: "center", gap: "0.5rem" }}>
+          <button
+            type="button"
+            className="btn btn-danger"
+            style={{ fontSize: "0.75rem", padding: "0.25rem 0.65rem" }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setResidentToDelete(r);
+              setDeleteError("");
+            }}
+            title="Delete Resident Profile"
+          >
+            🗑️ Delete
+          </button>
+        </div>
+      ),
+    },
   ];
 
   const filteredResidents = residents?.filter((r) => {
@@ -170,7 +259,11 @@ export default function ResidentsPage() {
     <div>
       <PageHeader
         title="Global Residents Directory"
-        subtitle="View registered owners, tenants, and family occupants across communities"
+        subtitle={
+          activeCommunityId
+            ? "Viewing registered residents for selected community"
+            : "View registered owners, tenants, and family occupants across communities"
+        }
         breadcrumbs={[
           { label: "Super Admin", href: "/super-admin/dashboard" },
           { label: "Residents" },
@@ -182,12 +275,21 @@ export default function ResidentsPage() {
         }
       />
 
+      {/* Active Scope Banner */}
+      <ScopeBanner
+        entityName="residents"
+        onClear={() => {
+          setCommunityId("");
+          setPage(1);
+        }}
+      />
+
       <div className="card">
         <div className="card-header" style={{ flexWrap: "wrap", gap: "0.75rem" }}>
           <div>
             <h3 className="card-title">Resident Profiles</h3>
             <p style={{ fontSize: "0.775rem", color: "var(--muted)" }}>
-              {filteredResidents?.length || 0} residents listed
+              {isLoading ? "Loading residents…" : `${filteredResidents?.length || 0} residents listed`}
             </p>
           </div>
 
@@ -200,7 +302,9 @@ export default function ResidentsPage() {
               className="select-field"
               value={communityId}
               onChange={(e) => {
-                setCommunityId(e.target.value);
+                const newCommId = e.target.value;
+                setCommunityId(newCommId);
+                setActiveCommunity(newCommId || null);
                 setPage(1);
               }}
               style={{ width: "auto", height: 36, padding: "0.25rem 0.6rem", fontSize: "0.85rem" }}
@@ -283,20 +387,23 @@ export default function ResidentsPage() {
                   Community <span style={{ color: "#dc2626" }}>*</span>
                 </label>
                 <select
+                  id="resident-form-targetCommunityId"
                   className="input-field"
                   value={targetCommunityId}
                   onChange={(e) => {
                     setTargetCommunityId(e.target.value);
                     setTargetTowerId("");
                     setTargetUnitId("");
+                    if (fieldErrors.targetCommunityId) {
+                      setFieldErrors((prev) => ({ ...prev, targetCommunityId: "" }));
+                    }
                   }}
-                  required
                   style={{
                     width: "100%",
                     padding: "0.5rem 0.75rem",
                     fontSize: "0.85rem",
                     borderRadius: "6px",
-                    border: "1px solid #cbd5e1",
+                    border: `1px solid ${fieldErrors.targetCommunityId ? "#dc2626" : "#cbd5e1"}`,
                     backgroundColor: "#ffffff",
                   }}
                 >
@@ -307,6 +414,11 @@ export default function ResidentsPage() {
                     </option>
                   ))}
                 </select>
+                {fieldErrors.targetCommunityId && (
+                  <span style={{ fontSize: "0.75rem", color: "#dc2626", marginTop: "0.25rem", display: "block" }}>
+                    {fieldErrors.targetCommunityId}
+                  </span>
+                )}
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.85rem" }}>
@@ -347,17 +459,22 @@ export default function ResidentsPage() {
                     Residential Unit <span style={{ color: "#dc2626" }}>*</span>
                   </label>
                   <select
+                    id="resident-form-targetUnitId"
                     className="input-field"
                     value={targetUnitId}
-                    onChange={(e) => setTargetUnitId(e.target.value)}
-                    required
+                    onChange={(e) => {
+                      setTargetUnitId(e.target.value);
+                      if (fieldErrors.targetUnitId) {
+                        setFieldErrors((prev) => ({ ...prev, targetUnitId: "" }));
+                      }
+                    }}
                     disabled={!targetCommunityId}
                     style={{
                       width: "100%",
                       padding: "0.5rem 0.75rem",
                       fontSize: "0.85rem",
                       borderRadius: "6px",
-                      border: "1px solid #cbd5e1",
+                      border: `1px solid ${fieldErrors.targetUnitId ? "#dc2626" : "#cbd5e1"}`,
                       backgroundColor: "#ffffff",
                     }}
                   >
@@ -374,8 +491,32 @@ export default function ResidentsPage() {
                       </option>
                     )}
                   </select>
+                  {fieldErrors.targetUnitId && (
+                    <span style={{ fontSize: "0.75rem", color: "#dc2626", marginTop: "0.25rem", display: "block" }}>
+                      {fieldErrors.targetUnitId}
+                    </span>
+                  )}
                 </div>
               </div>
+
+              {Boolean(targetCommunityId) && (!communityUnits || communityUnits.length === 0) && (
+                <div
+                  style={{
+                    padding: "0.5rem 0.75rem",
+                    background: "#fffbeb",
+                    border: "1px solid #fde68a",
+                    borderRadius: "6px",
+                    color: "#92400e",
+                    fontSize: "0.775rem",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.4rem",
+                  }}
+                >
+                  <span>⚠️</span>
+                  <span>No units created yet in this community. Please add towers/units in Community Management first.</span>
+                </div>
+              )}
             </div>
 
             {/* SECTION 2: RESIDENT PROFILE & CONTACT */}
@@ -401,6 +542,7 @@ export default function ResidentsPage() {
                     Full Name <span style={{ color: "#dc2626" }}>*</span>
                   </label>
                   <input
+                    id="resident-form-fullName"
                     type="text"
                     className="input-field"
                     value={fullName}
@@ -408,37 +550,54 @@ export default function ResidentsPage() {
                       const val = e.target.value;
                       setFullName(val);
                       setPassword(generateInitialPassword(val, "resident"));
+                      if (fieldErrors.fullName) {
+                        setFieldErrors((prev) => ({ ...prev, fullName: "" }));
+                      }
                     }}
                     placeholder="e.g. Rahul Sharma"
-                    required
                     style={{
                       width: "100%",
                       padding: "0.5rem 0.75rem",
                       fontSize: "0.85rem",
                       borderRadius: "6px",
-                      border: "1px solid #cbd5e1",
+                      border: `1px solid ${fieldErrors.fullName ? "#dc2626" : "#cbd5e1"}`,
                     }}
                   />
+                  {fieldErrors.fullName && (
+                    <span style={{ fontSize: "0.75rem", color: "#dc2626", marginTop: "0.25rem", display: "block" }}>
+                      {fieldErrors.fullName}
+                    </span>
+                  )}
                 </div>
                 <div>
                   <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#475569", marginBottom: "0.35rem" }}>
                     Email Address <span style={{ color: "#dc2626" }}>*</span>
                   </label>
                   <input
+                    id="resident-form-email"
                     type="email"
                     className="input-field"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (fieldErrors.email) {
+                        setFieldErrors((prev) => ({ ...prev, email: "" }));
+                      }
+                    }}
                     placeholder="e.g. rahul@example.com"
-                    required
                     style={{
                       width: "100%",
                       padding: "0.5rem 0.75rem",
                       fontSize: "0.85rem",
                       borderRadius: "6px",
-                      border: "1px solid #cbd5e1",
+                      border: `1px solid ${fieldErrors.email ? "#dc2626" : "#cbd5e1"}`,
                     }}
                   />
+                  {fieldErrors.email && (
+                    <span style={{ fontSize: "0.75rem", color: "#dc2626", marginTop: "0.25rem", display: "block" }}>
+                      {fieldErrors.email}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -449,26 +608,48 @@ export default function ResidentsPage() {
                     Phone Number
                   </label>
                   <input
+                    id="resident-form-phone"
                     type="tel"
                     className="input-field"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      if (fieldErrors.phone) {
+                        setFieldErrors((prev) => ({ ...prev, phone: "" }));
+                      }
+                    }}
                     placeholder="e.g. +91 98765 43210"
                     style={{
                       width: "100%",
                       padding: "0.5rem 0.75rem",
                       fontSize: "0.85rem",
                       borderRadius: "6px",
-                      border: "1px solid #cbd5e1",
+                      border: `1px solid ${fieldErrors.phone ? "#dc2626" : "#cbd5e1"}`,
                     }}
                   />
+                  {fieldErrors.phone && (
+                    <span style={{ fontSize: "0.75rem", color: "#dc2626", marginTop: "0.25rem", display: "block" }}>
+                      {fieldErrors.phone}
+                    </span>
+                  )}
                 </div>
                 <div>
                   <PasswordField
+                    id="resident-form-password"
                     value={password}
-                    onChange={(val) => setPassword(val)}
+                    onChange={(val) => {
+                      setPassword(val);
+                      if (fieldErrors.password) {
+                        setFieldErrors((prev) => ({ ...prev, password: "" }));
+                      }
+                    }}
                     placeholder="e.g. rahul@Gate2026!"
                   />
+                  {fieldErrors.password && (
+                    <span style={{ fontSize: "0.75rem", color: "#dc2626", marginTop: "0.25rem", display: "block" }}>
+                      {fieldErrors.password}
+                    </span>
+                  )}
                 </div>
               </div>
               <p style={{ margin: 0, fontSize: "11.5px", color: "var(--muted)" }}>
@@ -586,7 +767,7 @@ export default function ResidentsPage() {
               <button
                 type="submit"
                 className="btn btn-primary"
-                disabled={isSubmitting || !targetCommunityId || !targetUnitId}
+                disabled={isSubmitting}
                 style={{
                   padding: "0.5rem 1.25rem",
                   fontSize: "0.85rem",
@@ -604,6 +785,84 @@ export default function ResidentsPage() {
             </div>
           </div>
         </form>
+      </Modal>
+
+      {/* Delete Resident Confirmation Modal */}
+      <Modal
+        isOpen={Boolean(residentToDelete)}
+        onClose={() => {
+          setResidentToDelete(null);
+          setDeleteError("");
+        }}
+        title="⚠️ Delete Resident Profile"
+      >
+        {residentToDelete && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+            <div
+              style={{
+                background: "#fef2f2",
+                border: "1px solid #fecaca",
+                borderRadius: "var(--radius-sm)",
+                padding: "1rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <span style={{ fontSize: "1.5rem" }}>🗑️</span>
+                <strong style={{ fontSize: "0.95rem", color: "#991b1b" }}>
+                  This action is permanent and cannot be undone.
+                </strong>
+              </div>
+              <p style={{ fontSize: "0.85rem", color: "#7f1d1d", margin: 0, lineHeight: 1.5 }}>
+                You are about to permanently delete the profile of{" "}
+                <strong>{residentToDelete.full_name}</strong> (Unit{" "}
+                {residentToDelete.unit_number || "–"}).
+              </p>
+              <p style={{ fontSize: "0.8rem", color: "#991b1b", margin: 0 }}>
+                This will remove their portal access, visitor pre-approvals, and all associated records.
+              </p>
+            </div>
+
+            {deleteError && (
+              <div
+                style={{
+                  padding: "0.6rem 0.85rem",
+                  background: "#fef2f2",
+                  border: "1px solid #fecaca",
+                  borderRadius: "var(--radius-sm)",
+                  color: "#b91c1c",
+                  fontSize: "0.85rem",
+                }}
+              >
+                {deleteError}
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setResidentToDelete(null);
+                  setDeleteError("");
+                }}
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={handleDeleteResident}
+                disabled={isDeleting}
+              >
+                {isDeleting ? "Deleting..." : "Confirm Delete"}
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

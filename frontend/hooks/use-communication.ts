@@ -137,3 +137,36 @@ export function useEventRsvp() {
   });
 }
 
+export function useGroupMembers(groupId?: string) {
+  return useQuery({
+    queryKey: ["group-members", groupId],
+    queryFn: () => (groupId ? communicationApi.groupMembers(groupId) : []),
+    enabled: Boolean(groupId),
+    staleTime: 15_000,
+  });
+}
+
+export function useAddGroupMember() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ groupId, userId }: { groupId: string; userId: string }) =>
+      communicationApi.addGroupMember(groupId, { user_id: userId }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["group-members", variables.groupId] });
+      queryClient.invalidateQueries({ queryKey: ["resident-groups"] });
+    },
+  });
+}
+
+export function useRemoveGroupMember() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ groupId, memberId }: { groupId: string; memberId: string }) =>
+      communicationApi.removeGroupMember(groupId, memberId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["group-members", variables.groupId] });
+      queryClient.invalidateQueries({ queryKey: ["resident-groups"] });
+    },
+  });
+}
+

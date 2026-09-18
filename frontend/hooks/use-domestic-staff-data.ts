@@ -38,10 +38,13 @@ export interface AttendanceRecord {
   id: string;
   date: string;
   check_in_at: string;
+  raw_check_in_at?: string;
   check_out_at?: string | null;
   gate_name: string;
   unit_number: string;
   duration_minutes?: number | null;
+  duration_hours?: number | null;
+  is_overdue?: boolean;
   status: "open" | "completed";
 }
 
@@ -60,6 +63,7 @@ export interface StaffVisit {
 export function useStaffProfile() {
   return useQuery<StaffProfile>({
     queryKey: ["staff", "profile"],
+    staleTime: 5_000,
     queryFn: async () => {
       const res = await api.get<any>("/domestic-staff/me");
       if (!res) {
@@ -97,6 +101,7 @@ export function useStaffPass() {
     expires_at: string;
   }>({
     queryKey: ["staff", "pass"],
+    staleTime: 10_000,
     queryFn: async () => {
       const res = await api.get<any>("/domestic-staff/me/pass");
       return res;
@@ -109,6 +114,7 @@ export function useUpdateStaffProfile() {
   return useMutation({
     mutationFn: async ({ data }: { staffId?: string; data: Partial<StaffProfile> }) => {
       const payload: Record<string, any> = {};
+      if (data.full_name && data.full_name.trim()) payload.full_name = data.full_name.trim();
       if (data.phone && data.phone.trim()) payload.phone = data.phone.trim();
       if (data.emergency_contact !== undefined) payload.emergency_address = data.emergency_contact;
       if (data.avatar_url) payload.photo_url = data.avatar_url;
@@ -123,6 +129,7 @@ export function useUpdateStaffProfile() {
 export function useAssignedHomes() {
   return useQuery<AssignedHome[]>({
     queryKey: ["staff", "assigned-homes"],
+    staleTime: 5_000,
     queryFn: async () => {
       const res = await api.get<any[]>("/domestic-staff/me/assignments");
       if (!Array.isArray(res)) return [];
@@ -150,32 +157,43 @@ export function useAssignedHomes() {
 export function useStaffAttendance() {
   return useQuery<AttendanceRecord[]>({
     queryKey: ["staff", "attendance"],
+    staleTime: 5_000,
     queryFn: async () => {
       const res = await api.get<any[]>("/domestic-staff/me/attendance");
       if (!Array.isArray(res)) return [];
-      return res.map((att: any) => ({
-        id: att.id,
-        date: att.check_in_at ? att.check_in_at.split("T")[0] : "",
-        check_in_at: att.check_in_at
-          ? new Date(att.check_in_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-          : "",
-        check_out_at: att.check_out_at
-          ? new Date(att.check_out_at).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })
-          : null,
-        gate_name: att.gate_id ? "Main Gate 1" : "Gate Operations",
-        unit_number: "Assigned Units",
-        duration_minutes:
-          att.check_out_at && att.check_in_at
-            ? Math.round(
-                (new Date(att.check_out_at).getTime() - new Date(att.check_in_at).getTime()) /
-                  60000,
-              )
+      return res.map((att: any) => {
+        const isOverdue =
+          att.is_overdue ??
+          (!att.check_out_at && att.check_in_at
+            ? (Date.now() - new Date(att.check_in_at).getTime()) / 3600000 > 12
+            : false);
+        return {
+          id: att.id,
+          date: att.check_in_at ? att.check_in_at.split("T")[0] : "",
+          raw_check_in_at: att.check_in_at,
+          check_in_at: att.check_in_at
+            ? new Date(att.check_in_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+            : "",
+          check_out_at: att.check_out_at
+            ? new Date(att.check_out_at).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })
             : null,
-        status: att.check_out_at ? ("completed" as const) : ("open" as const),
-      }));
+          gate_name: att.gate_id ? "Main Gate 1" : "Gate Operations",
+          unit_number: "Assigned Units",
+          duration_minutes:
+            att.check_out_at && att.check_in_at
+              ? Math.round(
+                  (new Date(att.check_out_at).getTime() - new Date(att.check_in_at).getTime()) /
+                    60000,
+                )
+              : null,
+          duration_hours: att.duration_hours ?? null,
+          is_overdue: isOverdue,
+          status: att.check_out_at ? ("completed" as const) : ("open" as const),
+        };
+      });
     },
   });
 }
@@ -183,6 +201,7 @@ export function useStaffAttendance() {
 export function useStaffVisits() {
   return useQuery<StaffVisit[]>({
     queryKey: ["staff", "visits"],
+    staleTime: 5_000,
     queryFn: async () => {
       const res = await api.get<any[]>("/domestic-staff/me/visits");
       if (!Array.isArray(res)) return [];

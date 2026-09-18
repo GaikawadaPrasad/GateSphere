@@ -3,23 +3,43 @@
 import { useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { blacklistApi } from "@/lib/api";
+import { toast } from "@/store/toast";
 
 export default function SecurityGuardBlacklistCheckPage() {
   const [query, setQuery] = useState("");
+  const [queryError, setQueryError] = useState("");
   const [isChecking, setIsChecking] = useState(false);
   const [result, setResult] = useState<any>(null);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query.trim()) return;
+    const cleanQuery = query.trim();
+    if (!cleanQuery) {
+      setQueryError("Please enter a name, phone number, or vehicle plate to check.");
+      toast.error("Please enter a search term.");
+      return;
+    }
+    if (cleanQuery.length < 2) {
+      setQueryError("Search term must be at least 2 characters.");
+      toast.error("Search term must be at least 2 characters.");
+      return;
+    }
+    setQueryError("");
     setIsChecking(true);
     try {
-      const res = await blacklistApi.check(query.trim());
+      const res = await blacklistApi.check(cleanQuery);
       setResult(res);
-    } catch {
+      if (res?.blacklisted) {
+        toast.error("🚨 Restricted entry! Match found in security blacklist.");
+      } else {
+        toast.success("✅ Clear to enter. No blacklist match found.");
+      }
+    } catch (err: any) {
       setResult(null);
+      toast.error(err?.message || "Failed to query blacklist registry.");
+    } finally {
+      setIsChecking(false);
     }
-    setIsChecking(false);
   };
 
   return (
@@ -42,26 +62,36 @@ export default function SecurityGuardBlacklistCheckPage() {
           🔍 Instant Identity / Vehicle Check
         </h3>
 
-        <form onSubmit={handleSearch} style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <input
-              type="text"
-              className="input-field"
-              placeholder="Search Name, Phone (+91...), or Vehicle Plate (e.g. KA-02-Z-9999)..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              style={{ fontSize: "1.05rem", padding: "0.75rem 1rem", fontWeight: 600 }}
-              autoFocus
-            />
+        <form onSubmit={handleSearch} style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <input
+                type="text"
+                className="input-field"
+                placeholder="Search Name, Phone (+91...), or Vehicle Plate (e.g. KA-02-Z-9999)..."
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  if (queryError) setQueryError("");
+                }}
+                style={{ fontSize: "1.05rem", padding: "0.75rem 1rem", fontWeight: 600 }}
+                autoFocus
+              />
+            </div>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={isChecking}
+              style={{ padding: "0.75rem 1.5rem", fontSize: "1rem", fontWeight: 700 }}
+            >
+              {isChecking ? "Checking…" : "SEARCH REGISTRY"}
+            </button>
           </div>
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={isChecking || !query.trim()}
-            style={{ padding: "0.75rem 1.5rem", fontSize: "1rem", fontWeight: 700 }}
-          >
-            {isChecking ? "Checking…" : "SEARCH REGISTRY"}
-          </button>
+          {queryError && (
+            <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.8rem", fontWeight: 500 }}>
+              {queryError}
+            </span>
+          )}
         </form>
       </div>
 

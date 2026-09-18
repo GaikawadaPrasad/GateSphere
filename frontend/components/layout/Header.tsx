@@ -1,19 +1,35 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useMe, useLogout } from "@/hooks/use-auth";
-import { useCommunities } from "@/hooks/use-communities";
+import { useCommunities, useCommunityDetails } from "@/hooks/use-communities";
 import { useUiStore } from "@/store/ui";
 import type { Community } from "@/types/communities";
 
 export function Header() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: user } = useMe();
   const logout = useLogout();
   const isSuperAdmin = Boolean(user?.is_superadmin || user?.active_role === "super_admin");
   const { data: communities } = useCommunities(undefined, { enabled: isSuperAdmin });
   const { activeCommunityId, setActiveCommunity, toggleSidebar } = useUiStore();
+
+  const assignedCommunityId =
+    user?.community_ids?.[0] ||
+    user?.roles?.find((r) => r.community_id)?.community_id ||
+    null;
+  const effectiveCommunityId = activeCommunityId || assignedCommunityId;
+
+  useEffect(() => {
+    if (!isSuperAdmin && assignedCommunityId && activeCommunityId !== assignedCommunityId) {
+      setActiveCommunity(assignedCommunityId);
+    }
+  }, [isSuperAdmin, assignedCommunityId, activeCommunityId, setActiveCommunity]);
+
+  const { data: currentCommunity } = useCommunityDetails(effectiveCommunityId || undefined);
 
   const handleSignOut = async () => {
     try {
@@ -114,7 +130,12 @@ export function Header() {
             <span style={{ fontSize: "12px", color: "var(--muted)", fontWeight: 600 }}>Scope:</span>
             <select
               value={activeCommunityId || ""}
-              onChange={(e) => setActiveCommunity(e.target.value || null)}
+              onChange={(e) => {
+                // AGENTS.md §5.3: a community switch is an identity change — drop
+                // every cached query so Tenant B never renders Tenant A's data.
+                queryClient.clear();
+                setActiveCommunity(e.target.value || null);
+              }}
               style={{
                 height: 28,
                 border: "none",
@@ -133,6 +154,45 @@ export function Header() {
                 </option>
               ))}
             </select>
+          </div>
+        )}
+
+        {/* Scoped Community Badge for non-superadmin users */}
+        {!isSuperAdmin && currentCommunity && (
+          <div
+            className="mobile-hide"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.35rem",
+              background: "#ECFDF5",
+              border: "1px solid #A7F3D0",
+              color: "#065F46",
+              padding: "0.25rem 0.6rem",
+              borderRadius: "8px",
+              fontSize: "12px",
+              fontWeight: 600,
+              maxWidth: 220,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            <span>🏢</span>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+              {currentCommunity.name}
+            </span>
+            <span
+              title="Community Scope Enforced"
+              style={{
+                fontSize: "11px",
+                color: "#10B981",
+                marginLeft: "0.15rem",
+                flexShrink: 0,
+              }}
+            >
+              🔒
+            </span>
           </div>
         )}
       </div>

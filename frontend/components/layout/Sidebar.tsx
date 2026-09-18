@@ -16,6 +16,7 @@ import {
 const SUPER_ADMIN_NAV_ITEMS: NavItem[] = [
   { id: "dashboard", label: "Dashboard", href: "/super-admin/dashboard", icon: "📊" },
   { id: "communities", label: "Communities", href: "/super-admin/communities", icon: "🏢" },
+  { id: "users", label: "Users & Staff", href: "/super-admin/users", icon: "👔" },
   { id: "residents", label: "Residents", href: "/super-admin/residents", icon: "👥" },
   { id: "gate-traffic", label: "Gate Traffic", href: "/super-admin/gate-traffic", icon: "🛡️" },
   { id: "complaints", label: "Complaints", href: "/super-admin/complaints", icon: "🎫" },
@@ -23,6 +24,18 @@ const SUPER_ADMIN_NAV_ITEMS: NavItem[] = [
   { id: "reports", label: "Reports & Analytics", href: "/super-admin/reports", icon: "📈" },
   { id: "audit-logs", label: "Audit Logs", href: "/super-admin/audit-logs", icon: "📋" },
   { id: "settings", label: "System Settings", href: "/super-admin/settings", icon: "⚙️" },
+];
+
+const COMMUNITY_ADMIN_NAV_ITEMS: NavItem[] = [
+  { id: "dashboard", label: "Dashboard", href: "/community-admin/dashboard", icon: "🏢" },
+  { id: "property", label: "Property & Structure", href: "/community-admin/property", icon: "🏗️" },
+  { id: "residents", label: "Residents & Occupancy", href: "/community-admin/residents", icon: "👥" },
+  { id: "staff", label: "Operational Staff", href: "/community-admin/staff", icon: "👔" },
+  { id: "security-staff", label: "Security & Operations", href: "/community-admin/security-staff", icon: "🛡️" },
+  { id: "billing", label: "Billing & Finance", href: "/community-admin/billing", icon: "💳" },
+  { id: "communication", label: "Communications", href: "/community-admin/communication", icon: "📢" },
+  { id: "incidents", label: "Incidents & Safety", href: "/community-admin/incidents", icon: "🚨" },
+  { id: "notifications", label: "Notifications", href: "/community-admin/notifications", icon: "🔔" },
 ];
 
 export function Sidebar() {
@@ -80,9 +93,7 @@ export function Sidebar() {
       title: "GateSphere",
       roleLabel: "Community Admin",
       accentColor: "#2563EB",
-      items: [
-        { id: "dashboard", label: "Dashboard", href: "/community-admin/dashboard", icon: "🏢" },
-      ],
+      items: COMMUNITY_ADMIN_NAV_ITEMS,
     };
   } else if (
     pathname.startsWith("/security-guard") ||
@@ -152,7 +163,11 @@ export function Sidebar() {
     };
   }
 
-  const handleLinkClick = () => {
+  const handleLinkClick = (e: React.MouseEvent, href: string) => {
+    if (pathname === href) {
+      e.preventDefault();
+      return;
+    }
     // On small screens, close sidebar after clicking a nav link
     if (typeof window !== "undefined" && window.innerWidth < 768 && sidebarOpen) {
       toggleSidebar();
@@ -285,7 +300,7 @@ export function Sidebar() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  onClick={handleLinkClick}
+                  onClick={(e) => handleLinkClick(e, item.href)}
                   style={{
                     display: "flex",
                     alignItems: "center",

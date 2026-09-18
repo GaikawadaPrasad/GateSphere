@@ -102,24 +102,33 @@ export class ApiError extends Error {
 export function getActiveRole(): string | null {
   if (typeof window !== "undefined") {
     const pathname = window.location.pathname;
-    if (pathname.startsWith("/super-admin") || pathname.startsWith("/dashboard/super-admin")) return "super_admin";
-    if (pathname.startsWith("/owner-tenant") || pathname.startsWith("/resident") || pathname.startsWith("/dashboard/owner-tenant")) return "resident";
-    if (pathname.startsWith("/auditor") || pathname.startsWith("/dashboard/auditor")) return "auditor";
-    if (pathname.startsWith("/domestic-staff") || pathname.startsWith("/dashboard/domestic-staff")) return "domestic_staff";
-    if (pathname.startsWith("/community-admin") || pathname.startsWith("/dashboard/community-admin")) return "community_admin";
-    if (pathname.startsWith("/security-guard") || pathname.startsWith("/dashboard/security-guard")) return "security_guard";
-    if (pathname.startsWith("/security-supervisor") || pathname.startsWith("/dashboard/security-supervisor")) return "security_supervisor";
-    if (pathname.startsWith("/facility-manager") || pathname.startsWith("/dashboard/facility-manager")) return "facility_manager";
-    if (pathname.startsWith("/association-committee") || pathname.startsWith("/dashboard/association-committee")) return "association_committee";
-    if (pathname.startsWith("/vendor-technician") || pathname.startsWith("/dashboard/vendor-technician")) return "vendor_technician";
+    let roleFromPath: string | null = null;
+    if (pathname.startsWith("/super-admin") || pathname.startsWith("/dashboard/super-admin")) roleFromPath = "super_admin";
+    else if (pathname.startsWith("/owner-tenant") || pathname.startsWith("/resident") || pathname.startsWith("/dashboard/owner-tenant")) roleFromPath = "resident";
+    else if (pathname.startsWith("/auditor") || pathname.startsWith("/dashboard/auditor")) roleFromPath = "auditor";
+    else if (pathname.startsWith("/domestic-staff") || pathname.startsWith("/dashboard/domestic-staff")) roleFromPath = "domestic_staff";
+    else if (pathname.startsWith("/community-admin") || pathname.startsWith("/dashboard/community-admin")) roleFromPath = "community_admin";
+    else if (pathname.startsWith("/security-guard") || pathname.startsWith("/dashboard/security-guard")) roleFromPath = "security_guard";
+    else if (pathname.startsWith("/security-supervisor") || pathname.startsWith("/dashboard/security-supervisor")) roleFromPath = "security_supervisor";
+    else if (pathname.startsWith("/facility-manager") || pathname.startsWith("/dashboard/facility-manager")) roleFromPath = "facility_manager";
+    else if (pathname.startsWith("/association-committee") || pathname.startsWith("/dashboard/association-committee")) roleFromPath = "association_committee";
+    else if (pathname.startsWith("/vendor-technician") || pathname.startsWith("/dashboard/vendor-technician")) roleFromPath = "vendor_technician";
+
+    if (roleFromPath) {
+      sessionStorage.setItem("gatesphere_tab_role", roleFromPath);
+      return roleFromPath;
+    }
+
+    const tabSaved = sessionStorage.getItem("gatesphere_tab_role");
+    if (tabSaved) return tabSaved;
 
     const saved = localStorage.getItem("gatesphere_active_role");
     if (saved) return saved;
 
     if (document.cookie) {
-      const match = document.cookie.match(/gatesphere_([a-z0-9_]+)_session/);
-      if (match) {
-        const bucket = match[1];
+      const matches = Array.from(document.cookie.matchAll(/gatesphere_([a-z0-9_]+)_session=([^;]+)/g));
+      if (matches.length === 1) {
+        const bucket = matches[0][1];
         if (bucket === "superadmin") return "super_admin";
         if (bucket === "security") return "security_guard";
         return bucket;
@@ -132,9 +141,11 @@ export function getActiveRole(): string | null {
 export function setActiveRole(role: string | null): void {
   if (typeof window !== "undefined") {
     if (role) {
+      sessionStorage.setItem("gatesphere_tab_role", role);
       localStorage.setItem("gatesphere_active_role", role);
       document.cookie = `gs_active_role=${role}; path=/; SameSite=Lax`;
     } else {
+      sessionStorage.removeItem("gatesphere_tab_role");
       localStorage.removeItem("gatesphere_active_role");
       document.cookie = `gs_active_role=; path=/; max-age=0; SameSite=Lax`;
     }
@@ -288,6 +299,41 @@ export async function apiSend<T>(
   return handleResponse<T>(res);
 }
 
+export async function apiSendFormData<T>(
+  method: string,
+  path: string,
+  formData: FormData,
+  params?: Record<string, unknown>,
+  role?: string,
+): Promise<T> {
+  const url = buildUrl(path, params);
+  const activeRole = role || getActiveRole();
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+  };
+  if (activeRole) {
+    headers["X-Session-Role"] = activeRole;
+  }
+
+  const isMutation = ["POST", "PUT", "PATCH", "DELETE"].includes(method.toUpperCase());
+  if (isMutation) {
+    const csrf = getCsrfToken(activeRole || undefined);
+    if (csrf) {
+      headers["X-CSRF-Token"] = csrf;
+    }
+  }
+
+  // Note: Do NOT set Content-Type header so the browser sets multipart/form-data boundary automatically
+  const res = await fetch(url, {
+    method,
+    credentials: "include",
+    headers,
+    body: formData,
+  });
+
+  return handleResponse<T>(res);
+}
+
 export async function apiList<T>(
   path: string,
   params?: Record<string, unknown>,
@@ -358,10 +404,15 @@ export const authApi = {
     }
   },
   me: (role?: string) => apiGet<CurrentUser>("/auth/me", undefined, role),
+  updateMe: (data: { full_name?: string; phone?: string }) =>
+    apiSend<CurrentUser>("PATCH", "/auth/me", data),
+  changePassword: (payload: { current_password: string; new_password: string }) =>
+    apiSend<{ status: string }>("POST", "/auth/password", payload),
 };
 
 export const communitiesApi = {
-  list: (params?: { active?: boolean }) => apiGet<Community[]>("/communities", params),
+  list: (params?: { active?: boolean; page_size?: number; page?: number }) =>
+    apiGet<Community[]>("/communities", { page_size: 100, ...params }),
   get: (id: string) => apiGet<Community>(`/communities/${id}`),
   create: (data: Partial<Community> | CommunityCreate) =>
     apiSend<Community>("POST", "/communities", data),
@@ -374,8 +425,14 @@ export const communitiesApi = {
     communityId: string,
     data: { name: string; code: string; structure_type?: string; total_floors?: number },
   ) => apiSend<Tower>("POST", `/communities/${communityId}/towers`, data),
+  updateTower: (id: string, data: Partial<Tower>) =>
+    apiSend<Tower>("PATCH", `/communities/towers/${id}`, data),
+  deleteTower: (id: string) => apiSend<void>("DELETE", `/communities/towers/${id}`),
   createFloor: (data: { tower_id: string; floor_number: number; label?: string }) =>
     apiSend<Floor>("POST", "/communities/floors", data),
+  updateFloor: (id: string, data: Partial<Floor>) =>
+    apiSend<Floor>("PATCH", `/communities/floors/${id}`, data),
+  deleteFloor: (id: string) => apiSend<void>("DELETE", `/communities/floors/${id}`),
   createUnit: (data: {
     floor_id: string;
     unit_number: string;
@@ -383,8 +440,14 @@ export const communitiesApi = {
     bedrooms?: number;
     area_sqft?: number;
   }) => apiSend<Unit>("POST", "/communities/units", data),
+  updateUnit: (id: string, data: Partial<Unit>) =>
+    apiSend<Unit>("PATCH", `/communities/units/${id}`, data),
+  deleteUnit: (id: string) => apiSend<void>("DELETE", `/communities/units/${id}`),
   createGate: (communityId: string, data: { name: string; code: string; gate_type: string }) =>
     apiSend<Gate>("POST", `/communities/${communityId}/gates`, data),
+  updateGate: (id: string, data: Partial<Gate>) =>
+    apiSend<Gate>("PATCH", `/communities/gates/${id}`, data),
+  deleteGate: (id: string) => apiSend<void>("DELETE", `/communities/gates/${id}`),
   floors: (towerId: string) => apiGet<Floor[]>(`/communities/towers/${towerId}/floors`),
   units: (floorId: string) => apiGet<Unit[]>(`/communities/floors/${floorId}/units`),
   communityUnits: (communityId: string, params?: Record<string, unknown>) =>
@@ -394,7 +457,11 @@ export const communitiesApi = {
 };
 
 export const dashboardsApi = {
-  superAdmin: () => apiGet<SuperAdminDashboardMetrics>("/dashboards/super-admin"),
+  superAdmin: (communityId?: string) =>
+    apiGet<SuperAdminDashboardMetrics>(
+      "/dashboards/super-admin",
+      communityId ? { community_id: communityId } : undefined
+    ),
   overview: (communityId?: string) =>
     apiGet<OverviewStats>(
       "/dashboards/overview",
@@ -459,6 +526,8 @@ export const gateApi = {
     apiSend<any>("POST", `/gate/alerts/${alertId}/resolve`, {
       resolution_summary: resolutionSummary,
     }),
+  cancelAlert: (alertId: string) =>
+    apiSend<any>("POST", `/gate/alerts/${alertId}/cancel`),
   assignments: (params?: { gate_id?: string; active_only?: boolean }) =>
     apiGet<any[]>("/gate/assignments", params as Record<string, unknown>),
   createAssignment: (data: {
@@ -507,8 +576,28 @@ export const complaintsApi = {
     apiSend<any>("POST", `/complaints/tickets/${id}/assign`, { assigned_to_user_id: vendorUserId }),
   updateStatus: (id: string, status: string, notes?: string) =>
     apiSend<any>("POST", `/complaints/tickets/${id}/transition`, { status, remarks: notes }),
+  confirm: (id: string, data: { confirmation_status: string; remarks?: string }) =>
+    apiSend<any>("POST", `/complaints/tickets/${id}/confirm`, data),
+  feedback: (id: string, data: { rating: number; comments?: string }) =>
+    apiSend<any>("POST", `/complaints/tickets/${id}/feedback`, data),
+  attachments: (ticketId: string) =>
+    apiGet<any[]>(`/complaints/tickets/${ticketId}/attachments`),
+  addAttachment: (
+    ticketId: string,
+    data: {
+      file_url: string;
+      file_name?: string;
+      mime_type?: string;
+      file_size_bytes?: number;
+      message_id?: string;
+    },
+  ) => apiSend<any>("POST", `/complaints/tickets/${ticketId}/attachments`, data),
   exportCsv: (params?: Record<string, unknown>) =>
     apiGet<string>("/complaints/tickets.csv", params),
+  getFeedback: (id: string) =>
+    apiGet<{ id: string; ticket_id: string; resident_user_id: string | null; rating: number; comments: string | null; created_at: string; updated_at: string } | null>(`/complaints/tickets/${id}/feedback`),
+  addFeedback: (id: string, data: { rating: number; comments?: string }) =>
+    apiSend<any>("POST", `/complaints/tickets/${id}/feedback`, data),
 };
 
 export const serviceRequestsApi = complaintsApi;
@@ -533,14 +622,56 @@ export const billingApi = {
       taxable?: boolean;
     }>;
   }) => apiSend<MaintenanceInvoice>("POST", "/billing/invoices", data),
+  assessPenalty: (
+    data: {
+      unit_id: string;
+      amount: number | string;
+      reason: string;
+      violation_reference?: string;
+      due_date?: string;
+    },
+    communityId?: string,
+  ) =>
+    apiSend<MaintenanceInvoice>(
+      "POST",
+      "/billing/penalties",
+      data,
+      communityId ? { community_id: communityId } : undefined,
+    ),
   postInvoice: (invoiceId: string) =>
     apiSend<MaintenanceInvoice>("POST", `/billing/invoices/${invoiceId}/post`),
   cancelInvoice: (invoiceId: string) =>
     apiSend<MaintenanceInvoice>("POST", `/billing/invoices/${invoiceId}/cancel`),
   payments: (params?: ListQueryParams) =>
     apiGet<Payment[]>("/billing/payments", params as Record<string, unknown>),
+  recordPayment: (data: {
+    amount: number;
+    payment_method?: string;
+    unit_id?: string;
+    allocations?: Array<{ invoice_id: string; amount: number }>;
+    remarks?: string;
+    community_id?: string;
+  }) => apiSend<Payment>("POST", "/billing/payments", data),
+  getPaymentReceipt: (paymentId: string) =>
+    apiGet<any>(`/billing/payments/${paymentId}/receipt`),
   chargeHeads: (communityId?: string) =>
     apiGet<any[]>("/billing/charge-heads", communityId ? { community_id: communityId } : undefined),
+  createChargeHead: (
+    data: {
+      name: string;
+      code: string;
+      charge_type: string;
+      default_amount: number;
+      is_active?: boolean;
+    },
+    communityId?: string,
+  ) =>
+    apiSend<any>(
+      "POST",
+      "/billing/charge-heads",
+      data,
+      communityId ? { community_id: communityId } : undefined,
+    ),
   rules: (communityId?: string) =>
     apiGet<any>("/billing/rules", communityId ? { community_id: communityId } : undefined),
   unitLedger: (unitId: string, params?: ListQueryParams) =>
@@ -572,10 +703,10 @@ export const assessmentsApi = {
       payload,
       communityId ? { community_id: communityId } : undefined,
     ),
-  approve: (id: string, notes?: string) =>
-    apiSend<any>("POST", `/billing/assessments/${id}/approve`, { notes }),
-  reject: (id: string, reason?: string) =>
-    apiSend<any>("POST", `/billing/assessments/${id}/reject`, { reason }),
+  approve: (id: string, notes?: string, approved_by_user_id?: string, approved_by_name?: string) =>
+    apiSend<any>("POST", `/billing/assessments/${id}/approve`, { notes, approved_by_user_id, approved_by_name }),
+  reject: (id: string, reason?: string, rejected_by_user_id?: string, rejected_by_name?: string) =>
+    apiSend<any>("POST", `/billing/assessments/${id}/reject`, { reason, rejected_by_user_id, rejected_by_name }),
 };
 
 export const communicationApi = {
@@ -615,6 +746,14 @@ export const communicationApi = {
       data,
       communityId ? { community_id: communityId } : undefined,
     ),
+  groupMembers: (groupId: string) =>
+    apiGet<Array<{ group_id: string; user_id: string; added_at: string; user?: any }>>(
+      `/communication/groups/${groupId}/members`,
+    ),
+  addGroupMember: (groupId: string, data: { user_id: string }) =>
+    apiSend<any>("POST", `/communication/groups/${groupId}/members`, data),
+  removeGroupMember: (groupId: string, memberId: string) =>
+    apiSend<void>("DELETE", `/communication/groups/${groupId}/members/${memberId}`),
 };
 
 export const auditApi = {
@@ -627,7 +766,28 @@ export const auditApi = {
 export const rbacApi = {
   roles: () => apiGet<Role[]>("/rbac/roles"),
   permissions: () => apiGet<Permission[]>("/rbac/permissions"),
+  updatePermission: (code: string, data: { description?: string }) =>
+    apiSend<Permission>("PATCH", `/rbac/permissions/${encodeURIComponent(code)}`, data),
+  setRolePermissions: (slug: string, permissions: string[]) =>
+    apiSend<Role>("PUT", `/rbac/roles/${slug}/permissions`, { permissions }),
 };
+
+export const usersApi = {
+  list: (params?: { q?: string; role_slug?: string; community_id?: string; active?: boolean; page?: number; page_size?: number }) =>
+    apiGet<Record<string, unknown>[]>("/users", params as Record<string, unknown>),
+  get: (id: string) => apiGet<Record<string, unknown>>(`/users/${id}`),
+  create: (data: { email: string; full_name: string; password: string; phone?: string; role_slug?: string; community_id?: string }) =>
+    apiSend<Record<string, unknown>>("POST", "/users", data),
+  update: (id: string, data: { full_name?: string; email?: string; password?: string; phone?: string; is_active?: boolean }) =>
+    apiSend<Record<string, unknown>>("PATCH", `/users/${id}`, data),
+  delete: (id: string) => apiSend<void>("DELETE", `/users/${id}`),
+  grantRole: (userId: string, data: { role_slug: string; community_id?: string }) =>
+    apiSend<Record<string, unknown>>("POST", `/users/${userId}/roles`, data),
+  revokeRole: (userId: string, grantId: string) =>
+    apiSend<void>("DELETE", `/users/${userId}/roles/${grantId}`),
+};
+
+
 
 export const residentsApi = {
   list: (params?: ListQueryParams) =>
@@ -636,7 +796,7 @@ export const residentsApi = {
   me: () => apiGet<Record<string, unknown>>("/residents/me"),
   updateMe: (data: Record<string, unknown>) =>
     apiSend<Record<string, unknown>>("PATCH", "/residents/me", data),
-  occupancies: (unitId: string) => apiGet<any[]>(`/communities/units/${unitId}/occupancies`),
+  occupancies: (unitId: string) => apiGet<any[]>(`/residents/units/${unitId}/occupancies`),
   family: (unitId: string) => apiGet<any[]>("/residents/family-members", { unit_id: unitId }),
   contacts: (profileId: string) => apiGet<any[]>(`/residents/${profileId}/emergency-contacts`),
   moveRecords: (params?: {
@@ -669,6 +829,33 @@ export const residentsApi = {
       agreement_reference?: string;
     },
   ) => apiSend<any>("POST", `/communities/${communityId}/residents`, data),
+  delete: (id: string) => apiSend<void>("DELETE", `/residents/${id}`),
+  getFamilyPass: (memberId: string) =>
+    apiGet<{
+      member_id: string;
+      community_id: string;
+      unit_id: string;
+      unit_number: string;
+      full_name: string;
+      relationship: string;
+      phone: string | null;
+      access_enabled: boolean;
+      pass_token: string;
+      pin: string;
+      qr_payload: string;
+    }>(`/residents/family-members/${memberId}/pass`),
+  verifyFamilyPass: (data: { pass_code: string; gate_id?: string }) =>
+    apiSend<{
+      success: boolean;
+      member_id: string;
+      full_name: string;
+      relationship: string;
+      unit_number: string;
+      unit_id: string;
+      access_enabled: boolean;
+      event_id: string;
+      message: string;
+    }>("POST", "/residents/family-members/verify-pass", data),
 };
 
 export const onboardingApi = {
@@ -698,8 +885,26 @@ export const onboardingApi = {
       message?: string;
     },
   ) => apiSend<any>("POST", `/communities/${communityId}/invitations`, data),
+  createInvitation: (
+    communityId: string,
+    data: {
+      unit_id: string;
+      invited_email: string;
+      invited_phone?: string;
+      full_name?: string;
+      occupancy_role?: string;
+      is_primary?: boolean;
+      agreement_reference?: string;
+      message?: string;
+    },
+  ) => apiSend<any>("POST", `/communities/${communityId}/invitations`, data),
   listInvitations: (communityId: string) =>
     apiGet<any[]>(`/communities/${communityId}/invitations`),
+  revokeInvitation: (communityId: string, invitationId: string) =>
+    apiSend<any>("POST", `/communities/${communityId}/invitations/${invitationId}/revoke`),
+  viewInvitation: (token: string) => apiGet<any>(`/invitations/${token}`),
+  acceptInvitation: (token: string, payload: { full_name: string; phone?: string; password?: string }) =>
+    apiSend<any>("POST", `/invitations/${token}/accept`, payload),
 };
 
 export const domesticStaffApi = {
@@ -781,6 +986,7 @@ export const domesticStaffApi = {
     gate_id?: string;
     action?: "check_in" | "check_out";
   }) => apiSend<any>("POST", "/domestic-staff/passes/verify", data),
+  delete: (id: string) => apiSend<void>("DELETE", `/domestic-staff/${id}`),
 };
 
 export const staffApi = domesticStaffApi;
@@ -837,7 +1043,8 @@ export const amenitiesApi = {
     const { amenity_id, ...rest } = amenityIdOrData;
     return apiSend<any>("POST", `/amenities/${amenity_id}/blocks`, rest);
   },
-  unblockSlot: (amenityId: string) => apiSend<any>("PATCH", `/amenities/${amenityId}`, { is_active: true }),
+  unblockSlot: (blockId: string) =>
+    apiSend<any>("DELETE", `/amenities/blocks/${blockId}`, undefined),
 };
 
 export const facilitiesApi = {
@@ -845,6 +1052,8 @@ export const facilitiesApi = {
     apiGet<any[]>("/amenities", params as Record<string, unknown>),
   get: (id: string) => apiGet<any>(`/amenities/${id}`),
   create: (data: any) => apiSend<any>("POST", "/amenities", data),
+  update: (id: string, data: any) => apiSend<any>("PATCH", `/amenities/${id}`, data),
+  delete: (id: string) => apiSend<any>("DELETE", `/amenities/${id}`),
   updateStatus: (id: string, isActive: boolean) =>
     apiSend<any>("PATCH", `/amenities/${id}`, { is_active: isActive }),
 };
@@ -910,6 +1119,7 @@ export const visitorsApi = {
     visitor_id?: string;
     gate_id?: string;
     vehicle_number?: string;
+    entry_photo_url?: string;
   }) => apiSend<Record<string, unknown>>("POST", "/visitors/entries", data),
   recordExit: (entryId: string) =>
     apiSend<Record<string, unknown>>("PATCH", `/visitors/entries/${entryId}/exit`),
@@ -932,21 +1142,70 @@ export const deliveriesApi = {
   markDelivered: (id: string) =>
     apiSend<Record<string, unknown>>("POST", `/deliveries/${id}/delivered`),
   cancel: (id: string) => apiSend<Record<string, unknown>>("POST", `/deliveries/${id}/cancel`),
+  decide: (id: string, decision: string, remarks?: string) =>
+    apiSend<Record<string, unknown>>("POST", `/deliveries/${id}/decision`, { decision, remarks }),
+  approve: (id: string, remarks?: string) =>
+    deliveriesApi.decide(id, "approved", remarks),
+  reject: (id: string, remarks?: string) =>
+    deliveriesApi.decide(id, "rejected", remarks),
 };
 
 export const vehiclesApi = {
   list: (params?: ListQueryParams) =>
     apiGet<Record<string, unknown>[]>("/vehicles", params as Record<string, unknown>),
+  register: (data: {
+    registration_number?: string;
+    plate_number?: string;
+    vehicle_type?: string;
+    make?: string;
+    model?: string;
+    color?: string;
+    sticker_number?: string;
+    unit_id?: string;
+    resident_profile_id?: string;
+    visitor_id?: string;
+  }) => {
+    const payload = {
+      registration_number: (data.registration_number || data.plate_number || "").toUpperCase().trim(),
+      vehicle_type: data.vehicle_type || "car",
+      make: data.make || undefined,
+      model: data.model || undefined,
+      color: data.color || undefined,
+      sticker_number: data.sticker_number || undefined,
+      unit_id: data.unit_id || undefined,
+      resident_profile_id: data.resident_profile_id || undefined,
+      visitor_id: data.visitor_id || undefined,
+    };
+    return apiSend<Record<string, unknown>>("POST", "/vehicles", payload);
+  },
+  slots: (params?: { community_id?: string; slot_status?: string }) =>
+    apiGet<Record<string, unknown>[]>("/vehicles/parking/slots", params as Record<string, unknown>),
   allocations: (params?: ListQueryParams) =>
     apiGet<Record<string, unknown>[]>(
       "/vehicles/parking/allocations",
       params as Record<string, unknown>,
     ),
+  allocate: (data: { slot_id: string; vehicle_id: string; unit_id?: string; allocated_to?: string }) =>
+    apiSend<Record<string, unknown>>("POST", "/vehicles/parking/allocations", data),
+  release: (allocationId: string) =>
+    apiSend<Record<string, unknown>>("POST", `/vehicles/parking/allocations/${allocationId}/release`),
   violations: (params?: ListQueryParams) =>
     apiGet<Record<string, unknown>[]>(
       "/vehicles/parking/violations",
       params as Record<string, unknown>,
     ),
+  reportViolation: (data: {
+    violation_type: string;
+    vehicle_id?: string;
+    parking_slot_id?: string;
+    description?: string;
+    evidence_url?: string;
+    fine_amount?: number;
+  }) => apiSend<Record<string, unknown>>("POST", "/vehicles/parking/violations", data),
+  transitionViolation: (violationId: string, newStatus: string) =>
+    apiSend<Record<string, unknown>>("POST", `/vehicles/parking/violations/${violationId}/status`, undefined, { new_status: newStatus }),
+  delete: (id: string) =>
+    apiSend<void>("PATCH", `/vehicles/${id}`, { is_active: false }),
 };
 
 export const incidentsApi = {
@@ -966,8 +1225,21 @@ export const incidentsApi = {
     apiSend<Incident>("POST", `/incidents/${id}/transition`, payload),
   addAction: (id: string, payload: { action_type: string; details?: string }) =>
     apiSend<IncidentAction>("POST", `/incidents/${id}/actions`, payload),
-  resolve: (id: string, data: Record<string, unknown>) =>
-    apiSend<Incident>("PATCH", `/incidents/${id}/resolve`, data),
+  resolve: (id: string, data?: { summary?: string; resolution_summary?: string }) =>
+    apiSend<Incident>("POST", `/incidents/${id}/transition`, {
+      status: "resolved",
+      summary: data?.summary || data?.resolution_summary || "Resolved",
+    }),
+  attachments: (id: string) => apiGet<any[]>(`/incidents/${id}/attachments`),
+  addAttachment: (
+    id: string,
+    data: {
+      file_url: string;
+      file_name?: string;
+      mime_type?: string;
+      file_size_bytes?: number;
+    },
+  ) => apiSend<any>("POST", `/incidents/${id}/attachments`, data),
 };
 
 export const notificationsApi = {
@@ -978,4 +1250,59 @@ export const notificationsApi = {
   preferences: () => apiGet<NotificationPreference[]>("/notifications/me/preferences"),
   setPreference: (data: Partial<NotificationPreference>) =>
     apiSend<NotificationPreference>("PUT", "/notifications/me/preferences", data),
+  dispatch: (data: {
+    community_id?: string;
+    recipient_user_id?: string;
+    title: string;
+    body: string;
+    category?: string;
+    action_url?: string;
+  }) => apiSend<AppNotification>("POST", "/notifications/dispatch", data),
 };
+
+export interface PresignUploadPayload {
+  kind: string;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  community_id?: string;
+}
+
+export interface PresignUploadResponse {
+  file_id: string;
+  kind: string;
+  key: string;
+  upload_url: string;
+  method?: string;
+  required_headers?: Record<string, string>;
+  headers?: Record<string, string>;
+  file_url: string;
+  public_url?: string;
+  max_bytes: number;
+  expires_in: number;
+  confirm_url: string;
+}
+
+export interface ConfirmUploadResponse {
+  file_id: string;
+  status: string;
+  file_url?: string | null;
+  url?: string | null;
+  detected_content_type?: string | null;
+  size_bytes?: number | null;
+  reject_reason?: string | null;
+}
+
+export const uploadsApi = {
+  presign: (data: PresignUploadPayload) =>
+    apiSend<PresignUploadResponse>("POST", "/uploads", data),
+  confirm: (fileId: string) =>
+    apiSend<ConfirmUploadResponse>("POST", `/uploads/${fileId}/confirm`),
+  directUpload: (formData: FormData) =>
+    apiSendFormData<ConfirmUploadResponse>("POST", "/uploads/direct", formData),
+  kinds: () =>
+    apiGet<Record<string, { content_types: string[]; max_bytes: number; scope: string }>>("/uploads/kinds"),
+  download: (key: string) =>
+    apiGet<{ key: string; url: string; expires_in: number }>("/uploads/download", { key }),
+};
+

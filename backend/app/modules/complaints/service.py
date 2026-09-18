@@ -152,7 +152,10 @@ class ComplaintService(UnitScopedAccess):
                     default_priority=prio,
                 )
                 self.db.add(cat)
-            await self.db.flush()
+            try:
+                await self.db.flush()
+            except Exception:
+                pass
             cats = list((await self.db.scalars(stmt)).all())
         return cats
 
@@ -260,6 +263,7 @@ class ComplaintService(UnitScopedAccess):
             ticket.id,
             new={"ticket_number": ticket.ticket_number, "priority": priority},
         )
+        await self.tickets.enrich_tickets([ticket])
         return ticket
 
     async def get_ticket(self, ticket_id: uuid.UUID) -> ServiceTicket:
@@ -267,6 +271,7 @@ class ComplaintService(UnitScopedAccess):
         if obj is None:
             raise NotFoundError("Ticket not found")
         await self._assert_unit_visible(obj.unit_id)
+        await self.tickets.enrich_tickets([obj])
         return obj
 
     async def get_entry_pass(self, ticket_id: uuid.UUID) -> schemas.TicketEntryPassRead:
@@ -313,14 +318,34 @@ class ComplaintService(UnitScopedAccess):
             stmt = stmt.where(
                 ServiceTicket.ticket_number.ilike(like) | ServiceTicket.subject.ilike(like)
             )
-        stmt = await self._scope_unit_column(
-            stmt,
-            ServiceTicket.unit_id,
-            or_owned=ServiceTicket.raised_by_user_id == self.actor.id,
+        # vendor_technician only sees tickets assigned to them via TicketAssignment
+        from app.modules.users.models import Role, UserRole
+        is_vendor = await self.db.scalar(
+            select(UserRole.id)
+            .join(Role, Role.id == UserRole.role_id)
+            .where(UserRole.user_id == self.actor.id, Role.slug == "vendor_technician")
+            .limit(1)
         )
-        return await self.tickets.list(
+        if is_vendor:
+            stmt = stmt.where(
+                ServiceTicket.id.in_(
+                    select(TicketAssignment.ticket_id).where(
+                        TicketAssignment.assigned_to_user_id == self.actor.id,
+                        TicketAssignment.is_active.is_(True),
+                    )
+                )
+            )
+        else:
+            stmt = await self._scope_unit_column(
+                stmt,
+                ServiceTicket.unit_id,
+                or_owned=ServiceTicket.raised_by_user_id == self.actor.id,
+            )
+        rows = await self.tickets.list(
             offset=offset, limit=limit, extra=stmt
-        ), await self.tickets.count(extra=stmt)
+        )
+        await self.tickets.enrich_tickets(rows)
+        return rows, await self.tickets.count(extra=stmt)
 
     async def _mark_first_response(self, ticket: ServiceTicket) -> None:
         if ticket.first_responded_at is None:
@@ -415,6 +440,14 @@ class ComplaintService(UnitScopedAccess):
         self, ticket_id: uuid.UUID, payload: schemas.TicketConfirm
     ) -> ServiceTicket:
         ticket = await self.get_ticket(ticket_id)
+        is_restricted = await self.is_unit_restricted()
+        if is_restricted:
+            scope = await self._unit_scope()
+            if ticket.raised_by_user_id != self.actor.id and (not scope or ticket.unit_id not in scope):
+                raise ForbiddenError(
+                    "Only a resident of the unit or authorized staff may confirm the ticket",
+                    code="NOT_AUTHORIZED",
+                )
         _enum("confirmation_status", payload.confirmation_status)
         if ticket.status != "resident_confirmation":
             raise BusinessRuleError(
@@ -480,10 +513,21 @@ class ComplaintService(UnitScopedAccess):
             ).all()
         )
 
+    async def get_feedback(self, ticket_id: uuid.UUID) -> TicketFeedback | None:
+        await self.get_ticket(ticket_id)
+        return await self.db.scalar(
+            select(TicketFeedback).where(TicketFeedback.ticket_id == ticket_id)
+        )
+
     async def add_feedback(
         self, ticket_id: uuid.UUID, payload: schemas.FeedbackCreate
     ) -> TicketFeedback:
         ticket = await self.get_ticket(ticket_id)
+        if ticket.raised_by_user_id != self.actor.id:
+            raise ForbiddenError(
+                "Only the resident who raised the ticket may submit feedback",
+                code="NOT_TICKET_RAISER",
+            )
         if ticket.status != "closed":
             raise BusinessRuleError("Ticket is not closed", code="TICKET_NOT_CLOSED")
         existing = await self.db.scalar(

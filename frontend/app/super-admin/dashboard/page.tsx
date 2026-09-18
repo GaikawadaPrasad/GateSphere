@@ -14,6 +14,7 @@ import { DemoRequestsCard } from "@/components/dashboard/DemoRequestsCard";
 import { useSuperAdminDashboardMetrics } from "@/hooks/use-dashboards";
 import { useCommunities } from "@/hooks/use-communities";
 import { useGateEvents, usePanicAlerts } from "@/hooks/use-gate";
+import { useUiStore } from "@/store/ui";
 import type { DemoRequestLead } from "@/lib/demo-requests";
 import type { Community } from "@/types/communities";
 
@@ -39,6 +40,7 @@ const ViewCommunityModal = dynamic(
 export default function SuperAdminDashboardPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { activeCommunityId, setActiveCommunity } = useUiStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -58,7 +60,7 @@ export default function SuperAdminDashboardPage() {
     data: metrics,
     isLoading: isMetricsLoading,
     refetch: refetchMetrics,
-  } = useSuperAdminDashboardMetrics();
+  } = useSuperAdminDashboardMetrics(activeCommunityId);
 
   const {
     data: communities,
@@ -66,14 +68,28 @@ export default function SuperAdminDashboardPage() {
     refetch: refetchCommunities,
   } = useCommunities();
 
-  const { data: gateEvents, isLoading: isEventsLoading } = useGateEvents({ page_size: 6 });
-  const { data: panicAlerts } = usePanicAlerts({ page_size: 5 });
+  const activeCommunity = useMemo(
+    () => communities?.find((c: Community) => c.id === activeCommunityId) || null,
+    [communities, activeCommunityId]
+  );
+
+  const { data: gateEvents, isLoading: isEventsLoading } = useGateEvents({
+    page_size: 6,
+    community_id: activeCommunityId || undefined,
+  });
+  const { data: panicAlerts } = usePanicAlerts({
+    page_size: 5,
+    community_id: activeCommunityId || undefined,
+  });
 
   // Filter communities by search query & status, enriched with live breakdown metrics
   const filteredCommunities: CommunityWithMetrics[] = useMemo(() => {
     if (!communities) return [];
     return communities
       .filter((comm: Community) => {
+        if (activeCommunityId && comm.id !== activeCommunityId) {
+          return false;
+        }
         const matchesSearch =
           searchQuery === "" ||
           comm.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -103,7 +119,7 @@ export default function SuperAdminDashboardPage() {
         const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
         return bTime - aTime;
       });
-  }, [communities, searchQuery, statusFilter, metrics]);
+  }, [communities, searchQuery, statusFilter, metrics, activeCommunityId]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -148,7 +164,14 @@ export default function SuperAdminDashboardPage() {
     setIsViewModalOpen(true);
   };
 
-  const handleMutationSuccess = () => {
+  const handleMutationSuccess = async () => {
+    await Promise.allSettled([
+      queryClient.invalidateQueries({ queryKey: ["communities"], refetchType: "all" }),
+      queryClient.invalidateQueries({ queryKey: ["dashboards"], refetchType: "all" }),
+      queryClient.invalidateQueries({ queryKey: ["towers"], refetchType: "all" }),
+      queryClient.invalidateQueries({ queryKey: ["units"], refetchType: "all" }),
+      queryClient.invalidateQueries({ queryKey: ["gate"], refetchType: "all" }),
+    ]);
     refetchCommunities();
     refetchMetrics();
   };
@@ -156,9 +179,21 @@ export default function SuperAdminDashboardPage() {
   return (
     <div style={{ maxWidth: 1600, margin: "0 auto" }}>
       <PageHeader
-        title="Super Admin Dashboard"
-        subtitle="Global operations and analytics across all residential communities"
-        breadcrumbs={[{ label: "GateSphere" }, { label: "Super Admin" }, { label: "Dashboard" }]}
+        title={
+          activeCommunity
+            ? `${activeCommunity.name} Dashboard`
+            : "Super Admin Dashboard"
+        }
+        subtitle={
+          activeCommunity
+            ? `Operations and analytics scoped to ${activeCommunity.name} (${activeCommunity.code})`
+            : "Global operations and analytics across all residential communities"
+        }
+        breadcrumbs={[
+          { label: "GateSphere" },
+          { label: "Super Admin" },
+          { label: activeCommunity ? activeCommunity.name : "Dashboard" },
+        ]}
         actions={
           <div
             style={{
@@ -186,10 +221,48 @@ export default function SuperAdminDashboardPage() {
         }
       />
 
+      {/* Scope Banner if scoped to a specific community */}
+      {activeCommunity && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            background: "#eff6ff",
+            border: "1px solid #bfdbfe",
+            borderRadius: "8px",
+            padding: "0.6rem 1rem",
+            marginBottom: "1.25rem",
+            flexWrap: "wrap",
+            gap: "0.6rem",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.85rem", color: "#1e40af" }}>
+            <span>🏢</span>
+            <span>
+              Scope Active: Viewing metrics for <strong>{activeCommunity.name}</strong> ({activeCommunity.code})
+              {activeCommunity.city ? ` — ${activeCommunity.city}` : ""}{activeCommunity.state ? `, ${activeCommunity.state}` : ""}.
+            </span>
+          </div>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => {
+              queryClient.clear();
+              setActiveCommunity(null);
+            }}
+            style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem", background: "#ffffff" }}
+          >
+            🌐 Clear Scope (View All Communities)
+          </button>
+        </div>
+      )}
+
       {/* 6-KPI Metrics Grid with Responsive Auto-fit & Shimmer Skeletons */}
       <MetricsGrid
         metrics={metrics}
         isLoading={isMetricsLoading}
+        activeCommunity={activeCommunity}
         onCardClick={(key) => {
           if (key === "communities") router.push("/super-admin/communities");
           if (key === "residents") router.push("/super-admin/residents");
@@ -202,18 +275,17 @@ export default function SuperAdminDashboardPage() {
       {/* Quick Actions Bar */}
       <QuickActions onNewCommunity={handleOpenCreate} />
 
-      {/* Main Grid: Communities Table (Left / Full) + Live Activity Feed (Right / Collapsible) */}
+      {/* Main Grid: Communities Table (Top) + Live Activity Feed (Bottom) — stacked vertically */}
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 480px), 1fr))",
+          display: "flex",
+          flexDirection: "column",
           gap: "1.75rem",
-          alignItems: "start",
           marginBottom: "1.75rem",
         }}
       >
-        {/* Left Side: Communities Table with Built-in Search & Pagination */}
-        <div style={{ flex: 1, minWidth: 0 }}>
+        {/* Top: Communities Table with Built-in Search & Pagination */}
+        <div style={{ width: "100%", minWidth: 0 }}>
           <div className="card" style={{ marginBottom: "1rem" }}>
             <div
               className="card-header"
@@ -228,7 +300,7 @@ export default function SuperAdminDashboardPage() {
               <div>
                 <h3 className="card-title">Managed Communities</h3>
                 <p style={{ fontSize: "0.775rem", color: "var(--muted)", margin: "0.15rem 0 0 0" }}>
-                  {filteredCommunities.length} of {communities?.length || 0} communities
+                  {isCommunitiesLoading ? "Loading communities…" : `${filteredCommunities.length} of ${communities?.length || 0} communities`}
                 </p>
               </div>
 
@@ -278,7 +350,7 @@ export default function SuperAdminDashboardPage() {
           </div>
         </div>
 
-        {/* Right Side: Live Security Activity Feed */}
+        {/* Bottom: Live Security Activity Feed */}
         <div style={{ width: "100%", minWidth: 0 }}>
           <ActivityFeed events={gateEvents} alerts={panicAlerts} isLoading={isEventsLoading} />
         </div>
@@ -291,7 +363,10 @@ export default function SuperAdminDashboardPage() {
       {isCreateModalOpen && (
         <CreateCommunityModal
           isOpen={isCreateModalOpen}
-          onClose={() => setIsCreateModalOpen(false)}
+          onClose={() => {
+            setIsCreateModalOpen(false);
+            handleMutationSuccess();
+          }}
           onSuccess={handleMutationSuccess}
           initialName={leadInitialValues.name}
           initialCode={leadInitialValues.code}
@@ -301,7 +376,10 @@ export default function SuperAdminDashboardPage() {
       {isEditModalOpen && (
         <EditCommunityModal
           isOpen={isEditModalOpen}
-          onClose={() => setIsEditModalOpen(false)}
+          onClose={() => {
+            setIsEditModalOpen(false);
+            handleMutationSuccess();
+          }}
           onSuccess={handleMutationSuccess}
           community={editingCommunity}
         />

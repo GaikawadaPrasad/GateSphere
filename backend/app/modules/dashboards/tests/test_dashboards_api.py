@@ -65,6 +65,17 @@ def test_super_admin_dashboard(as_role):
     assert d["totalCommunities"] >= 1
 
 
+def test_super_admin_dashboard_scoped_community(as_role, seed_ids):
+    cid = seed_ids["community_id"]
+    r = as_role("super_admin").get(f"{P}/super-admin?community_id={cid}")
+    assert r.status_code == 200, r.text
+    d = r.json()["data"]
+    assert d["totalCommunities"] == 1
+    assert "totalUnits" in d
+    assert "totalResidents" in d
+    assert str(cid) in d["communityBreakdown"]
+
+
 def test_super_admin_dashboard_forbidden_for_non_superadmin(as_role, client):
     assert client.get(f"{P}/super-admin").status_code == 401
     assert as_role("community_admin").get(f"{P}/super-admin").status_code == 403

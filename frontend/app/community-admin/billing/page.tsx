@@ -11,6 +11,8 @@ import {
   useCreateInvoice,
   usePostInvoice,
   useCancelInvoice,
+  useRecordPayment,
+  useCreateChargeHead,
 } from "@/hooks/use-billing";
 import { useCommunityUnits } from "@/hooks/use-communities";
 import { useFinancialStats } from "@/hooks/use-dashboards";
@@ -22,6 +24,7 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import type { MaintenanceInvoice, Payment, ChargeHead, UnitLedgerEntry } from "@/types/billing";
 import { billingApi } from "@/lib/api";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
+import { toast } from "@/store/toast";
 
 interface LineItemForm {
   charge_head_id: string;
@@ -69,7 +72,7 @@ export default function CommunityAdminBillingPage() {
 
   // Queries
   const { data: financial } = useFinancialStats(activeCommunityId || undefined);
-  const { data: invoices, isLoading: invoicesLoading } = useInvoices({
+  const { data: invoices, isLoading: invoicesLoading, refetch: refetchInvoices } = useInvoices({
     community_id: activeCommunityId || undefined,
     page_size: 50,
   });
@@ -86,10 +89,44 @@ export default function CommunityAdminBillingPage() {
     selectedUnitId || undefined,
   );
 
+  // Export Loading States
+  const [isExportingInvoices, setIsExportingInvoices] = useState(false);
+  const [isExportingPayments, setIsExportingPayments] = useState(false);
+
+  // Detail Modal States
+  const [selectedInvoice, setSelectedInvoice] = useState<MaintenanceInvoice | null>(null);
+  const [selectedPaymentReceipt, setSelectedPaymentReceipt] = useState<any | null>(null);
+
+  // Record Offline Payment Modal State
+  const [isRecordPaymentOpen, setIsRecordPaymentOpen] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({
+    unit_id: "",
+    invoice_id: "",
+    amount: 0,
+    payment_method: "upi",
+    remarks: "",
+  });
+  const [isRecordingPayment, setIsRecordingPayment] = useState(false);
+  const [recordPaymentError, setRecordPaymentError] = useState("");
+
+  // Add Charge Head Modal State
+  const [isAddChargeHeadOpen, setIsAddChargeHeadOpen] = useState(false);
+  const [chargeHeadForm, setChargeHeadForm] = useState({
+    name: "",
+    code: "",
+    charge_type: "maintenance",
+    default_amount: 1500,
+    is_active: true,
+  });
+  const [isSubmittingChargeHead, setIsSubmittingChargeHead] = useState(false);
+  const [chargeHeadError, setChargeHeadError] = useState("");
+
   // Mutations
   const createInvoiceMutation = useCreateInvoice();
   const postInvoiceMutation = usePostInvoice();
   const cancelInvoiceMutation = useCancelInvoice();
+  const recordPaymentMutation = useRecordPayment();
+  const createChargeHeadMutation = useCreateChargeHead();
 
   // Reset Modal Form
   const resetInvoiceForm = () => {
@@ -191,11 +228,27 @@ export default function CommunityAdminBillingPage() {
       setFormError("Please select a residential unit.");
       return;
     }
+    if (billingPeriodStart && billingPeriodEnd && billingPeriodEnd < billingPeriodStart) {
+      setFormError("Billing period end date cannot precede start date.");
+      return;
+    }
+    if (issueDate && dueDate && dueDate < issueDate) {
+      setFormError("Invoice due date cannot precede issue date.");
+      return;
+    }
+    if (Number(discount) < 0) {
+      setFormError("Discount amount cannot be negative.");
+      return;
+    }
+    if (Number(discount) > itemsSubtotal) {
+      setFormError("Discount cannot exceed the invoice items subtotal.");
+      return;
+    }
     if (
       lineItems.length === 0 ||
-      lineItems.some((i) => !i.description.trim() || i.quantity <= 0 || i.unit_rate < 0)
+      lineItems.some((i) => !i.description.trim() || Number(i.quantity) <= 0 || Number(i.unit_rate) < 0)
     ) {
-      setFormError("Please ensure all line items have a description, quantity > 0, and rate >= 0.");
+      setFormError("Please ensure all line items have a description (min 2 chars), quantity > 0, and rate >= 0.");
       return;
     }
 
@@ -222,9 +275,18 @@ export default function CommunityAdminBillingPage() {
         await postInvoiceMutation.mutateAsync(newInvoice.id);
       }
 
+      await refetchInvoices();
       setIsCreateModalOpen(false);
+      toast.success(
+        postImmediately
+          ? "Invoice generated and posted to resident ledger."
+          : "Draft invoice generated successfully.",
+        "Invoice Created",
+      );
     } catch (err: any) {
-      setFormError(err?.message || "Failed to generate invoice.");
+      const errMsg = err?.message || "Failed to generate invoice.";
+      setFormError(errMsg);
+      toast.error(errMsg, "Billing Error");
     } finally {
       setIsSubmitting(false);
     }
@@ -232,35 +294,145 @@ export default function CommunityAdminBillingPage() {
 
   // Handle Export CSV
   const handleExportInvoices = async () => {
+    if (!activeCommunityId) {
+      toast.error("Please select an active community to export invoices.", "Export Failed");
+      return;
+    }
     try {
+      setIsExportingInvoices(true);
       const csvData = await billingApi.exportInvoicesCsv({
-        community_id: activeCommunityId || undefined,
+        community_id: activeCommunityId,
         status: statusFilter || undefined,
       });
-      const blob = new Blob([csvData], { type: "text/csv" });
+      const blob = new Blob([csvData], { type: "text/csv;charset=utf-8;" });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = `invoices_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
       a.click();
-    } catch (err) {
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success("Invoices CSV downloaded successfully.", "Export Complete");
+    } catch (err: any) {
       console.error(err);
+      toast.error(err?.message || "Failed to export invoices CSV.", "Export Failed");
+    } finally {
+      setIsExportingInvoices(false);
     }
   };
 
   const handleExportPayments = async () => {
+    if (!activeCommunityId) {
+      toast.error("Please select an active community to export payments.", "Export Failed");
+      return;
+    }
     try {
+      setIsExportingPayments(true);
       const csvData = await billingApi.exportPaymentsCsv({
-        community_id: activeCommunityId || undefined,
+        community_id: activeCommunityId,
       });
-      const blob = new Blob([csvData], { type: "text/csv" });
+      const blob = new Blob([csvData], { type: "text/csv;charset=utf-8;" });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = `payments_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
       a.click();
-    } catch (err) {
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success("Payments CSV downloaded successfully.", "Export Complete");
+    } catch (err: any) {
       console.error(err);
+      toast.error(err?.message || "Failed to export payments CSV.", "Export Failed");
+    } finally {
+      setIsExportingPayments(false);
+    }
+  };
+
+  // Handle Record Offline Payment Submit
+  const handleRecordPaymentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeCommunityId) {
+      setRecordPaymentError("Active community required.");
+      return;
+    }
+    if (!paymentForm.unit_id) {
+      setRecordPaymentError("Please select a target residential unit.");
+      return;
+    }
+    if (Number(paymentForm.amount) <= 0) {
+      setRecordPaymentError("Payment amount must be greater than 0.");
+      return;
+    }
+
+    try {
+      setIsRecordingPayment(true);
+      setRecordPaymentError("");
+      const allocations = paymentForm.invoice_id
+        ? [{ invoice_id: paymentForm.invoice_id, amount: Number(paymentForm.amount) }]
+        : undefined;
+
+      await recordPaymentMutation.mutateAsync({
+        community_id: activeCommunityId,
+        unit_id: paymentForm.unit_id,
+        amount: Number(paymentForm.amount),
+        payment_method: paymentForm.payment_method,
+        remarks: paymentForm.remarks.trim() || undefined,
+        allocations,
+      });
+
+      toast.success("Payment recorded and posted to unit ledger.", "Payment Recorded");
+      setIsRecordPaymentOpen(false);
+      await refetchInvoices();
+    } catch (err: any) {
+      setRecordPaymentError(err?.message || "Failed to record payment.");
+    } finally {
+      setIsRecordingPayment(false);
+    }
+  };
+
+  // Handle Add Charge Head Submit
+  const handleCreateChargeHeadSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeCommunityId) {
+      setChargeHeadError("Active community required.");
+      return;
+    }
+    const trimmedName = chargeHeadForm.name.trim();
+    if (!trimmedName || trimmedName.length < 2) {
+      setChargeHeadError("Charge head name must be at least 2 characters long.");
+      return;
+    }
+    const trimmedCode = chargeHeadForm.code.trim().toUpperCase();
+    if (!trimmedCode || !/^[A-Z0-9_-]{2,20}$/.test(trimmedCode)) {
+      setChargeHeadError("Charge head code must be 2-20 alphanumeric characters or dashes (e.g. MAINT-01).");
+      return;
+    }
+    if (Number(chargeHeadForm.default_amount) < 0) {
+      setChargeHeadError("Default amount cannot be negative.");
+      return;
+    }
+
+    try {
+      setIsSubmittingChargeHead(true);
+      setChargeHeadError("");
+      await createChargeHeadMutation.mutateAsync({
+        communityId: activeCommunityId,
+        data: {
+          name: trimmedName,
+          code: trimmedCode,
+          charge_type: chargeHeadForm.charge_type,
+          default_amount: Number(chargeHeadForm.default_amount),
+          is_active: chargeHeadForm.is_active,
+        },
+      });
+      toast.success(`Charge head "${trimmedName}" created successfully.`, "Charge Head Created");
+      setIsAddChargeHeadOpen(false);
+    } catch (err: any) {
+      setChargeHeadError(err?.message || "Failed to create charge head.");
+    } finally {
+      setIsSubmittingChargeHead(false);
     }
   };
 
@@ -322,7 +494,13 @@ export default function CommunityAdminBillingPage() {
               style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
               onClick={async () => {
                 if (confirm(`Post invoice ${i.invoice_number} to unit ledger now?`)) {
-                  await postInvoiceMutation.mutateAsync(i.id);
+                  try {
+                    await postInvoiceMutation.mutateAsync(i.id);
+                    await refetchInvoices();
+                    toast.success(`Invoice ${i.invoice_number} posted successfully.`, "Invoice Posted");
+                  } catch (err: any) {
+                    toast.error(err?.message || "Failed to post invoice.", "Action Failed");
+                  }
                 }
               }}
               disabled={postInvoiceMutation.isPending}
@@ -338,7 +516,13 @@ export default function CommunityAdminBillingPage() {
                 style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem", color: "#dc2626" }}
                 onClick={async () => {
                   if (confirm(`Cancel invoice ${i.invoice_number}?`)) {
-                    await cancelInvoiceMutation.mutateAsync(i.id);
+                    try {
+                      await cancelInvoiceMutation.mutateAsync(i.id);
+                      await refetchInvoices();
+                      toast.success(`Invoice ${i.invoice_number} cancelled.`, "Invoice Cancelled");
+                    } catch (err: any) {
+                      toast.error(err?.message || "Failed to cancel invoice.", "Action Failed");
+                    }
                   }
                 }}
                 disabled={cancelInvoiceMutation.isPending}
@@ -346,6 +530,22 @@ export default function CommunityAdminBillingPage() {
                 Cancel
               </button>
             )}
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
+            onClick={async () => {
+              setSelectedInvoice(i);
+              try {
+                const full = await billingApi.getInvoice(i.id);
+                if (full) setSelectedInvoice(full);
+              } catch {
+                // keep current i
+              }
+            }}
+          >
+            🔍 Details
+          </button>
           <button
             type="button"
             className="btn btn-secondary"
@@ -398,6 +598,28 @@ export default function CommunityAdminBillingPage() {
       key: "paid_at",
       header: "Paid At",
       render: (p) => formatDateTime(p.paid_at),
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      render: (p) => (
+        <button
+          type="button"
+          className="btn btn-secondary"
+          style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
+          onClick={async () => {
+            setSelectedPaymentReceipt(p);
+            try {
+              const receipt = await billingApi.getPaymentReceipt(p.id);
+              if (receipt) setSelectedPaymentReceipt(receipt);
+            } catch {
+              // fallback to p
+            }
+          }}
+        >
+          🧾 Receipt
+        </button>
+      ),
     },
   ];
 
@@ -487,24 +709,74 @@ export default function CommunityAdminBillingPage() {
         description="Community invoice reconciliation, payment collections, resident unit ledgers, and maintenance tariff rules."
         action={
           <div style={{ display: "flex", gap: "0.5rem" }}>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => {
-                resetInvoiceForm();
-                setIsCreateModalOpen(true);
-              }}
-            >
-              🧾 Generate Invoice
-            </button>
             {activeTab === "invoices" && (
-              <button type="button" className="btn btn-secondary" onClick={handleExportInvoices}>
-                📥 Export Invoices CSV
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    resetInvoiceForm();
+                    setIsCreateModalOpen(true);
+                  }}
+                >
+                  🧾 Generate Invoice
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleExportInvoices}
+                  disabled={isExportingInvoices}
+                >
+                  {isExportingInvoices ? "⏳ Exporting..." : "📥 Export Invoices CSV"}
+                </button>
+              </>
             )}
             {activeTab === "payments" && (
-              <button type="button" className="btn btn-secondary" onClick={handleExportPayments}>
-                📥 Export Payments CSV
+              <>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    setRecordPaymentError("");
+                    setPaymentForm({
+                      unit_id: units?.[0]?.id || "",
+                      invoice_id: "",
+                      amount: 0,
+                      payment_method: "upi",
+                      remarks: "",
+                    });
+                    setIsRecordPaymentOpen(true);
+                  }}
+                >
+                  💳 + Record Payment
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleExportPayments}
+                  disabled={isExportingPayments}
+                >
+                  {isExportingPayments ? "⏳ Exporting..." : "📥 Export Payments CSV"}
+                </button>
+              </>
+            )}
+            {activeTab === "rules" && (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  setChargeHeadError("");
+                  setChargeHeadForm({
+                    name: "",
+                    code: "",
+                    charge_type: "maintenance",
+                    default_amount: 1500,
+                    is_active: true,
+                  });
+                  setIsAddChargeHeadOpen(true);
+                }}
+              >
+                ➕ Add Charge Head
               </button>
             )}
           </div>
@@ -736,7 +1008,34 @@ export default function CommunityAdminBillingPage() {
           )}
 
           <div>
-            <h4 style={{ marginBottom: "0.75rem", fontSize: "0.9rem" }}>Charge Heads Catalogue</h4>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "0.75rem",
+              }}
+            >
+              <h4 style={{ margin: 0, fontSize: "0.9rem" }}>Charge Heads Catalogue</h4>
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ fontSize: "0.8rem", padding: "0.3rem 0.6rem" }}
+                onClick={() => {
+                  setChargeHeadError("");
+                  setChargeHeadForm({
+                    name: "",
+                    code: "",
+                    charge_type: "maintenance",
+                    default_amount: 1500,
+                    is_active: true,
+                  });
+                  setIsAddChargeHeadOpen(true);
+                }}
+              >
+                ➕ Add Charge Head
+              </button>
+            </div>
             <DataTable
               columns={chargeHeadColumns}
               data={chargeHeads as (ChargeHead & Record<string, unknown>)[]}
@@ -755,7 +1054,7 @@ export default function CommunityAdminBillingPage() {
         onClose={() => setIsCreateModalOpen(false)}
         title="🧾 Generate Maintenance Invoice"
       >
-        <form onSubmit={handleCreateInvoiceSubmit}>
+        <form onSubmit={handleCreateInvoiceSubmit} noValidate>
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
             {formError && (
               <div
@@ -778,7 +1077,7 @@ export default function CommunityAdminBillingPage() {
                 Target Residential Unit <span style={{ color: "#dc2626" }}>*</span>
               </label>
               <select
-                className="input"
+                className="select-field"
                 value={createUnitId}
                 onChange={(e) => setCreateUnitId(e.target.value)}
                 required
@@ -807,7 +1106,7 @@ export default function CommunityAdminBillingPage() {
                 </label>
                 <input
                   type="date"
-                  className="input"
+                  className="input-field"
                   value={billingPeriodStart}
                   onChange={(e) => setBillingPeriodStart(e.target.value)}
                   style={{ width: "100%" }}
@@ -819,7 +1118,7 @@ export default function CommunityAdminBillingPage() {
                 </label>
                 <input
                   type="date"
-                  className="input"
+                  className="input-field"
                   value={billingPeriodEnd}
                   onChange={(e) => setBillingPeriodEnd(e.target.value)}
                   style={{ width: "100%" }}
@@ -835,7 +1134,7 @@ export default function CommunityAdminBillingPage() {
                 </label>
                 <input
                   type="date"
-                  className="input"
+                  className="input-field"
                   value={issueDate}
                   onChange={(e) => setIssueDate(e.target.value)}
                   style={{ width: "100%" }}
@@ -847,7 +1146,7 @@ export default function CommunityAdminBillingPage() {
                 </label>
                 <input
                   type="date"
-                  className="input"
+                  className="input-field"
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
                   style={{ width: "100%" }}
@@ -889,7 +1188,7 @@ export default function CommunityAdminBillingPage() {
                           Charge Head Preset
                         </label>
                         <select
-                          className="input"
+                          className="select-field"
                           value={item.charge_head_id}
                           onChange={(e) => handleChargeHeadChange(idx, e.target.value)}
                           style={{ width: "100%", fontSize: "0.8rem", padding: "0.35rem 0.5rem" }}
@@ -908,7 +1207,7 @@ export default function CommunityAdminBillingPage() {
                         </label>
                         <input
                           type="text"
-                          className="input"
+                          className="input-field"
                           value={item.description}
                           onChange={(e) => updateLineItem(idx, "description", e.target.value)}
                           placeholder="Line item description"
@@ -927,7 +1226,7 @@ export default function CommunityAdminBillingPage() {
                           type="number"
                           step="1"
                           min="1"
-                          className="input"
+                          className="input-field"
                           value={item.quantity}
                           onChange={(e) => updateLineItem(idx, "quantity", Number(e.target.value))}
                           style={{ width: "100%", fontSize: "0.8rem", padding: "0.35rem 0.5rem" }}
@@ -941,7 +1240,7 @@ export default function CommunityAdminBillingPage() {
                           type="number"
                           step="0.01"
                           min="0"
-                          className="input"
+                          className="input-field"
                           value={item.unit_rate}
                           onChange={(e) => updateLineItem(idx, "unit_rate", Number(e.target.value))}
                           style={{ width: "100%", fontSize: "0.8rem", padding: "0.35rem 0.5rem" }}
@@ -983,7 +1282,7 @@ export default function CommunityAdminBillingPage() {
                   type="number"
                   step="0.01"
                   min="0"
-                  className="input"
+                  className="input-field"
                   value={discount}
                   onChange={(e) => setDiscount(Number(e.target.value))}
                   style={{ width: "100%" }}
@@ -1087,6 +1386,749 @@ export default function CommunityAdminBillingPage() {
             enableClientPagination={true}
           />
         </div>
+      </Modal>
+
+      {/* Invoice Details Modal */}
+      <Modal
+        isOpen={Boolean(selectedInvoice)}
+        onClose={() => setSelectedInvoice(null)}
+        title={
+          selectedInvoice
+            ? `Invoice Details — ${selectedInvoice.invoice_number}`
+            : "Invoice Details"
+        }
+      >
+        {selectedInvoice && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+            {/* Header info grid */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                gap: "0.75rem",
+                padding: "0.85rem",
+                background: "var(--bg-card, #f8fafc)",
+                borderRadius: "6px",
+                border: "1px solid var(--border)",
+              }}
+            >
+              <div>
+                <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Unit</div>
+                <div style={{ fontWeight: 600, fontSize: "0.9rem" }}>
+                  Unit {selectedInvoice.unit_number || selectedInvoice.unit_id?.slice(0, 8)}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Status</div>
+                <div style={{ marginTop: "0.2rem" }}>
+                  <StatusBadge status={selectedInvoice.status} />
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Due Date</div>
+                <div style={{ fontWeight: 600, fontSize: "0.9rem" }}>
+                  {selectedInvoice.due_date || "–"}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Billing Period</div>
+                <div style={{ fontSize: "0.8rem", fontWeight: 500 }}>
+                  {selectedInvoice.billing_period_start || "–"} to{" "}
+                  {selectedInvoice.billing_period_end || "–"}
+                </div>
+              </div>
+            </div>
+
+            {/* Line Items List */}
+            <div>
+              <h4 style={{ fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.5rem" }}>
+                Invoice Line Items
+              </h4>
+              {selectedInvoice.items && selectedInvoice.items.length > 0 ? (
+                <div
+                  style={{
+                    border: "1px solid var(--border)",
+                    borderRadius: "6px",
+                    overflow: "hidden",
+                  }}
+                >
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+                    <thead>
+                      <tr style={{ background: "var(--bg-muted, #f1f5f9)", textAlign: "left" }}>
+                        <th style={{ padding: "0.5rem 0.75rem" }}>Description</th>
+                        <th style={{ padding: "0.5rem 0.75rem", textAlign: "right" }}>Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedInvoice.items.map((item, idx) => (
+                        <tr key={item.id || idx} style={{ borderTop: "1px solid var(--border)" }}>
+                          <td style={{ padding: "0.5rem 0.75rem" }}>
+                            <div style={{ fontWeight: 500 }}>{item.description}</div>
+                            {item.charge_head_name && (
+                              <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                                {item.charge_head_name}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ padding: "0.5rem 0.75rem", textAlign: "right", fontWeight: 600 }}>
+                            {formatCurrency(Number(item.amount))}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    padding: "0.75rem",
+                    background: "var(--bg-card, #f8fafc)",
+                    borderRadius: "6px",
+                    border: "1px dashed var(--border)",
+                    fontSize: "0.85rem",
+                    color: "var(--muted)",
+                    textAlign: "center",
+                  }}
+                >
+                  Standard monthly maintenance assessment
+                </div>
+              )}
+            </div>
+
+            {/* Financial Summary Breakdown */}
+            <div
+              style={{
+                background: "#f1f5f9",
+                borderRadius: "6px",
+                padding: "0.85rem 1rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.35rem",
+                fontSize: "0.85rem",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: "var(--muted)" }}>Subtotal:</span>
+                <span style={{ fontWeight: 600 }}>
+                  {formatCurrency(
+                    Number(selectedInvoice.subtotal || selectedInvoice.total_amount),
+                  )}
+                </span>
+              </div>
+              {Number(selectedInvoice.discount) > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", color: "#059669" }}>
+                  <span>Discount:</span>
+                  <span>-{formatCurrency(Number(selectedInvoice.discount))}</span>
+                </div>
+              )}
+              {Number(selectedInvoice.tax) > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "var(--muted)" }}>Tax:</span>
+                  <span>+{formatCurrency(Number(selectedInvoice.tax))}</span>
+                </div>
+              )}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  borderTop: "1px solid var(--border)",
+                  paddingTop: "0.4rem",
+                  fontWeight: 700,
+                  color: "var(--fg)",
+                }}
+              >
+                <span>Total Amount:</span>
+                <span>{formatCurrency(Number(selectedInvoice.total_amount))}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", color: "#059669" }}>
+                <span>Amount Paid:</span>
+                <span style={{ fontWeight: 600 }}>
+                  {formatCurrency(Number(selectedInvoice.amount_paid))}
+                </span>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  borderTop: "1px solid var(--border)",
+                  paddingTop: "0.3rem",
+                  fontSize: "0.95rem",
+                  fontWeight: 700,
+                  color: Number(selectedInvoice.balance_due) > 0 ? "#dc2626" : "#059669",
+                }}
+              >
+                <span>Balance Due:</span>
+                <span>{formatCurrency(Number(selectedInvoice.balance_due))}</span>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setSelectedInvoice(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Payment Receipt Modal */}
+      <Modal
+        isOpen={Boolean(selectedPaymentReceipt)}
+        onClose={() => setSelectedPaymentReceipt(null)}
+        title={
+          selectedPaymentReceipt?.receipt_number
+            ? `Payment Receipt #${selectedPaymentReceipt.receipt_number}`
+            : "Payment Receipt"
+        }
+      >
+        {selectedPaymentReceipt && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+            <div
+              style={{
+                border: "2px dashed var(--border)",
+                borderRadius: "8px",
+                padding: "1.25rem",
+                background: "#fcfdfe",
+                display: "flex",
+                flexDirection: "column",
+                gap: "1rem",
+              }}
+            >
+              {/* Receipt Header */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  borderBottom: "1px solid var(--border)",
+                  paddingBottom: "0.75rem",
+                }}
+              >
+                <div>
+                  <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700, color: "var(--fg)" }}>
+                    {selectedPaymentReceipt.community_name || "GateSphere Enterprise"}
+                  </h3>
+                  <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.15rem" }}>
+                    Official Maintenance Collection Receipt
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <StatusBadge
+                    status={
+                      selectedPaymentReceipt.payment_status ||
+                      selectedPaymentReceipt.status ||
+                      "success"
+                    }
+                  />
+                  {selectedPaymentReceipt.receipt_number && (
+                    <div style={{ fontSize: "0.8rem", fontWeight: 600, marginTop: "0.25rem" }}>
+                      Receipt #{selectedPaymentReceipt.receipt_number}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Receipt Key-Value Rows */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "0.75rem",
+                  fontSize: "0.85rem",
+                }}
+              >
+                <div>
+                  <span style={{ color: "var(--muted)", display: "block", fontSize: "0.75rem" }}>
+                    Payment Reference
+                  </span>
+                  <strong>{selectedPaymentReceipt.payment_reference}</strong>
+                </div>
+                <div>
+                  <span style={{ color: "var(--muted)", display: "block", fontSize: "0.75rem" }}>
+                    Payment Date
+                  </span>
+                  <span>{formatDateTime(selectedPaymentReceipt.paid_at)}</span>
+                </div>
+                <div>
+                  <span style={{ color: "var(--muted)", display: "block", fontSize: "0.75rem" }}>
+                    Payer / Resident
+                  </span>
+                  <span>
+                    {selectedPaymentReceipt.payer_name ||
+                      selectedPaymentReceipt.resident_type ||
+                      "Unit Resident"}
+                  </span>
+                </div>
+                <div>
+                  <span style={{ color: "var(--muted)", display: "block", fontSize: "0.75rem" }}>
+                    Unit
+                  </span>
+                  <span>
+                    {selectedPaymentReceipt.unit_number
+                      ? `Unit ${selectedPaymentReceipt.unit_number}`
+                      : selectedPaymentReceipt.unit_id
+                      ? `Unit ${selectedPaymentReceipt.unit_id.slice(0, 8)}`
+                      : "–"}
+                  </span>
+                </div>
+                <div>
+                  <span style={{ color: "var(--muted)", display: "block", fontSize: "0.75rem" }}>
+                    Payment Method
+                  </span>
+                  <span style={{ textTransform: "uppercase", fontWeight: 600 }}>
+                    {selectedPaymentReceipt.payment_method}
+                  </span>
+                </div>
+                <div>
+                  <span style={{ color: "var(--muted)", display: "block", fontSize: "0.75rem" }}>
+                    Amount Collected
+                  </span>
+                  <strong style={{ color: "#059669", fontSize: "1.1rem" }}>
+                    {formatCurrency(Number(selectedPaymentReceipt.amount))}
+                  </strong>
+                </div>
+              </div>
+
+              {/* Allocations Breakdown */}
+              {selectedPaymentReceipt.allocations &&
+                selectedPaymentReceipt.allocations.length > 0 && (
+                  <div style={{ borderTop: "1px solid var(--border)", paddingTop: "0.75rem" }}>
+                    <div
+                      style={{
+                        fontSize: "0.75rem",
+                        fontWeight: 600,
+                        color: "var(--muted)",
+                        marginBottom: "0.35rem",
+                      }}
+                    >
+                      Invoice Allocations
+                    </div>
+                    {selectedPaymentReceipt.allocations.map((alloc: any, idx: number) => (
+                      <div
+                        key={idx}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          fontSize: "0.8rem",
+                          padding: "0.25rem 0",
+                        }}
+                      >
+                        <span>
+                          Invoice #{alloc.invoice_number || alloc.invoice_id?.slice(0, 8)}
+                        </span>
+                        <strong>
+                          {formatCurrency(Number(alloc.amount || alloc.allocated_amount))}
+                        </strong>
+                      </div>
+                    ))}
+                  </div>
+                )}
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => window.print()}
+              >
+                🖨️ Print Receipt
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => setSelectedPaymentReceipt(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Record Offline Payment Modal */}
+      <Modal
+        isOpen={isRecordPaymentOpen}
+        onClose={() => setIsRecordPaymentOpen(false)}
+        title="💳 Record Offline Collection / Payment"
+      >
+        <form onSubmit={handleRecordPaymentSubmit} noValidate>
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            {recordPaymentError && (
+              <div
+                style={{
+                  padding: "0.6rem 0.8rem",
+                  background: "#fee2e2",
+                  border: "1px solid #f87171",
+                  borderRadius: "6px",
+                  color: "#b91c1c",
+                  fontSize: "0.85rem",
+                }}
+              >
+                {recordPaymentError}
+              </div>
+            )}
+
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.8rem",
+                  fontWeight: 600,
+                  marginBottom: "0.3rem",
+                }}
+              >
+                Target Residential Unit <span style={{ color: "#dc2626" }}>*</span>
+              </label>
+              <select
+                className="select-field"
+                value={paymentForm.unit_id}
+                onChange={(e) =>
+                  setPaymentForm((prev) => ({ ...prev, unit_id: e.target.value }))
+                }
+                style={{ width: "100%" }}
+                required
+              >
+                <option value="">Select a unit...</option>
+                {units?.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    Unit {u.unit_number} {u.unit_type ? `(${u.unit_type})` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
+                    marginBottom: "0.3rem",
+                  }}
+                >
+                  Amount (₹) <span style={{ color: "#dc2626" }}>*</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="1"
+                  className="input-field"
+                  value={paymentForm.amount || ""}
+                  onChange={(e) =>
+                    setPaymentForm((prev) => ({
+                      ...prev,
+                      amount: Number(e.target.value),
+                    }))
+                  }
+                  placeholder="e.g. 2500"
+                  style={{ width: "100%" }}
+                  required
+                />
+              </div>
+
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
+                    marginBottom: "0.3rem",
+                  }}
+                >
+                  Payment Method <span style={{ color: "#dc2626" }}>*</span>
+                </label>
+                <select
+                  className="select-field"
+                  value={paymentForm.payment_method}
+                  onChange={(e) =>
+                    setPaymentForm((prev) => ({ ...prev, payment_method: e.target.value }))
+                  }
+                  style={{ width: "100%" }}
+                >
+                  <option value="upi">UPI / QR Code</option>
+                  <option value="neft">NEFT / RTGS / IMPS</option>
+                  <option value="cheque">Cheque</option>
+                  <option value="cash">Cash Collection</option>
+                  <option value="card">Card POS</option>
+                  <option value="bank_transfer">Direct Bank Transfer</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.8rem",
+                  fontWeight: 600,
+                  marginBottom: "0.3rem",
+                }}
+              >
+                Allocate to Specific Invoice (Optional)
+              </label>
+              <select
+                className="select-field"
+                value={paymentForm.invoice_id}
+                onChange={(e) =>
+                  setPaymentForm((prev) => ({ ...prev, invoice_id: e.target.value }))
+                }
+                style={{ width: "100%" }}
+              >
+                <option value="">Auto-allocate or Unallocated Credit</option>
+                {invoices
+                  ?.filter((i) => !paymentForm.unit_id || i.unit_id === paymentForm.unit_id)
+                  .map((i) => (
+                    <option key={i.id} value={i.id}>
+                      {i.invoice_number} (Due: {formatCurrency(Number(i.balance_due))})
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.8rem",
+                  fontWeight: 600,
+                  marginBottom: "0.3rem",
+                }}
+              >
+                Remarks / Cheque / UTR # (Optional)
+              </label>
+              <input
+                type="text"
+                className="input-field"
+                value={paymentForm.remarks}
+                onChange={(e) =>
+                  setPaymentForm((prev) => ({ ...prev, remarks: e.target.value }))
+                }
+                placeholder="e.g. Cheque #49281 HDFC Bank or UTR 328910"
+                style={{ width: "100%" }}
+              />
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "0.5rem",
+                marginTop: "0.5rem",
+              }}
+            >
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setIsRecordPaymentOpen(false)}
+                disabled={isRecordingPayment}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={
+                  isRecordingPayment ||
+                  !paymentForm.unit_id ||
+                  Number(paymentForm.amount) <= 0
+                }
+              >
+                {isRecordingPayment ? "Recording..." : "💾 Record Payment"}
+              </button>
+            </div>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Add Charge Head Modal */}
+      <Modal
+        isOpen={isAddChargeHeadOpen}
+        onClose={() => setIsAddChargeHeadOpen(false)}
+        title="➕ Add Charge Head Tariff"
+      >
+        <form onSubmit={handleCreateChargeHeadSubmit} noValidate>
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            {chargeHeadError && (
+              <div
+                style={{
+                  padding: "0.6rem 0.8rem",
+                  background: "#fee2e2",
+                  border: "1px solid #f87171",
+                  borderRadius: "6px",
+                  color: "#b91c1c",
+                  fontSize: "0.85rem",
+                }}
+              >
+                {chargeHeadError}
+              </div>
+            )}
+
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.8rem",
+                  fontWeight: 600,
+                  marginBottom: "0.3rem",
+                }}
+              >
+                Charge Head Name <span style={{ color: "#dc2626" }}>*</span>
+              </label>
+              <input
+                type="text"
+                className="input-field"
+                value={chargeHeadForm.name}
+                onChange={(e) =>
+                  setChargeHeadForm((prev) => ({ ...prev, name: e.target.value }))
+                }
+                placeholder="e.g. Diesel Generator Backup"
+                style={{ width: "100%" }}
+                required
+              />
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
+                    marginBottom: "0.3rem",
+                  }}
+                >
+                  Code <span style={{ color: "#dc2626" }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={chargeHeadForm.code}
+                  onChange={(e) =>
+                    setChargeHeadForm((prev) => ({
+                      ...prev,
+                      code: e.target.value.toUpperCase(),
+                    }))
+                  }
+                  placeholder="e.g. DG_MAINT"
+                  style={{ width: "100%" }}
+                  required
+                />
+              </div>
+
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
+                    marginBottom: "0.3rem",
+                  }}
+                >
+                  Charge Type <span style={{ color: "#dc2626" }}>*</span>
+                </label>
+                <select
+                  className="select-field"
+                  value={chargeHeadForm.charge_type}
+                  onChange={(e) =>
+                    setChargeHeadForm((prev) => ({ ...prev, charge_type: e.target.value }))
+                  }
+                  style={{ width: "100%" }}
+                >
+                  <option value="maintenance">Maintenance</option>
+                  <option value="utility">Utility</option>
+                  <option value="penalty">Penalty</option>
+                  <option value="event">Event / Facility</option>
+                  <option value="parking">Parking</option>
+                  <option value="fine">Fine</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.8rem",
+                  fontWeight: 600,
+                  marginBottom: "0.3rem",
+                }}
+              >
+                Default Rate (₹) <span style={{ color: "#dc2626" }}>*</span>
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                className="input-field"
+                value={chargeHeadForm.default_amount}
+                onChange={(e) =>
+                  setChargeHeadForm((prev) => ({
+                    ...prev,
+                    default_amount: Number(e.target.value),
+                  }))
+                }
+                style={{ width: "100%" }}
+                required
+              />
+            </div>
+
+            <div>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  fontSize: "0.85rem",
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={chargeHeadForm.is_active}
+                  onChange={(e) =>
+                    setChargeHeadForm((prev) => ({ ...prev, is_active: e.target.checked }))
+                  }
+                />
+                <span>Active (available for new invoices and assessments)</span>
+              </label>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "0.5rem",
+                marginTop: "0.5rem",
+              }}
+            >
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setIsAddChargeHeadOpen(false)}
+                disabled={isSubmittingChargeHead}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={
+                  isSubmittingChargeHead ||
+                  !chargeHeadForm.name.trim() ||
+                  !chargeHeadForm.code.trim()
+                }
+              >
+                {isSubmittingChargeHead ? "Creating..." : "➕ Create Charge Head"}
+              </button>
+            </div>
+          </div>
+        </form>
       </Modal>
     </div>
   );

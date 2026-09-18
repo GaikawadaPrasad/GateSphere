@@ -42,7 +42,7 @@ from app.modules.billing.repository import (
     RuleRepository,
 )
 from app.modules.billing.schemas import ALLOWED
-from app.modules.communities.models import Unit
+from app.modules.communities.models import Tower, Unit
 from app.modules.notifications import events as notif_events
 from app.modules.residents.access import UnitScopedAccess
 from app.modules.residents.models import ResidentProfile, UnitOccupancy
@@ -230,6 +230,7 @@ class BillingService(UnitScopedAccess):
             issue_date=payload.issue_date or date.today(),
             due_date=payload.due_date,
             discount=_money(payload.discount),
+            late_fee=Decimal("0.00"),
             status="draft",
         )
         subtotal = Decimal("0")
@@ -252,7 +253,8 @@ class BillingService(UnitScopedAccess):
         tax = _money(taxable_base * rule.tax_percent / Decimal("100"))
         inv.subtotal = _money(subtotal)
         inv.tax = tax
-        inv.total_amount = _money(subtotal - inv.discount + tax)
+        late_fee = inv.late_fee or Decimal("0.00")
+        inv.total_amount = _money(subtotal - inv.discount + tax + late_fee)
         inv.amount_paid = Decimal("0.00")
         inv.balance_due = inv.total_amount
         await self.invoices.add(inv)
@@ -357,15 +359,104 @@ class BillingService(UnitScopedAccess):
         await self._audit("invoice.cancel", inv.community_id, "invoice", inv.id)
         return await self.get_invoice(inv.id)
 
+    async def assess_penalty(self, payload: schemas.PenaltyCreate) -> MaintenanceInvoice:
+        if await self.is_unit_restricted():
+            raise ForbiddenError("Only community staff can assess penalties", code="STAFF_ONLY")
+        unit = await self._unit_in_scope(payload.unit_id)
+        now = datetime.now(UTC)
+        today = date.today()
+        seq = await self.invoices.next_sequence(unit.community_id)
+        inv_number = f"INV-PEN-{now.year}-{seq:05d}"
+        penalty_amount = _money(payload.amount)
+        due = payload.due_date or today
+
+        billed_user_id = await self._primary_billed_user(unit.id)
+
+        item = InvoiceItem(
+            description=f"Penalty: {payload.reason}"
+            + (f" (Ref: {payload.violation_reference})" if payload.violation_reference else ""),
+            quantity=Decimal("1"),
+            unit_rate=penalty_amount,
+            amount=penalty_amount,
+            taxable=False,
+        )
+
+        inv = MaintenanceInvoice(
+            community_id=unit.community_id,
+            unit_id=unit.id,
+            billed_to_user_id=billed_user_id,
+            invoice_number=inv_number,
+            billing_period_start=today,
+            billing_period_end=today,
+            issue_date=today,
+            due_date=due,
+            subtotal=penalty_amount,
+            discount=Decimal("0.00"),
+            late_fee=Decimal("0.00"),
+            tax=Decimal("0.00"),
+            total_amount=penalty_amount,
+            amount_paid=Decimal("0.00"),
+            balance_due=penalty_amount,
+            status="posted",
+            items=[item],
+        )
+        await self.invoices.add(inv)
+        await self._ledger(
+            unit.community_id,
+            unit.id,
+            billed_user_id,
+            "debit",
+            penalty_amount,
+            source_type="penalty",
+            source_id=inv.id,
+            narration=f"Penalty assessed: {payload.reason}",
+        )
+        await self.db.flush()
+        await self._audit(
+            "penalty.assess",
+            unit.community_id,
+            "invoice",
+            inv.id,
+            new={
+                "invoice_number": inv.invoice_number,
+                "amount": str(penalty_amount),
+                "reason": payload.reason,
+            },
+        )
+        if billed_user_id:
+            await notif_events.emit(
+                self.db,
+                self.scope,
+                self.actor,
+                self.ctx,
+                recipient_user_id=billed_user_id,
+                community_id=unit.community_id,
+                notification_type="billing.penalty_assessed",
+                title="Penalty Notice",
+                message=f"A penalty of {penalty_amount} has been assessed for {payload.reason}.",
+                reference_type="invoice",
+                reference_id=inv.id,
+                channels=["in_app", "email", "sms", "whatsapp", "push"],
+            )
+        return await self.get_invoice(inv.id)
+
     # -- payments --------------------------------------- #
     async def record_payment(self, payload: schemas.PaymentCreate) -> Payment:
         cid = self._one_community(payload.community_id)
         _enum("payment_method", payload.payment_method)
+        rule = await self._rule(cid)
         alloc_total = sum((a.amount for a in payload.allocations), Decimal("0"))
-        if _money(alloc_total) != _money(payload.amount):
+        excess = _money(payload.amount) - _money(alloc_total)
+
+        if excess < Decimal("0"):
+            raise BusinessRuleError(
+                "Allocations exceed total payment amount", code="ALLOCATION_MISMATCH"
+            )
+        if excess > Decimal("0") and not rule.allow_advance_payment:
             raise BusinessRuleError(
                 "Allocations must sum to the payment amount", code="ALLOCATION_MISMATCH"
             )
+
         now = datetime.now(UTC)
         # a unit-restricted caller (plain resident) may only record their own payment —
         # never attribute one to another user.
@@ -390,11 +481,14 @@ class BillingService(UnitScopedAccess):
         )
         await self.payments.add(payment)
 
+        target_unit_id: uuid.UUID | None = payload.unit_id
         for line in payload.allocations:
             inv = await self.invoices.get(line.invoice_id)
             if inv is None or inv.community_id != cid:
                 raise NotFoundError("Invoice not found")
             await self._assert_unit_visible(inv.unit_id)
+            if not target_unit_id:
+                target_unit_id = inv.unit_id
             if inv.status not in ("posted", "partially_paid", "overdue"):
                 raise BusinessRuleError(
                     f"Invoice {inv.invoice_number} is '{inv.status}'", code="INVOICE_NOT_PAYABLE"
@@ -421,6 +515,22 @@ class BillingService(UnitScopedAccess):
                 source_id=payment.id,
                 narration=f"Payment {payment.payment_reference} -> {inv.invoice_number}",
             )
+
+        if excess > Decimal("0"):
+            # Post surplus as unallocated advance payment credit on the unit's ledger
+            if target_unit_id:
+                await self._assert_unit_visible(target_unit_id)
+            await self._ledger(
+                cid,
+                target_unit_id,
+                payment.payer_user_id,
+                "credit",
+                excess,
+                source_type="advance_payment",
+                source_id=payment.id,
+                narration=f"Advance payment surplus {payment.payment_reference}",
+            )
+
         await self.db.flush()
         await self._audit(
             "payment.record",
@@ -431,12 +541,137 @@ class BillingService(UnitScopedAccess):
         )
         return await self.get_payment(payment.id)
 
+    async def _enrich_payments(self, payments: list[Payment]) -> list[Payment]:
+        if not payments:
+            return payments
+
+        payer_user_ids = {p.payer_user_id for p in payments if p.payer_user_id is not None}
+        invoice_ids = {
+            alloc.invoice_id
+            for p in payments
+            for alloc in (p.allocations or [])
+            if alloc.invoice_id is not None
+        }
+
+        # 1. Bulk load users
+        users_map: dict[uuid.UUID, User] = {}
+        if payer_user_ids:
+            res_users = await self.db.execute(select(User).where(User.id.in_(payer_user_ids)))
+            users_map = {u.id: u for u in res_users.scalars().all()}
+
+        # 2. Bulk load invoices
+        invoices_map: dict[uuid.UUID, MaintenanceInvoice] = {}
+        if invoice_ids:
+            res_invs = await self.db.execute(
+                select(MaintenanceInvoice).where(MaintenanceInvoice.id.in_(invoice_ids))
+            )
+            invoices_map = {inv.id: inv for inv in res_invs.scalars().all()}
+
+        # 3. Bulk load resident profiles and unit occupancies for payers
+        profiles_by_user: dict[uuid.UUID, uuid.UUID] = {}
+        occupancies_by_profile: dict[uuid.UUID, list[UnitOccupancy]] = {}
+        if payer_user_ids:
+            res_profiles = await self.db.execute(
+                select(ResidentProfile).where(ResidentProfile.user_id.in_(payer_user_ids))
+            )
+            profiles = res_profiles.scalars().all()
+            for prof in profiles:
+                profiles_by_user[prof.user_id] = prof.id
+
+            if profiles_by_user:
+                res_occs = await self.db.execute(
+                    select(UnitOccupancy).where(
+                        UnitOccupancy.resident_profile_id.in_(profiles_by_user.values()),
+                        UnitOccupancy.is_active.is_(True),
+                    )
+                )
+                for occ in res_occs.scalars().all():
+                    occupancies_by_profile.setdefault(occ.resident_profile_id, []).append(occ)
+
+        # 4. Collect all unit IDs from invoices and occupancies
+        unit_ids: set[uuid.UUID] = {
+            inv.unit_id for inv in invoices_map.values() if inv.unit_id is not None
+        }
+        for occs in occupancies_by_profile.values():
+            for occ in occs:
+                if occ.unit_id:
+                    unit_ids.add(occ.unit_id)
+
+        # 5. Bulk load units and joined towers
+        units_map: dict[uuid.UUID, tuple[Unit, Tower | None]] = {}
+        if unit_ids:
+            stmt_units = (
+                select(Unit, Tower)
+                .outerjoin(Tower, Unit.tower_id == Tower.id)
+                .where(Unit.id.in_(unit_ids))
+            )
+            res_u = await self.db.execute(stmt_units)
+            for unit_obj, tower_obj in res_u.all():
+                units_map[unit_obj.id] = (unit_obj, tower_obj)
+
+        # 6. Enrich each payment object
+        for pay in payments:
+            user = users_map.get(pay.payer_user_id) if pay.payer_user_id else None
+            payer_name = user.full_name if user else None
+            payer_email = user.email if user else None
+            payer_phone = user.phone if user else None
+
+            target_unit_id: uuid.UUID | None = None
+            invoice_num: str | None = None
+            resident_role: str | None = None
+
+            # Check from allocations -> invoice
+            if pay.allocations:
+                for alloc in pay.allocations:
+                    inv = invoices_map.get(alloc.invoice_id)
+                    if inv:
+                        if not invoice_num:
+                            invoice_num = inv.invoice_number
+                        if not target_unit_id and inv.unit_id:
+                            target_unit_id = inv.unit_id
+
+            # If no unit from allocations, fallback to user's primary occupancy
+            if pay.payer_user_id and pay.payer_user_id in profiles_by_user:
+                prof_id = profiles_by_user[pay.payer_user_id]
+                occs = occupancies_by_profile.get(prof_id, [])
+                if occs:
+                    primary_occ = next((o for o in occs if o.is_primary), occs[0])
+                    if not target_unit_id:
+                        target_unit_id = primary_occ.unit_id
+                    resident_role = primary_occ.occupancy_role
+
+            unit_number: str | None = None
+            tower_name: str | None = None
+            if target_unit_id and target_unit_id in units_map:
+                u_obj, t_obj = units_map[target_unit_id]
+                unit_number = u_obj.unit_number
+                tower_name = t_obj.name if t_obj else None
+
+            formatted_res_type = None
+            if resident_role:
+                formatted_res_type = resident_role.replace("_", " ").title()
+                if "Owner" in formatted_res_type:
+                    formatted_res_type = "Owner"
+                elif "Tenant" in formatted_res_type:
+                    formatted_res_type = "Tenant"
+
+            pay.payer_name = payer_name
+            pay.payer_email = payer_email
+            pay.payer_phone = payer_phone
+            pay.unit_number = unit_number
+            pay.tower_name = tower_name
+            pay.resident_type = formatted_res_type
+            pay.invoice_number = invoice_num
+
+        return payments
+
     async def get_payment(self, payment_id: uuid.UUID) -> Payment:
         obj = await self.payments.get(payment_id)
         if obj is None:
             raise NotFoundError("Payment not found")
         if (await self.is_unit_restricted()) and obj.payer_user_id != self.actor.id:
             raise NotFoundError("Payment not found")
+        await self._enrich_payments([obj])
         return obj
 
     async def get_receipt(self, payment_id: uuid.UUID) -> dict:
@@ -527,9 +762,10 @@ class BillingService(UnitScopedAccess):
             stmt = stmt.where(Payment.community_id == community_id)
         stmt = stmt.order_by(Payment.paid_at.desc())
         stmt = await self._scope_owned(stmt, Payment.payer_user_id)
-        return await self.payments.list(
-            offset=offset, limit=limit, extra=stmt
-        ), await self.payments.count(extra=stmt)
+        items = await self.payments.list(offset=offset, limit=limit, extra=stmt)
+        total = await self.payments.count(extra=stmt)
+        await self._enrich_payments(items)
+        return items, total
 
     # -- ledger --------------------------------------- #
     async def unit_ledger(self, unit_id: uuid.UUID, *, offset: int, limit: int):

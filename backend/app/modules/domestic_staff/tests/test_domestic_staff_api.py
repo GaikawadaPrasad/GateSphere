@@ -172,3 +172,21 @@ def test_domestic_staff_self_service_endpoints(as_role):
 
     visits = staff_client.get(f"{P}/me/visits")
     assert visits.status_code == 200, visits.text
+
+
+def test_community_admin_deletes_staff(as_role):
+    admin = as_role("community_admin")
+
+    # Create a staff member
+    r = admin.post(P, json={"full_name": "Temp Cleaner", "staff_type": "maid", "phone": _phone()})
+    assert r.status_code == 201, r.text
+    staff_id = r.json()["data"]["id"]
+
+    # Verify it exists
+    assert admin.get(f"{P}/{staff_id}").status_code == 200
+
+    # Delete it -> 204
+    assert admin.delete(f"{P}/{staff_id}").status_code == 204
+
+    # Confirm it's gone -> 404
+    assert admin.get(f"{P}/{staff_id}").status_code == 404

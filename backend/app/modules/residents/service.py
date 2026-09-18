@@ -434,9 +434,153 @@ class ResidentService(UnitScopedAccess):
         self.scope.require(obj.community_id)
         await self._assert_unit_visible(obj.unit_id)
         cid = obj.community_id
-        await self.db.delete(obj)
+        await self.family.delete(obj)
         await self.db.flush()
         await self._audit("family.delete", cid, "family_member", member_id)
+
+    def _family_pass_credentials(self, member: FamilyMember) -> tuple[str, str, str]:
+        """Generate deterministic permanent gate pass token, 6-digit PIN, and QR payload for a family member."""
+        import hashlib
+        import json
+
+        raw_key = f"gse:family:{member.id}:{member.community_id}"
+        h = hashlib.sha256(raw_key.encode()).hexdigest()
+        # 6-digit numeric PIN
+        pin = f"{int(h[:8], 16) % 900000 + 100000}"
+        # Permanent Pass Token
+        pass_token = f"GSE-FAM-{str(member.id).replace('-', '')[:10].upper()}"
+        # Standard QR string payload
+        qr_payload = f"GSE:FAMILY:{member.id}:{pin}"
+        return pass_token, pin, qr_payload
+
+    async def get_family_pass(self, member_id: uuid.UUID) -> schemas.FamilyPassRead:
+        obj = await self.family.get(member_id)
+        if obj is None:
+            raise NotFoundError("Family member not found")
+        self.scope.require(obj.community_id)
+        await self._assert_unit_visible(obj.unit_id)
+
+        unit = await self.db.get(Unit, obj.unit_id)
+        unit_num = unit.unit_number if unit else "Unit"
+        pass_token, pin, qr_payload = self._family_pass_credentials(obj)
+
+        return schemas.FamilyPassRead(
+            member_id=obj.id,
+            community_id=obj.community_id,
+            unit_id=obj.unit_id,
+            unit_number=unit_num,
+            full_name=obj.full_name,
+            relationship=obj.relationship_type,
+            phone=obj.phone,
+            access_enabled=obj.access_enabled,
+            pass_token=pass_token,
+            pin=pin,
+            qr_payload=qr_payload,
+        )
+
+    async def verify_family_pass(
+        self, payload: schemas.FamilyPassVerifyIn
+    ) -> schemas.FamilyPassVerifyOut:
+        """Verify a permanent family member QR code or PIN at the gate and log gate event."""
+        import json
+        from app.modules.gate.models import GateEvent
+
+        code = payload.pass_code.strip()
+        matched_member: FamilyMember | None = None
+
+        # 1. Check if GSE:FAMILY:<id>:<pin> format
+        if code.startswith("GSE:FAMILY:"):
+            parts = code.split(":")
+            if len(parts) >= 3:
+                try:
+                    f_id = uuid.UUID(parts[2])
+                    m = await self.family.get(f_id)
+                    if m is not None:
+                        matched_member = m
+                except (ValueError, TypeError):
+                    pass
+
+        # 2. Check by UUID directly
+        if matched_member is None:
+            try:
+                f_id = uuid.UUID(code)
+                m = await self.family.get(f_id)
+                if m is not None:
+                    matched_member = m
+            except (ValueError, TypeError):
+                pass
+
+        # 3. Check by token or 6-digit PIN across active community scope
+        if matched_member is None:
+            stmt = select(FamilyMember)
+            if not self.scope.is_global and self.scope.community_ids:
+                stmt = stmt.where(FamilyMember.community_id.in_(self.scope.community_ids))
+            all_candidates = (await self.db.scalars(stmt)).all()
+
+            for cand in all_candidates:
+                p_tok, p_pin, p_qr = self._family_pass_credentials(cand)
+                if (
+                    code.upper() == p_tok.upper()
+                    or code == p_pin
+                    or code == p_qr
+                    or (cand.phone and code in (cand.phone, cand.phone.replace("+91", "")))
+                ):
+                    matched_member = cand
+                    break
+
+        if matched_member is None:
+            raise NotFoundError("Invalid family pass code or member not found")
+
+        self.scope.require(matched_member.community_id)
+
+        if not matched_member.access_enabled:
+            raise BusinessRuleError(
+                f"Gate access is currently disabled for {matched_member.full_name}. Resident must enable access.",
+                code="ACCESS_DISABLED",
+            )
+
+        unit = await self.db.get(Unit, matched_member.unit_id)
+        unit_num = unit.unit_number if unit else "Unit"
+
+        # Log Gate Event (FR-05)
+        event_obj = GateEvent(
+            community_id=matched_member.community_id,
+            gate_id=payload.gate_id,
+            actor_user_id=self.actor.id,
+            event_type="visitor_in",
+            reference_type="family_member",
+            reference_id=matched_member.id,
+            occurred_at=datetime.now(UTC),
+            event_metadata={
+                "member_name": matched_member.full_name,
+                "relationship": matched_member.relationship_type,
+                "unit_number": unit_num,
+                "unit_id": str(matched_member.unit_id),
+                "pass_type": "permanent_family_pass",
+            },
+        )
+        self.db.add(event_obj)
+        await self.db.flush()
+
+        await self._audit(
+            "gate.family_pass_verified",
+            matched_member.community_id,
+            "family_member",
+            matched_member.id,
+            new={"event_id": str(event_obj.id)},
+        )
+
+        return schemas.FamilyPassVerifyOut(
+            success=True,
+            member_id=matched_member.id,
+            full_name=matched_member.full_name,
+            relationship=matched_member.relationship_type,
+            unit_number=unit_num,
+            unit_id=matched_member.unit_id,
+            access_enabled=matched_member.access_enabled,
+            event_id=str(event_obj.id),
+            message=f"Pre-Approved Family Member Entry Permitted for {matched_member.full_name} ({unit_num})",
+        )
 
     # -- emergency contacts ------------------------------------ #
     async def list_contacts(self, *, profile_id: uuid.UUID, offset: int, limit: int):
@@ -470,10 +614,20 @@ class ResidentService(UnitScopedAccess):
         obj = await self.contacts.get(contact_id)
         if obj is None:
             raise NotFoundError("Emergency contact not found")
+        self.scope.require(obj.community_id)
+        await self.get_profile(obj.resident_profile_id)
         cid = obj.community_id
         await self.db.delete(obj)
         await self.db.flush()
         await self._audit("contact.delete", cid, "emergency_contact", contact_id)
+
+    # -- profile deletion ---------------------------------- #
+    async def delete_profile(self, profile_id: uuid.UUID) -> None:
+        obj = await self.get_profile(profile_id)
+        cid = obj.community_id
+        await self.db.delete(obj)
+        await self.db.flush()
+        await self._audit("profile.delete", cid, "resident_profile", profile_id)
 
     # -- move records ------------------------------------- #
     async def list_moves(
@@ -749,6 +903,16 @@ class ResidentService(UnitScopedAccess):
             )
         ).all()
 
+        enriched_family: list[schemas.FamilyMemberRead] = []
+        for f in family_members:
+            p_tok, p_pin, _ = self._family_pass_credentials(f)
+            u_num = next((o.unit_number for o in occ_details if o.unit_id == f.unit_id), None)
+            f_read = schemas.FamilyMemberRead.model_validate(f)
+            f_read.pass_token = p_tok
+            f_read.pin = p_pin
+            f_read.unit_number = u_num
+            enriched_family.append(f_read)
+
         return schemas.ResidentMeRead(
             id=profile.id,
             community_id=profile.community_id,
@@ -764,7 +928,7 @@ class ResidentService(UnitScopedAccess):
             created_at=profile.created_at,
             updated_at=profile.updated_at,
             occupancies=occ_details,
-            family_members=[schemas.FamilyMemberRead.model_validate(f) for f in family_members],
+            family_members=enriched_family,
             emergency_contacts=[
                 schemas.EmergencyContactRead.model_validate(e) for e in emergency_contacts
             ],

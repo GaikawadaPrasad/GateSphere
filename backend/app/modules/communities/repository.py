@@ -30,7 +30,7 @@ class CommunityRepository:
     async def _populate_admin_info(self, comms: list[Community]) -> list[Community]:
         if not comms:
             return comms
-        from app.modules.users.models import User, UserRole, Role
+        from app.modules.users.models import Role, User, UserRole
         comm_map = {c.id: c for c in comms}
         stmt = (
             select(UserRole.community_id, User.email, User.full_name)
@@ -168,6 +168,11 @@ class TowerRepository(AsyncTenantRepository[Tower]):
             select(Tower).where(Tower.community_id == community_id, Tower.name == name)
         )
 
+    async def by_code(self, community_id: uuid.UUID, code: str) -> Tower | None:
+        return await self.db.scalar(
+            select(Tower).where(Tower.community_id == community_id, Tower.code == code)
+        )
+
     async def list_for_community(
         self, community_id: uuid.UUID, *, offset: int, limit: int
     ) -> tuple[list[Tower], int]:
@@ -250,3 +255,25 @@ class UnitRepository(AsyncTenantRepository[Unit]):
                 Unit.unit_number == number,
             )
         )
+
+    async def counts_by_floors(self, floor_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
+        if not floor_ids:
+            return {}
+        stmt = (
+            select(Unit.floor_id, func.count(Unit.id))
+            .where(Unit.floor_id.in_(floor_ids))
+            .group_by(Unit.floor_id)
+        )
+        rows = await self.db.execute(stmt)
+        return {r[0]: int(r[1]) for r in rows.all()}
+
+    async def counts_by_towers(self, tower_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
+        if not tower_ids:
+            return {}
+        stmt = (
+            select(Unit.tower_id, func.count(Unit.id))
+            .where(Unit.tower_id.in_(tower_ids))
+            .group_by(Unit.tower_id)
+        )
+        rows = await self.db.execute(stmt)
+        return {r[0]: int(r[1]) for r in rows.all()}

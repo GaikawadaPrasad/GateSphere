@@ -49,7 +49,7 @@ export function useStaffAttendance(params?: {
   return useQuery({
     queryKey: ["staff-attendance", params],
     queryFn: () => domesticStaffApi.attendance(params),
-    staleTime: 15_000,
+    staleTime: 60_000,
   });
 }
 
@@ -117,3 +117,13 @@ export function useEndStaffAssignment() {
   });
 }
 
+export function useDeleteStaff() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (staffId: string) => domesticStaffApi.delete(staffId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["staff"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboards"] });
+    },
+  });
+}

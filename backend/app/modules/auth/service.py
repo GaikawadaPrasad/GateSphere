@@ -16,12 +16,14 @@ from fastapi import Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.context import RequestContext
-from app.core.errors import AuthError
+from app.core.errors import AuthError, BusinessRuleError, RateLimitedError
+from app.core.login_lockout import clear_failures, lock_remaining, record_failure
 from app.core.security import (
     create_session,
     destroy_session,
     hash_password,
     needs_rehash,
+    revoke_all_user_sessions_async,
     user_permissions_async,
     verify_password,
 )
@@ -45,7 +47,11 @@ async def resolve_login_role(
     """
     if user.is_superadmin:
         return "super_admin", None
-    grants = await repo.role_grants(user.id)
+    roles_loaded = "roles" in user.__dict__
+    if roles_loaded and user.roles is not None:
+        grants = [(r.role.slug, r.community_id) for r in user.roles if r.role]
+    else:
+        grants = await repo.role_grants(user.id)
     if not grants:
         raise AuthError("This account has no role grants", code="NO_ROLE")
     if requested:
@@ -71,11 +77,16 @@ class AuthService:
     async def _serialize(
         self, user: User, *, role_slug: str | None = None, session_bucket: str | None = None
     ) -> CurrentUser:
-        cids = await self.repo.community_ids(user.id)
+        roles_loaded = "roles" in user.__dict__
+        if roles_loaded and user.roles is not None:
+            cids = [r.community_id for r in user.roles if r.community_id is not None]
+        else:
+            cids = await self.repo.community_ids(user.id)
         return CurrentUser(
             id=str(user.id),
             email=user.email,
             full_name=user.full_name,
+            phone=user.phone,
             is_superadmin=user.is_superadmin,
             permissions=sorted(await user_permissions_async(self.db, user)),
             community_ids=sorted({str(c) for c in cids}),
@@ -87,6 +98,13 @@ class AuthService:
     async def login(
         self, request: Request, response: Response, *, email: str, password: str, role: str | None
     ) -> CurrentUser:
+        locked_for = lock_remaining(email)
+        if locked_for:
+            raise RateLimitedError(
+                "Account temporarily locked after repeated failed logins — try again shortly.",
+                code="ACCOUNT_LOCKED",
+                retry_after=locked_for,
+            )
         user = await self.repo.user_by_email(email)
         if not user or not user.is_active or not verify_password(password, user.password_hash):
             # Failed logins are audited (FR-01) in their own transaction — the request
@@ -103,7 +121,17 @@ class AuthService:
                     ctx=RequestContext.from_request(request),
                 )
                 await audit_db.commit()
+            ttl = record_failure(email)
+            if ttl:
+                raise RateLimitedError(
+                    "Account temporarily locked after repeated failed logins — "
+                    "try again shortly.",
+                    code="ACCOUNT_LOCKED",
+                    retry_after=ttl,
+                )
             raise AuthError("Invalid email or password", code="INVALID_CREDENTIALS")
+
+        clear_failures(email)
 
         if needs_rehash(user.password_hash):
             user.password_hash = hash_password(password)
@@ -146,4 +174,41 @@ class AuthService:
             user,
             role_slug=getattr(request.state, "session_role", None),
             session_bucket=getattr(request.state, "session_bucket", None),
+        )
+
+    async def update_me(self, user: User, *, full_name: str | None, phone: str | None) -> User:
+        if full_name is not None:
+            user.full_name = full_name
+        if phone is not None:
+            user.phone = phone
+        await self.db.flush()
+        return user
+
+    async def change_password(
+        self,
+        request: Request,
+        response: Response,
+        user: User,
+        *,
+        current_password: str,
+        new_password: str,
+    ) -> None:
+        if not verify_password(current_password, user.password_hash):
+            raise AuthError("Current password incorrect", code="INVALID_CREDENTIALS")
+        if current_password == new_password:
+            raise BusinessRuleError(
+                "New password must be different from current password",
+                code="SAME_PASSWORD",
+            )
+        user.password_hash = hash_password(new_password)
+        await revoke_all_user_sessions_async(self.db, user.id)
+        await record_audit_async(
+            self.db,
+            module="auth",
+            action="password.changed",
+            actor=user,
+            entity_type="user",
+            entity_id=str(user.id),
+            ctx=RequestContext.from_request(request),
+            role_slug=getattr(request.state, "session_role", None),
         )

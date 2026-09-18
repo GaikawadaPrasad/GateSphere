@@ -13,7 +13,7 @@ from app.core.responses import Response as Envelope
 from app.core.responses import ok
 from app.core.security import require_auth_async
 from app.db.session import get_async_db
-from app.modules.auth.schemas import CurrentUser, LoginRequest
+from app.modules.auth.schemas import CurrentUser, LoginRequest, PasswordChangeRequest, ProfileUpdateRequest
 from app.modules.auth.service import AuthService
 from app.modules.users.models import User
 
@@ -55,3 +55,32 @@ async def me(
     user: User = Depends(require_auth_async),
 ) -> dict:
     return ok(await svc.me(request, user))
+
+
+@router.patch("/me", response_model=Envelope[CurrentUser])
+async def update_me(
+    request: Request,
+    payload: ProfileUpdateRequest,
+    svc: AuthService = Depends(auth_service),
+    user: User = Depends(require_auth_async),
+) -> dict:
+    updated = await svc.update_me(user, full_name=payload.full_name, phone=payload.phone)
+    return ok(await svc.me(request, updated))
+
+
+@router.post("/password", response_model=Envelope[dict])
+async def change_password(
+    request: Request,
+    response: Response,
+    payload: PasswordChangeRequest,
+    svc: AuthService = Depends(auth_service),
+    user: User = Depends(require_auth_async),
+) -> dict:
+    await svc.change_password(
+        request,
+        response,
+        user,
+        current_password=payload.current_password,
+        new_password=payload.new_password,
+    )
+    return ok({"status": "password_changed"}, message="Password changed successfully")

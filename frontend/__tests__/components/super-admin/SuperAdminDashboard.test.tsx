@@ -6,11 +6,38 @@ import { CommunityTable, type CommunityWithMetrics } from "@/components/tables/C
 import { MetricsGrid } from "@/components/dashboard/MetricsGrid";
 import { CreateCommunityModal } from "@/components/super-admin/CreateCommunityModal";
 import type { SuperAdminDashboardMetrics } from "@/types/dashboards";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+const createTestQueryClient = () =>
+  new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+    },
+  });
+
+function renderWithClient(ui: React.ReactElement) {
+  const testQueryClient = createTestQueryClient();
+  return render(
+    <QueryClientProvider client={testQueryClient}>{ui}</QueryClientProvider>
+  );
+}
 
 // Mock QueryClient & hooks
 vi.mock("@/hooks/use-communities", () => ({
   useCreateCommunity: () => ({
     mutateAsync: vi.fn().mockResolvedValue({ id: "comm-1", name: "New Community" }),
+    isPending: false,
+  }),
+  useCreateTower: () => ({
+    mutateAsync: vi.fn().mockResolvedValue({ id: "twr-1", name: "Tower A" }),
+    isPending: false,
+  }),
+  useCreateFloor: () => ({
+    mutateAsync: vi.fn().mockResolvedValue({ id: "flr-1", floor_number: 1 }),
+    isPending: false,
+  }),
+  useCreateUnit: () => ({
+    mutateAsync: vi.fn().mockResolvedValue({ id: "unt-1", unit_number: "A-101" }),
     isPending: false,
   }),
 }));
@@ -103,7 +130,7 @@ describe("Super Admin Dashboard Components", () => {
 
   describe("CreateCommunityModal", () => {
     it("validates required fields before submission", async () => {
-      const { container } = render(
+      const { container } = renderWithClient(
         <CreateCommunityModal
           isOpen={true}
           onClose={vi.fn()}
@@ -118,6 +145,50 @@ describe("Super Admin Dashboard Components", () => {
 
       const errorMessages = await screen.findAllByText(/Community name is required/i);
       expect(errorMessages.length).toBeGreaterThan(0);
+    });
+
+    it("renders step indicator with Community, Towers, Floors, and Units steps", () => {
+      renderWithClient(
+        <CreateCommunityModal
+          isOpen={true}
+          onClose={vi.fn()}
+          initialName="Green Meadows"
+          initialCode="GM-01"
+        />
+      );
+
+      expect(screen.getByText(/1\. Community/i)).toBeInTheDocument();
+      expect(screen.getByText(/2\. Towers/i)).toBeInTheDocument();
+      expect(screen.getByText(/3\. Floors/i)).toBeInTheDocument();
+      expect(screen.getByText(/4\. Units/i)).toBeInTheDocument();
+    });
+  });
+
+  describe("Unit Number Auto-Generation Logic", () => {
+    it("correctly auto-generates unit numbers based on floor number and unit index", async () => {
+      const { generateUnitNumber } = await import("@/components/super-admin/CreateCommunityModal");
+      
+      // Floor 1 with 4 units -> 101, 102, 103, 104
+      expect(generateUnitNumber(1, 1)).toBe("101");
+      expect(generateUnitNumber(1, 2)).toBe("102");
+      expect(generateUnitNumber(1, 4)).toBe("104");
+
+      // Floor 2 with 4 units -> 201, 202, 203, 204
+      expect(generateUnitNumber(2, 1)).toBe("201");
+      expect(generateUnitNumber(2, 4)).toBe("204");
+
+      // Floor 11 with 4 units -> 1101, 1102, 1103, 1104
+      expect(generateUnitNumber(11, 1)).toBe("1101");
+      expect(generateUnitNumber(11, 4)).toBe("1104");
+
+      // Tower prefix style
+      expect(generateUnitNumber(1, 1, "87", "tower_prefix")).toBe("87-101");
+      expect(generateUnitNumber(11, 4, "TWR-A", "tower_prefix")).toBe("TWR-A-1104");
+
+      // Alphabetical style
+      expect(generateUnitNumber(1, 1, "", "alpha")).toBe("1A");
+      expect(generateUnitNumber(1, 2, "", "alpha")).toBe("1B");
+      expect(generateUnitNumber(11, 4, "", "alpha")).toBe("11D");
     });
   });
 });

@@ -54,6 +54,11 @@ def _parse(spec: str) -> tuple[int, int]:
 def classify(request: Request) -> str:
     path = request.url.path
     method = request.method
+    if path.endswith("/auth/me"):
+        # PATCH /auth/me is a profile update, not an auth action — use write bucket
+        if method not in _SAFE_METHODS:
+            return "write"
+        return "default"
     if path.startswith("/api/v1/auth/") or path.endswith("/login"):
         return "auth"
     if path.endswith(".csv") or "/export" in path or path.endswith("/receipt"):

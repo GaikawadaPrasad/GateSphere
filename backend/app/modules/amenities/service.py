@@ -11,7 +11,8 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, time
+from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,10 +38,12 @@ from app.modules.amenities.repository import (
 )
 from app.modules.amenities.schemas import ALLOWED
 from app.modules.audit.service import record_audit_async
+from app.modules.communities.models import Community
 from app.modules.notifications import events as notif_events
 from app.modules.residents.access import UnitScopedAccess
 from app.modules.residents.models import ResidentProfile, UnitOccupancy
 from app.modules.users.models import User
+from zoneinfo import ZoneInfo
 
 
 def _enum(field: str, value: str | None) -> None:
@@ -88,6 +91,14 @@ class AmenityService(UnitScopedAccess):
             "Specify a community", code="COMMUNITY_REQUIRED", fields={"community_id": "required"}
         )
 
+    async def _community_tz(self, community_id: uuid.UUID) -> ZoneInfo:
+        comm = await self.db.get(Community, community_id)
+        tz_str = getattr(comm, "timezone", "Asia/Kolkata") if comm else "Asia/Kolkata"
+        try:
+            return ZoneInfo(tz_str or "Asia/Kolkata")
+        except Exception:
+            return ZoneInfo("Asia/Kolkata")
+
     async def _amenity_in_scope(self, amenity_id: uuid.UUID) -> Amenity:
         obj = await self.amenities.get(amenity_id)
         if obj is None:
@@ -128,6 +139,30 @@ class AmenityService(UnitScopedAccess):
             raise ConflictError("That code exists", code="AMENITY_EXISTS")
         obj = Amenity(community_id=cid, **payload.model_dump())
         await self.amenities.add(obj)
+        # Auto-provision standard 2-hour slots (06:00–22:00) for every day of the week
+        _standard_slots = [
+            (time(6, 0), time(8, 0)),
+            (time(8, 0), time(10, 0)),
+            (time(10, 0), time(12, 0)),
+            (time(12, 0), time(14, 0)),
+            (time(14, 0), time(16, 0)),
+            (time(16, 0), time(18, 0)),
+            (time(18, 0), time(20, 0)),
+            (time(20, 0), time(22, 0)),
+        ]
+        for day in range(7):
+            for st, et in _standard_slots:
+                self.db.add(AmenitySlot(
+                    community_id=cid,
+                    amenity_id=obj.id,
+                    day_of_week=day,
+                    start_time=st,
+                    end_time=et,
+                    capacity=obj.capacity or 20,
+                    fee=Decimal("0"),
+                    is_active=True,
+                ))
+        await self.db.flush()
         await self._audit("amenity.create", cid, "amenity", obj.id)
         return obj
 
@@ -141,10 +176,26 @@ class AmenityService(UnitScopedAccess):
         await self._audit("amenity.update", obj.community_id, "amenity", obj.id, new=patch)
         return obj
 
+    async def delete_amenity(self, amenity_id: uuid.UUID) -> None:
+        obj = await self._amenity_in_scope(amenity_id)
+        active_bookings = await self.db.scalar(
+            select(AmenityBooking)
+            .where(AmenityBooking.amenity_id == amenity_id, AmenityBooking.status == "confirmed")
+            .limit(1)
+        )
+        if active_bookings is not None:
+            raise BusinessRuleError(
+                "Cannot delete a facility with active bookings", code="HAS_ACTIVE_BOOKINGS"
+            )
+        community_id = obj.community_id
+        await self.db.delete(obj)
+        await self.db.flush()
+        await self._audit("amenity.delete", community_id, "amenity", amenity_id)
+
     # -- slots ------------------------------------------- #
     async def list_slots(self, amenity_id: uuid.UUID):
-        amenity = await self._amenity_in_scope(amenity_id)
-        existing = list(
+        await self._amenity_in_scope(amenity_id)
+        return list(
             (
                 await self.db.scalars(
                     select(AmenitySlot)
@@ -153,49 +204,6 @@ class AmenityService(UnitScopedAccess):
                 )
             ).all()
         )
-        # If no slots exist or only a single wide block exists (e.g. 6:00 to 22:00), populate standard 2-hour slots
-        has_only_monolithic = len(existing) > 0 and all(
-            (s.end_time.hour - s.start_time.hour) >= 6 for s in existing
-        )
-        if len(existing) == 0 or has_only_monolithic:
-            from datetime import time
-
-            for s in existing:
-                await self.db.delete(s)
-            standard_slot_times = [
-                (time(6, 0), time(8, 0)),
-                (time(8, 0), time(10, 0)),
-                (time(10, 0), time(12, 0)),
-                (time(12, 0), time(14, 0)),
-                (time(14, 0), time(16, 0)),
-                (time(16, 0), time(18, 0)),
-                (time(18, 0), time(20, 0)),
-                (time(20, 0), time(22, 0)),
-            ]
-            for dow in range(0, 7):
-                for st, et in standard_slot_times:
-                    slot = AmenitySlot(
-                        community_id=amenity.community_id,
-                        amenity_id=amenity.id,
-                        day_of_week=dow,
-                        start_time=st,
-                        end_time=et,
-                        capacity=amenity.capacity or 20,
-                    )
-                    self.db.add(slot)
-            await self.db.flush()
-            existing = list(
-                (
-                    await self.db.scalars(
-                        select(AmenitySlot)
-                        .where(
-                            AmenitySlot.amenity_id == amenity_id, AmenitySlot.is_active.is_(True)
-                        )
-                        .order_by(AmenitySlot.day_of_week, AmenitySlot.start_time)
-                    )
-                ).all()
-            )
-        return existing
 
     async def create_slot(self, amenity_id: uuid.UUID, payload: schemas.SlotCreate):
         amenity = await self._amenity_in_scope(amenity_id)
@@ -291,6 +299,15 @@ class AmenityService(UnitScopedAccess):
         await self._audit("block.create", amenity.community_id, "amenity_block", obj.id)
         return obj
 
+    async def delete_block(self, block_id: uuid.UUID) -> None:
+        obj = await self.db.get(AmenityBlock, block_id)
+        if obj is None:
+            raise NotFoundError("Maintenance block not found")
+        await self.db.delete(obj)
+        await self.db.flush()
+        await self._audit("block.delete", obj.community_id, "amenity_block", obj.id)
+
+
     # -- bookings ------------------------------------- #
     async def list_bookings(
         self,
@@ -341,7 +358,8 @@ class AmenityService(UnitScopedAccess):
             raise BusinessRuleError(
                 "booking_date does not fall on the slot's weekday", code="SLOT_WEEKDAY_MISMATCH"
             )
-        today = date.today()
+        local_tz = await self._community_tz(amenity.community_id)
+        today = datetime.now(local_tz).date()
         if payload.booking_date < today:
             raise BusinessRuleError("booking_date is in the past", code="DATE_IN_PAST")
 
@@ -351,8 +369,10 @@ class AmenityService(UnitScopedAccess):
                 f"Bookings open only {max_adv} days ahead", code="TOO_FAR_AHEAD"
             )
 
-        start_at = datetime.combine(payload.booking_date, slot.start_time, tzinfo=UTC)
-        end_at = datetime.combine(payload.booking_date, slot.end_time, tzinfo=UTC)
+        start_local = datetime.combine(payload.booking_date, slot.start_time, tzinfo=local_tz)
+        end_local = datetime.combine(payload.booking_date, slot.end_time, tzinfo=local_tz)
+        start_at = start_local.astimezone(UTC)
+        end_at = end_local.astimezone(UTC)
 
         max_hours = await self._rule_int(amenity.id, "max_hours_per_booking")
         if max_hours is not None and (end_at - start_at).total_seconds() > max_hours * 3600:

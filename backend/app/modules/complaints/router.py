@@ -150,7 +150,9 @@ async def export_tickets(
             "status",
             "priority",
             "escalation_state",
-            "unit_id",
+            "community_name",
+            "raised_by_name",
+            "unit_number",
             "created_at",
             "resolved_at",
         ],
@@ -161,7 +163,9 @@ async def export_tickets(
                 t.status,
                 t.priority,
                 t.escalation_state,
-                t.unit_id,
+                getattr(t, "community_name", "") or "",
+                getattr(t, "raised_by_name", "") or "",
+                getattr(t, "unit_number", "") or "",
                 t.created_at,
                 getattr(t, "resolved_at", ""),
             )
@@ -223,7 +227,7 @@ async def ticket_messages(ticket_id: uuid.UUID, svc: Svc = Depends(complaint_ser
     "/tickets/{ticket_id}/messages",
     response_model=Envelope[schemas.MessageRead],
     status_code=status.HTTP_201_CREATED,
-    dependencies=[VIEW],
+    dependencies=[CREATE],
 )
 async def add_message(
     ticket_id: uuid.UUID,
@@ -271,7 +275,7 @@ async def transition_ticket(
 @router.post(
     "/tickets/{ticket_id}/confirm",
     response_model=Envelope[schemas.TicketRead],
-    dependencies=[VIEW],
+    dependencies=[UPDATE],
 )
 async def confirm_ticket(
     ticket_id: uuid.UUID,
@@ -284,11 +288,20 @@ async def confirm_ticket(
     )
 
 
+@router.get(
+    "/tickets/{ticket_id}/feedback",
+    response_model=Envelope[schemas.FeedbackRead | None],
+    dependencies=[VIEW],
+)
+async def get_feedback(ticket_id: uuid.UUID, svc: Svc = Depends(complaint_service)) -> dict:
+    return ok(schemas.FeedbackRead.model_validate(fb) if (fb := await svc.get_feedback(ticket_id)) else None)
+
+
 @router.post(
     "/tickets/{ticket_id}/feedback",
     response_model=Envelope[schemas.FeedbackRead],
     status_code=status.HTTP_201_CREATED,
-    dependencies=[VIEW],
+    dependencies=[CREATE],
 )
 async def add_feedback(
     ticket_id: uuid.UUID,
@@ -316,7 +329,7 @@ async def list_attachments(ticket_id: uuid.UUID, svc: Svc = Depends(complaint_se
     "/tickets/{ticket_id}/attachments",
     response_model=Envelope[schemas.AttachmentRead],
     status_code=status.HTTP_201_CREATED,
-    dependencies=[VIEW],
+    dependencies=[CREATE],
 )
 async def add_attachment(
     ticket_id: uuid.UUID,
@@ -327,3 +340,13 @@ async def add_attachment(
         schemas.AttachmentRead.model_validate(await svc.add_attachment(ticket_id, payload)),
         message="Attached",
     )
+
+
+@router.get(
+    "/tickets/{ticket_id}/entry-pass",
+    response_model=Envelope[schemas.TicketEntryPassRead],
+    dependencies=[VIEW],
+)
+async def get_entry_pass(ticket_id: uuid.UUID, svc: Svc = Depends(complaint_service)) -> dict:
+    return ok(await svc.get_entry_pass(ticket_id))
+

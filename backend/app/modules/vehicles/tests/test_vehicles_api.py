@@ -44,6 +44,23 @@ def test_resident_registers_vehicle(as_role, seed_ids):
     assert r.json()["data"]["is_active"] is True
 
 
+def test_resident_self_registers_vehicle(as_role):
+    resident = as_role("resident")
+    r = resident.post(
+        P,
+        json={
+            "vehicle_type": "bike",
+            "registration_number": _plate(),
+            "make": "Honda",
+            "model": "CBR",
+            "color": "Black",
+        },
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["data"]["is_active"] is True
+    assert r.json()["data"]["vehicle_type"] == "bike"
+
+
 def test_guard_logs_plate_entry_and_exit(as_role, seed_ids):
     guard = as_role("security_guard")
     plate = _plate()

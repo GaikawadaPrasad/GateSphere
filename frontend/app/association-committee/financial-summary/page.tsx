@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useUiStore } from "@/store/ui";
 import { useCommunityDetails } from "@/hooks/use-communities";
 import { useInvoices, usePayments, useBillingRules, useChargeHeads } from "@/hooks/use-billing";
+import { useResidents } from "@/hooks/use-residents";
 import { useGovernanceOverview, useCollectionAudit } from "@/hooks/use-governance";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, type Column } from "@/components/tables/DataTable";
@@ -11,6 +12,7 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { billingApi } from "@/lib/api";
 import type { MaintenanceInvoice, Payment } from "@/types/billing";
+import type { ResidentProfile } from "@/types/residents";
 
 type TabType = "overview" | "collections" | "outstanding" | "rules";
 
@@ -31,8 +33,55 @@ export default function FinancialSummaryPage() {
     community_id: activeCommunityId || undefined,
     page_size: 50,
   });
+  const { data: residentsList } = useResidents({
+    community_id: activeCommunityId || undefined,
+    page_size: 200,
+  });
   const { data: rules } = useBillingRules(activeCommunityId || undefined);
   const { data: chargeHeads } = useChargeHeads(activeCommunityId || undefined);
+
+  const residentMap = useMemo(() => {
+    const map = new Map<string, ResidentProfile>();
+    if (Array.isArray(residentsList)) {
+      residentsList.forEach((r) => {
+        if (r.user_id) map.set(r.user_id, r);
+        if (r.id) map.set(r.id, r);
+      });
+    }
+    return map;
+  }, [residentsList]);
+
+  const invoiceMap = useMemo(() => {
+    const map = new Map<string, MaintenanceInvoice>();
+    if (Array.isArray(invoices)) {
+      invoices.forEach((inv) => {
+        if (inv.id) map.set(inv.id, inv);
+      });
+    }
+    return map;
+  }, [invoices]);
+
+  const getPayerInfo = (p: Payment) => {
+    const resident = p.payer_user_id ? residentMap.get(p.payer_user_id) : undefined;
+    const firstAlloc = p.allocations?.[0];
+    const invoice = firstAlloc?.invoice_id ? invoiceMap.get(firstAlloc.invoice_id) : undefined;
+
+    const name = p.payer_name || resident?.full_name || "Resident Payer";
+    const email = p.payer_email || resident?.email || "";
+    const phone = p.payer_phone || resident?.phone || "";
+    const residentType = p.resident_type || resident?.resident_type || "";
+
+    let unitDisplay = "–";
+    if (p.unit_number) {
+      unitDisplay = `${p.tower_name ? `${p.tower_name} · ` : ""}Unit ${p.unit_number}`;
+    } else if (resident?.unit_number) {
+      unitDisplay = `${resident.tower_name ? `${resident.tower_name} · ` : ""}Unit ${resident.unit_number}`;
+    } else if (invoice?.unit_number) {
+      unitDisplay = `Unit ${invoice.unit_number}`;
+    }
+
+    return { name, email, phone, residentType, unitDisplay };
+  };
 
   const handleExportInvoices = async () => {
     const cid = activeCommunityId || community?.id;
@@ -152,11 +201,55 @@ export default function FinancialSummaryPage() {
   ];
 
   const paymentColumns: Column<Payment>[] = [
-    { key: "payment_reference", header: "Reference #" },
     {
-      key: "receipt_number",
-      header: "Receipt #",
-      render: (item) => (item.receipt_number ? String(item.receipt_number) : "–"),
+      key: "payer_name",
+      header: "Resident / Payer",
+      render: (item) => {
+        const payer = getPayerInfo(item);
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <span style={{ fontWeight: 600, color: "var(--fg)" }}>{payer.name}</span>
+              {payer.residentType && (
+                <span
+                  style={{
+                    fontSize: "0.675rem",
+                    padding: "0.1rem 0.4rem",
+                    borderRadius: "var(--radius-sm)",
+                    background: "#f1f5f9",
+                    color: "#475569",
+                    fontWeight: 600,
+                    textTransform: "capitalize",
+                  }}
+                >
+                  {payer.residentType}
+                </span>
+              )}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap", fontSize: "0.75rem", color: "var(--muted)" }}>
+              <span style={{ fontWeight: 500, color: "var(--primary)" }}>{payer.unitDisplay}</span>
+              {payer.email && <span>· {payer.email}</span>}
+              {payer.phone && <span>· {payer.phone}</span>}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      key: "payment_reference",
+      header: "Reference & Receipt",
+      render: (item) => (
+        <div>
+          <span style={{ fontWeight: 600, fontFamily: "monospace", fontSize: "0.825rem" }}>
+            {item.payment_reference}
+          </span>
+          {item.receipt_number && (
+            <div style={{ fontSize: "0.725rem", color: "#059669", fontWeight: 500 }}>
+              Receipt: {item.receipt_number}
+            </div>
+          )}
+        </div>
+      ),
     },
     {
       key: "amount",

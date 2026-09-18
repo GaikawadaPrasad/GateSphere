@@ -105,3 +105,45 @@ def test_resident_cannot_touch_other_units_delivery(as_role, seed_ids, resident_
     )
     assert all(x["id"] != d["id"] for x in resident.get(P).json()["data"])
     assert as_role("community_admin").get(f"{P}/{d['id']}").status_code == 200
+
+
+def test_duplicate_handover_is_rejected_without_double_effect(
+    as_role, seed_ids, resident_unit_id
+):
+    """Retried handover/completion must fail safe (422), never record twice."""
+    from app.modules.deliveries.models import Delivery, DeliveryEvent
+
+    guard = as_role("security_guard")
+    d = guard.post(
+        P,
+        json={
+            "unit_id": resident_unit_id,
+            "delivery_type": "courier",
+            "provider_name": "RacePost",
+        },
+    ).json()["data"]
+    try:
+        resident = as_role("resident")
+        assert resident.post(f"{P}/{d['id']}/decision", json={"decision": "approved"})
+        assert guard.post(f"{P}/{d['id']}/arrival", json={}).status_code == 200
+        assert guard.post(f"{P}/{d['id']}/delivered").status_code == 200
+
+        dup = guard.post(f"{P}/{d['id']}/delivered")
+        assert dup.status_code == 422, dup.text
+        assert dup.json()["error"]["code"] == "INVALID_TRANSITION"
+        assert guard.get(f"{P}/{d['id']}").json()["data"]["status"] == "collected"
+        with SessionLocal() as db:
+            completions = (
+                db.query(DeliveryEvent)
+                .filter_by(delivery_id=d["id"], event_type="delivered")
+                .count()
+            )
+            assert completions == 1
+    finally:
+        with SessionLocal() as db:
+            for row in db.query(DeliveryEvent).filter_by(delivery_id=d["id"]).all():
+                db.delete(row)
+            obj = db.get(Delivery, d["id"])
+            if obj is not None:
+                db.delete(obj)
+            db.commit()

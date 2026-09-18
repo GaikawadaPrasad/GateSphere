@@ -34,6 +34,8 @@ class UserCreate(_Write):
 
 class UserUpdate(_Write):
     full_name: str | None = Field(default=None, max_length=255)
+    email: EmailStr | None = None
+    password: str | None = Field(default=None, min_length=8, max_length=200)
     phone: str | None = _Phone
     is_active: bool | None = None
 

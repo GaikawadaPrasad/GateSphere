@@ -283,7 +283,7 @@ export default function RequestDemo() {
                           <option value="+65">🇸🇬 +65</option>
                         </select>
                         <input
-                          type="tel"
+                          type="number"
                           placeholder="98765 43210"
                           required
                           value={formData.phone}

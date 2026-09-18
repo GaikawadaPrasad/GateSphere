@@ -6,7 +6,7 @@ import { CommunityTable, type CommunityWithMetrics } from "@/components/tables/C
 import { SearchInput } from "@/components/forms/SearchInput";
 import { Modal } from "@/components/common/Modal";
 import { StatusBadge } from "@/components/common/StatusBadge";
-import { communitiesApi, residentsApi } from "@/lib/api";
+import { communitiesApi, residentsApi, usersApi } from "@/lib/api";
 import {
   useCommunities,
   useCreateCommunity,
@@ -25,41 +25,48 @@ import {
   POPULAR_CITIES_BY_STATE,
   isValidCommunityName,
   isValidCityName,
+  isValidPersonName,
 } from "@/constants/locations";
 import type { Community, Tower, Gate, Floor } from "@/types/communities";
 import type { ResidentProfile } from "@/types/residents";
 import { PasswordField } from "@/components/forms/PasswordField";
 import { generateInitialPassword } from "@/lib/utils";
+import { CreateCommunityModal } from "@/components/super-admin/CreateCommunityModal";
+import { CreateUserModal } from "@/components/super-admin/CreateUserModal";
+import { EditUserModal, type UserRecord } from "@/components/super-admin/EditUserModal";
+import { toast } from "@/store/toast";
+import { useUiStore } from "@/store/ui";
+import { ScopeBanner } from "@/components/common/ScopeBanner";
 
 export default function CommunitiesPage() {
+  const { activeCommunityId } = useUiStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
 
-  // Create modal state & validations
+  // Create modal state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [code, setCode] = useState("");
-  const [city, setCity] = useState("");
-  const [state, setState] = useState("");
-  const [formError, setFormError] = useState("");
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
-
-  // Community Admin credentials state for Create Modal
-  const [adminName, setAdminName] = useState("");
-  const [adminEmail, setAdminEmail] = useState("");
-  const [adminPassword, setAdminPassword] = useState("");
-  const [adminPhone, setAdminPhone] = useState("");
   const [createdAdminInfo, setCreatedAdminInfo] = useState<{
+    communityId?: string;
     communityName: string;
     communityCode: string;
     adminName: string;
     adminEmail: string;
     adminPassword?: string;
+    adminPhone?: string;
   } | null>(null);
   const [copiedEmail, setCopiedEmail] = useState(false);
   const [copiedPassword, setCopiedPassword] = useState(false);
   const [copiedAll, setCopiedAll] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  // Admin Credential Update State
+  const [isEditingAdminCredentials, setIsEditingAdminCredentials] = useState(false);
+  const [updateAdminEmail, setUpdateAdminEmail] = useState("");
+  const [updateAdminName, setUpdateAdminName] = useState("");
+  const [updateAdminPhone, setUpdateAdminPhone] = useState("");
+  const [updateAdminPassword, setUpdateAdminPassword] = useState("");
+  const [isUpdatingAdminCreds, setIsUpdatingAdminCreds] = useState(false);
+  const [updateAdminCredsError, setUpdateAdminCredsError] = useState("");
 
   // Edit & Delete modal state & validations
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -75,10 +82,16 @@ export default function CommunitiesPage() {
   // View / Structure Details Modal state
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [viewingCommunity, setViewingCommunity] = useState<CommunityWithMetrics | null>(null);
-  const [activeTab, setActiveTab] = useState<"towers" | "units" | "residents" | "gates" | "credentials">("towers");
+  const [activeTab, setActiveTab] = useState<"towers" | "units" | "residents" | "gates" | "credentials" | "staff">("towers");
   const [communityTowers, setCommunityTowers] = useState<Tower[]>([]);
   const [communityGates, setCommunityGates] = useState<Gate[]>([]);
   const [communityResidents, setCommunityResidents] = useState<ResidentProfile[]>([]);
+  const [communityPersonnel, setCommunityPersonnel] = useState<UserRecord[]>([]);
+  const [personnelRoleFilter, setPersonnelRoleFilter] = useState<string>("");
+  const [personnelSearch, setPersonnelSearch] = useState<string>("");
+  const [isAddPersonnelOpen, setIsAddPersonnelOpen] = useState(false);
+  const [editingPersonnel, setEditingPersonnel] = useState<UserRecord | null>(null);
+  const [deletingPersonnel, setDeletingPersonnel] = useState<UserRecord | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [detailsFeedback, setDetailsFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
@@ -92,7 +105,15 @@ export default function CommunitiesPage() {
     setCopiedEmail(false);
     setCopiedPassword(false);
     setCopiedAll(false);
+    setIsEditingAdminCredentials(false);
+    setUpdateAdminEmail(email);
+    setUpdateAdminName(adminName);
+    setUpdateAdminPhone("");
+    setUpdateAdminPassword(pwd);
+    setUpdateAdminCredsError("");
+
     setCreatedAdminInfo({
+      communityId: comm.id,
       communityName: comm.name,
       communityCode: comm.code,
       adminName: adminName,
@@ -101,12 +122,65 @@ export default function CommunitiesPage() {
     });
   };
 
+  const handleSaveAdminCredentials = async () => {
+    if (!createdAdminInfo?.communityId) return;
+    const trimmedName = updateAdminName.trim();
+    if (trimmedName && (trimmedName.length < 2 || !isValidPersonName(trimmedName))) {
+      setUpdateAdminCredsError("Admin full name must contain only alphabets and spaces (min 2 chars).");
+      return;
+    }
+    const trimmedEmail = updateAdminEmail.trim();
+    if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setUpdateAdminCredsError("Please enter a valid email address.");
+      return;
+    }
+    if (!updateAdminPassword || updateAdminPassword.length < 10) {
+      setUpdateAdminCredsError("Password must be at least 10 characters.");
+      return;
+    }
+    const trimmedPhone = updateAdminPhone.trim();
+    if (trimmedPhone && !/^[+0-9][0-9 \-]{4,19}$/.test(trimmedPhone)) {
+      setUpdateAdminCredsError("Please enter a valid phone number (5-20 digits).");
+      return;
+    }
+
+    try {
+      setIsUpdatingAdminCreds(true);
+      setUpdateAdminCredsError("");
+      const res = await communitiesApi.provisionAdmin(createdAdminInfo.communityId, {
+        email: trimmedEmail,
+        password: updateAdminPassword.trim(),
+        full_name: trimmedName || undefined,
+        phone: trimmedPhone || undefined,
+      });
+
+      setCreatedAdminInfo({
+        ...createdAdminInfo,
+        adminName: res.full_name || updateAdminName.trim(),
+        adminEmail: res.email || updateAdminEmail.trim(),
+        adminPassword: updateAdminPassword.trim(),
+      });
+
+      toast.success(
+        `Updated Community Admin credentials for ${createdAdminInfo.communityName}.`,
+        "Credentials Updated"
+      );
+      refetch();
+      setIsEditingAdminCredentials(false);
+    } catch (err: any) {
+      console.error("Failed to update community admin credentials:", err);
+      setUpdateAdminCredsError(err?.message || "Failed to update community admin credentials.");
+    } finally {
+      setIsUpdatingAdminCreds(false);
+    }
+  };
+
   // Sub-modals for adding Tower, Floor, Unit, Resident, Gate
   const [isAddTowerOpen, setIsAddTowerOpen] = useState(false);
   const [towerName, setTowerName] = useState("");
   const [towerCode, setTowerCode] = useState("");
   const [towerFloors, setTowerFloors] = useState(10);
-  const [towerType, setTowerType] = useState("residential_highrise");
+  const [towerType, setTowerType] = useState("tower");
 
   const [isAddFloorOpen, setIsAddFloorOpen] = useState(false);
   const [selectedTowerForFloor, setSelectedTowerForFloor] = useState("");
@@ -131,6 +205,7 @@ export default function CommunitiesPage() {
   const [residentPassword, setResidentPassword] = useState("");
   const [residentRole, setResidentRole] = useState("primary_owner");
   const [residentIsPrimary, setResidentIsPrimary] = useState(true);
+  const [residentFormErrors, setResidentFormErrors] = useState<Record<string, string>>({});
 
   const [isAddGateOpen, setIsAddGateOpen] = useState(false);
   const [gateName, setGateName] = useState("");
@@ -138,7 +213,7 @@ export default function CommunitiesPage() {
   const [gateType, setGateType] = useState<"entry" | "exit" | "both" | "pedestrian">("both");
 
   const { data: communities, isLoading, refetch } = useCommunities();
-  const { data: metrics } = useSuperAdminDashboardMetrics();
+  const { data: metrics } = useSuperAdminDashboardMetrics(activeCommunityId);
   const { data: communityUnitsList, refetch: refetchUnits } = useCommunityUnits(
     viewingCommunity?.id || undefined
   );
@@ -157,71 +232,6 @@ export default function CommunitiesPage() {
   const createUnitMutation = useCreateUnit();
   const createGateMutation = useCreateGate();
   const addResidentMutation = useAddResident();
-
-  // Field validation rules for Create Community
-  const createErrors = useMemo(() => {
-    const errs: Record<string, string> = {};
-    const trimmedName = name.trim();
-
-    if (!trimmedName) {
-      errs.name = "Community name is required";
-    } else if (trimmedName.length < 2) {
-      errs.name = "Community name must be at least 2 characters";
-    } else if (trimmedName.length > 255) {
-      errs.name = "Community name cannot exceed 255 characters";
-    } else if (!isValidCommunityName(trimmedName)) {
-      errs.name = "Community name contains invalid characters";
-    }
-
-    const trimmedCode = code.trim().toUpperCase();
-    if (!trimmedCode) {
-      errs.code = "Community code is required";
-    } else if (trimmedCode.length < 2 || trimmedCode.length > 32) {
-      errs.code = "Code must be between 2 and 32 characters";
-    } else if (!/^[A-Z0-9][A-Z0-9_\-\/]*$/.test(trimmedCode)) {
-      errs.code =
-        "Code must start with alphanumeric and only contain letters, numbers, hyphens or underscores (e.g. PGW-01)";
-    }
-
-    const trimmedCity = city.trim();
-    if (trimmedCity) {
-      if (trimmedCity.length > 120) {
-        errs.city = "City cannot exceed 120 characters";
-      } else if (!isValidCityName(trimmedCity)) {
-        errs.city = "City must contain only alphabetical letters and spaces";
-      }
-    }
-
-    const trimmedState = state.trim();
-    if (trimmedState && trimmedState.length > 120) {
-      errs.state = "State cannot exceed 120 characters";
-    }
-
-    const trimmedAdminName = adminName.trim();
-    if (!trimmedAdminName) {
-      errs.adminName = "Admin full name is required";
-    }
-
-    const trimmedAdminEmail = adminEmail.trim();
-    if (!trimmedAdminEmail) {
-      errs.adminEmail = "Admin login email is required";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedAdminEmail)) {
-      errs.adminEmail = "Please enter a valid email address (e.g. admin@example.com)";
-    }
-
-    if (!adminPassword) {
-      errs.adminPassword = "Admin password is required";
-    } else if (adminPassword.length < 8) {
-      errs.adminPassword = "Password must be at least 8 characters";
-    }
-
-    const trimmedAdminPhone = adminPhone.trim();
-    if (trimmedAdminPhone && trimmedAdminPhone.length > 20) {
-      errs.adminPhone = "Phone cannot exceed 20 characters";
-    }
-
-    return errs;
-  }, [name, code, city, state, adminName, adminEmail, adminPassword, adminPhone]);
 
   // Field validation rules for Edit Community
   const editErrors = useMemo(() => {
@@ -255,13 +265,16 @@ export default function CommunitiesPage() {
     return errs;
   }, [editName, editCity, editState]);
 
-  const isCreateFormValid = Object.keys(createErrors).length === 0;
   const isEditFormValid = Object.keys(editErrors).length === 0;
 
   const filteredCommunities: CommunityWithMetrics[] = useMemo(() => {
     if (!communities) return [];
     return communities
       .filter((comm: Community) => {
+        if (activeCommunityId && comm.id !== activeCommunityId) {
+          return false;
+        }
+
         const matchesSearch =
           searchQuery === "" ||
           comm.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -286,78 +299,10 @@ export default function CommunitiesPage() {
           financialStatus: bd?.financialStatus ?? "Good",
         };
       });
-  }, [communities, searchQuery, statusFilter, metrics]);
+  }, [communities, searchQuery, statusFilter, metrics, activeCommunityId]);
 
   const handleOpenCreate = () => {
-    setName("");
-    setCode("");
-    setCity("");
-    setState("");
-    setAdminName("");
-    setAdminEmail("");
-    setAdminPassword(generateInitialPassword("Admin"));
-    setAdminPhone("");
-    setFormError("");
-    setTouched({});
     setIsCreateModalOpen(true);
-  };
-
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormError("");
-    setTouched({
-      name: true,
-      code: true,
-      city: true,
-      state: true,
-      adminName: true,
-      adminEmail: true,
-      adminPassword: true,
-      adminPhone: true,
-    });
-
-    if (!isCreateFormValid) {
-      const firstError = Object.values(createErrors)[0];
-      setFormError(firstError || "Please fix validation errors before submitting.");
-      return;
-    }
-
-    try {
-      await createMutation.mutateAsync({
-        name: name.trim(),
-        code: code.trim().toUpperCase(),
-        city: city.trim() || undefined,
-        state: state.trim() || undefined,
-        admin_name: adminName.trim(),
-        admin_email: adminEmail.trim(),
-        admin_password: adminPassword,
-        admin_phone: adminPhone.trim() || undefined,
-      });
-      setIsCreateModalOpen(false);
-      setCreatedAdminInfo({
-        communityName: name.trim(),
-        communityCode: code.trim().toUpperCase(),
-        adminName: adminName.trim(),
-        adminEmail: adminEmail.trim(),
-        adminPassword: adminPassword,
-      });
-      setName("");
-      setCode("");
-      setCity("");
-      setState("");
-      setAdminName("");
-      setAdminEmail("");
-      setAdminPassword("");
-      setAdminPhone("");
-      setTouched({});
-      refetch();
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        setFormError(err.message);
-      } else {
-        setFormError("Failed to create community. Ensure code is unique.");
-      }
-    }
   };
 
   const handleOpenEdit = (comm: CommunityWithMetrics) => {
@@ -374,10 +319,11 @@ export default function CommunitiesPage() {
 
   const refreshCommunityDetails = async (commId: string) => {
     try {
-      const [towersRes, gatesRes, residentsRes] = await Promise.allSettled([
+      const [towersRes, gatesRes, residentsRes, personnelRes] = await Promise.allSettled([
         communitiesApi.towers(commId),
         communitiesApi.gates(commId),
         residentsApi.list({ community_id: commId, page: 1, page_size: 100 }),
+        usersApi.list({ community_id: commId, page_size: 100 }),
       ]);
       if (towersRes.status === "fulfilled") setCommunityTowers(towersRes.value || []);
       if (gatesRes.status === "fulfilled") setCommunityGates(gatesRes.value || []);
@@ -387,6 +333,10 @@ export default function CommunitiesPage() {
           ? (val as ResidentProfile[])
           : ((val as { items?: ResidentProfile[] })?.items || []);
         setCommunityResidents(resList);
+      }
+      if (personnelRes.status === "fulfilled") {
+        const pVal = personnelRes.value;
+        setCommunityPersonnel((Array.isArray(pVal) ? pVal : []) as unknown as UserRecord[]);
       }
       refetchUnits();
     } catch (err) {
@@ -402,6 +352,9 @@ export default function CommunitiesPage() {
     setCommunityTowers([]);
     setCommunityGates([]);
     setCommunityResidents([]);
+    setCommunityPersonnel([]);
+    setPersonnelRoleFilter("");
+    setPersonnelSearch("");
     setDetailsFeedback(null);
 
     try {
@@ -410,6 +363,24 @@ export default function CommunitiesPage() {
       setIsLoadingDetails(false);
     }
   };
+
+  const filteredPersonnel = useMemo(() => {
+    return communityPersonnel.filter((u) => {
+      if (personnelRoleFilter) {
+        const hasRole = u.roles?.some((r) => r.role_slug === personnelRoleFilter);
+        if (!hasRole) return false;
+      }
+      if (personnelSearch.trim()) {
+        const q = personnelSearch.toLowerCase().trim();
+        const matches =
+          u.full_name?.toLowerCase().includes(q) ||
+          u.email?.toLowerCase().includes(q) ||
+          u.phone?.toLowerCase().includes(q);
+        if (!matches) return false;
+      }
+      return true;
+    });
+  }, [communityPersonnel, personnelRoleFilter, personnelSearch]);
 
   const handleTowerSelectForUnit = async (tId: string) => {
     setUnitTowerId(tId);
@@ -435,7 +406,7 @@ export default function CommunitiesPage() {
     setTowerName("");
     setTowerCode("");
     setTowerFloors(10);
-    setTowerType("residential_highrise");
+    setTowerType("tower");
     setDetailsFeedback(null);
     setIsAddTowerOpen(true);
   };
@@ -590,15 +561,41 @@ export default function CommunitiesPage() {
     setResidentPassword("resident@Gate2026!");
     setResidentRole("primary_owner");
     setResidentIsPrimary(true);
+    setResidentFormErrors({});
     setDetailsFeedback(null);
     setIsAddResidentOpen(true);
   };
 
   const handleSaveResident = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!viewingCommunity || !residentUnitId || !residentFullName.trim() || !residentEmail.trim() || !residentPhone.trim()) {
+    if (!viewingCommunity) return;
+
+    const errs: Record<string, string> = {};
+    if (!residentUnitId) errs.residentUnitId = "Please select a target residential unit.";
+    const trimmedResidentName = residentFullName.trim();
+    if (!trimmedResidentName || trimmedResidentName.length < 2) {
+      errs.residentFullName = "Full name is required (min 2 characters).";
+    } else if (!isValidPersonName(trimmedResidentName)) {
+      errs.residentFullName = "Name must contain only alphabets and spaces.";
+    }
+    if (!residentEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(residentEmail.trim())) {
+      errs.residentEmail = "Valid email address is required.";
+    }
+    if (!residentPhone.trim() || !/^[+0-9][0-9 \-]{4,19}$/.test(residentPhone.trim())) {
+      errs.residentPhone = "Enter a valid phone number (10-15 digits).";
+    }
+    if (residentPassword.trim() && residentPassword.trim().length < 10) {
+      errs.residentPassword = "Initial password must be at least 10 characters.";
+    }
+    setResidentFormErrors(errs);
+    if (Object.keys(errs).length > 0) {
+      setDetailsFeedback({
+        type: "error",
+        message: "Please fill in all required fields marked in red below.",
+      });
       return;
     }
+
     try {
       await addResidentMutation.mutateAsync({
         communityId: viewingCommunity.id,
@@ -613,6 +610,8 @@ export default function CommunitiesPage() {
         },
       });
       setIsAddResidentOpen(false);
+      setResidentFormErrors({});
+      toast.success(`Resident "${residentFullName.trim()}" onboarded successfully!`, "Resident Registered");
       setDetailsFeedback({
         type: "success",
         message: `Resident "${residentFullName}" onboarded successfully.`,
@@ -711,14 +710,17 @@ export default function CommunitiesPage() {
     }
   };
 
-  const stateCitySuggestions = state ? POPULAR_CITIES_BY_STATE[state] || [] : [];
   const editStateCitySuggestions = editState ? POPULAR_CITIES_BY_STATE[editState] || [] : [];
 
   return (
     <div>
       <PageHeader
         title="Community Management"
-        subtitle="Configure and manage all registered residential properties in the platform"
+        subtitle={
+          activeCommunityId
+            ? "Viewing scoped community property configuration and structure"
+            : "Configure and manage all registered residential properties in the platform"
+        }
         breadcrumbs={[
           { label: "Super Admin", href: "/super-admin/dashboard" },
           { label: "Communities" },
@@ -730,12 +732,15 @@ export default function CommunitiesPage() {
         }
       />
 
+      {/* Active Scope Banner */}
+      <ScopeBanner entityName="community details" />
+
       <div className="card" style={{ marginBottom: "1.5rem" }}>
         <div className="card-header" style={{ flexWrap: "wrap", gap: "0.75rem" }}>
           <div>
             <h3 className="card-title">All Communities</h3>
             <p style={{ fontSize: "0.775rem", color: "var(--muted)" }}>
-              Total {communities?.length || 0} registered communities
+              {isLoading ? "Loading registered communities…" : `Total ${communities?.length || 0} registered communities`}
             </p>
           </div>
 
@@ -769,469 +774,17 @@ export default function CommunitiesPage() {
         />
       </div>
 
-      {/* Create Modal with Validation */}
-      <Modal
+      {/* Create Community 4-Step Wizard (Community → Towers → Floors → Units) */}
+      <CreateCommunityModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
-        title="Add New Community"
-        footer={
-          <>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => setIsCreateModalOpen(false)}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              form="create-comm-page-form"
-              className="btn btn-primary"
-              disabled={createMutation.isPending}
-            >
-              {createMutation.isPending ? "Creating…" : "Save Community"}
-            </button>
-          </>
-        }
-      >
-        <form id="create-comm-page-form" onSubmit={handleCreate} noValidate>
-          {formError && (
-            <div
-              className="badge badge-danger"
-              style={{
-                display: "block",
-                marginBottom: "1.25rem",
-                padding: "0.6rem 0.75rem",
-                textAlign: "left",
-              }}
-            >
-              ⚠️ {formError}
-            </div>
-          )}
-
-          {/* Community Name Field */}
-          <div style={{ marginBottom: "1.25rem" }}>
-            <div
-              style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem" }}
-            >
-              <label
-                htmlFor="modal-name"
-                style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--fg)" }}
-              >
-                Community Name <span style={{ color: "var(--danger)" }}>*</span>
-              </label>
-              <span
-                style={{
-                  fontSize: "0.75rem",
-                  color: name.length > 255 ? "var(--danger)" : "var(--muted)",
-                }}
-              >
-                {name.length}/255
-              </span>
-            </div>
-            <input
-              id="modal-name"
-              type="text"
-              className="input-field"
-              placeholder="e.g. Prestige Greenwoods"
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                if (!touched.name) setTouched((t) => ({ ...t, name: true }));
-              }}
-              onBlur={() => setTouched((t) => ({ ...t, name: true }))}
-              style={{
-                borderColor: touched.name && createErrors.name ? "var(--danger)" : undefined,
-              }}
-              required
-            />
-            {touched.name && createErrors.name && (
-              <p
-                style={{
-                  color: "var(--danger)",
-                  fontSize: "0.75rem",
-                  marginTop: "0.3rem",
-                  fontWeight: 500,
-                }}
-              >
-                ✕ {createErrors.name}
-              </p>
-            )}
-          </div>
-
-          {/* Community Code */}
-          <div style={{ marginBottom: "1.25rem" }}>
-            <div
-              style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem" }}
-            >
-              <label
-                htmlFor="modal-code"
-                style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--fg)" }}
-              >
-                Community Code <span style={{ color: "var(--danger)" }}>*</span>
-              </label>
-              <span
-                style={{
-                  fontSize: "0.75rem",
-                  color: code.length > 32 ? "var(--danger)" : "var(--muted)",
-                }}
-              >
-                {code.length}/32
-              </span>
-            </div>
-            <input
-              id="modal-code"
-              type="text"
-              className="input-field"
-              placeholder="e.g. PGW-01"
-              value={code}
-              onChange={(e) => {
-                const upper = e.target.value.toUpperCase();
-                setCode(upper);
-                if (!touched.code) setTouched((t) => ({ ...t, code: true }));
-              }}
-              onBlur={() => setTouched((t) => ({ ...t, code: true }))}
-              style={{
-                borderColor: touched.code && createErrors.code ? "var(--danger)" : undefined,
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-                fontWeight: 600,
-              }}
-              required
-            />
-            {touched.code && createErrors.code ? (
-              <p
-                style={{
-                  color: "var(--danger)",
-                  fontSize: "0.75rem",
-                  marginTop: "0.3rem",
-                  fontWeight: 500,
-                }}
-              >
-                ✕ {createErrors.code}
-              </p>
-            ) : (
-              <p style={{ color: "var(--muted)", fontSize: "0.75rem", marginTop: "0.3rem" }}>
-                Use 2–32 uppercase characters, numbers, and hyphens (e.g. <code>PGW-01</code>).
-              </p>
-            )}
-          </div>
-
-          {/* State & City Section */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-            {/* State Selection */}
-            <div>
-              <label
-                htmlFor="modal-state"
-                style={{
-                  fontWeight: 600,
-                  fontSize: "0.85rem",
-                  color: "var(--fg)",
-                  display: "block",
-                  marginBottom: "0.35rem",
-                }}
-              >
-                State / UT
-              </label>
-              <select
-                id="modal-state"
-                className="select-field"
-                value={state}
-                onChange={(e) => {
-                  setState(e.target.value);
-                  if (!touched.state) setTouched((t) => ({ ...t, state: true }));
-                }}
-                onBlur={() => setTouched((t) => ({ ...t, state: true }))}
-                style={{
-                  borderColor: touched.state && createErrors.state ? "var(--danger)" : undefined,
-                }}
-              >
-                <option value="">Select State / UT…</option>
-                {INDIAN_STATES_AND_UTS.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-              {touched.state && createErrors.state && (
-                <p style={{ color: "var(--danger)", fontSize: "0.75rem", marginTop: "0.3rem" }}>
-                  ✕ {createErrors.state}
-                </p>
-              )}
-            </div>
-
-            {/* City Selection */}
-            <div>
-              <label
-                htmlFor="modal-city"
-                style={{
-                  fontWeight: 600,
-                  fontSize: "0.85rem",
-                  color: "var(--fg)",
-                  display: "block",
-                  marginBottom: "0.35rem",
-                }}
-              >
-                City
-              </label>
-              <input
-                id="modal-city"
-                type="text"
-                list="modal-city-suggestions"
-                className="input-field"
-                placeholder={
-                  state ? `e.g. ${stateCitySuggestions[0] || "City Name"}` : "e.g. Mumbai"
-                }
-                value={city}
-                onChange={(e) => {
-                  setCity(e.target.value);
-                  if (!touched.city) setTouched((t) => ({ ...t, city: true }));
-                }}
-                onBlur={() => setTouched((t) => ({ ...t, city: true }))}
-                style={{
-                  borderColor: touched.city && createErrors.city ? "var(--danger)" : undefined,
-                }}
-              />
-              <datalist id="modal-city-suggestions">
-                {stateCitySuggestions.map((c) => (
-                  <option key={c} value={c} />
-                ))}
-              </datalist>
-              {touched.city && createErrors.city && (
-                <p style={{ color: "var(--danger)", fontSize: "0.75rem", marginTop: "0.3rem" }}>
-                  ✕ {createErrors.city}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Section: Community Admin Credentials */}
-          <div
-            style={{
-              marginTop: "1.5rem",
-              paddingTop: "1.25rem",
-              borderTop: "1px solid #e2e8f0",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                marginBottom: "0.85rem",
-              }}
-            >
-              <div>
-                <h4
-                  style={{
-                    margin: 0,
-                    fontSize: "0.95rem",
-                    fontWeight: 700,
-                    color: "var(--fg)",
-                  }}
-                >
-                  👤 Community Admin Account
-                </h4>
-                <p
-                  style={{
-                    margin: "0.2rem 0 0 0",
-                    fontSize: "0.75rem",
-                    color: "var(--muted)",
-                  }}
-                >
-                  Set up initial login credentials for the Community Admin.
-                </p>
-              </div>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                style={{ fontSize: "0.75rem", padding: "0.3rem 0.6rem" }}
-                onClick={() => {
-                  setAdminPassword(generateInitialPassword(adminName || name || "Admin"));
-                  if (!touched.adminPassword) setTouched((t) => ({ ...t, adminPassword: true }));
-                }}
-              >
-                ⚡ Generate Password
-              </button>
-            </div>
-
-            {/* Admin Name & Phone Grid */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "1rem",
-                marginBottom: "1.25rem",
-              }}
-            >
-              <div>
-                <label
-                  htmlFor="modal-admin-name"
-                  style={{
-                    fontWeight: 600,
-                    fontSize: "0.85rem",
-                    color: "var(--fg)",
-                    display: "block",
-                    marginBottom: "0.35rem",
-                  }}
-                >
-                  Admin Full Name <span style={{ color: "var(--danger)" }}>*</span>
-                </label>
-                <input
-                  id="modal-admin-name"
-                  type="text"
-                  className="input-field"
-                  placeholder="e.g. Ramesh Sharma"
-                  value={adminName}
-                  onChange={(e) => {
-                    setAdminName(e.target.value);
-                    if (!touched.adminName) setTouched((t) => ({ ...t, adminName: true }));
-                  }}
-                  onBlur={() => setTouched((t) => ({ ...t, adminName: true }))}
-                  style={{
-                    borderColor:
-                      touched.adminName && createErrors.adminName ? "var(--danger)" : undefined,
-                  }}
-                  required
-                />
-                {touched.adminName && createErrors.adminName && (
-                  <p
-                    style={{
-                      color: "var(--danger)",
-                      fontSize: "0.75rem",
-                      marginTop: "0.3rem",
-                      fontWeight: 500,
-                    }}
-                  >
-                    ✕ {createErrors.adminName}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label
-                  htmlFor="modal-admin-phone"
-                  style={{
-                    fontWeight: 600,
-                    fontSize: "0.85rem",
-                    color: "var(--fg)",
-                    display: "block",
-                    marginBottom: "0.35rem",
-                  }}
-                >
-                  Admin Phone{" "}
-                  <span style={{ color: "var(--muted)", fontWeight: 400, fontSize: "0.75rem" }}>
-                    (Optional)
-                  </span>
-                </label>
-                <input
-                  id="modal-admin-phone"
-                  type="tel"
-                  className="input-field"
-                  placeholder="+91 98765 43210"
-                  value={adminPhone}
-                  onChange={(e) => {
-                    setAdminPhone(e.target.value);
-                    if (!touched.adminPhone) setTouched((t) => ({ ...t, adminPhone: true }));
-                  }}
-                  onBlur={() => setTouched((t) => ({ ...t, adminPhone: true }))}
-                  style={{
-                    borderColor:
-                      touched.adminPhone && createErrors.adminPhone ? "var(--danger)" : undefined,
-                  }}
-                />
-                {touched.adminPhone && createErrors.adminPhone && (
-                  <p
-                    style={{
-                      color: "var(--danger)",
-                      fontSize: "0.75rem",
-                      marginTop: "0.3rem",
-                      fontWeight: 500,
-                    }}
-                  >
-                    ✕ {createErrors.adminPhone}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Admin Email */}
-            <div style={{ marginBottom: "1.25rem" }}>
-              <label
-                htmlFor="modal-admin-email"
-                style={{
-                  fontWeight: 600,
-                  fontSize: "0.85rem",
-                  color: "var(--fg)",
-                  display: "block",
-                  marginBottom: "0.35rem",
-                }}
-              >
-                Admin Login Email <span style={{ color: "var(--danger)" }}>*</span>
-              </label>
-              <input
-                id="modal-admin-email"
-                type="email"
-                className="input-field"
-                placeholder="e.g. admin.prestige@gatesphere.com"
-                value={adminEmail}
-                onChange={(e) => {
-                  setAdminEmail(e.target.value);
-                  if (!touched.adminEmail) setTouched((t) => ({ ...t, adminEmail: true }));
-                }}
-                onBlur={() => setTouched((t) => ({ ...t, adminEmail: true }))}
-                style={{
-                  borderColor:
-                    touched.adminEmail && createErrors.adminEmail ? "var(--danger)" : undefined,
-                }}
-                required
-              />
-              {touched.adminEmail && createErrors.adminEmail && (
-                <p
-                  style={{
-                    color: "var(--danger)",
-                    fontSize: "0.75rem",
-                    marginTop: "0.3rem",
-                    fontWeight: 500,
-                  }}
-                >
-                  ✕ {createErrors.adminEmail}
-                </p>
-              )}
-            </div>
-
-            {/* Admin Password using PasswordField */}
-            <div style={{ marginBottom: "0.5rem" }}>
-              <PasswordField
-                id="modal-admin-password"
-                label="Initial Password"
-                subLabel="(Min 8 characters)"
-                value={adminPassword}
-                onChange={(val) => {
-                  setAdminPassword(val);
-                  if (!touched.adminPassword) setTouched((t) => ({ ...t, adminPassword: true }));
-                }}
-                placeholder="e.g. admin@Gate2026!"
-                required
-                minLength={8}
-                helperText="💡 The admin will use this email and password to log in and manage the community portal."
-              />
-              {touched.adminPassword && createErrors.adminPassword && (
-                <p
-                  style={{
-                    color: "var(--danger)",
-                    fontSize: "0.75rem",
-                    marginTop: "0.3rem",
-                    fontWeight: 500,
-                  }}
-                >
-                  ✕ {createErrors.adminPassword}
-                </p>
-              )}
-            </div>
-          </div>
-        </form>
-      </Modal>
+        onSuccess={(adminInfo) => {
+          if (adminInfo) {
+            setCreatedAdminInfo(adminInfo);
+          }
+          refetch();
+        }}
+      />
 
       {/* Community & Admin Credentials Modal */}
       <Modal
@@ -1316,123 +869,196 @@ export default function CommunitiesPage() {
               >
                 🔑 Admin Credentials Card
               </h4>
-              <span className="badge badge-primary" style={{ fontSize: "0.7rem" }}>
-                community_admin
-              </span>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ fontSize: "0.75rem", padding: "0.2rem 0.6rem" }}
+                onClick={() => setIsEditingAdminCredentials(!isEditingAdminCredentials)}
+              >
+                {isEditingAdminCredentials ? "Cancel Edit" : "✏️ Update Credentials"}
+              </button>
             </div>
 
-            <div style={{ display: "grid", gap: "0.75rem", fontSize: "0.85rem" }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  paddingBottom: "0.4rem",
-                  borderBottom: "1px dashed #e2e8f0",
-                }}
-              >
-                <span style={{ color: "var(--muted)", fontWeight: 500 }}>Community Name & Code:</span>
-                <span style={{ fontWeight: 600, color: "var(--fg)" }}>
-                  {createdAdminInfo?.communityName} <code style={{ background: "#e2e8f0", padding: "0.1rem 0.35rem", borderRadius: 4 }}>{createdAdminInfo?.communityCode}</code>
-                </span>
+            {updateAdminCredsError && (
+              <div style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", padding: "0.5rem 0.75rem", borderRadius: "6px", fontSize: "0.8rem", marginBottom: "0.75rem" }}>
+                ⚠️ {updateAdminCredsError}
               </div>
+            )}
 
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  paddingBottom: "0.4rem",
-                  borderBottom: "1px dashed #e2e8f0",
-                }}
-              >
-                <span style={{ color: "var(--muted)", fontWeight: 500 }}>Admin Name:</span>
-                <span style={{ fontWeight: 600, color: "var(--fg)" }}>
-                  {createdAdminInfo?.adminName}
-                </span>
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  paddingBottom: "0.4rem",
-                  borderBottom: "1px dashed #e2e8f0",
-                }}
-              >
-                <span style={{ color: "var(--muted)", fontWeight: 500 }}>Login Email:</span>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <span style={{ fontWeight: 600, color: "#1e293b", fontFamily: "monospace" }}>
-                    {createdAdminInfo?.adminEmail}
-                  </span>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    style={{ fontSize: "0.7rem", padding: "0.15rem 0.45rem" }}
-                    onClick={() => {
-                      if (createdAdminInfo?.adminEmail) {
-                        navigator.clipboard.writeText(createdAdminInfo.adminEmail);
-                        setCopiedEmail(true);
-                        setTimeout(() => setCopiedEmail(false), 2000);
-                      }
-                    }}
-                  >
-                    {copiedEmail ? "✓ Copied" : "Copy"}
-                  </button>
+            {isEditingAdminCredentials ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", fontSize: "0.85rem" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "#475569", marginBottom: "0.2rem" }}>
+                    Admin Name
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={updateAdminName}
+                    onChange={(e) => setUpdateAdminName(e.target.value)}
+                    placeholder="Admin Full Name"
+                  />
                 </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "#475569", marginBottom: "0.2rem" }}>
+                      Login Email <span style={{ color: "var(--danger)" }}>*</span>
+                    </label>
+                    <input
+                      type="email"
+                      className="input-field"
+                      value={updateAdminEmail}
+                      onChange={(e) => setUpdateAdminEmail(e.target.value)}
+                      placeholder="admin@gatesphere.com"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "#475569", marginBottom: "0.2rem" }}>
+                      Phone
+                    </label>
+                    <input
+                      type="number"
+                      className="input-field"
+                      value={updateAdminPhone}
+                      onChange={(e) => setUpdateAdminPhone(e.target.value)}
+                      placeholder="+91 98765 43210"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <PasswordField
+                    label="New Password"
+                    value={updateAdminPassword}
+                    onChange={(val) => setUpdateAdminPassword(val)}
+                    placeholder="Set new admin password"
+                    required
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ marginTop: "0.25rem", width: "100%" }}
+                  onClick={handleSaveAdminCredentials}
+                  disabled={isUpdatingAdminCreds}
+                >
+                  {isUpdatingAdminCreds ? "Updating Credentials…" : "💾 Save & Provision New Credentials"}
+                </button>
               </div>
-
-              {createdAdminInfo?.adminPassword && (
+            ) : (
+              <div style={{ display: "grid", gap: "0.75rem", fontSize: "0.85rem" }}>
                 <div
                   style={{
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
+                    paddingBottom: "0.4rem",
+                    borderBottom: "1px dashed #e2e8f0",
                   }}
                 >
-                  <span style={{ color: "var(--muted)", fontWeight: 500 }}>Admin Password:</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                    <code
-                      style={{
-                        background: "#f1f5f9",
-                        border: "1px solid #cbd5e1",
-                        padding: "0.2rem 0.5rem",
-                        borderRadius: "4px",
-                        fontWeight: 600,
-                        color: "#0f172a",
-                        fontSize: "0.85rem",
-                        letterSpacing: showPassword ? "normal" : "0.15em",
-                      }}
-                    >
-                      {showPassword ? createdAdminInfo.adminPassword : "••••••••••••"}
-                    </code>
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      style={{ fontSize: "0.7rem", padding: "0.15rem 0.45rem" }}
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? "Hide" : "Show"}
-                    </button>
+                  <span style={{ color: "var(--muted)", fontWeight: 500 }}>Community Name & Code:</span>
+                  <span style={{ fontWeight: 600, color: "var(--fg)" }}>
+                    {createdAdminInfo?.communityName} <code style={{ background: "#e2e8f0", padding: "0.1rem 0.35rem", borderRadius: 4 }}>{createdAdminInfo?.communityCode}</code>
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    paddingBottom: "0.4rem",
+                    borderBottom: "1px dashed #e2e8f0",
+                  }}
+                >
+                  <span style={{ color: "var(--muted)", fontWeight: 500 }}>Admin Name:</span>
+                  <span style={{ fontWeight: 600, color: "var(--fg)" }}>
+                    {createdAdminInfo?.adminName}
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    paddingBottom: "0.4rem",
+                    borderBottom: "1px dashed #e2e8f0",
+                  }}
+                >
+                  <span style={{ color: "var(--muted)", fontWeight: 500 }}>Login Email:</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <span style={{ fontWeight: 600, color: "#1e293b", fontFamily: "monospace" }}>
+                      {createdAdminInfo?.adminEmail}
+                    </span>
                     <button
                       type="button"
                       className="btn btn-secondary"
                       style={{ fontSize: "0.7rem", padding: "0.15rem 0.45rem" }}
                       onClick={() => {
-                        if (createdAdminInfo?.adminPassword) {
-                          navigator.clipboard.writeText(createdAdminInfo.adminPassword);
-                          setCopiedPassword(true);
-                          setTimeout(() => setCopiedPassword(false), 2000);
+                        if (createdAdminInfo?.adminEmail) {
+                          navigator.clipboard.writeText(createdAdminInfo.adminEmail);
+                          setCopiedEmail(true);
+                          setTimeout(() => setCopiedEmail(false), 2000);
                         }
                       }}
                     >
-                      {copiedPassword ? "✓ Copied" : "Copy"}
+                      {copiedEmail ? "✓ Copied" : "Copy"}
                     </button>
                   </div>
                 </div>
-              )}
-            </div>
+
+                {createdAdminInfo?.adminPassword && (
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <span style={{ color: "var(--muted)", fontWeight: 500 }}>Admin Password:</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                      <code
+                        style={{
+                          background: "#f1f5f9",
+                          border: "1px solid #cbd5e1",
+                          padding: "0.2rem 0.5rem",
+                          borderRadius: "4px",
+                          fontWeight: 600,
+                          color: "#0f172a",
+                          fontSize: "0.85rem",
+                          letterSpacing: showPassword ? "normal" : "0.15em",
+                        }}
+                      >
+                        {showPassword ? createdAdminInfo.adminPassword : "••••••••••••"}
+                      </code>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ fontSize: "0.7rem", padding: "0.15rem 0.45rem" }}
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? "Hide" : "Show"}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ fontSize: "0.7rem", padding: "0.15rem 0.45rem" }}
+                        onClick={() => {
+                          if (createdAdminInfo?.adminPassword) {
+                            navigator.clipboard.writeText(createdAdminInfo.adminPassword);
+                            setCopiedPassword(true);
+                            setTimeout(() => setCopiedPassword(false), 2000);
+                          }
+                        }}
+                      >
+                        {copiedPassword ? "✓ Copied" : "Copy"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <p
@@ -1880,6 +1506,13 @@ export default function CommunitiesPage() {
                 onClick={() => setActiveTab("credentials")}
               >
                 🔑 Admin Credentials
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm ${activeTab === "staff" ? "btn-primary" : "btn-secondary"}`}
+                onClick={() => setActiveTab("staff")}
+              >
+                👔 Personnel & Admins ({communityPersonnel.length})
               </button>
             </div>
 
@@ -2467,11 +2100,226 @@ export default function CommunitiesPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Tab 6: PERSONNEL & ADMINS */}
+                {activeTab === "staff" && (
+                  <div>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: "0.75rem",
+                        flexWrap: "wrap",
+                        marginBottom: "1rem",
+                      }}
+                    >
+                      <div style={{ display: "flex", gap: "0.5rem", flex: 1, minWidth: "260px" }}>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Search personnel by name, email, phone..."
+                          value={personnelSearch}
+                          onChange={(e) => setPersonnelSearch(e.target.value)}
+                          style={{ fontSize: "0.85rem", padding: "0.4rem 0.75rem" }}
+                        />
+                        <select
+                          className="form-control"
+                          value={personnelRoleFilter}
+                          onChange={(e) => setPersonnelRoleFilter(e.target.value)}
+                          style={{ fontSize: "0.85rem", padding: "0.4rem 0.65rem", width: "auto" }}
+                        >
+                          <option value="">All Assigned Roles</option>
+                          <option value="community_admin">Community Admin</option>
+                          <option value="association_committee">Association Committee</option>
+                          <option value="facility_manager">Facility Manager</option>
+                          <option value="vendor_technician">Vendor Technician</option>
+                          <option value="auditor">Auditor (Read-Only)</option>
+                          <option value="domestic_staff">Domestic Staff</option>
+                          <option value="security_supervisor">Security Supervisor</option>
+                          <option value="security_guard">Security Guard</option>
+                        </select>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={() => setIsAddPersonnelOpen(true)}
+                        style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}
+                      >
+                        <span>+</span> Add Personnel / Admin
+                      </button>
+                    </div>
+
+                    {filteredPersonnel.length === 0 ? (
+                      <div
+                        style={{
+                          textAlign: "center",
+                          padding: "2.5rem 1rem",
+                          background: "var(--surface-muted, #f8fafc)",
+                          borderRadius: "8px",
+                          border: "1px dashed var(--border)",
+                        }}
+                      >
+                        <p style={{ fontWeight: 600, color: "var(--brand-heading)", marginBottom: "0.25rem" }}>
+                          No personnel records found
+                        </p>
+                        <p style={{ fontSize: "0.825rem", color: "var(--muted)", marginBottom: "1rem" }}>
+                          No administrators or staff match the current filters for {viewingCommunity.name}.
+                        </p>
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          onClick={() => setIsAddPersonnelOpen(true)}
+                        >
+                          + Add Personnel to {viewingCommunity.name}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="table-responsive" style={{ maxHeight: "420px", overflowY: "auto" }}>
+                        <table className="table" style={{ width: "100%", fontSize: "0.85rem" }}>
+                          <thead>
+                            <tr>
+                              <th>Personnel / Admin</th>
+                              <th>Assigned Role(s)</th>
+                              <th>Status</th>
+                              <th style={{ textAlign: "right" }}>Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredPersonnel.map((u) => (
+                              <tr key={u.id}>
+                                <td>
+                                  <div>
+                                    <div style={{ fontWeight: 600, color: "var(--fg)" }}>{u.full_name}</div>
+                                    <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                                      {u.email} {u.phone ? `• ${u.phone}` : ""}
+                                    </div>
+                                  </div>
+                                </td>
+                                <td>
+                                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem" }}>
+                                    {u.roles && u.roles.length > 0 ? (
+                                      u.roles.map((r) => (
+                                        <span
+                                          key={r.id}
+                                          className="badge badge-primary"
+                                          style={{ fontSize: "0.725rem", textTransform: "capitalize" }}
+                                        >
+                                          {r.role_name || r.role_slug.replace(/_/g, " ")}
+                                        </span>
+                                      ))
+                                    ) : (
+                                      <span style={{ color: "var(--muted)", fontSize: "0.75rem" }}>Unassigned</span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td>
+                                  <span
+                                    className={`badge ${u.is_active !== false ? "badge-success" : "badge-neutral"}`}
+                                    style={{ fontSize: "0.725rem" }}
+                                  >
+                                    {u.is_active !== false ? "Active" : "Disabled"}
+                                  </span>
+                                </td>
+                                <td style={{ textAlign: "right" }}>
+                                  <div style={{ display: "flex", gap: "0.4rem", justifyContent: "flex-end" }}>
+                                    <button
+                                      type="button"
+                                      className="btn btn-secondary btn-sm"
+                                      style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}
+                                      onClick={() => setEditingPersonnel(u)}
+                                    >
+                                      Edit Access
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn btn-danger btn-sm"
+                                      style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}
+                                      onClick={() => setDeletingPersonnel(u)}
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
         )}
       </Modal>
+
+      {/* Personnel Sub-Modals */}
+      {isAddPersonnelOpen && viewingCommunity && (
+        <CreateUserModal
+          isOpen={isAddPersonnelOpen}
+          onClose={() => setIsAddPersonnelOpen(false)}
+          preselectedCommunityId={viewingCommunity.id}
+          lockCommunity={true}
+          onSuccess={() => {
+            refreshCommunityDetails(viewingCommunity.id);
+          }}
+        />
+      )}
+
+      {editingPersonnel && viewingCommunity && (
+        <EditUserModal
+          isOpen={!!editingPersonnel}
+          onClose={() => setEditingPersonnel(null)}
+          user={editingPersonnel}
+          onSuccess={() => {
+            refreshCommunityDetails(viewingCommunity.id);
+          }}
+        />
+      )}
+
+      {deletingPersonnel && (
+        <Modal
+          isOpen={true}
+          onClose={() => setDeletingPersonnel(null)}
+          title="Delete Personnel Account"
+          size="sm"
+          footer={
+            <>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setDeletingPersonnel(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={async () => {
+                  try {
+                    await usersApi.delete(deletingPersonnel.id);
+                    toast.success(`Personnel "${deletingPersonnel.full_name}" deleted.`);
+                    setDeletingPersonnel(null);
+                    if (viewingCommunity) refreshCommunityDetails(viewingCommunity.id);
+                  } catch (err: any) {
+                    toast.error(err?.message || "Failed to delete user");
+                  }
+                }}
+              >
+                Confirm Delete
+              </button>
+            </>
+          }
+        >
+          <p style={{ fontSize: "0.9rem" }}>
+            Are you sure you want to delete user <strong>{deletingPersonnel.full_name}</strong> ({deletingPersonnel.email})?
+            This will revoke all role grants and session tokens for this user.
+          </p>
+        </Modal>
+      )}
 
       {/* SUB-MODAL: Add Tower */}
       <Modal
@@ -2549,10 +2397,10 @@ export default function CommunitiesPage() {
                 value={towerType}
                 onChange={(e) => setTowerType(e.target.value)}
               >
-                <option value="residential_highrise">Residential Highrise</option>
-                <option value="residential_lowrise">Residential Lowrise</option>
+                <option value="tower">Tower</option>
+                <option value="block">Block</option>
                 <option value="villa_cluster">Villa Cluster</option>
-                <option value="commercial_block">Commercial Block</option>
+                <option value="wing">Wing</option>
               </select>
             </div>
           </div>
@@ -2784,7 +2632,7 @@ export default function CommunitiesPage() {
               type="submit"
               form="add-resident-form"
               className="btn btn-primary"
-              disabled={addResidentMutation.isPending || !residentUnitId}
+              disabled={addResidentMutation.isPending}
             >
               {addResidentMutation.isPending ? "Registering…" : "👤 Register Resident"}
             </button>
@@ -2838,8 +2686,15 @@ export default function CommunitiesPage() {
                   <select
                     className="select-field"
                     value={residentUnitId}
-                    onChange={(e) => setResidentUnitId(e.target.value)}
-                    required
+                    onChange={(e) => {
+                      setResidentUnitId(e.target.value);
+                      if (residentFormErrors.residentUnitId) {
+                        setResidentFormErrors((prev) => ({ ...prev, residentUnitId: "" }));
+                      }
+                    }}
+                    style={{
+                      border: residentFormErrors.residentUnitId ? "1px solid var(--danger, #dc2626)" : undefined,
+                    }}
                   >
                     <option value="">Select Unit…</option>
                     {filteredResidentUnits.map((u) => (
@@ -2848,6 +2703,11 @@ export default function CommunitiesPage() {
                       </option>
                     ))}
                   </select>
+                  {residentFormErrors.residentUnitId && (
+                    <span style={{ fontSize: "0.75rem", color: "var(--danger, #dc2626)", marginTop: "0.25rem", display: "block" }}>
+                      {residentFormErrors.residentUnitId}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -2882,9 +2742,19 @@ export default function CommunitiesPage() {
                       const val = e.target.value;
                       setResidentFullName(val);
                       setResidentPassword(generateInitialPassword(val, "resident"));
+                      if (residentFormErrors.residentFullName) {
+                        setResidentFormErrors((prev) => ({ ...prev, residentFullName: "" }));
+                      }
                     }}
-                    required
+                    style={{
+                      border: residentFormErrors.residentFullName ? "1px solid var(--danger, #dc2626)" : undefined,
+                    }}
                   />
+                  {residentFormErrors.residentFullName && (
+                    <span style={{ fontSize: "0.75rem", color: "var(--danger, #dc2626)", marginTop: "0.25rem", display: "block" }}>
+                      {residentFormErrors.residentFullName}
+                    </span>
+                  )}
                 </div>
                 <div>
                   <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "#475569", marginBottom: "0.3rem" }}>
@@ -2913,9 +2783,21 @@ export default function CommunitiesPage() {
                     className="input-field"
                     placeholder="ananya@example.com"
                     value={residentEmail}
-                    onChange={(e) => setResidentEmail(e.target.value)}
-                    required
+                    onChange={(e) => {
+                      setResidentEmail(e.target.value);
+                      if (residentFormErrors.residentEmail) {
+                        setResidentFormErrors((prev) => ({ ...prev, residentEmail: "" }));
+                      }
+                    }}
+                    style={{
+                      border: residentFormErrors.residentEmail ? "1px solid var(--danger, #dc2626)" : undefined,
+                    }}
                   />
+                  {residentFormErrors.residentEmail && (
+                    <span style={{ fontSize: "0.75rem", color: "var(--danger, #dc2626)", marginTop: "0.25rem", display: "block" }}>
+                      {residentFormErrors.residentEmail}
+                    </span>
+                  )}
                 </div>
                 <div>
                   <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "#475569", marginBottom: "0.3rem" }}>
@@ -2926,19 +2808,41 @@ export default function CommunitiesPage() {
                     className="input-field"
                     placeholder="+91 98765 43210"
                     value={residentPhone}
-                    onChange={(e) => setResidentPhone(e.target.value)}
-                    required
+                    onChange={(e) => {
+                      setResidentPhone(e.target.value);
+                      if (residentFormErrors.residentPhone) {
+                        setResidentFormErrors((prev) => ({ ...prev, residentPhone: "" }));
+                      }
+                    }}
+                    style={{
+                      border: residentFormErrors.residentPhone ? "1px solid var(--danger, #dc2626)" : undefined,
+                    }}
                   />
+                  {residentFormErrors.residentPhone && (
+                    <span style={{ fontSize: "0.75rem", color: "var(--danger, #dc2626)", marginTop: "0.25rem", display: "block" }}>
+                      {residentFormErrors.residentPhone}
+                    </span>
+                  )}
                 </div>
               </div>
 
               <div>
                 <PasswordField
                   value={residentPassword}
-                  onChange={(val) => setResidentPassword(val)}
+                  onChange={(val) => {
+                    setResidentPassword(val);
+                    if (residentFormErrors.residentPassword) {
+                      setResidentFormErrors((prev) => ({ ...prev, residentPassword: "" }));
+                    }
+                  }}
                   placeholder="e.g. ananya@Gate2026!"
                   helperText="💡 Providing credentials allows this resident to sign in to the Resident Portal to approve visitors, receive delivery alerts, and book amenities."
                 />
+                {residentFormErrors.residentPassword && (
+                  <span style={{ fontSize: "0.75rem", color: "var(--danger, #dc2626)", marginTop: "0.25rem", display: "block" }}>
+                    {residentFormErrors.residentPassword}
+                  </span>
+                )}
               </div>
 
               <div

@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import contextlib
+import re
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -16,7 +17,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.context import RequestContext
-from app.core.errors import BusinessRuleError, ConflictError, NotFoundError
+from app.core.errors import BusinessRuleError, ConflictError, ForbiddenError, NotFoundError
 from app.core.hashing import digest, digest_opt
 from app.core.state_machine import ensure_transition
 from app.core.tenancy import TenantScope
@@ -50,6 +51,21 @@ _VERIFICATION_TRANSITIONS: dict[str, set[str]] = {
     "verified": {"expired", "pending"},
     "expired": {"pending"},
 }
+
+# Actors holding one of these roles see staff-wide data; anyone else resolved to a
+# staff row is restricted to their own rows. Compared against role slugs loaded with
+# an explicit query — never the lazy `User.roles` relationship (MissingGreenlet → 500
+# in async context; found by the Newman sweep on GET /attendance).
+_CROSS_UNIT_ROLE_SLUGS = frozenset(
+    {
+        "community_admin",
+        "super_admin",
+        "security_guard",
+        "security_supervisor",
+        "facility_manager",
+        "auditor",
+    }
+)
 
 
 def _enum(field: str, value: str | None) -> None:
@@ -163,6 +179,14 @@ class DomesticStaffService(UnitScopedAccess):
                     self.db.add(UserRole(user_id=user.id, role_id=ds_role.id, community_id=cid))
                     await self.db.flush()
 
+        clean_id_number = payload.id_number
+        if clean_id_number and payload.id_type:
+            id_type_norm = payload.id_type.strip().lower()
+            if id_type_norm in ("aadhaar", "aadhar"):
+                clean_id_number = re.sub(r"[\s-]", "", clean_id_number)
+            elif id_type_norm in ("pan", "pan card", "pan_card", "voter id", "voter_id", "passport", "driving license", "driving_license", "dl"):
+                clean_id_number = re.sub(r"[\s-]", "", clean_id_number).upper()
+
         obj = DomesticStaff(
             community_id=cid,
             user_id=user_id,
@@ -170,7 +194,7 @@ class DomesticStaffService(UnitScopedAccess):
             staff_type=payload.staff_type,
             phone=payload.phone,
             id_type=payload.id_type,
-            id_number_hash=digest_opt(payload.id_number),
+            id_number_hash=digest_opt(clean_id_number),
             photo_url=payload.photo_url,
             police_verification_status=payload.police_verification_status,
             verification_expiry=payload.verification_expiry,
@@ -184,6 +208,17 @@ class DomesticStaffService(UnitScopedAccess):
         self, *, community_id: uuid.UUID | None, q: str | None, offset: int, limit: int
     ):
         cid = self._one_community(community_id)
+        
+        from app.modules.users.models import Role, UserRole
+        slugs = await self.db.scalars(
+            select(Role.slug)
+            .join(UserRole, UserRole.role_id == Role.id)
+            .where(UserRole.user_id == self.actor.id)
+        )
+        slug_set = set(slugs.all())
+        if not self.actor.is_superadmin and "resident" not in slug_set and not slug_set.intersection(_CROSS_UNIT_ROLE_SLUGS):
+            raise ForbiddenError("You do not have permission to view the staff registry", code="PERMISSION_DENIED")
+
         stmt = select(DomesticStaff).where(DomesticStaff.community_id == cid)
         if q:
             stmt = stmt.where(
@@ -200,6 +235,9 @@ class DomesticStaffService(UnitScopedAccess):
     async def update_staff(
         self, staff_id: uuid.UUID, payload: schemas.StaffUpdate
     ) -> DomesticStaff:
+        if not self.actor.is_superadmin and not await self._actor_has_cross_unit_role():
+            raise ForbiddenError("Only administrators can update staff profiles directly", code="PERMISSION_DENIED")
+            
         obj = await self._staff_in_scope(staff_id)
         patch = payload.model_dump(exclude_unset=True)
         _enum("staff_type", patch.get("staff_type"))
@@ -214,11 +252,29 @@ class DomesticStaffService(UnitScopedAccess):
             )
         if "photo_url" in patch:
             await ensure_confirmed_async(self.db, patch["photo_url"])
+        if "id_number" in patch:
+            raw_id = patch.pop("id_number")
+            clean_id = raw_id
+            target_id_type = patch.get("id_type", obj.id_type)
+            if clean_id and target_id_type:
+                id_type_norm = target_id_type.strip().lower()
+                if id_type_norm in ("aadhaar", "aadhar"):
+                    clean_id = re.sub(r"[\s-]", "", clean_id)
+                elif id_type_norm in ("pan", "pan card", "pan_card", "voter id", "voter_id", "passport", "driving license", "driving_license", "dl"):
+                    clean_id = re.sub(r"[\s-]", "", clean_id).upper()
+            obj.id_number_hash = digest_opt(clean_id)
         for k, v in patch.items():
             setattr(obj, k, v)
         await self.db.flush()
         await self._audit("staff.update", obj.community_id, "domestic_staff", obj.id, new=patch)
         return obj
+
+    async def delete_staff(self, staff_id: uuid.UUID) -> None:
+        obj = await self._staff_in_scope(staff_id)
+        cid = obj.community_id
+        await self.db.delete(obj)
+        await self.db.flush()
+        await self._audit("staff.delete", cid, "domestic_staff", staff_id)
 
     # -- assignments ------------------------------------------ #
     async def assign_unit(self, payload: schemas.AssignmentCreate) -> StaffUnitAssignment:
@@ -226,8 +282,13 @@ class DomesticStaffService(UnitScopedAccess):
         unit = await self._unit_in_scope(payload.unit_id, staff.community_id)
         await self._assert_unit_visible(payload.unit_id)
         _enum("work_type", payload.work_type)
+        today = datetime.now(UTC).date()
+        if payload.start_date and payload.start_date < today:
+            raise BusinessRuleError("start_date cannot be in the past", code="INVALID_START_DATE")
         if payload.start_date and payload.end_date and payload.start_date > payload.end_date:
             raise BusinessRuleError("start_date must be <= end_date", code="INVALID_DATE_RANGE")
+        if payload.time_from and payload.time_to and payload.time_to <= payload.time_from:
+            raise BusinessRuleError("time_to must be after time_from", code="INVALID_TIME_RANGE")
         if await self.assignments.active_for_pair(payload.staff_id, payload.unit_id):
             raise ConflictError("Staff is already assigned to that unit", code="ASSIGNMENT_EXISTS")
         days = payload.days_of_week or ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
@@ -441,18 +502,7 @@ class DomesticStaffService(UnitScopedAccess):
             my_staff_obj = None
             with contextlib.suppress(NotFoundError):
                 my_staff_obj = await self._resolve_my_staff()
-            if my_staff_obj is not None and not any(
-                r
-                in {
-                    "community_admin",
-                    "super_admin",
-                    "security_guard",
-                    "security_supervisor",
-                    "facility_manager",
-                    "auditor",
-                }
-                for r in getattr(self.actor, "roles", [])
-            ):
+            if my_staff_obj is not None and not await self._actor_has_cross_unit_role():
                 stmt = stmt.where(StaffAttendance.staff_id == my_staff_obj.id)
             elif staff_id:
                 stmt = stmt.where(StaffAttendance.staff_id == staff_id)
@@ -583,6 +633,21 @@ class DomesticStaffService(UnitScopedAccess):
 
         raise NotFoundError("Domestic staff profile not found")
 
+    async def _actor_has_cross_unit_role(self) -> bool:
+        """Whether the actor holds a staff-wide role, via an explicit query.
+
+        Never touch the lazy `User.roles` relationship here — in async context an
+        unloaded relationship raises MissingGreenlet (500 on GET /attendance).
+        """
+        from app.modules.users.models import Role, UserRole
+
+        slugs = await self.db.scalars(
+            select(Role.slug)
+            .join(UserRole, UserRole.role_id == Role.id)
+            .where(UserRole.user_id == self.actor.id)
+        )
+        return bool(set(slugs.all()) & _CROSS_UNIT_ROLE_SLUGS)
+
     async def get_my_profile(self) -> schemas.StaffMeRead:
         staff = await self._resolve_my_staff()
         ratings = await self.ratings.for_staff(staff.id)
@@ -606,7 +671,12 @@ class DomesticStaffService(UnitScopedAccess):
 
         for att in month_attendances:
             ci = att.check_in_at
-            co = att.check_out_at or now
+            if ci.tzinfo is None:
+                ci = ci.replace(tzinfo=UTC)
+            co = att.check_out_at
+            if co is not None and co.tzinfo is None:
+                co = co.replace(tzinfo=UTC)
+            co = co or now
             dur = max(0.0, (co - ci).total_seconds() / 3600.0)
             hours_month += dur
             if ci >= week_start:

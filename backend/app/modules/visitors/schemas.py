@@ -30,6 +30,7 @@ ALLOWED = {
         "staff",
         "family",
         "event",
+        "other",
     },
     "status": set(REQUEST_STATUS),
     "risk_level": set(RISK_LEVELS),
@@ -181,6 +182,7 @@ class RequestRead(_Read):
     visitor: VisitorRead | None = None
     visitor_name: str | None = None
     phone: str | None = None
+    photo_url: str | None = None
     passes: list[PassRead] = []
 
     @model_validator(mode="before")
@@ -191,9 +193,11 @@ class RequestRead(_Read):
             if isinstance(v, dict):
                 data.setdefault("visitor_name", v.get("full_name"))
                 data.setdefault("phone", v.get("phone"))
+                data.setdefault("photo_url", v.get("photo_url"))
             elif v is not None:
                 data.setdefault("visitor_name", getattr(v, "full_name", None))
                 data.setdefault("phone", getattr(v, "phone", None))
+                data.setdefault("photo_url", getattr(v, "photo_url", None))
             return data
 
         # If data is an ORM instance or other object, extract attributes into dict safely
@@ -201,6 +205,7 @@ class RequestRead(_Read):
             v = getattr(data, "visitor", None)
             v_name = getattr(v, "full_name", None) if v else None
             v_phone = getattr(v, "phone", None) if v else None
+            v_photo = getattr(v, "photo_url", None) if v else None
             passes = []
             try:
                 raw_passes = getattr(data, "passes", [])
@@ -227,6 +232,7 @@ class RequestRead(_Read):
                 "visitor": v,
                 "visitor_name": v_name,
                 "phone": v_phone,
+                "photo_url": v_photo,
                 "passes": passes,
             }
         return data
@@ -249,6 +255,7 @@ class EntryRead(_Read):
     gate_id: uuid.UUID | None
     entry_at: datetime | None
     exit_at: datetime | None
+    entry_photo_url: str | None = None
     vehicle_number: str | None
     status: str
     denial_reason: str | None

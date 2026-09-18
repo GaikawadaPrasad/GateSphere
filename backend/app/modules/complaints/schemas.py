@@ -163,6 +163,7 @@ class AttachmentRead(_Read):
 
 class TicketRead(_Read):
     community_id: uuid.UUID
+    community_name: str | None = None
     unit_id: uuid.UUID
     ticket_number: str
     raised_by_user_id: uuid.UUID | None
@@ -180,6 +181,11 @@ class TicketRead(_Read):
     sla_breached_at: datetime | None
     resolved_at: datetime | None
     closed_at: datetime | None
+    raised_by_name: str | None = None
+    raised_by_phone: str | None = None
+    raised_by_email: str | None = None
+    unit_number: str | None = None
+    category_name: str | None = None
 
 
 class TicketEntryPassRead(BaseModel):

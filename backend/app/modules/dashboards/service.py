@@ -162,6 +162,11 @@ class DashboardService:
     # -- financial --------------------------------------- #
     async def financial(self, community_id: uuid.UUID | None):
         cid = self._community(community_id)
+        unit_scope = await actor_unit_scope(self.db, self.actor)
+        if unit_scope is not None:
+            raise ForbiddenError(
+                "Residents cannot access community financial totals", code="PERMISSION_DENIED"
+            )
         from app.modules.dashboards import schemas
 
         by_status = {
@@ -341,112 +346,139 @@ class DashboardService:
             return "security"
         return "admin"
 
-    async def super_admin_stats(self) -> schemas.SuperAdminDashboardStats:
+    async def super_admin_stats(
+        self, community_id: uuid.UUID | None = None
+    ) -> schemas.SuperAdminDashboardStats:
         if not (self.actor.is_superadmin or self.scope.is_global):
             raise ForbiddenError(
                 "Only a platform Super Admin can access global platform statistics",
                 code="GLOBAL_ONLY",
             )
-        communities = (
-            await self.db.scalars(select(Community).order_by(Community.created_at.desc()))
-        ).all()
+        if community_id is not None:
+            community = await self.db.get(Community, community_id)
+            if not community:
+                raise BusinessRuleError("Community not found", code="COMMUNITY_NOT_FOUND")
+            communities = [community]
+        else:
+            communities = (
+                await self.db.scalars(select(Community).order_by(Community.created_at.desc()))
+            ).all()
+
         total_comm = len(communities)
         active_comm = [c for c in communities if c.is_active]
         active_comm_count = len(active_comm)
         inactive_comm_count = total_comm - active_comm_count
 
         # 1. Total units and units per community
-        unit_counts_res = (
-            await self.db.execute(
-                select(Unit.community_id, func.count()).group_by(Unit.community_id)
-            )
-        ).all()
+        unit_query = select(Unit.community_id, func.count()).group_by(Unit.community_id)
+        if community_id is not None:
+            unit_query = unit_query.where(Unit.community_id == community_id)
+        unit_counts_res = (await self.db.execute(unit_query)).all()
         units_by_comm = {str(cid): cnt for cid, cnt in unit_counts_res if cid}
         total_units = sum(units_by_comm.values())
 
         # 2. Total residents and residents per community
-        res_counts_res = (
-            await self.db.execute(
-                select(ResidentProfile.community_id, func.count()).group_by(
-                    ResidentProfile.community_id
-                )
-            )
-        ).all()
+        res_query = select(ResidentProfile.community_id, func.count()).group_by(
+            ResidentProfile.community_id
+        )
+        if community_id is not None:
+            res_query = res_query.where(ResidentProfile.community_id == community_id)
+        res_counts_res = (await self.db.execute(res_query)).all()
         res_by_comm = {str(cid): cnt for cid, cnt in res_counts_res if cid}
         total_residents = sum(res_by_comm.values())
 
         # 3. Towers per community
-        tower_counts_res = (
-            await self.db.execute(
-                select(Tower.community_id, func.count()).group_by(Tower.community_id)
-            )
-        ).all()
+        tower_query = select(Tower.community_id, func.count()).group_by(Tower.community_id)
+        if community_id is not None:
+            tower_query = tower_query.where(Tower.community_id == community_id)
+        tower_counts_res = (await self.db.execute(tower_query)).all()
         towers_by_comm = {str(cid): cnt for cid, cnt in tower_counts_res if cid}
 
         # 4. Open complaints / tickets per community
-        ticket_counts_res = (
-            await self.db.execute(
-                select(ServiceTicket.community_id, func.count())
-                .where(ServiceTicket.status.in_(_OPEN_TICKET))
-                .group_by(ServiceTicket.community_id)
-            )
-        ).all()
+        ticket_query = (
+            select(ServiceTicket.community_id, func.count())
+            .where(ServiceTicket.status.in_(_OPEN_TICKET))
+            .group_by(ServiceTicket.community_id)
+        )
+        if community_id is not None:
+            ticket_query = ticket_query.where(ServiceTicket.community_id == community_id)
+        ticket_counts_res = (await self.db.execute(ticket_query)).all()
         tickets_by_comm = {str(cid): cnt for cid, cnt in ticket_counts_res if cid}
         total_open_tickets = sum(tickets_by_comm.values())
 
         # 5. Critical complaints
-        critical_complaints = await self._count(
-            ServiceTicket,
+        crit_filters = [
             ServiceTicket.status.in_(_OPEN_TICKET),
             ServiceTicket.priority == "critical",
-        )
+        ]
+        if community_id is not None:
+            crit_filters.append(ServiceTicket.community_id == community_id)
+        critical_complaints = await self._count(ServiceTicket, *crit_filters)
 
         # 6. Active gate traffic
-        visitors_inside = await self._count(VisitorEntry, VisitorEntry.status == "inside")
-        vehicles_inside = await self._count(VehicleEntry, VehicleEntry.status == "inside")
-        staff_inside = await self._count(StaffAttendance, StaffAttendance.check_out_at.is_(None))
+        traffic_comm_filter = [VisitorEntry.community_id == community_id] if community_id else []
+        veh_comm_filter = [VehicleEntry.community_id == community_id] if community_id else []
+        staff_comm_filter = [StaffAttendance.community_id == community_id] if community_id else []
+
+        visitors_inside = await self._count(
+            VisitorEntry, VisitorEntry.status == "inside", *traffic_comm_filter
+        )
+        vehicles_inside = await self._count(
+            VehicleEntry, VehicleEntry.status == "inside", *veh_comm_filter
+        )
+        staff_inside = await self._count(
+            StaffAttendance, StaffAttendance.check_out_at.is_(None), *staff_comm_filter
+        )
         active_gate_traffic = visitors_inside + vehicles_inside + staff_inside
 
         # 7. Open incidents and panic alerts
-        open_incidents = await self._count(
-            SecurityIncident, SecurityIncident.status.in_(_OPEN_INCIDENT)
-        )
-        active_panic_alerts = await self._count(PanicAlert, PanicAlert.status == "active")
+        inc_filters = [SecurityIncident.status.in_(_OPEN_INCIDENT)]
+        if community_id is not None:
+            inc_filters.append(SecurityIncident.community_id == community_id)
+        open_incidents = await self._count(SecurityIncident, *inc_filters)
+
+        panic_filters = [PanicAlert.status == "active"]
+        if community_id is not None:
+            panic_filters.append(PanicAlert.community_id == community_id)
+        active_panic_alerts = await self._count(PanicAlert, *panic_filters)
 
         # 8. Financials
-        billed_by_comm_res = (
-            await self.db.execute(
-                select(
-                    MaintenanceInvoice.community_id,
-                    func.coalesce(func.sum(MaintenanceInvoice.total_amount), 0),
-                )
-                .where(MaintenanceInvoice.status != "draft")
-                .group_by(MaintenanceInvoice.community_id)
+        billed_query = (
+            select(
+                MaintenanceInvoice.community_id,
+                func.coalesce(func.sum(MaintenanceInvoice.total_amount), 0),
             )
-        ).all()
+            .where(MaintenanceInvoice.status != "draft")
+            .group_by(MaintenanceInvoice.community_id)
+        )
+        if community_id is not None:
+            billed_query = billed_query.where(MaintenanceInvoice.community_id == community_id)
+        billed_by_comm_res = (await self.db.execute(billed_query)).all()
         billed_by_comm = {str(cid): val for cid, val in billed_by_comm_res if cid}
         total_billed = sum(billed_by_comm.values()) if billed_by_comm else Decimal(0)
 
-        collected_by_comm_res = (
-            await self.db.execute(
-                select(Payment.community_id, func.coalesce(func.sum(Payment.amount), 0))
-                .where(Payment.payment_status == "success")
-                .group_by(Payment.community_id)
-            )
-        ).all()
+        collected_query = (
+            select(Payment.community_id, func.coalesce(func.sum(Payment.amount), 0))
+            .where(Payment.payment_status == "success")
+            .group_by(Payment.community_id)
+        )
+        if community_id is not None:
+            collected_query = collected_query.where(Payment.community_id == community_id)
+        collected_by_comm_res = (await self.db.execute(collected_query)).all()
         collected_by_comm = {str(cid): val for cid, val in collected_by_comm_res if cid}
         total_collected = sum(collected_by_comm.values()) if collected_by_comm else Decimal(0)
 
-        outstanding_by_comm_res = (
-            await self.db.execute(
-                select(
-                    MaintenanceInvoice.community_id,
-                    func.coalesce(func.sum(MaintenanceInvoice.balance_due), 0),
-                )
-                .where(MaintenanceInvoice.status.in_(("posted", "partially_paid", "overdue")))
-                .group_by(MaintenanceInvoice.community_id)
+        out_query = (
+            select(
+                MaintenanceInvoice.community_id,
+                func.coalesce(func.sum(MaintenanceInvoice.balance_due), 0),
             )
-        ).all()
+            .where(MaintenanceInvoice.status.in_(("posted", "partially_paid", "overdue")))
+            .group_by(MaintenanceInvoice.community_id)
+        )
+        if community_id is not None:
+            out_query = out_query.where(MaintenanceInvoice.community_id == community_id)
+        outstanding_by_comm_res = (await self.db.execute(out_query)).all()
         outstanding_by_comm = {str(cid): val for cid, val in outstanding_by_comm_res if cid}
         total_outstanding = sum(outstanding_by_comm.values()) if outstanding_by_comm else Decimal(0)
 

@@ -13,12 +13,19 @@ import uuid
 
 from fastapi import APIRouter, Depends, Response, status
 
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.errors import ForbiddenError
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
-from app.core.tenancy import require_permission_async
+from app.core.security import require_auth_async
+from app.core.tenancy import TenantScope, get_tenant_scope_async, require_permission_async
+from app.db.session import get_async_db
 from app.modules.residents import schemas
 from app.modules.residents.deps import resident_service
 from app.modules.residents.service import ResidentService
+from app.modules.users.models import Role, User, UserRole
 
 router = APIRouter(prefix="/residents", tags=["Residents"])
 
@@ -26,6 +33,53 @@ VIEW = Depends(require_permission_async("residents:view"))
 CREATE = Depends(require_permission_async("residents:create"))
 UPDATE = Depends(require_permission_async("residents:update"))
 DELETE = Depends(require_permission_async("residents:delete"))
+
+
+async def require_household_view(
+    scope: TenantScope = Depends(get_tenant_scope_async),
+    user: User = Depends(require_auth_async),
+) -> TenantScope:
+    if scope.can("residents:view"):
+        return scope
+    return scope
+
+
+async def require_household_write(
+    scope: TenantScope = Depends(get_tenant_scope_async),
+    user: User = Depends(require_auth_async),
+    db: AsyncSession = Depends(get_async_db),
+) -> TenantScope:
+    if (
+        scope.can("residents:create")
+        or scope.can("residents:update")
+        or scope.can("residents:delete")
+    ):
+        return scope
+    if not user.is_superadmin:
+        roles = list(
+            (
+                await db.scalars(
+                    select(Role.slug)
+                    .join(UserRole, UserRole.role_id == Role.id)
+                    .where(UserRole.user_id == user.id)
+                )
+            ).all()
+        )
+        if "resident" not in roles:
+            raise ForbiddenError(
+                "Only residents and community staff can manage household records",
+                code="PERMISSION_DENIED",
+            )
+        if "auditor" in roles and not any(
+            r in ("resident", "community_admin", "facility_manager") for r in roles
+        ):
+            raise ForbiddenError("Auditors are strictly read-only", code="AUDITOR_READ_ONLY")
+    return scope
+
+
+HOUSEHOLD_VIEW = Depends(require_household_view)
+HOUSEHOLD_WRITE = Depends(require_household_write)
+
 
 
 @router.get("/health", summary="Residents module liveness")
@@ -85,6 +139,7 @@ async def list_occupancies(
 @router.get(
     "/units/{unit_id}/family-members",
     response_model=Envelope[list[schemas.FamilyMemberRead]],
+    dependencies=[HOUSEHOLD_VIEW],
 )
 async def list_family(
     unit_id: uuid.UUID,
@@ -135,6 +190,7 @@ async def end_occupancy(
     "/family-members",
     response_model=Envelope[schemas.FamilyMemberRead],
     status_code=status.HTTP_201_CREATED,
+    dependencies=[HOUSEHOLD_WRITE],
 )
 async def create_family(
     payload: schemas.FamilyMemberCreate, svc: ResidentService = Depends(resident_service)
@@ -148,6 +204,7 @@ async def create_family(
 @router.patch(
     "/family-members/{member_id}",
     response_model=Envelope[schemas.FamilyMemberRead],
+    dependencies=[HOUSEHOLD_WRITE],
 )
 async def update_family(
     member_id: uuid.UUID,
@@ -164,6 +221,7 @@ async def update_family(
     "/family-members/{member_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     response_class=Response,
+    dependencies=[HOUSEHOLD_WRITE],
 )
 async def delete_family(
     member_id: uuid.UUID, svc: ResidentService = Depends(resident_service)
@@ -172,12 +230,33 @@ async def delete_family(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.get(
+    "/family-members/{member_id}/pass",
+    response_model=Envelope[schemas.FamilyPassRead],
+    dependencies=[HOUSEHOLD_VIEW],
+)
+async def get_family_pass(
+    member_id: uuid.UUID, svc: ResidentService = Depends(resident_service)
+) -> dict:
+    return ok(await svc.get_family_pass(member_id))
+
+
+@router.post(
+    "/family-members/verify-pass",
+    response_model=Envelope[schemas.FamilyPassVerifyOut],
+)
+async def verify_family_pass(
+    payload: schemas.FamilyPassVerifyIn, svc: ResidentService = Depends(resident_service)
+) -> dict:
+    return ok(await svc.verify_family_pass(payload))
+
+
 # --- emergency contacts (delete-by-id) --------------------------------- #
 @router.delete(
     "/emergency-contacts/{contact_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     response_class=Response,
-    dependencies=[DELETE],
+    dependencies=[HOUSEHOLD_WRITE],
 )
 async def delete_contact(
     contact_id: uuid.UUID, svc: ResidentService = Depends(resident_service)
@@ -310,10 +389,23 @@ async def update_profile(
     )
 
 
+@router.delete(
+    "/{profile_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    dependencies=[DELETE],
+)
+async def delete_profile(
+    profile_id: uuid.UUID, svc: ResidentService = Depends(resident_service)
+) -> Response:
+    await svc.delete_profile(profile_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get(
     "/{profile_id}/emergency-contacts",
     response_model=Envelope[list[schemas.EmergencyContactRead]],
-    dependencies=[VIEW],
+    dependencies=[HOUSEHOLD_VIEW],
 )
 async def list_contacts(
     profile_id: uuid.UUID,
@@ -332,7 +424,7 @@ async def list_contacts(
     "/{profile_id}/emergency-contacts",
     response_model=Envelope[schemas.EmergencyContactRead],
     status_code=status.HTTP_201_CREATED,
-    dependencies=[CREATE],
+    dependencies=[HOUSEHOLD_WRITE],
 )
 async def create_contact(
     profile_id: uuid.UUID,
@@ -343,3 +435,4 @@ async def create_contact(
         schemas.EmergencyContactRead.model_validate(await svc.create_contact(profile_id, payload)),
         message="Contact added",
     )
+

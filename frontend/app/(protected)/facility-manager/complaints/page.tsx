@@ -6,6 +6,8 @@ import { SearchInput } from "@/components/forms/SearchInput";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
 import { complaintsApi, vendorsApi, getCsrfToken } from "@/lib/api";
+import { FileUpload } from "@/components/common/FileUpload";
+import { toast } from "@/store/toast";
 import { formatDate as fmtDate } from "@/lib/utils";
 
 function deriveSlaStatus(c: any): string {
@@ -53,9 +55,11 @@ export default function FacilityManagerComplaintsPage() {
   const [historyTicket, setHistoryTicket] = useState<any | null>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
+  const [attachments, setAttachments] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [ticketFeedback, setTicketFeedback] = useState<{ rating: number; comments: string | null } | null>(null);
 
   const loadData = async (reset = true) => {
     const currentPage = reset ? 1 : page + 1;
@@ -134,20 +138,40 @@ export default function FacilityManagerComplaintsPage() {
     setHistoryTicket(c);
     setHistory([]);
     setMessages([]);
+    setAttachments([]);
     setNewMessage("");
+    setTicketFeedback(null);
     setIsHistoryModalOpen(true);
     setHistoryLoading(true);
     try {
-      const [histRes, msgRes] = await Promise.allSettled([
+      const [histRes, msgRes, attRes, fbRes] = await Promise.allSettled([
         fetch(`/api/v1/complaints/tickets/${c.id}/history`, { credentials: "include", headers: { Accept: "application/json", "X-Session-Role": "facility_manager" } }).then(r => r.json()),
         fetch(`/api/v1/complaints/tickets/${c.id}/messages`, { credentials: "include", headers: { Accept: "application/json", "X-Session-Role": "facility_manager" } }).then(r => r.json()),
+        complaintsApi.attachments(c.id),
+        complaintsApi.getFeedback(c.id),
       ]);
       if (histRes.status === "fulfilled") setHistory(histRes.value?.data || histRes.value || []);
       if (msgRes.status === "fulfilled") setMessages(msgRes.value?.data || msgRes.value || []);
+      if (attRes.status === "fulfilled") setAttachments((attRes.value as any)?.data || (attRes.value as any) || []);
+      if (fbRes.status === "fulfilled" && fbRes.value) setTicketFeedback(fbRes.value);
     } catch {
       setHistory([]);
     } finally {
       setHistoryLoading(false);
+    }
+  };
+
+  const handleUploadAttachment = async (url: string) => {
+    if (!historyTicket?.id) return;
+    try {
+      const newAtt = await complaintsApi.addAttachment(historyTicket.id, {
+        file_url: url,
+        file_name: "Work-completion proof / attachment",
+      });
+      setAttachments((prev) => [...prev, newAtt?.data || newAtt]);
+      toast.success("Attachment added successfully");
+    } catch (err: any) {
+      alert(err?.message || "Failed to add attachment");
     }
   };
 
@@ -368,6 +392,18 @@ export default function FacilityManagerComplaintsPage() {
             <div style={{ marginBottom: "1rem", padding: "0.75rem", background: "var(--surface)", borderRadius: "var(--radius-sm)", fontSize: "0.85rem" }}>
               <strong>{historyTicket.subject}</strong>
               <span style={{ marginLeft: "0.75rem", color: "var(--muted)" }}>{categoryMap[historyTicket.category_id] || "—"}</span>
+              {ticketFeedback && (
+                <div style={{ marginTop: "0.5rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Resident Rating</span>
+                  <span style={{ color: "#f59e0b", fontSize: "1rem", letterSpacing: 1 }}>
+                    {"★".repeat(ticketFeedback.rating)}{"☆".repeat(5 - ticketFeedback.rating)}
+                  </span>
+                  <span style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--fg)" }}>{ticketFeedback.rating}/5</span>
+                  {ticketFeedback.comments && (
+                    <span style={{ fontSize: "0.8rem", color: "var(--muted)", fontStyle: "italic" }}>— {ticketFeedback.comments}</span>
+                  )}
+                </div>
+              )}
             </div>
           )}
           {historyLoading ? (
@@ -419,6 +455,48 @@ export default function FacilityManagerComplaintsPage() {
                   <button className="btn btn-primary" onClick={handleSendMessage} disabled={isSendingMessage || !newMessage.trim()} style={{ whiteSpace: "nowrap" }}>
                     {isSendingMessage ? "Sending…" : "Send"}
                   </button>
+                </div>
+              </div>
+
+              {/* Attachments & Proof of Work */}
+              <div>
+                <div style={{ fontWeight: 600, fontSize: "0.8rem", color: "var(--muted)", marginBottom: "0.5rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  Attachments & Work-Completion Proof
+                </div>
+                {attachments.length === 0 ? (
+                  <p style={{ fontSize: "0.82rem", color: "var(--muted)", marginBottom: "0.5rem" }}>No attachments uploaded yet.</p>
+                ) : (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.75rem" }}>
+                    {attachments.map((a: any, i: number) => (
+                      <a
+                        key={a.id || i}
+                        href={a.file_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "0.4rem",
+                          padding: "0.35rem 0.65rem",
+                          background: "var(--surface)",
+                          border: "1px solid var(--border)",
+                          borderRadius: "var(--radius-sm)",
+                          fontSize: "0.8rem",
+                          textDecoration: "none",
+                          color: "var(--primary)",
+                        }}
+                      >
+                        📎 {a.file_name || "Attachment"}
+                      </a>
+                    ))}
+                  </div>
+                )}
+                <div style={{ marginTop: "0.5rem", padding: "0.75rem", background: "var(--surface)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
+                  <FileUpload
+                    kind="ticket_attachment"
+                    label="Upload work-completion proof or issue photo"
+                    onUploadComplete={handleUploadAttachment}
+                  />
                 </div>
               </div>
             </div>

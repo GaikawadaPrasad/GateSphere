@@ -41,8 +41,6 @@ export const ROLE_CONFIGS: Record<string, RoleConfig> = {
     navItems: [
       { label: "Dashboard", href: "/facility-manager/dashboard", icon: "📊" },
       { label: "Facilities", href: "/facility-manager/facilities", icon: "🏢" },
-      { label: "Maintenance", href: "/facility-manager/maintenance", icon: "🔧" },
-      { label: "Service Requests", href: "/facility-manager/service-requests", icon: "📋" },
       { label: "Vendors", href: "/facility-manager/vendors", icon: "🛠️" },
       { label: "Amenities", href: "/facility-manager/amenities", icon: "🏊" },
       { label: "Complaints", href: "/facility-manager/complaints", icon: "🎫" },

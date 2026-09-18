@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 import pytest
 from sqlalchemy import select
@@ -38,7 +39,8 @@ async def test_booking_computes_window_and_amount(db, scope_for, community, amen
         schemas.BookingCreate(amenity_id=amenity.id, slot_id=slot.id, booking_date=bdate)
     )
     assert b.status == "confirmed"
-    assert b.start_at.hour == 6 and b.end_at.hour == 8
+    loc_tz = ZoneInfo(getattr(community, "timezone", "Asia/Kolkata") or "Asia/Kolkata")
+    assert b.start_at.astimezone(loc_tz).hour == 6 and b.end_at.astimezone(loc_tz).hour == 8
     assert b.booking_date == bdate
 
 

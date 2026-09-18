@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
-import { complaintsApi, authApi, type CurrentUser, type ServiceTicket } from "@/lib/api";
+import { vendorTicketsApi, authApi, type CurrentUser } from "@/lib/api";
 
 const QrCodeSvg = dynamic(
   () => import("@/components/common/QrCodeSvg").then((mod) => mod.QrCodeSvg),
@@ -31,7 +31,7 @@ const QrCodeSvg = dynamic(
 );
 
 export default function VendorEntryPassPage() {
-  const [activeTicket, setActiveTicket] = useState<ServiceTicket | null>(null);
+  const [activeTicket, setActiveTicket] = useState<any | null>(null);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -40,7 +40,7 @@ export default function VendorEntryPassPage() {
       setIsLoading(true);
       try {
         const [ticketsRes, meRes] = await Promise.allSettled([
-          complaintsApi.tickets({ page_size: 20 }),
+          vendorTicketsApi.list(),
           authApi.me("vendor_technician"),
         ]);
 
@@ -49,13 +49,23 @@ export default function VendorEntryPassPage() {
         }
 
         if (ticketsRes.status === "fulfilled" && Array.isArray(ticketsRes.value)) {
-          // Priority: in_progress first, then acknowledged, then assigned
-          const inProgress = ticketsRes.value.find((t) => t.status === "in_progress");
-          const acknowledged = ticketsRes.value.find((t) => t.status === "acknowledged");
-          const assigned = ticketsRes.value.find(
+          const tickets = ticketsRes.value as any[];
+          const inProgress = tickets.find((t) => t.status === "in_progress");
+          const acknowledged = tickets.find((t) => t.status === "acknowledged");
+          const assigned = tickets.find(
             (t) => t.status === "assigned" || t.status === "created",
           );
-          setActiveTicket(inProgress || acknowledged || assigned || null);
+          const matched = inProgress || acknowledged || assigned || null;
+          if (matched) {
+            try {
+              const pass = await vendorTicketsApi.getEntryPass(matched.id);
+              setActiveTicket({ ...matched, ...pass });
+            } catch {
+              setActiveTicket(matched);
+            }
+          } else {
+            setActiveTicket(null);
+          }
         }
       } catch {
         setActiveTicket(null);
@@ -66,11 +76,15 @@ export default function VendorEntryPassPage() {
     loadPass();
   }, []);
 
-  const passCode = activeTicket
+  const passCode = activeTicket?.pass_code
+    ? activeTicket.pass_code
+    : activeTicket
     ? `PASS-VEN-${activeTicket.ticket_number.replace(/\D/g, "").slice(-4) || "8812"}`
     : "NO-ACTIVE-PASS";
 
-  const qrData = activeTicket
+  const qrData = activeTicket?.qr_payload
+    ? activeTicket.qr_payload
+    : activeTicket
     ? `GS-PASS-${activeTicket.ticket_number}-${activeTicket.id.slice(0, 8).toUpperCase()}`
     : "NO-ACTIVE-WORK-ORDER";
 

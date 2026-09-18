@@ -46,4 +46,6 @@ export interface GuardRoster {
   shift_end: string;
   status: "planned" | "active" | "completed" | "cancelled";
   notes?: string | null;
+  guard_name?: string | null;
+  guard_phone?: string | null;
 }

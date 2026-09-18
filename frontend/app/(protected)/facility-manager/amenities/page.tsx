@@ -4,13 +4,21 @@ import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
-import { amenitiesApi, getCsrfToken, type Amenity, type AmenityBooking } from "@/lib/api";
+import { amenitiesApi, facilitiesApi, type Amenity, type AmenityBooking } from "@/lib/api";
 
 export default function FacilityManagerAmenitiesPage() {
   const [amenities, setAmenities] = useState<Amenity[]>([]);
   const [bookings, setBookings] = useState<AmenityBooking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Add Amenity Modal
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newType, setNewType] = useState("hall");
+  const [newCapacity, setNewCapacity] = useState("50");
+  const [newLocation, setNewLocation] = useState("");
+  const [isCreatingAmenity, setIsCreatingAmenity] = useState(false);
 
   // Maintenance Block Modal
   const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
@@ -64,6 +72,47 @@ export default function FacilityManagerAmenitiesPage() {
     loadData();
   }, []);
 
+  const handleAddAmenity = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newName.trim() || newName.trim().length < 2) {
+      alert("Amenity name must be at least 2 characters.");
+      return;
+    }
+    const cap = parseInt(newCapacity, 10);
+    if (isNaN(cap) || cap < 1) {
+      alert("Capacity must be a positive number.");
+      return;
+    }
+    setIsCreatingAmenity(true);
+    try {
+      const generatedCode =
+        newName
+          .replace(/[^A-Za-z0-9]/g, "")
+          .toUpperCase()
+          .slice(0, 8) +
+        "-" +
+        Math.floor(10 + Math.random() * 90);
+
+      await facilitiesApi.create({
+        code: generatedCode,
+        name: newName.trim(),
+        amenity_type: newType,
+        location_text: newLocation.trim() || undefined,
+        capacity: cap,
+        booking_required: true,
+      });
+      setIsAddModalOpen(false);
+      setNewName("");
+      setNewLocation("");
+      setNewCapacity("50");
+      await loadData();
+    } catch (err: any) {
+      alert(err?.message || "Failed to create amenity.");
+    } finally {
+      setIsCreatingAmenity(false);
+    }
+  };
+
   const handleBlockSlot = async () => {
     if (!selectedAmenity || !blockFrom || !blockTo) return;
     if (new Date(blockTo) <= new Date(blockFrom)) {
@@ -71,21 +120,15 @@ export default function FacilityManagerAmenitiesPage() {
       return;
     }
     try {
-      const block = await amenitiesApi.blockSlot({
+      await amenitiesApi.blockSlot({
         amenity_id: selectedAmenity.id,
         blocked_from: new Date(blockFrom).toISOString(),
         blocked_to: new Date(blockTo).toISOString(),
         reason: blockReason || undefined,
       });
-      setAmenities((prev) =>
-        prev.map((a) =>
-          a.id === selectedAmenity.id
-            ? { ...a, is_active: false, block_id: block?.id }
-            : a,
-        ),
-      );
       setIsBlockModalOpen(false);
       setBlockReason("");
+      await loadData();
     } catch (err: any) {
       alert(err?.message || "Failed to block slot.");
     }
@@ -93,25 +136,9 @@ export default function FacilityManagerAmenitiesPage() {
 
   const handleUnblockSlot = async (amenity: any) => {
     try {
-      const csrf = getCsrfToken();
-      const res = await fetch(`/api/v1/amenities/${amenity.id}`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          "X-Session-Role": "facility_manager",
-          ...(csrf ? { "X-CSRF-Token": csrf } : {}),
-        },
-        body: JSON.stringify({ is_active: true }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.message || `Failed to unblock (${res.status})`);
-      }
-      setAmenities((prev) =>
-        prev.map((a: any) => (a.id === amenity.id ? { ...a, is_active: true, block_id: null } : a)),
-      );
+      if (!amenity.block_id) return;
+      await amenitiesApi.unblockSlot(amenity.block_id);
+      await loadData();
     } catch (err: any) {
       alert(err?.message || "Failed to unblock slot.");
     }
@@ -131,7 +158,7 @@ export default function FacilityManagerAmenitiesPage() {
     if (!confirm("Cancel this booking?")) return;
     try {
       await amenitiesApi.cancelBooking(bookingId, "Cancelled by facility manager");
-      setBookings((prev) => prev.map((b: any) => b.id === bookingId ? { ...b, status: "cancelled" } : b));
+      await loadData();
     } catch (err: any) {
       alert(err?.message || "Failed to cancel booking.");
     }
@@ -167,6 +194,11 @@ export default function FacilityManagerAmenitiesPage() {
           { label: "Facility Manager" },
           { label: "Amenities" },
         ]}
+        actions={
+          <button className="btn btn-primary" onClick={() => setIsAddModalOpen(true)}>
+            + Add Amenity
+          </button>
+        }
       />
 
       <div
@@ -379,6 +411,96 @@ export default function FacilityManagerAmenitiesPage() {
             />
           </div>
         </div>
+      </Modal>
+
+      {/* Add Amenity Modal */}
+      <Modal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        title="Add New Amenity"
+        footer={
+          <>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setIsAddModalOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              form="add-amenity-form"
+              className="btn btn-primary"
+              disabled={isCreatingAmenity}
+            >
+              {isCreatingAmenity ? "Creating…" : "Create Amenity"}
+            </button>
+          </>
+        }
+      >
+        <form id="add-amenity-form" onSubmit={handleAddAmenity}>
+          <div style={{ marginBottom: "1rem" }}>
+            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              Amenity Name *
+            </label>
+            <input
+              type="text"
+              className="input-field"
+              placeholder="e.g. Badminton Court A"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              required
+            />
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+            <div>
+              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+                Type *
+              </label>
+              <select
+                className="input-field"
+                value={newType}
+                onChange={(e) => setNewType(e.target.value)}
+              >
+                <option value="hall">Community Hall</option>
+                <option value="clubhouse">Clubhouse</option>
+                <option value="pool">Swimming Pool</option>
+                <option value="gym">Gym / Fitness Center</option>
+                <option value="tennis">Tennis / Badminton Court</option>
+                <option value="guest_room">Guest Suite</option>
+                <option value="park">Garden / Park</option>
+                <option value="other">Other Facility</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+                Capacity (People) *
+              </label>
+              <input
+                type="number"
+                min={1}
+                className="input-field"
+                value={newCapacity}
+                onChange={(e) => setNewCapacity(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+
+          <div style={{ marginBottom: "0.5rem" }}>
+            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              Location / Instructions
+            </label>
+            <input
+              type="text"
+              className="input-field"
+              placeholder="e.g. Block B, Ground Floor"
+              value={newLocation}
+              onChange={(e) => setNewLocation(e.target.value)}
+            />
+          </div>
+        </form>
       </Modal>
     </div>
   );

@@ -6,9 +6,11 @@ Contract: docs/backend/api/domestic-staff.md.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+from typing import Any
 import uuid
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response, status
 
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
@@ -22,6 +24,7 @@ router = APIRouter(prefix="/domestic-staff", tags=["Domestic Staff"])
 VIEW = Depends(require_permission_async("domestic_staff:view"))
 CREATE = Depends(require_permission_async("domestic_staff:create"))
 UPDATE = Depends(require_permission_async("domestic_staff:update"))
+DELETE = Depends(require_permission_async("domestic_staff:delete"))
 APPROVE = Depends(require_permission_async("domestic_staff:approve"))
 
 Svc = DomesticStaffService
@@ -152,6 +155,26 @@ async def end_assignment(
     )
 
 
+def _to_attendance_read(r: Any) -> schemas.AttendanceRead:
+    read = schemas.AttendanceRead.model_validate(r)
+    now = datetime.now(UTC)
+    check_in = r.check_in_at
+    if check_in.tzinfo is None:
+        check_in = check_in.replace(tzinfo=UTC)
+    if r.check_out_at is None:
+        elapsed_sec = max(0.0, (now - check_in).total_seconds())
+        read.duration_hours = round(elapsed_sec / 3600.0, 2)
+        read.is_overdue = elapsed_sec > 12.0 * 3600.0
+    else:
+        check_out = r.check_out_at
+        if check_out.tzinfo is None:
+            check_out = check_out.replace(tzinfo=UTC)
+        elapsed_sec = max(0.0, (check_out - check_in).total_seconds())
+        read.duration_hours = round(elapsed_sec / 3600.0, 2)
+        read.is_overdue = False
+    return read
+
+
 # --- attendance --------------------------------------------------- #
 @router.get(
     "/attendance", response_model=Envelope[list[schemas.AttendanceRead]], dependencies=[VIEW]
@@ -171,7 +194,7 @@ async def list_attendance(
         limit=params.page_size,
     )
     return paginated(
-        [schemas.AttendanceRead.model_validate(r) for r in rows], total=total, params=params
+        [_to_attendance_read(r) for r in rows], total=total, params=params
     )
 
 
@@ -185,7 +208,7 @@ async def check_in(
     payload: schemas.CheckInCreate, svc: Svc = Depends(domestic_staff_service)
 ) -> dict:
     return ok(
-        schemas.AttendanceRead.model_validate(await svc.check_in(payload)), message="Checked in"
+        _to_attendance_read(await svc.check_in(payload)), message="Checked in"
     )
 
 
@@ -196,7 +219,7 @@ async def check_in(
 )
 async def check_out(attendance_id: uuid.UUID, svc: Svc = Depends(domestic_staff_service)) -> dict:
     return ok(
-        schemas.AttendanceRead.model_validate(await svc.check_out(attendance_id)),
+        _to_attendance_read(await svc.check_out(attendance_id)),
         message="Checked out",
     )
 
@@ -217,7 +240,7 @@ async def verify_pass(
     "/ratings",
     response_model=Envelope[schemas.RatingRead],
     status_code=status.HTTP_201_CREATED,
-    dependencies=[VIEW],
+    dependencies=[CREATE],
 )
 async def rate_staff(
     payload: schemas.RatingCreate, svc: Svc = Depends(domestic_staff_service)
@@ -291,3 +314,16 @@ async def update_staff(
         schemas.StaffRead.model_validate(await svc.update_staff(staff_id, payload)),
         message="Updated",
     )
+
+
+@router.delete(
+    "/{staff_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    dependencies=[DELETE],
+)
+async def delete_staff(
+    staff_id: uuid.UUID, svc: Svc = Depends(domestic_staff_service)
+) -> Response:
+    await svc.delete_staff(staff_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

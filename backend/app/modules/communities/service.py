@@ -118,7 +118,6 @@ class CommunityService:
         admin_email = payload.admin_email or f"admin.{code}@gatesphere.com"
         admin_password = payload.admin_password or f"{code_slug}@Gate2026!"
         admin_name = payload.admin_name or f"{obj.name} Admin"
-
         admin_user = await self.communities.provision_community_admin(
             obj.id,
             email=admin_email,
@@ -126,20 +125,24 @@ class CommunityService:
             full_name=admin_name,
             phone=payload.admin_phone,
         )
-        await invalidate_user_permissions_async(self.db, [admin_user.id])
+        admin_id = admin_user.id
+        admin_user_email = admin_user.email
+        admin_user_name = admin_user.full_name
+
+        await invalidate_user_permissions_async(self.db, [admin_id])
         await self._audit(
             "community.admin_provisioned",
             obj.id,
             "user",
-            admin_user.id,
+            admin_id,
             new={
-                "email": admin_user.email,
+                "email": admin_user_email,
                 "role": "community_admin",
                 "community_id": str(obj.id),
             },
         )
-        obj.admin_email = admin_user.email
-        obj.admin_name = admin_user.full_name
+        obj.admin_email = admin_user_email
+        obj.admin_name = admin_user_name
 
         await self._audit(
             "community.create",
@@ -163,28 +166,35 @@ class CommunityService:
             full_name=payload.full_name or f"{comm.name} Admin",
             phone=payload.phone,
         )
-        await invalidate_user_permissions_async(self.db, [admin_user.id])
+        res_id = admin_user.id
+        res_email = admin_user.email
+        res_name = admin_user.full_name
+        res_phone = admin_user.phone
+        res_created_at = admin_user.created_at
+        res_updated_at = admin_user.updated_at
+
+        await invalidate_user_permissions_async(self.db, [res_id])
         await self._audit(
             "community.admin_provisioned",
             comm.id,
             "user",
-            admin_user.id,
+            res_id,
             new={
-                "email": admin_user.email,
+                "email": res_email,
                 "role": "community_admin",
                 "community_id": str(comm.id),
             },
         )
         return schemas.CommunityAdminRead(
-            id=admin_user.id,
-            user_id=admin_user.id,
-            email=admin_user.email,
-            full_name=admin_user.full_name,
-            phone=admin_user.phone,
+            id=res_id,
+            user_id=res_id,
+            email=res_email,
+            full_name=res_name,
+            phone=res_phone,
             role="community_admin",
             community_id=comm.id,
-            created_at=admin_user.created_at,
-            updated_at=admin_user.updated_at,
+            created_at=res_created_at,
+            updated_at=res_updated_at,
         )
 
     async def update_community(
@@ -202,9 +212,9 @@ class CommunityService:
         if not self.scope.is_global:
             raise ForbiddenError("Only a platform admin can delete a community", code="GLOBAL_ONLY")
         obj = await self.get_community(community_id)
-        obj.is_active = False
-        await self.db.flush()
         await self._audit("community.delete", community_id, "community", community_id)
+        await self.db.delete(obj)
+        await self.db.flush()
 
     # -- gates ---------------------------------------------------------- #
     async def list_gates(
@@ -243,16 +253,26 @@ class CommunityService:
 
     async def delete_gate(self, gate_id: uuid.UUID) -> None:
         obj = await self.get_gate(gate_id)
+        old = {
+            "name": obj.name,
+            "code": obj.code,
+            "gate_type": obj.gate_type,
+            "is_active": obj.is_active,
+        }
         await self.db.delete(obj)
         await self.db.flush()
-        await self._audit("gate.delete", obj.community_id, "gate", gate_id)
+        await self._audit("gate.delete", obj.community_id, "gate", gate_id, old=old)
 
     # -- towers ------------------------------------------------------- #
     async def list_towers(
         self, *, community_id: uuid.UUID, offset: int, limit: int
     ) -> tuple[list[Tower], int]:
         cid = self.scope.require(community_id)
-        return await self.towers.list_for_community(cid, offset=offset, limit=limit)
+        towers, count = await self.towers.list_for_community(cid, offset=offset, limit=limit)
+        counts = await self.units.counts_by_towers([t.id for t in towers])
+        for t in towers:
+            t.total_units = counts.get(t.id, 0)
+        return towers, count
 
     async def get_tower(self, tower_id: uuid.UUID) -> Tower:
         obj = await self.towers.get(tower_id)
@@ -266,6 +286,10 @@ class CommunityService:
         if await self.towers.by_name(cid, payload.name):
             raise ConflictError(
                 "Tower name already in use", code="TOWER_NAME_TAKEN", fields={"name": "taken"}
+            )
+        if payload.code and await self.towers.by_code(cid, payload.code):
+            raise ConflictError(
+                "Tower code already in use", code="TOWER_CODE_TAKEN", fields={"code": "taken"}
             )
         obj = Tower(community_id=cid, **payload.model_dump())
         await self.towers.add(obj)
@@ -284,16 +308,27 @@ class CommunityService:
 
     async def delete_tower(self, tower_id: uuid.UUID) -> None:
         obj = await self.get_tower(tower_id)
+        old = {
+            "name": obj.name,
+            "code": obj.code,
+            "structure_type": obj.structure_type,
+            "total_floors": obj.total_floors,
+            "is_active": obj.is_active,
+        }
         await self.db.delete(obj)
         await self.db.flush()
-        await self._audit("tower.delete", obj.community_id, "tower", tower_id)
+        await self._audit("tower.delete", obj.community_id, "tower", tower_id, old=old)
 
     # -- floors ---------------------------------------------------- #
     async def list_floors(
         self, *, tower_id: uuid.UUID, offset: int, limit: int
     ) -> tuple[list[Floor], int]:
         tower = await self.get_tower(tower_id)
-        return await self.floors.list_for_tower(tower.id, offset=offset, limit=limit)
+        floors, count = await self.floors.list_for_tower(tower.id, offset=offset, limit=limit)
+        counts = await self.units.counts_by_floors([f.id for f in floors])
+        for f in floors:
+            f.total_units = counts.get(f.id, 0)
+        return floors, count
 
     async def get_floor(self, floor_id: uuid.UUID) -> Floor:
         obj = await self.floors.get(floor_id)
@@ -336,9 +371,15 @@ class CommunityService:
 
     async def delete_floor(self, floor_id: uuid.UUID) -> None:
         obj = await self.get_floor(floor_id)
+        old = {
+            "floor_number": obj.floor_number,
+            "label": obj.label,
+            "tower_id": str(obj.tower_id),
+            "is_active": obj.is_active,
+        }
         await self.db.delete(obj)
         await self.db.flush()
-        await self._audit("floor.delete", obj.community_id, "floor", floor_id)
+        await self._audit("floor.delete", obj.community_id, "floor", floor_id, old=old)
 
     # -- units --------------------------------------------------- #
     async def list_units(
@@ -417,6 +458,15 @@ class CommunityService:
 
     async def delete_unit(self, unit_id: uuid.UUID) -> None:
         obj = await self.get_unit(unit_id)
+        old = {
+            "unit_number": obj.unit_number,
+            "unit_type": obj.unit_type,
+            "bedrooms": obj.bedrooms,
+            "area_sqft": float(obj.area_sqft) if obj.area_sqft is not None else None,
+            "floor_id": str(obj.floor_id),
+            "tower_id": str(obj.tower_id),
+            "is_active": obj.is_active,
+        }
         await self.db.delete(obj)
         await self.db.flush()
-        await self._audit("unit.delete", obj.community_id, "unit", unit_id)
+        await self._audit("unit.delete", obj.community_id, "unit", unit_id, old=old)

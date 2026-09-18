@@ -6,7 +6,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.modules.billing.models import (
     CALCULATION_TYPES,
@@ -73,6 +73,15 @@ class RuleUpdate(_Write):
     late_fee_value: Decimal | None = Field(default=None, max_digits=12, decimal_places=2, ge=0)
     tax_percent: Decimal | None = Field(default=None, max_digits=5, decimal_places=2, ge=0, le=100)
     allow_advance_payment: bool | None = None
+
+    @model_validator(mode="after")
+    def check_at_least_one_field(self) -> RuleUpdate:
+        if all(
+            getattr(self, field) is None 
+            for field in ("due_day", "grace_days", "late_fee_mode", "late_fee_value", "tax_percent", "allow_advance_payment")
+        ):
+            raise ValueError("At least one billing rule field must be provided for update")
+        return self
 
 
 class RuleRead(_Read):
@@ -146,7 +155,8 @@ class PaymentCreate(_Write):
     amount: Decimal = Field(max_digits=12, decimal_places=2, gt=0)
     payment_method: str = "upi"
     payer_user_id: uuid.UUID | None = None
-    allocations: list[PaymentAllocationIn] = Field(min_length=1)
+    unit_id: uuid.UUID | None = None
+    allocations: list[PaymentAllocationIn] = Field(default_factory=list)
     remarks: str | None = Field(default=None, max_length=2000)
     community_id: uuid.UUID | None = None
 
@@ -162,6 +172,13 @@ class PaymentAllocationRead(BaseModel):
 class PaymentRead(_Read):
     community_id: uuid.UUID
     payer_user_id: uuid.UUID | None
+    payer_name: str | None = None
+    payer_email: str | None = None
+    payer_phone: str | None = None
+    unit_number: str | None = None
+    tower_name: str | None = None
+    resident_type: str | None = None
+    invoice_number: str | None = None
     payment_reference: str
     receipt_number: str | None
     receipt_issued_at: datetime | None
@@ -208,3 +225,29 @@ class LedgerRead(_Read):
     balance_after: Decimal
     entry_date: datetime
     narration: str | None
+
+
+# -- penalties --------------------------------------------------- #
+class PenaltyCreate(_Write):
+    unit_id: uuid.UUID
+    amount: Decimal = Field(..., max_digits=12, decimal_places=2, gt=0)
+    reason: str = Field(..., min_length=3, max_length=255)
+    violation_reference: str | None = Field(default=None, max_length=60)
+    due_date: date | None = None
+
+
+# -- special assessments ----------------------------------------- #
+class AssessmentCreate(_Write):
+    title: str = Field(min_length=1, max_length=255)
+    target_amount: Decimal = Field(max_digits=12, decimal_places=2, gt=0)
+    purpose: str | None = None
+    description: str | None = None
+    per_unit_amount: Decimal | None = Field(default=None, max_digits=12, decimal_places=2, gt=0)
+    effective_date: date | None = None
+    due_date: date | None = None
+    affected_units_count: int | None = Field(default=None, gt=0)
+    proposer_role: str | None = None
+    proposer_department: str | None = None
+    community_id: uuid.UUID | None = None
+    proposed_by_user_id: uuid.UUID | None = None
+    proposed_by_name: str | None = None

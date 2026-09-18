@@ -9,8 +9,10 @@ import { visitorsApi } from "@/lib/api";
 import { WalkInVisitorModal } from "@/components/common/WalkInVisitorModal";
 
 import { Modal } from "@/components/common/Modal";
+import { FileUpload } from "@/components/common/FileUpload";
 import { formatDateTime } from "@/lib/utils";
 import { communitiesApi, authApi } from "@/lib/api";
+import { toast } from "@/store/toast";
 
 interface VisitorRow {
   id: string;
@@ -27,6 +29,8 @@ interface VisitorRow {
   partySize?: number;
   groupLabel?: string;
   createdAt?: string;
+  photoUrl?: string;
+  entryPhotoUrl?: string;
 }
 
 export default function SecurityGuardVisitorsPage() {
@@ -37,6 +41,10 @@ export default function SecurityGuardVisitorsPage() {
   const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isWalkInModalOpen, setIsWalkInModalOpen] = useState(false);
   const [selectedVisitor, setSelectedVisitor] = useState<VisitorRow | null>(null);
+  const [admitVisitor, setAdmitVisitor] = useState<VisitorRow | null>(null);
+  const [admitPhotoUrl, setAdmitPhotoUrl] = useState<string | null>(null);
+  const [isAdmitting, setIsAdmitting] = useState(false);
+  const [admitError, setAdmitError] = useState<string | null>(null);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -96,6 +104,16 @@ export default function SecurityGuardVisitorsPage() {
             directoryVisitor?.phone ||
             "—";
           const unit = unitMap.get(r.unit_id) || (r.unit_id ? `Unit #${r.unit_id.slice(0, 6)}` : "—");
+          const photoUrl =
+            r.photo_url ||
+            r.visitor?.photo_url ||
+            directoryVisitor?.photo_url ||
+            openEntry?.entry_photo_url ||
+            undefined;
+          const entryPhotoUrl =
+            openEntry?.entry_photo_url ||
+            r.entry_photo_url ||
+            undefined;
 
           return {
             id: r.id,
@@ -112,6 +130,8 @@ export default function SecurityGuardVisitorsPage() {
             partySize: r.party_size || 1,
             groupLabel: r.group_label || "—",
             createdAt: r.created_at ? formatDateTime(r.created_at) : "—",
+            photoUrl,
+            entryPhotoUrl,
           };
         }),
       );
@@ -125,14 +145,41 @@ export default function SecurityGuardVisitorsPage() {
     loadData();
   }, []);
 
-  const handleMarkEntry = async (v: VisitorRow) => {
+  const handleMarkEntry = (v: VisitorRow) => {
     setActionMessage(null);
+    setAdmitError(null);
+    setAdmitPhotoUrl(null);
+    setAdmitVisitor(v);
+  };
+
+  const handleConfirmAdmit = async () => {
+    if (!admitVisitor) return;
+    if (!admitPhotoUrl) {
+      const msg = "📸 VISITOR PHOTO REQUIRED: Security policy mandates capturing a visitor photograph before gate entry. Please attach photo.";
+      setAdmitError(msg);
+      toast.error(msg);
+      return;
+    }
+    setIsAdmitting(true);
+    setAdmitError(null);
     try {
-      await visitorsApi.recordEntry({ request_id: v.id });
-      setActionMessage({ type: "success", text: `Entry recorded for ${v.name}` });
-      loadData();
+      await visitorsApi.recordEntry({
+        request_id: admitVisitor.id,
+        entry_photo_url: admitPhotoUrl,
+        vehicle_number: admitVisitor.vehicleNumber !== "—" ? admitVisitor.vehicleNumber : undefined,
+      });
+      const msg = `Gate entry recorded for ${admitVisitor.name}`;
+      setActionMessage({ type: "success", text: msg });
+      toast.success(msg);
+      setAdmitVisitor(null);
+      setAdmitPhotoUrl(null);
+      await loadData();
     } catch (err: any) {
-      setActionMessage({ type: "error", text: err?.message || "Failed to record entry." });
+      const errMsg = err?.message || "Failed to record gate entry.";
+      setAdmitError(errMsg);
+      toast.error(errMsg);
+    } finally {
+      setIsAdmitting(false);
     }
   };
 
@@ -141,10 +188,14 @@ export default function SecurityGuardVisitorsPage() {
     setActionMessage(null);
     try {
       await visitorsApi.recordExit(v.entryId);
-      setActionMessage({ type: "success", text: `Exit recorded for ${v.name}` });
-      loadData();
+      const msg = `Exit recorded for ${v.name}`;
+      setActionMessage({ type: "success", text: msg });
+      toast.success(msg);
+      await loadData();
     } catch (err: any) {
-      setActionMessage({ type: "error", text: err?.message || "Failed to record exit." });
+      const errMsg = err?.message || "Failed to record exit.";
+      setActionMessage({ type: "error", text: errMsg });
+      toast.error(errMsg);
     }
   };
 
@@ -189,7 +240,7 @@ export default function SecurityGuardVisitorsPage() {
       key: "phone",
       header: "Phone",
       sortable: true,
-      render: (v) => <span style={{ fontFamily: "monospace" }}>{v.phone}</span>,
+      render: (v) => <span style={{ fontFamily: "monospace", fontWeight: 500 }}>{v.phone}</span>,
     },
     {
       key: "unitNumber",
@@ -222,16 +273,17 @@ export default function SecurityGuardVisitorsPage() {
           <button
             type="button"
             className="btn btn-secondary"
-            style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem" }}
+            style={{ fontSize: "0.8rem", padding: "0.3rem 0.65rem", display: "inline-flex", alignItems: "center", gap: "0.25rem" }}
             onClick={() => setSelectedVisitor(v)}
+            title="View full visitor details"
           >
-            Details
+            👁️ View
           </button>
           {v.status === "approved" ? (
             <button
               type="button"
               className="btn btn-primary"
-              style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem" }}
+              style={{ fontSize: "0.8rem", padding: "0.3rem 0.65rem" }}
               onClick={() => handleMarkEntry(v)}
             >
               Mark Entry
@@ -240,7 +292,7 @@ export default function SecurityGuardVisitorsPage() {
             <button
               type="button"
               className="btn btn-secondary"
-              style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem" }}
+              style={{ fontSize: "0.8rem", padding: "0.3rem 0.65rem" }}
               onClick={() => handleMarkExit(v)}
             >
               Mark Exit
@@ -257,6 +309,15 @@ export default function SecurityGuardVisitorsPage() {
         title="Visitor Gate Verification"
         subtitle="Review resident-approved visitor requests, and log visitor gate entry / exit"
         breadcrumbs={[{ label: "GateSphere" }, { label: "Security Guard" }, { label: "Visitors" }]}
+        actions={
+          <button
+            className="btn btn-secondary"
+            onClick={loadData}
+            disabled={isLoading}
+          >
+            🔄 {isLoading ? "Refreshing…" : "Refresh"}
+          </button>
+        }
       />
 
       {actionMessage && (
@@ -410,22 +471,156 @@ export default function SecurityGuardVisitorsPage() {
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                padding: "0.75rem",
+                padding: "0.85rem 1rem",
                 background: "var(--bg-subtle, #f8fafc)",
                 borderRadius: "var(--radius)",
                 border: "1px solid var(--border)",
+                gap: "1rem",
               }}
             >
-              <div>
-                <h4 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700, color: "var(--fg)" }}>
-                  👤 {selectedVisitor.name}
-                </h4>
-                <p style={{ margin: "0.2rem 0 0", fontSize: "0.85rem", color: "var(--muted)", fontFamily: "monospace" }}>
-                  {selectedVisitor.phone}
-                </p>
+              <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                {selectedVisitor.photoUrl || selectedVisitor.entryPhotoUrl ? (
+                  <a
+                    href={selectedVisitor.photoUrl || selectedVisitor.entryPhotoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Click to view full photograph"
+                    style={{ position: "relative", display: "inline-block", flexShrink: 0 }}
+                  >
+                    <img
+                      src={selectedVisitor.photoUrl || selectedVisitor.entryPhotoUrl}
+                      alt={selectedVisitor.name}
+                      style={{
+                        width: "64px",
+                        height: "64px",
+                        borderRadius: "8px",
+                        objectFit: "cover",
+                        border: "2px solid #86efac",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+                        cursor: "pointer",
+                      }}
+                    />
+                    <span
+                      style={{
+                        position: "absolute",
+                        bottom: "-4px",
+                        right: "-4px",
+                        background: "#059669",
+                        color: "white",
+                        fontSize: "0.55rem",
+                        padding: "1px 4px",
+                        borderRadius: "3px",
+                        fontWeight: 700,
+                      }}
+                    >
+                      📷 PHOTO
+                    </span>
+                  </a>
+                ) : (
+                  <div
+                    style={{
+                      width: "64px",
+                      height: "64px",
+                      borderRadius: "8px",
+                      background: "#e2e8f0",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "1.5rem",
+                      color: "#94a3b8",
+                      border: "1px dashed #cbd5e1",
+                      flexShrink: 0,
+                    }}
+                    title="No photograph attached"
+                  >
+                    👤
+                  </div>
+                )}
+                <div>
+                  <h4 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700, color: "var(--fg)" }}>
+                    {selectedVisitor.name}
+                  </h4>
+                  <p style={{ margin: "0.2rem 0 0", fontSize: "0.85rem", color: "var(--muted)", fontFamily: "monospace" }}>
+                    {selectedVisitor.phone}
+                  </p>
+                  {selectedVisitor.photoUrl || selectedVisitor.entryPhotoUrl ? (
+                    <span style={{ fontSize: "0.75rem", color: "#16a34a", fontWeight: 600, display: "block", marginTop: "0.2rem" }}>
+                      ✓ Verified Photo Attached
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: "0.75rem", color: "#d97706", fontWeight: 600, display: "block", marginTop: "0.2rem" }}>
+                      ⚠️ No Photo Attached
+                    </span>
+                  )}
+                </div>
               </div>
               <StatusBadge status={selectedVisitor.status} />
             </div>
+
+            {/* Dedicated Visitor Photograph Card */}
+            {(selectedVisitor.photoUrl || selectedVisitor.entryPhotoUrl) && (
+              <div
+                style={{
+                  background: "#f0fdf4",
+                  border: "1px solid #bbf7d0",
+                  borderRadius: "8px",
+                  padding: "0.85rem 1rem",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "1rem",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
+                  <a
+                    href={selectedVisitor.photoUrl || selectedVisitor.entryPhotoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Click to view full size"
+                  >
+                    <img
+                      src={selectedVisitor.photoUrl || selectedVisitor.entryPhotoUrl}
+                      alt={selectedVisitor.name}
+                      style={{
+                        width: "80px",
+                        height: "80px",
+                        borderRadius: "8px",
+                        objectFit: "cover",
+                        border: "2px solid #86efac",
+                        cursor: "pointer",
+                      }}
+                    />
+                  </a>
+                  <div>
+                    <div style={{ fontSize: "0.875rem", fontWeight: 700, color: "#166534" }}>
+                      📷 Visitor Identity Photograph
+                    </div>
+                    <div style={{ fontSize: "0.75rem", color: "#15803d", marginTop: "0.15rem" }}>
+                      Mandatory face photo captured during gate registration
+                    </div>
+                  </div>
+                </div>
+                <a
+                  href={selectedVisitor.photoUrl || selectedVisitor.entryPhotoUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-sm"
+                  style={{
+                    fontSize: "0.75rem",
+                    padding: "0.4rem 0.75rem",
+                    background: "#059669",
+                    color: "#ffffff",
+                    textDecoration: "none",
+                    borderRadius: "6px",
+                    fontWeight: 600,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  🔍 View Full Size
+                </a>
+              </div>
+            )}
 
             <div
               style={{
@@ -506,6 +701,135 @@ export default function SecurityGuardVisitorsPage() {
                   {selectedVisitor.createdAt}
                 </div>
               </div>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Admit Visitor & Mandatory Photo Verification Modal */}
+      {admitVisitor && (
+        <Modal
+          isOpen={true}
+          onClose={() => {
+            if (!isAdmitting) {
+              setAdmitVisitor(null);
+              setAdmitPhotoUrl(null);
+              setAdmitError(null);
+            }
+          }}
+          title="📷 Admit Visitor — Photograph Required"
+          size="md"
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            {admitError && (
+              <div
+                style={{
+                  padding: "0.75rem 1rem",
+                  borderRadius: "6px",
+                  background: "#fee2e2",
+                  border: "1px solid #fca5a5",
+                  color: "#991b1b",
+                  fontSize: "0.875rem",
+                  fontWeight: 600,
+                }}
+              >
+                ⚠️ {admitError}
+              </div>
+            )}
+
+            <div
+              style={{
+                padding: "0.85rem 1rem",
+                borderRadius: "8px",
+                background: "#f8fafc",
+                border: "1px solid #e2e8f0",
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "0.75rem",
+                fontSize: "0.875rem",
+              }}
+            >
+              <div>
+                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>Visitor</span>
+                <strong style={{ color: "var(--fg)" }}>👤 {admitVisitor.name}</strong>
+              </div>
+              <div>
+                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>Phone</span>
+                <strong style={{ fontFamily: "monospace" }}>{admitVisitor.phone}</strong>
+              </div>
+              <div>
+                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>Destination</span>
+                <strong>🏢 {admitVisitor.unitNumber}</strong>
+              </div>
+              <div>
+                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>Type</span>
+                <span style={{ textTransform: "capitalize" }}>{admitVisitor.visitorType}</span>
+              </div>
+            </div>
+
+            <div
+              style={{
+                padding: "1rem",
+                borderRadius: "8px",
+                background: admitPhotoUrl ? "#f0fdf4" : "#fffbeb",
+                border: admitPhotoUrl ? "1px solid #86efac" : "2px solid #f59e0b",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "0.5rem",
+                }}
+              >
+                <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "#1e293b" }}>
+                  📷 Visitor Face Photograph <span style={{ color: "#dc2626", fontWeight: 900 }}>* (Mandatory)</span>
+                </span>
+                {admitPhotoUrl ? (
+                  <span style={{ fontSize: "0.75rem", color: "#16a34a", fontWeight: 700 }}>
+                    ✓ Photograph Attached
+                  </span>
+                ) : (
+                  <span style={{ fontSize: "0.75rem", color: "#b45309", fontWeight: 700 }}>
+                    Required Before Admitting
+                  </span>
+                )}
+              </div>
+              <FileUpload
+                kind="visitor_photo"
+                label="Snap or upload visitor photograph before gate entry"
+                currentUrl={admitPhotoUrl || undefined}
+                onUploadComplete={(url) => {
+                  setAdmitPhotoUrl(url);
+                  setAdmitError(null);
+                }}
+              />
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setAdmitVisitor(null)}
+                disabled={isAdmitting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleConfirmAdmit}
+                disabled={isAdmitting}
+                style={{
+                  padding: "0.5rem 1.25rem",
+                  fontWeight: 700,
+                  background: admitPhotoUrl ? "#059669" : undefined,
+                  borderColor: admitPhotoUrl ? "#059669" : undefined,
+                }}
+              >
+                {isAdmitting ? "Recording Entry…" : "🚪 ALLOW GATE ENTRY"}
+              </button>
             </div>
           </div>
         </Modal>

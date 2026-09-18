@@ -121,15 +121,15 @@ class GateRead(_Read):
 # --- Tower -------------------------------------------------------------- #
 class TowerCreate(_Write):
     code: _Code
-    name: str = Field(min_length=1, max_length=128)
+    name: str = Field(min_length=2, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9 \-_.,&()'/]*$")
     structure_type: str = Field(default="tower")
-    total_floors: int = Field(default=0, ge=0, le=300)
+    total_floors: int = Field(default=1, ge=1, le=300)
 
 
 class TowerUpdate(_Write):
-    name: str | None = Field(default=None, min_length=1, max_length=128)
+    name: str | None = Field(default=None, min_length=2, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9 \-_.,&()'/]*$")
     structure_type: str | None = None
-    total_floors: int | None = Field(default=None, ge=0, le=300)
+    total_floors: int | None = Field(default=None, ge=1, le=300)
     is_active: bool | None = None
 
 
@@ -139,6 +139,7 @@ class TowerRead(_Read):
     name: str
     structure_type: str
     total_floors: int
+    total_units: int = 0
     is_active: bool
 
 
@@ -160,6 +161,7 @@ class FloorRead(_Read):
     floor_number: int
     label: str | None
     is_active: bool
+    total_units: int = 0
 
 
 # --- Unit ------------------------------------------------------------ #

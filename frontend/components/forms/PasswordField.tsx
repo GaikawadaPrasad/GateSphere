@@ -7,6 +7,8 @@ interface PasswordFieldProps {
   subLabel?: string;
   value: string;
   onChange: (val: string) => void;
+  onBlur?: () => void;
+  error?: string;
   placeholder?: string;
   required?: boolean;
   minLength?: number;
@@ -21,6 +23,8 @@ export function PasswordField({
   subLabel = "(Editable)",
   value,
   onChange,
+  onBlur,
+  error,
   placeholder = "e.g. user@Gate2026!",
   required = false,
   minLength,
@@ -65,11 +69,12 @@ export function PasswordField({
             paddingRight: "2.5rem",
             fontSize: "0.85rem",
             borderRadius: "6px",
-            border: "1px solid #cbd5e1",
+            border: error ? "1px solid var(--danger, #ef4444)" : "1px solid #cbd5e1",
           }}
           placeholder={placeholder}
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
           required={required}
           minLength={minLength}
         />
@@ -122,11 +127,15 @@ export function PasswordField({
         </button>
       </div>
 
-      {helperText && (
+      {error ? (
+        <p style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", marginTop: "0.3rem", fontWeight: 500 }}>
+          ✕ {error}
+        </p>
+      ) : helperText ? (
         <div style={{ marginTop: "0.4rem", fontSize: "11.5px", color: "var(--muted)" }}>
           {helperText}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -3,8 +3,11 @@
 import { useState, useEffect, useRef } from "react";
 import { Modal } from "@/components/common/Modal";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { FileUpload } from "@/components/common/FileUpload";
 import { visitorsApi, communitiesApi, authApi, blacklistApi } from "@/lib/api";
+import { useUiStore } from "@/store/ui";
 import type { Unit } from "@/types/communities";
+import { isValidPersonName } from "@/lib/utils";
 
 interface WalkInVisitorModalProps {
   isOpen: boolean;
@@ -45,6 +48,7 @@ export function WalkInVisitorModal({
   const [visitorType, setVisitorType] = useState("guest");
   const [purpose, setPurpose] = useState("Visitor at gate requesting entry");
   const [vehicleNumber, setVehicleNumber] = useState("");
+  const [visitorPhotoUrl, setVisitorPhotoUrl] = useState<string | null>(null);
 
   // Blacklist screening state
   const [isCheckingBlacklist, setIsCheckingBlacklist] = useState(false);
@@ -64,6 +68,18 @@ export function WalkInVisitorModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Field-level validation state
+  const [fieldErrors, setFieldErrors] = useState<{
+    visitorName?: string;
+    visitorPhone?: string;
+    idNumber?: string;
+    unitId?: string;
+    vehicleNumber?: string;
+    purpose?: string;
+    visitorPhotoUrl?: string;
+  }>({});
+  const [touchedFields, setTouchedFields] = useState<{ [key: string]: boolean }>({});
+
   // Active request being tracked
   const [activeRequest, setActiveRequest] = useState<any | null>(null);
   const [isAdmitting, setIsAdmitting] = useState(false);
@@ -79,10 +95,14 @@ export function WalkInVisitorModal({
       setIdNumber("");
       setBlacklistHit(null);
       setUnitId("");
+      setUnitFilter("");
       setVisitorType("guest");
       setPurpose("Visitor at gate requesting entry");
       setVehicleNumber("");
+      setVisitorPhotoUrl(null);
       setErrorMessage(null);
+      setFieldErrors({});
+      setTouchedFields({});
       setUnitsError(null);
       setActiveRequest(null);
       loadUnits();
@@ -94,14 +114,140 @@ export function WalkInVisitorModal({
     };
   }, [isOpen]);
 
-  const loadUnits = async () => {
+  const validateField = (
+    name: string,
+    value: any,
+    context?: { idType?: string }
+  ): string | undefined => {
+    switch (name) {
+      case "visitorName": {
+        const trimmed = (value || "").trim();
+        if (!trimmed) return "Visitor full name is required.";
+        if (trimmed.length < 2) return "Visitor name must be at least 2 characters.";
+        if (trimmed.length > 100) return "Visitor name cannot exceed 100 characters.";
+        if (!isValidPersonName(trimmed)) {
+          return "Visitor name must contain only alphabetic letters and spaces (no numbers or symbols).";
+        }
+        return undefined;
+      }
+      case "visitorPhone": {
+        const raw = (value || "").trim();
+        if (!raw) return "Mobile number is required.";
+        const cleaned = raw.replace(/[\s\-()]/g, "");
+        if (!/^\+?[0-9]+$/.test(cleaned)) {
+          return "Mobile number must contain digits only.";
+        }
+        let digits = cleaned;
+        if (digits.startsWith("+91")) {
+          digits = digits.slice(3);
+        } else if (digits.startsWith("+")) {
+          digits = digits.slice(1);
+        } else if (digits.startsWith("0") && digits.length === 11) {
+          digits = digits.slice(1);
+        }
+
+        if (digits.length === 10) {
+          if (!/^[6-9]\d{9}$/.test(digits)) {
+            return "Valid 10-digit mobile number must start with 6, 7, 8, or 9.";
+          }
+        } else if (cleaned.startsWith("+") && cleaned.length >= 11 && cleaned.length <= 15) {
+          return undefined;
+        } else {
+          return "Mobile number must be a valid 10-digit number (e.g. 9876543210 or +91 9876543210).";
+        }
+        return undefined;
+      }
+      case "idNumber": {
+        const raw = (value || "").trim();
+        if (!raw) return undefined; // Optional field
+        const currentIdType = context?.idType || idType;
+        const cleanVal = raw.toUpperCase().replace(/[\s\-]/g, "");
+        if (currentIdType === "aadhaar") {
+          if (!/^\d{12}$/.test(cleanVal)) {
+            return "Aadhaar number must be exactly 12 numeric digits.";
+          }
+        } else if (currentIdType === "pan") {
+          if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(cleanVal)) {
+            return "PAN must be 10 characters in format ABCDE1234F (5 letters, 4 digits, 1 letter).";
+          }
+        } else if (currentIdType === "driving_license") {
+          if (!/^[A-Z0-9]{10,20}$/.test(cleanVal)) {
+            return "Driving license must be 10-20 alphanumeric characters.";
+          }
+        } else if (currentIdType === "voter_id") {
+          if (!/^[A-Z0-9]{8,16}$/.test(cleanVal)) {
+            return "Voter ID must be 8-16 alphanumeric characters (e.g. ABC1234567).";
+          }
+        } else if (currentIdType === "passport") {
+          if (!/^[A-Z][0-9]{7,8}$/.test(cleanVal) && !/^[A-Z0-9]{8,9}$/.test(cleanVal)) {
+            return "Passport number must be 8-9 characters starting with a letter (e.g. A1234567).";
+          }
+        } else {
+          if (cleanVal.length < 4 || cleanVal.length > 40) {
+            return "Govt ID number must be between 4 and 40 characters.";
+          }
+        }
+        return undefined;
+      }
+      case "unitId": {
+        if (!value) return "Please select the destination unit/flat.";
+        return undefined;
+      }
+      case "vehicleNumber": {
+        const raw = (value || "").trim();
+        if (!raw) return undefined; // Optional field
+        const cleanVal = raw.toUpperCase().replace(/[\s\-]/g, "");
+        if (!/^[A-Z0-9]{4,15}$/.test(cleanVal)) {
+          return "Vehicle number must be 4-15 alphanumeric characters (e.g. TS09EA1234).";
+        }
+        return undefined;
+      }
+      case "purpose": {
+        const trimmed = (value || "").trim();
+        if (trimmed && (trimmed.length < 2 || trimmed.length > 255)) {
+          return "Purpose must be between 2 and 255 characters.";
+        }
+        return undefined;
+      }
+      case "visitorPhotoUrl": {
+        if (!value) {
+          return "Visitor photograph is required by security policy before gate check-in.";
+        }
+        return undefined;
+      }
+      default:
+        return undefined;
+    }
+  };
+
+  const handleFieldChange = (name: string, value: any, context?: any) => {
+    if (touchedFields[name] || fieldErrors[name as keyof typeof fieldErrors]) {
+      const error = validateField(name, value, context);
+      setFieldErrors((prev) => ({ ...prev, [name]: error }));
+    }
+  };
+
+  const handleFieldBlur = (name: string, value: any, context?: any) => {
+    setTouchedFields((prev) => ({ ...prev, [name]: true }));
+    const error = validateField(name, value, context);
+    setFieldErrors((prev) => ({ ...prev, [name]: error }));
+  };
+
+  const { activeCommunityId } = useUiStore();
+
+  const loadUnits = async (force = false) => {
+    if (!force && units.length > 0) return;
     setIsLoadingUnits(true);
     setUnitsError(null);
     try {
-      const me = await authApi.me();
-      let cid = me?.community_ids?.[0] || (me as any)?.community_id;
-      if (!cid && me?.roles && Array.isArray(me.roles)) {
-        cid = me.roles.find((r: any) => r.community_id)?.community_id;
+      let cid: string | null = activeCommunityId || null;
+      if (!cid) {
+        const me = await authApi.me();
+        cid = me?.community_ids?.[0] || (me as any)?.community_id || null;
+        if (!cid && me?.roles && Array.isArray(me.roles)) {
+          const matchedRole = me.roles.find((r: any) => r.community_id);
+          cid = matchedRole ? matchedRole.community_id : null;
+        }
       }
       if (!cid) {
         const comms: any = await communitiesApi.list({ active: true });
@@ -121,9 +267,7 @@ export function WalkInVisitorModal({
             })
           );
           setUnits(sorted);
-          if (sorted.length > 0) {
-            setUnitId((prev) => (prev && sorted.some((u: any) => u.id === prev) ? prev : sorted[0].id));
-          }
+          setUnitId((prev) => (prev && sorted.some((u: any) => u.id === prev) ? prev : ""));
         } else {
           setUnits([]);
         }
@@ -195,25 +339,48 @@ export function WalkInVisitorModal({
 
   const handleSendPrompt = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!visitorName.trim()) {
-      setErrorMessage("Please enter visitor full name.");
+
+    const errors: { [key: string]: string } = {};
+    const nameErr = validateField("visitorName", visitorName);
+    if (nameErr) errors.visitorName = nameErr;
+    const phoneErr = validateField("visitorPhone", visitorPhone);
+    if (phoneErr) errors.visitorPhone = phoneErr;
+    const idErr = validateField("idNumber", idNumber, { idType });
+    if (idErr) errors.idNumber = idErr;
+    const unitErr = validateField("unitId", unitId);
+    if (unitErr) errors.unitId = unitErr;
+    const vehErr = validateField("vehicleNumber", vehicleNumber);
+    if (vehErr) errors.vehicleNumber = vehErr;
+    const purposeErr = validateField("purpose", purpose);
+    if (purposeErr) errors.purpose = purposeErr;
+    const photoErr = validateField("visitorPhotoUrl", visitorPhotoUrl);
+    if (photoErr) errors.visitorPhotoUrl = photoErr;
+
+    setFieldErrors(errors);
+    setTouchedFields({
+      visitorName: true,
+      visitorPhone: true,
+      idNumber: true,
+      unitId: true,
+      vehicleNumber: true,
+      purpose: true,
+      visitorPhotoUrl: true,
+    });
+
+    if (Object.keys(errors).length > 0) {
+      setErrorMessage("Please correct the highlighted validation errors before submitting.");
       return;
     }
 
     let cleanPhone = visitorPhone.trim().replace(/[\s\-()]/g, "");
-    if (!cleanPhone || cleanPhone.length < 5) {
-      setErrorMessage("Please enter a valid mobile number.");
-      return;
-    }
-    if (!cleanPhone.startsWith("+") && cleanPhone.length === 10) {
-      cleanPhone = `+91${cleanPhone}`;
-    } else if (!cleanPhone.startsWith("+") && cleanPhone.length > 10) {
-      cleanPhone = `+${cleanPhone}`;
-    }
-
-    if (!unitId) {
-      setErrorMessage("Please select the destination unit/flat.");
-      return;
+    if (!cleanPhone.startsWith("+")) {
+      if (cleanPhone.length === 10) {
+        cleanPhone = `+91${cleanPhone}`;
+      } else if (cleanPhone.startsWith("0") && cleanPhone.length === 11) {
+        cleanPhone = `+91${cleanPhone.slice(1)}`;
+      } else {
+        cleanPhone = `+${cleanPhone}`;
+      }
     }
 
     setIsSubmitting(true);
@@ -229,6 +396,7 @@ export function WalkInVisitorModal({
           id_type: cleanId ? idType : undefined,
           id_number: cleanId || undefined,
           vehicle_number: vehicleNumber.trim() || undefined,
+          photo_url: visitorPhotoUrl || undefined,
         },
         visitor_type: visitorType,
         purpose: purpose.trim() || "Visitor at gate requesting entry",
@@ -239,22 +407,28 @@ export function WalkInVisitorModal({
       setActiveRequest(res);
       setStep("waiting_approval");
     } catch (err: any) {
+      console.error("Failed to initiate visitor approval request:", err);
       if (
         err?.code === "VISITOR_BLACKLISTED" ||
         (err?.message && err.message.toLowerCase().includes("blacklist"))
       ) {
         setBlacklistHit({
           reason:
-            err?.fields?.reason ||
-            err?.message ||
-            "This visitor is flagged on the security blacklist.",
+          err?.fields?.reason ||
+          err?.message ||
+          "This visitor is flagged on the security blacklist.",
           risk_level: err?.fields?.risk_level || "high",
         });
         setErrorMessage("⛔ ENTRY DENIED: Visitor is blacklisted by community security!");
       } else {
-        setErrorMessage(
-          err?.message || "Failed to initiate visitor approval request. Please check blacklist / unit status."
-        );
+        let detailMsg = err?.message || "Failed to initiate visitor approval request. Please check blacklist / unit status.";
+        if (err?.fields && typeof err.fields === "object" && Object.keys(err.fields).length > 0) {
+          const fieldDetails = Object.entries(err.fields)
+            .map(([k, v]) => `${k}: ${v}`)
+            .join(" | ");
+          detailMsg = `${detailMsg} (${fieldDetails})`;
+        }
+        setErrorMessage(detailMsg);
       }
     } finally {
       setIsSubmitting(false);
@@ -263,17 +437,32 @@ export function WalkInVisitorModal({
 
   const handleAdmitVisitor = async () => {
     if (!activeRequest?.id) return;
+    if (!visitorPhotoUrl) {
+      setErrorMessage(
+        "📸 VISITOR PHOTO REQUIRED: Security policy mandates capturing a visitor photograph before gate admittance. Please attach the photo below."
+      );
+      return;
+    }
     setIsAdmitting(true);
     setErrorMessage(null);
     try {
       const entry: any = await visitorsApi.recordEntry({
         request_id: activeRequest.id,
         vehicle_number: vehicleNumber.trim() || undefined,
+        entry_photo_url: visitorPhotoUrl,
       });
       setStep("admitted");
       if (onEntryAdmitted) onEntryAdmitted(entry);
     } catch (err: any) {
-      setErrorMessage(err?.message || "Failed to record gate entry.");
+      console.error("Failed to record gate entry:", err);
+      let detailMsg = err?.message || "Failed to record gate entry.";
+      if (err?.fields && typeof err.fields === "object" && Object.keys(err.fields).length > 0) {
+        const fieldDetails = Object.entries(err.fields)
+          .map(([k, v]) => `${k}: ${v}`)
+          .join(" | ");
+        detailMsg = `${detailMsg} (${fieldDetails})`;
+      }
+      setErrorMessage(detailMsg);
     } finally {
       setIsAdmitting(false);
     }
@@ -281,8 +470,32 @@ export function WalkInVisitorModal({
 
   const selectedUnit = units.find((u) => u.id === unitId);
   const filteredUnits = unitFilter.trim()
-    ? units.filter((u) => u.unit_number.toLowerCase().includes(unitFilter.toLowerCase()))
+    ? units.filter((u) => (u.unit_number || "").toLowerCase().includes(unitFilter.toLowerCase().trim()))
     : units;
+
+  const handleUnitFilterChange = (val: string) => {
+    setUnitFilter(val);
+    const trimmed = val.trim().toLowerCase();
+    if (!trimmed) {
+      return;
+    }
+    const matches = units.filter((u) =>
+      (u.unit_number || "").toLowerCase().includes(trimmed)
+    );
+    const exactMatch = matches.find(
+      (u) => (u.unit_number || "").toLowerCase() === trimmed
+    );
+    if (exactMatch) {
+      setUnitId(exactMatch.id);
+      handleFieldChange("unitId", exactMatch.id);
+    } else if (matches.length === 1) {
+      setUnitId(matches[0].id);
+      handleFieldChange("unitId", matches[0].id);
+    } else if (unitId && !matches.some((u) => u.id === unitId)) {
+      setUnitId("");
+      handleFieldChange("unitId", "");
+    }
+  };
 
   return (
     <>
@@ -316,7 +529,7 @@ export function WalkInVisitorModal({
       )}
 
       {step === "form" && (
-        <form onSubmit={handleSendPrompt}>
+        <form onSubmit={handleSendPrompt} noValidate>
           <p style={{ fontSize: "0.875rem", color: "var(--muted)", marginBottom: "1.25rem" }}>
             Visitor arrived at gate without a pre-approved pass. Enter mobile and details to trigger an instant approval prompt to the resident.
           </p>
@@ -338,9 +551,19 @@ export function WalkInVisitorModal({
                 className="input-field"
                 placeholder="e.g. Ramesh Kumar"
                 value={visitorName}
-                onChange={(e) => setVisitorName(e.target.value)}
+                onChange={(e) => {
+                  setVisitorName(e.target.value);
+                  handleFieldChange("visitorName", e.target.value);
+                }}
+                onBlur={() => handleFieldBlur("visitorName", visitorName)}
+                style={fieldErrors.visitorName ? { borderColor: "#EF4444", background: "#FEF2F2" } : undefined}
                 required
               />
+              {fieldErrors.visitorName && (
+                <div style={{ color: "#DC2626", fontSize: "0.75rem", marginTop: "0.25rem", fontWeight: 600 }}>
+                  {fieldErrors.visitorName}
+                </div>
+              )}
             </div>
 
             <div>
@@ -352,10 +575,22 @@ export function WalkInVisitorModal({
                 className="input-field"
                 placeholder="e.g. 98765 43210"
                 value={visitorPhone}
-                onChange={(e) => setVisitorPhone(e.target.value)}
-                onBlur={() => checkBlacklist(visitorPhone, undefined)}
+                onChange={(e) => {
+                  setVisitorPhone(e.target.value);
+                  handleFieldChange("visitorPhone", e.target.value);
+                }}
+                onBlur={() => {
+                  handleFieldBlur("visitorPhone", visitorPhone);
+                  checkBlacklist(visitorPhone, undefined);
+                }}
+                style={fieldErrors.visitorPhone ? { borderColor: "#EF4444", background: "#FEF2F2" } : undefined}
                 required
               />
+              {fieldErrors.visitorPhone && (
+                <div style={{ color: "#DC2626", fontSize: "0.75rem", marginTop: "0.25rem", fontWeight: 600 }}>
+                  {fieldErrors.visitorPhone}
+                </div>
+              )}
             </div>
           </div>
 
@@ -374,7 +609,14 @@ export function WalkInVisitorModal({
               <select
                 className="input-field"
                 value={idType}
-                onChange={(e) => setIdType(e.target.value)}
+                onChange={(e) => {
+                  const newType = e.target.value;
+                  setIdType(newType);
+                  if (idNumber.trim()) {
+                    const idErr = validateField("idNumber", idNumber, { idType: newType });
+                    setFieldErrors((prev) => ({ ...prev, idNumber: idErr }));
+                  }
+                }}
               >
                 {GOVT_ID_TYPES.map((t) => (
                   <option key={t.value} value={t.value}>
@@ -400,16 +642,31 @@ export function WalkInVisitorModal({
                 className="input-field"
                 placeholder={
                   idType === "aadhaar"
-                    ? "e.g. 1234 5678 9012"
+                    ? "e.g. 1234 5678 9012 (12 digits)"
                     : idType === "pan"
-                    ? "e.g. ABCDE1234F"
+                    ? "e.g. ABCDE1234F (10 chars)"
                     : "Enter Govt ID number"
                 }
                 value={idNumber}
-                onChange={(e) => setIdNumber(e.target.value.toUpperCase())}
-                onBlur={() => checkBlacklist(undefined, idNumber)}
-                style={{ fontFamily: "monospace" }}
+                onChange={(e) => {
+                  const val = e.target.value.toUpperCase();
+                  setIdNumber(val);
+                  handleFieldChange("idNumber", val, { idType });
+                }}
+                onBlur={() => {
+                  handleFieldBlur("idNumber", idNumber, { idType });
+                  checkBlacklist(undefined, idNumber);
+                }}
+                style={{
+                  fontFamily: "monospace",
+                  ...(fieldErrors.idNumber ? { borderColor: "#EF4444", background: "#FEF2F2" } : {}),
+                }}
               />
+              {fieldErrors.idNumber && (
+                <div style={{ color: "#DC2626", fontSize: "0.75rem", marginTop: "0.25rem", fontWeight: 600 }}>
+                  {fieldErrors.idNumber}
+                </div>
+              )}
             </div>
           </div>
 
@@ -434,7 +691,7 @@ export function WalkInVisitorModal({
                 {unitsError && (
                   <button
                     type="button"
-                    onClick={loadUnits}
+                    onClick={() => loadUnits(true)}
                     style={{
                       background: "none",
                       border: "none",
@@ -450,12 +707,12 @@ export function WalkInVisitorModal({
                 )}
               </div>
 
-              {units.length > 8 && (
+              {units.length > 6 && (
                 <input
                   type="text"
                   placeholder="🔍 Filter flat e.g. A-101, B-2..."
                   value={unitFilter}
-                  onChange={(e) => setUnitFilter(e.target.value)}
+                  onChange={(e) => handleUnitFilterChange(e.target.value)}
                   style={{
                     fontSize: "0.8rem",
                     padding: "0.35rem 0.6rem",
@@ -470,7 +727,13 @@ export function WalkInVisitorModal({
               <select
                 className="input-field"
                 value={unitId}
-                onChange={(e) => setUnitId(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setUnitId(val);
+                  handleFieldChange("unitId", val);
+                }}
+                onBlur={() => handleFieldBlur("unitId", unitId)}
+                style={fieldErrors.unitId ? { borderColor: "#EF4444", background: "#FEF2F2" } : undefined}
                 disabled={isLoadingUnits}
                 required
               >
@@ -483,13 +746,63 @@ export function WalkInVisitorModal({
                     {units.length === 0 ? "No units registered in community" : `No units match "${unitFilter}"`}
                   </option>
                 ) : (
-                  filteredUnits.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      Unit {u.unit_number} {u.unit_type ? `(${u.unit_type})` : ""}
+                  <>
+                    <option value="">
+                      {unitFilter.trim()
+                        ? `-- Select Destination Flat (${filteredUnits.length} matching) --`
+                        : "-- Select Destination Unit / Flat --"}
                     </option>
-                  ))
+                    {filteredUnits.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        Unit {u.unit_number} {u.unit_type ? `(${u.unit_type})` : ""}
+                      </option>
+                    ))}
+                  </>
                 )}
               </select>
+              {selectedUnit && (
+                <div
+                  style={{
+                    marginTop: "0.35rem",
+                    padding: "0.3rem 0.5rem",
+                    borderRadius: "4px",
+                    background: "#F0FDF4",
+                    border: "1px solid #BBF7D0",
+                    color: "#166534",
+                    fontSize: "0.75rem",
+                    fontWeight: 600,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <span>📍 Target Flat: <strong>Unit {selectedUnit.unit_number}</strong> {selectedUnit.unit_type ? `(${selectedUnit.unit_type})` : ""}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUnitId("");
+                      setUnitFilter("");
+                      handleFieldChange("unitId", "");
+                    }}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#991B1B",
+                      cursor: "pointer",
+                      fontSize: "0.75rem",
+                      fontWeight: 600,
+                    }}
+                    title="Clear selection"
+                  >
+                    ✕ Clear
+                  </button>
+                </div>
+              )}
+              {fieldErrors.unitId && (
+                <div style={{ color: "#DC2626", fontSize: "0.75rem", marginTop: "0.25rem", fontWeight: 600 }}>
+                  {fieldErrors.unitId}
+                </div>
+              )}
             </div>
 
             <div>
@@ -527,9 +840,22 @@ export function WalkInVisitorModal({
                 className="input-field"
                 placeholder="e.g. TS 09 EA 1234"
                 value={vehicleNumber}
-                onChange={(e) => setVehicleNumber(e.target.value.toUpperCase())}
-                style={{ fontFamily: "monospace" }}
+                onChange={(e) => {
+                  const val = e.target.value.toUpperCase();
+                  setVehicleNumber(val);
+                  handleFieldChange("vehicleNumber", val);
+                }}
+                onBlur={() => handleFieldBlur("vehicleNumber", vehicleNumber)}
+                style={{
+                  fontFamily: "monospace",
+                  ...(fieldErrors.vehicleNumber ? { borderColor: "#EF4444", background: "#FEF2F2" } : {}),
+                }}
               />
+              {fieldErrors.vehicleNumber && (
+                <div style={{ color: "#DC2626", fontSize: "0.75rem", marginTop: "0.25rem", fontWeight: 600 }}>
+                  {fieldErrors.vehicleNumber}
+                </div>
+              )}
             </div>
 
             <div>
@@ -541,10 +867,88 @@ export function WalkInVisitorModal({
                 className="input-field"
                 placeholder="e.g. Meeting resident, Package drop"
                 value={purpose}
-                onChange={(e) => setPurpose(e.target.value)}
+                onChange={(e) => {
+                  setPurpose(e.target.value);
+                  handleFieldChange("purpose", e.target.value);
+                }}
+                onBlur={() => handleFieldBlur("purpose", purpose)}
+                style={fieldErrors.purpose ? { borderColor: "#EF4444", background: "#FEF2F2" } : undefined}
               />
+              {fieldErrors.purpose && (
+                <div style={{ color: "#DC2626", fontSize: "0.75rem", marginTop: "0.25rem", fontWeight: 600 }}>
+                  {fieldErrors.purpose}
+                </div>
+              )}
             </div>
           </div>
+
+          <div
+            style={{
+              padding: "1rem",
+              borderRadius: "8px",
+              background: "#F8FAFC",
+              border: visitorPhotoUrl
+                ? "1px solid #86EFAC"
+                : fieldErrors.visitorPhotoUrl
+                ? "1.5px solid #EF4444"
+                : "1px solid #CBD5E1",
+              marginBottom: "1.25rem",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "0.5rem",
+              }}
+            >
+              <label style={{ fontSize: "0.85rem", fontWeight: 700, color: "#1E293B" }}>
+                📷 Visitor Photograph <span style={{ color: "#DC2626", fontWeight: 900 }}>* (Mandatory)</span>
+              </label>
+              {visitorPhotoUrl ? (
+                <span style={{ fontSize: "0.75rem", color: "#16A34A", fontWeight: 700 }}>
+                  ✓ Photograph Attached
+                </span>
+              ) : (
+                <span style={{ fontSize: "0.75rem", color: "#DC2626", fontWeight: 700 }}>
+                  Required Before Entry
+                </span>
+              )}
+            </div>
+            <FileUpload
+              kind="visitor_photo"
+              label="Upload or snap visitor face photograph"
+              currentUrl={visitorPhotoUrl || undefined}
+              onUploadComplete={(url) => {
+                setVisitorPhotoUrl(url);
+                setErrorMessage(null);
+                setFieldErrors((prev) => ({ ...prev, visitorPhotoUrl: undefined }));
+              }}
+            />
+            {fieldErrors.visitorPhotoUrl && (
+              <div style={{ color: "#DC2626", fontSize: "0.75rem", marginTop: "0.4rem", fontWeight: 600 }}>
+                {fieldErrors.visitorPhotoUrl}
+              </div>
+            )}
+          </div>
+
+          {errorMessage && (
+            <div
+              style={{
+                marginBottom: "1rem",
+                padding: "0.75rem 1rem",
+                borderRadius: "var(--radius-sm)",
+                background: "#FEF2F2",
+                border: "1px solid #F87171",
+                color: "#991B1B",
+                fontSize: "0.85rem",
+                fontWeight: 600,
+              }}
+            >
+              ⚠️ {errorMessage}
+            </div>
+          )}
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "1.5rem" }}>
             <button type="button" className="btn btn-secondary" onClick={onClose} disabled={isSubmitting}>
@@ -637,6 +1041,49 @@ export function WalkInVisitorModal({
               <StatusBadge status={activeRequest.status} />
             </div>
           </div>
+
+          {activeRequest.status === "approved" && (
+            <div
+              style={{
+                padding: "1rem",
+                borderRadius: "8px",
+                background: visitorPhotoUrl ? "#F0FDF4" : "#FEF2F2",
+                border: visitorPhotoUrl ? "1px solid #86EFAC" : "2px solid #F87171",
+                marginBottom: "1.25rem",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "0.5rem",
+                }}
+              >
+                <label style={{ fontSize: "0.85rem", fontWeight: 700, color: "#1E293B" }}>
+                  📷 Visitor Entry Photograph <span style={{ color: "#DC2626", fontWeight: 900 }}>* (Mandatory)</span>
+                </label>
+                {visitorPhotoUrl ? (
+                  <span style={{ fontSize: "0.75rem", color: "#16A34A", fontWeight: 700 }}>
+                    ✓ Photograph Ready for Admittance
+                  </span>
+                ) : (
+                  <span style={{ fontSize: "0.75rem", color: "#DC2626", fontWeight: 700 }}>
+                    ⚠️ Photograph Required to Admit Visitor
+                  </span>
+                )}
+              </div>
+              <FileUpload
+                kind="visitor_photo"
+                label="Attach visitor face photograph before allowing entry"
+                currentUrl={visitorPhotoUrl || undefined}
+                onUploadComplete={(url) => {
+                  setVisitorPhotoUrl(url);
+                  setErrorMessage(null);
+                }}
+              />
+            </div>
+          )}
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
             <button
