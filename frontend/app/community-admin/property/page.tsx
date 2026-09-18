@@ -67,12 +67,22 @@ export default function CommunityAdminPropertyPage() {
   const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
   const [isAddGateOpen, setIsAddGateOpen] = useState(false);
 
-  const [towerForm, setTowerForm] = useState({
+  const [towerForm, setTowerForm] = useState<{
+    name: string;
+    code: string;
+    structure_type: string;
+    total_floors: number | string;
+  }>({
     name: "",
     code: "",
     structure_type: "tower",
     total_floors: 10,
   });
+  const [towerErrors, setTowerErrors] = useState<{
+    name?: string;
+    code?: string;
+    total_floors?: string;
+  }>({});
   const [floorForm, setFloorForm] = useState({ tower_id: "", floor_number: 1, label: "" });
   const [unitForm, setUnitForm] = useState({
     floor_id: "",
@@ -90,16 +100,61 @@ export default function CommunityAdminPropertyPage() {
   const handleCreateTower = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeCommunityId) return;
+
+    // Field-level validations
+    const errors: { name?: string; code?: string; total_floors?: string } = {};
+
+    const trimmedName = towerForm.name.trim();
+    if (!trimmedName) {
+      errors.name = "Tower name is required.";
+    } else if (trimmedName.length < 2) {
+      errors.name = "Tower name must be at least 2 characters.";
+    } else if (trimmedName.length > 128) {
+      errors.name = "Tower name cannot exceed 128 characters.";
+    } else if (!/[A-Za-z]/.test(trimmedName)) {
+      errors.name = "Tower name must contain letters and cannot be purely numeric or symbols.";
+    } else if (!/^[A-Za-z0-9][A-Za-z0-9\s\-./]*$/.test(trimmedName)) {
+      errors.name = "Tower name can only contain letters, numbers, spaces, hyphens, slashes, and periods.";
+    }
+
+    const trimmedCode = towerForm.code.trim();
+    if (!trimmedCode) {
+      errors.code = "Block / Tower code is required.";
+    } else if (trimmedCode.length > 32) {
+      errors.code = "Block / Tower code cannot exceed 32 characters.";
+    } else if (!/^[A-Za-z0-9][A-Za-z0-9 _\-\/]*$/.test(trimmedCode)) {
+      errors.code = "Block / Tower code must start with a letter or number and contain only letters, numbers, hyphens, or slashes (e.g. T-A).";
+    }
+
+    const rawFloors = towerForm.total_floors;
+    if (rawFloors === "" || rawFloors === null || rawFloors === undefined) {
+      errors.total_floors = "Total floors is required.";
+    } else {
+      const floorsNum = Number(rawFloors);
+      if (isNaN(floorsNum) || !Number.isInteger(floorsNum)) {
+        errors.total_floors = "Total floors must be a whole number.";
+      } else if (floorsNum < 1 || floorsNum > 300) {
+        errors.total_floors = "Total floors must be between 1 and 300.";
+      }
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setTowerErrors(errors);
+      setErrorMessage(errors.name || errors.code || errors.total_floors || "Please fix the validation errors below.");
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setErrorMessage(null);
+      setTowerErrors({});
       await createTower.mutateAsync({
         communityId: activeCommunityId,
         data: {
-          name: towerForm.name.trim(),
-          code: towerForm.code.trim().toUpperCase(),
+          name: trimmedName,
+          code: trimmedCode.toUpperCase(),
           structure_type: towerForm.structure_type,
-          total_floors: Number(towerForm.total_floors) || 0,
+          total_floors: Number(rawFloors),
         },
       });
       setIsAddTowerOpen(false);
@@ -328,6 +383,8 @@ export default function CommunityAdminPropertyPage() {
                 className="btn btn-primary"
                 onClick={() => {
                   setErrorMessage(null);
+                  setTowerErrors({});
+                  setTowerForm({ name: "", code: "", structure_type: "tower", total_floors: 10 });
                   setIsAddTowerOpen(true);
                 }}
               >
@@ -603,11 +660,16 @@ export default function CommunityAdminPropertyPage() {
       {/* Add Tower Modal */}
       <Modal
         isOpen={isAddTowerOpen}
-        onClose={() => setIsAddTowerOpen(false)}
+        onClose={() => {
+          setIsAddTowerOpen(false);
+          setTowerErrors({});
+          setErrorMessage(null);
+        }}
         title="Add Residential Tower / Block"
       >
         <form
           onSubmit={handleCreateTower}
+          noValidate
           style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
         >
           {errorMessage && (
@@ -634,16 +696,28 @@ export default function CommunityAdminPropertyPage() {
                 marginBottom: "0.25rem",
               }}
             >
-              Tower Name
+              Tower Name <span style={{ color: "#ef4444" }}>*</span>
             </label>
             <input
               type="text"
               className="input-field"
-              required
               placeholder="e.g. Tower A / Block 1"
               value={towerForm.name}
-              onChange={(e) => setTowerForm({ ...towerForm, name: e.target.value })}
+              onChange={(e) => {
+                setTowerForm({ ...towerForm, name: e.target.value });
+                if (towerErrors.name) setTowerErrors((prev) => ({ ...prev, name: undefined }));
+              }}
+              style={towerErrors.name ? { borderColor: "#ef4444", borderWidth: "1.5px" } : undefined}
             />
+            {towerErrors.name ? (
+              <p style={{ fontSize: "0.75rem", color: "#ef4444", margin: "0.25rem 0 0 0", fontWeight: 500 }}>
+                {towerErrors.name}
+              </p>
+            ) : (
+              <p style={{ fontSize: "0.75rem", color: "var(--text-muted, #64748b)", margin: "0.25rem 0 0 0" }}>
+                2–128 characters (alphanumeric, spaces, hyphens).
+              </p>
+            )}
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
@@ -656,16 +730,28 @@ export default function CommunityAdminPropertyPage() {
                   marginBottom: "0.25rem",
                 }}
               >
-                Block / Tower Code
+                Block / Tower Code <span style={{ color: "#ef4444" }}>*</span>
               </label>
               <input
                 type="text"
                 className="input-field"
-                required
                 placeholder="e.g. T-A"
                 value={towerForm.code}
-                onChange={(e) => setTowerForm({ ...towerForm, code: e.target.value })}
+                onChange={(e) => {
+                  setTowerForm({ ...towerForm, code: e.target.value });
+                  if (towerErrors.code) setTowerErrors((prev) => ({ ...prev, code: undefined }));
+                }}
+                style={towerErrors.code ? { borderColor: "#ef4444", borderWidth: "1.5px" } : undefined}
               />
+              {towerErrors.code ? (
+                <p style={{ fontSize: "0.75rem", color: "#ef4444", margin: "0.25rem 0 0 0", fontWeight: 500 }}>
+                  {towerErrors.code}
+                </p>
+              ) : (
+                <p style={{ fontSize: "0.75rem", color: "var(--text-muted, #64748b)", margin: "0.25rem 0 0 0" }}>
+                  1–32 letters/numbers, hyphens, slashes.
+                </p>
+              )}
             </div>
 
             <div>
@@ -677,7 +763,7 @@ export default function CommunityAdminPropertyPage() {
                   marginBottom: "0.25rem",
                 }}
               >
-                Structure Type
+                Structure Type <span style={{ color: "#ef4444" }}>*</span>
               </label>
               <select
                 className="select-field"
@@ -701,17 +787,29 @@ export default function CommunityAdminPropertyPage() {
                 marginBottom: "0.25rem",
               }}
             >
-              Total Floors
+              Total Floors <span style={{ color: "#ef4444" }}>*</span>
             </label>
             <input
               type="number"
               className="input-field"
               min={1}
-              max={150}
-              required
+              max={300}
               value={towerForm.total_floors}
-              onChange={(e) => setTowerForm({ ...towerForm, total_floors: Number(e.target.value) })}
+              onChange={(e) => {
+                setTowerForm({ ...towerForm, total_floors: e.target.value });
+                if (towerErrors.total_floors) setTowerErrors((prev) => ({ ...prev, total_floors: undefined }));
+              }}
+              style={towerErrors.total_floors ? { borderColor: "#ef4444", borderWidth: "1.5px" } : undefined}
             />
+            {towerErrors.total_floors ? (
+              <p style={{ fontSize: "0.75rem", color: "#ef4444", margin: "0.25rem 0 0 0", fontWeight: 500 }}>
+                {towerErrors.total_floors}
+              </p>
+            ) : (
+              <p style={{ fontSize: "0.75rem", color: "var(--text-muted, #64748b)", margin: "0.25rem 0 0 0" }}>
+                Positive whole number from 1 to 300.
+              </p>
+            )}
           </div>
 
           <div
@@ -725,7 +823,11 @@ export default function CommunityAdminPropertyPage() {
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={() => setIsAddTowerOpen(false)}
+              onClick={() => {
+                setIsAddTowerOpen(false);
+                setTowerErrors({});
+                setErrorMessage(null);
+              }}
             >
               Cancel
             </button>
