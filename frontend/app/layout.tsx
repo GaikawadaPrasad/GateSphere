@@ -41,9 +41,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="en"
+      data-scroll-behavior="smooth"
       className={`${inter.variable} ${outfit.variable} ${plusJakartaSans.variable} ${syne.variable}`}
     >
       <body className="font-sans antialiased">
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.addEventListener("error",function(e){if(e.message&&e.message.indexOf("startTime")!==-1){e.stopImmediatePropagation();e.preventDefault();return!1}},true);`,
+          }}
+        />
         <Providers>{children}</Providers>
       </body>
     </html>
