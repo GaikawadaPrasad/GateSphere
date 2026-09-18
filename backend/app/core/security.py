@@ -50,7 +50,7 @@ from app.modules.users.models import (
     UserRole,
 )
 
-_ph = PasswordHasher()
+_ph = PasswordHasher(time_cost=2, memory_cost=32768, parallelism=2)
 _SESSION_PREFIX = "session:"
 
 # Role -> cookie bucket. Roles that share a bucket cannot be held simultaneously in one
