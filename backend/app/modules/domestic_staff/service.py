@@ -17,7 +17,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.context import RequestContext
-from app.core.errors import BusinessRuleError, ConflictError, NotFoundError
+from app.core.errors import BusinessRuleError, ConflictError, ForbiddenError, NotFoundError
 from app.core.hashing import digest, digest_opt
 from app.core.state_machine import ensure_transition
 from app.core.tenancy import TenantScope
@@ -208,6 +208,17 @@ class DomesticStaffService(UnitScopedAccess):
         self, *, community_id: uuid.UUID | None, q: str | None, offset: int, limit: int
     ):
         cid = self._one_community(community_id)
+        
+        from app.modules.users.models import Role, UserRole
+        slugs = await self.db.scalars(
+            select(Role.slug)
+            .join(UserRole, UserRole.role_id == Role.id)
+            .where(UserRole.user_id == self.actor.id)
+        )
+        slug_set = set(slugs.all())
+        if not self.actor.is_superadmin and "resident" not in slug_set and not slug_set.intersection(_CROSS_UNIT_ROLE_SLUGS):
+            raise ForbiddenError("You do not have permission to view the staff registry", code="PERMISSION_DENIED")
+
         stmt = select(DomesticStaff).where(DomesticStaff.community_id == cid)
         if q:
             stmt = stmt.where(
@@ -224,6 +235,9 @@ class DomesticStaffService(UnitScopedAccess):
     async def update_staff(
         self, staff_id: uuid.UUID, payload: schemas.StaffUpdate
     ) -> DomesticStaff:
+        if not self.actor.is_superadmin and not await self._actor_has_cross_unit_role():
+            raise ForbiddenError("Only administrators can update staff profiles directly", code="PERMISSION_DENIED")
+            
         obj = await self._staff_in_scope(staff_id)
         patch = payload.model_dump(exclude_unset=True)
         _enum("staff_type", patch.get("staff_type"))
