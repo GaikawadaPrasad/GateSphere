@@ -9,6 +9,8 @@ import { Modal } from "@/components/common/Modal";
 import { FileUpload } from "@/components/common/FileUpload";
 import { visitorsApi, communitiesApi, authApi } from "@/lib/api";
 import type { Unit } from "@/types/communities";
+import { isValidPersonName } from "@/lib/utils";
+import { toast } from "@/store/toast";
 
 interface CabMovement {
   id: string;
@@ -43,6 +45,7 @@ export default function SecurityGuardCabTaxiPage() {
   const [cabCompany, setCabCompany] = useState("Uber");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
+  const [cabFieldErrors, setCabFieldErrors] = useState<Record<string, string>>({});
 
   const loadData = async (showLoading = true) => {
     if (showLoading) setIsLoading(true);
@@ -139,42 +142,74 @@ export default function SecurityGuardCabTaxiPage() {
     setVehicleNumber("");
     setCabCompany("Uber");
     setModalError(null);
+    setCabFieldErrors({});
     setIsModalOpen(true);
     loadUnits();
   };
 
   const handleCreateCabArrival = async (e: React.FormEvent) => {
     e.preventDefault();
+    const cleanPlate = vehicleNumber.trim().toUpperCase();
+    const trimmedDriverName = driverName.trim();
+    const trimmedDriverPhone = driverPhone.trim();
+    const errors: Record<string, string> = {};
+
     if (!selectedUnitId) {
-      setModalError("Please select a target resident unit.");
+      errors.unitId = "Please select a target resident unit.";
+    }
+    if (!cleanPlate) {
+      errors.vehicleNumber = "Please enter vehicle plate number (e.g. KA-01-AB-1234).";
+    } else {
+      const cleanPlateNoSpaces = cleanPlate.replace(/[\s\-]/g, "");
+      if (!/^[A-Z0-9]{4,15}$/.test(cleanPlateNoSpaces)) {
+        errors.vehicleNumber = "Vehicle plate number must be 4-15 alphanumeric characters (e.g. KA01AB1234).";
+      }
+    }
+    if (trimmedDriverName) {
+      if (trimmedDriverName.length < 2 || !isValidPersonName(trimmedDriverName)) {
+        errors.driverName = "Driver name must contain only alphabetic letters and spaces (min 2 characters).";
+      }
+    }
+    if (trimmedDriverPhone) {
+      const phoneDigits = trimmedDriverPhone.replace(/\D/g, "");
+      if (!/^\+?[0-9\s\-()]{7,20}$/.test(trimmedDriverPhone) || phoneDigits.length < 10) {
+        errors.driverPhone = "Please enter a valid mobile number for the driver (at least 10 digits).";
+      }
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setCabFieldErrors(errors);
+      setModalError("Please resolve the highlighted form errors.");
+      toast.error("Please resolve the highlighted form errors.");
       return;
     }
-    if (!vehicleNumber.trim()) {
-      setModalError("Please enter vehicle plate number (e.g. KA-01-AB-1234).");
-      return;
-    }
+
     setIsSubmitting(true);
     setModalError(null);
     try {
       await visitorsApi.createRequest({
         unit_id: selectedUnitId,
         visitor_type: "cab_taxi",
-        vehicle_number: vehicleNumber.trim().toUpperCase(),
+        vehicle_number: cleanPlate,
         purpose: cabCompany || "Cab / Taxi Entry",
         visitor: {
-          full_name: driverName.trim() || "Cab / Taxi Driver",
-          phone: driverPhone.trim() || "9999999999",
-          vehicle_number: vehicleNumber.trim().toUpperCase(),
+          full_name: trimmedDriverName || "Cab / Taxi Driver",
+          phone: trimmedDriverPhone || "9999999999",
+          vehicle_number: cleanPlate,
         },
       });
+      const successText = `Cab entry ticket logged! Notification sent to resident for approval.`;
       setActionMessage({
         type: "success",
-        text: `Cab entry ticket logged! Notification sent to resident for approval.`,
+        text: successText,
       });
+      toast.success(successText);
       setIsModalOpen(false);
       loadData(false);
     } catch (err: any) {
-      setModalError(err?.message || "Failed to log cab arrival request.");
+      const errMsg = err?.message || "Failed to log cab arrival request.";
+      setModalError(errMsg);
+      toast.error(errMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -203,12 +238,16 @@ export default function SecurityGuardCabTaxiPage() {
         entry_photo_url: admitPhotoUrl,
         vehicle_number: admitCab.vehicleNumber !== "—" ? admitCab.vehicleNumber : undefined,
       });
-      setActionMessage({ type: "success", text: `Cab entry recorded for ${admitCab.vehicleNumber}` });
+      const successText = `Cab entry recorded for ${admitCab.vehicleNumber}`;
+      setActionMessage({ type: "success", text: successText });
+      toast.success(successText);
       setAdmitCab(null);
       setAdmitPhotoUrl(null);
       loadData(false);
     } catch (err: any) {
-      setAdmitError(err?.message || "Failed to record cab entry.");
+      const errMsg = err?.message || "Failed to record cab entry.";
+      setAdmitError(errMsg);
+      toast.error(errMsg);
     } finally {
       setIsAdmitting(false);
     }
@@ -219,10 +258,14 @@ export default function SecurityGuardCabTaxiPage() {
     setActionMessage(null);
     try {
       await visitorsApi.recordExit(cab.entryId);
-      setActionMessage({ type: "success", text: `Cab exit recorded for ${cab.vehicleNumber}` });
+      const successText = `Cab exit recorded for ${cab.vehicleNumber}`;
+      setActionMessage({ type: "success", text: successText });
+      toast.success(successText);
       loadData(false);
     } catch (err: any) {
-      setActionMessage({ type: "error", text: err?.message || "Failed to record cab exit." });
+      const errMsg = err?.message || "Failed to record cab exit.";
+      setActionMessage({ type: "error", text: errMsg });
+      toast.error(errMsg);
     }
   };
 
@@ -309,9 +352,18 @@ export default function SecurityGuardCabTaxiPage() {
           { label: "Cab / Taxi" },
         ]}
         actions={
-          <button className="btn btn-primary" onClick={handleOpenModal}>
-            + Log Cab / Taxi Arrival
-          </button>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+            <button
+              className="btn btn-secondary"
+              onClick={() => loadData(false)}
+              disabled={isLoading}
+            >
+              🔄 {isLoading ? "Refreshing…" : "Refresh"}
+            </button>
+            <button className="btn btn-primary" onClick={handleOpenModal}>
+              + Log Cab / Taxi Arrival
+            </button>
+          </div>
         }
       />
 
@@ -573,7 +625,12 @@ export default function SecurityGuardCabTaxiPage() {
             <select
               className="form-control"
               value={selectedUnitId}
-              onChange={(e) => setSelectedUnitId(e.target.value)}
+              onChange={(e) => {
+                setSelectedUnitId(e.target.value);
+                if (cabFieldErrors.unitId) {
+                  setCabFieldErrors((prev) => ({ ...prev, unitId: "" }));
+                }
+              }}
               required
             >
               {units.length === 0 ? (
@@ -586,6 +643,11 @@ export default function SecurityGuardCabTaxiPage() {
                 ))
               )}
             </select>
+            {cabFieldErrors.unitId && (
+              <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                {cabFieldErrors.unitId}
+              </span>
+            )}
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
@@ -598,9 +660,19 @@ export default function SecurityGuardCabTaxiPage() {
                 className="form-control"
                 placeholder="e.g. KA-01-AB-1234"
                 value={vehicleNumber}
-                onChange={(e) => setVehicleNumber(e.target.value)}
+                onChange={(e) => {
+                  setVehicleNumber(e.target.value);
+                  if (cabFieldErrors.vehicleNumber) {
+                    setCabFieldErrors((prev) => ({ ...prev, vehicleNumber: "" }));
+                  }
+                }}
                 required
               />
+              {cabFieldErrors.vehicleNumber && (
+                <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                  {cabFieldErrors.vehicleNumber}
+                </span>
+              )}
             </div>
 
             <div>
@@ -632,8 +704,18 @@ export default function SecurityGuardCabTaxiPage() {
                 className="form-control"
                 placeholder="Driver full name"
                 value={driverName}
-                onChange={(e) => setDriverName(e.target.value)}
+                onChange={(e) => {
+                  setDriverName(e.target.value);
+                  if (cabFieldErrors.driverName) {
+                    setCabFieldErrors((prev) => ({ ...prev, driverName: "" }));
+                  }
+                }}
               />
+              {cabFieldErrors.driverName && (
+                <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                  {cabFieldErrors.driverName}
+                </span>
+              )}
             </div>
 
             <div>
@@ -641,12 +723,22 @@ export default function SecurityGuardCabTaxiPage() {
                 Driver Phone (Optional)
               </label>
               <input
-                type="number"
+                type="tel"
                 className="form-control"
                 placeholder="10-digit mobile"
                 value={driverPhone}
-                onChange={(e) => setDriverPhone(e.target.value)}
+                onChange={(e) => {
+                  setDriverPhone(e.target.value);
+                  if (cabFieldErrors.driverPhone) {
+                    setCabFieldErrors((prev) => ({ ...prev, driverPhone: "" }));
+                  }
+                }}
               />
+              {cabFieldErrors.driverPhone && (
+                <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                  {cabFieldErrors.driverPhone}
+                </span>
+              )}
             </div>
           </div>
         </form>

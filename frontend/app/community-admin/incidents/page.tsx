@@ -101,6 +101,10 @@ export default function CommunityAdminIncidentsPage() {
       setErrorMessage("Incident description must be at least 5 characters long.");
       return;
     }
+    if (!/[a-zA-Z]{3,}/.test(desc)) {
+      setErrorMessage("Incident description must contain readable text (at least 3 alphabetic letters).");
+      return;
+    }
 
     try {
       setIsSubmitting(true);

@@ -68,14 +68,29 @@ export default function CommunityAdminPropertyPage() {
   const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
   const [isAddGateOpen, setIsAddGateOpen] = useState(false);
 
-  const [towerForm, setTowerForm] = useState({
+  const [towerForm, setTowerForm] = useState<{
+    name: string;
+    code: string;
+    structure_type: string;
+    total_floors: number | string;
+  }>({
     name: "",
     code: "",
     structure_type: "tower",
     total_floors: 10,
   });
-  const [floorForm, setFloorForm] = useState({ tower_id: "", floor_number: 1, label: "" });
-  const [unitForm, setUnitForm] = useState({
+  const [floorForm, setFloorForm] = useState<{
+    tower_id: string;
+    floor_number: number | string;
+    label: string;
+  }>({ tower_id: "", floor_number: 1, label: "" });
+  const [unitForm, setUnitForm] = useState<{
+    floor_id: string;
+    unit_number: string;
+    unit_type: string;
+    bedrooms: number | string;
+    area_sqft: number | string;
+  }>({
     floor_id: "",
     unit_number: "",
     unit_type: "apartment",
@@ -89,24 +104,63 @@ export default function CommunityAdminPropertyPage() {
 
   const [propertyFieldErrors, setPropertyFieldErrors] = useState<Record<string, string>>({});
 
-  // Handle Add Tower
+  // Handle Add Tower (GS-014)
   const handleCreateTower = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeCommunityId) return;
+    if (!activeCommunityId) {
+      setErrorMessage("No active community selected.");
+      return;
+    }
 
     const errors: Record<string, string> = {};
-    if (!towerForm.name.trim() || towerForm.name.trim().length < 2) {
-      errors.tower_name = "Tower name must be at least 2 characters long.";
+    const trimmedName = towerForm.name.trim();
+    const trimmedCode = towerForm.code.trim();
+    const floorsVal =
+      typeof towerForm.total_floors === "string"
+        ? towerForm.total_floors.trim()
+        : towerForm.total_floors;
+
+    // Tower Name validation
+    if (!trimmedName) {
+      errors.tower_name = "Tower name is required.";
+    } else if (trimmedName.length < 2 || trimmedName.length > 128) {
+      errors.tower_name = "Tower name must be between 2 and 128 characters.";
+    } else if (!/^[A-Za-z0-9][A-Za-z0-9 \-_.,&()'/]*$/.test(trimmedName)) {
+      errors.tower_name =
+        "Tower name must start with a letter or number and contain only valid characters.";
     }
-    if (!towerForm.code.trim() || !/^[A-Z0-9_\-]{2,32}$/i.test(towerForm.code.trim())) {
-      errors.tower_code = "Code must be 2-32 alphanumeric characters or hyphens.";
+
+    // Tower Code validation
+    if (!trimmedCode) {
+      errors.tower_code = "Block / Tower code is required.";
+    } else if (trimmedCode.length < 1 || trimmedCode.length > 32) {
+      errors.tower_code = "Block / Tower code must be between 1 and 32 characters.";
+    } else if (!/^[A-Za-z0-9][A-Za-z0-9 _\-\/]*$/.test(trimmedCode)) {
+      errors.tower_code =
+        "Block code must start with a letter or number and contain only letters, numbers, spaces, hyphens, underscores, or slashes.";
     }
-    if (!towerForm.total_floors || Number(towerForm.total_floors) < 1) {
-      errors.total_floors = "Total floors must be at least 1.";
+
+    // Structure Type validation
+    const validStructureTypes = ["tower", "block", "villa_cluster", "wing"];
+    if (!validStructureTypes.includes(towerForm.structure_type)) {
+      errors.structure_type = "Please select a valid structure type.";
+    }
+
+    // Total Floors validation
+    if (floorsVal === "" || floorsVal === undefined || floorsVal === null) {
+      errors.total_floors = "Total floors is required.";
+    } else {
+      const numFloors = Number(floorsVal);
+      if (isNaN(numFloors) || !Number.isInteger(numFloors)) {
+        errors.total_floors = "Total floors must be a whole number (e.g. 10).";
+      } else if (numFloors < 1 || numFloors > 300) {
+        errors.total_floors = "Total floors must be between 1 and 300.";
+      }
     }
 
     if (Object.keys(errors).length > 0) {
       setPropertyFieldErrors(errors);
+      setErrorMessage(Object.values(errors)[0]);
       return;
     }
 
@@ -116,21 +170,30 @@ export default function CommunityAdminPropertyPage() {
       await createTower.mutateAsync({
         communityId: activeCommunityId,
         data: {
-          name: towerForm.name.trim(),
-          code: towerForm.code.trim().toUpperCase(),
+          name: trimmedName,
+          code: trimmedCode.toUpperCase(),
           structure_type: towerForm.structure_type,
-          total_floors: Number(towerForm.total_floors) || 0,
+          total_floors: Number(floorsVal),
         },
       });
-      toast.success(`Tower "${towerForm.name.trim()}" created successfully.`, "Tower Created");
+      toast.success(`Tower "${trimmedName}" created successfully.`, "Tower Created");
       setIsAddTowerOpen(false);
       setPropertyFieldErrors({});
       setTowerForm({ name: "", code: "", structure_type: "tower", total_floors: 10 });
       refetchTowers();
     } catch (err: unknown) {
       console.error(err);
-      const msg = err instanceof Error ? err.message : "Failed to create tower";
+      const msg =
+        (err as any)?.response?.data?.detail ||
+        (err instanceof Error ? err.message : "Failed to create tower");
       setErrorMessage(msg);
+      if (typeof msg === "string") {
+        if (msg.toLowerCase().includes("name")) {
+          setPropertyFieldErrors((prev) => ({ ...prev, tower_name: msg }));
+        } else if (msg.toLowerCase().includes("code")) {
+          setPropertyFieldErrors((prev) => ({ ...prev, tower_code: msg }));
+        }
+      }
       toast.error(msg, "Tower Creation Failed");
     } finally {
       setIsSubmitting(false);
@@ -147,11 +210,29 @@ export default function CommunityAdminPropertyPage() {
     }
 
     const errors: Record<string, string> = {};
-    if (floorForm.floor_number === undefined || isNaN(Number(floorForm.floor_number))) {
-      errors.floor_number = "Valid floor number is required.";
+    const fVal =
+      typeof floorForm.floor_number === "string"
+        ? floorForm.floor_number.trim()
+        : floorForm.floor_number;
+
+    if (fVal === "" || fVal === undefined || fVal === null) {
+      errors.floor_number = "Floor number is required.";
+    } else {
+      const fNum = Number(fVal);
+      if (isNaN(fNum) || !Number.isInteger(fNum)) {
+        errors.floor_number = "Floor number must be an integer (e.g. 1, 0, -1).";
+      } else if (fNum < -10 || fNum > 300) {
+        errors.floor_number = "Floor number must be between -10 and 300.";
+      }
     }
+
+    if (floorForm.label && floorForm.label.trim().length > 40) {
+      errors.floor_label = "Floor label cannot exceed 40 characters.";
+    }
+
     if (Object.keys(errors).length > 0) {
       setPropertyFieldErrors(errors);
+      setErrorMessage(Object.values(errors)[0]);
       return;
     }
 
@@ -160,17 +241,19 @@ export default function CommunityAdminPropertyPage() {
       setErrorMessage(null);
       await createFloor.mutateAsync({
         tower_id: towerId,
-        floor_number: Number(floorForm.floor_number),
+        floor_number: Number(fVal),
         label: floorForm.label ? floorForm.label.trim() : undefined,
       });
-      toast.success(`Floor #${floorForm.floor_number} added successfully.`, "Floor Added");
+      toast.success(`Floor #${fVal} added successfully.`, "Floor Added");
       setIsAddFloorOpen(false);
       setPropertyFieldErrors({});
       setFloorForm({ tower_id: "", floor_number: 1, label: "" });
       refetchFloors();
     } catch (err: unknown) {
       console.error(err);
-      const msg = err instanceof Error ? err.message : "Failed to create floor";
+      const msg =
+        (err as any)?.response?.data?.detail ||
+        (err instanceof Error ? err.message : "Failed to create floor");
       setErrorMessage(msg);
       toast.error(msg, "Floor Creation Failed");
     } finally {
@@ -188,14 +271,34 @@ export default function CommunityAdminPropertyPage() {
     }
 
     const errors: Record<string, string> = {};
-    if (!unitForm.unit_number.trim()) {
+    const trimmedUnitNumber = unitForm.unit_number.trim();
+
+    if (!trimmedUnitNumber) {
       errors.unit_number = "Unit number is required.";
+    } else if (trimmedUnitNumber.length > 32) {
+      errors.unit_number = "Unit number cannot exceed 32 characters.";
+    } else if (!/^[A-Za-z0-9][A-Za-z0-9 \-_./]*$/.test(trimmedUnitNumber)) {
+      errors.unit_number =
+        "Unit number must start with a letter or number and contain valid characters.";
     }
-    if (unitForm.area_sqft !== undefined && Number(unitForm.area_sqft) <= 0) {
-      errors.area_sqft = "Area must be a positive number.";
+
+    if (unitForm.bedrooms !== "" && unitForm.bedrooms !== undefined && unitForm.bedrooms !== null) {
+      const bNum = Number(unitForm.bedrooms);
+      if (isNaN(bNum) || !Number.isInteger(bNum) || bNum < 0 || bNum > 20) {
+        errors.bedrooms = "Bedrooms must be a whole number between 0 and 20.";
+      }
     }
+
+    if (unitForm.area_sqft !== "" && unitForm.area_sqft !== undefined && unitForm.area_sqft !== null) {
+      const aNum = Number(unitForm.area_sqft);
+      if (isNaN(aNum) || aNum <= 0 || aNum > 1000000) {
+        errors.area_sqft = "Area must be a positive number up to 1,000,000 sq ft.";
+      }
+    }
+
     if (Object.keys(errors).length > 0) {
       setPropertyFieldErrors(errors);
+      setErrorMessage(Object.values(errors)[0]);
       return;
     }
 
@@ -204,12 +307,18 @@ export default function CommunityAdminPropertyPage() {
       setErrorMessage(null);
       await createUnit.mutateAsync({
         floor_id: floorId,
-        unit_number: unitForm.unit_number.trim(),
+        unit_number: trimmedUnitNumber,
         unit_type: unitForm.unit_type,
-        bedrooms: unitForm.bedrooms ? Number(unitForm.bedrooms) : undefined,
-        area_sqft: unitForm.area_sqft ? Number(unitForm.area_sqft) : undefined,
+        bedrooms:
+          unitForm.bedrooms !== "" && unitForm.bedrooms !== undefined
+            ? Number(unitForm.bedrooms)
+            : undefined,
+        area_sqft:
+          unitForm.area_sqft !== "" && unitForm.area_sqft !== undefined
+            ? Number(unitForm.area_sqft)
+            : undefined,
       });
-      toast.success(`Unit "${unitForm.unit_number.trim()}" created successfully.`, "Unit Created");
+      toast.success(`Unit "${trimmedUnitNumber}" created successfully.`, "Unit Created");
       setIsAddUnitOpen(false);
       setPropertyFieldErrors({});
       setUnitForm({
@@ -222,7 +331,9 @@ export default function CommunityAdminPropertyPage() {
       refetchUnits();
     } catch (err: unknown) {
       console.error(err);
-      const msg = err instanceof Error ? err.message : "Failed to create unit";
+      const msg =
+        (err as any)?.response?.data?.detail ||
+        (err instanceof Error ? err.message : "Failed to create unit");
       setErrorMessage(msg);
       toast.error(msg, "Unit Creation Failed");
     } finally {
@@ -233,17 +344,36 @@ export default function CommunityAdminPropertyPage() {
   // Handle Add Gate
   const handleCreateGate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeCommunityId) return;
+    if (!activeCommunityId) {
+      setErrorMessage("No active community selected.");
+      return;
+    }
 
     const errors: Record<string, string> = {};
-    if (!gateForm.name.trim() || gateForm.name.trim().length < 2) {
-      errors.gate_name = "Gate name must be at least 2 characters.";
+    const trimmedName = gateForm.name.trim();
+    const trimmedCode = gateForm.code.trim();
+
+    if (!trimmedName) {
+      errors.gate_name = "Gate name is required.";
+    } else if (trimmedName.length < 2 || trimmedName.length > 120) {
+      errors.gate_name = "Gate name must be between 2 and 120 characters.";
+    } else if (!/^[A-Za-z0-9][A-Za-z0-9 \-_.,&()'/]*$/.test(trimmedName)) {
+      errors.gate_name =
+        "Gate name must start with a letter or number and contain only valid characters.";
     }
-    if (!gateForm.code.trim() || !/^[A-Z0-9_\-]{2,32}$/i.test(gateForm.code.trim())) {
-      errors.gate_code = "Gate code must be 2-32 alphanumeric characters.";
+
+    if (!trimmedCode) {
+      errors.gate_code = "Gate code is required.";
+    } else if (trimmedCode.length < 1 || trimmedCode.length > 32) {
+      errors.gate_code = "Gate code must be between 1 and 32 characters.";
+    } else if (!/^[A-Za-z0-9][A-Za-z0-9 _\-\/]*$/.test(trimmedCode)) {
+      errors.gate_code =
+        "Gate code must start with a letter or number and contain only letters, numbers, spaces, hyphens, underscores, or slashes.";
     }
+
     if (Object.keys(errors).length > 0) {
       setPropertyFieldErrors(errors);
+      setErrorMessage(Object.values(errors)[0]);
       return;
     }
 
@@ -253,19 +383,21 @@ export default function CommunityAdminPropertyPage() {
       await createGate.mutateAsync({
         communityId: activeCommunityId,
         data: {
-          name: gateForm.name.trim(),
-          code: gateForm.code.trim().toUpperCase(),
+          name: trimmedName,
+          code: trimmedCode.toUpperCase(),
           gate_type: gateForm.gate_type,
         },
       });
-      toast.success(`Security gate "${gateForm.name.trim()}" registered successfully.`, "Gate Created");
+      toast.success(`Security gate "${trimmedName}" registered successfully.`, "Gate Created");
       setIsAddGateOpen(false);
       setPropertyFieldErrors({});
       setGateForm({ name: "", code: "", gate_type: "main" });
       refetchGates();
     } catch (err: unknown) {
       console.error(err);
-      const msg = err instanceof Error ? err.message : "Failed to create security gate";
+      const msg =
+        (err as any)?.response?.data?.detail ||
+        (err instanceof Error ? err.message : "Failed to create security gate");
       setErrorMessage(msg);
       toast.error(msg, "Gate Creation Failed");
     } finally {
@@ -713,6 +845,7 @@ export default function CommunityAdminPropertyPage() {
         title="Add Residential Tower / Block"
       >
         <form
+          noValidate
           onSubmit={handleCreateTower}
           style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
         >
@@ -733,6 +866,7 @@ export default function CommunityAdminPropertyPage() {
 
           <div>
             <label
+              htmlFor="tower-name-input"
               style={{
                 fontSize: "0.85rem",
                 fontWeight: 600,
@@ -740,21 +874,59 @@ export default function CommunityAdminPropertyPage() {
                 marginBottom: "0.25rem",
               }}
             >
-              Tower Name
+              Tower Name <span style={{ color: "#ef4444" }}>*</span>
             </label>
             <input
+              id="tower-name-input"
               type="text"
               className="input-field"
-              required
               placeholder="e.g. Tower A / Block 1"
               value={towerForm.name}
-              onChange={(e) => setTowerForm({ ...towerForm, name: e.target.value })}
+              style={{
+                borderColor: propertyFieldErrors.tower_name ? "#ef4444" : undefined,
+                boxShadow: propertyFieldErrors.tower_name ? "0 0 0 1px #ef4444" : undefined,
+              }}
+              aria-invalid={!!propertyFieldErrors.tower_name}
+              onChange={(e) => {
+                setTowerForm({ ...towerForm, name: e.target.value });
+                if (propertyFieldErrors.tower_name) {
+                  setPropertyFieldErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.tower_name;
+                    return next;
+                  });
+                }
+              }}
             />
+            {propertyFieldErrors.tower_name ? (
+              <span
+                style={{
+                  color: "#ef4444",
+                  fontSize: "0.75rem",
+                  marginTop: "0.25rem",
+                  display: "block",
+                }}
+              >
+                {propertyFieldErrors.tower_name}
+              </span>
+            ) : (
+              <span
+                style={{
+                  color: "var(--muted)",
+                  fontSize: "0.75rem",
+                  marginTop: "0.25rem",
+                  display: "block",
+                }}
+              >
+                2–128 characters (alphanumeric, spaces, hyphens).
+              </span>
+            )}
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
             <div>
               <label
+                htmlFor="tower-code-input"
                 style={{
                   fontSize: "0.85rem",
                   fontWeight: 600,
@@ -762,20 +934,58 @@ export default function CommunityAdminPropertyPage() {
                   marginBottom: "0.25rem",
                 }}
               >
-                Block / Tower Code
+                Block / Tower Code <span style={{ color: "#ef4444" }}>*</span>
               </label>
               <input
+                id="tower-code-input"
                 type="text"
                 className="input-field"
-                required
                 placeholder="e.g. T-A"
                 value={towerForm.code}
-                onChange={(e) => setTowerForm({ ...towerForm, code: e.target.value })}
+                style={{
+                  borderColor: propertyFieldErrors.tower_code ? "#ef4444" : undefined,
+                  boxShadow: propertyFieldErrors.tower_code ? "0 0 0 1px #ef4444" : undefined,
+                }}
+                aria-invalid={!!propertyFieldErrors.tower_code}
+                onChange={(e) => {
+                  setTowerForm({ ...towerForm, code: e.target.value });
+                  if (propertyFieldErrors.tower_code) {
+                    setPropertyFieldErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.tower_code;
+                      return next;
+                    });
+                  }
+                }}
               />
+              {propertyFieldErrors.tower_code ? (
+                <span
+                  style={{
+                    color: "#ef4444",
+                    fontSize: "0.75rem",
+                    marginTop: "0.25rem",
+                    display: "block",
+                  }}
+                >
+                  {propertyFieldErrors.tower_code}
+                </span>
+              ) : (
+                <span
+                  style={{
+                    color: "var(--muted)",
+                    fontSize: "0.75rem",
+                    marginTop: "0.25rem",
+                    display: "block",
+                  }}
+                >
+                  1–32 letters/numbers, hyphens, slashes.
+                </span>
+              )}
             </div>
 
             <div>
               <label
+                htmlFor="tower-structure-type-select"
                 style={{
                   fontSize: "0.85rem",
                   fontWeight: 600,
@@ -783,23 +993,50 @@ export default function CommunityAdminPropertyPage() {
                   marginBottom: "0.25rem",
                 }}
               >
-                Structure Type
+                Structure Type <span style={{ color: "#ef4444" }}>*</span>
               </label>
               <select
+                id="tower-structure-type-select"
                 className="select-field"
                 value={towerForm.structure_type}
-                onChange={(e) => setTowerForm({ ...towerForm, structure_type: e.target.value })}
+                style={{
+                  borderColor: propertyFieldErrors.structure_type ? "#ef4444" : undefined,
+                }}
+                aria-invalid={!!propertyFieldErrors.structure_type}
+                onChange={(e) => {
+                  setTowerForm({ ...towerForm, structure_type: e.target.value });
+                  if (propertyFieldErrors.structure_type) {
+                    setPropertyFieldErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.structure_type;
+                      return next;
+                    });
+                  }
+                }}
               >
                 <option value="tower">Tower</option>
                 <option value="block">Block</option>
                 <option value="villa_cluster">Villa Cluster</option>
                 <option value="wing">Wing</option>
               </select>
+              {propertyFieldErrors.structure_type && (
+                <span
+                  style={{
+                    color: "#ef4444",
+                    fontSize: "0.75rem",
+                    marginTop: "0.25rem",
+                    display: "block",
+                  }}
+                >
+                  {propertyFieldErrors.structure_type}
+                </span>
+              )}
             </div>
           </div>
 
           <div>
             <label
+              htmlFor="tower-total-floors-input"
               style={{
                 fontSize: "0.85rem",
                 fontWeight: 600,
@@ -807,17 +1044,55 @@ export default function CommunityAdminPropertyPage() {
                 marginBottom: "0.25rem",
               }}
             >
-              Total Floors
+              Total Floors <span style={{ color: "#ef4444" }}>*</span>
             </label>
             <input
+              id="tower-total-floors-input"
               type="number"
               className="input-field"
               min={1}
-              max={150}
-              required
+              max={300}
+              placeholder="e.g. 10 (1–300)"
               value={towerForm.total_floors}
-              onChange={(e) => setTowerForm({ ...towerForm, total_floors: Number(e.target.value) })}
+              style={{
+                borderColor: propertyFieldErrors.total_floors ? "#ef4444" : undefined,
+                boxShadow: propertyFieldErrors.total_floors ? "0 0 0 1px #ef4444" : undefined,
+              }}
+              aria-invalid={!!propertyFieldErrors.total_floors}
+              onChange={(e) => {
+                setTowerForm({ ...towerForm, total_floors: e.target.value });
+                if (propertyFieldErrors.total_floors) {
+                  setPropertyFieldErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.total_floors;
+                    return next;
+                  });
+                }
+              }}
             />
+            {propertyFieldErrors.total_floors ? (
+              <span
+                style={{
+                  color: "#ef4444",
+                  fontSize: "0.75rem",
+                  marginTop: "0.25rem",
+                  display: "block",
+                }}
+              >
+                {propertyFieldErrors.total_floors}
+              </span>
+            ) : (
+              <span
+                style={{
+                  color: "var(--muted)",
+                  fontSize: "0.75rem",
+                  marginTop: "0.25rem",
+                  display: "block",
+                }}
+              >
+                Positive whole number from 1 to 300.
+              </span>
+            )}
           </div>
 
           <div
@@ -849,6 +1124,7 @@ export default function CommunityAdminPropertyPage() {
         title="Add Floor to Tower"
       >
         <form
+          noValidate
           onSubmit={handleCreateFloor}
           style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
         >
@@ -869,6 +1145,7 @@ export default function CommunityAdminPropertyPage() {
 
           <div>
             <label
+              htmlFor="floor-tower-select"
               style={{
                 fontSize: "0.85rem",
                 fontWeight: 600,
@@ -876,11 +1153,11 @@ export default function CommunityAdminPropertyPage() {
                 marginBottom: "0.25rem",
               }}
             >
-              Tower / Block
+              Tower / Block <span style={{ color: "#ef4444" }}>*</span>
             </label>
             <select
+              id="floor-tower-select"
               className="select-field"
-              required
               value={floorForm.tower_id || currentTowerId}
               onChange={(e) => setFloorForm({ ...floorForm, tower_id: e.target.value })}
             >
@@ -894,6 +1171,7 @@ export default function CommunityAdminPropertyPage() {
 
           <div>
             <label
+              htmlFor="floor-number-input"
               style={{
                 fontSize: "0.85rem",
                 fontWeight: 600,
@@ -901,20 +1179,58 @@ export default function CommunityAdminPropertyPage() {
                 marginBottom: "0.25rem",
               }}
             >
-              Floor Number
+              Floor Number <span style={{ color: "#ef4444" }}>*</span>
             </label>
             <input
+              id="floor-number-input"
               type="number"
               className="input-field"
-              required
               placeholder="e.g. 1 (0 for ground, -1 for basement)"
               value={floorForm.floor_number}
-              onChange={(e) => setFloorForm({ ...floorForm, floor_number: Number(e.target.value) })}
+              style={{
+                borderColor: propertyFieldErrors.floor_number ? "#ef4444" : undefined,
+                boxShadow: propertyFieldErrors.floor_number ? "0 0 0 1px #ef4444" : undefined,
+              }}
+              aria-invalid={!!propertyFieldErrors.floor_number}
+              onChange={(e) => {
+                setFloorForm({ ...floorForm, floor_number: e.target.value });
+                if (propertyFieldErrors.floor_number) {
+                  setPropertyFieldErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.floor_number;
+                    return next;
+                  });
+                }
+              }}
             />
+            {propertyFieldErrors.floor_number ? (
+              <span
+                style={{
+                  color: "#ef4444",
+                  fontSize: "0.75rem",
+                  marginTop: "0.25rem",
+                  display: "block",
+                }}
+              >
+                {propertyFieldErrors.floor_number}
+              </span>
+            ) : (
+              <span
+                style={{
+                  color: "var(--muted)",
+                  fontSize: "0.75rem",
+                  marginTop: "0.25rem",
+                  display: "block",
+                }}
+              >
+                Whole number between -10 and 300.
+              </span>
+            )}
           </div>
 
           <div>
             <label
+              htmlFor="floor-label-input"
               style={{
                 fontSize: "0.85rem",
                 fontWeight: 600,
@@ -925,12 +1241,39 @@ export default function CommunityAdminPropertyPage() {
               Floor Label (Optional)
             </label>
             <input
+              id="floor-label-input"
               type="text"
               className="input-field"
               placeholder="e.g. 1st Floor / Ground Floor"
               value={floorForm.label}
-              onChange={(e) => setFloorForm({ ...floorForm, label: e.target.value })}
+              style={{
+                borderColor: propertyFieldErrors.floor_label ? "#ef4444" : undefined,
+                boxShadow: propertyFieldErrors.floor_label ? "0 0 0 1px #ef4444" : undefined,
+              }}
+              aria-invalid={!!propertyFieldErrors.floor_label}
+              onChange={(e) => {
+                setFloorForm({ ...floorForm, label: e.target.value });
+                if (propertyFieldErrors.floor_label) {
+                  setPropertyFieldErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.floor_label;
+                    return next;
+                  });
+                }
+              }}
             />
+            {propertyFieldErrors.floor_label && (
+              <span
+                style={{
+                  color: "#ef4444",
+                  fontSize: "0.75rem",
+                  marginTop: "0.25rem",
+                  display: "block",
+                }}
+              >
+                {propertyFieldErrors.floor_label}
+              </span>
+            )}
           </div>
 
           <div
@@ -962,6 +1305,7 @@ export default function CommunityAdminPropertyPage() {
         title="Add Residential Unit"
       >
         <form
+          noValidate
           onSubmit={handleCreateUnit}
           style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
         >
@@ -982,6 +1326,7 @@ export default function CommunityAdminPropertyPage() {
 
           <div>
             <label
+              htmlFor="unit-floor-select"
               style={{
                 fontSize: "0.85rem",
                 fontWeight: 600,
@@ -989,11 +1334,11 @@ export default function CommunityAdminPropertyPage() {
                 marginBottom: "0.25rem",
               }}
             >
-              Floor
+              Floor <span style={{ color: "#ef4444" }}>*</span>
             </label>
             <select
+              id="unit-floor-select"
               className="select-field"
-              required
               value={unitForm.floor_id || currentFloorId}
               onChange={(e) => setUnitForm({ ...unitForm, floor_id: e.target.value })}
             >
@@ -1008,6 +1353,7 @@ export default function CommunityAdminPropertyPage() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
             <div>
               <label
+                htmlFor="unit-number-input"
                 style={{
                   fontSize: "0.85rem",
                   fontWeight: 600,
@@ -1015,20 +1361,47 @@ export default function CommunityAdminPropertyPage() {
                   marginBottom: "0.25rem",
                 }}
               >
-                Unit Number
+                Unit Number <span style={{ color: "#ef4444" }}>*</span>
               </label>
               <input
+                id="unit-number-input"
                 type="text"
                 className="input-field"
-                required
                 placeholder="e.g. 101 / A-204"
                 value={unitForm.unit_number}
-                onChange={(e) => setUnitForm({ ...unitForm, unit_number: e.target.value })}
+                style={{
+                  borderColor: propertyFieldErrors.unit_number ? "#ef4444" : undefined,
+                  boxShadow: propertyFieldErrors.unit_number ? "0 0 0 1px #ef4444" : undefined,
+                }}
+                aria-invalid={!!propertyFieldErrors.unit_number}
+                onChange={(e) => {
+                  setUnitForm({ ...unitForm, unit_number: e.target.value });
+                  if (propertyFieldErrors.unit_number) {
+                    setPropertyFieldErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.unit_number;
+                      return next;
+                    });
+                  }
+                }}
               />
+              {propertyFieldErrors.unit_number && (
+                <span
+                  style={{
+                    color: "#ef4444",
+                    fontSize: "0.75rem",
+                    marginTop: "0.25rem",
+                    display: "block",
+                  }}
+                >
+                  {propertyFieldErrors.unit_number}
+                </span>
+              )}
             </div>
 
             <div>
               <label
+                htmlFor="unit-type-select"
                 style={{
                   fontSize: "0.85rem",
                   fontWeight: 600,
@@ -1036,9 +1409,10 @@ export default function CommunityAdminPropertyPage() {
                   marginBottom: "0.25rem",
                 }}
               >
-                Unit Type
+                Unit Type <span style={{ color: "#ef4444" }}>*</span>
               </label>
               <select
+                id="unit-type-select"
                 className="select-field"
                 value={unitForm.unit_type}
                 onChange={(e) => setUnitForm({ ...unitForm, unit_type: e.target.value })}
@@ -1055,6 +1429,7 @@ export default function CommunityAdminPropertyPage() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
             <div>
               <label
+                htmlFor="unit-bedrooms-input"
                 style={{
                   fontSize: "0.85rem",
                   fontWeight: 600,
@@ -1065,17 +1440,46 @@ export default function CommunityAdminPropertyPage() {
                 Bedrooms (BHK)
               </label>
               <input
+                id="unit-bedrooms-input"
                 type="number"
                 min={0}
-                max={10}
+                max={20}
                 className="input-field"
+                placeholder="e.g. 2 (0-20)"
                 value={unitForm.bedrooms}
-                onChange={(e) => setUnitForm({ ...unitForm, bedrooms: Number(e.target.value) })}
+                style={{
+                  borderColor: propertyFieldErrors.bedrooms ? "#ef4444" : undefined,
+                  boxShadow: propertyFieldErrors.bedrooms ? "0 0 0 1px #ef4444" : undefined,
+                }}
+                aria-invalid={!!propertyFieldErrors.bedrooms}
+                onChange={(e) => {
+                  setUnitForm({ ...unitForm, bedrooms: e.target.value });
+                  if (propertyFieldErrors.bedrooms) {
+                    setPropertyFieldErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.bedrooms;
+                      return next;
+                    });
+                  }
+                }}
               />
+              {propertyFieldErrors.bedrooms && (
+                <span
+                  style={{
+                    color: "#ef4444",
+                    fontSize: "0.75rem",
+                    marginTop: "0.25rem",
+                    display: "block",
+                  }}
+                >
+                  {propertyFieldErrors.bedrooms}
+                </span>
+              )}
             </div>
 
             <div>
               <label
+                htmlFor="unit-area-sqft-input"
                 style={{
                   fontSize: "0.85rem",
                   fontWeight: 600,
@@ -1086,13 +1490,41 @@ export default function CommunityAdminPropertyPage() {
                 Area (sq ft)
               </label>
               <input
+                id="unit-area-sqft-input"
                 type="number"
-                min={100}
-                max={50000}
+                min={1}
+                max={1000000}
                 className="input-field"
+                placeholder="e.g. 1200"
                 value={unitForm.area_sqft}
-                onChange={(e) => setUnitForm({ ...unitForm, area_sqft: Number(e.target.value) })}
+                style={{
+                  borderColor: propertyFieldErrors.area_sqft ? "#ef4444" : undefined,
+                  boxShadow: propertyFieldErrors.area_sqft ? "0 0 0 1px #ef4444" : undefined,
+                }}
+                aria-invalid={!!propertyFieldErrors.area_sqft}
+                onChange={(e) => {
+                  setUnitForm({ ...unitForm, area_sqft: e.target.value });
+                  if (propertyFieldErrors.area_sqft) {
+                    setPropertyFieldErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.area_sqft;
+                      return next;
+                    });
+                  }
+                }}
               />
+              {propertyFieldErrors.area_sqft && (
+                <span
+                  style={{
+                    color: "#ef4444",
+                    fontSize: "0.75rem",
+                    marginTop: "0.25rem",
+                    display: "block",
+                  }}
+                >
+                  {propertyFieldErrors.area_sqft}
+                </span>
+              )}
             </div>
           </div>
 
@@ -1125,6 +1557,7 @@ export default function CommunityAdminPropertyPage() {
         title="Add Security Gate"
       >
         <form
+          noValidate
           onSubmit={handleCreateGate}
           style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
         >
@@ -1145,6 +1578,7 @@ export default function CommunityAdminPropertyPage() {
 
           <div>
             <label
+              htmlFor="gate-name-input"
               style={{
                 fontSize: "0.85rem",
                 fontWeight: 600,
@@ -1152,21 +1586,48 @@ export default function CommunityAdminPropertyPage() {
                 marginBottom: "0.25rem",
               }}
             >
-              Gate Name
+              Gate Name <span style={{ color: "#ef4444" }}>*</span>
             </label>
             <input
+              id="gate-name-input"
               type="text"
               className="input-field"
-              required
               placeholder="e.g. Main North Entry Gate"
               value={gateForm.name}
-              onChange={(e) => setGateForm({ ...gateForm, name: e.target.value })}
+              style={{
+                borderColor: propertyFieldErrors.gate_name ? "#ef4444" : undefined,
+                boxShadow: propertyFieldErrors.gate_name ? "0 0 0 1px #ef4444" : undefined,
+              }}
+              aria-invalid={!!propertyFieldErrors.gate_name}
+              onChange={(e) => {
+                setGateForm({ ...gateForm, name: e.target.value });
+                if (propertyFieldErrors.gate_name) {
+                  setPropertyFieldErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.gate_name;
+                    return next;
+                  });
+                }
+              }}
             />
+            {propertyFieldErrors.gate_name && (
+              <span
+                style={{
+                  color: "#ef4444",
+                  fontSize: "0.75rem",
+                  marginTop: "0.25rem",
+                  display: "block",
+                }}
+              >
+                {propertyFieldErrors.gate_name}
+              </span>
+            )}
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
             <div>
               <label
+                htmlFor="gate-code-input"
                 style={{
                   fontSize: "0.85rem",
                   fontWeight: 600,
@@ -1174,20 +1635,47 @@ export default function CommunityAdminPropertyPage() {
                   marginBottom: "0.25rem",
                 }}
               >
-                Gate Code
+                Gate Code <span style={{ color: "#ef4444" }}>*</span>
               </label>
               <input
+                id="gate-code-input"
                 type="text"
                 className="input-field"
-                required
                 placeholder="e.g. GATE-01"
                 value={gateForm.code}
-                onChange={(e) => setGateForm({ ...gateForm, code: e.target.value })}
+                style={{
+                  borderColor: propertyFieldErrors.gate_code ? "#ef4444" : undefined,
+                  boxShadow: propertyFieldErrors.gate_code ? "0 0 0 1px #ef4444" : undefined,
+                }}
+                aria-invalid={!!propertyFieldErrors.gate_code}
+                onChange={(e) => {
+                  setGateForm({ ...gateForm, code: e.target.value });
+                  if (propertyFieldErrors.gate_code) {
+                    setPropertyFieldErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.gate_code;
+                      return next;
+                    });
+                  }
+                }}
               />
+              {propertyFieldErrors.gate_code && (
+                <span
+                  style={{
+                    color: "#ef4444",
+                    fontSize: "0.75rem",
+                    marginTop: "0.25rem",
+                    display: "block",
+                  }}
+                >
+                  {propertyFieldErrors.gate_code}
+                </span>
+              )}
             </div>
 
             <div>
               <label
+                htmlFor="gate-type-select"
                 style={{
                   fontSize: "0.85rem",
                   fontWeight: 600,
@@ -1195,9 +1683,10 @@ export default function CommunityAdminPropertyPage() {
                   marginBottom: "0.25rem",
                 }}
               >
-                Gate Direction / Type
+                Gate Direction / Type <span style={{ color: "#ef4444" }}>*</span>
               </label>
               <select
+                id="gate-type-select"
                 className="select-field"
                 value={gateForm.gate_type}
                 onChange={(e) => setGateForm({ ...gateForm, gate_type: e.target.value })}

@@ -111,3 +111,31 @@ export function useUnitLedger(unitId?: string, params?: ListQueryParams) {
     staleTime: 30_000,
   });
 }
+
+export function useRecordPayment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Parameters<typeof billingApi.recordPayment>[0]) =>
+      billingApi.recordPayment(data),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: billingKeys.all, refetchType: "all" });
+      await qc.invalidateQueries({ queryKey: ["dashboards"], refetchType: "all" });
+    },
+  });
+}
+
+export function useCreateChargeHead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      data,
+      communityId,
+    }: {
+      data: Parameters<typeof billingApi.createChargeHead>[0];
+      communityId?: string;
+    }) => billingApi.createChargeHead(data, communityId),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: billingKeys.all, refetchType: "all" });
+    },
+  });
+}

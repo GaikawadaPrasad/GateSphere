@@ -63,6 +63,7 @@ export interface StaffVisit {
 export function useStaffProfile() {
   return useQuery<StaffProfile>({
     queryKey: ["staff", "profile"],
+    staleTime: 5_000,
     queryFn: async () => {
       const res = await api.get<any>("/domestic-staff/me");
       if (!res) {
@@ -100,6 +101,7 @@ export function useStaffPass() {
     expires_at: string;
   }>({
     queryKey: ["staff", "pass"],
+    staleTime: 10_000,
     queryFn: async () => {
       const res = await api.get<any>("/domestic-staff/me/pass");
       return res;
@@ -112,6 +114,7 @@ export function useUpdateStaffProfile() {
   return useMutation({
     mutationFn: async ({ data }: { staffId?: string; data: Partial<StaffProfile> }) => {
       const payload: Record<string, any> = {};
+      if (data.full_name && data.full_name.trim()) payload.full_name = data.full_name.trim();
       if (data.phone && data.phone.trim()) payload.phone = data.phone.trim();
       if (data.emergency_contact !== undefined) payload.emergency_address = data.emergency_contact;
       if (data.avatar_url) payload.photo_url = data.avatar_url;
@@ -126,6 +129,7 @@ export function useUpdateStaffProfile() {
 export function useAssignedHomes() {
   return useQuery<AssignedHome[]>({
     queryKey: ["staff", "assigned-homes"],
+    staleTime: 5_000,
     queryFn: async () => {
       const res = await api.get<any[]>("/domestic-staff/me/assignments");
       if (!Array.isArray(res)) return [];
@@ -153,6 +157,7 @@ export function useAssignedHomes() {
 export function useStaffAttendance() {
   return useQuery<AttendanceRecord[]>({
     queryKey: ["staff", "attendance"],
+    staleTime: 5_000,
     queryFn: async () => {
       const res = await api.get<any[]>("/domestic-staff/me/attendance");
       if (!Array.isArray(res)) return [];
@@ -196,6 +201,7 @@ export function useStaffAttendance() {
 export function useStaffVisits() {
   return useQuery<StaffVisit[]>({
     queryKey: ["staff", "visits"],
+    staleTime: 5_000,
     queryFn: async () => {
       const res = await api.get<any[]>("/domestic-staff/me/visits");
       if (!Array.isArray(res)) return [];

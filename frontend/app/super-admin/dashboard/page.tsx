@@ -300,7 +300,7 @@ export default function SuperAdminDashboardPage() {
               <div>
                 <h3 className="card-title">Managed Communities</h3>
                 <p style={{ fontSize: "0.775rem", color: "var(--muted)", margin: "0.15rem 0 0 0" }}>
-                  {filteredCommunities.length} of {communities?.length || 0} communities
+                  {isCommunitiesLoading ? "Loading communities…" : `${filteredCommunities.length} of ${communities?.length || 0} communities`}
                 </p>
               </div>
 

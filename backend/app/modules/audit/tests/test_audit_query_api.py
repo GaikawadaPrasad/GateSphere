@@ -38,9 +38,13 @@ def test_auditor_reads_scoped_logs(as_role, seed_ids):
     assert r.json()["meta"]["total"] >= 1
     first = r.json()["data"][0]
     assert first["module"] == "gate"
+    assert first["community_name"] is not None
+    assert first["user_email"] is not None or first["user_name"] is not None
 
     detail = auditor.get(f"{P}/logs/{first['id']}")
     assert detail.status_code == 200 and detail.json()["data"]["id"] == first["id"]
+    assert detail.json()["data"]["community_name"] == first["community_name"]
+    assert detail.json()["data"]["user_email"] == first["user_email"]
 
 
 def test_csv_export_needs_export_permission(as_role):
@@ -56,9 +60,11 @@ def test_community_admin_gets_403_on_csv(as_role):
 
 def test_community_scoped_auditor_sees_only_own_community(auth_client, seed_ids):
     import uuid
+
     from conftest import csrf_cookie_value
     from fastapi.testclient import TestClient
     from sqlalchemy import select
+
     from app.db.session import SessionLocal
     from app.main import app
     from app.modules.users.models import User

@@ -632,8 +632,34 @@ export const billingApi = {
     apiSend<MaintenanceInvoice>("POST", `/billing/invoices/${invoiceId}/cancel`),
   payments: (params?: ListQueryParams) =>
     apiGet<Payment[]>("/billing/payments", params as Record<string, unknown>),
+  recordPayment: (data: {
+    amount: number;
+    payment_method?: string;
+    unit_id?: string;
+    allocations?: Array<{ invoice_id: string; amount: number }>;
+    remarks?: string;
+    community_id?: string;
+  }) => apiSend<Payment>("POST", "/billing/payments", data),
+  getPaymentReceipt: (paymentId: string) =>
+    apiGet<any>(`/billing/payments/${paymentId}/receipt`),
   chargeHeads: (communityId?: string) =>
     apiGet<any[]>("/billing/charge-heads", communityId ? { community_id: communityId } : undefined),
+  createChargeHead: (
+    data: {
+      name: string;
+      code: string;
+      charge_type: string;
+      default_amount: number;
+      is_active?: boolean;
+    },
+    communityId?: string,
+  ) =>
+    apiSend<any>(
+      "POST",
+      "/billing/charge-heads",
+      data,
+      communityId ? { community_id: communityId } : undefined,
+    ),
   rules: (communityId?: string) =>
     apiGet<any>("/billing/rules", communityId ? { community_id: communityId } : undefined),
   unitLedger: (unitId: string, params?: ListQueryParams) =>

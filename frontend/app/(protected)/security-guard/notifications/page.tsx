@@ -40,6 +40,15 @@ export default function SecurityGuardNotificationsPage() {
           { label: "Security Guard" },
           { label: "Notifications" },
         ]}
+        actions={
+          <button
+            className="btn btn-secondary"
+            onClick={loadData}
+            disabled={isLoading}
+          >
+            🔄 {isLoading ? "Refreshing…" : "Refresh"}
+          </button>
+        }
       />
 
       <div className="card">

@@ -9,6 +9,7 @@ import { DataTable, type Column } from "@/components/tables/DataTable";
 import { visitorsApi, communitiesApi, authApi, type VisitorRecord } from "@/lib/api";
 import { Modal } from "@/components/common/Modal";
 import { formatDateTime } from "@/lib/utils";
+import { toast } from "@/store/toast";
 
 interface SupervisorVisitorRow {
   id: string;
@@ -126,25 +127,33 @@ export default function SecuritySupervisorVisitorManagementPage() {
     loadData();
   }, []);
 
-  const handleApprove = async (id: string, name: string) => {
-    setActionMessage(null);
-    try {
-      await visitorsApi.approve(id, "Approved by Security Supervisor");
-      setActionMessage({ type: "success", text: `Visitor request approved for ${name}.` });
-      await loadData();
-    } catch (err: any) {
-      setActionMessage({ type: "error", text: err?.message || "Failed to approve visitor request." });
-    }
-  };
+  // const handleApprove = async (id: string, name: string) => {
+  //   setActionMessage(null);
+  //   try {
+  //     await visitorsApi.approve(id, "Approved by Security Supervisor");
+  //     const msg = `Visitor request approved for ${name}.`;
+  //     setActionMessage({ type: "success", text: msg });
+  //     toast.success(msg);
+  //     await loadData();
+  //   } catch (err: any) {
+  //     const errMsg = err?.message || "Failed to approve visitor request.";
+  //     setActionMessage({ type: "error", text: errMsg });
+  //     toast.error(errMsg);
+  //   }
+  // };
 
   const handleReject = async (id: string, name: string) => {
     setActionMessage(null);
     try {
       await visitorsApi.reject(id, "Rejected by Security Supervisor");
-      setActionMessage({ type: "success", text: `Visitor request rejected for ${name}.` });
+      const msg = `Visitor request rejected for ${name}.`;
+      setActionMessage({ type: "success", text: msg });
+      toast.success(msg);
       await loadData();
     } catch (err: any) {
-      setActionMessage({ type: "error", text: err?.message || "Failed to reject visitor request." });
+      const errMsg = err?.message || "Failed to reject visitor request.";
+      setActionMessage({ type: "error", text: errMsg });
+      toast.error(errMsg);
     }
   };
 
@@ -237,26 +246,24 @@ export default function SecuritySupervisorVisitorManagementPage() {
           >
             👁️ View
           </button>
-          {v.status === "Pending Approval" ? (
-            <>
-              <button
-                type="button"
-                className="btn btn-primary"
-                style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
-                onClick={() => handleApprove(v.id, v.name)}
-              >
-                Approve
-              </button>
-              <button
-                type="button"
-                className="btn btn-danger"
-                style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
-                onClick={() => handleReject(v.id, v.name)}
-              >
-                Reject
-              </button>
-            </>
-          ) : null}
+          {/* {v.status === "Pending Approval" ? (
+  <>
+    <button
+      type="button"
+      className="btn btn-primary"
+      onClick={() => handleApprove(v.id, v.name)}
+    >
+      Approve
+    </button>
+    <button
+      type="button"
+      className="btn btn-danger"
+      onClick={() => handleReject(v.id, v.name)}
+    >
+      Reject
+    </button>
+  </>
+) : null} */}
         </div>
       ),
     },
@@ -273,9 +280,18 @@ export default function SecuritySupervisorVisitorManagementPage() {
           { label: "Visitor Management" },
         ]}
         actions={
-          <Link href="/security-supervisor/blacklist" className="btn btn-danger" style={{ fontSize: "0.85rem" }}>
-            🚫 Blacklist Registry & Restricted Entry
-          </Link>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+            <button
+              className="btn btn-secondary"
+              onClick={loadData}
+              disabled={isLoading}
+            >
+              🔄 {isLoading ? "Refreshing…" : "Refresh"}
+            </button>
+            <Link href="/security-supervisor/blacklist" className="btn btn-danger" style={{ fontSize: "0.85rem" }}>
+              🚫 Blacklist Registry & Restricted Entry
+            </Link>
+          </div>
         }
       />
 
@@ -362,7 +378,7 @@ export default function SecuritySupervisorVisitorManagementPage() {
           size="md"
           footer={
             <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", width: "100%" }}>
-              {selectedVisitor.status === "Pending Approval" && (
+              {/* {selectedVisitor.status === "Pending Approval" && (
                 <>
                   <button
                     type="button"
@@ -385,7 +401,7 @@ export default function SecuritySupervisorVisitorManagementPage() {
                     Reject Request
                   </button>
                 </>
-              )}
+              )} */}
               <button
                 type="button"
                 className="btn btn-secondary"

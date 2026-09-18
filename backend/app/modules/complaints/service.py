@@ -260,6 +260,7 @@ class ComplaintService(UnitScopedAccess):
             ticket.id,
             new={"ticket_number": ticket.ticket_number, "priority": priority},
         )
+        await self.tickets.enrich_tickets([ticket])
         return ticket
 
     async def get_ticket(self, ticket_id: uuid.UUID) -> ServiceTicket:
@@ -267,6 +268,7 @@ class ComplaintService(UnitScopedAccess):
         if obj is None:
             raise NotFoundError("Ticket not found")
         await self._assert_unit_visible(obj.unit_id)
+        await self.tickets.enrich_tickets([obj])
         return obj
 
     async def get_entry_pass(self, ticket_id: uuid.UUID) -> schemas.TicketEntryPassRead:
@@ -336,9 +338,11 @@ class ComplaintService(UnitScopedAccess):
                 ServiceTicket.unit_id,
                 or_owned=ServiceTicket.raised_by_user_id == self.actor.id,
             )
-        return await self.tickets.list(
+        rows = await self.tickets.list(
             offset=offset, limit=limit, extra=stmt
-        ), await self.tickets.count(extra=stmt)
+        )
+        await self.tickets.enrich_tickets(rows)
+        return rows, await self.tickets.count(extra=stmt)
 
     async def _mark_first_response(self, ticket: ServiceTicket) -> None:
         if ticket.first_responded_at is None:

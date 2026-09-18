@@ -6,6 +6,21 @@ import { CommunityTable, type CommunityWithMetrics } from "@/components/tables/C
 import { MetricsGrid } from "@/components/dashboard/MetricsGrid";
 import { CreateCommunityModal } from "@/components/super-admin/CreateCommunityModal";
 import type { SuperAdminDashboardMetrics } from "@/types/dashboards";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+const createTestQueryClient = () =>
+  new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+    },
+  });
+
+function renderWithClient(ui: React.ReactElement) {
+  const testQueryClient = createTestQueryClient();
+  return render(
+    <QueryClientProvider client={testQueryClient}>{ui}</QueryClientProvider>
+  );
+}
 
 // Mock QueryClient & hooks
 vi.mock("@/hooks/use-communities", () => ({
@@ -115,7 +130,7 @@ describe("Super Admin Dashboard Components", () => {
 
   describe("CreateCommunityModal", () => {
     it("validates required fields before submission", async () => {
-      const { container } = render(
+      const { container } = renderWithClient(
         <CreateCommunityModal
           isOpen={true}
           onClose={vi.fn()}
@@ -133,7 +148,7 @@ describe("Super Admin Dashboard Components", () => {
     });
 
     it("renders step indicator with Community, Towers, Floors, and Units steps", () => {
-      render(
+      renderWithClient(
         <CreateCommunityModal
           isOpen={true}
           onClose={vi.fn()}

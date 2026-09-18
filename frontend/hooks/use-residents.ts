@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { residentsApi } from "@/lib/api";
+import { residentsApi, onboardingApi } from "@/lib/api";
 import type { ListQueryParams } from "@/types/api";
 import type { ResidentProfile } from "@/types/residents";
 
@@ -9,7 +9,7 @@ export function useResidents(params?: ListQueryParams) {
   return useQuery({
     queryKey: ["residents", params],
     queryFn: () => residentsApi.list(params),
-    staleTime: 5_000,
+    staleTime: 60_000,
   });
 }
 
@@ -18,7 +18,7 @@ export function useResidentDetails(id?: string) {
     queryKey: ["residents", id],
     queryFn: () => (id ? residentsApi.get(id) : null),
     enabled: Boolean(id),
-    staleTime: 5_000,
+    staleTime: 60_000,
   });
 }
 
@@ -27,7 +27,7 @@ export function useUnitOccupancies(unitId?: string) {
     queryKey: ["occupancies", unitId],
     queryFn: () => (unitId ? residentsApi.occupancies(unitId) : []),
     enabled: Boolean(unitId),
-    staleTime: 5_000,
+    staleTime: 60_000,
   });
 }
 
@@ -36,7 +36,7 @@ export function useFamilyMembers(unitId?: string) {
     queryKey: ["family-members", unitId],
     queryFn: () => (unitId ? residentsApi.family(unitId) : []),
     enabled: Boolean(unitId),
-    staleTime: 5_000,
+    staleTime: 60_000,
   });
 }
 
@@ -45,7 +45,7 @@ export function useEmergencyContacts(profileId?: string) {
     queryKey: ["emergency-contacts", profileId],
     queryFn: () => (profileId ? residentsApi.contacts(profileId) : []),
     enabled: Boolean(profileId),
-    staleTime: 5_000,
+    staleTime: 60_000,
   });
 }
 
@@ -58,7 +58,16 @@ export function useMoveRecords(params?: {
   return useQuery({
     queryKey: ["move-records", params],
     queryFn: () => residentsApi.moveRecords(params),
-    staleTime: 5_000,
+    staleTime: 60_000,
+  });
+}
+
+export function useCommunityInvitations(communityId?: string) {
+  return useQuery({
+    queryKey: ["community-invitations", communityId],
+    queryFn: () => (communityId ? onboardingApi.listInvitations(communityId) : []),
+    enabled: Boolean(communityId),
+    staleTime: 60_000,
   });
 }
 

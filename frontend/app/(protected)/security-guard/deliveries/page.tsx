@@ -8,6 +8,8 @@ import { DataTable, type Column } from "@/components/tables/DataTable";
 import { Modal } from "@/components/common/Modal";
 import { deliveriesApi, communitiesApi, authApi } from "@/lib/api";
 import type { Unit } from "@/types/communities";
+import { isValidPersonName } from "@/lib/utils";
+import { toast } from "@/store/toast";
 
 interface DeliveryRow {
   id: string;
@@ -41,6 +43,7 @@ export default function SecurityGuardDeliveriesPage() {
   const [trackingReference, setTrackingReference] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
+  const [deliveryFieldErrors, setDeliveryFieldErrors] = useState<Record<string, string>>({});
 
   const loadData = async (showLoading = true) => {
     if (showLoading) setIsLoading(true);
@@ -123,39 +126,66 @@ export default function SecurityGuardDeliveriesPage() {
     setExecutivePhone("");
     setTrackingReference("");
     setModalError(null);
+    setDeliveryFieldErrors({});
     setIsModalOpen(true);
     loadUnits();
   };
 
   const handleCreateDelivery = async (e: React.FormEvent) => {
     e.preventDefault();
+    const trimmedProvider = providerName.trim();
+    const trimmedExecName = executiveName.trim();
+    const trimmedExecPhone = executivePhone.trim();
+    const errors: Record<string, string> = {};
+
     if (!selectedUnitId) {
-      setModalError("Please select a target resident unit.");
+      errors.unitId = "Please select a target resident unit.";
+    }
+    if (!trimmedProvider || trimmedProvider.length < 2) {
+      errors.providerName = "Please enter courier / provider name (min 2 characters).";
+    }
+    if (trimmedExecName) {
+      if (trimmedExecName.length < 2 || !isValidPersonName(trimmedExecName)) {
+        errors.executiveName = "Delivery executive name must contain only alphabetic letters and spaces (min 2 characters).";
+      }
+    }
+    if (trimmedExecPhone) {
+      const phoneDigits = trimmedExecPhone.replace(/\D/g, "");
+      if (!/^\+?[0-9\s\-()]{7,20}$/.test(trimmedExecPhone) || phoneDigits.length < 10) {
+        errors.executivePhone = "Please enter a valid mobile number for the delivery executive (at least 10 digits).";
+      }
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setDeliveryFieldErrors(errors);
+      setModalError("Please resolve the highlighted delivery form errors.");
+      toast.error("Please resolve the highlighted delivery form errors.");
       return;
     }
-    if (!providerName.trim()) {
-      setModalError("Please enter courier / provider name (e.g. Swiggy, Amazon, Zomato).");
-      return;
-    }
+
     setIsSubmitting(true);
     setModalError(null);
     try {
       await deliveriesApi.create({
         unit_id: selectedUnitId,
         delivery_type: deliveryType,
-        provider_name: providerName.trim(),
-        executive_name: executiveName.trim() || undefined,
-        executive_phone: executivePhone.trim() || undefined,
+        provider_name: trimmedProvider,
+        executive_name: trimmedExecName || undefined,
+        executive_phone: trimmedExecPhone || undefined,
         tracking_reference: trackingReference.trim() || undefined,
       });
+      const successText = `Delivery ticket logged for unit! Notification sent to resident for approval.`;
       setActionMessage({
         type: "success",
-        text: `Delivery ticket logged for unit! Notification sent to resident for approval.`,
+        text: successText,
       });
+      toast.success(successText);
       setIsModalOpen(false);
       loadData(false);
     } catch (err: any) {
-      setModalError(err?.message || "Failed to log delivery entry.");
+      const errMsg = err?.message || "Failed to log delivery entry.";
+      setModalError(errMsg);
+      toast.error(errMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -165,10 +195,14 @@ export default function SecurityGuardDeliveriesPage() {
     setActionMessage(null);
     try {
       await deliveriesApi.recordArrival(id);
-      setActionMessage({ type: "success", text: "Courier arrival recorded at gate desk." });
+      const msg = "Courier arrival recorded at gate desk.";
+      setActionMessage({ type: "success", text: msg });
+      toast.success(msg);
       loadData(false);
     } catch (err: any) {
-      setActionMessage({ type: "error", text: err?.message || "Failed to record arrival." });
+      const errMsg = err?.message || "Failed to record arrival.";
+      setActionMessage({ type: "error", text: errMsg });
+      toast.error(errMsg);
     }
   };
 
@@ -176,10 +210,14 @@ export default function SecurityGuardDeliveriesPage() {
     setActionMessage(null);
     try {
       await deliveriesApi.markDelivered(id);
-      setActionMessage({ type: "success", text: "Package marked as delivered / collected." });
+      const msg = "Package marked as delivered / collected.";
+      setActionMessage({ type: "success", text: msg });
+      toast.success(msg);
       loadData(false);
     } catch (err: any) {
-      setActionMessage({ type: "error", text: err?.message || "Failed to mark delivered." });
+      const errMsg = err?.message || "Failed to mark delivered.";
+      setActionMessage({ type: "error", text: errMsg });
+      toast.error(errMsg);
     }
   };
 
@@ -187,10 +225,14 @@ export default function SecurityGuardDeliveriesPage() {
     setActionMessage(null);
     try {
       await deliveriesApi.cancel(id);
-      setActionMessage({ type: "success", text: "Delivery entry rejected / cancelled." });
+      const msg = "Delivery entry rejected / cancelled.";
+      setActionMessage({ type: "success", text: msg });
+      toast.success(msg);
       loadData(false);
     } catch (err: any) {
-      setActionMessage({ type: "error", text: err?.message || "Failed to cancel delivery." });
+      const errMsg = err?.message || "Failed to cancel delivery.";
+      setActionMessage({ type: "error", text: errMsg });
+      toast.error(errMsg);
     }
   };
 
@@ -296,9 +338,18 @@ export default function SecurityGuardDeliveriesPage() {
           { label: "Deliveries" },
         ]}
         actions={
-          <button className="btn btn-primary" onClick={handleOpenModal}>
-            + Log Gate Delivery
-          </button>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+            <button
+              className="btn btn-secondary"
+              onClick={() => loadData(false)}
+              disabled={isLoading}
+            >
+              🔄 {isLoading ? "Refreshing…" : "Refresh"}
+            </button>
+            <button className="btn btn-primary" onClick={handleOpenModal}>
+              + Log Gate Delivery
+            </button>
+          </div>
         }
       />
 
@@ -435,7 +486,12 @@ export default function SecurityGuardDeliveriesPage() {
             <select
               className="form-control"
               value={selectedUnitId}
-              onChange={(e) => setSelectedUnitId(e.target.value)}
+              onChange={(e) => {
+                setSelectedUnitId(e.target.value);
+                if (deliveryFieldErrors.unitId) {
+                  setDeliveryFieldErrors((prev) => ({ ...prev, unitId: "" }));
+                }
+              }}
               required
             >
               {units.length === 0 ? (
@@ -448,6 +504,11 @@ export default function SecurityGuardDeliveriesPage() {
                 ))
               )}
             </select>
+            {deliveryFieldErrors.unitId && (
+              <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                {deliveryFieldErrors.unitId}
+              </span>
+            )}
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
@@ -477,9 +538,19 @@ export default function SecurityGuardDeliveriesPage() {
                 className="form-control"
                 placeholder="e.g. Amazon, Flipkart, Swiggy, Zomato"
                 value={providerName}
-                onChange={(e) => setProviderName(e.target.value)}
+                onChange={(e) => {
+                  setProviderName(e.target.value);
+                  if (deliveryFieldErrors.providerName) {
+                    setDeliveryFieldErrors((prev) => ({ ...prev, providerName: "" }));
+                  }
+                }}
                 required
               />
+              {deliveryFieldErrors.providerName && (
+                <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                  {deliveryFieldErrors.providerName}
+                </span>
+              )}
             </div>
           </div>
 
@@ -493,8 +564,18 @@ export default function SecurityGuardDeliveriesPage() {
                 className="form-control"
                 placeholder="Executive name"
                 value={executiveName}
-                onChange={(e) => setExecutiveName(e.target.value)}
+                onChange={(e) => {
+                  setExecutiveName(e.target.value);
+                  if (deliveryFieldErrors.executiveName) {
+                    setDeliveryFieldErrors((prev) => ({ ...prev, executiveName: "" }));
+                  }
+                }}
               />
+              {deliveryFieldErrors.executiveName && (
+                <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                  {deliveryFieldErrors.executiveName}
+                </span>
+              )}
             </div>
 
             <div>
@@ -502,12 +583,22 @@ export default function SecurityGuardDeliveriesPage() {
                 Executive Mobile Number
               </label>
               <input
-                type="number"
+                type="tel"
                 className="form-control"
                 placeholder="10-digit mobile"
                 value={executivePhone}
-                onChange={(e) => setExecutivePhone(e.target.value)}
+                onChange={(e) => {
+                  setExecutivePhone(e.target.value);
+                  if (deliveryFieldErrors.executivePhone) {
+                    setDeliveryFieldErrors((prev) => ({ ...prev, executivePhone: "" }));
+                  }
+                }}
               />
+              {deliveryFieldErrors.executivePhone && (
+                <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                  {deliveryFieldErrors.executivePhone}
+                </span>
+              )}
             </div>
           </div>
 

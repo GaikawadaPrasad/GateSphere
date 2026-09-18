@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Modal } from "@/components/common/Modal";
 import { toast } from "@/store/toast";
@@ -12,6 +12,8 @@ interface CreateUserModalProps {
   isOpen: boolean;
   onClose: () => void;
   defaultRoleSlug?: string;
+  preselectedCommunityId?: string;
+  lockCommunity?: boolean;
   availableRoles?: Role[];
   onSuccess: () => void;
 }
@@ -20,6 +22,8 @@ export function CreateUserModal({
   isOpen,
   onClose,
   defaultRoleSlug = "community_admin",
+  preselectedCommunityId = "",
+  lockCommunity = false,
   availableRoles = [],
   onSuccess,
 }: CreateUserModalProps) {
@@ -29,11 +33,24 @@ export function CreateUserModal({
   const [password, setPassword] = useState("GateSphere2026!");
   const [phone, setPhone] = useState("");
   const [roleSlug, setRoleSlug] = useState(defaultRoleSlug);
-  const [communityId, setCommunityId] = useState("");
+  const [communityId, setCommunityId] = useState(preselectedCommunityId);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (isOpen) {
+      if (preselectedCommunityId) {
+        setCommunityId(preselectedCommunityId);
+      }
+      if (defaultRoleSlug) {
+        setRoleSlug(defaultRoleSlug);
+      }
+      setErrorMessage(null);
+      setFieldErrors({});
+    }
+  }, [isOpen, preselectedCommunityId, defaultRoleSlug]);
 
   const { data: communities } = useQuery({
     queryKey: ["communities"],
@@ -66,8 +83,8 @@ export function CreateUserModal({
       errors.phone = "Phone must be 5-20 digits (e.g. +91 9876543210).";
     }
 
-    if (roleSlug === "community_admin" && !communityId) {
-      errors.communityId = "A community must be assigned for Community Admin role.";
+    if (roleSlug !== "super_admin" && !communityId) {
+      errors.communityId = "A community must be selected for community-assigned roles.";
     }
 
     setFieldErrors(errors);
@@ -172,10 +189,11 @@ export function CreateUserModal({
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
           <div>
-            <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.35rem" }}>
+            <label htmlFor="createUserFullName" style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.35rem" }}>
               Full Name <span style={{ color: "var(--danger)" }}>*</span>
             </label>
             <input
+              id="createUserFullName"
               type="text"
               className="form-control"
               value={fullName}
@@ -197,10 +215,11 @@ export function CreateUserModal({
           </div>
 
           <div>
-            <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.35rem" }}>
+            <label htmlFor="createUserEmail" style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.35rem" }}>
               Email Address <span style={{ color: "var(--danger)" }}>*</span>
             </label>
             <input
+              id="createUserEmail"
               type="email"
               className="form-control"
               value={email}
@@ -222,10 +241,11 @@ export function CreateUserModal({
           </div>
 
           <div>
-            <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.35rem" }}>
+            <label htmlFor="createUserPassword" style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.35rem" }}>
               Initial Password <span style={{ color: "var(--danger)" }}>*</span>
             </label>
             <input
+              id="createUserPassword"
               type="text"
               className="form-control"
               value={password}
@@ -246,10 +266,11 @@ export function CreateUserModal({
           </div>
 
           <div>
-            <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.35rem" }}>
+            <label htmlFor="createUserPhone" style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.35rem" }}>
               Phone Number
             </label>
             <input
+              id="createUserPhone"
               type="text"
               className="form-control"
               value={phone}
@@ -270,24 +291,46 @@ export function CreateUserModal({
           </div>
 
           <div>
-            <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.35rem" }}>
-              Assign System Role <span style={{ color: "var(--danger)" }}>*</span>
+            <label htmlFor="createUserRole" style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.35rem" }}>
+              Assign Role <span style={{ color: "var(--danger)" }}>*</span>
             </label>
             <select
+              id="createUserRole"
               className="form-control"
               value={roleSlug}
               onChange={(e) => setRoleSlug(e.target.value)}
               style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: "var(--radius-input)", border: "1px solid var(--border-standard)" }}
             >
-              <option value="community_admin">Community Admin (community_admin)</option>
-              <option value="super_admin">Super Admin (super_admin)</option>
-              <option value="association_committee">Association Committee</option>
-              <option value="facility_manager">Facility Manager</option>
-              <option value="security_supervisor">Security Supervisor</option>
-              <option value="security_guard">Security Guard</option>
-              <option value="auditor">Auditor (read-only)</option>
+              <optgroup label="Community Administrative & Management">
+                <option value="community_admin">Community Admin (community_admin)</option>
+                <option value="association_committee">Association Committee (association_committee)</option>
+                <option value="facility_manager">Facility Manager (facility_manager)</option>
+              </optgroup>
+              <optgroup label="Operations, Compliance & Staff">
+                <option value="vendor_technician">Vendor Technician (vendor_technician)</option>
+                <option value="auditor">Auditor — Read-Only (auditor)</option>
+                <option value="domestic_staff">Domestic Staff (domestic_staff)</option>
+                <option value="security_supervisor">Security Supervisor (security_supervisor)</option>
+                <option value="security_guard">Security Guard (security_guard)</option>
+              </optgroup>
+              <optgroup label="Platform System">
+                <option value="super_admin">Super Admin (super_admin)</option>
+              </optgroup>
               {availableRoles
-                .filter((r) => !["community_admin", "super_admin", "association_committee", "facility_manager", "security_supervisor", "security_guard", "auditor"].includes(r.slug))
+                .filter(
+                  (r) =>
+                    ![
+                      "community_admin",
+                      "super_admin",
+                      "association_committee",
+                      "facility_manager",
+                      "vendor_technician",
+                      "auditor",
+                      "domestic_staff",
+                      "security_supervisor",
+                      "security_guard",
+                    ].includes(r.slug)
+                )
                 .map((r) => (
                   <option key={r.slug} value={r.slug}>
                     {r.name} ({r.slug})
@@ -297,18 +340,21 @@ export function CreateUserModal({
           </div>
 
           <div>
-            <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.35rem" }}>
-              Assigned Community {roleSlug === "community_admin" && <span style={{ color: "var(--danger)" }}>*</span>}
+            <label htmlFor="createUserCommunity" style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.35rem" }}>
+              Assigned Community {roleSlug !== "super_admin" && <span style={{ color: "var(--danger)" }}>*</span>}
             </label>
             <select
+              id="createUserCommunity"
               className="form-control"
               value={communityId}
               onChange={(e) => setCommunityId(e.target.value)}
+              disabled={lockCommunity}
               style={{
                 width: "100%",
                 padding: "0.5rem 0.75rem",
                 borderRadius: "var(--radius-input)",
                 border: `1px solid ${fieldErrors.communityId ? "#ef4444" : "var(--border-standard)"}`,
+                backgroundColor: lockCommunity ? "var(--surface-muted, #f8fafc)" : "inherit",
               }}
             >
               <option value="">-- Platform-Global / Select Community --</option>
@@ -321,6 +367,11 @@ export function CreateUserModal({
             {fieldErrors.communityId && (
               <span style={{ fontSize: "0.75rem", color: "#ef4444", marginTop: "0.25rem", display: "block" }}>
                 {fieldErrors.communityId}
+              </span>
+            )}
+            {lockCommunity && (
+              <span style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.25rem", display: "block" }}>
+                🔒 Locked to active community
               </span>
             )}
           </div>

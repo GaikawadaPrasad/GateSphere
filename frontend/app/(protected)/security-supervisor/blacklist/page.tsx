@@ -6,6 +6,8 @@ import { SearchInput } from "@/components/forms/SearchInput";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
 import { blacklistApi, type BlacklistEntry } from "@/lib/api";
+import { isValidPersonName } from "@/lib/utils";
+import { toast } from "@/store/toast";
 
 export default function SecuritySupervisorBlacklistPage() {
   const [blacklist, setBlacklist] = useState<BlacklistEntry[]>([]);
@@ -36,16 +38,32 @@ export default function SecuritySupervisorBlacklistPage() {
 
   const handleAddBlacklist = async (e: React.FormEvent) => {
     e.preventDefault();
+    const cleanName = name.trim();
     const cleanPhone = phone.trim();
     const cleanId = idNumber.trim().toUpperCase();
+    const cleanVehicle = vehicleNumber.trim().toUpperCase();
     const errors: Record<string, string> = {};
 
+    if (cleanName) {
+      if (cleanName.length < 2 || !isValidPersonName(cleanName)) {
+        errors.name = "Name must contain only alphabetic letters and spaces (min 2 characters).";
+      }
+    }
     if (!cleanPhone && !cleanId) {
       errors.phone = "Provide either a mobile number or Government ID number to blacklist.";
       errors.idNumber = "Provide either a mobile number or Government ID number to blacklist.";
     }
-    if (cleanPhone && !/^\+?[0-9\s\-()]{7,20}$/.test(cleanPhone)) {
-      errors.phone = "Invalid phone number format.";
+    if (cleanPhone) {
+      const phoneDigits = cleanPhone.replace(/\D/g, "");
+      if (!/^\+?[0-9\s\-()]{7,20}$/.test(cleanPhone) || phoneDigits.length < 10) {
+        errors.phone = "Please enter a valid phone number (at least 10 digits).";
+      }
+    }
+    if (cleanVehicle) {
+      const cleanVehicleNoSpaces = cleanVehicle.replace(/[\s\-]/g, "");
+      if (!/^[A-Z0-9]{4,15}$/.test(cleanVehicleNoSpaces)) {
+        errors.vehicleNumber = "Vehicle plate must be 4-15 alphanumeric characters.";
+      }
     }
     if (!reason.trim() || reason.trim().length < 5) {
       errors.reason = "Please provide a detailed restriction reason (min 5 characters).";
@@ -53,6 +71,7 @@ export default function SecuritySupervisorBlacklistPage() {
 
     if (Object.keys(errors).length > 0) {
       setBlacklistFieldErrors(errors);
+      toast.error("Please resolve the highlighted form errors.");
       return;
     }
 
@@ -67,9 +86,10 @@ export default function SecuritySupervisorBlacklistPage() {
         phone: formattedPhone,
         id_type: cleanId ? idType : undefined,
         id_number: cleanId || undefined,
-        reason: `${name.trim() ? name.trim() + ": " : ""}${reason.trim()}${cleanId ? ` [${idType.toUpperCase()}: ${cleanId}]` : ""}${vehicleNumber.trim() ? " (Vehicle: " + vehicleNumber.trim() + ")" : ""}`,
+        reason: `${cleanName ? cleanName + ": " : ""}${reason.trim()}${cleanId ? ` [${idType.toUpperCase()}: ${cleanId}]` : ""}${cleanVehicle ? " (Vehicle: " + cleanVehicle + ")" : ""}`,
         risk_level: "high",
       });
+      toast.success("Security blacklist entry added successfully.");
       setIsAddModalOpen(false);
       setBlacklistFieldErrors({});
       setName("");
@@ -80,7 +100,8 @@ export default function SecuritySupervisorBlacklistPage() {
       setReason("");
       loadData();
     } catch (err: any) {
-      alert(err?.message || "Failed to add to blacklist.");
+      const errMsg = err?.message || "Failed to add to blacklist.";
+      toast.error(errMsg);
     }
   };
 
@@ -93,9 +114,10 @@ export default function SecuritySupervisorBlacklistPage() {
     setIsDeleting(id);
     try {
       await blacklistApi.remove(id);
+      toast.success(`"${nameLabel}" removed from the security blacklist.`);
       await loadData();
     } catch (err: any) {
-      alert(err?.message || "Failed to remove from blacklist.");
+      toast.error(err?.message || "Failed to remove from blacklist.");
     } finally {
       setIsDeleting(null);
     }
@@ -129,9 +151,18 @@ export default function SecuritySupervisorBlacklistPage() {
           { label: "Blacklist" },
         ]}
         actions={
-          <button className="btn btn-danger" onClick={() => setIsAddModalOpen(true)}>
-            🚫 Add to Blacklist
-          </button>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+            <button
+              className="btn btn-secondary"
+              onClick={loadData}
+              disabled={isLoading}
+            >
+              🔄 {isLoading ? "Refreshing…" : "Refresh"}
+            </button>
+            <button className="btn btn-danger" onClick={() => setIsAddModalOpen(true)}>
+              🚫 Add to Blacklist
+            </button>
+          </div>
         }
       />
 
@@ -281,8 +312,18 @@ export default function SecuritySupervisorBlacklistPage() {
               className="input-field"
               placeholder="e.g. Ramesh Kumar"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (blacklistFieldErrors.name) {
+                  setBlacklistFieldErrors((prev) => ({ ...prev, name: "" }));
+                }
+              }}
             />
+            {blacklistFieldErrors.name && (
+              <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                {blacklistFieldErrors.name}
+              </span>
+            )}
           </div>
 
           <div
@@ -305,12 +346,22 @@ export default function SecuritySupervisorBlacklistPage() {
                 Phone Number
               </label>
               <input
-                type="text"
+                type="tel"
                 className="input-field"
                 placeholder="e.g. +91 98000 00000"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => {
+                  setPhone(e.target.value);
+                  if (blacklistFieldErrors.phone) {
+                    setBlacklistFieldErrors((prev) => ({ ...prev, phone: "" }));
+                  }
+                }}
               />
+              {blacklistFieldErrors.phone && (
+                <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                  {blacklistFieldErrors.phone}
+                </span>
+              )}
             </div>
 
             <div>
@@ -329,8 +380,18 @@ export default function SecuritySupervisorBlacklistPage() {
                 className="input-field"
                 placeholder="e.g. KA-02-Z-9999"
                 value={vehicleNumber}
-                onChange={(e) => setVehicleNumber(e.target.value)}
+                onChange={(e) => {
+                  setVehicleNumber(e.target.value);
+                  if (blacklistFieldErrors.vehicleNumber) {
+                    setBlacklistFieldErrors((prev) => ({ ...prev, vehicleNumber: "" }));
+                  }
+                }}
               />
+              {blacklistFieldErrors.vehicleNumber && (
+                <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                  {blacklistFieldErrors.vehicleNumber}
+                </span>
+              )}
             </div>
           </div>
 
@@ -383,8 +444,18 @@ export default function SecuritySupervisorBlacklistPage() {
                 className="input-field"
                 placeholder="e.g. 1234 5678 9012 or ABCDE1234F"
                 value={idNumber}
-                onChange={(e) => setIdNumber(e.target.value.toUpperCase())}
+                onChange={(e) => {
+                  setIdNumber(e.target.value.toUpperCase());
+                  if (blacklistFieldErrors.idNumber) {
+                    setBlacklistFieldErrors((prev) => ({ ...prev, idNumber: "" }));
+                  }
+                }}
               />
+              {blacklistFieldErrors.idNumber && (
+                <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                  {blacklistFieldErrors.idNumber}
+                </span>
+              )}
             </div>
           </div>
 
@@ -408,9 +479,19 @@ export default function SecuritySupervisorBlacklistPage() {
               rows={3}
               placeholder="Explain security violation or reason for restriction..."
               value={reason}
-              onChange={(e) => setReason(e.target.value)}
+              onChange={(e) => {
+                setReason(e.target.value);
+                if (blacklistFieldErrors.reason) {
+                  setBlacklistFieldErrors((prev) => ({ ...prev, reason: "" }));
+                }
+              }}
               required
             />
+            {blacklistFieldErrors.reason && (
+              <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                {blacklistFieldErrors.reason}
+              </span>
+            )}
           </div>
         </form>
       </Modal>

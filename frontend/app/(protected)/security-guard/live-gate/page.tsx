@@ -56,7 +56,14 @@ export default function SecurityGuardLiveGatePage() {
   const executeVerification = useCallback(
     async (inputOverride?: string, hint?: ParsedQrData) => {
       const raw = (inputOverride !== undefined ? inputOverride : passInput).trim();
-      if (!raw) return;
+      if (!raw) {
+        setErrorMessage("Please enter a PIN code or scan a QR pass to verify.");
+        return;
+      }
+      if (raw.length < 4) {
+        setErrorMessage("PIN code or pass token must be at least 4 characters.");
+        return;
+      }
 
       // Extract details if JSON string or structured payload
       let parsedPayload = hint;

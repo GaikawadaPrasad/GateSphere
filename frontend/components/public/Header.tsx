@@ -48,40 +48,48 @@ export default function Header() {
   }, []);
 
   const isHome = pathname === "/";
+  const showHeroCapsules = isHome && !scrolled;
 
   return (
     <>
       <header
-        className={`sticky sm:fixed top-0 left-0 right-0 w-full z-50 transition-all duration-300 ${
+        className={`sticky md:fixed top-0 left-0 right-0 w-full z-50 transition-all duration-300 ${
           isHome && !scrolled
-            ? "bg-[#090E1A]/95 sm:bg-transparent backdrop-blur-xl sm:backdrop-blur-none border-b border-white/10 sm:border-transparent py-3.5 sm:py-4 shadow-2xl sm:shadow-none"
-            : "bg-[#090E1A]/95 backdrop-blur-xl border-b border-white/10 py-3.5 shadow-2xl"
+            ? "bg-[#090E1A]/95 md:bg-transparent py-3 md:py-2.5 lg:py-3 border-b border-white/10 md:border-transparent shadow-2xl md:shadow-none backdrop-blur-xl md:backdrop-blur-none"
+            : "bg-[#090E1A]/95 backdrop-blur-xl border-b border-white/10 py-3 sm:py-3.5 shadow-2xl"
         }`}
       >
-        <div className="w-full max-w-7xl mx-auto px-3 sm:px-8 flex items-center justify-between gap-2 sm:gap-4">
+        {/* ── DESKTOP NAVBAR (Original layout when pulled) ── */}
+        <div className="hidden md:flex w-full max-w-7xl mx-auto px-8 items-center justify-between gap-4">
           {/* ── LEFT: MENU Trigger & Compact Logo ── */}
-          <div className="flex items-center gap-2 sm:gap-6 min-w-0">
-            {/* MENU Trigger (Staggered 3-Bar Hamburger) */}
+          <div className="flex items-center gap-3 min-w-0">
+            {/* MENU Trigger */}
             <button
               onClick={() => setMenuOpen(true)}
-              className="group flex items-center gap-1.5 sm:gap-3 text-white hover:text-sky-300 transition-colors cursor-pointer select-none bg-transparent border-0 shrink-0"
+              className={`group rounded-full transition-all flex items-center gap-1.5 shrink-0 cursor-pointer select-none ${
+                showHeroCapsules
+                  ? "px-3.5 py-1.5 text-[13px] font-medium text-white bg-black/45 hover:bg-black/60 backdrop-blur-md border border-white/25 shadow-sm"
+                  : "px-4 py-1.5 text-[13px] font-medium text-white/90 hover:text-white border border-white/20 hover:border-white/40 hover:bg-white/10"
+              }`}
               aria-label="Open navigation menu"
             >
-              <span className="text-[12px] sm:text-[14px] font-normal tracking-[0.04em] text-white leading-none">
-                MENU
-              </span>
-              <div className="flex flex-col justify-between w-[18px] sm:w-[20px] h-[11px] sm:h-[12px] shrink-0">
-                {/* Top line */}
-                <span className="w-[9px] sm:w-[10px] h-[1.8px] bg-white rounded-none block" />
-                {/* Middle line */}
-                <span className="w-[18px] sm:w-[20px] h-[1.8px] bg-white rounded-none block" />
-                {/* Bottom line */}
-                <span className="w-[9px] sm:w-[10px] h-[1.8px] bg-white rounded-none block ml-auto" />
+              <span>MENU</span>
+              <div className="flex flex-col justify-between w-3.5 h-2.5 shrink-0 text-white/80 group-hover:text-white transition-colors">
+                <span className="w-2 h-[1.5px] bg-current rounded-full block transition-transform group-hover:translate-x-0.5" />
+                <span className="w-3.5 h-[1.5px] bg-current rounded-full block" />
+                <span className="w-2 h-[1.5px] bg-current rounded-full block ml-auto transition-transform group-hover:-translate-x-0.5" />
               </div>
             </button>
 
             {/* Logo */}
-            <Link href="/" className="flex items-center gap-1.5 sm:gap-2.5 group shrink-0 min-w-0">
+            <Link
+              href="/"
+              className={`flex items-center gap-2 transition-all group shrink-0 min-w-0 ${
+                showHeroCapsules
+                  ? "px-5 py-0.5 rounded-full bg-black/40 hover:bg-black/55 backdrop-blur-md border border-white/20 shadow-sm"
+                  : ""
+              }`}
+            >
               <GateSphereLogo
                 variant="light"
                 className="transition-transform duration-200 group-hover:scale-105"
@@ -91,19 +99,23 @@ export default function Header() {
           </div>
 
           {/* ── RIGHT: Minimal Search Icon & Sign In Button ── */}
-          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+          <div className="flex items-center gap-2.5 shrink-0">
             <button
               onClick={() => setSearchOpen(true)}
-              className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 transition-all cursor-pointer bg-transparent border-0 shrink-0"
+              className={`w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                showHeroCapsules
+                  ? "text-white bg-black/40 hover:bg-black/55 backdrop-blur-md border border-white/20 shadow-sm"
+                  : "text-white/80 hover:text-white hover:bg-white/10"
+              }`}
               title="Search"
               aria-label="Search"
             >
               <svg
-                className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                className="w-4 h-4"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="1.8"
+                strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
@@ -114,10 +126,80 @@ export default function Header() {
 
             <Link
               href="/login"
-              className="px-2.5 py-1 sm:px-3.5 sm:py-1.5 rounded-full text-[11.5px] sm:text-[12.5px] font-semibold text-white/90 hover:text-white bg-white/10 hover:bg-white/20 border border-white/15 transition-all shadow-xs flex items-center gap-1 sm:gap-1.5 shrink-0"
+              className={`rounded-full transition-all flex items-center gap-1.5 shrink-0 ${
+                showHeroCapsules
+                  ? "px-3.5 py-1.5 text-[13px] font-medium text-white bg-black/45 hover:bg-black/60 backdrop-blur-md border border-white/25 shadow-sm"
+                  : "px-4 py-1.5 text-[13px] font-medium text-white/90 hover:text-white border border-white/20 hover:border-white/40 hover:bg-white/10"
+              }`}
             >
               <span>Sign In</span>
-              <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white/70" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg className="w-3 h-3 text-white/80" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M6 4l4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </Link>
+          </div>
+        </div>
+
+        {/* ── MOBILE NAVBAR (Tailored exclusively for mobile responsive views) ── */}
+        <div className="flex md:hidden w-full mx-auto px-2.5 items-center justify-between gap-1.5">
+          {/* ── LEFT: MENU Trigger ── */}
+          <div className="flex items-center shrink-0">
+            <button
+              onClick={() => setMenuOpen(true)}
+              className="group rounded-full transition-all flex items-center gap-1.5 shrink-0 cursor-pointer select-none px-3 py-1.5 text-[12px] font-medium text-white bg-black/45 hover:bg-black/60 backdrop-blur-md border border-white/25 shadow-sm"
+              aria-label="Open navigation menu"
+            >
+              <span>MENU</span>
+              <div className="flex flex-col justify-between w-3.5 h-2.5 shrink-0 text-white/80 group-hover:text-white transition-colors">
+                <span className="w-2 h-[1.5px] bg-current rounded-full block transition-transform group-hover:translate-x-0.5" />
+                <span className="w-3.5 h-[1.5px] bg-current rounded-full block" />
+                <span className="w-2 h-[1.5px] bg-current rounded-full block ml-auto transition-transform group-hover:-translate-x-0.5" />
+              </div>
+            </button>
+          </div>
+
+          {/* ── CENTER: Logo & Search ── */}
+          <div className="flex items-center justify-center gap-2 shrink-0">
+            <Link
+              href="/"
+              className="flex items-center transition-all group shrink-0 min-w-0"
+            >
+              <GateSphereLogo
+                variant="light"
+                className="transition-transform duration-200 group-hover:scale-105"
+                size="normal"
+              />
+            </Link>
+            
+            <button
+              onClick={() => setSearchOpen(true)}
+              className="w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer shrink-0 text-white/80 hover:text-white hover:bg-white/10"
+              title="Search"
+              aria-label="Search"
+            >
+              <svg
+                className="w-3.5 h-3.5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+            </button>
+          </div>
+
+          {/* ── RIGHT: Sign In Button ── */}
+          <div className="flex items-center justify-end shrink-0">
+            <Link
+              href="/login"
+              className="rounded-full transition-all flex items-center gap-1.5 shrink-0 px-3 py-1.5 text-[12px] font-medium text-white bg-black/45 hover:bg-black/60 backdrop-blur-md border border-white/25 shadow-sm"
+            >
+              <span>Sign In</span>
+              <svg className="w-2.5 h-2.5 text-white/80" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M6 4l4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </Link>

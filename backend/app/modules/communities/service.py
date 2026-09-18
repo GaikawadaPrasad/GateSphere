@@ -281,6 +281,10 @@ class CommunityService:
             raise ConflictError(
                 "Tower name already in use", code="TOWER_NAME_TAKEN", fields={"name": "taken"}
             )
+        if payload.code and await self.towers.by_code(cid, payload.code):
+            raise ConflictError(
+                "Tower code already in use", code="TOWER_CODE_TAKEN", fields={"code": "taken"}
+            )
         obj = Tower(community_id=cid, **payload.model_dump())
         await self.towers.add(obj)
         await self._audit("tower.create", cid, "tower", obj.id, new=payload.model_dump())

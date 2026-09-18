@@ -110,18 +110,31 @@ export default function CommunityAdminCommunicationPage() {
     if (!activeCommunityId) return;
 
     const errors: Record<string, string> = {};
-    if (!form.title.trim() || form.title.trim().length < 3) {
-      errors.title = "Announcement title must be at least 3 characters long.";
+    const trimmedTitle = form.title.trim();
+    if (!trimmedTitle || trimmedTitle.length < 3) {
+      errors.title = "Announcement title is required and must be at least 3 characters long.";
+    } else if (trimmedTitle.length > 200) {
+      errors.title = "Announcement title cannot exceed 200 characters.";
+    } else if (!/[a-zA-Z]{2,}/.test(trimmedTitle)) {
+      errors.title = "Announcement title must contain meaningful readable text (at least 2 alphabetic letters).";
     }
-    if (!form.body.trim() || form.body.trim().length < 5) {
-      errors.body = "Announcement body must be at least 5 characters long.";
+
+    const trimmedBody = form.body.trim();
+    if (!trimmedBody || trimmedBody.length < 10) {
+      errors.body = "Announcement message content is required and must be at least 10 characters long.";
+    } else if (trimmedBody.length > 20000) {
+      errors.body = "Announcement message content cannot exceed 20,000 characters.";
+    } else if (!/[a-zA-Z]{3,}/.test(trimmedBody)) {
+      errors.body = "Announcement message content must contain meaningful text (at least 3 alphabetic letters).";
     }
+
     if (form.target_type !== "all" && !form.target_id) {
-      errors.target_id = "Please select a target for this announcement.";
+      errors.target_id = `Please select a specific ${form.target_type === "tower" ? "tower" : "resident group"} for this announcement.`;
     }
 
     if (Object.keys(errors).length > 0) {
       setCommFieldErrors(errors);
+      setAnnouncementError("Please fix the highlighted validation errors below.");
       return;
     }
 
@@ -202,8 +215,13 @@ export default function CommunityAdminCommunicationPage() {
     e.preventDefault();
     if (!activeCommunityId) return;
 
-    if (!groupForm.name.trim() || groupForm.name.trim().length < 2) {
+    const trimmedGroupName = groupForm.name.trim();
+    if (!trimmedGroupName || trimmedGroupName.length < 2) {
       setCommFieldErrors({ group_name: "Group name must be at least 2 characters long." });
+      return;
+    }
+    if (!/[a-zA-Z]{2,}/.test(trimmedGroupName)) {
+      setCommFieldErrors({ group_name: "Group name must contain readable alphabetic characters." });
       return;
     }
 
@@ -436,7 +454,15 @@ export default function CommunityAdminCommunicationPage() {
         description="Broadcast announcements, dispatch emergency alerts, publish community notices, and manage resident groups."
         action={
           <div style={{ display: "flex", gap: "0.5rem" }}>
-            <button type="button" className="btn btn-primary" onClick={() => setIsCreateOpen(true)}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                setCommFieldErrors({});
+                setAnnouncementError(null);
+                setIsCreateOpen(true);
+              }}
+            >
               📢 New Announcement
             </button>
           </div>
@@ -584,6 +610,8 @@ export default function CommunityAdminCommunicationPage() {
                   target_type: "all",
                   target_id: "",
                 });
+                setCommFieldErrors({});
+                setAnnouncementError(null);
                 setIsCreateOpen(true);
               }}
             >
@@ -600,7 +628,10 @@ export default function CommunityAdminCommunicationPage() {
             <button
               type="button"
               className="btn btn-primary"
-              onClick={() => setIsGroupModalOpen(true)}
+              onClick={() => {
+                setCommFieldErrors({});
+                setIsGroupModalOpen(true);
+              }}
             >
               + Create Resident Group
             </button>
@@ -620,7 +651,11 @@ export default function CommunityAdminCommunicationPage() {
       {/* Create Announcement Modal */}
       <Modal
         isOpen={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
+        onClose={() => {
+          setIsCreateOpen(false);
+          setCommFieldErrors({});
+          setAnnouncementError(null);
+        }}
         title={
           form.announcement_type === "emergency"
             ? "🚨 Compose Emergency Broadcast"
@@ -629,6 +664,7 @@ export default function CommunityAdminCommunicationPage() {
       >
         <form
           onSubmit={handleCreateAnnouncement}
+          noValidate
           style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
         >
           {announcementError && (
@@ -642,7 +678,7 @@ export default function CommunityAdminCommunicationPage() {
                 fontSize: "0.85rem",
               }}
             >
-              {announcementError}
+              ⚠️ {announcementError}
             </div>
           )}
 
@@ -655,16 +691,44 @@ export default function CommunityAdminCommunicationPage() {
                 marginBottom: "0.25rem",
               }}
             >
-              Title
+              Title <span style={{ color: "#ef4444" }}>*</span>
             </label>
             <input
               type="text"
               className="input-field"
               required
+              aria-invalid={Boolean(commFieldErrors.title)}
+              style={{
+                borderColor: commFieldErrors.title ? "#ef4444" : undefined,
+              }}
               placeholder="e.g. Water Tank Maintenance Schedule"
               value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              onChange={(e) => {
+                setForm({ ...form, title: e.target.value });
+                if (commFieldErrors.title) {
+                  setCommFieldErrors((prev) => {
+                    const n = { ...prev };
+                    delete n.title;
+                    return n;
+                  });
+                }
+              }}
             />
+            {commFieldErrors.title && (
+              <span
+                role="alert"
+                style={{
+                  fontSize: "0.75rem",
+                  color: "#ef4444",
+                  marginTop: "0.25rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.25rem",
+                }}
+              >
+                <span>⚠️</span> {commFieldErrors.title}
+              </span>
+            )}
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.75rem" }}>
@@ -738,13 +802,20 @@ export default function CommunityAdminCommunicationPage() {
               <select
                 className="select-field"
                 value={form.target_type}
-                onChange={(e) =>
+                onChange={(e) => {
                   setForm({
                     ...form,
                     target_type: e.target.value as typeof form.target_type,
                     target_id: "",
-                  })
-                }
+                  });
+                  if (commFieldErrors.target_id) {
+                    setCommFieldErrors((prev) => {
+                      const n = { ...prev };
+                      delete n.target_id;
+                      return n;
+                    });
+                  }
+                }}
               >
                 <option value="all">Entire Community</option>
                 <option value="tower">Specific Tower</option>
@@ -763,13 +834,26 @@ export default function CommunityAdminCommunicationPage() {
                   marginBottom: "0.25rem",
                 }}
               >
-                Select Tower
+                Select Tower <span style={{ color: "#ef4444" }}>*</span>
               </label>
               <select
                 className="select-field"
                 required
+                aria-invalid={Boolean(commFieldErrors.target_id)}
+                style={{
+                  borderColor: commFieldErrors.target_id ? "#ef4444" : undefined,
+                }}
                 value={form.target_id}
-                onChange={(e) => setForm({ ...form, target_id: e.target.value })}
+                onChange={(e) => {
+                  setForm({ ...form, target_id: e.target.value });
+                  if (commFieldErrors.target_id) {
+                    setCommFieldErrors((prev) => {
+                      const n = { ...prev };
+                      delete n.target_id;
+                      return n;
+                    });
+                  }
+                }}
               >
                 <option value="">-- Choose Tower --</option>
                 {towers?.map((t) => (
@@ -778,6 +862,21 @@ export default function CommunityAdminCommunicationPage() {
                   </option>
                 ))}
               </select>
+              {commFieldErrors.target_id && (
+                <span
+                  role="alert"
+                  style={{
+                    fontSize: "0.75rem",
+                    color: "#ef4444",
+                    marginTop: "0.25rem",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.25rem",
+                  }}
+                >
+                  <span>⚠️</span> {commFieldErrors.target_id}
+                </span>
+              )}
             </div>
           )}
 
@@ -791,13 +890,26 @@ export default function CommunityAdminCommunicationPage() {
                   marginBottom: "0.25rem",
                 }}
               >
-                Select Resident Group
+                Select Resident Group <span style={{ color: "#ef4444" }}>*</span>
               </label>
               <select
                 className="select-field"
                 required
+                aria-invalid={Boolean(commFieldErrors.target_id)}
+                style={{
+                  borderColor: commFieldErrors.target_id ? "#ef4444" : undefined,
+                }}
                 value={form.target_id}
-                onChange={(e) => setForm({ ...form, target_id: e.target.value })}
+                onChange={(e) => {
+                  setForm({ ...form, target_id: e.target.value });
+                  if (commFieldErrors.target_id) {
+                    setCommFieldErrors((prev) => {
+                      const n = { ...prev };
+                      delete n.target_id;
+                      return n;
+                    });
+                  }
+                }}
               >
                 <option value="">-- Choose Group --</option>
                 {groups?.map((g: any) => (
@@ -806,6 +918,21 @@ export default function CommunityAdminCommunicationPage() {
                   </option>
                 ))}
               </select>
+              {commFieldErrors.target_id && (
+                <span
+                  role="alert"
+                  style={{
+                    fontSize: "0.75rem",
+                    color: "#ef4444",
+                    marginTop: "0.25rem",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.25rem",
+                  }}
+                >
+                  <span>⚠️</span> {commFieldErrors.target_id}
+                </span>
+              )}
             </div>
           )}
 
@@ -818,16 +945,44 @@ export default function CommunityAdminCommunicationPage() {
                 marginBottom: "0.25rem",
               }}
             >
-              Message Content
+              Message Content <span style={{ color: "#ef4444" }}>*</span>
             </label>
             <textarea
               className="input-field"
               rows={4}
               required
-              placeholder="Write the full announcement details..."
+              aria-invalid={Boolean(commFieldErrors.body)}
+              style={{
+                borderColor: commFieldErrors.body ? "#ef4444" : undefined,
+              }}
+              placeholder="Write the full announcement details (min 10 characters)..."
               value={form.body}
-              onChange={(e) => setForm({ ...form, body: e.target.value })}
+              onChange={(e) => {
+                setForm({ ...form, body: e.target.value });
+                if (commFieldErrors.body) {
+                  setCommFieldErrors((prev) => {
+                    const n = { ...prev };
+                    delete n.body;
+                    return n;
+                  });
+                }
+              }}
             />
+            {commFieldErrors.body && (
+              <span
+                role="alert"
+                style={{
+                  fontSize: "0.75rem",
+                  color: "#ef4444",
+                  marginTop: "0.25rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.25rem",
+                }}
+              >
+                <span>⚠️</span> {commFieldErrors.body}
+              </span>
+            )}
           </div>
 
           <div
@@ -855,11 +1010,15 @@ export default function CommunityAdminCommunicationPage() {
       {/* Create Group Modal */}
       <Modal
         isOpen={isGroupModalOpen}
-        onClose={() => setIsGroupModalOpen(false)}
+        onClose={() => {
+          setIsGroupModalOpen(false);
+          setCommFieldErrors({});
+        }}
         title="Create Resident Group"
       >
         <form
           onSubmit={handleCreateGroup}
+          noValidate
           style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
         >
           <div>
@@ -871,16 +1030,44 @@ export default function CommunityAdminCommunicationPage() {
                 marginBottom: "0.25rem",
               }}
             >
-              Group Name
+              Group Name <span style={{ color: "#ef4444" }}>*</span>
             </label>
             <input
               type="text"
               className="input-field"
               required
+              aria-invalid={Boolean(commFieldErrors.group_name)}
+              style={{
+                borderColor: commFieldErrors.group_name ? "#ef4444" : undefined,
+              }}
               placeholder="e.g. Garden Committee / Tower A Owners"
               value={groupForm.name}
-              onChange={(e) => setGroupForm({ ...groupForm, name: e.target.value })}
+              onChange={(e) => {
+                setGroupForm({ ...groupForm, name: e.target.value });
+                if (commFieldErrors.group_name) {
+                  setCommFieldErrors((prev) => {
+                    const n = { ...prev };
+                    delete n.group_name;
+                    return n;
+                  });
+                }
+              }}
             />
+            {commFieldErrors.group_name && (
+              <span
+                role="alert"
+                style={{
+                  fontSize: "0.75rem",
+                  color: "#ef4444",
+                  marginTop: "0.25rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.25rem",
+                }}
+              >
+                <span>⚠️</span> {commFieldErrors.group_name}
+              </span>
+            )}
           </div>
 
           <div>

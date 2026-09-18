@@ -140,3 +140,100 @@ async def test_blacklisted_staff_blocked_at_checkin(db, scope_for, community, su
     with pytest.raises(BusinessRuleError) as exc:
         await svc.check_in(schemas.CheckInCreate(staff_id=staff.id))
     assert exc.value.code == "STAFF_BLACKLISTED"
+
+
+async def test_aadhaar_validation_rules(db, scope_for, community, superadmin):
+    from pydantic import ValidationError
+
+    svc = _svc(db, scope_for(community.id), superadmin)
+
+    # Valid 12-digit Aadhaar formats
+    staff_valid = await _staff(
+        svc,
+        community,
+        phone="+919870000091",
+        id_type="Aadhaar",
+        id_number="1234 5678 9012",
+    )
+    assert staff_valid.id_type == "Aadhaar"
+    assert staff_valid.id_number_hash is not None
+
+    # Invalid: 5 digits
+    with pytest.raises(ValidationError) as exc:
+        schemas.StaffCreate(
+            full_name="Tester",
+            staff_type="maid",
+            phone="+919870000092",
+            id_type="Aadhaar",
+            id_number="12345",
+        )
+    assert "Aadhaar number must be exactly 12 numeric digits" in str(exc.value)
+
+    # Invalid: Contains letters
+    with pytest.raises(ValidationError) as exc:
+        schemas.StaffCreate(
+            full_name="Tester",
+            staff_type="maid",
+            phone="+919870000093",
+            id_type="Aadhaar",
+            id_number="1234abcd5678",
+        )
+    assert "Aadhaar number must be exactly 12 numeric digits" in str(exc.value)
+
+    # Invalid: All repeating digits
+    with pytest.raises(ValidationError) as exc:
+        schemas.StaffCreate(
+            full_name="Tester",
+            staff_type="maid",
+            phone="+919870000094",
+            id_type="Aadhaar",
+            id_number="000000000000",
+        )
+    assert "Aadhaar number cannot contain all identical repeating digits" in str(exc.value)
+
+
+async def test_pan_and_voter_id_validation_rules():
+    from pydantic import ValidationError
+
+    # Valid PAN Card
+    p1 = schemas.StaffCreate(
+        full_name="Tester",
+        staff_type="cook",
+        phone="+919870000095",
+        id_type="PAN Card",
+        id_number="ABCDE1234F",
+    )
+    assert p1.id_type == "PAN Card"
+
+    # Invalid PAN Card
+    with pytest.raises(ValidationError) as exc:
+        schemas.StaffCreate(
+            full_name="Tester",
+            staff_type="cook",
+            phone="+919870000096",
+            id_type="PAN Card",
+            id_number="12345ABCDE",
+        )
+    assert "PAN Card must be 10 characters" in str(exc.value)
+
+    # Valid Voter ID
+    v1 = schemas.StaffCreate(
+        full_name="Tester",
+        staff_type="driver",
+        phone="+919870000097",
+        id_type="Voter ID",
+        id_number="ABC1234567",
+    )
+    assert v1.id_type == "Voter ID"
+
+    # Invalid Voter ID
+    with pytest.raises(ValidationError) as exc:
+        schemas.StaffCreate(
+            full_name="Tester",
+            staff_type="driver",
+            phone="+919870000098",
+            id_type="Voter ID",
+            id_number="123",
+        )
+    assert "Voter ID must be 10 characters" in str(exc.value)
+

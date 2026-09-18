@@ -163,6 +163,7 @@ class AttachmentRead(_Read):
 
 class TicketRead(_Read):
     community_id: uuid.UUID
+    community_name: str | None = None
     unit_id: uuid.UUID
     ticket_number: str
     raised_by_user_id: uuid.UUID | None

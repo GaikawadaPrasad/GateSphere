@@ -8,29 +8,29 @@ export default function Footer() {
 
   return (
     <footer
-      className="relative text-slate-300 pt-12 pb-6 border-t border-slate-800 overflow-hidden"
+      className="relative text-slate-300 pt-8 sm:pt-12 pb-6 border-t border-slate-800 overflow-hidden"
       style={{
         backgroundColor: "#090E1A",
       }}
     >
-      <div className="max-w-7xl mx-auto px-6 sm:px-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-8">
         {/* ── TOP SECTION: Brand + Services + Company + Contact + Action Button ── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-6 pb-12 border-b border-slate-800/80 items-start">
-          {/* Column 1: Brand (3.5 Cols) */}
-          <div className="lg:col-span-3 space-y-4">
+        <div className="grid grid-cols-2 lg:grid-cols-12 gap-5 sm:gap-8 lg:gap-6 pb-8 sm:pb-12 border-b border-slate-800/80 items-start">
+          {/* Column 1: Brand (full width on mobile, 3 cols on lg) */}
+          <div className="col-span-2 lg:col-span-3 space-y-3 sm:space-y-4">
             <Link href="/" className="inline-flex items-center gap-2.5 group cursor-pointer">
               <GateSphereLogo variant="light" className="group-hover:scale-105 transition-transform" />
             </Link>
 
             <p
-              className="text-[13px] text-slate-400 leading-relaxed max-w-xs"
+              className="text-[12.5px] sm:text-[13px] text-slate-400 leading-relaxed max-w-sm"
               style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
             >
               Coordinating gate security, visitor pre-approvals, society dues, and facility maintenance for premier townships.
             </p>
 
             {/* Social Icons */}
-            <div className="flex items-center gap-2 pt-1">
+            <div className="flex items-center gap-2 pt-0.5">
               {[
                 {
                   name: "X (Twitter)",
@@ -42,11 +42,11 @@ export default function Footer() {
                   ),
                 },
                 {
-                  name: "LinkedIn",
-                  url: "https://linkedin.com",
+                  name: "Instagram",
+                  url: "https://instagram.com",
                   icon: (
                     <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
-                      <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+                      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
                     </svg>
                   ),
                 },
@@ -60,11 +60,11 @@ export default function Footer() {
                   ),
                 },
                 {
-                  name: "GitHub",
-                  url: "https://github.com",
+                  name: "WhatsApp",
+                  url: "https://whatsapp.com",
                   icon: (
                     <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
-                      <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
+                      <path d="M17.472 14.382c-.301-.15-1.78-.878-2.056-.978-.276-.1-.477-.15-.678.15-.2.301-.778.978-.954 1.18-.175.2-.351.225-.652.075-.301-.15-1.27-.468-2.42-1.493-.895-.798-1.5-1.785-1.675-2.086-.176-.301-.019-.464.132-.614.136-.135.301-.351.452-.527.15-.175.2-.3.301-.501.1-.2.05-.376-.025-.526-.075-.15-.677-1.632-.928-2.235-.244-.588-.493-.508-.677-.517-.176-.009-.377-.01-.578-.01s-.527.075-.803.376c-.276.301-1.054 1.03-1.054 2.511s1.079 2.912 1.23 3.113c.15.2 2.122 3.24 5.141 4.544.718.31 1.279.496 1.716.635.722.23 1.379.197 1.898.12.578-.087 1.78-.727 2.03-1.43.25-.702.25-1.304.176-1.43-.076-.125-.276-.2-.577-.35zm-5.467 7.42c-1.89 0-3.663-.508-5.197-1.39l-.372-.216-3.864 1.013 1.031-3.766-.237-.377c-.965-1.536-1.474-3.327-1.474-5.166 0-5.457 4.44-9.9 9.9-9.9 2.644 0 5.13 1.03 6.999 2.9 1.868 1.87 2.898 4.356 2.898 7 0 5.458-4.441 9.9-9.9 9.9zm8.503-18.404C18.277 1.163 15.26 0 12.005 0 5.385 0 0 5.385 0 12.005c0 2.112.551 4.175 1.599 5.992L0 24l6.177-1.62c1.75 1 3.738 1.528 5.828 1.528 6.62 0 12.005-5.385 12.005-12.005 0-3.254-1.267-6.27-3.48-8.485z" />
                     </svg>
                   ),
                 },
@@ -83,15 +83,15 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* Column 2: Platform Links (2.5 Cols) */}
-          <div className="lg:col-span-2 space-y-3">
+          {/* Column 2: Platform Links (1 col on mobile, 2 cols on lg) */}
+          <div className="col-span-1 lg:col-span-2 space-y-2.5 sm:space-y-3">
             <h4
-              className="text-[12px] font-bold uppercase tracking-wider text-white"
+              className="text-[11.5px] sm:text-[12px] font-bold uppercase tracking-wider text-white"
               style={{ fontFamily: "'Outfit', sans-serif" }}
             >
               PLATFORM
             </h4>
-            <ul className="space-y-2 text-[13px]">
+            <ul className="space-y-1.5 sm:space-y-2 text-[12px] sm:text-[13px]">
               {[
                 { label: "Platform Architecture", href: "/platform" },
                 { label: "Gate Security & Hardware", href: "/security" },
@@ -111,15 +111,15 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Column 3: Company Links (2.5 Cols) */}
-          <div className="lg:col-span-2 space-y-3">
+          {/* Column 3: Company Links (1 col on mobile, 2 cols on lg) */}
+          <div className="col-span-1 lg:col-span-2 space-y-2.5 sm:space-y-3">
             <h4
-              className="text-[12px] font-bold uppercase tracking-wider text-white"
+              className="text-[11.5px] sm:text-[12px] font-bold uppercase tracking-wider text-white"
               style={{ fontFamily: "'Outfit', sans-serif" }}
             >
               COMPANY
             </h4>
-            <ul className="space-y-2 text-[13px]">
+            <ul className="space-y-1.5 sm:space-y-2 text-[12px] sm:text-[13px]">
               {[
                 { label: "About GateSphere", href: "/about" },
                 { label: "Platform Architecture", href: "/platform" },
@@ -139,20 +139,20 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Column 4: Get In Touch (3 Cols) */}
-          <div className="lg:col-span-3 space-y-3">
+          {/* Column 4: Get In Touch (full width on mobile, 3 cols on lg) */}
+          <div className="col-span-2 lg:col-span-3 space-y-2.5 sm:space-y-3">
             <h4
-              className="text-[12px] font-bold uppercase tracking-wider text-white"
+              className="text-[11.5px] sm:text-[12px] font-bold uppercase tracking-wider text-white"
               style={{ fontFamily: "'Outfit', sans-serif" }}
             >
               GET IN TOUCH
             </h4>
-            <div className="space-y-2.5 text-[13px] text-slate-400">
+            <div className="space-y-2 text-[12.5px] sm:text-[13px] text-slate-400">
               <a
                 href="mailto:support@gatesphere.io"
                 className="flex items-center gap-2.5 hover:text-cyan-400 transition-colors cursor-pointer group"
               >
-                <div className="w-7 h-7 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-slate-300 group-hover:border-cyan-400/50">
+                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-slate-300 group-hover:border-cyan-400/50 text-xs">
                   ✉
                 </div>
                 <span>support@gatesphere.io</span>
@@ -161,30 +161,41 @@ export default function Footer() {
                 href="tel:+919876543210"
                 className="flex items-center gap-2.5 hover:text-cyan-400 transition-colors cursor-pointer group"
               >
-                <div className="w-7 h-7 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-slate-300 group-hover:border-cyan-400/50">
+                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-slate-300 group-hover:border-cyan-400/50 text-xs">
                   📞
                 </div>
                 <span>+91 98765 43210</span>
               </a>
               <a
-                href="https://maps.google.com/?q=Prestige+Tech+Park+Outer+Ring+Road+Bengaluru"
+                href="https://maps.google.com/?q=Bangalore+Karnataka"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-start gap-2.5 hover:text-cyan-400 transition-colors cursor-pointer group"
               >
-                <div className="w-7 h-7 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-slate-300 mt-0.5 group-hover:border-cyan-400/50">
+                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-slate-300 mt-0.5 group-hover:border-cyan-400/50 text-xs">
                   📍
                 </div>
-                <span className="leading-snug">Prestige Tech Park, Outer Ring Road, Bengaluru, Karnataka</span>
+                <span className="leading-snug">Bangalore, Karnataka</span>
               </a>
+            </div>
+
+            {/* Contact Button on mobile */}
+            <div className="pt-2 lg:hidden">
+              <Link
+                href="/demo"
+                className="inline-flex items-center justify-center px-5 py-2.5 rounded-full text-[12px] font-bold uppercase tracking-wider text-white bg-gradient-to-r from-red-600 to-rose-500 hover:from-red-500 hover:to-rose-400 transition-all shadow-lg shadow-red-500/25 whitespace-nowrap cursor-pointer hover:scale-105"
+                style={{ fontFamily: "'Outfit', sans-serif" }}
+              >
+                Contact Us
+              </Link>
             </div>
           </div>
 
-          {/* Column 5: Action Button (1.5 Cols) */}
-          <div className="lg:col-span-1 flex lg:justify-end">
+          {/* Column 5: Action Button (Desktop only, mobile is nested above) */}
+          <div className="hidden lg:flex lg:col-span-2 items-center lg:justify-end">
             <Link
               href="/demo"
-              className="inline-flex items-center justify-center px-4 py-2.5 rounded-full text-[12px] font-bold uppercase tracking-wider text-white bg-gradient-to-r from-red-600 to-rose-500 hover:from-red-500 hover:to-rose-400 transition-all shadow-lg shadow-red-500/25 whitespace-nowrap cursor-pointer hover:scale-105"
+              className="inline-flex items-center justify-center px-5 py-2.5 rounded-full text-[12px] font-bold uppercase tracking-wider text-white bg-gradient-to-r from-red-600 to-rose-500 hover:from-red-500 hover:to-rose-400 transition-all shadow-lg shadow-red-500/25 whitespace-nowrap cursor-pointer hover:scale-105"
               style={{ fontFamily: "'Outfit', sans-serif" }}
             >
               Contact Us
@@ -192,16 +203,14 @@ export default function Footer() {
           </div>
         </div>
 
-       
-
         {/* ── BOTTOM BAR: Copyright + Active Navigation Links ── */}
-        <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-[12px] text-slate-500 text-center sm:text-left">
+        <div className="pt-5 sm:pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 text-[11.5px] sm:text-[12px] text-slate-500 text-center sm:text-left">
           <div>
             © 2026 GateSphere Enterprise. All rights reserved.
           </div>
 
           {/* Direct Quick Links Bar */}
-          <div className="flex flex-nowrap items-center justify-center gap-3 text-xs font-medium">
+          <div className="flex flex-wrap sm:flex-nowrap items-center justify-center gap-2 sm:gap-3 text-[11px] sm:text-xs font-medium">
             <Link href="/" className="text-slate-400 hover:text-white transition-colors cursor-pointer">Home</Link>
             <span className="text-slate-700">·</span>
             <Link href="/platform" className="text-slate-400 hover:text-white transition-colors cursor-pointer">Platform</Link>
@@ -217,7 +226,7 @@ export default function Footer() {
             <Link href="/demo" className="text-slate-400 hover:text-white transition-colors cursor-pointer">Contact Us</Link>
           </div>
 
-          <div className="flex items-center gap-1.5 text-slate-400">
+          <div className="flex items-center gap-1.5 text-slate-400 text-[11px] sm:text-xs">
             <span>Built for premier communities</span>
             <span className="text-blue-400">🛡️</span>
           </div>
