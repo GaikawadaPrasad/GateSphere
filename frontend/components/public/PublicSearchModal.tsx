@@ -10,7 +10,7 @@ interface PublicSearchModalProps {
 
 const SEARCH_SUGGESTIONS = [
   { title: "Features & Modules", href: "/features", desc: "Helpdesk SLA, maintenance & finances" },
-  { title: "Book Demo & Contact", href: "/demo", desc: "Schedule a customized 1-on-1 walkthrough" },
+  { title: "Contact", href: "/demo", desc: "Schedule a customized 1-on-1 walkthrough" },
   { title: "About GateSphere", href: "/about", desc: "Mission, township proof & leadership" },
   { title: "Resident / Staff Sign In", href: "/login", desc: "Sign into your community account" },
 ];
