@@ -127,20 +127,20 @@ export default function SecuritySupervisorVisitorManagementPage() {
     loadData();
   }, []);
 
-  const handleApprove = async (id: string, name: string) => {
-    setActionMessage(null);
-    try {
-      await visitorsApi.approve(id, "Approved by Security Supervisor");
-      const msg = `Visitor request approved for ${name}.`;
-      setActionMessage({ type: "success", text: msg });
-      toast.success(msg);
-      await loadData();
-    } catch (err: any) {
-      const errMsg = err?.message || "Failed to approve visitor request.";
-      setActionMessage({ type: "error", text: errMsg });
-      toast.error(errMsg);
-    }
-  };
+  // const handleApprove = async (id: string, name: string) => {
+  //   setActionMessage(null);
+  //   try {
+  //     await visitorsApi.approve(id, "Approved by Security Supervisor");
+  //     const msg = `Visitor request approved for ${name}.`;
+  //     setActionMessage({ type: "success", text: msg });
+  //     toast.success(msg);
+  //     await loadData();
+  //   } catch (err: any) {
+  //     const errMsg = err?.message || "Failed to approve visitor request.";
+  //     setActionMessage({ type: "error", text: errMsg });
+  //     toast.error(errMsg);
+  //   }
+  // };
 
   const handleReject = async (id: string, name: string) => {
     setActionMessage(null);
@@ -246,26 +246,24 @@ export default function SecuritySupervisorVisitorManagementPage() {
           >
             👁️ View
           </button>
-          {v.status === "Pending Approval" ? (
-            <>
-              <button
-                type="button"
-                className="btn btn-primary"
-                style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
-                onClick={() => handleApprove(v.id, v.name)}
-              >
-                Approve
-              </button>
-              <button
-                type="button"
-                className="btn btn-danger"
-                style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
-                onClick={() => handleReject(v.id, v.name)}
-              >
-                Reject
-              </button>
-            </>
-          ) : null}
+          {/* {v.status === "Pending Approval" ? (
+  <>
+    <button
+      type="button"
+      className="btn btn-primary"
+      onClick={() => handleApprove(v.id, v.name)}
+    >
+      Approve
+    </button>
+    <button
+      type="button"
+      className="btn btn-danger"
+      onClick={() => handleReject(v.id, v.name)}
+    >
+      Reject
+    </button>
+  </>
+) : null} */}
         </div>
       ),
     },
@@ -380,7 +378,7 @@ export default function SecuritySupervisorVisitorManagementPage() {
           size="md"
           footer={
             <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", width: "100%" }}>
-              {selectedVisitor.status === "Pending Approval" && (
+              {/* {selectedVisitor.status === "Pending Approval" && (
                 <>
                   <button
                     type="button"
@@ -403,7 +401,7 @@ export default function SecuritySupervisorVisitorManagementPage() {
                     Reject Request
                   </button>
                 </>
-              )}
+              )} */}
               <button
                 type="button"
                 className="btn btn-secondary"
