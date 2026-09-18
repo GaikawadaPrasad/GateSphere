@@ -197,6 +197,8 @@ export default function CommunityAdminPropertyPage() {
       errors.tower_name = "Tower name is required.";
     } else if (trimmedName.length < 2 || trimmedName.length > 128) {
       errors.tower_name = "Tower name must be between 2 and 128 characters.";
+    } else if (!/[A-Za-z]/.test(trimmedName)) {
+      errors.tower_name = "Tower name must contain letters and cannot be purely numeric or symbols.";
     } else if (!/^[A-Za-z0-9][A-Za-z0-9 \-_.,&()'/]*$/.test(trimmedName)) {
       errors.tower_name =
         "Tower name must start with a letter or number and contain only valid characters.";
@@ -236,6 +238,7 @@ export default function CommunityAdminPropertyPage() {
     try {
       setIsSubmitting(true);
       setErrorMessage(null);
+      setPropertyFieldErrors({});
       await createTower.mutateAsync({
         communityId: activeCommunityId,
         data: {
@@ -1204,6 +1207,7 @@ export default function CommunityAdminPropertyPage() {
                 onClick={() => {
                   setErrorMessage(null);
                   setPropertyFieldErrors({});
+                  setTowerForm({ name: "", code: "", structure_type: "tower", total_floors: 10 });
                   setIsAddTowerOpen(true);
                 }}
               >
@@ -1486,12 +1490,17 @@ export default function CommunityAdminPropertyPage() {
       {/* Add Tower Modal */}
       <Modal
         isOpen={isAddTowerOpen}
-        onClose={() => setIsAddTowerOpen(false)}
+        onClose={() => {
+          setIsAddTowerOpen(false);
+          setTowerErrors({});
+          setErrorMessage(null);
+        }}
         title="Add Residential Tower / Block"
       >
         <form
           noValidate
           onSubmit={handleCreateTower}
+          noValidate
           style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
         >
           {errorMessage && (
@@ -1751,7 +1760,11 @@ export default function CommunityAdminPropertyPage() {
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={() => setIsAddTowerOpen(false)}
+              onClick={() => {
+                setIsAddTowerOpen(false);
+                setPropertyFieldErrors({});
+                setErrorMessage(null);
+              }}
             >
               Cancel
             </button>
