@@ -123,19 +123,35 @@ export default function SecurityGuardEmergencyPage() {
     setIsSubmitting(true);
     setErrorMessage(null);
     try {
-      await gateApi.cancelAlert(alertToDismiss.id);
+      // Security Guards resolve / dismiss the incident with a resolution summary
+      await gateApi.resolveAlert(alertToDismiss.id, "Resolved and dismissed by Security Guard on duty");
       setAlertsList((prev) =>
-        prev.map((a) => (a.id === alertToDismiss.id ? { ...a, status: "cancelled" } : a)),
+        prev.map((a) => (a.id === alertToDismiss.id ? { ...a, status: "resolved" } : a)),
       );
       if (activeSos?.id === alertToDismiss.id) {
         setActiveSos(null);
       }
       setIsDismissModalOpen(false);
       setAlertToDismiss(null);
-    } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : "Failed to cancel emergency alert. Please retry.";
-      setErrorMessage(msg);
+      toast.success("Emergency SOS alert resolved and cleared from gate console.", "Alert Dismissed");
+    } catch {
+      try {
+        await gateApi.cancelAlert(alertToDismiss.id);
+        setAlertsList((prev) =>
+          prev.map((a) => (a.id === alertToDismiss.id ? { ...a, status: "cancelled" } : a)),
+        );
+        if (activeSos?.id === alertToDismiss.id) {
+          setActiveSos(null);
+        }
+        setIsDismissModalOpen(false);
+        setAlertToDismiss(null);
+        toast.success("Emergency SOS alert cancelled.", "Alert Dismissed");
+      } catch (cancelErr: unknown) {
+        const msg =
+          cancelErr instanceof Error ? cancelErr.message : "Failed to dismiss emergency alert. Please retry.";
+        setErrorMessage(msg);
+        toast.error(msg, "Error");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -169,9 +185,25 @@ export default function SecurityGuardEmergencyPage() {
       ),
     },
     {
+      key: "location",
+      header: "Location / Unit",
+      render: (a) => {
+        const raw = (a as any).message || "";
+        const match = raw.match(/Location:\s*([^—\n]+)/i);
+        const titleRaw = (a as any).title || "";
+        const titleMatch = titleRaw.match(/Location:\s*([^—\n]+)/i) || titleRaw.match(/SOS EMERGENCY:\s*(.+)/i);
+        const loc = match?.[1]?.trim() || titleMatch?.[1]?.trim() || (a as any).location_coordinates || "Main Gate / Facility";
+        return (
+          <span style={{ fontWeight: 700, color: "var(--primary-dark, #1e3a8a)", background: "var(--primary-subtle, #eff6ff)", padding: "0.2rem 0.5rem", borderRadius: "var(--radius-sm, 4px)", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
+            📍 {loc}
+          </span>
+        );
+      },
+    },
+    {
       key: "message",
       header: "Details",
-      render: (a) => <span>{(a as any).message || "—"}</span>,
+      render: (a) => <span>{(a as any).message?.split(" — Location:")[0] || (a as any).message || "—"}</span>,
     },
     {
       key: "triggered_at",
@@ -277,7 +309,7 @@ export default function SecurityGuardEmergencyPage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
               gap: "1rem",
               fontSize: "0.9rem",
             }}
@@ -289,8 +321,24 @@ export default function SecurityGuardEmergencyPage() {
               <strong style={{ textTransform: "capitalize" }}>🚨 {activeSos.alert_type}</strong>
             </div>
             <div>
+              <span style={{ opacity: 0.8, fontSize: "0.75rem", display: "block" }}>
+                📍 Tower / Unit Location
+              </span>
+              <strong style={{ fontSize: "1.05rem", color: "#fef08a", fontWeight: 800 }}>
+                {(() => {
+                  const raw = (activeSos as any)?.message || "";
+                  const match = raw.match(/Location:\s*([^—\n]+)/i);
+                  if (match && match[1]?.trim()) return match[1].trim();
+                  const rawTitle = (activeSos as any)?.title || "";
+                  const titleMatch = rawTitle.match(/Location:\s*([^—\n]+)/i) || rawTitle.match(/SOS EMERGENCY:\s*(.+)/i);
+                  if (titleMatch && titleMatch[1]?.trim()) return titleMatch[1].trim();
+                  return (activeSos as any)?.location_coordinates || "Main Gate / Facility";
+                })()}
+              </strong>
+            </div>
+            <div>
               <span style={{ opacity: 0.8, fontSize: "0.75rem", display: "block" }}>Details</span>
-              <strong>{(activeSos as any).message || "—"}</strong>
+              <strong>{(activeSos as any).message?.split(" — Location:")[0] || (activeSos as any).message || "—"}</strong>
             </div>
             <div>
               <span style={{ opacity: 0.8, fontSize: "0.75rem", display: "block" }}>Time Sent</span>

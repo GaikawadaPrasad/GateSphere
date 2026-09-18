@@ -362,19 +362,58 @@ class GateService:
             cid = await self._gate_community(payload.gate_id)
         else:
             cid = self._one_community(payload.community_id)
+
+        # Resolve resident's location (Tower/Block and Unit Number) if triggered by a user
+        unit_label = None
+        if self.actor and self.actor.id:
+            try:
+                from app.modules.residents.models import ResidentProfile, UnitOccupancy
+                from app.modules.properties.models import Unit, Block
+
+                occ_res = await self.db.execute(
+                    select(Unit, Block)
+                    .join(UnitOccupancy, UnitOccupancy.unit_id == Unit.id)
+                    .join(ResidentProfile, ResidentProfile.id == UnitOccupancy.resident_profile_id)
+                    .outerjoin(Block, Block.id == Unit.block_id)
+                    .where(ResidentProfile.user_id == self.actor.id, UnitOccupancy.is_active.is_(True))
+                )
+                row = occ_res.first()
+                if row:
+                    u, b = row
+                    block_name = b.name if b else ""
+                    u_num = u.unit_number if u else ""
+                    if block_name and u_num:
+                        unit_label = f"{block_name} - Unit {u_num}"
+                    elif u_num:
+                        unit_label = f"Unit {u_num}"
+            except Exception:
+                unit_label = None
+
+        msg = payload.message or "Emergency SOS triggered by resident from portal"
+        if unit_label and "Location:" not in msg and unit_label not in msg:
+            msg = f"Location: {unit_label} — {msg}"
+
         obj = PanicAlert(
             community_id=cid,
             triggered_by_user_id=self.actor.id,
             gate_id=payload.gate_id,
             alert_type=payload.alert_type,
             severity=payload.severity,
-            message=payload.message,
+            message=msg,
         )
         await self.alerts.add(obj)
         await self._audit(
             "alert.raise", cid, "panic_alert", obj.id, new={"type": payload.alert_type}
         )
         await self.db.flush()
+
+        notif_title = f"🚨 SOS EMERGENCY: {unit_label}" if unit_label else f"PANIC: {payload.alert_type} ({payload.severity})"
+        notif_message = (
+            f"Emergency SOS triggered from {unit_label}. Details: {msg}"
+            if unit_label
+            else (msg or f"A {payload.alert_type} alert was raised. Respond now.")
+        )
+
         await notif_events.emit_to_roles(
             self.db,
             self.scope,
@@ -383,8 +422,8 @@ class GateService:
             community_id=cid,
             role_slugs=["security_supervisor", "security_guard", "community_admin"],
             notification_type="gate.panic_alert",
-            title=f"PANIC: {payload.alert_type} ({payload.severity})",
-            message=payload.message or f"A {payload.alert_type} alert was raised. Respond now.",
+            title=notif_title,
+            message=notif_message,
             reference_type="panic_alert",
             reference_id=obj.id,
             channels=["in_app", "push", "sms", "whatsapp"],

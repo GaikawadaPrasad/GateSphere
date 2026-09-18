@@ -399,6 +399,14 @@ class VisitorService(UnitScopedAccess):
                 fields={"reason": hit.reason, "risk_level": hit.risk_level},
             )
 
+        # Anti-passback: prevent creating duplicate requests while visitor is currently inside premises
+        if await self.entries.open_for_visitor(unit.community_id, visitor.id):
+            raise ConflictError(
+                f"Visitor {visitor.full_name} is currently inside the premises and has not checked out.",
+                code="VISITOR_ALREADY_INSIDE",
+                fields={"phone": f"Visitor {visitor.full_name} is already checked in at the premises."},
+            )
+
         approval_required = policy.approval_required and visitor_type != "recurring"
         obj = VisitorRequest(
             community_id=unit.community_id,
@@ -434,6 +442,12 @@ class VisitorService(UnitScopedAccess):
                     code="VISITOR_BLACKLISTED",
                     fields={"reason": hit_m.reason, "risk_level": hit_m.risk_level},
                 )
+            if await self.entries.open_for_visitor(unit.community_id, mv.id):
+                raise ConflictError(
+                    f"Additional visitor {mv.full_name} is currently inside the premises and has not checked out.",
+                    code="VISITOR_ALREADY_INSIDE",
+                    fields={"phone": f"Visitor {mv.full_name} is already checked in at the premises."},
+                )
             await self._add_member(obj, mv.id, is_primary=False)
         await self._audit(
             "request.create",
@@ -443,6 +457,23 @@ class VisitorService(UnitScopedAccess):
             new={"visitor_type": payload.visitor_type, "status": obj.status},
         )
         if approval_required and obj.host_user_id:
+            if obj.visitor_type == "cab_taxi":
+                cab_provider = obj.purpose or "Cab"
+                plate_str = f" ({obj.vehicle_number})" if obj.vehicle_number else ""
+                notif_title = f"🚖 Cab Arrival Approval: {cab_provider}{plate_str}"
+                notif_message = (
+                    f"Cab Driver {visitor.full_name} ({cab_provider}{plate_str}) has arrived at the gate for Unit {unit.unit_number}. Please confirm entry."
+                )
+                notif_type = "cab.approval_needed"
+                ref_type = "cab_request"
+            else:
+                notif_title = f"Visitor Approval Request: {visitor.full_name}"
+                notif_message = (
+                    f"Visitor {visitor.full_name} (Purpose: {obj.purpose or 'General Visit'}) has arrived at the gate for Unit {unit.unit_number}. Please confirm entry."
+                )
+                notif_type = "visitor.approval_needed"
+                ref_type = "visitor_request"
+
             await notif_events.emit(
                 self.db,
                 self.scope,
@@ -450,10 +481,10 @@ class VisitorService(UnitScopedAccess):
                 self.ctx,
                 recipient_user_id=obj.host_user_id,
                 community_id=unit.community_id,
-                notification_type="visitor.approval_needed",
-                title="Visitor approval needed",
-                message=f"{visitor.full_name} is requesting to visit your unit.",
-                reference_type="visitor_request",
+                notification_type=notif_type,
+                title=notif_title,
+                message=notif_message,
+                reference_type=ref_type,
                 reference_id=obj.id,
                 channels=["in_app", "push", "sms", "whatsapp"],
             )
@@ -533,6 +564,51 @@ class VisitorService(UnitScopedAccess):
         req.status = "cancelled"
         await self.db.flush()
         await self._audit("request.cancel", req.community_id, "visitor_request", req.id)
+        return req
+
+    async def notify_resident(self, request_id: uuid.UUID) -> VisitorRequest:
+        req = await self.get_request(request_id)
+        if req.status != "pending":
+            raise BusinessRuleError(
+                f"Cannot request approval for a request with status '{req.status}'.",
+                code="INVALID_STATE",
+            )
+        visitor = await self.visitors.get(req.visitor_id) if req.visitor_id else req.visitor
+        visitor_name = visitor.full_name if visitor else "Cab Driver"
+        unit = await self.db.get(Unit, req.unit_id)
+        unit_label = unit.unit_number if unit else ""
+        target_user = req.host_user_id or req.created_by_user_id
+        if target_user:
+            if req.visitor_type == "cab_taxi":
+                cab_provider = req.purpose or "Cab"
+                plate_str = f" ({req.vehicle_number})" if req.vehicle_number else ""
+                notif_title = f"🚖 Cab Arrival Approval: {cab_provider}{plate_str}"
+                notif_message = (
+                    f"Cab Driver {visitor_name} ({cab_provider}{plate_str}) has arrived at the gate for Unit {unit_label}. Please confirm entry."
+                )
+                notif_type = "cab.approval_needed"
+                ref_type = "cab_request"
+            else:
+                notif_title = f"Visitor Approval Request ({visitor_name})"
+                notif_message = f"{visitor_name} ({req.purpose or req.visitor_type}) has arrived at the gate and is waiting for your approval."
+                notif_type = "visitor.approval_needed"
+                ref_type = "visitor_request"
+
+            await notif_events.emit(
+                self.db,
+                self.scope,
+                self.actor,
+                self.ctx,
+                recipient_user_id=target_user,
+                community_id=req.community_id,
+                notification_type=notif_type,
+                title=notif_title,
+                message=notif_message,
+                reference_type=ref_type,
+                reference_id=req.id,
+                channels=["in_app", "push", "sms", "whatsapp"],
+            )
+        await self._audit("request.notify", req.community_id, "visitor_request", req.id)
         return req
 
     # -- passes ----------------------------------------------- #

@@ -3,6 +3,7 @@
 import React, { useState, useRef } from "react";
 import { uploadsApi } from "@/lib/api";
 import { useUiStore } from "@/store/ui";
+import { Modal } from "@/components/common/Modal";
 
 interface FileUploadProps {
   kind: string;
@@ -193,6 +194,8 @@ export const FileUpload: React.FC<FileUploadProps> = ({
     }
   };
 
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+
   const activePreview = previewUrl || localBlobUrl;
   const isImage =
     Boolean(activePreview?.match(/\.(jpg|jpeg|png|webp|gif|heic|heif)/i)) ||
@@ -257,16 +260,25 @@ export const FileUpload: React.FC<FileUploadProps> = ({
       {activePreview && (
         <div className="mt-1 flex items-center gap-3 p-2 bg-slate-50 dark:bg-slate-900/50 rounded border border-slate-200 dark:border-slate-800">
           {isImage ? (
-            <img
-              src={activePreview}
-              alt="Upload preview"
-              className="w-14 h-14 object-cover rounded border border-slate-300 shadow-sm"
-              onError={(e) => {
-                if (localBlobUrl && e.currentTarget.src !== localBlobUrl) {
-                  e.currentTarget.src = localBlobUrl;
-                }
-              }}
-            />
+            <div
+              className="relative cursor-pointer group flex-shrink-0"
+              onClick={() => setLightboxOpen(true)}
+              title="Click to view full-size photo"
+            >
+              <img
+                src={activePreview}
+                alt="Upload preview"
+                className="w-14 h-14 object-cover rounded border border-slate-300 shadow-sm transition group-hover:opacity-90"
+                onError={(e) => {
+                  if (localBlobUrl && e.currentTarget.src !== localBlobUrl) {
+                    e.currentTarget.src = localBlobUrl;
+                  }
+                }}
+              />
+              <span className="absolute bottom-0 right-0 bg-blue-600 text-white text-[9px] px-1 rounded font-bold">
+                🔍
+              </span>
+            </div>
           ) : (
             <a
               href={activePreview}
@@ -277,10 +289,66 @@ export const FileUpload: React.FC<FileUploadProps> = ({
               📄 View Document
             </a>
           )}
-          <div className="text-xs text-emerald-600 font-semibold">
-            ✓ Uploaded successfully
+          <div className="flex flex-col">
+            <span className="text-xs text-emerald-600 font-semibold">
+              ✓ Uploaded successfully
+            </span>
+            {isImage && (
+              <span
+                onClick={() => setLightboxOpen(true)}
+                className="text-[11px] text-blue-600 hover:underline cursor-pointer"
+              >
+                Click image to expand preview
+              </span>
+            )}
           </div>
         </div>
+      )}
+
+      {/* Lightbox Preview Modal */}
+      {isImage && activePreview && (
+        <Modal
+          isOpen={lightboxOpen}
+          onClose={() => setLightboxOpen(false)}
+          title="📷 Photograph Preview"
+          size="md"
+        >
+          <div style={{ textAlign: "center", padding: "0.5rem 0" }}>
+            <div
+              style={{
+                borderRadius: 12,
+                overflow: "hidden",
+                background: "#0f172a",
+                maxHeight: "70vh",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: "0.75rem",
+                boxShadow: "inset 0 0 20px rgba(0,0,0,0.5)",
+              }}
+            >
+              <img
+                src={activePreview}
+                alt="Full size preview"
+                style={{
+                  maxWidth: "100%",
+                  maxHeight: "65vh",
+                  objectFit: "contain",
+                  display: "block",
+                }}
+              />
+            </div>
+            <div style={{ marginTop: "1rem", display: "flex", justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                className="px-4 py-1.5 text-xs font-semibold rounded-md border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                onClick={() => setLightboxOpen(false)}
+              >
+                Close Preview
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );

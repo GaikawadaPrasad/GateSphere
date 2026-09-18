@@ -118,7 +118,7 @@ export function useAuditorGateActivity(communityId?: string | null) {
     queryKey: ["auditor", "gate-activity", communityId],
     queryFn: async () => {
       const res = await api.get<any[]>(
-        `/gate/events${communityId ? `?community_id=${communityId}` : ""}`,
+        `/gate/events?page_size=100${communityId ? `&community_id=${communityId}` : ""}`,
       );
       if (!Array.isArray(res)) return [];
       return res.map((e: any) => ({
@@ -148,7 +148,7 @@ export function useAuditorVisitorRecords(communityId?: string | null) {
     queryKey: ["auditor", "visitor-records", communityId],
     queryFn: async () => {
       const res = await api.get<any[]>(
-        `/visitors/requests${communityId ? `?community_id=${communityId}` : ""}`,
+        `/visitors/requests?page_size=100${communityId ? `&community_id=${communityId}` : ""}`,
       );
       if (!Array.isArray(res)) return [];
       return res.map((r: any) => ({
@@ -172,7 +172,7 @@ export function useAuditorFinancialLedger(communityId?: string | null) {
     queryKey: ["auditor", "financial", communityId],
     queryFn: async () => {
       const invoices = await api.get<any[]>(
-        `/billing/invoices${communityId ? `?community_id=${communityId}` : ""}`,
+        `/billing/invoices?page_size=100${communityId ? `&community_id=${communityId}` : ""}`,
       );
       if (!Array.isArray(invoices)) return [];
       return invoices.map((inv: any) => ({
@@ -196,7 +196,7 @@ export function useAuditorComplaints(communityId?: string | null) {
     queryKey: ["auditor", "complaints", communityId],
     queryFn: async () => {
       const res = await api.get<any[]>(
-        `/complaints/tickets${communityId ? `?community_id=${communityId}` : ""}`,
+        `/complaints/tickets?page_size=100${communityId ? `&community_id=${communityId}` : ""}`,
       );
       if (!Array.isArray(res)) return [];
       return res.map((t: any) => ({
@@ -218,7 +218,7 @@ export function useAuditorVendors(communityId?: string | null) {
     queryKey: ["auditor", "vendors", communityId],
     queryFn: async () => {
       const res = await api.get<any[]>(
-        `/domestic-staff${communityId ? `?community_id=${communityId}` : ""}`,
+        `/domestic-staff?page_size=100${communityId ? `&community_id=${communityId}` : ""}`,
       );
       if (!Array.isArray(res)) return [];
       return res.map((s: any) => ({
@@ -242,7 +242,7 @@ export function useAuditorIncidents(communityId?: string | null) {
     queryKey: ["auditor", "incidents", communityId],
     queryFn: async () => {
       const res = await api.get<any[]>(
-        `/incidents${communityId ? `?community_id=${communityId}` : ""}`,
+        `/incidents?page_size=100${communityId ? `&community_id=${communityId}` : ""}`,
       );
       if (!Array.isArray(res)) return [];
       return res.map((inc: any) => ({

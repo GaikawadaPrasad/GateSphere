@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 
 T = TypeVar("T")
 
-MAX_PAGE_SIZE = 100
+MAX_PAGE_SIZE = 1000
 
 
 class PageMeta(BaseModel):

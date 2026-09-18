@@ -309,6 +309,58 @@ class AmenityService(UnitScopedAccess):
 
 
     # -- bookings ------------------------------------- #
+    async def _populate_booking_details(self, bookings: list[AmenityBooking]) -> list[AmenityBooking]:
+        if not bookings:
+            return bookings
+
+        user_ids = {b.resident_user_id for b in bookings if b.resident_user_id}
+        unit_ids = {b.unit_id for b in bookings if b.unit_id}
+        amenity_ids = {b.amenity_id for b in bookings if b.amenity_id}
+
+        user_map: dict[uuid.UUID, dict[str, str | None]] = {}
+        if user_ids:
+            u_stmt = select(User.id, User.full_name, User.phone).where(User.id.in_(user_ids))
+            u_res = (await self.db.execute(u_stmt)).all()
+            user_map = {row[0]: {"name": row[1], "phone": row[2]} for row in u_res}
+
+        unit_map: dict[uuid.UUID, dict[str, str | None]] = {}
+        if unit_ids:
+            from app.modules.properties.models import Unit, Block
+            un_stmt = (
+                select(Unit.id, Unit.unit_number, Block.name)
+                .outerjoin(Block, Block.id == Unit.block_id)
+                .where(Unit.id.in_(unit_ids))
+            )
+            un_res = (await self.db.execute(un_stmt)).all()
+            unit_map = {
+                row[0]: {
+                    "unit_number": row[1],
+                    "tower_name": row[2],
+                    "unit_label": f"{row[2]} - Unit {row[1]}" if row[2] else f"Unit {row[1]}",
+                }
+                for row in un_res
+            }
+
+        amenity_map: dict[uuid.UUID, str] = {}
+        if amenity_ids:
+            am_stmt = select(Amenity.id, Amenity.name).where(Amenity.id.in_(amenity_ids))
+            am_res = (await self.db.execute(am_stmt)).all()
+            amenity_map = {row[0]: row[1] for row in am_res}
+
+        for b in bookings:
+            u_info = user_map.get(b.resident_user_id, {})
+            b.resident_name = u_info.get("name")
+            b.resident_phone = u_info.get("phone")
+
+            un_info = unit_map.get(b.unit_id, {})
+            b.unit_number = un_info.get("unit_number")
+            b.tower_name = un_info.get("tower_name")
+            b.unit_label = un_info.get("unit_label")
+
+            b.amenity_name = amenity_map.get(b.amenity_id)
+
+        return bookings
+
     async def list_bookings(
         self,
         *,
@@ -333,9 +385,10 @@ class AmenityService(UnitScopedAccess):
         stmt = stmt.order_by(AmenityBooking.start_at.desc())
         # a plain resident only sees their own bookings (amenities themselves stay community-wide)
         stmt = await self._scope_owned(stmt, AmenityBooking.resident_user_id)
-        return await self.bookings.list(
-            offset=offset, limit=limit, extra=stmt
-        ), await self.bookings.count(extra=stmt)
+        bookings = await self.bookings.list(offset=offset, limit=limit, extra=stmt)
+        total = await self.bookings.count(extra=stmt)
+        await self._populate_booking_details(bookings)
+        return bookings, total
 
     async def get_booking(self, booking_id: uuid.UUID) -> AmenityBooking:
         obj = await self.bookings.get(booking_id)
@@ -343,6 +396,7 @@ class AmenityService(UnitScopedAccess):
             raise NotFoundError("Booking not found")
         if (await self.is_unit_restricted()) and obj.resident_user_id != self.actor.id:
             raise NotFoundError("Booking not found")
+        await self._populate_booking_details([obj])
         return obj
 
     async def book(self, payload: schemas.BookingCreate) -> AmenityBooking:

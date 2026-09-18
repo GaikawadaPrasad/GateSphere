@@ -147,3 +147,40 @@ def test_duplicate_handover_is_rejected_without_double_effect(
             if obj is not None:
                 db.delete(obj)
             db.commit()
+
+
+def test_guard_sends_approval_request_to_resident(as_role, resident_unit_id):
+    guard = as_role("security_guard")
+    unit_id = resident_unit_id
+
+    # Guard logs delivery
+    r = guard.post(
+        P,
+        json={
+            "unit_id": unit_id,
+            "delivery_type": "courier",
+            "provider_name": "Amazon Express",
+            "tracking_reference": "AMZ-987654",
+        },
+    )
+    assert r.status_code == 201, r.text
+    del_data = r.json()["data"]
+    delivery_id = del_data["id"]
+    assert del_data["approval_status"] == "pending"
+
+    # Guard sends approval request notification to resident
+    r_notify = guard.post(
+        f"{P}/{delivery_id}/notify",
+        json={"notes": "Please confirm if courier can be allowed inside tower."},
+    )
+    assert r_notify.status_code == 200, r_notify.text
+    assert r_notify.json()["message"] == "Approval request sent to resident"
+
+    # Verify event logged
+    events_res = guard.get(f"{P}/{delivery_id}/events")
+    assert events_res.status_code == 200
+    events = events_res.json()["data"]
+    notified_events = [e for e in events if e["event_type"] == "notified"]
+    assert len(notified_events) >= 1
+    assert "Please confirm" in (notified_events[0]["remarks"] or "")
+

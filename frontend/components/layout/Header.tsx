@@ -1,21 +1,39 @@
 "use client";
 
 import React, { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useRouter, usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMe, useLogout } from "@/hooks/use-auth";
 import { useCommunities, useCommunityDetails } from "@/hooks/use-communities";
 import { useUiStore } from "@/store/ui";
+import { useMyNotifications } from "@/hooks/use-notifications";
 import type { Community } from "@/types/communities";
 
 export function Header() {
   const router = useRouter();
+  const pathname = usePathname();
   const queryClient = useQueryClient();
   const { data: user } = useMe();
   const logout = useLogout();
+  const { data: unreadNotifications } = useMyNotifications({ unread_only: true });
+  const unreadCount = unreadNotifications?.length || 0;
   const isSuperAdmin = Boolean(user?.is_superadmin || user?.active_role === "super_admin");
   const { data: communities } = useCommunities(undefined, { enabled: isSuperAdmin });
   const { activeCommunityId, setActiveCommunity, toggleSidebar } = useUiStore();
+
+  const notifHref =
+    pathname.startsWith("/domestic-staff")
+      ? "/domestic-staff/notifications"
+      : pathname.startsWith("/vendor-technician")
+        ? "/vendor-technician/notifications"
+        : pathname.startsWith("/security-guard")
+          ? "/security-guard/notifications"
+          : pathname.startsWith("/security-supervisor")
+            ? "/security-supervisor/notifications"
+            : pathname.startsWith("/admin")
+              ? "/admin/notifications"
+              : "/owner-tenant/notifications";
 
   const assignedCommunityId =
     user?.community_ids?.[0] ||
@@ -202,6 +220,51 @@ export function Header() {
         className="mobile-header-right"
         style={{ display: "flex", alignItems: "center", gap: "0.75rem", minWidth: 0, flexShrink: 0 }}
       >
+        {/* Notification Bell Icon */}
+        <Link
+          href={notifHref}
+          style={{
+            position: "relative",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 34,
+            height: 34,
+            borderRadius: "8px",
+            background: "#F8FAFC",
+            border: "1px solid var(--border)",
+            fontSize: "1rem",
+            color: "var(--fg)",
+            textDecoration: "none",
+            flexShrink: 0,
+          }}
+          title="Notification Center"
+        >
+          🔔
+          {unreadCount > 0 && (
+            <span
+              style={{
+                position: "absolute",
+                top: -4,
+                right: -4,
+                background: "#EF4444",
+                color: "white",
+                fontSize: "0.6rem",
+                fontWeight: 700,
+                width: 16,
+                height: 16,
+                borderRadius: "50%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                border: "2px solid #FFFFFF",
+              }}
+            >
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
+        </Link>
+
         {/* User Profile Pill - text hidden on mobile, avatar stays */}
         <div
           style={{

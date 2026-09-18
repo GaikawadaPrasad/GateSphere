@@ -1096,6 +1096,10 @@ export const visitorsApi = {
     visitorsApi.decideRequest(requestId, "rejected", remarks),
   createPass: (requestId: string, data?: Record<string, unknown>) =>
     apiSend<Record<string, unknown>>("POST", `/visitors/requests/${requestId}/passes`, data || {}),
+  notifyResident: (requestId: string) =>
+    apiSend<Record<string, unknown>>("POST", `/visitors/requests/${requestId}/notify`),
+  sendApprovalRequest: (requestId: string) =>
+    apiSend<Record<string, unknown>>("POST", `/visitors/requests/${requestId}/notify`),
   entries: (params?: ListQueryParams) =>
     apiGet<Record<string, unknown>[]>("/visitors/entries", params as Record<string, unknown>),
   // Recording an entry (by pass_token, pin, request_id, or visitor_id) IS the pass-verification step —
@@ -1136,6 +1140,10 @@ export const deliveriesApi = {
     deliveriesApi.decide(id, "approved", remarks),
   reject: (id: string, remarks?: string) =>
     deliveriesApi.decide(id, "rejected", remarks),
+  notifyResident: (id: string, notes?: string) =>
+    apiSend<Record<string, unknown>>("POST", `/deliveries/${id}/notify`, { notes }),
+  sendApprovalRequest: (id: string, notes?: string) =>
+    apiSend<Record<string, unknown>>("POST", `/deliveries/${id}/notify`, { notes }),
 };
 
 export const vehiclesApi = {

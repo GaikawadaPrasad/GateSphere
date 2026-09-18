@@ -45,6 +45,11 @@ export default function SecurityGuardVisitorsPage() {
   const [admitPhotoUrl, setAdmitPhotoUrl] = useState<string | null>(null);
   const [isAdmitting, setIsAdmitting] = useState(false);
   const [admitError, setAdmitError] = useState<string | null>(null);
+  const [previewPhoto, setPreviewPhoto] = useState<{
+    url: string;
+    title: string;
+    subtitle?: string;
+  } | null>(null);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -214,27 +219,86 @@ export default function SecurityGuardVisitorsPage() {
       key: "name",
       header: "Visitor Name",
       sortable: true,
-      render: (v) => (
-        <button
-          type="button"
-          onClick={() => setSelectedVisitor(v)}
-          style={{
-            background: "none",
-            border: "none",
-            padding: 0,
-            cursor: "pointer",
-            fontWeight: 600,
-            color: "var(--primary, #2563eb)",
-            textAlign: "left",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "0.25rem",
-          }}
-          title="Click to view full visitor details"
-        >
-          👤 {v.name}
-        </button>
-      ),
+      render: (v) => {
+        const photo = v.photoUrl || v.entryPhotoUrl;
+        return (
+          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+            {photo ? (
+              <div
+                style={{ position: "relative", cursor: "pointer", flexShrink: 0 }}
+                onClick={() =>
+                  setPreviewPhoto({
+                    url: photo,
+                    title: v.name,
+                    subtitle: `Unit: ${v.unitNumber || "—"} • Phone: ${v.phone} • Type: ${v.visitorType}`,
+                  })
+                }
+                title="Click to view full photograph"
+              >
+                <img
+                  src={photo}
+                  alt={v.name}
+                  style={{
+                    width: "36px",
+                    height: "36px",
+                    borderRadius: "6px",
+                    objectFit: "cover",
+                    border: "1.5px solid #86EFAC",
+                  }}
+                />
+                <span
+                  style={{
+                    position: "absolute",
+                    bottom: -2,
+                    right: -2,
+                    fontSize: "8px",
+                    background: "#059669",
+                    color: "white",
+                    borderRadius: "3px",
+                    padding: "0 2px",
+                    fontWeight: 800,
+                  }}
+                >
+                  🔍
+                </span>
+              </div>
+            ) : (
+              <div
+                style={{
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "6px",
+                  background: "var(--bg-subtle, #f1f5f9)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "15px",
+                  border: "1px dashed var(--border)",
+                  flexShrink: 0,
+                }}
+              >
+                👤
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setSelectedVisitor(v)}
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+                fontWeight: 600,
+                color: "var(--primary, #2563eb)",
+                textAlign: "left",
+              }}
+              title="Click to view full visitor details"
+            >
+              {v.name}
+            </button>
+          </div>
+        );
+      },
     },
     {
       key: "phone",
@@ -480,12 +544,19 @@ export default function SecurityGuardVisitorsPage() {
             >
               <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
                 {selectedVisitor.photoUrl || selectedVisitor.entryPhotoUrl ? (
-                  <a
-                    href={selectedVisitor.photoUrl || selectedVisitor.entryPhotoUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <div
+                    onClick={() => {
+                      const photo = selectedVisitor.photoUrl || selectedVisitor.entryPhotoUrl;
+                      if (photo) {
+                        setPreviewPhoto({
+                          url: photo,
+                          title: selectedVisitor.name,
+                          subtitle: `Destination: ${selectedVisitor.unitNumber || "—"} • Phone: ${selectedVisitor.phone} • Type: ${selectedVisitor.visitorType}`,
+                        });
+                      }
+                    }}
                     title="Click to view full photograph"
-                    style={{ position: "relative", display: "inline-block", flexShrink: 0 }}
+                    style={{ position: "relative", display: "inline-block", flexShrink: 0, cursor: "pointer" }}
                   >
                     <img
                       src={selectedVisitor.photoUrl || selectedVisitor.entryPhotoUrl}
@@ -497,8 +568,10 @@ export default function SecurityGuardVisitorsPage() {
                         objectFit: "cover",
                         border: "2px solid #86efac",
                         boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-                        cursor: "pointer",
+                        transition: "transform 0.15s ease",
                       }}
+                      onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.05)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
                     />
                     <span
                       style={{
@@ -513,9 +586,9 @@ export default function SecurityGuardVisitorsPage() {
                         fontWeight: 700,
                       }}
                     >
-                      📷 PHOTO
+                      🔍 VIEW FULL
                     </span>
-                  </a>
+                  </div>
                 ) : (
                   <div
                     style={{
@@ -829,6 +902,57 @@ export default function SecurityGuardVisitorsPage() {
                 }}
               >
                 {isAdmitting ? "Recording Entry…" : "🚪 ALLOW GATE ENTRY"}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Photo Lightbox Modal */}
+      {previewPhoto && (
+        <Modal
+          isOpen={Boolean(previewPhoto)}
+          onClose={() => setPreviewPhoto(null)}
+          title={`📷 ${previewPhoto.title}`}
+          size="md"
+        >
+          <div style={{ textAlign: "center", padding: "0.5rem 0" }}>
+            <div
+              style={{
+                borderRadius: 12,
+                overflow: "hidden",
+                background: "#0f172a",
+                maxHeight: "70vh",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: "0.75rem",
+                boxShadow: "inset 0 0 20px rgba(0,0,0,0.5)",
+              }}
+            >
+              <img
+                src={previewPhoto.url}
+                alt={previewPhoto.title}
+                style={{
+                  maxWidth: "100%",
+                  maxHeight: "65vh",
+                  objectFit: "contain",
+                  display: "block",
+                }}
+              />
+            </div>
+            {previewPhoto.subtitle && (
+              <p style={{ fontSize: "0.85rem", color: "var(--muted)", margin: 0 }}>
+                {previewPhoto.subtitle}
+              </p>
+            )}
+            <div style={{ marginTop: "1rem", display: "flex", justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setPreviewPhoto(null)}
+              >
+                Close Preview
               </button>
             </div>
           </div>
