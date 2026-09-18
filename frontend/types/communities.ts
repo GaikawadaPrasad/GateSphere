@@ -48,6 +48,7 @@ export interface Tower {
 
 export interface Floor {
   id: string;
+  community_id?: string;
   tower_id: string;
   floor_number: number;
   label?: string;
@@ -58,6 +59,7 @@ export interface Floor {
 
 export interface Unit {
   id: string;
+  community_id?: string;
   floor_id: string;
   tower_id?: string;
   unit_number: string;
@@ -66,6 +68,7 @@ export interface Unit {
   sq_ft?: number;
   area_sqft?: number;
   is_occupied?: boolean;
+  is_active?: boolean;
   created_at: string;
 }
 
@@ -74,7 +77,7 @@ export interface Gate {
   community_id: string;
   name: string;
   code: string;
-  gate_type: "main" | "service" | "visitor" | "pedestrian" | "emergency" | "both" | "entry" | "exit";
+  gate_type: string;
   is_active: boolean;
   created_at: string;
 }
@@ -86,10 +89,24 @@ export interface TowerCreate {
   total_floors?: number;
 }
 
+export interface TowerUpdate {
+  name?: string;
+  code?: string;
+  structure_type?: string;
+  total_floors?: number;
+  is_active?: boolean;
+}
+
 export interface FloorCreate {
   tower_id: string;
   floor_number: number;
   label?: string;
+}
+
+export interface FloorUpdate {
+  floor_number?: number;
+  label?: string;
+  is_active?: boolean;
 }
 
 export interface UnitCreate {
@@ -98,4 +115,26 @@ export interface UnitCreate {
   unit_type?: string;
   bedrooms?: number;
   area_sqft?: number;
+}
+
+export interface UnitUpdate {
+  unit_number?: string;
+  unit_type?: string;
+  bedrooms?: number;
+  area_sqft?: number;
+  is_active?: boolean;
+}
+
+export interface GateCreate {
+  name: string;
+  code: string;
+  gate_type: string;
+  is_active?: boolean;
+}
+
+export interface GateUpdate {
+  name?: string;
+  code?: string;
+  gate_type?: string;
+  is_active?: boolean;
 }
