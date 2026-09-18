@@ -10,7 +10,13 @@ import redis
 
 from app.core.config import settings
 
-redis_client: redis.Redis = redis.Redis.from_url(str(settings.REDIS_URL), decode_responses=True)
+redis_client: redis.Redis = redis.Redis.from_url(
+    str(settings.REDIS_URL),
+    decode_responses=True,
+    socket_timeout=1.0,
+    socket_connect_timeout=1.0,
+    retry_on_timeout=False,
+)
 
 _NS = "gs"
 

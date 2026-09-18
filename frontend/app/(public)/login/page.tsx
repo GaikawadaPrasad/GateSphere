@@ -34,6 +34,17 @@ function LoginForm() {
     defaultValues: { email: "", password: "" },
   });
 
+  // Prefetch dashboard routes in the background while the user fills credentials
+  // so navigation upon successful login is instantaneous without Vercel bundle-download delays.
+  React.useEffect(() => {
+    router.prefetch("/community-admin/dashboard");
+    router.prefetch("/super-admin/dashboard");
+    router.prefetch("/owner-tenant/dashboard");
+    router.prefetch("/security-guard/dashboard");
+    router.prefetch("/facility-manager/dashboard");
+    router.prefetch("/association-committee/governance");
+  }, [router]);
+
   const onSubmit = handleSubmit(async (values) => {
     try {
       const user = await login.mutateAsync(values);

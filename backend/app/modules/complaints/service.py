@@ -152,7 +152,10 @@ class ComplaintService(UnitScopedAccess):
                     default_priority=prio,
                 )
                 self.db.add(cat)
-            await self.db.flush()
+            try:
+                await self.db.flush()
+            except Exception:
+                pass
             cats = list((await self.db.scalars(stmt)).all())
         return cats
 

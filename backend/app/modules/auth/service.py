@@ -47,7 +47,11 @@ async def resolve_login_role(
     """
     if user.is_superadmin:
         return "super_admin", None
-    grants = await repo.role_grants(user.id)
+    roles_loaded = "roles" in user.__dict__
+    if roles_loaded and user.roles is not None:
+        grants = [(r.role.slug, r.community_id) for r in user.roles if r.role]
+    else:
+        grants = await repo.role_grants(user.id)
     if not grants:
         raise AuthError("This account has no role grants", code="NO_ROLE")
     if requested:
@@ -66,7 +70,11 @@ class AuthService:
     async def _serialize(
         self, user: User, *, role_slug: str | None = None, session_bucket: str | None = None
     ) -> CurrentUser:
-        cids = await self.repo.community_ids(user.id)
+        roles_loaded = "roles" in user.__dict__
+        if roles_loaded and user.roles is not None:
+            cids = [r.community_id for r in user.roles if r.community_id is not None]
+        else:
+            cids = await self.repo.community_ids(user.id)
         return CurrentUser(
             id=str(user.id),
             email=user.email,

@@ -1,10 +1,12 @@
 "use client";
 
 import React from "react";
+import dynamic from "next/dynamic";
 import PublicLayout from "@/components/public/PublicLayout";
 import SecuritySection from "@/components/public/SecuritySection";
-import Emergency from "@/components/public/Emergency";
-import RequestDemo from "@/components/public/RequestDemo";
+
+const Emergency = dynamic(() => import("@/components/public/Emergency"), { ssr: true });
+const RequestDemo = dynamic(() => import("@/components/public/RequestDemo"), { ssr: true });
 
 export default function SecurityPage() {
   return (
