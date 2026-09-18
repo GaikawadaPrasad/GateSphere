@@ -15,6 +15,7 @@ availability over strictness. A reverse proxy is expected to add a second, indep
 
 from __future__ import annotations
 
+import asyncio
 import time
 import uuid
 
@@ -129,11 +130,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         cls = classify(request)
         max_n, window = _limits()[cls]
-        ident = _identity(request)
-        key = rkey("rl", cls, ident)
-        now = time.time()
 
-        try:
+        def _check_rate_limit() -> int:
+            ident = _identity(request)
+            key = rkey("rl", cls, ident)
+            now = time.time()
             member = f"{now}:{uuid.uuid4().hex}"
             pipe = redis_client.pipeline()
             pipe.zremrangebyscore(key, 0, now - window)
@@ -141,7 +142,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             pipe.zadd(key, {member: now})
             pipe.expire(key, window)
             _, used, _, _ = pipe.execute()
-        except RedisError:
+            return int(used)
+
+        try:
+            used = await asyncio.to_thread(_check_rate_limit)
+        except (RedisError, Exception):
             return await call_next(request)  # fail open
 
         if used >= max_n:
