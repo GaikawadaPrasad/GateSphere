@@ -116,7 +116,6 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "incidents:view",
         "incidents:create",
         "incidents:update",
-        "users:view",
         "communities:view",
         "dashboards:view",
         "notifications:view",
