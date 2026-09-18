@@ -35,8 +35,9 @@ class Settings(BaseSettings):
     ENABLE_DOCS: bool | None = None
 
     # --- DB pool ---
-    DB_POOL_SIZE: int = 5
-    DB_MAX_OVERFLOW: int = 10
+    DB_POOL_SIZE: int = 30
+    DB_MAX_OVERFLOW: int = 60
+    DB_POOL_TIMEOUT_SECONDS: int = 30
     DB_POOL_RECYCLE_SECONDS: int = 1800  # recycle before a pooled conn is dropped upstream
 
     # --- CORS / cookies ---
@@ -146,7 +147,7 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()  # type: ignore[call-arg]
+    return Settings()
 
 
 settings = get_settings()
