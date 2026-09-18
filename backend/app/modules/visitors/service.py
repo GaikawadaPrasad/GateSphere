@@ -668,7 +668,8 @@ class VisitorService(UnitScopedAccess):
         await ensure_confirmed_async(self.db, payload.entry_photo_url)
         req: VisitorRequest | None = None
         if payload.pass_token:
-            vpass = await pass_by_hash(self.db, digest(payload.pass_token))
+            c_ids = None if self.scope.is_global else self.scope.community_ids
+            vpass = await pass_by_hash(self.db, digest(payload.pass_token), c_ids)
             if vpass is None:
                 raise NotFoundError("Pass not found")
             req = await self.get_request(vpass.request_id)

@@ -149,7 +149,7 @@ class BillingService(UnitScopedAccess):
         source_id: uuid.UUID,
         narration: str,
     ) -> None:
-        prev = await self.ledger.latest_balance(unit_id)
+        prev = await self.ledger.latest_balance(unit_id, lock=True)
         base = Decimal(prev.balance_after) if prev is not None else Decimal("0")
         delta = amount if entry_type == "debit" else -amount
         self.db.add(

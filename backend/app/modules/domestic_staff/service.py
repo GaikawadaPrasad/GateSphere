@@ -576,8 +576,6 @@ class DomesticStaffService(UnitScopedAccess):
         if not self.scope.is_global and self.scope.community_ids:
             cid = next(iter(self.scope.community_ids))
             existing = await self.staff.first_in_community(cid, unlinked_only=True)
-            if existing is None:
-                existing = await self.staff.first_in_community(cid)
 
             if existing is not None:
                 existing.user_id = self.actor.id
