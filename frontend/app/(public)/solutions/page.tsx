@@ -1,12 +1,14 @@
 "use client";
 
 import React from "react";
+import dynamic from "next/dynamic";
 import PublicLayout from "@/components/public/PublicLayout";
 import VisitorManagement from "@/components/public/VisitorManagement";
 import ResidentExperience from "@/components/public/ResidentExperience";
-import Emergency from "@/components/public/Emergency";
-import Communication from "@/components/public/Communication";
-import RequestDemo from "@/components/public/RequestDemo";
+
+const Emergency = dynamic(() => import("@/components/public/Emergency"), { ssr: true });
+const Communication = dynamic(() => import("@/components/public/Communication"), { ssr: true });
+const RequestDemo = dynamic(() => import("@/components/public/RequestDemo"), { ssr: true });
 
 export default function SolutionsPage() {
   return (

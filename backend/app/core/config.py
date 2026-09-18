@@ -35,8 +35,8 @@ class Settings(BaseSettings):
     ENABLE_DOCS: bool | None = None
 
     # --- DB pool ---
-    DB_POOL_SIZE: int = 30
-    DB_MAX_OVERFLOW: int = 60
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 5
     DB_POOL_TIMEOUT_SECONDS: int = 30
     DB_POOL_RECYCLE_SECONDS: int = 1800  # recycle before a pooled conn is dropped upstream
 

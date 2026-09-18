@@ -6,6 +6,7 @@ import uuid
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.modules.users.models import Role, User, UserRole
 
@@ -15,7 +16,12 @@ class AuthRepository:
         self.db = db
 
     async def user_by_email(self, email: str) -> User | None:
-        return await self.db.scalar(select(User).where(User.email == email.lower()))
+        stmt = (
+            select(User)
+            .options(selectinload(User.roles).selectinload(UserRole.role))
+            .where(User.email == email.lower())
+        )
+        return await self.db.scalar(stmt)
 
     async def role_grants(self, user_id: uuid.UUID) -> list[tuple[str, uuid.UUID | None]]:
         """[(role_slug, community_id | None)] for every grant the user holds."""
