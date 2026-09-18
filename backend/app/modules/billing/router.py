@@ -526,51 +526,52 @@ async def get_assessment(
 
 @router.post("/assessments", status_code=status.HTTP_201_CREATED, dependencies=[CREATE])
 async def create_assessment(
-    payload: dict,
+    payload: schemas.AssessmentCreate,
     community_id: str | None = None,
     svc: Svc = Depends(billing_service),
 ) -> dict:
-    cid = str(_assessment_scope_id(svc, community_id or payload.get("community_id")))
+    payload_dict = payload.model_dump(mode="json", exclude_unset=True)
+    cid = str(_assessment_scope_id(svc, community_id or payload_dict.get("community_id")))
     sa_id = f"sa-{uuid.uuid4().hex[:8]}"
     now_iso = datetime.now(UTC).isoformat()
 
-    target_amt = str(payload.get("target_amount") or "0.00")
+    target_amt = str(payload_dict.get("target_amount") or "0.00")
     try:
-        units_count = int(payload.get("affected_units_count") or 120)
+        units_count = int(payload_dict.get("affected_units_count") or 120)
     except (ValueError, TypeError):
         units_count = 120
 
     try:
         per_unit = str(
-            payload.get("per_unit_amount") or f"{float(target_amt) / max(units_count, 1):.2f}"
+            payload_dict.get("per_unit_amount") or f"{float(target_amt) / max(units_count, 1):.2f}"
         )
     except (ValueError, TypeError):
         per_unit = "0.00"
 
-    proposer_id = str(svc.actor.id) if (svc and svc.actor) else payload.get("proposed_by_user_id")
+    proposer_id = str(svc.actor.id) if (svc and svc.actor) else payload_dict.get("proposed_by_user_id")
     proposer_name = (
         svc.actor.full_name
         if (svc and svc.actor and svc.actor.full_name)
-        else payload.get("proposed_by_name", "Operations & Management")
+        else payload_dict.get("proposed_by_name", "Operations & Management")
     )
 
     new_sa = {
         "id": sa_id,
         "community_id": cid,
-        "title": payload.get("title", "Special Assessment Proposal"),
-        "purpose": payload.get("purpose", "CapEx Infrastructure"),
-        "description": payload.get("description", ""),
+        "title": payload_dict.get("title", "Special Assessment Proposal"),
+        "purpose": payload_dict.get("purpose", "CapEx Infrastructure"),
+        "description": payload_dict.get("description", ""),
         "target_amount": target_amt,
         "amount_collected": "0.00",
         "per_unit_amount": per_unit,
-        "effective_date": payload.get("effective_date", datetime.now(UTC).strftime("%Y-%m-%d")),
-        "due_date": payload.get("due_date", ""),
+        "effective_date": payload_dict.get("effective_date", datetime.now(UTC).strftime("%Y-%m-%d")),
+        "due_date": payload_dict.get("due_date", ""),
         "affected_units_count": units_count,
         "status": "under_review",
         "proposed_by_user_id": proposer_id,
         "proposed_by_name": proposer_name,
-        "proposer_role": payload.get("proposer_role", "association_committee"),
-        "proposer_department": payload.get("proposer_department", "Association Committee"),
+        "proposer_role": payload_dict.get("proposer_role", "association_committee"),
+        "proposer_department": payload_dict.get("proposer_department", "Association Committee"),
         "created_at": now_iso,
         "updated_at": now_iso,
     }
