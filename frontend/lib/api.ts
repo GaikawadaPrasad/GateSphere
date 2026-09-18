@@ -425,8 +425,14 @@ export const communitiesApi = {
     communityId: string,
     data: { name: string; code: string; structure_type?: string; total_floors?: number },
   ) => apiSend<Tower>("POST", `/communities/${communityId}/towers`, data),
+  updateTower: (id: string, data: Partial<Tower>) =>
+    apiSend<Tower>("PATCH", `/communities/towers/${id}`, data),
+  deleteTower: (id: string) => apiSend<void>("DELETE", `/communities/towers/${id}`),
   createFloor: (data: { tower_id: string; floor_number: number; label?: string }) =>
     apiSend<Floor>("POST", "/communities/floors", data),
+  updateFloor: (id: string, data: Partial<Floor>) =>
+    apiSend<Floor>("PATCH", `/communities/floors/${id}`, data),
+  deleteFloor: (id: string) => apiSend<void>("DELETE", `/communities/floors/${id}`),
   createUnit: (data: {
     floor_id: string;
     unit_number: string;
@@ -434,8 +440,14 @@ export const communitiesApi = {
     bedrooms?: number;
     area_sqft?: number;
   }) => apiSend<Unit>("POST", "/communities/units", data),
+  updateUnit: (id: string, data: Partial<Unit>) =>
+    apiSend<Unit>("PATCH", `/communities/units/${id}`, data),
+  deleteUnit: (id: string) => apiSend<void>("DELETE", `/communities/units/${id}`),
   createGate: (communityId: string, data: { name: string; code: string; gate_type: string }) =>
     apiSend<Gate>("POST", `/communities/${communityId}/gates`, data),
+  updateGate: (id: string, data: Partial<Gate>) =>
+    apiSend<Gate>("PATCH", `/communities/gates/${id}`, data),
+  deleteGate: (id: string) => apiSend<void>("DELETE", `/communities/gates/${id}`),
   floors: (towerId: string) => apiGet<Floor[]>(`/communities/towers/${towerId}/floors`),
   units: (floorId: string) => apiGet<Unit[]>(`/communities/floors/${floorId}/units`),
   communityUnits: (communityId: string, params?: Record<string, unknown>) =>

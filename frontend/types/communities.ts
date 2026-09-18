@@ -39,8 +39,10 @@ export interface Tower {
   community_id: string;
   name: string;
   code?: string;
+  structure_type?: string;
   total_floors: number;
   total_units?: number;
+  is_active?: boolean;
   created_at: string;
 }
 
@@ -48,7 +50,9 @@ export interface Floor {
   id: string;
   tower_id: string;
   floor_number: number;
+  label?: string;
   total_units?: number;
+  is_active?: boolean;
   created_at: string;
 }
 
@@ -70,7 +74,7 @@ export interface Gate {
   community_id: string;
   name: string;
   code: string;
-  gate_type: "entry" | "exit" | "both" | "pedestrian";
+  gate_type: "main" | "service" | "visitor" | "pedestrian" | "emergency" | "both" | "entry" | "exit";
   is_active: boolean;
   created_at: string;
 }

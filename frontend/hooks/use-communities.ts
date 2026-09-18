@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { communitiesApi } from "@/lib/api";
-import type { Community, CommunityCreate } from "@/types/communities";
+import type { Community, CommunityCreate, Tower, Floor, Unit, Gate } from "@/types/communities";
 
 export const communityKeys = {
   all: ["communities"] as const,
@@ -190,6 +190,174 @@ export function useCreateGate() {
     }) => communitiesApi.createGate(communityId, data),
     onSuccess: (_, { communityId }) => {
       qc.invalidateQueries({ queryKey: ["gates", communityId] });
+    },
+  });
+}
+
+export function useUpdateTower() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string;
+      communityId?: string;
+      data: Partial<Tower>;
+    }) => communitiesApi.updateTower(id, data),
+    onSuccess: (_, { communityId }) => {
+      if (communityId) {
+        qc.invalidateQueries({ queryKey: ["towers", communityId], refetchType: "all" });
+      }
+      qc.invalidateQueries({ queryKey: ["towers"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["dashboards"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: communityKeys.all, refetchType: "all" });
+    },
+  });
+}
+
+export function useDeleteTower() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+    }: {
+      id: string;
+      communityId?: string;
+    }) => communitiesApi.deleteTower(id),
+    onSuccess: (_, { communityId }) => {
+      if (communityId) {
+        qc.invalidateQueries({ queryKey: ["towers", communityId], refetchType: "all" });
+      }
+      qc.invalidateQueries({ queryKey: ["towers"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["dashboards"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: communityKeys.all, refetchType: "all" });
+    },
+  });
+}
+
+export function useUpdateFloor() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string;
+      tower_id?: string;
+      data: Partial<Floor>;
+    }) => communitiesApi.updateFloor(id, data),
+    onSuccess: (_, { tower_id }) => {
+      if (tower_id) {
+        qc.invalidateQueries({ queryKey: ["floors", tower_id], refetchType: "all" });
+      }
+      qc.invalidateQueries({ queryKey: ["floors"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["towers"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["dashboards"], refetchType: "all" });
+    },
+  });
+}
+
+export function useDeleteFloor() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+    }: {
+      id: string;
+      tower_id?: string;
+    }) => communitiesApi.deleteFloor(id),
+    onSuccess: (_, { tower_id }) => {
+      if (tower_id) {
+        qc.invalidateQueries({ queryKey: ["floors", tower_id], refetchType: "all" });
+      }
+      qc.invalidateQueries({ queryKey: ["floors"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["towers"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["dashboards"], refetchType: "all" });
+    },
+  });
+}
+
+export function useUpdateUnit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string;
+      floor_id?: string;
+      data: Partial<Unit>;
+    }) => communitiesApi.updateUnit(id, data),
+    onSuccess: (_, { floor_id }) => {
+      if (floor_id) {
+        qc.invalidateQueries({ queryKey: ["units", floor_id], refetchType: "all" });
+      }
+      qc.invalidateQueries({ queryKey: ["units"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["community-units"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["floors"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["dashboards"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: communityKeys.all, refetchType: "all" });
+    },
+  });
+}
+
+export function useDeleteUnit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+    }: {
+      id: string;
+      floor_id?: string;
+    }) => communitiesApi.deleteUnit(id),
+    onSuccess: (_, { floor_id }) => {
+      if (floor_id) {
+        qc.invalidateQueries({ queryKey: ["units", floor_id], refetchType: "all" });
+      }
+      qc.invalidateQueries({ queryKey: ["units"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["community-units"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["floors"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["dashboards"], refetchType: "all" });
+      qc.invalidateQueries({ queryKey: communityKeys.all, refetchType: "all" });
+    },
+  });
+}
+
+export function useUpdateGate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string;
+      communityId?: string;
+      data: Partial<Gate>;
+    }) => communitiesApi.updateGate(id, data),
+    onSuccess: (_, { communityId }) => {
+      if (communityId) {
+        qc.invalidateQueries({ queryKey: ["gates", communityId], refetchType: "all" });
+      }
+      qc.invalidateQueries({ queryKey: ["gates"], refetchType: "all" });
+    },
+  });
+}
+
+export function useDeleteGate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+    }: {
+      id: string;
+      communityId?: string;
+    }) => communitiesApi.deleteGate(id),
+    onSuccess: (_, { communityId }) => {
+      if (communityId) {
+        qc.invalidateQueries({ queryKey: ["gates", communityId], refetchType: "all" });
+      }
+      qc.invalidateQueries({ queryKey: ["gates"], refetchType: "all" });
     },
   });
 }
