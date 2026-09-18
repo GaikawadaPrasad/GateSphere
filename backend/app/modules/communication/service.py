@@ -261,13 +261,16 @@ class CommunicationService(UnitScopedAccess):
         _enum("announcement_type", payload.announcement_type)
         _enum("priority", payload.priority)
         await self._validate_targets(cid, payload.targets)
+        import html
+
         ann = Announcement(
             community_id=cid,
             created_by_user_id=self.actor.id,
             announcement_type=payload.announcement_type,
-            title=payload.title,
-            body=payload.body,
+            title=html.escape(payload.title),
+            body=html.escape(payload.body),
             priority=payload.priority,
+
             publish_at=payload.publish_at,
             expires_at=payload.expires_at,
             event_start_at=payload.event_start_at,

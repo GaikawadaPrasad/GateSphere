@@ -143,7 +143,7 @@ def seed_users(db: Session, communities: list[Community]) -> None:
         )
         if not created:
             user.password_hash = hash_password(demo_password(slug))
-        scope = None if slug in ("super_admin", "auditor") else communities[0].id
+        scope = None if slug == "super_admin" else communities[0].id
         _get_or_create(db, UserRole, user_id=user.id, role_id=roles[slug].id, community_id=scope)
 
     # Non-interactive actor for Celery scheduled jobs (SLA sweeps, dues reminders, …).

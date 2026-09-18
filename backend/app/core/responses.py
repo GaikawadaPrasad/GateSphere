@@ -69,8 +69,9 @@ class PageParams(BaseModel):
 def page_params(
     page: Annotated[int, Query(ge=1, le=10_000)] = 1,
     page_size: Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)] = 20,
+    limit: Annotated[int | None, Query(ge=1, le=MAX_PAGE_SIZE, deprecated=True)] = None,
 ) -> PageParams:
-    return PageParams(page=page, page_size=page_size)
+    return PageParams(page=page, page_size=limit if limit is not None else page_size)
 
 
 def ok(data: T = None, *, message: str = "OK") -> dict:
