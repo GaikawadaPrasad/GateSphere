@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 
 class LoginRequest(BaseModel):
@@ -43,4 +43,10 @@ class ProfileUpdateRequest(BaseModel):
 
     full_name: str | None = Field(default=None, min_length=1, max_length=255)
     phone: str | None = Field(default=None, max_length=20, pattern=r"^[+0-9][0-9 \-]{4,19}$")
+
+    @model_validator(mode="after")
+    def check_at_least_one_field(self) -> ProfileUpdateRequest:
+        if self.full_name is None and self.phone is None:
+            raise ValueError("At least one profile field must be provided for update")
+        return self
 

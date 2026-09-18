@@ -127,35 +127,8 @@ export default function SecuritySupervisorVisitorManagementPage() {
     loadData();
   }, []);
 
-  // const handleApprove = async (id: string, name: string) => {
-  //   setActionMessage(null);
-  //   try {
-  //     await visitorsApi.approve(id, "Approved by Security Supervisor");
-  //     const msg = `Visitor request approved for ${name}.`;
-  //     setActionMessage({ type: "success", text: msg });
-  //     toast.success(msg);
-  //     await loadData();
-  //   } catch (err: any) {
-  //     const errMsg = err?.message || "Failed to approve visitor request.";
-  //     setActionMessage({ type: "error", text: errMsg });
-  //     toast.error(errMsg);
-  //   }
-  // };
 
-  const handleReject = async (id: string, name: string) => {
-    setActionMessage(null);
-    try {
-      await visitorsApi.reject(id, "Rejected by Security Supervisor");
-      const msg = `Visitor request rejected for ${name}.`;
-      setActionMessage({ type: "success", text: msg });
-      toast.success(msg);
-      await loadData();
-    } catch (err: any) {
-      const errMsg = err?.message || "Failed to reject visitor request.";
-      setActionMessage({ type: "error", text: errMsg });
-      toast.error(errMsg);
-    }
-  };
+  
 
   const filteredVisitors = visitors.filter((v) => {
     const q = search.toLowerCase();
@@ -246,24 +219,7 @@ export default function SecuritySupervisorVisitorManagementPage() {
           >
             👁️ View
           </button>
-          {/* {v.status === "Pending Approval" ? (
-  <>
-    <button
-      type="button"
-      className="btn btn-primary"
-      onClick={() => handleApprove(v.id, v.name)}
-    >
-      Approve
-    </button>
-    <button
-      type="button"
-      className="btn btn-danger"
-      onClick={() => handleReject(v.id, v.name)}
-    >
-      Reject
-    </button>
-  </>
-) : null} */}
+          
         </div>
       ),
     },
@@ -378,30 +334,7 @@ export default function SecuritySupervisorVisitorManagementPage() {
           size="md"
           footer={
             <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", width: "100%" }}>
-              {/* {selectedVisitor.status === "Pending Approval" && (
-                <>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={() => {
-                      handleApprove(selectedVisitor.id, selectedVisitor.name);
-                      setSelectedVisitor(null);
-                    }}
-                  >
-                    Approve Request
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-danger"
-                    onClick={() => {
-                      handleReject(selectedVisitor.id, selectedVisitor.name);
-                      setSelectedVisitor(null);
-                    }}
-                  >
-                    Reject Request
-                  </button>
-                </>
-              )} */}
+              
               <button
                 type="button"
                 className="btn btn-secondary"
