@@ -368,22 +368,22 @@ class GateService:
         if self.actor and self.actor.id:
             try:
                 from app.modules.residents.models import ResidentProfile, UnitOccupancy
-                from app.modules.properties.models import Unit, Block
+                from app.modules.communities.models import Unit, Tower
 
                 occ_res = await self.db.execute(
-                    select(Unit, Block)
+                    select(Unit, Tower)
                     .join(UnitOccupancy, UnitOccupancy.unit_id == Unit.id)
                     .join(ResidentProfile, ResidentProfile.id == UnitOccupancy.resident_profile_id)
-                    .outerjoin(Block, Block.id == Unit.block_id)
+                    .outerjoin(Tower, Tower.id == Unit.tower_id)
                     .where(ResidentProfile.user_id == self.actor.id, UnitOccupancy.is_active.is_(True))
                 )
                 row = occ_res.first()
                 if row:
-                    u, b = row
-                    block_name = b.name if b else ""
+                    u, t = row
+                    tower_name = t.name if t else ""
                     u_num = u.unit_number if u else ""
-                    if block_name and u_num:
-                        unit_label = f"{block_name} - Unit {u_num}"
+                    if tower_name and u_num:
+                        unit_label = f"{tower_name} - Unit {u_num}"
                     elif u_num:
                         unit_label = f"Unit {u_num}"
             except Exception:

@@ -325,10 +325,10 @@ class AmenityService(UnitScopedAccess):
 
         unit_map: dict[uuid.UUID, dict[str, str | None]] = {}
         if unit_ids:
-            from app.modules.properties.models import Unit, Block
+            from app.modules.communities.models import Unit, Tower
             un_stmt = (
-                select(Unit.id, Unit.unit_number, Block.name)
-                .outerjoin(Block, Block.id == Unit.block_id)
+                select(Unit.id, Unit.unit_number, Tower.name)
+                .outerjoin(Tower, Tower.id == Unit.tower_id)
                 .where(Unit.id.in_(unit_ids))
             )
             un_res = (await self.db.execute(un_stmt)).all()
@@ -441,18 +441,6 @@ class AmenityService(UnitScopedAccess):
                 "Your unit has reached its active-booking limit", code="UNIT_BOOKING_LIMIT"
             )
 
-        # check for identical duplicate booking by the same user
-        existing_duplicate = await self.db.scalar(
-            select(AmenityBooking).where(
-                AmenityBooking.slot_id == slot.id,
-                AmenityBooking.booking_date == payload.booking_date,
-                AmenityBooking.resident_user_id == self.actor.id,
-                AmenityBooking.status == "confirmed"
-            )
-        )
-        if existing_duplicate is not None:
-            raise ConflictError("You already have a confirmed booking for this exact slot", code="DUPLICATE_BOOKING")
-
         # atomic conflict check
         await self.amenities.lock(amenity.id)
         if await self.blocks.overlapping(amenity.id, start_at, end_at):
@@ -464,6 +452,18 @@ class AmenityService(UnitScopedAccess):
         )
         if used + payload.participant_count > cap:
             raise ConflictError("No capacity left for that slot", code="SLOT_FULL")
+
+        # check for identical duplicate booking by the same user
+        existing_duplicate = await self.db.scalar(
+            select(AmenityBooking).where(
+                AmenityBooking.slot_id == slot.id,
+                AmenityBooking.booking_date == payload.booking_date,
+                AmenityBooking.resident_user_id == self.actor.id,
+                AmenityBooking.status == "confirmed"
+            )
+        )
+        if existing_duplicate is not None:
+            raise ConflictError("You already have a confirmed booking for this exact slot", code="DUPLICATE_BOOKING")
 
         obj = AmenityBooking(
             community_id=amenity.community_id,

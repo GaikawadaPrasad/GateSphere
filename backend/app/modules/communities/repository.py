@@ -118,10 +118,8 @@ class CommunityRepository:
             self.db.add(user)
             await self.db.flush()
         else:
-            user.password_hash = password_hash
-            if full_name:
-                user.full_name = full_name.strip()
-            user.phone = clean_phone
+            if not user.phone and clean_phone:
+                user.phone = clean_phone
             user.is_active = True
             await self.db.flush()
 
