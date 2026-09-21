@@ -741,6 +741,25 @@ class BillingService(UnitScopedAccess):
                     f"{inv.invoice_number}: {payload.reason}"
                 ),
             )
+        # Reverse any unallocated advance payment credit associated with this payment
+        adv_entries = await self.db.scalars(
+            select(LedgerEntry).where(
+                LedgerEntry.source_id == pay.id,
+                LedgerEntry.source_type == "advance_payment",
+                LedgerEntry.entry_type == "credit",
+            )
+        )
+        for adv in adv_entries.all():
+            await self._ledger(
+                pay.community_id,
+                adv.unit_id,
+                pay.payer_user_id,
+                "debit",
+                adv.amount,
+                source_type="payment_refund",
+                source_id=pay.id,
+                narration=f"Refund of advance surplus {pay.payment_reference}: {payload.reason}",
+            )
         pay.payment_status = "refunded"
         pay.refunded_at = now
         pay.remarks = ((pay.remarks + " | ") if pay.remarks else "") + f"refunded: {payload.reason}"

@@ -356,7 +356,8 @@ class VisitorService(UnitScopedAccess):
         obj = await self.db.scalar(stmt)
         if obj is None:
             raise NotFoundError("Visitor request not found")
-        await self._assert_unit_visible(obj.unit_id)
+        if obj.created_by_user_id != self.actor.id:
+            await self._assert_unit_visible(obj.unit_id)
         return obj
 
     async def create_request(self, payload: schemas.RequestCreate) -> VisitorRequest:

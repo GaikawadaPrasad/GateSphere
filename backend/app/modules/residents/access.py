@@ -71,24 +71,36 @@ async def user_in_community(db: AsyncSession, user_id: uuid.UUID, community_id: 
     )
 
 
-async def actor_unit_scope(db: AsyncSession, actor: User) -> frozenset[uuid.UUID] | None:
+async def actor_unit_scope(
+    db: AsyncSession, actor: User, community_id: uuid.UUID | None = None
+) -> frozenset[uuid.UUID] | None:
     if actor.is_superadmin:
         return None
+
+    role_filter = [UserRole.user_id == actor.id, Role.slug.in_(CROSS_UNIT_ROLES)]
+    if community_id is not None:
+        role_filter.append((UserRole.community_id == community_id) | (UserRole.community_id.is_(None)))
+
     cross = await db.scalar(
         select(UserRole.id)
         .join(Role, Role.id == UserRole.role_id)
-        .where(UserRole.user_id == actor.id, Role.slug.in_(CROSS_UNIT_ROLES))
+        .where(*role_filter)
         .limit(1)
     )
     if cross is not None:
         return None
+
+    occ_filter = [
+        ResidentProfile.user_id == actor.id,
+        UnitOccupancy.is_active.is_(True),
+    ]
+    if community_id is not None:
+        occ_filter.append(ResidentProfile.community_id == community_id)
+
     rows = await db.scalars(
         select(UnitOccupancy.unit_id)
         .join(ResidentProfile, ResidentProfile.id == UnitOccupancy.resident_profile_id)
-        .where(
-            ResidentProfile.user_id == actor.id,
-            UnitOccupancy.is_active.is_(True),
-        )
+        .where(*occ_filter)
     )
     return frozenset(rows.all())
 
@@ -99,18 +111,27 @@ class UnitScopedAccess:
     db: AsyncSession
     actor: User
 
-    async def _unit_scope(self) -> frozenset[uuid.UUID] | None:
-        cached = getattr(self, "_unit_scope_val", _MISSING)
+    async def _unit_scope(self, community_id: uuid.UUID | None = None) -> frozenset[uuid.UUID] | None:
+        cid = community_id
+        if cid is None:
+            scope = getattr(self, "scope", None)
+            if scope and hasattr(scope, "community_ids") and len(scope.community_ids) == 1:
+                cid = next(iter(scope.community_ids))
+            elif hasattr(self, "community_id"):
+                cid = getattr(self, "community_id")
+
+        cache_key = f"_unit_scope_val_{cid}"
+        cached = getattr(self, cache_key, _MISSING)
         if cached is _MISSING:
-            cached = await actor_unit_scope(self.db, self.actor)
-            self._unit_scope_val = cached
+            cached = await actor_unit_scope(self.db, self.actor, community_id=cid)
+            setattr(self, cache_key, cached)
         return cached
 
-    async def is_unit_restricted(self) -> bool:
-        return (await self._unit_scope()) is not None
+    async def is_unit_restricted(self, community_id: uuid.UUID | None = None) -> bool:
+        return (await self._unit_scope(community_id)) is not None
 
-    async def _assert_unit_visible(self, unit_id: uuid.UUID | None) -> None:
-        scope = await self._unit_scope()
+    async def _assert_unit_visible(self, unit_id: uuid.UUID | None, community_id: uuid.UUID | None = None) -> None:
+        scope = await self._unit_scope(community_id)
         if scope is not None and unit_id not in scope:
             # Same shape as a real 404 — never reveal that the record exists in the community.
             raise NotFoundError("Not found")
@@ -121,10 +142,11 @@ class UnitScopedAccess:
         unit_col: ColumnElement,
         *,
         or_owned: ColumnElement | None = None,
+        community_id: uuid.UUID | None = None,
     ) -> Select:
         """Narrow a list query to the actor's units (optionally OR a `created_by == me`
         style column). No-op for an unrestricted actor."""
-        scope = await self._unit_scope()
+        scope = await self._unit_scope(community_id)
         if scope is None:
             return stmt
         if not scope:
@@ -134,9 +156,14 @@ class UnitScopedAccess:
             cond = cond | or_owned
         return stmt.where(cond)
 
-    async def _scope_owned(self, stmt: Select, owner_col: ColumnElement) -> Select:
+    async def _scope_owned(
+        self,
+        stmt: Select,
+        owner_col: ColumnElement,
+        community_id: uuid.UUID | None = None,
+    ) -> Select:
         """Narrow a list query to rows the actor owns (by user id). No-op if unrestricted."""
-        scope = await self._unit_scope()
+        scope = await self._unit_scope(community_id)
         if scope is None:
             return stmt
         return stmt.where(owner_col == self.actor.id)

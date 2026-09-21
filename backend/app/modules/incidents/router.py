@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, status
 
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
-from app.core.tenancy import require_permission_async
+from app.core.tenancy import TenantScope, get_tenant_scope_async, require_permission_async
 from app.modules.incidents import schemas
 from app.modules.incidents.deps import incident_service
 from app.modules.incidents.service import IncidentService
@@ -22,6 +22,19 @@ router = APIRouter(prefix="/incidents", tags=["Emergency & Incident Management"]
 VIEW = Depends(require_permission_async("incidents:view"))
 CREATE = Depends(require_permission_async("incidents:create"))
 UPDATE = Depends(require_permission_async("incidents:update"))
+
+
+async def require_attachment_permission_async(
+    scope: TenantScope = Depends(get_tenant_scope_async),
+) -> TenantScope:
+    if scope.can("incidents:create") or scope.can("incidents:update"):
+        return scope
+    from app.core.errors import ForbiddenError
+
+    raise ForbiddenError("Missing permission: incidents:create or incidents:update", code="PERMISSION_DENIED")
+
+
+ATTACH = Depends(require_attachment_permission_async)
 
 Svc = IncidentService
 
@@ -192,7 +205,7 @@ async def incident_attachments(
     "/{incident_id}/attachments",
     response_model=Envelope[schemas.AttachmentRead],
     status_code=status.HTTP_201_CREATED,
-    dependencies=[UPDATE],
+    dependencies=[ATTACH],
 )
 async def add_attachment(
     incident_id: uuid.UUID,
