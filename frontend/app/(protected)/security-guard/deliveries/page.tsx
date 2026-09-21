@@ -536,7 +536,7 @@ export default function SecurityGuardDeliveriesPage() {
               fontWeight: 500,
             }}
           >
-            📲 <strong>Real-Time Notification:</strong> Logging this delivery will immediately dispatch an approval and arrival prompt to the resident's mobile app.
+            📲 <strong>Real-Time Notification:</strong> Logging this delivery will immediately dispatch an approval and arrival prompt to the resident&apos;s mobile app.
           </div>
 
           {modalError && (
