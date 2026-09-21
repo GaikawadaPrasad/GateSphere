@@ -21,6 +21,7 @@ from sqlalchemy import (
     Text,
     Time,
     UniqueConstraint,
+    CheckConstraint,
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -70,6 +71,10 @@ class DeliveryProtocol(Base, TimestampMixin, TenantMixin):
             "delivery_type",
             unique=True,
             postgresql_where=text("unit_id IS NOT NULL"),
+        ),
+        CheckConstraint(
+            "protocol_type IN ('leave_at_gate', 'collect_at_gate', 'direct_to_door', 'call_resident', 'direct_rejection')",
+            name="ck_delivery_protocol_type"
         ),
     )
 

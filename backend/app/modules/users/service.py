@@ -194,6 +194,8 @@ class UserService:
 
     async def update_user(self, user_id: uuid.UUID, payload: schemas.UserUpdate) -> User:
         user = await self._get_visible(user_id)
+        if not self.scope.is_global and not user.roles:
+            raise ForbiddenError("Cannot modify an unaffiliated user", code="UNAFFILIATED_TAKEOVER")
         patch = payload.model_dump(exclude_unset=True)
         was_active = user.is_active
 
@@ -226,6 +228,28 @@ class UserService:
         if role is None:
             raise NotFoundError("Role not found")
         self._require_community(payload.community_id)
+
+        is_super = await self.db.scalar(
+            select(UserRole.id)
+            .join(Role, Role.id == UserRole.role_id)
+            .where(UserRole.user_id == self.actor.id, Role.slug == "super_admin")
+            .limit(1)
+        ) is not None
+        if role.slug in ("super_admin", "auditor") and not is_super:
+            raise ForbiddenError(f"Only super_admin can grant {role.slug}", code="HIERARCHY_VIOLATION")
+
+        from app.core.rbac import ROLES
+        role_order = list(ROLES.keys())
+        target_idx = role_order.index(role.slug)
+        caller_roles = (await self.db.scalars(
+            select(Role.slug)
+            .join(UserRole, UserRole.role_id == Role.id)
+            .where(UserRole.user_id == self.actor.id)
+        )).all()
+        caller_idx = min([role_order.index(r) for r in caller_roles if r in role_order] + [len(role_order)])
+        if target_idx < caller_idx:
+            raise ForbiddenError("Cannot grant a role higher than your own", code="HIERARCHY_VIOLATION")
+
         if role.slug == "super_admin" and payload.community_id is not None:
             raise BusinessRuleError(
                 f"{role.slug} is a platform-global role", code="GLOBAL_ROLE_ONLY"
@@ -259,6 +283,17 @@ class UserService:
         if ur is None or ur.user_id != user.id:
             raise NotFoundError("Grant not found")
         self._require_community(ur.community_id)
+
+        is_super = await self.db.scalar(
+            select(UserRole.id)
+            .join(Role, Role.id == UserRole.role_id)
+            .where(UserRole.user_id == self.actor.id, Role.slug == "super_admin")
+            .limit(1)
+        ) is not None
+        role_slug = await self.db.scalar(select(Role.slug).where(Role.id == ur.role_id))
+        if role_slug in ("super_admin", "auditor", "community_admin") and not is_super:
+            raise ForbiddenError(f"Only super_admin can revoke {role_slug}", code="HIERARCHY_VIOLATION")
+
         await self.db.delete(ur)
         await self.db.flush()
         await invalidate_user_permissions_async(self.db, [user.id])

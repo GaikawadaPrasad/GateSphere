@@ -174,9 +174,10 @@ class GateService:
         community_id: uuid.UUID | None,
         gate_id: uuid.UUID | None,
         event_type: str | None,
-        offset: int,
+        cursor: str | None,
         limit: int,
     ):
+        import base64
         _enum("event_type", event_type)
         stmt = select(GateEvent)
         if community_id is not None:
@@ -186,10 +187,31 @@ class GateService:
             stmt = stmt.where(GateEvent.gate_id == gate_id)
         if event_type:
             stmt = stmt.where(GateEvent.event_type == event_type)
-        stmt = stmt.order_by(GateEvent.occurred_at.desc())
-        return await self.events.list(
-            offset=offset, limit=limit, extra=stmt
-        ), await self.events.count(extra=stmt)
+            
+        if cursor:
+            try:
+                decoded = base64.b64decode(cursor).decode('utf-8')
+                ts, last_id = decoded.split('|')
+                dt = datetime.fromtimestamp(float(ts), UTC)
+                # Keyset pagination condition: (occurred_at, id) < (dt, last_id)
+                from sqlalchemy import tuple_
+                stmt = stmt.where(tuple_(GateEvent.occurred_at, GateEvent.id) < tuple_(dt, last_id))
+            except Exception:
+                pass
+                
+        stmt = stmt.order_by(GateEvent.occurred_at.desc(), GateEvent.id.desc())
+        
+        rows = list((await self.db.scalars(stmt.limit(limit + 1))).all())
+        next_cursor = None
+        if len(rows) > limit:
+            last = rows.pop()
+            # The next page should start AFTER the last item of THIS page
+            # Wait, if we return `limit` items, the cursor should be built from the LAST item
+            last = rows[-1]
+            ts = last.occurred_at.timestamp()
+            next_cursor = base64.b64encode(f"{ts}|{last.id}".encode()).decode('utf-8')
+            
+        return rows, next_cursor
 
     # -- guard rosters ------------------------------------------ #
     async def create_roster(self, payload, *, community_id: uuid.UUID | None) -> GuardRoster:
