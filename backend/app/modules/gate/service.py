@@ -367,8 +367,8 @@ class GateService:
         unit_label = None
         if self.actor and self.actor.id:
             try:
+                from app.modules.communities.models import Tower, Unit
                 from app.modules.residents.models import ResidentProfile, UnitOccupancy
-                from app.modules.communities.models import Unit, Tower
 
                 occ_res = await self.db.execute(
                     select(Unit, Tower)

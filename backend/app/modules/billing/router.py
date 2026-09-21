@@ -599,9 +599,7 @@ async def approve_assessment(
     )
 
     is_self_approval = False
-    if actor_id and proposer_id and actor_id == proposer_id:
-        is_self_approval = True
-    elif actor_name and proposer_name and actor_name.lower() == proposer_name.lower():
+    if (actor_id and proposer_id and actor_id == proposer_id) or (actor_name and proposer_name and actor_name.lower() == proposer_name.lower()):
         is_self_approval = True
 
     if is_self_approval:

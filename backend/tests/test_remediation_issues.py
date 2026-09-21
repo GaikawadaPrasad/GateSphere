@@ -1,8 +1,10 @@
 """Regression tests for Super Admin / Community Admin issue remediation."""
 
 import uuid
+
 from conftest import csrf_cookie_value
 from fastapi.testclient import TestClient
+
 from app.main import app
 
 DEMO_EMAIL = "super_admin@gatesphere.com"

@@ -29,7 +29,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base_class import Base, TenantMixin, TimestampMixin, pk
 from app.modules.communities.models import Unit
 
-
 DELIVERY_TYPES = (
     "food",
     "grocery",

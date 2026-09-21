@@ -197,7 +197,7 @@ class UserService:
         patch = payload.model_dump(exclude_unset=True)
         was_active = user.is_active
 
-        if "email" in patch and patch["email"]:
+        if patch.get("email"):
             new_email = str(patch.pop("email")).strip().lower()
             if new_email != user.email:
                 existing = await self.db.scalar(
@@ -207,7 +207,7 @@ class UserService:
                     raise ConflictError("Email already registered", code="EMAIL_TAKEN")
                 user.email = new_email
 
-        if "password" in patch and patch["password"]:
+        if patch.get("password"):
             raw_pwd = str(patch.pop("password"))
             user.password_hash = hash_password(raw_pwd)
             await revoke_all_user_sessions_async(self.db, user.id)

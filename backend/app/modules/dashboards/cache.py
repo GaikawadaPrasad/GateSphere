@@ -92,7 +92,7 @@ def invalidate_dashboard_cache(community_id: uuid.UUID | None = None) -> None:
     """
     try:
         if community_id:
-            pattern = f"{rkey('dashboard')}*{str(community_id)}*"
+            pattern = f"{rkey('dashboard')}*{community_id!s}*"
         else:
             pattern = f"{rkey('dashboard')}*"
         keys = redis_client.keys(pattern)
