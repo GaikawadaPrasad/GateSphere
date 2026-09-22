@@ -16,17 +16,13 @@ branch_labels = None
 depends_on = None
 
 def upgrade() -> None:
-    # We must ensure the btree_gist extension is available to use '=' with UUID in an EXCLUDE constraint
-    op.execute('CREATE EXTENSION IF NOT EXISTS btree_gist;')
-    
+    # Pairwise EXCLUDE constraint rejected by CR-04 audit because amenities support
+    # shared capacity > 1 (e.g. swimming pool, clubhouse). Overbooking is guarded
+    # by the trigger gs_amenity_booking_capacity_guard in 0037_amenity_capacity_guard.py.
+    # We drop the constraint if it was ever partially applied to prevent failures on overlapping data.
     op.execute("""
         ALTER TABLE amenity_bookings
-        ADD CONSTRAINT excl_amenity_booking_overlap
-        EXCLUDE USING gist (
-            amenity_id WITH =,
-            tstzrange(start_at, end_at) WITH &&
-        )
-        WHERE (status = 'confirmed');
+        DROP CONSTRAINT IF EXISTS excl_amenity_booking_overlap;
     """)
 
 def downgrade() -> None:
