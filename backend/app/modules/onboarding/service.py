@@ -336,10 +336,60 @@ class OnboardingService:
             raise BusinessRuleError(
                 f"Invitation is already {inv.status}", code="INVITATION_NOT_PENDING"
             )
+
         inv.status = "revoked"
-        await self.db.flush()
-        await self._audit("invitation.revoke", inv.id, community_id=community_id)
+        inv.updated_at = _now()
+        await self.db.commit()
+
+        # Audit
+        unit, ctx_str = await self._unit_ctx(inv.unit_id, community_id)
+        if self.ctx:
+            await record_audit_async(
+                self.ctx,
+                action="residents:revoke_invitation",
+                target_id=inv.id,
+                description=f"Revoked invitation for {inv.invited_email} ({ctx_str})",
+            )
+
         return inv
+
+    async def regenerate_invitation(
+        self, community_id: uuid.UUID, invitation_id: uuid.UUID
+    ) -> schemas.InvitationCreated:
+        self._require_scope(community_id)
+        inv = await self.db.scalar(
+            select(CommunityInvitation).where(
+                CommunityInvitation.id == invitation_id,
+                CommunityInvitation.community_id == community_id,
+            )
+        )
+        if inv is None:
+            raise NotFoundError("Invitation not found")
+        if inv.status != "pending":
+            raise BusinessRuleError(
+                f"Cannot regenerate link for {inv.status} invitation", code="INVITATION_NOT_PENDING"
+            )
+
+        token = secrets.token_urlsafe(_TOKEN_BYTES)
+        inv.token_hash = _hash(token)
+        inv.expires_at = _now() + timedelta(days=_INVITE_EXPIRY_DAYS)
+        inv.updated_at = _now()
+        await self.db.commit()
+
+        # Audit
+        unit, ctx_str = await self._unit_ctx(inv.unit_id, community_id)
+        if self.ctx:
+            await record_audit_async(
+                self.ctx,
+                action="residents:regenerate_invitation",
+                target_id=inv.id,
+                description=f"Regenerated invitation link for {inv.invited_email} ({ctx_str})",
+            )
+
+        resp = schemas.InvitationCreated.model_validate(inv)
+        resp.token = token
+        resp.accept_url = f"{settings.FRONTEND_ORIGIN}/invitations/{token}"
+        return resp
 
     # ------------------------------------------------------------------ #
     # invitations — public (token)

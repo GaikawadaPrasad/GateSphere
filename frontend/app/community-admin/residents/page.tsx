@@ -800,6 +800,29 @@ export default function CommunityAdminResidentsPage() {
                       <button
                         type="button"
                         className="btn btn-secondary"
+                        style={{ fontSize: "12px", padding: "0.25rem 0.6rem" }}
+                        onClick={async () => {
+                          try {
+                            const res = await onboardingApi.regenerateInvitation(activeCommunityId!, row.id);
+                            if (res?.data?.accept_url) {
+                              navigator.clipboard.writeText(res.data.accept_url);
+                              toast.success("New link generated and copied to clipboard!", "Copied");
+                              fetchInvitations();
+                            } else {
+                              toast.error("Failed to generate link");
+                            }
+                          } catch (err: any) {
+                            toast.error(err?.message || "Failed to regenerate invitation", "Error");
+                          }
+                        }}
+                      >
+                        🔗 Regenerate Link
+                      </button>
+                    )}
+                    {row.status === "pending" && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
                         style={{ fontSize: "12px", padding: "0.25rem 0.6rem", color: "#DC2626" }}
                         onClick={async () => {
                           try {
@@ -1825,31 +1848,65 @@ export default function CommunityAdminResidentsPage() {
                 >
                   🔗 Secure Onboarding Invitation URL
                 </label>
-                <div style={{ display: "flex", gap: "0.5rem" }}>
-                  <input
-                    type="text"
-                    readOnly
-                    className="input-field"
-                    value={
-                      typeof window !== "undefined"
-                        ? `${window.location.origin}/invitations/${selectedInvitation.token}`
-                        : `/invitations/${selectedInvitation.token}`
-                    }
-                    style={{ flex: 1, fontSize: "0.8rem", background: "#f8fafc" }}
-                  />
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    style={{ flexShrink: 0 }}
-                    onClick={() => {
-                      const link = `${window.location.origin}/invitations/${selectedInvitation.token}`;
-                      navigator.clipboard.writeText(link);
-                      toast.success("Invitation link copied to clipboard!", "Copied");
-                    }}
-                  >
-                    📋 Copy Link
-                  </button>
-                </div>
+                {selectedInvitation.status === "pending" ? (
+                  <div style={{ display: "flex", gap: "0.5rem" }}>
+                    <input
+                      type="text"
+                      readOnly
+                      className="input-field"
+                      value="Link expires after generation (Click Regenerate to create new link)"
+                      style={{ flex: 1, fontSize: "0.8rem", background: "#f8fafc", fontStyle: "italic", color: "#64748b" }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ flexShrink: 0 }}
+                      onClick={async () => {
+                        try {
+                          const res = await onboardingApi.regenerateInvitation(activeCommunityId!, selectedInvitation.id);
+                          if (res?.data?.accept_url) {
+                            navigator.clipboard.writeText(res.data.accept_url);
+                            toast.success("New link generated and copied to clipboard!", "Copied");
+                            fetchInvitations();
+                            setSelectedInvitation(null);
+                          } else {
+                            toast.error("Failed to generate link");
+                          }
+                        } catch (err: any) {
+                          toast.error(err?.message || "Failed to regenerate invitation", "Error");
+                        }
+                      }}
+                    >
+                      🔗 Regenerate Link
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", gap: "0.5rem" }}>
+                    <input
+                      type="text"
+                      readOnly
+                      className="input-field"
+                      value={
+                        typeof window !== "undefined"
+                          ? `${window.location.origin}/invitations/${selectedInvitation.token}`
+                          : `/invitations/${selectedInvitation.token}`
+                      }
+                      style={{ flex: 1, fontSize: "0.8rem", background: "#f8fafc" }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ flexShrink: 0 }}
+                      onClick={() => {
+                        const link = `${window.location.origin}/invitations/${selectedInvitation.token}`;
+                        navigator.clipboard.writeText(link);
+                        toast.success("Invitation link copied to clipboard!", "Copied");
+                      }}
+                    >
+                      📋 Copy Link
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
