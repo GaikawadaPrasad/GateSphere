@@ -3,11 +3,35 @@
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 
+declare global {
+  interface Window {
+    __gs_intro_shown?: boolean;
+  }
+}
+
 export default function IntroLoader({ onReady }: { onReady?: () => void }) {
+  // Check if loader has already been shown in this window/browser session
+  const [alreadyShown] = useState(() => {
+    if (typeof window !== "undefined" && Boolean(window.__gs_intro_shown)) {
+      return true;
+    }
+    return false;
+  });
+
   const [exiting, setExiting] = useState(false);
-  const [removed, setRemoved] = useState(false);
+  const [removed, setRemoved] = useState(alreadyShown);
 
   useEffect(() => {
+    if (alreadyShown) {
+      if (onReady) onReady();
+      return;
+    }
+
+    // Mark as shown so subsequent client-side navigation (navbar clicks) will not re-trigger it
+    if (typeof window !== "undefined") {
+      window.__gs_intro_shown = true;
+    }
+
     // Lock scroll during loader
     document.documentElement.style.overflow = "hidden";
 
@@ -27,9 +51,9 @@ export default function IntroLoader({ onReady }: { onReady?: () => void }) {
       clearTimeout(removeTimer);
       document.documentElement.style.overflow = "";
     };
-  }, [onReady]);
+  }, [alreadyShown, onReady]);
 
-  if (removed) return null;
+  if (alreadyShown || removed) return null;
 
   return (
     <aside
