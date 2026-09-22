@@ -4,21 +4,57 @@ Other services call `emit(...)` inside their own transaction to turn a business 
 (visitor approved, invoice posted, ticket resolved, ...) into a `Notification` for one
 recipient. Best-effort: the dispatch runs inside a SAVEPOINT so a missing recipient /
 template / any hiccup rolls back **only** the notification, never the domain operation.
+
+M-02 (backend/REMEDIATION_LOG.md): a failure here used to just log a warning and vanish
+— unrecoverable the moment the log scrolled past. It now also writes a
+`NotificationDeadLetter` row (outside the failed SAVEPOINT, so it survives and commits
+with the caller's own transaction) that `app.modules.notifications.tasks.retry_dead_letters`
+replays on a schedule. The write happens best-effort too (a second failure here still
+must not break the domain op) — logged if even that fails.
 """
 
 from __future__ import annotations
 
 import logging
 import uuid
+from datetime import UTC, datetime
 
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.tenancy import TenantScope
 from app.modules.notifications import schemas
+from app.modules.notifications.models import NotificationDeadLetter
 from app.modules.notifications.service import NotificationService
 from app.modules.users.models import Role, User, UserRole
 
 log = logging.getLogger(__name__)
+
+
+async def _dead_letter(
+    db: AsyncSession,
+    *,
+    community_id: uuid.UUID,
+    kind: str,
+    notification_type: str,
+    payload: dict,
+    reason: str,
+) -> None:
+    try:
+        db.add(
+            NotificationDeadLetter(
+                community_id=community_id,
+                kind=kind,
+                notification_type=notification_type,
+                payload=payload,
+                failure_reason=reason[:2000],
+                attempts=1,
+                last_attempted_at=datetime.now(UTC),
+            )
+        )
+        await db.flush()
+    except Exception:  # the dead-letter write itself must never break the domain op
+        log.error("dead_letter write failed", extra={"type": notification_type}, exc_info=True)
 
 
 async def emit(
@@ -51,8 +87,23 @@ async def emit(
     try:
         async with db.begin_nested():  # SAVEPOINT — rolls back only the notification
             await NotificationService(db, scope, actor, ctx).dispatch(payload)
-    except Exception:  # notifications must never break the domain op
+    except Exception as exc:  # notifications must never break the domain op
         log.warning("notification emit failed", extra={"type": notification_type}, exc_info=True)
+        await _dead_letter(
+            db,
+            community_id=community_id,
+            kind="single",
+            notification_type=notification_type,
+            payload={
+                "recipient_user_id": str(recipient_user_id),
+                "title": title,
+                "message": message,
+                "reference_type": reference_type,
+                "reference_id": str(reference_id) if reference_id else None,
+                "channels": channels or ["in_app"],
+            },
+            reason=repr(exc),
+        )
 
 
 async def emit_many(
@@ -92,8 +143,22 @@ async def emit_many(
                 )
                 for uid in ids
             )
-    except Exception:
+    except Exception as exc:
         log.warning("broadcast emit failed", extra={"type": notification_type}, exc_info=True)
+        await _dead_letter(
+            db,
+            community_id=community_id,
+            kind="bulk",
+            notification_type=notification_type,
+            payload={
+                "recipient_user_ids": [str(u) for u in ids],
+                "title": title,
+                "message": message,
+                "reference_type": reference_type,
+                "reference_id": str(reference_id) if reference_id else None,
+            },
+            reason=repr(exc),
+        )
         return 0
     return len(ids)
 

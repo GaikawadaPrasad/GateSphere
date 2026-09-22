@@ -80,17 +80,22 @@ class Settings(BaseSettings):
 
     # --- rate limiting (sliding window over Redis, AGENTS.md §9.2) ---
     # `<max requests>/<window seconds>` per path class. Identity = user:<id> when the
-    # session cookie resolves, else ip:<addr>. Fails OPEN on a Redis error.
+    # session cookie resolves, else ip:<addr>. Fails OPEN on a Redis error for every class
+    # except `auth` and `payment` (M-01, backend/REMEDIATION_LOG.md) — those two fail
+    # CLOSED (503) because an unmetered auth or payment endpoint during a Redis outage is a
+    # worse outcome than a temporary outage of that one class of request.
     RATE_LIMIT_ENABLED: bool = True
     RATE_LIMIT_LOGIN: str = "5/60"  # the `auth` class — kept name for back-compat
     RATE_LIMIT_SEARCH: str = "60/60"
     RATE_LIMIT_UPLOAD: str = "30/60"
     RATE_LIMIT_EXPORT: str = "20/60"
     RATE_LIMIT_WRITE: str = "120/60"
+    RATE_LIMIT_PAYMENT: str = "20/60"
     RATE_LIMIT_DEFAULT: str = "600/60"
 
     # --- per-account login lockout (AGENTS.md §7: 5 failed attempts → temporary lockout) ---
-    # Redis counters keyed by normalized email. Fails OPEN on a Redis error.
+    # Redis counters keyed by normalized email. Fails CLOSED (M-01): a Redis error is
+    # treated as "locked" / "attempt counted", never as "safe to let through".
     LOGIN_LOCKOUT_ENABLED: bool = True
     LOGIN_LOCKOUT_ATTEMPTS: int = 5
     LOGIN_LOCKOUT_WINDOW_SECONDS: int = 900  # failures counted inside this window

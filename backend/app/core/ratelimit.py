@@ -9,8 +9,17 @@ Algorithm: sliding-window **log** in a Redis sorted set — `ZREMRANGEBYSCORE` d
 older than the window, `ZCARD` is the current count, `ZADD` records this request, `EXPIRE`
 bounds the key. All four run in one `MULTI/EXEC` pipeline.
 
-**Fails open**: any `RedisError` (or the limiter being disabled) lets the request through —
-availability over strictness. A reverse proxy is expected to add a second, independent layer.
+**Fails open** for most classes: any `RedisError` (or the limiter being disabled) lets the
+request through — availability over strictness. A reverse proxy is expected to add a second,
+independent layer.
+
+**Fails CLOSED for `auth` and `payment`** (M-01, backend/REMEDIATION_LOG.md): those two
+classes cover login/session and money-moving endpoints, where letting an unmetered flood of
+requests through during a Redis outage (unlimited login attempts, unlimited payment/refund
+submissions) is a worse failure mode than refusing that one class of request with a 503
+until Redis recovers. Every other class (search/upload/export/write/default) keeps the
+original fail-open behavior — those are throughput/abuse controls, not the last line of
+defense against credential stuffing or financial abuse.
 """
 
 from __future__ import annotations
@@ -31,6 +40,13 @@ _SESSION_PREFIX = "session:"  # mirrors app.core.security (cache-only read here)
 
 _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 _EXEMPT_PATHS = frozenset({"/", "/healthz", "/readyz", "/docs", "/redoc", "/openapi.json"})
+
+# Classes where a Redis outage must not silently let the request through (M-01).
+_FAIL_CLOSED_CLASSES = frozenset({"auth", "payment"})
+
+# Money-moving paths (create payment, refund) — GET/list/receipt stays out of this class
+# since those aren't the thing M-01 is protecting against.
+_PAYMENT_PATH_MARKERS = ("/billing/payments",)
 
 
 _UNIT_SECONDS = {
@@ -62,6 +78,12 @@ def classify(request: Request) -> str:
         return "default"
     if path.startswith("/api/v1/auth/") or path.endswith("/login"):
         return "auth"
+    if (
+        method not in _SAFE_METHODS
+        and not path.endswith("/receipt")
+        and any(marker in path for marker in _PAYMENT_PATH_MARKERS)
+    ):
+        return "payment"
     if path.endswith(".csv") or "/export" in path or path.endswith("/receipt"):
         return "export"
     if path.startswith("/api/v1/uploads"):
@@ -80,6 +102,7 @@ def _limits() -> dict[str, tuple[int, int]]:
         "upload": _parse(settings.RATE_LIMIT_UPLOAD),
         "export": _parse(settings.RATE_LIMIT_EXPORT),
         "write": _parse(settings.RATE_LIMIT_WRITE),
+        "payment": _parse(settings.RATE_LIMIT_PAYMENT),
         "default": _parse(settings.RATE_LIMIT_DEFAULT),
     }
 
@@ -123,6 +146,23 @@ def _too_many(retry_after: int, request_id: str | None) -> JSONResponse:
     )
 
 
+def _unavailable(request_id: str | None) -> JSONResponse:
+    """M-01: the fail-closed response for `auth`/`payment` when Redis itself is down —
+    distinct from `_too_many` (429, a real client that hit its budget). This is a 503
+    because the *server's* ability to enforce the limit is what's unavailable."""
+    return JSONResponse(
+        status_code=503,
+        headers={"Retry-After": "5", "X-Request-ID": request_id or ""},
+        content={
+            "success": False,
+            "message": "This action is temporarily unavailable — try again shortly.",
+            "data": None,
+            "meta": None,
+            "error": {"code": "RATE_LIMIT_UNAVAILABLE"},
+        },
+    )
+
+
 class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):  # type: ignore[no-untyped-def]
         if not settings.RATE_LIMIT_ENABLED or request.url.path in _EXEMPT_PATHS:
@@ -147,6 +187,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         try:
             used = await asyncio.to_thread(_check_rate_limit)
         except (RedisError, Exception):
+            if cls in _FAIL_CLOSED_CLASSES:
+                return _unavailable(getattr(request.state, "request_id", None))  # fail closed
             return await call_next(request)  # fail open
 
         if used >= max_n:

@@ -10,5 +10,9 @@ RUN npm install --legacy-peer-deps
 
 COPY . .
 
+# node:20-slim ships a pre-created `node` user (uid/gid 1000) for exactly this.
+RUN chown -R node:node /app
+USER node
+
 EXPOSE 3000
 CMD ["npm", "run", "dev"]

@@ -64,6 +64,37 @@ async def test_full_lifecycle_to_closed_needs_confirmation(
     ]
 
 
+async def test_ticket_history_timestamps_strictly_increase(
+    db, scope_for, community, unit, category, superadmin, make_user
+):
+    """Root-cause regression: `changed_at` defaulted to now(), which PostgreSQL freezes
+    for the whole transaction — every history row from one lifecycle (all inserted in
+    this same test transaction) got an identical timestamp, so `list_history`'s
+    `ORDER BY changed_at` was undefined for ties. That only actually misordered results
+    once the full suite had built up enough unrelated rows to flip which tie won —
+    passing in isolation, occasionally failing in the full run
+    (test_full_lifecycle_to_closed_needs_confirmation). Fixed via clock_timestamp()
+    (migration 0039). This asserts the real invariant directly: timestamps from the same
+    transaction must be distinct and strictly increasing, not just "the query happened
+    to come back in the right order this time."
+    """
+    svc = _svc(db, scope_for(community.id), superadmin)
+    t = await _ticket(svc, unit, category)
+    await svc.assign_ticket(
+        t.id, schemas.TicketAssign(assigned_to_user_id=(await make_user(community)).id)
+    )
+    await svc.transition_ticket(t.id, schemas.TicketTransition(status="acknowledged"))
+    await svc.transition_ticket(t.id, schemas.TicketTransition(status="in_progress"))
+    await svc.transition_ticket(t.id, schemas.TicketTransition(status="resolved"))
+
+    hist = await svc.list_history(t.id)
+    timestamps = [h.changed_at for h in hist]
+    assert len(timestamps) == len(set(timestamps)), (
+        f"expected distinct changed_at per row (clock_timestamp()), got duplicates: {timestamps}"
+    )
+    assert timestamps == sorted(timestamps), timestamps
+
+
 async def test_disputed_confirmation_reopens(
     db, scope_for, community, unit, category, superadmin, make_user
 ):

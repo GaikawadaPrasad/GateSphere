@@ -1,5 +1,11 @@
 # GateSphere backend — pinned top-level dependencies
-fastapi==0.115.6
+#
+# fastapi/starlette/python-multipart (CR-02/HP-05, backend/REMEDIATION_LOG.md): bumped
+# 2026-09-22 to clear 16 known CVEs found by pip-audit, including a HIGH (CVSS 7.5)
+# Starlette Range-header DoS and several others only fixed at starlette>=1.x — FastAPI
+# 0.115.6 hard-capped starlette<0.42.0, so this required a FastAPI bump, not just a
+# starlette one. Full backend test suite re-verified green after the bump.
+fastapi==0.141.1
 uvicorn[standard]==0.34.0
 gunicorn==23.0.0
 pydantic[email]==2.10.4
@@ -14,13 +20,19 @@ celery==5.4.0
 kombu==5.4.2  # celery dep — imported directly for Queue defs
 argon2-cffi==23.1.0
 itsdangerous==2.2.0
-python-multipart==0.0.20
+python-multipart==0.0.32
 httpx==0.28.1
 boto3==1.35.90
 sib-api-v3-sdk==7.6.0
 structlog==24.4.0
 
 # dev / test
+# NOTE: pip-audit also flags pytest==8.3.4 (PYSEC-2026-1845, fix 9.0.3) and
+# black==24.10.0 (PYSEC-2026-2120/2121, fix 26.3.0+). Both are dev-only tooling with no
+# production exposure. Deferred rather than bundled into this pass: pytest 9 is a major
+# version whose compatibility with pinned pytest-asyncio==0.25.0/pytest-cov==6.0.0 needs
+# its own check, and black 26.x may reformat the entire codebase (a mass diff unrelated
+# to this security pass). See REMEDIATION_LOG.md HP-05 for tracking.
 pytest==8.3.4
 pytest-asyncio==0.25.0
 pytest-cov==6.0.0

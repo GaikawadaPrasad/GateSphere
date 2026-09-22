@@ -21,12 +21,14 @@ from sqlalchemy import (
     Time,
     UniqueConstraint,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base, TenantMixin, TimestampMixin, pk
 
 CHANNELS = ("in_app", "email", "sms", "whatsapp", "push")
 DELIVERY_STATUS = ("queued", "sent", "delivered", "failed", "skipped")
+DEAD_LETTER_KINDS = ("single", "bulk", "broadcast_enqueue")
 
 
 class NotificationTemplate(Base, TimestampMixin, TenantMixin):
@@ -100,3 +102,22 @@ class UserNotificationPreference(Base, TimestampMixin):
     is_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     quiet_hours_start: Mapped[time | None] = mapped_column(Time)
     quiet_hours_end: Mapped[time | None] = mapped_column(Time)
+
+
+class NotificationDeadLetter(Base, TimestampMixin, TenantMixin):
+    """M-02 (backend/REMEDIATION_LOG.md): a durable record of a notification the app
+    tried and failed to deliver — `notif_events.emit`/`emit_many`/the broadcast fan-out
+    enqueue used to just log a warning and drop it. `kind` + `payload` carry everything
+    a retry needs; `app.modules.notifications.tasks.retry_dead_letters` (Celery beat,
+    every 5 min) replays unresolved rows up to `MAX_RETRY_ATTEMPTS`."""
+
+    __tablename__ = "notification_dead_letters"
+
+    id: Mapped[uuid.UUID] = pk()
+    kind: Mapped[str] = mapped_column(String(20))
+    notification_type: Mapped[str] = mapped_column(String(60))
+    payload: Mapped[dict] = mapped_column(JSONB)
+    failure_reason: Mapped[str] = mapped_column(Text)
+    attempts: Mapped[int] = mapped_column(Integer, default=1)
+    last_attempted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
