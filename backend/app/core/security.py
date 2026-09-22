@@ -418,10 +418,12 @@ async def user_permissions_async(
         str(community_id or "global"),
         str(user.permission_version or 0),
     )
-    with contextlib.suppress(Exception):
+    try:
         cached = redis_client.get(cache_key)
         if cached:
             return set(json.loads(cached))
+    except Exception:
+        pass
 
     # If user.roles is already loaded, reuse it to avoid a UserRole DB query
     roles_loaded = "roles" in user.__dict__
@@ -474,8 +476,10 @@ async def user_permissions_async(
         for code, effect in overrides:
             perms.add(code) if effect == "allow" else perms.discard(code)
 
-    with contextlib.suppress(Exception):
+    try:
         redis_client.setex(cache_key, 300, json.dumps(sorted(perms)))
+    except Exception:
+        pass
 
     return perms
 

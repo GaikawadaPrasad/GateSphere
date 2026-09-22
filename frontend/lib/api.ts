@@ -119,6 +119,22 @@ export function getActiveRole(): string | null {
       return roleFromPath;
     }
 
+    if (window.location.search) {
+      const next = new URLSearchParams(window.location.search).get("next");
+      if (next) {
+        if (next.startsWith("/super-admin")) return "super_admin";
+        if (next.startsWith("/owner-tenant") || next.startsWith("/resident")) return "resident";
+        if (next.startsWith("/auditor")) return "auditor";
+        if (next.startsWith("/domestic-staff")) return "domestic_staff";
+        if (next.startsWith("/community-admin")) return "community_admin";
+        if (next.startsWith("/security-guard")) return "security_guard";
+        if (next.startsWith("/security-supervisor")) return "security_supervisor";
+        if (next.startsWith("/facility-manager")) return "facility_manager";
+        if (next.startsWith("/association-committee")) return "association_committee";
+        if (next.startsWith("/vendor-technician")) return "vendor_technician";
+      }
+    }
+
     const tabSaved = sessionStorage.getItem("gatesphere_tab_role");
     if (tabSaved) return tabSaved;
 
@@ -126,7 +142,10 @@ export function getActiveRole(): string | null {
     if (saved) return saved;
 
     if (document.cookie) {
-      const matches = Array.from(document.cookie.matchAll(/gatesphere_([a-z0-9_]+)_session=([^;]+)/g));
+      const roleMatch = document.cookie.match(/gs_active_role=([^;]+)/);
+      if (roleMatch && roleMatch[1]) return roleMatch[1];
+
+      const matches = Array.from(document.cookie.matchAll(/gatesphere_([a-z0-9_]+)_csrf=([^;]+)/g));
       if (matches.length === 1) {
         const bucket = matches[0][1];
         if (bucket === "superadmin") return "super_admin";

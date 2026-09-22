@@ -1,5 +1,6 @@
 """Unit tests for SEC-02 Server-Side HTML & Rich Text Sanitization."""
 
+import pytest
 from app.core.sanitization import sanitize_html
 
 

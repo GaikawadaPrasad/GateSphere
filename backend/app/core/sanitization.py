@@ -5,8 +5,8 @@ event attributes (onerror, onload, onclick, etc.), and `javascript:` / `data:` U
 Preserves legitimate rich-text formatting tags (<p>, <b>, <i>, <ul>, <li>, <a>, <h1>-<h6>, etc.).
 """
 
-import html
 import re
+import html
 
 # Allowed HTML tags for rich text fields
 ALLOWED_TAGS = {

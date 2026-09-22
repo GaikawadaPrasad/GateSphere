@@ -68,6 +68,14 @@ def test_resident_can_raise_but_not_acknowledge_alert(as_role, seed_ids):
     assert sup.post(f"{P}/alerts/{alert2}/acknowledge").status_code == 200
     assert sup.post(f"{P}/alerts/{alert2}/resolve", json={}).status_code == 200
 
+    # Test listing alerts with page_size=5
+    ca = as_role("community_admin")
+    r_list = ca.get(f"{P}/alerts", params={"page_size": 5})
+    assert r_list.status_code == 200, r_list.text
+    data = r_list.json()["data"]
+    assert isinstance(data, list)
+    assert len(data) <= 5
+
 
 def test_cross_community_gate_event_is_404(as_role, seed_ids):
     sup = as_role("security_supervisor")
