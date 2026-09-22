@@ -95,6 +95,22 @@ async def revoke_invitation(
     )
 
 
+@router.post(
+    "/communities/{community_id}/invitations/{invitation_id}/regenerate",
+    response_model=Envelope[schemas.InvitationCreated],
+    dependencies=[CREATE],
+)
+async def regenerate_invitation(
+    community_id: uuid.UUID,
+    invitation_id: uuid.UUID,
+    svc: Svc = Depends(onboarding_service),
+) -> dict:
+    return ok(
+        await svc.regenerate_invitation(community_id, invitation_id),
+        message="Invitation link regenerated",
+    )
+
+
 # --- invitations: public (token) --------------------------------------- #
 @router.get("/invitations/{token}", response_model=Envelope[schemas.InvitationPublic])
 async def view_invitation(token: str, svc: Svc = Depends(public_onboarding_service)) -> dict:

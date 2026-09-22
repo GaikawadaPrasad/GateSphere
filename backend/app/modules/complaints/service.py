@@ -440,14 +440,11 @@ class ComplaintService(UnitScopedAccess):
         self, ticket_id: uuid.UUID, payload: schemas.TicketConfirm
     ) -> ServiceTicket:
         ticket = await self.get_ticket(ticket_id)
-        is_restricted = await self.is_unit_restricted()
-        if is_restricted:
-            scope = await self._unit_scope()
-            if ticket.raised_by_user_id != self.actor.id and (not scope or ticket.unit_id not in scope):
-                raise ForbiddenError(
-                    "Only a resident of the unit or authorized staff may confirm the ticket",
-                    code="NOT_AUTHORIZED",
-                )
+        if ticket.raised_by_user_id != self.actor.id:
+            raise ForbiddenError(
+                "Only the resident who raised the ticket can confirm it",
+                code="NOT_AUTHORIZED",
+            )
         _enum("confirmation_status", payload.confirmation_status)
         if ticket.status != "resident_confirmation":
             raise BusinessRuleError(
