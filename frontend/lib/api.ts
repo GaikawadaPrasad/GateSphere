@@ -921,6 +921,8 @@ export const onboardingApi = {
     apiGet<any[]>(`/communities/${communityId}/invitations`),
   revokeInvitation: (communityId: string, invitationId: string) =>
     apiSend<any>("POST", `/communities/${communityId}/invitations/${invitationId}/revoke`),
+  regenerateInvitation: (communityId: string, invitationId: string) =>
+    apiSend<any>("POST", `/communities/${communityId}/invitations/${invitationId}/regenerate`),
   viewInvitation: (token: string) => apiGet<any>(`/invitations/${token}`),
   acceptInvitation: (token: string, payload: { full_name: string; phone?: string; password?: string }) =>
     apiSend<any>("POST", `/invitations/${token}/accept`, payload),

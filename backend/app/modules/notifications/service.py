@@ -102,6 +102,7 @@ class NotificationService:
         self, payload: schemas.TemplateUpsert, *, community_id: uuid.UUID | None
     ):
         cid = self._one_community(community_id)
+        self.scope.require_permission("notifications:create", cid)
         _enum("channel", payload.channel)
         obj = await self.templates.match(cid, payload.code, payload.channel)
         data = payload.model_dump()
