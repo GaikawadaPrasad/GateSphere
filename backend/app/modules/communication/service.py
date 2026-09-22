@@ -49,15 +49,40 @@ from app.modules.users.models import Role, User, UserRole
 _log = structlog.get_logger(__name__)
 
 
-def _enqueue_fan_out(announcement_id: str) -> None:
+async def _enqueue_fan_out(db: AsyncSession, community_id: uuid.UUID, announcement_id: str) -> None:
     """Best-effort enqueue of the broadcast fan-out. A broker hiccup must not fail the
-    publish — the row is committed; a follow-up publish or an ops replay can re-fan."""
+    publish — the row is committed. M-02 (backend/REMEDIATION_LOG.md): previously a
+    broker-down enqueue failure was only logged and then unrecoverable; it now also
+    writes a `NotificationDeadLetter` (kind="broadcast_enqueue") that
+    `app.modules.notifications.tasks.retry_dead_letters` re-enqueues on a schedule."""
     try:
         from app.modules.communication.tasks import fan_out_announcement
 
         fan_out_announcement.apply_async(args=[announcement_id], countdown=2, queue="notifications")
-    except Exception:
+    except Exception as exc:
         _log.warning("fan_out enqueue failed", announcement=announcement_id, exc_info=True)
+        from datetime import UTC as _UTC
+        from datetime import datetime as _datetime
+
+        from app.modules.notifications.models import NotificationDeadLetter
+
+        try:
+            db.add(
+                NotificationDeadLetter(
+                    community_id=community_id,
+                    kind="broadcast_enqueue",
+                    notification_type="communication.fan_out",
+                    payload={"announcement_id": announcement_id},
+                    failure_reason=repr(exc)[:2000],
+                    attempts=1,
+                    last_attempted_at=_datetime.now(_UTC),
+                )
+            )
+            await db.flush()
+        except Exception:
+            _log.error(
+                "fan_out dead_letter write failed", announcement=announcement_id, exc_info=True
+            )
 
 
 def _enum(field: str, value: str | None) -> None:
@@ -203,10 +228,9 @@ class CommunicationService(UnitScopedAccess):
         )
         if members:
             from app.modules.users.models import User
+
             user_ids = [m.user_id for m in members]
-            users = list(
-                (await self.db.scalars(select(User).where(User.id.in_(user_ids)))).all()
-            )
+            users = list((await self.db.scalars(select(User).where(User.id.in_(user_ids)))).all())
             user_map = {u.id: u for u in users}
             for m in members:
                 u = user_map.get(m.user_id)
@@ -230,6 +254,7 @@ class CommunicationService(UnitScopedAccess):
         self.db.add(m)
         await self.db.flush()
         from app.modules.users.models import User
+
         u = await self.db.get(User, payload.user_id)
         if u:
             m.user_name = u.full_name
@@ -270,7 +295,6 @@ class CommunicationService(UnitScopedAccess):
             title=html.escape(payload.title),
             body=html.escape(payload.body),
             priority=payload.priority,
-
             publish_at=payload.publish_at,
             expires_at=payload.expires_at,
             event_start_at=payload.event_start_at,
@@ -424,13 +448,17 @@ class CommunicationService(UnitScopedAccess):
         # Broadcast fan-out (FR-15) runs on the `notifications` Celery queue — off the
         # request path so a whole-community publish stays sub-second. The task is
         # idempotent and retries until it sees `is_published` committed.
-        _enqueue_fan_out(str(ann.id))
+        await _enqueue_fan_out(self.db, ann.community_id, str(ann.id))
         return await self.get_announcement(ann.id)
 
     async def expire_announcement(self, announcement_id: uuid.UUID) -> Announcement:
         ann = await self.get_announcement(announcement_id)
         now = datetime.now(UTC)
-        exp = ann.expires_at if (ann.expires_at and ann.expires_at.tzinfo) else (ann.expires_at.replace(tzinfo=UTC) if ann.expires_at else None)
+        exp = (
+            ann.expires_at
+            if (ann.expires_at and ann.expires_at.tzinfo)
+            else (ann.expires_at.replace(tzinfo=UTC) if ann.expires_at else None)
+        )
         if exp is None or exp > now:
             ann.expires_at = now
             await self.db.flush()

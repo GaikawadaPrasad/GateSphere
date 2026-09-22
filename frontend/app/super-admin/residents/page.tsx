@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SearchInput } from "@/components/forms/SearchInput";
@@ -133,8 +133,11 @@ export default function ResidentsPage() {
     return errs;
   };
 
+  const isSubmittingRef = useRef(false);
+
   const handleAddResidentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current) return;
     const errs = validateForm();
     if (Object.keys(errs).length > 0) {
       setFormError("Please fill in all required fields marked below.");
@@ -149,6 +152,7 @@ export default function ResidentsPage() {
 
     setFormError("");
     setIsSubmitting(true);
+    isSubmittingRef.current = true;
     try {
       await addResidentMutation.mutateAsync({
         communityId: targetCommunityId,
@@ -171,6 +175,7 @@ export default function ResidentsPage() {
       setFormError(err?.message || "Failed to onboard resident.");
     } finally {
       setIsSubmitting(false);
+      isSubmittingRef.current = false;
     }
   };
 

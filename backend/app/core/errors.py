@@ -72,7 +72,7 @@ class ConflictError(AppError):
 
 
 class BusinessRuleError(AppError):
-    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
     code = "BUSINESS_RULE_VIOLATION"
 
 
@@ -117,7 +117,7 @@ def _error_headers(request: Request, exc: AppError) -> dict[str, str]:
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def _app_error(request: Request, exc: AppError) -> JSONResponse:
-        if exc.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY:
+        if exc.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT:
             log.warning(
                 "business_rule_violation",
                 url=str(request.url),
@@ -146,14 +146,14 @@ def register_exception_handlers(app: FastAPI) -> None:
             fields=fields,
         )
         return JSONResponse(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             content=_envelope("VALIDATION_ERROR", "Request validation failed", fields),
         )
 
     @app.exception_handler(ValidationError)
     async def _pydantic(request: Request, exc: ValidationError) -> JSONResponse:
         return JSONResponse(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             content=_envelope("VALIDATION_ERROR", "Response validation failed"),
         )
 

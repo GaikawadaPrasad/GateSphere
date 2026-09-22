@@ -22,6 +22,7 @@ from sqlalchemy import (
     SmallInteger,
     String,
     Text,
+    text,
     Time,
     UniqueConstraint,
 )

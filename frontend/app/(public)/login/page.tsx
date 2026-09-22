@@ -28,6 +28,10 @@ function LoginForm() {
   // If already authenticated with a valid active session, forward directly to the destination
   React.useEffect(() => {
     if (currentUser && !isUserLoading) {
+      if (typeof window !== "undefined" && sessionStorage.getItem("gatesphere_logged_out") === "true") {
+        // Do not auto-redirect; let the user see the login screen because they explicitly logged out.
+        return;
+      }
       const nextParam = params.get("next");
       const target =
         nextParam && nextParam !== "/unauthorized"

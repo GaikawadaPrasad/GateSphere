@@ -58,7 +58,12 @@ Static-prefix routes (`/move-records`, `/occupancies`, `/units/...`, `/emergency
 
 ## Events
 
-- Emails / notifications: none yet (move-in approval should notify — TODO).
+- Emails / notifications: the `residents` module itself emits none directly. Move-in via
+  invitation acceptance notifies the inviter (`onboarding.invitation_accepted`) from
+  `app/modules/onboarding/service.py::accept_invitation` (the `onboarding` module has no
+  `docs/backend/modules/` page yet — see REMEDIATION_LOG.md M-03). A move-in created
+  directly through this module's own endpoints (not via invitation) does not notify
+  anyone yet.
 - Background jobs: none.
 - **Audit** (`audit_logs`, same transaction): `profile.create/update`, `occupancy.create/end`,
   `family.create`, `contact.create/delete`, `move.create/transition`.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUiStore } from "@/store/ui";
 import {
@@ -456,8 +456,11 @@ export default function CommunityAdminResidentsPage() {
     return Object.keys(errors).length === 0;
   };
 
+  const isAddingRef = useRef(false);
+
   const handleAddResidentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isAddingRef.current) return;
     if (!activeCommunityId) {
       setAddError("Active community required.");
       return;
@@ -470,6 +473,7 @@ export default function CommunityAdminResidentsPage() {
 
     setAddError("");
     setIsAdding(true);
+    isAddingRef.current = true;
     try {
       const defaultPassword = generateInitialPassword(fullName, "resident");
       await addResidentMutation.mutateAsync({
@@ -494,6 +498,7 @@ export default function CommunityAdminResidentsPage() {
       setAddError(err?.message || "Failed to onboard resident.");
     } finally {
       setIsAdding(false);
+      isAddingRef.current = false;
     }
   };
 
