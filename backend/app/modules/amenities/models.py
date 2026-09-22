@@ -135,8 +135,6 @@ class AmenityBlock(Base, TimestampMixin, TenantMixin):
     )
 
 
-from sqlalchemy.dialects.postgresql import ExcludeConstraint
-
 class AmenityBooking(Base, TimestampMixin, TenantMixin):
     __tablename__ = "amenity_bookings"
     __table_args__ = (
@@ -149,12 +147,6 @@ class AmenityBooking(Base, TimestampMixin, TenantMixin):
             ["unit_id", "community_id"], ["units.id", "units.community_id"], ondelete="CASCADE"
         ),
         CheckConstraint("end_at > start_at", name="ck_amenity_booking_window"),
-        ExcludeConstraint(
-            ("amenity_id", "="),
-            (text("tstzrange(start_at, end_at)"), "&&"),
-            name="excl_amenity_booking_overlap",
-            where=text("status = 'confirmed'")
-        ),
     )
 
     id: Mapped[uuid.UUID] = pk()
