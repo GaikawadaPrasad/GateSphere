@@ -12,11 +12,10 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import structlog
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from app.core.celery_app import celery
 from app.core.jobs import job_session, run, system_actor, system_scope
-from app.modules.audit.service import record_audit_async
 from app.modules.billing.models import (
     BillingRule,
     ChargeHead,
@@ -27,6 +26,7 @@ from app.modules.billing.models import (
 from app.modules.communities.models import Community, Unit
 from app.modules.notifications import events as notif_events
 from app.modules.residents.models import ResidentProfile, UnitOccupancy
+from sqlalchemy import func
 
 log = structlog.get_logger(__name__)
 
@@ -237,16 +237,6 @@ async def _generate_monthly_invoices() -> dict:
                         balance_after=_money(prev_bal + total_amt),
                         narration=f"Monthly Maintenance Invoice {inv_number} posted",
                     )
-                )
-                await record_audit_async(
-                    db,
-                    module="billing",
-                    action="invoice.generated",
-                    actor=actor,
-                    community_id=comm.id,
-                    entity_type="maintenance_invoice",
-                    entity_id=inv.id,
-                    new={"invoice_number": inv_number, "total_amount": total_amt, "unit_id": unit.id},
                 )
                 generated += 1
 

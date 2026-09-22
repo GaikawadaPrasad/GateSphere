@@ -46,9 +46,12 @@ def _disable_rate_limit():
     ratelimit.settings.RATE_LIMIT_ENABLED = False
     prev_lockout = settings.LOGIN_LOCKOUT_ENABLED
     settings.LOGIN_LOCKOUT_ENABLED = False
-    for pattern in ("gs:loginfail:*", "gs:loginlock:*"):
-        for k in redis_client.scan_iter(pattern):
-            redis_client.delete(k)
+    try:
+        for pattern in ("gs:loginfail:*", "gs:loginlock:*"):
+            for k in redis_client.scan_iter(pattern):
+                redis_client.delete(k)
+    except Exception:
+        pass
     yield
     ratelimit.settings.RATE_LIMIT_ENABLED = True
     settings.LOGIN_LOCKOUT_ENABLED = prev_lockout

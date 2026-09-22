@@ -12,6 +12,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, Response, status
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 

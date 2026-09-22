@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-
 import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -67,8 +66,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
                     headers=dict(response.headers),
                     media_type=response.media_type,
                 )
-            except Exception as e:
-                log.debug("swagger_sri_injection_skipped", error=str(e))
+            except Exception:
+                pass
         else:
             response.headers.setdefault(
                 "Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'"

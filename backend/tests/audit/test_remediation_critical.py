@@ -10,12 +10,11 @@ Tests critical security, authorization, data integrity, and session management f
 """
 
 import pytest
-from conftest import _login
 from starlette.testclient import TestClient
-
 from app.main import app
 from app.modules.residents.access import actor_unit_scope
 from app.modules.users.models import User
+from conftest import _login
 
 
 @pytest.mark.asyncio

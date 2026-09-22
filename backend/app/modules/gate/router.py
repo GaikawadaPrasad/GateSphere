@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import uuid
 
+import structlog
 from fastapi import APIRouter, Depends, status
 
 from app.core.export import EXPORT_ROW_CAP, csv_response
@@ -18,6 +19,8 @@ from app.core.tenancy import require_permission_async
 from app.modules.gate import schemas
 from app.modules.gate.deps import gate_service
 from app.modules.gate.service import GateService
+
+log = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/gate", tags=["Gate Operations"])
 
@@ -255,9 +258,16 @@ async def list_alerts(
         offset=params.offset,
         limit=params.page_size,
     )
-    return paginated(
-        [schemas.AlertRead.model_validate(r) for r in rows], total=total, params=params
-    )
+    valid_rows: list[schemas.AlertRead] = []
+    for r in rows:
+        try:
+            valid_rows.append(schemas.AlertRead.model_validate(r))
+        except Exception as exc:
+            log.warning(
+                "gate.alerts.serialize_failed", error=str(exc), alert_id=getattr(r, "id", None)
+            )
+            continue
+    return paginated(valid_rows, total=total, params=params)
 
 
 @router.post(
