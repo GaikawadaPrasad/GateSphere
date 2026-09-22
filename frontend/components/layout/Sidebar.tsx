@@ -4,12 +4,14 @@ import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useUiStore } from "@/store/ui";
+import { useMyNotifications } from "@/hooks/use-notifications";
 import {
   AUDITOR_NAV,
   DOMESTIC_STAFF_NAV,
   OWNER_TENANT_NAV,
   SECURITY_GUARD_NAV,
   VENDOR_TECHNICIAN_NAV,
+  FACILITY_MANAGER_NAV,
   NavItem,
 } from "@/config/dashboard-navigation";
 
@@ -41,6 +43,8 @@ const COMMUNITY_ADMIN_NAV_ITEMS: NavItem[] = [
 export function Sidebar() {
   const pathname = usePathname();
   const { sidebarOpen, toggleSidebar } = useUiStore();
+  const { data: unreadNotifications } = useMyNotifications({ unread_only: true });
+  const unreadCount = unreadNotifications?.length || 0;
 
   // Determine current active dashboard
   let navConfig = {
@@ -128,14 +132,15 @@ export function Sidebar() {
         { id: "audit-logs", label: "Audit Logs", href: "/security-supervisor/audit-logs", icon: "📋" },
       ],
     };
-  } else if (pathname.startsWith("/dashboard/facility-manager")) {
+  } else if (
+    pathname.startsWith("/facility-manager") || 
+    pathname.startsWith("/dashboard/facility-manager")
+  ) {
     navConfig = {
       title: "GateSphere",
       roleLabel: "Facility Manager",
       accentColor: "#059669",
-      items: [
-        { id: "dashboard", label: "Dashboard", href: "/dashboard/facility-manager", icon: "🔧" },
-      ],
+      items: FACILITY_MANAGER_NAV.navItems,
     };
   } else if (pathname.startsWith("/dashboard/association-committee")) {
     navConfig = {
@@ -295,6 +300,9 @@ export function Sidebar() {
               const isSubActive =
                 item.href !== navConfig.items[0]?.href && pathname.startsWith(item.href);
               const isActive = isExactActive || isSubActive;
+              const isNotifItem = item.id === "notifications" || item.href.includes("notifications");
+              const effectiveBadge =
+                isNotifItem && unreadCount > 0 ? unreadCount : item.badge;
 
               return (
                 <Link
@@ -314,13 +322,30 @@ export function Sidebar() {
                     fontSize: "13.5px",
                     textDecoration: "none",
                     transition: "all 0.15s ease",
+                    position: "relative",
                     borderLeft: isActive
                       ? `3px solid ${item.accentColor || navConfig.accentColor || "var(--brand-primary)"}`
                       : "3px solid transparent",
                   }}
                   title={item.label}
                 >
-                  <span style={{ fontSize: "1.15rem" }}>{item.icon}</span>
+                  <span style={{ fontSize: "1.15rem", position: "relative" }}>
+                    {item.icon}
+                    {!sidebarOpen && effectiveBadge !== undefined && (
+                      <span
+                        style={{
+                          position: "absolute",
+                          top: -2,
+                          right: -4,
+                          width: 8,
+                          height: 8,
+                          borderRadius: "50%",
+                          background: "#EF4444",
+                          boxShadow: "0 0 6px rgba(239, 68, 68, 0.9)",
+                        }}
+                      />
+                    )}
+                  </span>
                   {sidebarOpen && (
                     <div
                       style={{
@@ -331,20 +356,23 @@ export function Sidebar() {
                       }}
                     >
                       <span>{item.label}</span>
-                      {item.badge !== undefined && (
+                      {effectiveBadge !== undefined && (
                         <span
                           style={{
-                            fontSize: "10px",
-                            fontWeight: 700,
-                            padding: "0.1rem 0.45rem",
+                            fontSize: "10.5px",
+                            fontWeight: 800,
+                            padding: "0.1rem 0.5rem",
                             borderRadius: "9999px",
-                            background: item.accentColor
-                              ? `${item.accentColor}30`
-                              : `${navConfig.accentColor}30`,
-                            color: item.accentColor || navConfig.accentColor,
+                            background: isNotifItem
+                              ? "#EF4444"
+                              : item.accentColor
+                                ? `${item.accentColor}30`
+                                : `${navConfig.accentColor}30`,
+                            color: isNotifItem ? "#FFFFFF" : item.accentColor || navConfig.accentColor,
+                            boxShadow: isNotifItem ? "0 2px 6px rgba(239, 68, 68, 0.4)" : "none",
                           }}
                         >
-                          {item.badge}
+                          {effectiveBadge}
                         </span>
                       )}
                     </div>

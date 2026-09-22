@@ -7,6 +7,8 @@ clean 409/empty result, never a double-write and never a 500:
 - parking: two allocations racing for the same slot (partial-unique backstop)
 - visitors: two gate check-ins racing for the same approved request
 - notifications: two concurrent mark-all-read calls (idempotent, exact total)
+- amenities: two bookings racing for the last seat on a capacity-1 slot (CR-04 —
+  DB-level `gs_amenity_booking_capacity_guard` trigger, migration 0037)
 
 Setup rows are created through the public API; teardown deletes them with
 `SessionLocal` (IS-1: HTTP tests clean up their own mutations).
@@ -16,6 +18,7 @@ from __future__ import annotations
 
 import threading
 import uuid
+from datetime import date, time, timedelta
 
 from conftest import DEMO_DOMAIN, csrf_cookie_value, demo_password
 from fastapi.testclient import TestClient
@@ -23,6 +26,7 @@ from sqlalchemy import select
 
 from app.db.session import SessionLocal
 from app.main import app
+from app.modules.amenities.models import Amenity, AmenityBooking, AmenitySlot
 from app.modules.notifications.models import Notification
 from app.modules.residents.models import ResidentProfile
 from app.modules.users.models import User
@@ -32,6 +36,7 @@ from app.modules.visitors.models import Visitor, VisitorEntry, VisitorRequest
 VP = "/api/v1/vehicles"
 VS = "/api/v1/visitors"
 NP = "/api/v1/notifications"
+AP = "/api/v1/amenities"
 
 
 def _login(role: str) -> TestClient:
@@ -234,4 +239,78 @@ def test_concurrent_mark_all_read_is_exact(as_role, seed_ids):
                 n = db.get(Notification, nid)
                 if n is not None:
                     db.delete(n)
+            db.commit()
+
+
+def test_concurrent_amenity_booking_respects_capacity(as_role, seed_ids):
+    """CR-04: two requests race for the single remaining seat on a capacity-1 slot.
+
+    Exactly one must win (201); the loser gets a clean 409, never a 500. This proves
+    the full stack (app-level lock in amenities/service.py `book`, backed by the
+    `gs_amenity_booking_capacity_guard` DB trigger from migration 0037) end to end —
+    the audit's literal CR-04 request for "concurrent integration testing".
+    """
+    cid = seed_ids["community_id"]
+    target = date.today() + timedelta(days=3)
+    with SessionLocal() as db:
+        am = Amenity(
+            community_id=cid,
+            code=f"RACE-{uuid.uuid4().hex[:6]}",
+            name="Race Court",
+            amenity_type="court",
+            capacity=1,
+            is_active=True,
+        )
+        db.add(am)
+        db.flush()
+        slot = AmenitySlot(
+            community_id=cid,
+            amenity_id=am.id,
+            day_of_week=target.weekday(),
+            start_time=time(9, 0),
+            end_time=time(10, 0),
+            capacity=1,
+        )
+        db.add(slot)
+        db.commit()
+        db.refresh(am)
+        db.refresh(slot)
+        amenity_id, slot_id = str(am.id), str(slot.id)
+
+    try:
+        r1, r2 = _login("resident"), _login("resident")
+        try:
+            codes = _race(
+                lambda c, i: c.post(
+                    f"{AP}/bookings",
+                    json={
+                        "amenity_id": amenity_id,
+                        "slot_id": slot_id,
+                        "booking_date": target.isoformat(),
+                    },
+                ).status_code,
+                r1,
+                r2,
+            )
+            assert sorted(codes) == [201, 409], codes
+        finally:
+            r1.close()
+            r2.close()
+        with SessionLocal() as db:
+            confirmed = (
+                db.query(AmenityBooking)
+                .filter_by(amenity_id=amenity_id, status="confirmed")
+                .count()
+            )
+            assert confirmed == 1
+    finally:
+        with SessionLocal() as db:
+            for row in db.query(AmenityBooking).filter_by(amenity_id=amenity_id).all():
+                db.delete(row)
+            slot_obj = db.get(AmenitySlot, slot_id)
+            if slot_obj is not None:
+                db.delete(slot_obj)
+            am_obj = db.get(Amenity, amenity_id)
+            if am_obj is not None:
+                db.delete(am_obj)
             db.commit()

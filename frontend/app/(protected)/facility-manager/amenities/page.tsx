@@ -292,6 +292,8 @@ export default function FacilityManagerAmenitiesPage() {
               <thead>
                 <tr>
                   <th>Amenity</th>
+                  <th>Resident / Booked By</th>
+                  <th>Unit / Tower</th>
                   <th>Booking Date</th>
                   <th>Time Slot</th>
                   <th>Status</th>
@@ -301,43 +303,76 @@ export default function FacilityManagerAmenitiesPage() {
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={5} style={{ textAlign: "center", padding: "1.5rem" }}>
+                    <td colSpan={7} style={{ textAlign: "center", padding: "1.5rem" }}>
                       Loading bookings…
                     </td>
                   </tr>
                 ) : bookings.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={7}
                       style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}
                     >
                       No upcoming bookings.
                     </td>
                   </tr>
                 ) : (
-                  bookings.map((b: any) => (
-                    <tr key={b.id}>
-                      <td style={{ fontWeight: 600 }}>
-                        {amenities.find((a: any) => a.id === b.amenity_id)?.name || b.amenity_id}
-                      </td>
-                      <td>{formatBookingDate(b)}</td>
-                      <td style={{ fontSize: "0.8rem", color: "var(--muted)" }}>
-                        {formatSlot(b)}
-                      </td>
-                      <td><StatusBadge status={b.status} /></td>
-                      <td>
-                        {b.status !== "cancelled" && (
-                          <button
-                            className="btn btn-danger"
-                            style={{ fontSize: "0.72rem", padding: "0.15rem 0.4rem" }}
-                            onClick={() => handleCancelBooking(b.id)}
+                  bookings.map((b: any) => {
+                    const residentName = b.resident_name || b.resident_user?.full_name || (b.resident_user_id ? "Resident" : "—");
+                    const unitDisplay = b.unit_label || (b.unit_number ? `Unit ${b.unit_number}${b.tower_name ? `, ${b.tower_name}` : ""}` : "—");
+                    const phoneDisplay = b.resident_phone || b.resident_user?.phone || "";
+
+                    return (
+                      <tr key={b.id}>
+                        <td style={{ fontWeight: 600, color: "var(--fg)" }}>
+                          {b.amenity_name || amenities.find((a: any) => a.id === b.amenity_id)?.name || "Amenity"}
+                        </td>
+                        <td>
+                          <div style={{ fontWeight: 600, fontSize: "0.875rem", color: "var(--fg)" }}>
+                            👤 {residentName}
+                          </div>
+                          {phoneDisplay && (
+                            <div style={{ fontSize: "0.75rem", color: "var(--muted)", fontFamily: "monospace", marginTop: "0.1rem" }}>
+                              {phoneDisplay}
+                            </div>
+                          )}
+                        </td>
+                        <td>
+                          <span
+                            style={{
+                              display: "inline-block",
+                              fontWeight: 600,
+                              fontSize: "0.8rem",
+                              color: "var(--primary-dark, #1e40af)",
+                              background: "var(--primary-subtle, #eff6ff)",
+                              padding: "0.2rem 0.5rem",
+                              borderRadius: "4px",
+                              border: "1px solid #bfdbfe",
+                              whiteSpace: "nowrap",
+                            }}
                           >
-                            Cancel
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))
+                            📍 {unitDisplay}
+                          </span>
+                        </td>
+                        <td>{formatBookingDate(b)}</td>
+                        <td style={{ fontSize: "0.8rem", color: "var(--muted)" }}>
+                          {formatSlot(b)}
+                        </td>
+                        <td><StatusBadge status={b.status} /></td>
+                        <td>
+                          {b.status !== "cancelled" && (
+                            <button
+                              className="btn btn-danger"
+                              style={{ fontSize: "0.72rem", padding: "0.15rem 0.4rem" }}
+                              onClick={() => handleCancelBooking(b.id)}
+                            >
+                              Cancel
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

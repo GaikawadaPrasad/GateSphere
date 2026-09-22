@@ -31,7 +31,7 @@ TENANT_TABLES = ["towers", "floors", "units", "user_roles", "audit_logs"]
 _POLICY = """
 CREATE POLICY tenant_isolation ON {table}
 USING (
-    coalesce(current_setting('app.community_ids', true), '') = ''
+    current_setting('app.community_ids', true) = ''
     OR community_id IS NULL
     OR community_id::text = ANY (
         string_to_array(current_setting('app.community_ids', true), ',')

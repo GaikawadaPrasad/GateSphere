@@ -135,3 +135,9 @@ class BookingRead(_Read):
     amount: Decimal
     cancelled_at: datetime | None
     cancellation_reason: str | None
+    resident_name: str | None = None
+    resident_phone: str | None = None
+    unit_number: str | None = None
+    tower_name: str | None = None
+    unit_label: str | None = None
+    amenity_name: str | None = None

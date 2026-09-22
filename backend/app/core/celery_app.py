@@ -71,5 +71,9 @@ celery.conf.update(
             "task": "app.modules.amenities.tasks.close_past_bookings",
             "schedule": 900.0,
         },
+        "retry-notification-dead-letters": {
+            "task": "app.modules.notifications.tasks.retry_dead_letters",
+            "schedule": 300.0,  # every 5 min — M-02, backend/REMEDIATION_LOG.md
+        },
     },
 )

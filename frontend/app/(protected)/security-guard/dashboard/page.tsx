@@ -359,7 +359,7 @@ export default function SecurityGuardDashboardPage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
               gap: "1rem",
               fontSize: "0.9rem",
             }}
@@ -373,9 +373,25 @@ export default function SecurityGuardDashboardPage() {
               </strong>
             </div>
             <div>
+              <span style={{ opacity: 0.8, fontSize: "0.75rem", display: "block" }}>
+                📍 Tower / Unit Location
+              </span>
+              <strong style={{ fontSize: "1.05rem", color: "#fef08a", fontWeight: 800 }}>
+                {(() => {
+                  const raw = (activeSos as any)?.message || "";
+                  const match = raw.match(/Location:\s*([^—\n]+)/i);
+                  if (match && match[1]?.trim()) return match[1].trim();
+                  const rawTitle = (activeSos as any)?.title || "";
+                  const titleMatch = rawTitle.match(/Location:\s*([^—\n]+)/i) || rawTitle.match(/SOS EMERGENCY:\s*(.+)/i);
+                  if (titleMatch && titleMatch[1]?.trim()) return titleMatch[1].trim();
+                  return (activeSos as any)?.location_coordinates || "Main Gate / Facility";
+                })()}
+              </strong>
+            </div>
+            <div>
               <span style={{ opacity: 0.8, fontSize: "0.75rem", display: "block" }}>Details</span>
               <strong style={{ fontSize: "1rem", color: "#fef2f2" }}>
-                {(activeSos as any).message || "—"}
+                {(activeSos as any).message?.split(" — Location:")[0] || (activeSos as any).message || "—"}
               </strong>
             </div>
             <div>

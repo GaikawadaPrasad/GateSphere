@@ -138,6 +138,52 @@ async def record_payment(
     )
 
 
+@router.get("/payments.csv", dependencies=[EXPORT])
+@router.get("/payments/export", dependencies=[EXPORT])
+async def export_payments(
+    community_id: uuid.UUID | None = None, svc: Svc = Depends(billing_service)
+):
+    rows, _ = await svc.list_payments(community_id=community_id, offset=0, limit=EXPORT_ROW_CAP)
+    return csv_response(
+        "payments.csv",
+        [
+            "payment_reference",
+            "receipt_number",
+            "payer_name",
+            "payer_email",
+            "payer_phone",
+            "unit_number",
+            "tower_name",
+            "resident_type",
+            "invoice_number",
+            "amount",
+            "payment_method",
+            "payment_status",
+            "paid_at",
+            "refunded_at",
+        ],
+        (
+            (
+                p.payment_reference,
+                p.receipt_number,
+                getattr(p, "payer_name", None),
+                getattr(p, "payer_email", None),
+                getattr(p, "payer_phone", None),
+                getattr(p, "unit_number", None),
+                getattr(p, "tower_name", None),
+                getattr(p, "resident_type", None),
+                getattr(p, "invoice_number", None),
+                p.amount,
+                p.payment_method,
+                p.payment_status,
+                p.paid_at,
+                p.refunded_at,
+            )
+            for p in rows
+        ),
+    )
+
+
 @router.get(
     "/payments/{payment_id}", response_model=Envelope[schemas.PaymentRead], dependencies=[VIEW]
 )
@@ -248,52 +294,6 @@ async def export_invoices(
                 i.created_at,
             )
             for i in rows
-        ),
-    )
-
-
-@router.get("/payments.csv", dependencies=[EXPORT])
-@router.get("/payments/export", dependencies=[EXPORT])
-async def export_payments(
-    community_id: uuid.UUID | None = None, svc: Svc = Depends(billing_service)
-):
-    rows, _ = await svc.list_payments(community_id=community_id, offset=0, limit=EXPORT_ROW_CAP)
-    return csv_response(
-        "payments.csv",
-        [
-            "payment_reference",
-            "receipt_number",
-            "payer_name",
-            "payer_email",
-            "payer_phone",
-            "unit_number",
-            "tower_name",
-            "resident_type",
-            "invoice_number",
-            "amount",
-            "payment_method",
-            "payment_status",
-            "paid_at",
-            "refunded_at",
-        ],
-        (
-            (
-                p.payment_reference,
-                p.receipt_number,
-                getattr(p, "payer_name", None),
-                getattr(p, "payer_email", None),
-                getattr(p, "payer_phone", None),
-                getattr(p, "unit_number", None),
-                getattr(p, "tower_name", None),
-                getattr(p, "resident_type", None),
-                getattr(p, "invoice_number", None),
-                p.amount,
-                p.payment_method,
-                p.payment_status,
-                p.paid_at,
-                p.refunded_at,
-            )
-            for p in rows
         ),
     )
 

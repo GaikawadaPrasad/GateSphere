@@ -567,71 +567,12 @@ class DomesticStaffService(UnitScopedAccess):
         if self.actor.phone:
             staff_phone = await self.staff.by_phone_scoped(self.actor.phone)
             if staff_phone is not None:
-                staff_phone.user_id = self.actor.id
-                await self.db.flush()
+                if staff_phone.user_id is None:
+                    staff_phone.user_id = self.actor.id
+                    await self.db.flush()
                 return staff_phone
 
-        # 3. Auto-heal / link: In deployed staging environments (e.g. Vercel + Supabase),
-        # staff rows may exist from seed without user_id or linked to an old user ID.
-        if not self.scope.is_global and self.scope.community_ids:
-            cid = next(iter(self.scope.community_ids))
-            existing = await self.staff.first_in_community(cid, unlinked_only=True)
-            if existing is None:
-                existing = await self.staff.first_in_community(cid)
-
-            if existing is not None:
-                existing.user_id = self.actor.id
-                await self.db.flush()
-                active = await self.assignments.active_for_staff(existing.id)
-                if not active:
-                    unit_id = await self.staff.first_unit_id(cid)
-                    if unit_id is not None:
-                        self.db.add(
-                            StaffUnitAssignment(
-                                community_id=cid,
-                                staff_id=existing.id,
-                                unit_id=unit_id,
-                                work_type="part_time",
-                                approved_by_user_id=self.actor.id,
-                            )
-                        )
-                        await self.db.flush()
-                return existing
-
-            # If no staff exists in this community at all, provision one
-            new_staff = DomesticStaff(
-                community_id=cid,
-                user_id=self.actor.id,
-                full_name=self.actor.full_name or "Domestic Staff",
-                staff_type="maid",
-                phone=self.actor.phone or f"+9197{str(cid)[-2:]}0001",
-                police_verification_status="verified",
-                is_active=True,
-            )
-            self.db.add(new_staff)
-            await self.db.flush()
-
-            unit_id = await self.staff.first_unit_id(cid)
-            if unit_id is not None:
-                self.db.add(
-                    StaffUnitAssignment(
-                        community_id=cid,
-                        staff_id=new_staff.id,
-                        unit_id=unit_id,
-                        work_type="part_time",
-                        approved_by_user_id=self.actor.id,
-                    )
-                )
-                await self.db.flush()
-            return new_staff
-
-        fallback = await self.staff.first_any()
-        if fallback is not None:
-            fallback.user_id = self.actor.id
-            await self.db.flush()
-            return fallback
-
-        raise NotFoundError("Domestic staff profile not found")
+        raise NotFoundError("No domestic staff profile found for current user")
 
     async def _actor_has_cross_unit_role(self) -> bool:
         """Whether the actor holds a staff-wide role, via an explicit query.

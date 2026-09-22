@@ -4,10 +4,17 @@ from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
+from starlette.requests import Request
 
 from app.core import ratelimit
 from app.core.redis import redis_client
 from app.main import app
+
+
+def _fake_request(method: str, path: str) -> Request:
+    return Request(
+        {"type": "http", "method": method, "path": path, "headers": [], "query_string": b""}
+    )
 
 
 @pytest.fixture()
@@ -47,7 +54,12 @@ def test_health_is_exempt(_limited):
         assert c.get("/healthz").status_code == 200
 
 
-def test_fails_open_when_redis_is_down(monkeypatch, _limited):
+def test_auth_fails_closed_when_redis_is_down(monkeypatch, _limited):
+    """M-01 (backend/REMEDIATION_LOG.md): `auth` is a fail-closed class. Before this fix
+    a Redis outage silently let every request through unmetered (this test used to assert
+    `status_code != 429` and pass); now it must get a clean 503, never reach the login
+    handler at all — proven by asserting the login endpoint's own error codes (401/429)
+    never appear."""
     from redis.exceptions import RedisError
 
     class _Boom:
@@ -59,10 +71,67 @@ def test_fails_open_when_redis_is_down(monkeypatch, _limited):
 
     monkeypatch.setattr(ratelimit, "redis_client", _Boom())
     c = TestClient(app)
-    # limiter can't count -> requests still go through (they'll 401, not 429)
     for _ in range(10):
         r = c.post("/api/v1/auth/login", json={"email": "x@x.com", "password": "y"})
-        assert r.status_code != 429
+        assert r.status_code == 503, r.text
+        assert r.json()["error"]["code"] == "RATE_LIMIT_UNAVAILABLE"
+
+
+def test_non_sensitive_classes_still_fail_open_when_redis_is_down(monkeypatch, _limited):
+    """M-01: only `auth`/`payment` fail closed — every other class (search/upload/export/
+    write/default) keeps the original availability-over-strictness behavior. Uses the
+    `default` class (`GET /api/v1/auth/me`, unauthenticated) so a Redis outage must still
+    reach the real handler (401), not the new 503 fail-closed path."""
+    from redis.exceptions import RedisError
+
+    class _Boom:
+        def pipeline(self, *a, **k):
+            raise RedisError("down")
+
+        def get(self, *a, **k):
+            raise RedisError("down")
+
+    monkeypatch.setattr(ratelimit, "redis_client", _Boom())
+    c = TestClient(app)
+    r = c.get("/api/v1/auth/me")
+    assert r.status_code != 503
+    assert r.status_code == 401
+
+
+def test_classify_payment_paths():
+    """M-01: only mutating billing/payments paths classify as `payment` — GET/list/receipt
+    stay out of it, since those aren't the thing the fail-closed behavior protects."""
+    assert ratelimit.classify(_fake_request("POST", "/api/v1/billing/payments")) == "payment"
+    assert (
+        ratelimit.classify(_fake_request("POST", "/api/v1/billing/payments/abc/refund"))
+        == "payment"
+    )
+    assert ratelimit.classify(_fake_request("GET", "/api/v1/billing/payments")) != "payment"
+    assert (
+        ratelimit.classify(_fake_request("GET", "/api/v1/billing/payments/abc/receipt"))
+        != "payment"
+    )
+
+
+def test_payment_class_fails_closed_when_redis_is_down(monkeypatch, _limited):
+    """M-01: same fail-closed treatment as `auth` — proven at the dispatch level. The
+    middleware runs before auth/dependency resolution, so an unauthenticated request is
+    enough: a 503 here (not the endpoint's own 401) proves the class was intercepted
+    before ever reaching the handler."""
+    from redis.exceptions import RedisError
+
+    class _Boom:
+        def pipeline(self, *a, **k):
+            raise RedisError("down")
+
+        def get(self, *a, **k):
+            raise RedisError("down")
+
+    monkeypatch.setattr(ratelimit, "redis_client", _Boom())
+    c = TestClient(app)
+    r = c.post("/api/v1/billing/payments", json={})
+    assert r.status_code == 503, r.text
+    assert r.json()["error"]["code"] == "RATE_LIMIT_UNAVAILABLE"
 
 
 def test_invite_token_is_redacted_in_logs():

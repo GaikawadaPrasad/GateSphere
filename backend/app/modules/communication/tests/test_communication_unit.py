@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import pytest
+from sqlalchemy import select
 
 from app.core.errors import BusinessRuleError, ConflictError
 from app.modules.communication import schemas
 from app.modules.communication.service import CommunicationService
+from app.modules.notifications.models import NotificationDeadLetter
 
 
 def _svc(db, scope, actor):
@@ -33,6 +35,36 @@ async def test_publish_freezes_the_announcement(db, scope_for, community, supera
     with pytest.raises(BusinessRuleError) as exc:
         await svc.update_announcement(ann.id, schemas.AnnouncementUpdate(title="edited"))
     assert exc.value.code == "ALREADY_PUBLISHED"
+
+
+async def test_publish_dead_letters_when_broker_enqueue_fails(
+    db, scope_for, community, superadmin, monkeypatch
+):
+    """M-02 (backend/REMEDIATION_LOG.md): a Celery broker outage during the fan-out
+    enqueue must not fail the publish (the announcement row is already committed) and
+    must leave a `NotificationDeadLetter` (kind="broadcast_enqueue") instead of only a
+    log line, so `retry_dead_letters` can re-enqueue it later."""
+    from app.modules.communication.tasks import fan_out_announcement
+
+    def _boom(*a, **k):
+        raise RuntimeError("broker unreachable")
+
+    monkeypatch.setattr(fan_out_announcement, "apply_async", _boom)
+
+    svc = _svc(db, scope_for(community.id), superadmin)
+    ann = await _announcement(svc, community)
+    await svc.publish_announcement(ann.id)  # must not raise
+    assert ann.is_published
+
+    row = await db.scalar(
+        select(NotificationDeadLetter).where(
+            NotificationDeadLetter.notification_type == "communication.fan_out",
+            NotificationDeadLetter.payload["announcement_id"].astext == str(ann.id),
+        )
+    )
+    assert row is not None
+    assert row.kind == "broadcast_enqueue"
+    assert row.resolved_at is None
 
 
 async def test_publish_requires_a_target(db, scope_for, community, superadmin):

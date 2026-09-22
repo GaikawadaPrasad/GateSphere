@@ -34,8 +34,8 @@ class _Read(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 # -- gate events ------------------------------------------------------- #
@@ -140,14 +140,14 @@ class AlertResolve(_Write):
 
 class AlertRead(_Read):
     community_id: uuid.UUID
-    triggered_by_user_id: uuid.UUID | None
-    gate_id: uuid.UUID | None
-    alert_type: str
-    severity: str
-    message: str | None
-    status: str
-    triggered_at: datetime
-    acknowledged_by_user_id: uuid.UUID | None
-    acknowledged_at: datetime | None
-    resolved_at: datetime | None
-    resolution_summary: str | None
+    triggered_by_user_id: uuid.UUID | None = None
+    gate_id: uuid.UUID | None = None
+    alert_type: str = "other"
+    severity: str = "high"
+    message: str | None = None
+    status: str = "active"
+    triggered_at: datetime | None = None
+    acknowledged_by_user_id: uuid.UUID | None = None
+    acknowledged_at: datetime | None = None
+    resolved_at: datetime | None = None
+    resolution_summary: str | None = None

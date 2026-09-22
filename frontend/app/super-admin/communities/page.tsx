@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { CommunityTable, type CommunityWithMetrics } from "@/components/tables/CommunityTable";
 import { SearchInput } from "@/components/forms/SearchInput";
@@ -413,19 +413,54 @@ export default function CommunitiesPage() {
 
   const handleSaveTower = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!viewingCommunity || !towerName.trim() || !towerCode.trim()) return;
+    if (!viewingCommunity) return;
+
+    const trimmedName = towerName.trim();
+    if (!trimmedName) {
+      setDetailsFeedback({ type: "error", message: "Tower name is required." });
+      return;
+    }
+    if (trimmedName.length < 2 || trimmedName.length > 128) {
+      setDetailsFeedback({ type: "error", message: "Tower name must be between 2 and 128 characters." });
+      return;
+    }
+    if (!/[A-Za-z]/.test(trimmedName)) {
+      setDetailsFeedback({ type: "error", message: "Tower name must contain letters and cannot be purely numeric or symbols." });
+      return;
+    }
+    if (!/^[A-Za-z0-9][A-Za-z0-9\s\-./]*$/.test(trimmedName)) {
+      setDetailsFeedback({ type: "error", message: "Tower name can only contain letters, numbers, spaces, hyphens, and periods." });
+      return;
+    }
+
+    const trimmedCode = towerCode.trim();
+    if (!trimmedCode) {
+      setDetailsFeedback({ type: "error", message: "Tower code is required." });
+      return;
+    }
+    if (trimmedCode.length > 32 || !/^[A-Za-z0-9][A-Za-z0-9 _\-\/]*$/.test(trimmedCode)) {
+      setDetailsFeedback({ type: "error", message: "Tower code must start with a letter or number and contain only letters, numbers, hyphens, or slashes (1–32 characters)." });
+      return;
+    }
+
+    const floorsNum = Number(towerFloors);
+    if (isNaN(floorsNum) || !Number.isInteger(floorsNum) || floorsNum < 1 || floorsNum > 300) {
+      setDetailsFeedback({ type: "error", message: "Total floors must be a whole number between 1 and 300." });
+      return;
+    }
+
     try {
       await createTowerMutation.mutateAsync({
         communityId: viewingCommunity.id,
         data: {
-          name: towerName.trim(),
-          code: towerCode.trim().toUpperCase(),
-          total_floors: Number(towerFloors),
+          name: trimmedName,
+          code: trimmedCode.toUpperCase(),
+          total_floors: floorsNum,
           structure_type: towerType,
         },
       });
       setIsAddTowerOpen(false);
-      setDetailsFeedback({ type: "success", message: `Tower "${towerName}" created successfully.` });
+      setDetailsFeedback({ type: "success", message: `Tower "${trimmedName}" created successfully.` });
       await refreshCommunityDetails(viewingCommunity.id);
       refetch();
     } catch (err: unknown) {
@@ -531,8 +566,11 @@ export default function CommunitiesPage() {
     setIsAddResidentOpen(true);
   };
 
+  const isSavingResidentRef = useRef(false);
+
   const handleSaveResident = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSavingResidentRef.current) return;
     if (!viewingCommunity) return;
 
     const errs: Record<string, string> = {};
@@ -561,6 +599,7 @@ export default function CommunitiesPage() {
       return;
     }
 
+    isSavingResidentRef.current = true;
     try {
       await addResidentMutation.mutateAsync({
         communityId: viewingCommunity.id,
@@ -588,6 +627,8 @@ export default function CommunitiesPage() {
         type: "error",
         message: err instanceof Error ? err.message : "Failed to onboard resident.",
       });
+    } finally {
+      isSavingResidentRef.current = false;
     }
   };
 

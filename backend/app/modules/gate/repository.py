@@ -23,7 +23,7 @@ class GateAssignmentRepository(AsyncTenantRepository[GateAssignment]):
 
     async def active_for_guard(self, guard_user_id: uuid.UUID) -> GateAssignment | None:
         return await self.db.scalar(
-            select(GateAssignment).where(
+            self._scoped(select(GateAssignment)).where(
                 GateAssignment.guard_user_id == guard_user_id,
                 GateAssignment.status == "active",
             )
