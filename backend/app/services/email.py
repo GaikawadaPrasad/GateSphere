@@ -24,8 +24,10 @@ def send_email(to: str, subject: str, html: str, *, to_name: str | None = None) 
 
 
 def _send_brevo(*, to: str, to_name: str, subject: str, html: str) -> None:
+    import time
     import sib_api_v3_sdk
     from sib_api_v3_sdk.rest import ApiException
+    from app.core.errors import BusinessRuleError
 
     cfg = sib_api_v3_sdk.Configuration()
     cfg.api_key["api-key"] = settings.BREVO_API_KEY
@@ -36,9 +38,14 @@ def _send_brevo(*, to: str, to_name: str, subject: str, html: str) -> None:
         subject=subject,
         html_content=html,
     )
-    try:
-        api.send_transac_email(payload)
-        log.info("email.brevo.sent", to=to, subject=subject)
-    except ApiException:
-        log.exception("email.brevo.failed", to=to, subject=subject)
-        raise
+    
+    for attempt in range(3):
+        try:
+            api.send_transac_email(payload)
+            log.info("email.brevo.sent", to=to, subject=subject)
+            return
+        except ApiException:
+            if attempt == 2:
+                log.exception("email.brevo.failed", to=to, subject=subject)
+                raise BusinessRuleError("Email service temporarily unavailable", code="SERVICE_UNAVAILABLE")
+            time.sleep(2 ** attempt)

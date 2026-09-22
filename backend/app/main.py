@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-
 import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -67,8 +66,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
                     headers=dict(response.headers),
                     media_type=response.media_type,
                 )
-            except Exception as e:
-                log.debug("swagger_sri_injection_skipped", error=str(e))
+            except Exception:
+                pass
         else:
             response.headers.setdefault(
                 "Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'"
@@ -92,6 +91,38 @@ def create_app() -> FastAPI:
     )
 
     register_exception_handlers(app)
+
+    from fastapi.openapi.utils import get_openapi
+    def custom_openapi() -> dict:
+        if app.openapi_schema:
+            return app.openapi_schema
+        openapi_schema = get_openapi(
+            title=app.title,
+            version=app.version,
+            openapi_version=app.openapi_version,
+            description=app.description,
+            routes=app.routes,
+        )
+        if "components" not in openapi_schema:
+            openapi_schema["components"] = {}
+        openapi_schema["components"]["securitySchemes"] = {
+            "sessionCookie": {
+                "type": "apiKey",
+                "in": "cookie",
+                "name": "gs_session",
+            },
+            "csrfToken": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-CSRF-Token",
+            },
+        }
+        # Apply to all routes
+        openapi_schema["security"] = [{"sessionCookie": [], "csrfToken": []}]
+        app.openapi_schema = openapi_schema
+        return app.openapi_schema
+
+    app.openapi = custom_openapi
 
     # Middleware runs bottom-up on the request: TrustedHost → CORS → CorrelationId →
     # RateLimit → SecurityHeaders → route.

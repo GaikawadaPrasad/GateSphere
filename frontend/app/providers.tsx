@@ -19,8 +19,15 @@ export function Providers({ children }: { children: React.ReactNode }) {
     const unsub = cache.subscribe((event) => {
       if (event.type === "updated" && event.query.state.error instanceof ApiError) {
         if (event.query.state.error.isUnauthenticated) {
+          if (typeof window !== "undefined" && window.location.pathname.startsWith("/login")) {
+            return;
+          }
           client.clear();
-          router.replace("/login");
+          const next =
+            typeof window !== "undefined"
+              ? encodeURIComponent(window.location.pathname + window.location.search)
+              : "";
+          window.location.replace(next ? `/login?next=${next}` : "/login");
         }
       }
     });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUiStore } from "@/store/ui";
 import {
@@ -456,8 +456,11 @@ export default function CommunityAdminResidentsPage() {
     return Object.keys(errors).length === 0;
   };
 
+  const isAddingRef = useRef(false);
+
   const handleAddResidentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isAddingRef.current) return;
     if (!activeCommunityId) {
       setAddError("Active community required.");
       return;
@@ -470,6 +473,7 @@ export default function CommunityAdminResidentsPage() {
 
     setAddError("");
     setIsAdding(true);
+    isAddingRef.current = true;
     try {
       const defaultPassword = generateInitialPassword(fullName, "resident");
       await addResidentMutation.mutateAsync({
@@ -494,6 +498,7 @@ export default function CommunityAdminResidentsPage() {
       setAddError(err?.message || "Failed to onboard resident.");
     } finally {
       setIsAdding(false);
+      isAddingRef.current = false;
     }
   };
 
@@ -1808,43 +1813,45 @@ export default function CommunityAdminResidentsPage() {
             </div>
 
             {/* Invitation Link Section */}
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: "0.8rem",
-                  fontWeight: 600,
-                  marginBottom: "0.35rem",
-                }}
-              >
-                🔗 Secure Onboarding Invitation URL
-              </label>
-              <div style={{ display: "flex", gap: "0.5rem" }}>
-                <input
-                  type="text"
-                  readOnly
-                  className="input-field"
-                  value={
-                    typeof window !== "undefined"
-                      ? `${window.location.origin}/invitations/${selectedInvitation.token}`
-                      : `/invitations/${selectedInvitation.token}`
-                  }
-                  style={{ flex: 1, fontSize: "0.8rem", background: "#f8fafc" }}
-                />
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  style={{ flexShrink: 0 }}
-                  onClick={() => {
-                    const link = `${window.location.origin}/invitations/${selectedInvitation.token}`;
-                    navigator.clipboard.writeText(link);
-                    toast.success("Invitation link copied to clipboard!", "Copied");
+            {selectedInvitation.token && (
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
+                    marginBottom: "0.35rem",
                   }}
                 >
-                  📋 Copy Link
-                </button>
+                  🔗 Secure Onboarding Invitation URL
+                </label>
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <input
+                    type="text"
+                    readOnly
+                    className="input-field"
+                    value={
+                      typeof window !== "undefined"
+                        ? `${window.location.origin}/invitations/${selectedInvitation.token}`
+                        : `/invitations/${selectedInvitation.token}`
+                    }
+                    style={{ flex: 1, fontSize: "0.8rem", background: "#f8fafc" }}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ flexShrink: 0 }}
+                    onClick={() => {
+                      const link = `${window.location.origin}/invitations/${selectedInvitation.token}`;
+                      navigator.clipboard.writeText(link);
+                      toast.success("Invitation link copied to clipboard!", "Copied");
+                    }}
+                  >
+                    📋 Copy Link
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {selectedInvitation.message && (
               <div>

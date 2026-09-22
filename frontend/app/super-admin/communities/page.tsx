@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { CommunityTable, type CommunityWithMetrics } from "@/components/tables/CommunityTable";
 import { SearchInput } from "@/components/forms/SearchInput";
@@ -566,8 +566,11 @@ export default function CommunitiesPage() {
     setIsAddResidentOpen(true);
   };
 
+  const isSavingResidentRef = useRef(false);
+
   const handleSaveResident = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSavingResidentRef.current) return;
     if (!viewingCommunity) return;
 
     const errs: Record<string, string> = {};
@@ -596,6 +599,7 @@ export default function CommunitiesPage() {
       return;
     }
 
+    isSavingResidentRef.current = true;
     try {
       await addResidentMutation.mutateAsync({
         communityId: viewingCommunity.id,
@@ -623,6 +627,8 @@ export default function CommunitiesPage() {
         type: "error",
         message: err instanceof Error ? err.message : "Failed to onboard resident.",
       });
+    } finally {
+      isSavingResidentRef.current = false;
     }
   };
 
