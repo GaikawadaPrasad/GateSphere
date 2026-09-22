@@ -1808,43 +1808,45 @@ export default function CommunityAdminResidentsPage() {
             </div>
 
             {/* Invitation Link Section */}
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: "0.8rem",
-                  fontWeight: 600,
-                  marginBottom: "0.35rem",
-                }}
-              >
-                🔗 Secure Onboarding Invitation URL
-              </label>
-              <div style={{ display: "flex", gap: "0.5rem" }}>
-                <input
-                  type="text"
-                  readOnly
-                  className="input-field"
-                  value={
-                    typeof window !== "undefined"
-                      ? `${window.location.origin}/invitations/${selectedInvitation.token}`
-                      : `/invitations/${selectedInvitation.token}`
-                  }
-                  style={{ flex: 1, fontSize: "0.8rem", background: "#f8fafc" }}
-                />
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  style={{ flexShrink: 0 }}
-                  onClick={() => {
-                    const link = `${window.location.origin}/invitations/${selectedInvitation.token}`;
-                    navigator.clipboard.writeText(link);
-                    toast.success("Invitation link copied to clipboard!", "Copied");
+            {selectedInvitation.token && (
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
+                    marginBottom: "0.35rem",
                   }}
                 >
-                  📋 Copy Link
-                </button>
+                  🔗 Secure Onboarding Invitation URL
+                </label>
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <input
+                    type="text"
+                    readOnly
+                    className="input-field"
+                    value={
+                      typeof window !== "undefined"
+                        ? `${window.location.origin}/invitations/${selectedInvitation.token}`
+                        : `/invitations/${selectedInvitation.token}`
+                    }
+                    style={{ flex: 1, fontSize: "0.8rem", background: "#f8fafc" }}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ flexShrink: 0 }}
+                    onClick={() => {
+                      const link = `${window.location.origin}/invitations/${selectedInvitation.token}`;
+                      navigator.clipboard.writeText(link);
+                      toast.success("Invitation link copied to clipboard!", "Copied");
+                    }}
+                  >
+                    📋 Copy Link
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {selectedInvitation.message && (
               <div>

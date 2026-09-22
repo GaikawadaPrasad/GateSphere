@@ -147,7 +147,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         try:
             used = await asyncio.to_thread(_check_rate_limit)
         except (RedisError, Exception):
-            return await call_next(request)  # fail open
+            if cls == "auth":
+                return _too_many(window, getattr(request.state, "request_id", None))
+            return await call_next(request)
 
         if used >= max_n:
             resp: Response = _too_many(window, getattr(request.state, "request_id", None))

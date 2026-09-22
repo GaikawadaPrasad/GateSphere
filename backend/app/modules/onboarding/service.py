@@ -295,7 +295,7 @@ class OnboardingService:
             {
                 **schemas.InvitationRead.model_validate(inv).model_dump(),
                 "token": token,
-                "accept_url": f"{settings.FRONTEND_ORIGIN}/invite/{token}",
+                "accept_url": f"{settings.FRONTEND_ORIGIN}/invitations/{token}",
             }
         )
         return data

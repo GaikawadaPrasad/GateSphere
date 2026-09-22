@@ -20,7 +20,12 @@ _s3 = boto3.client(
     region_name=settings.S3_REGION,
     aws_access_key_id=settings.S3_ACCESS_KEY,
     aws_secret_access_key=settings.S3_SECRET_KEY,
-    config=Config(signature_version="s3v4"),
+    config=Config(
+        signature_version="s3v4",
+        connect_timeout=5,
+        read_timeout=10,
+        retries={"max_attempts": 3},
+    ),
 )
 
 
@@ -58,8 +63,13 @@ def ensure_bucket() -> None:
 
 
 def put_object(key: str, body: bytes, content_type: str) -> str:
-    _s3.put_object(Bucket=settings.S3_BUCKET, Key=key, Body=body, ContentType=content_type)
-    return public_url(key)
+    from botocore.exceptions import BotoCoreError, ClientError
+    from app.core.errors import BusinessRuleError
+    try:
+        _s3.put_object(Bucket=settings.S3_BUCKET, Key=key, Body=body, ContentType=content_type)
+        return public_url(key)
+    except (BotoCoreError, ClientError) as e:
+        raise BusinessRuleError("Storage service temporarily unavailable", code="SERVICE_UNAVAILABLE") from e
 
 
 def presigned_get(key: str, expires: int = 3600) -> str:
