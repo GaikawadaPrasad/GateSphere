@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import GateSphereLogo from "@/components/public/GateSphereLogo";
 import { ApiError } from "@/lib/api";
-import { useLogin } from "@/hooks/use-auth";
+import { useLogin, useMe } from "@/hooks/use-auth";
 import { getRoleLandingRoute } from "@/lib/permissions";
 
 const schema = z.object({
@@ -22,7 +22,20 @@ function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const login = useLogin();
+  const { data: currentUser, isLoading: isUserLoading } = useMe();
   const [showPassword, setShowPassword] = useState(false);
+
+  // If already authenticated with a valid active session, forward directly to the destination
+  React.useEffect(() => {
+    if (currentUser && !isUserLoading) {
+      const nextParam = params.get("next");
+      const target =
+        nextParam && nextParam !== "/unauthorized"
+          ? nextParam
+          : getRoleLandingRoute(currentUser);
+      window.location.replace(target);
+    }
+  }, [currentUser, isUserLoading, params]);
 
   const {
     register,
@@ -49,12 +62,13 @@ function LoginForm() {
     try {
       const user = await login.mutateAsync(values);
       const nextParam = params.get("next");
-      if (nextParam && nextParam !== "/unauthorized") {
-        router.replace(nextParam);
-        return;
-      }
+      const target =
+        nextParam && nextParam !== "/unauthorized"
+          ? nextParam
+          : getRoleLandingRoute(user);
 
-      router.replace(getRoleLandingRoute(user));
+      // Hard navigation ensures edge middleware sees the session cookie and cleans up stale memory
+      window.location.replace(target);
     } catch (err) {
       if (err instanceof ApiError && err.fields && Object.keys(err.fields).length) {
         for (const [field, message] of Object.entries(err.fields)) {

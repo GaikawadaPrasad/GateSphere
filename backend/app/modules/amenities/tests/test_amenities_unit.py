@@ -61,7 +61,7 @@ async def test_weekday_mismatch_rejected(db, scope_for, community, amenity, resi
 
 
 async def test_capacity_is_enforced_across_overlapping_bookings(
-    db, scope_for, community, amenity, resident, resident2
+    db, scope_for, community, amenity, resident
 ):
     svc = _svc(db, scope_for(community.id), resident)
     bdate, slot = await _future(db, amenity)
@@ -70,9 +70,8 @@ async def test_capacity_is_enforced_across_overlapping_bookings(
             amenity_id=amenity.id, slot_id=slot.id, booking_date=bdate, participant_count=4
         )
     )
-    svc2 = _svc(db, scope_for(community.id), resident2)
     with pytest.raises(ConflictError) as exc:
-        await svc2.book(
+        await svc.book(
             schemas.BookingCreate(
                 amenity_id=amenity.id, slot_id=slot.id, booking_date=bdate, participant_count=1
             )

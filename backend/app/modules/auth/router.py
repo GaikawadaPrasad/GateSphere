@@ -13,12 +13,7 @@ from app.core.responses import Response as Envelope
 from app.core.responses import ok
 from app.core.security import require_auth_async
 from app.db.session import get_async_db
-from app.modules.auth.schemas import (
-    CurrentUser,
-    LoginRequest,
-    PasswordChangeRequest,
-    ProfileUpdateRequest,
-)
+from app.modules.auth.schemas import CurrentUser, LoginRequest, PasswordChangeRequest, ProfileUpdateRequest
 from app.modules.auth.service import AuthService
 from app.modules.users.models import User
 

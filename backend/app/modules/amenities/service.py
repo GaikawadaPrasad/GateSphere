@@ -11,9 +11,8 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime, time
+from datetime import UTC, date, datetime, time
 from decimal import Decimal
-from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -44,6 +43,7 @@ from app.modules.notifications import events as notif_events
 from app.modules.residents.access import UnitScopedAccess
 from app.modules.residents.models import ResidentProfile, UnitOccupancy
 from app.modules.users.models import User
+from zoneinfo import ZoneInfo
 
 
 def _enum(field: str, value: str | None) -> None:
@@ -139,7 +139,7 @@ class AmenityService(UnitScopedAccess):
             raise ConflictError("That code exists", code="AMENITY_EXISTS")
         obj = Amenity(community_id=cid, **payload.model_dump())
         await self.amenities.add(obj)
-        # Auto-provision standard 2-hour slots (06:00-22:00) for every day of the week
+        # Auto-provision standard 2-hour slots (06:00–22:00) for every day of the week
         _standard_slots = [
             (time(6, 0), time(8, 0)),
             (time(8, 0), time(10, 0)),
@@ -325,8 +325,7 @@ class AmenityService(UnitScopedAccess):
 
         unit_map: dict[uuid.UUID, dict[str, str | None]] = {}
         if unit_ids:
-            from app.modules.communities.models import Tower, Unit
-
+            from app.modules.communities.models import Unit, Tower
             un_stmt = (
                 select(Unit.id, Unit.unit_number, Tower.name)
                 .outerjoin(Tower, Tower.id == Unit.tower_id)

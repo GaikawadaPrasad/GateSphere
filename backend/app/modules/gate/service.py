@@ -375,7 +375,9 @@ class GateService:
                     .join(UnitOccupancy, UnitOccupancy.unit_id == Unit.id)
                     .join(ResidentProfile, ResidentProfile.id == UnitOccupancy.resident_profile_id)
                     .outerjoin(Tower, Tower.id == Unit.tower_id)
-                    .where(ResidentProfile.user_id == self.actor.id, UnitOccupancy.is_active.is_(True))
+                    .where(
+                        ResidentProfile.user_id == self.actor.id, UnitOccupancy.is_active.is_(True)
+                    )
                 )
                 row = occ_res.first()
                 if row:
@@ -407,7 +409,11 @@ class GateService:
         )
         await self.db.flush()
 
-        notif_title = f"🚨 SOS EMERGENCY: {unit_label}" if unit_label else f"PANIC: {payload.alert_type} ({payload.severity})"
+        notif_title = (
+            f"🚨 SOS EMERGENCY: {unit_label}"
+            if unit_label
+            else f"PANIC: {payload.alert_type} ({payload.severity})"
+        )
         notif_message = (
             f"Emergency SOS triggered from {unit_label}. Details: {msg}"
             if unit_label

@@ -14,7 +14,6 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, timedelta
 
-import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -46,8 +45,6 @@ from app.modules.notifications import events as notif_events
 from app.modules.residents.access import UnitScopedAccess, user_in_community
 from app.modules.uploads.guard import ensure_confirmed_async
 from app.modules.users.models import User
-
-log = structlog.get_logger(__name__)
 
 # Full lifecycle (docs/backend/state-machines.md). `closed` / `reopened` are reachable ONLY
 # via confirm_ticket (resident confirmation) — never through the generic transition endpoint.
@@ -157,8 +154,8 @@ class ComplaintService(UnitScopedAccess):
                 self.db.add(cat)
             try:
                 await self.db.flush()
-            except Exception as e:
-                log.debug("default_categories_flush_skipped", error=str(e))
+            except Exception:
+                pass
             cats = list((await self.db.scalars(stmt)).all())
         return cats
 

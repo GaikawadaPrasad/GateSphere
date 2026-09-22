@@ -68,31 +68,6 @@ async def resident(db, community, unit) -> User:
 
 
 @pytest_asyncio.fixture()
-async def resident2(db, community, unit) -> User:
-    u = User(
-        email=f"am2-{uuid.uuid4().hex[:10]}@example.test",
-        full_name="Res 2",
-        password_hash=hash_password("x"),
-    )
-    db.add(u)
-    await db.flush()
-    p = ResidentProfile(community_id=community.id, user_id=u.id, profile_status="active")
-    db.add(p)
-    await db.flush()
-    db.add(
-        UnitOccupancy(
-            community_id=community.id,
-            unit_id=unit.id,
-            resident_profile_id=p.id,
-            occupancy_role="tenant",
-            is_primary=False,
-        )
-    )
-    await db.flush()
-    return u
-
-
-@pytest_asyncio.fixture()
 async def amenity(db, community):
     a = Amenity(
         community_id=community.id, code="POOL", name="Pool", amenity_type="pool", capacity=4
