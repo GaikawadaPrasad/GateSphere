@@ -34,13 +34,18 @@ def upgrade() -> None:
     op.execute("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO gatesphere_app;")
     op.execute("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO gatesphere_app;")
 
-    # 2. Force RLS on all RLS-enabled tables
-    res = op.get_bind().execute(sa.text(
-        "SELECT relname FROM pg_class WHERE relrowsecurity = true"
-    ))
+    # 2. Force RLS on all RLS-enabled tables in public schema only
+    res = op.get_bind().execute(sa.text("""
+        SELECT c.relname
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public'
+          AND c.relkind = 'r'
+          AND c.relrowsecurity = true;
+    """))
     for (table,) in res:
-        op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY;")
- 
+        op.execute(f'ALTER TABLE public."{table}" FORCE ROW LEVEL SECURITY;')
+
     # 3. Create BEFORE TRUNCATE trigger on audit_logs
     op.execute("""
     CREATE OR REPLACE FUNCTION prevent_audit_truncate() RETURNS TRIGGER AS $$
@@ -50,6 +55,7 @@ def upgrade() -> None:
     $$ LANGUAGE plpgsql;
     """)
     op.execute("""
+    DROP TRIGGER IF EXISTS tr_prevent_audit_truncate ON audit_logs;
     CREATE TRIGGER tr_prevent_audit_truncate
     BEFORE TRUNCATE ON audit_logs
     FOR EACH STATEMENT EXECUTE FUNCTION prevent_audit_truncate();
@@ -61,8 +67,13 @@ def downgrade() -> None:
     op.execute("DROP TRIGGER IF EXISTS tr_prevent_audit_truncate ON audit_logs;")
     op.execute("DROP FUNCTION IF EXISTS prevent_audit_truncate();")
     
-    res = op.get_bind().execute(sa.text(
-        "SELECT relname FROM pg_class WHERE relrowsecurity = true"
-    ))
+    res = op.get_bind().execute(sa.text("""
+        SELECT c.relname
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public'
+          AND c.relkind = 'r'
+          AND c.relrowsecurity = true;
+    """))
     for (table,) in res:
-        op.execute(f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY;")
+        op.execute(f'ALTER TABLE public."{table}" NO FORCE ROW LEVEL SECURITY;')
