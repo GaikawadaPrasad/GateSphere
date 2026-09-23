@@ -70,9 +70,13 @@ import {
   ResidentVehicle,
 } from "@/hooks/use-owner-tenant-data";
 import { useAnnouncements, useEventRsvp } from "@/hooks/use-communication";
-import { useMyNotifications } from "@/hooks/use-notifications";
+import {
+  useMyNotifications,
+  useMarkNotificationRead,
+  useMarkAllNotificationsRead,
+} from "@/hooks/use-notifications";
 import { useTableControls } from "@/hooks/use-table-controls";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDate, formatDateTime, formatCurrency, getAmenityIcon, isValidPersonName } from "@/lib/utils";
 import { authApi, gateApi } from "@/lib/api";
 import { useUiStore } from "@/store/ui";
@@ -279,6 +283,11 @@ export function OwnerTenantDashboardView({
   const domesticStaff = useResidentDomesticStaff();
   const announcements = useAnnouncements();
   const myNotifications = useMyNotifications({ page_size: 20 });
+  const queryClient = useQueryClient();
+  const markNotificationRead = useMarkNotificationRead();
+  const markAllNotificationsRead = useMarkAllNotificationsRead();
+  const [actionedNotifications, setActionedNotifications] = useState<Record<string, "approved" | "rejected">>({});
+  const [notifFilter, setNotifFilter] = useState<"all" | "unread">("all");
   const panicMutation = useSendResidentPanic();
   const submitStaffRating = useSubmitStaffRating();
   const eventRsvp = useEventRsvp();
@@ -432,6 +441,7 @@ export function OwnerTenantDashboardView({
       });
       await deliveries.refetch();
       refetchStats?.();
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
       toast.success(
         approved
           ? "Delivery approved! Security guard notified to permit entry."
@@ -556,6 +566,7 @@ export function OwnerTenantDashboardView({
         await visitors.decide.mutateAsync({ requestId, approved });
         await visitors.refetch();
         refetchStats?.();
+        queryClient.invalidateQueries({ queryKey: ["notifications"] });
       }
       if (pendingVisitor) setDismissedVisitorId(pendingVisitor.id);
       toast.success(
@@ -4116,156 +4127,450 @@ export function OwnerTenantDashboardView({
       )}
 
       {/* TAB 13: NOTIFICATIONS & ALERTS */}
-      {activeTab === "notifications" && (
-        <div className="gs-card">
-          <h3 className="card-h3" style={{ marginBottom: "1.25rem" }}>
-            Notifications & Gate Alerts
-          </h3>
-          {myNotifications.isLoading ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
-              {[1, 2, 3, 4].map((n) => (
-                <CardSkeleton key={n} lines={2} />
-              ))}
-            </div>
-          ) : myNotifications.isError ? (
-            <ErrorState
-              title="Failed to Load Notifications"
-              message={myNotifications.error?.message || "Could not retrieve notifications."}
-              onRetry={() => myNotifications.refetch()}
-            />
-          ) : (myNotifications.data || []).length === 0 ? (
-            <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>No notifications yet.</p>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
-              {(myNotifications.data || []).map((n) => {
-                const isCabNotif =
-                  n.reference_type === "cab_request" ||
-                  (n.notification_type && n.notification_type.includes("cab")) ||
-                  (n.title && n.title.toLowerCase().includes("cab"));
-                const isDeliveryNotif =
-                  !isCabNotif &&
-                  (n.reference_type === "delivery" || (n.notification_type && n.notification_type.includes("delivery")));
-                const isVisitorNotif =
-                  !isCabNotif &&
-                  (n.reference_type === "visitor_request" || (n.notification_type && n.notification_type.includes("visitor")));
-                const refId = n.reference_id;
+      {activeTab === "notifications" && (() => {
+        const notifList = myNotifications.data || [];
+        const unreadCount = notifList.filter((n) => !n.is_read && !actionedNotifications[n.id]).length;
+        const displayedNotifs = notifList.filter((n) => {
+          if (notifFilter === "unread") {
+            return !n.is_read && !actionedNotifications[n.id];
+          }
+          return true;
+        });
 
-                return (
-                  <div
-                    key={n.id}
+        const handleMarkAllRead = async () => {
+          try {
+            await markAllNotificationsRead.mutateAsync();
+            toast.success("All notifications marked as read.", "Notifications Updated");
+            myNotifications.refetch();
+          } catch (err: any) {
+            toast.error(err?.message || "Failed to mark all notifications as read.", "Error");
+          }
+        };
+
+        return (
+          <div className="gs-card">
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "1.25rem",
+                flexWrap: "wrap",
+                gap: "0.75rem",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                <h3 className="card-h3" style={{ margin: 0 }}>
+                  Notifications &amp; Gate Alerts
+                </h3>
+                {unreadCount > 0 && (
+                  <span
+                    className="badge badge-primary"
                     style={{
-                      padding: "1rem",
-                      border: n.is_read
-                        ? "1px solid var(--border-standard)"
-                        : isCabNotif
-                          ? "1px solid #F59E0B"
-                          : "1px solid var(--brand-primary)",
-                      borderRadius: "8px",
-                      background: n.is_read
-                        ? "#F8FAFC"
-                        : isCabNotif
-                          ? "#FFFBEB"
-                          : "#EFF6FF",
+                      background: "var(--brand-primary, #1D4ED8)",
+                      color: "#FFFFFF",
+                      fontWeight: 700,
+                      fontSize: "0.75rem",
+                      padding: "0.2rem 0.6rem",
+                      borderRadius: "9999px",
                     }}
                   >
+                    {unreadCount} Unread
+                  </span>
+                )}
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                <div style={{ display: "flex", background: "var(--bg-secondary, #F1F5F9)", padding: "2px", borderRadius: "8px" }}>
+                  <button
+                    type="button"
+                    className={`btn ${notifFilter === "all" ? "btn-primary" : "btn-secondary"}`}
+                    style={{
+                      fontSize: "0.75rem",
+                      padding: "0.25rem 0.65rem",
+                      borderRadius: "6px",
+                      border: "none",
+                      background: notifFilter === "all" ? "var(--brand-primary, #1D4ED8)" : "transparent",
+                      color: notifFilter === "all" ? "#FFFFFF" : "var(--brand-body, #64748B)",
+                    }}
+                    onClick={() => setNotifFilter("all")}
+                  >
+                    All ({notifList.length})
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn ${notifFilter === "unread" ? "btn-primary" : "btn-secondary"}`}
+                    style={{
+                      fontSize: "0.75rem",
+                      padding: "0.25rem 0.65rem",
+                      borderRadius: "6px",
+                      border: "none",
+                      background: notifFilter === "unread" ? "var(--brand-primary, #1D4ED8)" : "transparent",
+                      color: notifFilter === "unread" ? "#FFFFFF" : "var(--brand-body, #64748B)",
+                    }}
+                    onClick={() => setNotifFilter("unread")}
+                  >
+                    Unread ({unreadCount})
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ fontSize: "0.75rem", padding: "0.3rem 0.75rem", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
+                  onClick={handleMarkAllRead}
+                  disabled={markAllNotificationsRead.isPending || unreadCount === 0}
+                >
+                  ✓ Mark All as Read
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ fontSize: "0.75rem", padding: "0.3rem 0.6rem" }}
+                  onClick={() => myNotifications.refetch()}
+                  title="Refresh Notifications"
+                >
+                  🔄
+                </button>
+              </div>
+            </div>
+
+            {myNotifications.isLoading ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+                {[1, 2, 3, 4].map((n) => (
+                  <CardSkeleton key={n} lines={2} />
+                ))}
+              </div>
+            ) : myNotifications.isError ? (
+              <ErrorState
+                title="Failed to Load Notifications"
+                message={myNotifications.error?.message || "Could not retrieve notifications."}
+                onRetry={() => myNotifications.refetch()}
+              />
+            ) : displayedNotifs.length === 0 ? (
+              <p style={{ color: "var(--brand-body)", fontSize: "14px", padding: "1rem 0" }}>
+                {notifFilter === "unread" ? "No unread notifications! You are completely caught up." : "No notifications yet."}
+              </p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+                {displayedNotifs.map((n) => {
+                  const isCabNotif =
+                    n.reference_type === "cab_request" ||
+                    (n.notification_type && n.notification_type.includes("cab")) ||
+                    (n.title && n.title.toLowerCase().includes("cab"));
+                  const isDeliveryNotif =
+                    !isCabNotif &&
+                    (n.reference_type === "delivery" || (n.notification_type && n.notification_type.includes("delivery")));
+                  const isVisitorNotif =
+                    !isCabNotif &&
+                    (n.reference_type === "visitor_request" || (n.notification_type && n.notification_type.includes("visitor")));
+                  const refId = n.reference_id;
+
+                  const isLocalRead = Boolean(actionedNotifications[n.id]);
+                  const isRead = n.is_read || isLocalRead;
+
+                  // Find status in real-time collections
+                  const matchedVisitor = visitorList.find((v) => v.id === refId);
+                  const matchedDelivery = deliveryList.find((d) => d.id === refId);
+
+                  const localAction = actionedNotifications[n.id];
+                  const isVisitorApproved = matchedVisitor && (matchedVisitor.status === "approved" || matchedVisitor.status === "checked_in");
+                  const isVisitorRejected = matchedVisitor && matchedVisitor.status === "rejected";
+                  const isDeliveryApproved = matchedDelivery && (matchedDelivery.approval_status === "approved" || matchedDelivery.status === "delivered");
+                  const isDeliveryRejected = matchedDelivery && (matchedDelivery.approval_status === "rejected" || matchedDelivery.status === "rejected");
+
+                  const isApproved = localAction === "approved" || isVisitorApproved || isDeliveryApproved;
+                  const isRejected = localAction === "rejected" || isVisitorRejected || isDeliveryRejected;
+                  const isDecided = isApproved || isRejected;
+
+                  return (
                     <div
+                      key={n.id}
                       style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        marginBottom: "0.25rem",
-                        flexWrap: "wrap",
-                        gap: "0.5rem",
+                        padding: "1rem",
+                        border: isRead
+                          ? "1px solid var(--border-standard, #E2E8F0)"
+                          : isCabNotif
+                            ? "1px solid #F59E0B"
+                            : "1px solid var(--brand-primary, #3B82F6)",
+                        borderRadius: "8px",
+                        background: isRead
+                          ? "#F8FAFC"
+                          : isCabNotif
+                            ? "#FFFBEB"
+                            : "#EFF6FF",
+                        transition: "all 0.2s ease",
+                      }}
+                      onClick={async () => {
+                        if (!isRead) {
+                          try {
+                            await markNotificationRead.mutateAsync(n.id);
+                            myNotifications.refetch();
+                          } catch (e) {
+                            // ignore
+                          }
+                        }
                       }}
                     >
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                        {isCabNotif && (
-                          <span
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          marginBottom: "0.25rem",
+                          flexWrap: "wrap",
+                          gap: "0.5rem",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                          {isCabNotif ? (
+                            <span
+                              style={{
+                                fontSize: "10.5px",
+                                fontWeight: 800,
+                                background: "#D97706",
+                                color: "#FFFFFF",
+                                padding: "0.15rem 0.5rem",
+                                borderRadius: "9999px",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "0.25rem",
+                              }}
+                            >
+                              🚖 CAB ARRIVAL
+                            </span>
+                          ) : isDeliveryNotif ? (
+                            <span
+                              style={{
+                                fontSize: "10.5px",
+                                fontWeight: 800,
+                                background: "#0284C7",
+                                color: "#FFFFFF",
+                                padding: "0.15rem 0.5rem",
+                                borderRadius: "9999px",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "0.25rem",
+                              }}
+                            >
+                              📦 DELIVERY
+                            </span>
+                          ) : isVisitorNotif ? (
+                            <span
+                              style={{
+                                fontSize: "10.5px",
+                                fontWeight: 800,
+                                background: "#4F46E5",
+                                color: "#FFFFFF",
+                                padding: "0.15rem 0.5rem",
+                                borderRadius: "9999px",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "0.25rem",
+                              }}
+                            >
+                              👤 VISITOR PASS
+                            </span>
+                          ) : null}
+                          <h4
                             style={{
-                              fontSize: "10.5px",
-                              fontWeight: 800,
-                              background: "#D97706",
-                              color: "#FFFFFF",
-                              padding: "0.15rem 0.5rem",
-                              borderRadius: "9999px",
-                              display: "inline-flex",
+                              fontWeight: isRead ? 600 : 800,
+                              fontSize: "14px",
+                              color: "var(--brand-heading, #0F172A)",
+                              margin: 0,
+                              display: "flex",
                               alignItems: "center",
-                              gap: "0.25rem",
+                              gap: "0.4rem",
                             }}
                           >
-                            🚖 CAB ARRIVAL
+                            {n.title}
+                            {!isRead && (
+                              <span
+                                style={{
+                                  width: 8,
+                                  height: 8,
+                                  borderRadius: "50%",
+                                  background: "#EF4444",
+                                  display: "inline-block",
+                                }}
+                                title="Unread notification"
+                              />
+                            )}
+                          </h4>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                          {isRead ? (
+                            <span style={{ fontSize: "11px", color: "var(--brand-body, #64748B)", fontWeight: 500 }}>
+                              ✓ Seen
+                            </span>
+                          ) : (
+                            <span
+                              style={{
+                                fontSize: "10px",
+                                fontWeight: 700,
+                                color: "#1D4ED8",
+                                background: "#DBEAFE",
+                                padding: "0.1rem 0.4rem",
+                                borderRadius: "4px",
+                              }}
+                            >
+                              NEW
+                            </span>
+                          )}
+                          <span style={{ fontSize: "11px", color: "var(--brand-body, #64748B)" }}>
+                            {formatDate(n.created_at)}
                           </span>
-                        )}
-                        <h4
-                          style={{
-                            fontWeight: 700,
-                            fontSize: "14px",
-                            color: "var(--brand-heading)",
-                            margin: 0,
-                          }}
-                        >
-                          {n.title}
-                        </h4>
+                        </div>
                       </div>
-                      <span style={{ fontSize: "11px", color: "var(--brand-body)" }}>
-                        {formatDate(n.created_at)}
-                      </span>
-                    </div>
-                    <p style={{ fontSize: "13px", color: "var(--brand-body)", margin: "0.35rem 0 0 0", lineHeight: 1.4 }}>
-                      {n.body || (n as any).message}
-                    </p>
+                      <p style={{ fontSize: "13px", color: isRead ? "var(--brand-body, #64748B)" : "var(--brand-heading, #0F172A)", margin: "0.35rem 0 0 0", lineHeight: 1.4 }}>
+                        {n.body || (n as any).message}
+                      </p>
 
-                    {(isDeliveryNotif || isVisitorNotif || isCabNotif) && refId && (
-                      <div style={{ marginTop: "0.75rem", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                        <button
-                          type="button"
-                          className="btn btn-primary"
-                          style={{
-                            fontSize: "0.775rem",
-                            padding: "0.3rem 0.75rem",
-                            background: isCabNotif ? "#D97706" : "#059669",
-                            borderColor: isCabNotif ? "#D97706" : "#059669",
-                            color: "#FFFFFF",
-                            fontWeight: 700,
-                          }}
-                          onClick={async () => {
-                            if (isDeliveryNotif) {
-                              await handleDecideDelivery(refId, true);
-                            } else {
-                              await handleVisitorDecision(refId, true);
-                            }
-                            myNotifications.refetch();
-                          }}
-                        >
-                          {isCabNotif ? "✓ Approve Cab" : "✓ Approve"}
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-danger"
-                          style={{
-                            fontSize: "0.775rem",
-                            padding: "0.3rem 0.75rem",
-                            fontWeight: 700,
-                          }}
-                          onClick={async () => {
-                            if (isDeliveryNotif) {
-                              await handleDecideDelivery(refId, false);
-                            } else {
-                              await handleVisitorDecision(refId, false);
-                            }
-                            myNotifications.refetch();
-                          }}
-                        >
-                          {isCabNotif ? "✕ Turn Away" : "✕ Reject"}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
+                      {/* Action buttons / Status badges */}
+                      {(isDeliveryNotif || isVisitorNotif || isCabNotif) && refId ? (
+                        <div style={{ marginTop: "0.75rem", display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+                          {isApproved ? (
+                            <span
+                              className="badge badge-success"
+                              style={{
+                                fontWeight: 700,
+                                fontSize: "0.8rem",
+                                padding: "0.3rem 0.75rem",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "0.35rem",
+                                background: "#DCFCE7",
+                                color: "#15803D",
+                                border: "1px solid #86EFAC",
+                                borderRadius: "6px",
+                              }}
+                            >
+                              ✓ {isCabNotif ? "Cab Approved" : "Approved"}
+                            </span>
+                          ) : isRejected ? (
+                            <span
+                              className="badge badge-danger"
+                              style={{
+                                fontWeight: 700,
+                                fontSize: "0.8rem",
+                                padding: "0.3rem 0.75rem",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "0.35rem",
+                                background: "#FEE2E2",
+                                color: "#B91C1C",
+                                border: "1px solid #FCA5A5",
+                                borderRadius: "6px",
+                              }}
+                            >
+                              ✕ {isCabNotif ? "Cab Turned Away" : "Rejected"}
+                            </span>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                className="btn btn-primary"
+                                style={{
+                                  fontSize: "0.775rem",
+                                  padding: "0.35rem 0.85rem",
+                                  background: isCabNotif ? "#D97706" : "#059669",
+                                  borderColor: isCabNotif ? "#D97706" : "#059669",
+                                  color: "#FFFFFF",
+                                  fontWeight: 700,
+                                  cursor: "pointer",
+                                }}
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  setActionedNotifications((prev) => ({ ...prev, [n.id]: "approved" }));
+                                  try {
+                                    if (isDeliveryNotif) {
+                                      await handleDecideDelivery(refId, true);
+                                    } else {
+                                      await handleVisitorDecision(refId, true);
+                                    }
+                                    await markNotificationRead.mutateAsync(n.id);
+                                  } catch (err: any) {
+                                    toast.error(err?.message || "Failed to record approval.", "Error");
+                                  } finally {
+                                    myNotifications.refetch();
+                                    visitors.refetch();
+                                    deliveries.refetch();
+                                  }
+                                }}
+                              >
+                                {isCabNotif ? "✓ Approve Cab" : "✓ Approve"}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-danger"
+                                style={{
+                                  fontSize: "0.775rem",
+                                  padding: "0.35rem 0.85rem",
+                                  fontWeight: 700,
+                                  cursor: "pointer",
+                                }}
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  setActionedNotifications((prev) => ({ ...prev, [n.id]: "rejected" }));
+                                  try {
+                                    if (isDeliveryNotif) {
+                                      await handleDecideDelivery(refId, false);
+                                    } else {
+                                      await handleVisitorDecision(refId, false);
+                                    }
+                                    await markNotificationRead.mutateAsync(n.id);
+                                  } catch (err: any) {
+                                    toast.error(err?.message || "Failed to record rejection.", "Error");
+                                  } finally {
+                                    myNotifications.refetch();
+                                    visitors.refetch();
+                                    deliveries.refetch();
+                                  }
+                                }}
+                              >
+                                {isCabNotif ? "✕ Turn Away" : "✕ Reject"}
+                              </button>
+                              {!isRead && (
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary"
+                                  style={{ fontSize: "0.775rem", padding: "0.35rem 0.75rem" }}
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    await markNotificationRead.mutateAsync(n.id);
+                                    myNotifications.refetch();
+                                  }}
+                                >
+                                  Mark as Seen
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      ) : !isRead ? (
+                        <div style={{ marginTop: "0.5rem", display: "flex", justifyContent: "flex-end" }}>
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            style={{ fontSize: "0.75rem", padding: "0.25rem 0.65rem" }}
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              await markNotificationRead.mutateAsync(n.id);
+                              myNotifications.refetch();
+                            }}
+                          >
+                            ✓ Mark as Read
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* TAB 14: EMERGENCY SOS */}
       {activeTab === "emergency" && (

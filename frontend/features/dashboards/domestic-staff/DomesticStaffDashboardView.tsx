@@ -39,7 +39,11 @@ import {
   AttendanceRecord,
   StaffVisit,
 } from "@/hooks/use-domestic-staff-data";
-import { useMyNotifications } from "@/hooks/use-notifications";
+import {
+  useMyNotifications,
+  useMarkNotificationRead,
+  useMarkAllNotificationsRead,
+} from "@/hooks/use-notifications";
 import { useTableControls } from "@/hooks/use-table-controls";
 import { formatDate, isValidPersonName } from "@/lib/utils";
 
@@ -101,6 +105,8 @@ export function DomesticStaffDashboardView({
   const updateProfile = useUpdateStaffProfile();
   const panicMutation = useSendStaffPanic();
   const myNotifications = useMyNotifications({ page_size: 20 });
+  const markNotificationRead = useMarkNotificationRead();
+  const markAllNotificationsRead = useMarkAllNotificationsRead();
   const { data: passData } = useStaffPass();
 
   const openAttendance = attendance.find((a) => a.status === "open");
@@ -1283,46 +1289,141 @@ export function DomesticStaffDashboardView({
       )}
 
       {/* TAB 8: NOTIFICATIONS */}
-      {activeTab === "notifications" && (
-        <div className="gs-card">
-          <h3 className="card-h3" style={{ marginBottom: "1rem" }}>
-            Staff Notice Board & Alerts
-          </h3>
-          {myNotifications.isLoading ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              <CardSkeleton height={68} />
-              <CardSkeleton height={68} />
-              <CardSkeleton height={68} />
-            </div>
-          ) : (myNotifications.data || []).length === 0 ? (
-            <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>No notifications yet.</p>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              {(myNotifications.data || []).map((n) => (
-                <div
-                  key={n.id}
-                  style={{
-                    padding: "0.85rem",
-                    background: "#F8FAFC",
-                    borderRadius: "8px",
-                    border: "1px solid var(--border-light)",
-                  }}
+      {activeTab === "notifications" && (() => {
+        const notifList = myNotifications.data || [];
+        const unreadCount = notifList.filter((n) => !n.is_read).length;
+
+        const handleMarkAllRead = async () => {
+          try {
+            await markAllNotificationsRead.mutateAsync();
+            toast.success("All notifications marked as read.", "Caught Up");
+            myNotifications.refetch();
+          } catch (err: any) {
+            toast.error(err?.message || "Failed to mark notifications as read.", "Error");
+          }
+        };
+
+        return (
+          <div className="gs-card">
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "1rem",
+                flexWrap: "wrap",
+                gap: "0.5rem",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <h3 className="card-h3" style={{ margin: 0 }}>
+                  Staff Notice Board &amp; Alerts
+                </h3>
+                {unreadCount > 0 && (
+                  <span
+                    className="badge badge-primary"
+                    style={{
+                      background: "var(--brand-primary, #1D4ED8)",
+                      color: "#FFFFFF",
+                      fontWeight: 700,
+                      fontSize: "0.75rem",
+                      padding: "0.15rem 0.5rem",
+                      borderRadius: "9999px",
+                    }}
+                  >
+                    {unreadCount} Unread
+                  </span>
+                )}
+              </div>
+
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ fontSize: "0.75rem", padding: "0.25rem 0.65rem" }}
+                  onClick={handleMarkAllRead}
+                  disabled={markAllNotificationsRead.isPending || unreadCount === 0}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <strong style={{ fontSize: "14px" }}>{n.title}</strong>
-                    <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-                      {formatDate(n.created_at)}
-                    </span>
-                  </div>
-                  <p style={{ fontSize: "13px", color: "var(--brand-body)", marginTop: "0.25rem" }}>
-                    {n.body}
-                  </p>
-                </div>
-              ))}
+                  ✓ Mark All as Read
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
+                  onClick={() => myNotifications.refetch()}
+                  title="Refresh notifications"
+                >
+                  🔄
+                </button>
+              </div>
             </div>
-          )}
-        </div>
-      )}
+
+            {myNotifications.isLoading ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                <CardSkeleton height={68} />
+                <CardSkeleton height={68} />
+                <CardSkeleton height={68} />
+              </div>
+            ) : notifList.length === 0 ? (
+              <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>No notifications yet.</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                {notifList.map((n) => (
+                  <div
+                    key={n.id}
+                    style={{
+                      padding: "0.85rem",
+                      background: n.is_read ? "#F8FAFC" : "#EFF6FF",
+                      borderRadius: "8px",
+                      border: n.is_read ? "1px solid var(--border-light)" : "1px solid var(--brand-primary)",
+                      cursor: n.is_read ? "default" : "pointer",
+                      transition: "all 0.2s ease",
+                    }}
+                    onClick={async () => {
+                      if (!n.is_read) {
+                        try {
+                          await markNotificationRead.mutateAsync(n.id);
+                          myNotifications.refetch();
+                        } catch (e) {
+                          // ignore
+                        }
+                      }
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                        <strong style={{ fontSize: "14px", color: "var(--fg)" }}>{n.title}</strong>
+                        {!n.is_read && (
+                          <span
+                            style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: "50%",
+                              background: "#EF4444",
+                              display: "inline-block",
+                            }}
+                          />
+                        )}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                        {n.is_read && (
+                          <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>✓ Seen</span>
+                        )}
+                        <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                          {formatDate(n.created_at)}
+                        </span>
+                      </div>
+                    </div>
+                    <p style={{ fontSize: "13px", color: "var(--brand-body)", marginTop: "0.25rem" }}>
+                      {n.body}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* TAB 9: EMERGENCY SOS */}
       {activeTab === "emergency" && (
