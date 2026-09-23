@@ -254,6 +254,20 @@ async def cancel_request(
 
 
 @router.post(
+    "/requests/{request_id}/notify",
+    response_model=Envelope[schemas.RequestRead],
+    dependencies=[UPDATE],
+)
+async def notify_resident(
+    request_id: uuid.UUID, svc: VisitorService = Depends(visitor_service)
+) -> dict:
+    return ok(
+        schemas.RequestRead.model_validate(await svc.notify_resident(request_id)),
+        message="Approval request sent to resident",
+    )
+
+
+@router.post(
     "/requests/{request_id}/passes",
     response_model=Envelope[schemas.PassRead],
     status_code=status.HTTP_201_CREATED,

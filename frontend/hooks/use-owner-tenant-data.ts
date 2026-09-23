@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { deriveTicketEscalationState } from "@/lib/utils";
+import { deriveTicketEscalationState, isValidPersonName } from "@/lib/utils";
 
 export interface ResidentDashboardStats {
   pending_dues_amount: number;
@@ -19,6 +19,8 @@ export interface VisitorRequest {
   phone: string;
   purpose: string;
   vehicle_number?: string;
+  photo_url?: string | null;
+  visitor_type?: string;
   status: "pending" | "approved" | "rejected" | "expired" | "checked_in" | "checked_out";
   created_at: string;
   expires_at?: string;
@@ -71,6 +73,11 @@ export interface AmenityBooking {
   unit_id?: string;
   community_id?: string;
   user_id?: string;
+  resident_name?: string;
+  resident_phone?: string;
+  unit_number?: string;
+  tower_name?: string;
+  unit_label?: string;
 }
 
 export interface ComplaintTicket {
@@ -96,11 +103,24 @@ export interface InvoiceItem {
   total_amount: number;
   amount_paid: number;
   balance_due: number;
-  status: "posted" | "paid" | "partially_paid" | "overdue" | "cancelled";
+  status: "posted" | "paid" | "partially_paid" | "overdue" | "cancelled" | "draft";
   issue_date: string;
   due_date: string;
+  billing_period_start?: string | null;
+  billing_period_end?: string | null;
+  subtotal?: number;
+  discount?: number;
+  late_fee?: number;
+  tax?: number;
   receipt_number?: string;
-  line_items?: { head: string; amount: number }[];
+  line_items?: {
+    head: string;
+    description?: string;
+    quantity?: number;
+    unit_rate?: number;
+    amount: number;
+    taxable?: boolean;
+  }[];
 }
 
 export function useResidentOverview(communityId?: string | null) {
@@ -129,7 +149,7 @@ export function useResidentVisitors() {
   const query = useQuery<VisitorRequest[]>({
     queryKey: ["resident", "visitors"],
     queryFn: async () => {
-      const res = await api.get<any[]>("/visitors/requests");
+      const res = await api.get<any[]>("/visitors/requests?page_size=100");
       if (!Array.isArray(res)) return [];
       return res.map((r: any) => ({
         id: r.id,
@@ -137,6 +157,8 @@ export function useResidentVisitors() {
         phone: r.visitor?.phone || r.phone || r.visitor_phone || "",
         purpose: r.purpose || "Guest visit",
         vehicle_number: r.vehicle_number,
+        photo_url: r.photo_url || r.visitor?.photo_url || r.entries?.[0]?.entry_photo_url || null,
+        visitor_type: r.visitor_type || "guest",
         status: r.status,
         created_at: r.created_at,
         valid_until: r.valid_until,
@@ -209,6 +231,15 @@ export function useResidentVisitors() {
       const cleanName = (payload.visitor_name || "").trim();
       if (!cleanName) {
         throw new Error("Visitor name is required to generate a gate pass.");
+      }
+      if (cleanName.length < 2) {
+        throw new Error("Visitor name is too short (must be at least 2 characters).");
+      }
+      if (cleanName.length > 35) {
+        throw new Error("Visitor name exceeds maximum length (cannot exceed 35 characters).");
+      }
+      if (!isValidPersonName(cleanName)) {
+        throw new Error("Visitor name must contain only alphabetic letters and spaces.");
       }
       let rawPhone = (payload.phone || "").trim().replace(/[\s\-()]/g, "");
       if (!rawPhone) {
@@ -297,7 +328,7 @@ export function useResidentDeliveries() {
   const query = useQuery<DeliveryItem[]>({
     queryKey: ["resident", "deliveries"],
     queryFn: async () => {
-      const res = await api.get<any[]>("/deliveries");
+      const res = await api.get<any[]>("/deliveries?page_size=100");
       if (!Array.isArray(res)) return [];
       return res.map((d: any) => ({
         id: d.id,
@@ -416,7 +447,7 @@ export function useResidentAmenities() {
     queryKey: ["resident", "my-bookings"],
     queryFn: async () => {
       const [bookingsRes, amenitiesRes] = await Promise.all([
-        api.get<any[]>("/amenities/bookings"),
+        api.get<any[]>("/amenities/bookings?page_size=100"),
         api.get<any[]>("/amenities").catch(() => []),
       ]);
       if (!Array.isArray(bookingsRes)) return [];
@@ -497,7 +528,7 @@ export function useResidentComplaints() {
     queryKey: ["resident", "complaints"],
     queryFn: async () => {
       const [res, categoriesRes] = await Promise.all([
-        api.get<any[]>("/complaints/tickets"),
+        api.get<any[]>("/complaints/tickets?page_size=100"),
         api.get<any[]>("/complaints/categories").catch(() => []),
       ]);
       if (!Array.isArray(res)) return [];
@@ -641,7 +672,7 @@ export function useResidentLedger(unitId?: string) {
         targetUnitId = me?.occupancies?.[0]?.unit_id;
       }
       if (!targetUnitId) return [];
-      const res = await api.get<any[]>(`/billing/units/${targetUnitId}/ledger`);
+      const res = await api.get<any[]>(`/billing/units/${targetUnitId}/ledger?page_size=100`);
       if (!Array.isArray(res)) return [];
       return res.map((l: any) => ({
         id: l.id,
@@ -665,7 +696,7 @@ export function useResidentPayments() {
   const query = useQuery<InvoiceItem[]>({
     queryKey: ["resident", "invoices"],
     queryFn: async () => {
-      const res = await api.get<any[]>("/billing/invoices");
+      const res = await api.get<any[]>("/billing/invoices?page_size=100");
       if (!Array.isArray(res)) return [];
       return res.map((inv: any) => ({
         id: inv.id,
@@ -677,13 +708,32 @@ export function useResidentPayments() {
         status: inv.status,
         issue_date: inv.issue_date || inv.created_at,
         due_date: inv.due_date || inv.created_at,
+        billing_period_start: inv.billing_period_start || null,
+        billing_period_end: inv.billing_period_end || null,
+        subtotal: Number(inv.subtotal ?? inv.total_amount ?? 0),
+        discount: Number(inv.discount ?? 0),
+        late_fee: Number(inv.late_fee ?? 0),
+        tax: Number(inv.tax ?? 0),
         receipt_number: inv.receipt_number,
-        line_items: Array.isArray(inv.items)
+        line_items: Array.isArray(inv.items) && inv.items.length > 0
           ? inv.items.map((i: any) => ({
             head: i.description || "Maintenance Charge",
+            description: i.description || "General maintenance and community services",
+            quantity: Number(i.quantity ?? 1),
+            unit_rate: Number(i.unit_rate ?? i.amount ?? 0),
             amount: Number(i.amount ?? 0),
+            taxable: Boolean(i.taxable),
           }))
-          : [],
+          : [
+              {
+                head: "Monthly Society Maintenance & Operations",
+                description: "Standard community upkeep, security, and common utilities",
+                quantity: 1,
+                unit_rate: Number(inv.subtotal ?? inv.total_amount ?? 0),
+                amount: Number(inv.subtotal ?? inv.total_amount ?? 0),
+                taxable: Number(inv.tax ?? 0) > 0,
+              },
+            ],
       }));
     },
   });
@@ -950,7 +1000,10 @@ export function useResidentVehicles() {
     queryFn: async () => {
       const me = await api.get<any>("/residents/me").catch(() => null);
       const communityId = me?.community_id;
-      const params = communityId ? { community_id: communityId } : undefined;
+      const params = {
+        ...(communityId ? { community_id: communityId } : {}),
+        page_size: 100,
+      };
       const [vehiclesRes, allocationsRes, slotsRes, violationsRes] = await Promise.all([
         api.get<any[]>("/vehicles", params).catch(() => []),
         api.get<any[]>("/vehicles/parking/allocations", params).catch(() => []),
@@ -1068,8 +1121,8 @@ export function useResidentDomesticStaff() {
       const unitId = me?.occupancies?.[0]?.unit_id;
       if (!unitId) return [];
       const [assignments, openAttendance] = await Promise.all([
-        api.get<any[]>("/domestic-staff/assignments", { unit_id: unitId }),
-        api.get<any[]>("/domestic-staff/attendance?open_only=true").catch(() => []),
+        api.get<any[]>("/domestic-staff/assignments", { unit_id: unitId, page_size: 100 }),
+        api.get<any[]>("/domestic-staff/attendance?open_only=true&page_size=100").catch(() => []),
       ]);
       if (!Array.isArray(assignments) || assignments.length === 0) return [];
       const staffList = await Promise.all(
@@ -1135,13 +1188,35 @@ export function useSubmitStaffRating() {
 }
 
 export function useSendResidentPanic() {
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: { unit_id?: string; note?: string }) => {
+    mutationFn: async (payload: {
+      alert_type?: string;
+      severity?: string;
+      unit_id?: string;
+      note?: string;
+      location?: string;
+    }) => {
+      const locStr = payload.location
+        ? (payload.location.startsWith("Location:") ? payload.location : `Location: ${payload.location}`)
+        : "";
+      const fullMessage = [locStr, payload.note || "Resident emergency panic triggered from portal"]
+        .filter(Boolean)
+        .join(" — ");
+
+      const rawType = (payload.alert_type || "other").toLowerCase().trim();
+      const validTypes = ["medical", "fire", "security", "intrusion", "other"];
+      const backendType = validTypes.includes(rawType) ? rawType : "other";
+
       return await api.post("/gate/alerts", {
-        alert_type: "medical",
-        severity: "high",
-        message: payload.note || "Resident emergency panic triggered from portal",
+        alert_type: backendType,
+        severity: payload.severity || "critical",
+        message: fullMessage,
       });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["resident", "overview"], refetchType: "all" });
+      await queryClient.invalidateQueries({ queryKey: ["gate", "alerts"], refetchType: "all" });
     },
   });
 }

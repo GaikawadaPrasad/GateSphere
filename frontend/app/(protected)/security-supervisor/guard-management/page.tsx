@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
 import { DataTable, type Column } from "@/components/tables/DataTable";
-import { gateApi, guardsApi } from "@/lib/api";
+import { authApi, gateApi, guardsApi } from "@/lib/api";
 import { PasswordField } from "@/components/forms/PasswordField";
 import { generateInitialPassword, isValidPersonName } from "@/lib/utils";
 import { toast } from "@/store/toast";
@@ -26,6 +26,7 @@ interface GuardRosterItem {
 export default function SecuritySupervisorGuardManagementPage() {
   const [roster, setRoster] = useState<GuardRosterItem[]>([]);
   const [guardsList, setGuardsList] = useState<{ id: string; name: string }[]>([]);
+  const [communityId, setCommunityId] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
 
   // Status Modal
@@ -44,7 +45,7 @@ export default function SecuritySupervisorGuardManagementPage() {
   const [shiftNotes, setShiftNotes] = useState("");
   const [isCreating, setIsCreating] = useState(false);
 
-  // Register Guard Modal
+  // Register New Guard Modal
   const [isRegisterGuardOpen, setIsRegisterGuardOpen] = useState(false);
   const [guardFullName, setGuardFullName] = useState("");
   const [guardEmail, setGuardEmail] = useState("");
@@ -107,6 +108,7 @@ export default function SecuritySupervisorGuardManagementPage() {
         email: guardEmail.trim(),
         password: finalPassword,
         phone: guardPhone.trim() || undefined,
+        community_id: communityId,
       });
       toast.success(`Security guard "${guardFullName.trim()}" registered successfully.`, "Guard Created");
       setIsRegisterGuardOpen(false);
@@ -124,11 +126,18 @@ export default function SecuritySupervisorGuardManagementPage() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [rosterData, assignData, guardsData] = await Promise.allSettled([
+      const [rosterData, assignData, guardsData, meData] = await Promise.allSettled([
         gateApi.rosters(),
         gateApi.assignments(),
         guardsApi.list(),
+        authApi.me().catch(() => null),
       ]);
+
+      if (meData.status === "fulfilled" && meData.value) {
+        const me: any = meData.value;
+        const cid = me?.community_ids?.[0] || me?.community_id || me?.roles?.find((r: any) => r.community_id)?.community_id;
+        if (cid) setCommunityId(cid);
+      }
 
       const rawRoster = rosterData.status === "fulfilled" && Array.isArray(rosterData.value) ? rosterData.value : [];
       const rawAssigns = assignData.status === "fulfilled" && Array.isArray(assignData.value) ? assignData.value : [];

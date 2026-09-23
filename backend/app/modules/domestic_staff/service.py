@@ -17,7 +17,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.context import RequestContext
-from app.core.errors import BusinessRuleError, ConflictError, NotFoundError
+from app.core.errors import BusinessRuleError, ConflictError, ForbiddenError, NotFoundError
 from app.core.hashing import digest, digest_opt
 from app.core.state_machine import ensure_transition
 from app.core.tenancy import TenantScope
@@ -208,6 +208,17 @@ class DomesticStaffService(UnitScopedAccess):
         self, *, community_id: uuid.UUID | None, q: str | None, offset: int, limit: int
     ):
         cid = self._one_community(community_id)
+        
+        from app.modules.users.models import Role, UserRole
+        slugs = await self.db.scalars(
+            select(Role.slug)
+            .join(UserRole, UserRole.role_id == Role.id)
+            .where(UserRole.user_id == self.actor.id)
+        )
+        slug_set = set(slugs.all())
+        if not self.actor.is_superadmin and "resident" not in slug_set and not slug_set.intersection(_CROSS_UNIT_ROLE_SLUGS):
+            raise ForbiddenError("You do not have permission to view the staff registry", code="PERMISSION_DENIED")
+
         stmt = select(DomesticStaff).where(DomesticStaff.community_id == cid)
         if q:
             stmt = stmt.where(
@@ -224,6 +235,9 @@ class DomesticStaffService(UnitScopedAccess):
     async def update_staff(
         self, staff_id: uuid.UUID, payload: schemas.StaffUpdate
     ) -> DomesticStaff:
+        if not self.actor.is_superadmin and not await self._actor_has_cross_unit_role():
+            raise ForbiddenError("Only administrators can update staff profiles directly", code="PERMISSION_DENIED")
+            
         obj = await self._staff_in_scope(staff_id)
         patch = payload.model_dump(exclude_unset=True)
         _enum("staff_type", patch.get("staff_type"))
@@ -553,71 +567,12 @@ class DomesticStaffService(UnitScopedAccess):
         if self.actor.phone:
             staff_phone = await self.staff.by_phone_scoped(self.actor.phone)
             if staff_phone is not None:
-                staff_phone.user_id = self.actor.id
-                await self.db.flush()
+                if staff_phone.user_id is None:
+                    staff_phone.user_id = self.actor.id
+                    await self.db.flush()
                 return staff_phone
 
-        # 3. Auto-heal / link: In deployed staging environments (e.g. Vercel + Supabase),
-        # staff rows may exist from seed without user_id or linked to an old user ID.
-        if not self.scope.is_global and self.scope.community_ids:
-            cid = next(iter(self.scope.community_ids))
-            existing = await self.staff.first_in_community(cid, unlinked_only=True)
-            if existing is None:
-                existing = await self.staff.first_in_community(cid)
-
-            if existing is not None:
-                existing.user_id = self.actor.id
-                await self.db.flush()
-                active = await self.assignments.active_for_staff(existing.id)
-                if not active:
-                    unit_id = await self.staff.first_unit_id(cid)
-                    if unit_id is not None:
-                        self.db.add(
-                            StaffUnitAssignment(
-                                community_id=cid,
-                                staff_id=existing.id,
-                                unit_id=unit_id,
-                                work_type="part_time",
-                                approved_by_user_id=self.actor.id,
-                            )
-                        )
-                        await self.db.flush()
-                return existing
-
-            # If no staff exists in this community at all, provision one
-            new_staff = DomesticStaff(
-                community_id=cid,
-                user_id=self.actor.id,
-                full_name=self.actor.full_name or "Domestic Staff",
-                staff_type="maid",
-                phone=self.actor.phone or f"+9197{str(cid)[-2:]}0001",
-                police_verification_status="verified",
-                is_active=True,
-            )
-            self.db.add(new_staff)
-            await self.db.flush()
-
-            unit_id = await self.staff.first_unit_id(cid)
-            if unit_id is not None:
-                self.db.add(
-                    StaffUnitAssignment(
-                        community_id=cid,
-                        staff_id=new_staff.id,
-                        unit_id=unit_id,
-                        work_type="part_time",
-                        approved_by_user_id=self.actor.id,
-                    )
-                )
-                await self.db.flush()
-            return new_staff
-
-        fallback = await self.staff.first_any()
-        if fallback is not None:
-            fallback.user_id = self.actor.id
-            await self.db.flush()
-            return fallback
-
-        raise NotFoundError("Domestic staff profile not found")
+        raise NotFoundError("No domestic staff profile found for current user")
 
     async def _actor_has_cross_unit_role(self) -> bool:
         """Whether the actor holds a staff-wide role, via an explicit query.

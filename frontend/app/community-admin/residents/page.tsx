@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUiStore } from "@/store/ui";
 import {
@@ -433,26 +433,34 @@ export default function CommunityAdminResidentsPage() {
     if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
       errors.email = "Please enter a valid email address.";
     }
-    if (phone.trim() && !/^\+?[0-9\s\-()]{7,20}$/.test(phone.trim())) {
-      errors.phone = "Invalid phone number format.";
+    if (phone.trim()) {
+      const phoneDigits = phone.replace(/\D/g, "");
+      if (phoneDigits.length < 7 || phoneDigits.length > 15 || !/^\+?[0-9\s\-()]+$/.test(phone.trim())) {
+        errors.phone = "Invalid phone number format.";
+      }
     }
     if (password && password.trim().length < 10) {
       errors.password = "Initial password must be at least 10 characters.";
     }
     const trimmedAgreement = agreementRef.trim();
-    if (trimmedAgreement) {
+    if (occupancyRole === "tenant" && !trimmedAgreement) {
+      errors.agreementRef = "Agreement reference is required for tenants.";
+    } else if (trimmedAgreement) {
       if (trimmedAgreement.length < 3 || trimmedAgreement.length > 50) {
         errors.agreementRef = "Agreement reference must be between 3 and 50 characters.";
-      } else if (!/^[A-Za-z0-9\-_/]+$/.test(trimmedAgreement)) {
-        errors.agreementRef = "Agreement reference can only contain letters, numbers, hyphens, underscores, or slashes (e.g. LEASE-2026-081).";
+      } else if (!/^[A-Z0-9\-_/]+$/.test(trimmedAgreement)) {
+        errors.agreementRef = "Agreement reference must be uppercase letters, numbers, and allowed symbols (e.g. LEASE-2026-081).";
       }
     }
     setResidentFieldErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
+  const isAddingRef = useRef(false);
+
   const handleAddResidentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isAddingRef.current) return;
     if (!activeCommunityId) {
       setAddError("Active community required.");
       return;
@@ -465,6 +473,7 @@ export default function CommunityAdminResidentsPage() {
 
     setAddError("");
     setIsAdding(true);
+    isAddingRef.current = true;
     try {
       const defaultPassword = generateInitialPassword(fullName, "resident");
       await addResidentMutation.mutateAsync({
@@ -489,6 +498,7 @@ export default function CommunityAdminResidentsPage() {
       setAddError(err?.message || "Failed to onboard resident.");
     } finally {
       setIsAdding(false);
+      isAddingRef.current = false;
     }
   };
 
@@ -786,6 +796,29 @@ export default function CommunityAdminResidentsPage() {
                     >
                       📋 Copy Link
                     </button>
+                    {row.status === "pending" && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ fontSize: "12px", padding: "0.25rem 0.6rem" }}
+                        onClick={async () => {
+                          try {
+                            const res = await onboardingApi.regenerateInvitation(activeCommunityId!, row.id);
+                            if (res?.data?.accept_url) {
+                              navigator.clipboard.writeText(res.data.accept_url);
+                              toast.success("New link generated and copied to clipboard!", "Copied");
+                              fetchInvitations();
+                            } else {
+                              toast.error("Failed to generate link");
+                            }
+                          } catch (err: any) {
+                            toast.error(err?.message || "Failed to regenerate invitation", "Error");
+                          }
+                        }}
+                      >
+                        🔗 Regenerate Link
+                      </button>
+                    )}
                     {row.status === "pending" && (
                       <button
                         type="button"
@@ -1389,7 +1422,7 @@ export default function CommunityAdminResidentsPage() {
 
                 <div>
                   <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#475569", marginBottom: "0.35rem" }}>
-                    Agreement Reference (Optional)
+                    Agreement Reference {occupancyRole === "tenant" ? <span style={{ color: "#dc2626" }}>*</span> : "(Optional)"}
                   </label>
                   <input
                     type="text"
@@ -1803,43 +1836,79 @@ export default function CommunityAdminResidentsPage() {
             </div>
 
             {/* Invitation Link Section */}
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: "0.8rem",
-                  fontWeight: 600,
-                  marginBottom: "0.35rem",
-                }}
-              >
-                🔗 Secure Onboarding Invitation URL
-              </label>
-              <div style={{ display: "flex", gap: "0.5rem" }}>
-                <input
-                  type="text"
-                  readOnly
-                  className="input-field"
-                  value={
-                    typeof window !== "undefined"
-                      ? `${window.location.origin}/invitations/${selectedInvitation.token}`
-                      : `/invitations/${selectedInvitation.token}`
-                  }
-                  style={{ flex: 1, fontSize: "0.8rem", background: "#f8fafc" }}
-                />
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  style={{ flexShrink: 0 }}
-                  onClick={() => {
-                    const link = `${window.location.origin}/invitations/${selectedInvitation.token}`;
-                    navigator.clipboard.writeText(link);
-                    toast.success("Invitation link copied to clipboard!", "Copied");
+            {selectedInvitation.token && (
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
+                    marginBottom: "0.35rem",
                   }}
                 >
-                  📋 Copy Link
-                </button>
+                  🔗 Secure Onboarding Invitation URL
+                </label>
+                {selectedInvitation.status === "pending" ? (
+                  <div style={{ display: "flex", gap: "0.5rem" }}>
+                    <input
+                      type="text"
+                      readOnly
+                      className="input-field"
+                      value="Link expires after generation (Click Regenerate to create new link)"
+                      style={{ flex: 1, fontSize: "0.8rem", background: "#f8fafc", fontStyle: "italic", color: "#64748b" }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ flexShrink: 0 }}
+                      onClick={async () => {
+                        try {
+                          const res = await onboardingApi.regenerateInvitation(activeCommunityId!, selectedInvitation.id);
+                          if (res?.data?.accept_url) {
+                            navigator.clipboard.writeText(res.data.accept_url);
+                            toast.success("New link generated and copied to clipboard!", "Copied");
+                            fetchInvitations();
+                            setSelectedInvitation(null);
+                          } else {
+                            toast.error("Failed to generate link");
+                          }
+                        } catch (err: any) {
+                          toast.error(err?.message || "Failed to regenerate invitation", "Error");
+                        }
+                      }}
+                    >
+                      🔗 Regenerate Link
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", gap: "0.5rem" }}>
+                    <input
+                      type="text"
+                      readOnly
+                      className="input-field"
+                      value={
+                        typeof window !== "undefined"
+                          ? `${window.location.origin}/invitations/${selectedInvitation.token}`
+                          : `/invitations/${selectedInvitation.token}`
+                      }
+                      style={{ flex: 1, fontSize: "0.8rem", background: "#f8fafc" }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ flexShrink: 0 }}
+                      onClick={() => {
+                        const link = `${window.location.origin}/invitations/${selectedInvitation.token}`;
+                        navigator.clipboard.writeText(link);
+                        toast.success("Invitation link copied to clipboard!", "Copied");
+                      }}
+                    >
+                      📋 Copy Link
+                    </button>
+                  </div>
+                )}
               </div>
-            </div>
+            )}
 
             {selectedInvitation.message && (
               <div>

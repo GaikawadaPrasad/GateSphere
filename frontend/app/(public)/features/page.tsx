@@ -1,11 +1,13 @@
 "use client";
 
 import React from "react";
+import dynamic from "next/dynamic";
 import PublicLayout from "@/components/public/PublicLayout";
 import EverythingYouNeed from "@/components/public/EverythingYouNeed";
 import MaintenanceTimeline from "@/components/public/MaintenanceTimeline";
-import Amenities from "@/components/public/Amenities";
-import RequestDemo from "@/components/public/RequestDemo";
+
+const Amenities = dynamic(() => import("@/components/public/Amenities"), { ssr: true });
+const RequestDemo = dynamic(() => import("@/components/public/RequestDemo"), { ssr: true });
 
 export default function FeaturesPage() {
   return (

@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
+from decimal import Decimal
 
 import structlog
 from sqlalchemy import select
@@ -23,6 +24,7 @@ from app.modules.billing.models import (
     MaintenanceInvoice,
 )
 from app.modules.communities.models import Community, Unit
+from app.modules.notifications import events as notif_events
 from app.modules.residents.models import ResidentProfile, UnitOccupancy
 from sqlalchemy import func
 

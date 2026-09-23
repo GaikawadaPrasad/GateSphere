@@ -43,7 +43,8 @@ async def require_financial_dashboard_async(
 ) -> TenantScope:
     if not scope.can("billing:view"):
         raise ForbiddenError("Missing permission: billing:view", code="PERMISSION_DENIED")
-    unit_scope = await actor_unit_scope(db, user)
+    active_cid = next(iter(scope.community_ids)) if len(scope.community_ids) == 1 else None
+    unit_scope = await actor_unit_scope(db, user, community_id=active_cid)
     if unit_scope is not None:
         raise ForbiddenError(
             "Residents cannot access community financial totals", code="PERMISSION_DENIED"

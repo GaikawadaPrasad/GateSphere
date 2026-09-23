@@ -45,7 +45,6 @@ export function useMe(options?: { enabled?: boolean }) {
   });
 }
 
-
 export function useLogin() {
   const qc = useQueryClient();
   return useMutation({
@@ -53,8 +52,9 @@ export function useLogin() {
       authApi.login(email, password, role),
     onSuccess: (user) => {
       const activeRole = user?.active_role || (user?.is_superadmin ? "super_admin" : null);
-      if (typeof window !== "undefined" && activeRole) {
-        setActiveRole(activeRole);
+      if (typeof window !== "undefined") {
+        if (activeRole) setActiveRole(activeRole);
+        sessionStorage.removeItem("gatesphere_logged_out");
       }
       // Seed the auth cache FIRST so navigating components see the user immediately.
       // Then clear all other stale data from any previous session so cross-tenant
@@ -75,6 +75,7 @@ export function useLogout() {
     onSettled: () => {
       if (typeof window !== "undefined") {
         setActiveRole(null);
+        sessionStorage.setItem("gatesphere_logged_out", "true");
       }
       clearQueryCache(qc);
       qc.setQueryData(authKeys.me, null);

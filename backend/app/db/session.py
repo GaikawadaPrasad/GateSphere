@@ -25,6 +25,7 @@ _POOL_KW = {
     "pool_size": settings.DB_POOL_SIZE,
     "max_overflow": settings.DB_MAX_OVERFLOW,
     "pool_recycle": settings.DB_POOL_RECYCLE_SECONDS,
+    "pool_timeout": settings.DB_POOL_TIMEOUT_SECONDS,
 }
 async_engine = create_async_engine(settings.sqlalchemy_async_url, **_POOL_KW)
 AsyncSessionLocal = async_sessionmaker(

@@ -40,12 +40,17 @@ export default function FacilityManagerFacilitiesPage() {
       setFacilities(
         (data || []).map((a: any) => ({
           id: a.id,
+          community_id: a.community_id || "",
+          code: a.code || "",
           name: a.name,
-          code: a.code,
+          amenity_type: a.amenity_type || "other",
+          booking_required: !!a.booking_required,
+          is_active: !!a.is_active,
           type: a.amenity_type
             ? a.amenity_type.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
             : "Other",
           location: a.location_text || "Community Grounds",
+          location_text: a.location_text || "Community Grounds",
           capacity: a.capacity || 0,
           status: a.is_active ? "Available" : "Under Maintenance",
           last_maintenance: "Active",
@@ -68,7 +73,7 @@ export default function FacilityManagerFacilitiesPage() {
     setEditingFacility(f);
     setEditName(f.name);
     setEditType(f.type || "Community Hall");
-    setEditLocation(f.location === "Community Grounds" ? "" : f.location);
+    setEditLocation(f.location === "Community Grounds" ? "" : (f.location || ""));
     setEditCapacity(String(f.capacity || 50));
     setIsEditModalOpen(true);
   };
@@ -201,7 +206,7 @@ export default function FacilityManagerFacilitiesPage() {
   const filteredFacilities = facilities.filter((f) => {
     const matchSearch =
       f.name.toLowerCase().includes(search.toLowerCase()) ||
-      f.location.toLowerCase().includes(search.toLowerCase());
+      (f.location || "").toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === "all" || f.status === statusFilter;
     const matchType = typeFilter === "all" || f.type === typeFilter;
     return matchSearch && matchStatus && matchType;
@@ -294,7 +299,7 @@ export default function FacilityManagerFacilitiesPage() {
               key: "status",
               header: "Status",
               sortable: true,
-              render: (f: Facility) => <StatusBadge status={f.status} />,
+              render: (f: Facility) => <StatusBadge status={f.status || "Available"} />,
             },
             {
               key: "last_maintenance",

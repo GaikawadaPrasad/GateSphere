@@ -1,70 +1,59 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import GateSphereLogo from "./GateSphereLogo";
+import Image from "next/image";
 
-// In-memory flag: only plays on initial site open or browser refresh (F5).
-// Client-side navigations (e.g. side menu / navbar clicks) will NOT replay the loader.
-let hasIntroShown = false;
+declare global {
+  interface Window {
+    __gs_intro_shown?: boolean;
+  }
+}
 
 export default function IntroLoader({ onReady }: { onReady?: () => void }) {
-  const [shouldShow, setShouldShow] = useState(false);
-  const [revealed, setRevealed] = useState(false);
+  // Check if loader has already been shown in this window/browser session
+  const [alreadyShown] = useState(() => {
+    if (typeof window !== "undefined" && Boolean(window.__gs_intro_shown)) {
+      return true;
+    }
+    return false;
+  });
+
   const [exiting, setExiting] = useState(false);
-  const [removed, setRemoved] = useState(() => hasIntroShown);
+  const [removed, setRemoved] = useState(alreadyShown);
 
   useEffect(() => {
-    // If intro has already been shown during this browser session, skip immediately
-    if (hasIntroShown) {
+    if (alreadyShown) {
       if (onReady) onReady();
       return;
     }
 
+    // Mark as shown so subsequent client-side navigation (navbar clicks) will not re-trigger it
     if (typeof window !== "undefined") {
-      const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-      if (mediaQuery.matches) {
-        hasIntroShown = true;
-        setRemoved(true);
-        if (onReady) onReady();
-        return;
-      }
+      window.__gs_intro_shown = true;
     }
-
-    hasIntroShown = true;
-    setShouldShow(true);
 
     // Lock scroll during loader
     document.documentElement.style.overflow = "hidden";
 
-    // Start progress line & wordmark animation
-    const revealTimer = setTimeout(() => {
-      setRevealed(true);
-    }, 60);
-
-    // Loader timing: 1400ms display, then exit
-    const MIN_TIME = 1400;
-    const EXIT_TIME = 850;
-    let removeTimer: NodeJS.Timeout;
-
+    // Fast, snappy brand loader: 700ms display, then smooth 450ms exit
     const exitTimer = setTimeout(() => {
       setExiting(true);
       document.documentElement.style.overflow = "";
       if (onReady) onReady();
+    }, 700);
 
-      removeTimer = setTimeout(() => {
-        setRemoved(true);
-      }, EXIT_TIME);
-    }, MIN_TIME);
+    const removeTimer = setTimeout(() => {
+      setRemoved(true);
+    }, 1150);
 
     return () => {
-      clearTimeout(revealTimer);
       clearTimeout(exitTimer);
-      if (removeTimer) clearTimeout(removeTimer);
+      clearTimeout(removeTimer);
       document.documentElement.style.overflow = "";
     };
-  }, [onReady]);
+  }, [alreadyShown, onReady]);
 
-  if (removed || !shouldShow) return null;
+  if (alreadyShown || removed) return null;
 
   return (
     <aside
@@ -79,63 +68,104 @@ export default function IntroLoader({ onReady }: { onReady?: () => void }) {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        gap: "1.75rem",
+        gap: "1.5rem",
         transform: exiting ? "translateY(-105%)" : "translateY(0%)",
-        transition: "transform 850ms cubic-bezier(0.65, 0, 0.35, 1)",
+        transition: "transform 450ms cubic-bezier(0.4, 0, 0.2, 1)",
         willChange: "transform",
         pointerEvents: exiting ? "none" : "auto",
       }}
     >
+      <style>{`
+        @keyframes gsProgressFill {
+          0% { width: 5%; }
+          35% { width: 50%; }
+          75% { width: 85%; }
+          100% { width: 100%; }
+        }
+        @keyframes gsPulseGlow {
+          0%, 100% { opacity: 0.9; transform: scale(1); }
+          50% { opacity: 1; transform: scale(1.02); }
+        }
+      `}</style>
+
       {/* Brand Wordmark & Icon */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "0.875rem",
-          opacity: revealed ? 1 : 0,
-          transform: revealed ? "translateY(0)" : "translateY(16px)",
-          transition: "opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1)",
+          gap: "1rem",
+          animation: "gsPulseGlow 2.5s ease-in-out infinite",
         }}
       >
-        <GateSphereLogo variant="light" />
+        <div style={{ position: "relative", width: 56, height: 56, flexShrink: 0 }}>
+          <Image
+            src="/images/gatesphere-logo.webp"
+            alt="GateSphere Logo"
+            width={56}
+            height={56}
+            priority
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+              filter: "drop-shadow(0 0 16px rgba(56, 189, 248, 0.6))",
+            }}
+          />
+        </div>
+        <span
+          style={{
+            fontFamily: "'Outfit', var(--font-sans), sans-serif",
+            fontSize: "2.4rem",
+            fontWeight: 800,
+            letterSpacing: "-0.02em",
+            color: "#ffffff",
+            textShadow: "0 2px 10px rgba(0, 0, 0, 0.5), 0 0 20px rgba(56, 189, 248, 0.3)",
+          }}
+        >
+          GateSphere
+        </span>
       </div>
 
       {/* Progress Track & Fill */}
       <div
         style={{
-          width: "10.5rem",
-          height: "2px",
+          width: "14rem",
+          height: "4px",
           borderRadius: "9999px",
           background: "rgba(255, 255, 255, 0.15)",
           overflow: "hidden",
           position: "relative",
+          boxShadow: "0 0 10px rgba(56, 189, 248, 0.2)",
         }}
       >
         <div
           style={{
             position: "absolute",
-            inset: 0,
+            top: 0,
+            left: 0,
+            bottom: 0,
             background: "linear-gradient(90deg, #38BDF8, #34D399)",
-            transformOrigin: "left",
-            transform: revealed ? "scaleX(1)" : "scaleX(0)",
-            transition: "transform 1280ms cubic-bezier(0.65, 0, 0.35, 1) 100ms",
+            borderRadius: "9999px",
+            animation: "gsProgressFill 0.7s cubic-bezier(0.25, 1, 0.5, 1) forwards",
+            boxShadow: "0 0 8px #38BDF8",
           }}
         />
       </div>
 
-      {/* Subtitle / Micro tagline */}
+      {/* Subtitle / Tagline */}
       <div
         style={{
-          fontSize: "0.75rem",
-          fontWeight: 500,
-          letterSpacing: "0.15em",
+          fontSize: "0.8rem",
+          fontWeight: 600,
+          letterSpacing: "0.2em",
           textTransform: "uppercase",
-          color: "rgba(255, 255, 255, 0.5)",
-          opacity: revealed ? 1 : 0,
-          transition: "opacity 0.6s ease 0.2s",
+          color: "rgba(255, 255, 255, 0.7)",
+          display: "flex",
+          alignItems: "center",
+          gap: "0.5rem",
         }}
       >
-        Smart Community Platform
+        <span>Smart Community Platform</span>
       </div>
     </aside>
   );

@@ -17,10 +17,10 @@ export function makeQueryClient(): QueryClient {
           }
           return failureCount < 2;
         },
-        refetchOnWindowFocus: false,
-        refetchOnMount: false,
-        refetchOnReconnect: false,
-        staleTime: 60_000,
+        refetchOnWindowFocus: true,
+        refetchOnMount: true,
+        refetchOnReconnect: true,
+        staleTime: 30_000,
         gcTime: 5 * 60_000,
       },
     },

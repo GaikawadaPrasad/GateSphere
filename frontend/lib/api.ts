@@ -34,35 +34,85 @@ import type {
 } from "@/types/incidents";
 import type { AppNotification, NotificationPreference } from "@/types/notifications";
 import type { AssistantQuickActionsResponse, AssistantResponse } from "@/types/assistant";
+import type {
+  Amenity,
+  Facility,
+  AmenityBooking,
+  AmenitySlot,
+  AmenityBlock,
+  AmenityCreate,
+  AmenityUpdate,
+} from "@/types/amenities";
+import type {
+  Visitor,
+  VisitorRecord,
+  VisitorPass,
+  VisitorRequest,
+  VisitorEntry,
+  BlacklistEntry,
+} from "@/types/visitors";
+import type { DeliveryItem, DeliveryProtocol, DeliveryCreatePayload } from "@/types/deliveries";
 
-export type { CurrentUser, GateEvent, PanicAlert, GuardRoster, ServiceTicket, ServiceCategory };
+export type {
+  CurrentUser,
+  GateEvent,
+  PanicAlert,
+  GuardRoster,
+  ServiceTicket,
+  ServiceCategory,
+  Amenity,
+  Facility,
+  AmenityBooking,
+  AmenitySlot,
+  AmenityBlock,
+  AmenityCreate,
+  AmenityUpdate,
+  Visitor,
+  VisitorRecord,
+  VisitorPass,
+  VisitorRequest,
+  VisitorEntry,
+  BlacklistEntry,
+  DeliveryItem,
+  DeliveryProtocol,
+  DeliveryCreatePayload,
+};
+
 export type NotificationItem = AppNotification;
-export type VisitorRecord = Record<string, any>;
-export interface BlacklistEntry {
+export type VendorTicket = ServiceTicket;
+export type ServiceRequest = ServiceTicket;
+
+export interface MaintenanceRecord {
   id: string;
-  name?: string;
-  phone?: string;
-  phone_hash?: string;
-  id_type?: string;
-  id_number?: string;
-  id_number_hash?: string;
-  vehicle_number?: string;
-  reason?: string;
-  risk_level?: string;
-  active_from?: string;
-  active_until?: string;
-  created_at?: string;
-  date_added?: string;
-  status?: string;
-  is_active?: boolean;
+  community_id?: string;
+  ticket_number: string;
+  subject: string;
+  category_name?: string;
+  unit_number?: string;
+  unit_id?: string;
+  status: string;
+  priority: string;
+  created_at: string;
+  resolved_at?: string | null;
+  assigned_to_name?: string;
+  cost?: number;
 }
-export type VendorTicket = Record<string, any>;
-export type Amenity = Record<string, any>;
-export type AmenityBooking = Record<string, any>;
-export type ServiceRequest = Record<string, any>;
-export type Facility = Record<string, any>;
-export type MaintenanceRecord = Record<string, any>;
-export type Vendor = Record<string, any>;
+
+export interface Vendor {
+  id: string;
+  email?: string;
+  full_name?: string;
+  phone?: string | null;
+  role_slug?: string;
+  community_id?: string;
+  is_active?: boolean;
+  created_at?: string;
+  category?: string;
+  name?: string;
+  status?: string;
+  active_passes_count?: number;
+  rating?: number;
+}
 
 export class ApiError extends Error {
   status: number;
@@ -99,57 +149,31 @@ export class ApiError extends Error {
   }
 }
 
+let inMemoryActiveRole: string | null = null;
+
 export function getActiveRole(): string | null {
   if (typeof window !== "undefined") {
     const pathname = window.location.pathname;
-    let roleFromPath: string | null = null;
-    if (pathname.startsWith("/super-admin") || pathname.startsWith("/dashboard/super-admin")) roleFromPath = "super_admin";
-    else if (pathname.startsWith("/owner-tenant") || pathname.startsWith("/resident") || pathname.startsWith("/dashboard/owner-tenant")) roleFromPath = "resident";
-    else if (pathname.startsWith("/auditor") || pathname.startsWith("/dashboard/auditor")) roleFromPath = "auditor";
-    else if (pathname.startsWith("/domestic-staff") || pathname.startsWith("/dashboard/domestic-staff")) roleFromPath = "domestic_staff";
-    else if (pathname.startsWith("/community-admin") || pathname.startsWith("/dashboard/community-admin")) roleFromPath = "community_admin";
-    else if (pathname.startsWith("/security-guard") || pathname.startsWith("/dashboard/security-guard")) roleFromPath = "security_guard";
-    else if (pathname.startsWith("/security-supervisor") || pathname.startsWith("/dashboard/security-supervisor")) roleFromPath = "security_supervisor";
-    else if (pathname.startsWith("/facility-manager") || pathname.startsWith("/dashboard/facility-manager")) roleFromPath = "facility_manager";
-    else if (pathname.startsWith("/association-committee") || pathname.startsWith("/dashboard/association-committee")) roleFromPath = "association_committee";
-    else if (pathname.startsWith("/vendor-technician") || pathname.startsWith("/dashboard/vendor-technician")) roleFromPath = "vendor_technician";
+    // 1. Primary: Derive from portal path (deterministic & tab-safe)
+    if (pathname.startsWith("/super-admin")) return "super_admin";
+    if (pathname.startsWith("/community-admin")) return "community_admin";
+    if (pathname.startsWith("/security-guard")) return "security_guard";
+    if (pathname.startsWith("/security-supervisor")) return "security_supervisor";
+    if (pathname.startsWith("/facility-manager")) return "facility_manager";
+    if (pathname.startsWith("/owner-tenant") || pathname.startsWith("/resident")) return "resident";
+    if (pathname.startsWith("/domestic-staff")) return "domestic_staff";
+    if (pathname.startsWith("/vendor-technician")) return "vendor_technician";
+    if (pathname.startsWith("/auditor")) return "auditor";
+    if (pathname.startsWith("/association-committee")) return "association_committee";
 
-    if (roleFromPath) {
-      sessionStorage.setItem("gatesphere_tab_role", roleFromPath);
-      return roleFromPath;
-    }
-
-    const tabSaved = sessionStorage.getItem("gatesphere_tab_role");
-    if (tabSaved) return tabSaved;
-
-    const saved = localStorage.getItem("gatesphere_active_role");
-    if (saved) return saved;
-
-    if (document.cookie) {
-      const matches = Array.from(document.cookie.matchAll(/gatesphere_([a-z0-9_]+)_session=([^;]+)/g));
-      if (matches.length === 1) {
-        const bucket = matches[0][1];
-        if (bucket === "superadmin") return "super_admin";
-        if (bucket === "security") return "security_guard";
-        return bucket;
-      }
-    }
+    // 2. Secondary: In-memory fallback
+    if (inMemoryActiveRole) return inMemoryActiveRole;
   }
   return null;
 }
 
 export function setActiveRole(role: string | null): void {
-  if (typeof window !== "undefined") {
-    if (role) {
-      sessionStorage.setItem("gatesphere_tab_role", role);
-      localStorage.setItem("gatesphere_active_role", role);
-      document.cookie = `gs_active_role=${role}; path=/; SameSite=Lax`;
-    } else {
-      sessionStorage.removeItem("gatesphere_tab_role");
-      localStorage.removeItem("gatesphere_active_role");
-      document.cookie = `gs_active_role=; path=/; max-age=0; SameSite=Lax`;
-    }
-  }
+  inMemoryActiveRole = role;
 }
 
 export function getCsrfToken(role?: string): string | null {
@@ -425,8 +449,14 @@ export const communitiesApi = {
     communityId: string,
     data: { name: string; code: string; structure_type?: string; total_floors?: number },
   ) => apiSend<Tower>("POST", `/communities/${communityId}/towers`, data),
+  updateTower: (id: string, data: Partial<Tower>) =>
+    apiSend<Tower>("PATCH", `/communities/towers/${id}`, data),
+  deleteTower: (id: string) => apiSend<void>("DELETE", `/communities/towers/${id}`),
   createFloor: (data: { tower_id: string; floor_number: number; label?: string }) =>
     apiSend<Floor>("POST", "/communities/floors", data),
+  updateFloor: (id: string, data: Partial<Floor>) =>
+    apiSend<Floor>("PATCH", `/communities/floors/${id}`, data),
+  deleteFloor: (id: string) => apiSend<void>("DELETE", `/communities/floors/${id}`),
   createUnit: (data: {
     floor_id: string;
     unit_number: string;
@@ -434,8 +464,14 @@ export const communitiesApi = {
     bedrooms?: number;
     area_sqft?: number;
   }) => apiSend<Unit>("POST", "/communities/units", data),
+  updateUnit: (id: string, data: Partial<Unit>) =>
+    apiSend<Unit>("PATCH", `/communities/units/${id}`, data),
+  deleteUnit: (id: string) => apiSend<void>("DELETE", `/communities/units/${id}`),
   createGate: (communityId: string, data: { name: string; code: string; gate_type: string }) =>
     apiSend<Gate>("POST", `/communities/${communityId}/gates`, data),
+  updateGate: (id: string, data: Partial<Gate>) =>
+    apiSend<Gate>("PATCH", `/communities/gates/${id}`, data),
+  deleteGate: (id: string) => apiSend<void>("DELETE", `/communities/gates/${id}`),
   floors: (towerId: string) => apiGet<Floor[]>(`/communities/towers/${towerId}/floors`),
   units: (floorId: string) => apiGet<Unit[]>(`/communities/floors/${floorId}/units`),
   communityUnits: (communityId: string, params?: Record<string, unknown>) =>
@@ -890,6 +926,8 @@ export const onboardingApi = {
     apiGet<any[]>(`/communities/${communityId}/invitations`),
   revokeInvitation: (communityId: string, invitationId: string) =>
     apiSend<any>("POST", `/communities/${communityId}/invitations/${invitationId}/revoke`),
+  regenerateInvitation: (communityId: string, invitationId: string) =>
+    apiSend<any>("POST", `/communities/${communityId}/invitations/${invitationId}/regenerate`),
   viewInvitation: (token: string) => apiGet<any>(`/invitations/${token}`),
   acceptInvitation: (token: string, payload: { full_name: string; phone?: string; password?: string }) =>
     apiSend<any>("POST", `/invitations/${token}/accept`, payload),
@@ -997,15 +1035,15 @@ export const blacklistApi = {
 
 export const vendorTicketsApi = {
   list: (params?: ListQueryParams) =>
-    apiGet<Record<string, unknown>[]>("/complaints/tickets", params as Record<string, unknown>),
-  get: (id: string) => apiGet<Record<string, unknown>>(`/complaints/tickets/${id}`),
+    apiGet<ServiceTicket[]>("/complaints/tickets", params as Record<string, unknown>),
+  get: (id: string) => apiGet<ServiceTicket>(`/complaints/tickets/${id}`),
   updateStatus: (id: string, status: string, notes?: string) =>
-    apiSend<Record<string, unknown>>("POST", `/complaints/tickets/${id}/transition`, {
+    apiSend<ServiceTicket>("POST", `/complaints/tickets/${id}/transition`, {
       status,
       remarks: notes,
     }),
   submitCompletion: (id: string, notes?: string) =>
-    apiSend<Record<string, unknown>>("POST", `/complaints/tickets/${id}/transition`, {
+    apiSend<ServiceTicket>("POST", `/complaints/tickets/${id}/transition`, {
       status: "resolved",
       remarks: notes,
     }),
@@ -1015,13 +1053,13 @@ export const vendorTicketsApi = {
 
 export const amenitiesApi = {
   list: (params?: ListQueryParams) =>
-    apiGet<Record<string, unknown>[]>("/amenities", params as Record<string, unknown>),
+    apiGet<Amenity[]>("/amenities", params as Record<string, unknown>),
   bookings: (params?: ListQueryParams) =>
-    apiGet<Record<string, unknown>[]>("/amenities/bookings", params as Record<string, unknown>),
+    apiGet<AmenityBooking[]>("/amenities/bookings", params as Record<string, unknown>),
   book: (data: Record<string, unknown>) =>
-    apiSend<Record<string, unknown>>("POST", "/amenities/bookings", data),
+    apiSend<AmenityBooking>("POST", "/amenities/bookings", data),
   cancelBooking: (id: string, reason?: string) =>
-    apiSend<Record<string, unknown>>("POST", `/amenities/bookings/${id}/cancel`, {
+    apiSend<AmenityBooking>("POST", `/amenities/bookings/${id}/cancel`, {
       reason: reason || "User cancelled",
     }),
   blockSlot: (amenityIdOrData: any, reason?: string) => {
@@ -1037,33 +1075,33 @@ export const amenitiesApi = {
 
 export const facilitiesApi = {
   list: (params?: ListQueryParams) =>
-    apiGet<any[]>("/amenities", params as Record<string, unknown>),
-  get: (id: string) => apiGet<any>(`/amenities/${id}`),
-  create: (data: any) => apiSend<any>("POST", "/amenities", data),
-  update: (id: string, data: any) => apiSend<any>("PATCH", `/amenities/${id}`, data),
-  delete: (id: string) => apiSend<any>("DELETE", `/amenities/${id}`),
+    apiGet<Facility[]>("/amenities", params as Record<string, unknown>),
+  get: (id: string) => apiGet<Facility>(`/amenities/${id}`),
+  create: (data: any) => apiSend<Facility>("POST", "/amenities", data),
+  update: (id: string, data: any) => apiSend<Facility>("PATCH", `/amenities/${id}`, data),
+  delete: (id: string) => apiSend<void>("DELETE", `/amenities/${id}`),
   updateStatus: (id: string, isActive: boolean) =>
-    apiSend<any>("PATCH", `/amenities/${id}`, { is_active: isActive }),
+    apiSend<Facility>("PATCH", `/amenities/${id}`, { is_active: isActive }),
 };
 
 export const maintenanceApi = {
   list: (params?: ListQueryParams) =>
-    apiGet<any[]>("/complaints/tickets", params as Record<string, unknown>),
-  get: (id: string) => apiGet<any>(`/complaints/tickets/${id}`),
+    apiGet<ServiceTicket[]>("/complaints/tickets", params as Record<string, unknown>),
+  get: (id: string) => apiGet<ServiceTicket>(`/complaints/tickets/${id}`),
   assignVendor: (id: string, vendorUserId: string) =>
-    apiSend<any>("POST", `/complaints/tickets/${id}/assign`, { assigned_to_user_id: vendorUserId }),
+    apiSend<ServiceTicket>("POST", `/complaints/tickets/${id}/assign`, { assigned_to_user_id: vendorUserId }),
   updateStatus: (id: string, status: string, notes?: string) =>
-    apiSend<any>("POST", `/complaints/tickets/${id}/transition`, { status, remarks: notes }),
+    apiSend<ServiceTicket>("POST", `/complaints/tickets/${id}/transition`, { status, remarks: notes }),
 };
 
 export const vendorsApi = {
   list: (params?: ListQueryParams) =>
-    apiGet<any[]>("/users", { role_slug: "vendor_technician", ...(params as any) }),
-  get: (id: string) => apiGet<any>(`/users/${id}`),
+    apiGet<Vendor[]>("/users", { role_slug: "vendor_technician", ...(params as any) }),
+  get: (id: string) => apiGet<Vendor>(`/users/${id}`),
   create: (data: { email: string; full_name: string; password: string; phone?: string; community_id?: string }) =>
-    apiSend<any>("POST", "/users", { ...data, role_slug: "vendor_technician" }),
+    apiSend<Vendor>("POST", "/users", { ...data, role_slug: "vendor_technician" }),
   toggleActive: (id: string, is_active: boolean) =>
-    apiSend<any>("PATCH", `/users/${id}`, { is_active }),
+    apiSend<Vendor>("PATCH", `/users/${id}`, { is_active }),
 };
 
 export const guardsApi = {
@@ -1078,15 +1116,15 @@ export const guardsApi = {
 
 export const visitorsApi = {
   list: (params?: ListQueryParams) =>
-    apiGet<Record<string, unknown>[]>("/visitors/entries", params as Record<string, unknown>),
+    apiGet<VisitorEntry[]>("/visitors/entries", params as Record<string, unknown>),
   requests: (params?: ListQueryParams) =>
-    apiGet<Record<string, unknown>[]>("/visitors/requests", params as Record<string, unknown>),
+    apiGet<VisitorRequest[]>("/visitors/requests", params as Record<string, unknown>),
   getRequest: (requestId: string) =>
-    apiGet<Record<string, unknown>>(`/visitors/requests/${requestId}`),
+    apiGet<VisitorRequest>(`/visitors/requests/${requestId}`),
   createRequest: (data: Record<string, unknown>) =>
-    apiSend<Record<string, unknown>>("POST", "/visitors/requests", data),
+    apiSend<VisitorRequest>("POST", "/visitors/requests", data),
   decideRequest: (requestId: string, decision: string, remarks?: string) =>
-    apiSend<Record<string, unknown>>("POST", `/visitors/requests/${requestId}/decision`, {
+    apiSend<VisitorRequest>("POST", `/visitors/requests/${requestId}/decision`, {
       decision,
       remarks,
     }),
@@ -1095,9 +1133,13 @@ export const visitorsApi = {
   reject: (requestId: string, remarks?: string) =>
     visitorsApi.decideRequest(requestId, "rejected", remarks),
   createPass: (requestId: string, data?: Record<string, unknown>) =>
-    apiSend<Record<string, unknown>>("POST", `/visitors/requests/${requestId}/passes`, data || {}),
+    apiSend<VisitorPass>("POST", `/visitors/requests/${requestId}/passes`, data || {}),
+  notifyResident: (requestId: string) =>
+    apiSend<Record<string, unknown>>("POST", `/visitors/requests/${requestId}/notify`),
+  sendApprovalRequest: (requestId: string) =>
+    apiSend<Record<string, unknown>>("POST", `/visitors/requests/${requestId}/notify`),
   entries: (params?: ListQueryParams) =>
-    apiGet<Record<string, unknown>[]>("/visitors/entries", params as Record<string, unknown>),
+    apiGet<VisitorEntry[]>("/visitors/entries", params as Record<string, unknown>),
   // Recording an entry (by pass_token, pin, request_id, or visitor_id) IS the pass-verification step —
   // there is no separate /gate/verify-pass endpoint in the backend.
   recordEntry: (data: {
@@ -1108,19 +1150,19 @@ export const visitorsApi = {
     gate_id?: string;
     vehicle_number?: string;
     entry_photo_url?: string;
-  }) => apiSend<Record<string, unknown>>("POST", "/visitors/entries", data),
+  }) => apiSend<VisitorEntry>("POST", "/visitors/entries", data),
   recordExit: (entryId: string) =>
-    apiSend<Record<string, unknown>>("PATCH", `/visitors/entries/${entryId}/exit`),
+    apiSend<VisitorEntry>("PATCH", `/visitors/entries/${entryId}/exit`),
   directory: (params?: { community_id?: string; q?: string; page_size?: number }) =>
-    apiGet<Record<string, unknown>[]>("/visitors", params as Record<string, unknown>),
+    apiGet<Visitor[]>("/visitors", params as Record<string, unknown>),
 };
 
 export const deliveriesApi = {
   list: (params?: ListQueryParams) =>
-    apiGet<Record<string, unknown>[]>("/deliveries", params as Record<string, unknown>),
+    apiGet<DeliveryItem[]>("/deliveries", params as Record<string, unknown>),
   create: (data: Record<string, unknown>) =>
-    apiSend<Record<string, unknown>>("POST", "/deliveries", data),
-  protocols: () => apiGet<Record<string, unknown>[]>("/deliveries/protocols"),
+    apiSend<DeliveryItem>("POST", "/deliveries", data),
+  protocols: () => apiGet<DeliveryProtocol[]>("/deliveries/protocols"),
   updateProtocol: (data: Record<string, unknown>) =>
     apiSend<Record<string, unknown>>("PUT", "/deliveries/protocols", data),
   recordArrival: (
@@ -1136,6 +1178,10 @@ export const deliveriesApi = {
     deliveriesApi.decide(id, "approved", remarks),
   reject: (id: string, remarks?: string) =>
     deliveriesApi.decide(id, "rejected", remarks),
+  notifyResident: (id: string, notes?: string) =>
+    apiSend<Record<string, unknown>>("POST", `/deliveries/${id}/notify`, { notes }),
+  sendApprovalRequest: (id: string, notes?: string) =>
+    apiSend<Record<string, unknown>>("POST", `/deliveries/${id}/notify`, { notes }),
 };
 
 export const vehiclesApi = {

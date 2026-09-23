@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import GateSphereLogo from "@/components/public/GateSphereLogo";
 import { ApiError } from "@/lib/api";
-import { useLogin } from "@/hooks/use-auth";
+import { useLogin, useMe } from "@/hooks/use-auth";
 import { getRoleLandingRoute } from "@/lib/permissions";
 
 const schema = z.object({
@@ -22,7 +22,24 @@ function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const login = useLogin();
+  const { data: currentUser, isLoading: isUserLoading } = useMe();
   const [showPassword, setShowPassword] = useState(false);
+
+  // If already authenticated with a valid active session, forward directly to the destination
+  React.useEffect(() => {
+    if (currentUser && !isUserLoading) {
+      if (typeof window !== "undefined" && sessionStorage.getItem("gatesphere_logged_out") === "true") {
+        // Do not auto-redirect; let the user see the login screen because they explicitly logged out.
+        return;
+      }
+      const nextParam = params.get("next");
+      const target =
+        nextParam && nextParam !== "/unauthorized"
+          ? nextParam
+          : getRoleLandingRoute(currentUser);
+      window.location.replace(target);
+    }
+  }, [currentUser, isUserLoading, params]);
 
   const {
     register,
@@ -34,16 +51,28 @@ function LoginForm() {
     defaultValues: { email: "", password: "" },
   });
 
+  // Prefetch dashboard routes in the background while the user fills credentials
+  // so navigation upon successful login is instantaneous without Vercel bundle-download delays.
+  React.useEffect(() => {
+    router.prefetch("/community-admin/dashboard");
+    router.prefetch("/super-admin/dashboard");
+    router.prefetch("/owner-tenant/dashboard");
+    router.prefetch("/security-guard/dashboard");
+    router.prefetch("/facility-manager/dashboard");
+    router.prefetch("/association-committee/governance");
+  }, [router]);
+
   const onSubmit = handleSubmit(async (values) => {
     try {
       const user = await login.mutateAsync(values);
       const nextParam = params.get("next");
-      if (nextParam && nextParam !== "/unauthorized") {
-        router.replace(nextParam);
-        return;
-      }
+      const target =
+        nextParam && nextParam !== "/unauthorized"
+          ? nextParam
+          : getRoleLandingRoute(user);
 
-      router.replace(getRoleLandingRoute(user));
+      // Hard navigation ensures edge middleware sees the session cookie and cleans up stale memory
+      window.location.replace(target);
     } catch (err) {
       if (err instanceof ApiError && err.fields && Object.keys(err.fields).length) {
         for (const [field, message] of Object.entries(err.fields)) {

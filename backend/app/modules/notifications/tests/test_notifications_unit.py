@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import uuid
+
 import pytest
+from sqlalchemy import select
 
 from app.core.errors import BusinessRuleError, NotFoundError
+from app.modules.communities.models import Community
 from app.modules.notifications import schemas
+from app.modules.notifications.models import NotificationTemplate
 from app.modules.notifications.service import NotificationService
 
 
@@ -111,3 +116,36 @@ async def test_unknown_template_and_recipient(db, scope_for, community, superadm
                 community_id=community.id,
             )
         )
+
+
+async def test_notification_template_create_rejects_foreign_community_id(
+    db, scope_for, community, superadmin
+):
+    """HP-04 regression: a caller scoped to `community` must not be able to create a
+    notification template under a different community by supplying its id. The fix
+    (app/core/tenancy.py TenantScope.require, invoked via
+    NotificationService._one_community) already predates this test — this locks it in.
+    """
+    other = Community(code=f"nt-other-{uuid.uuid4().hex[:8]}", name="Foreign Community")
+    db.add(other)
+    await db.flush()
+
+    admin = _svc(db, scope_for(community.id), superadmin)
+    with pytest.raises(NotFoundError):
+        await admin.upsert_template(
+            schemas.TemplateUpsert(
+                code="cross-tenant-probe",
+                channel="in_app",
+                title_template="Hi",
+                body_template="Body",
+            ),
+            community_id=other.id,
+        )
+
+    leaked = await db.scalar(
+        select(NotificationTemplate).where(
+            NotificationTemplate.community_id == other.id,
+            NotificationTemplate.code == "cross-tenant-probe",
+        )
+    )
+    assert leaked is None, "template was created under the foreign community"

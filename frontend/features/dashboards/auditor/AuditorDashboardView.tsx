@@ -428,7 +428,7 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
             />
             <StatMetric
               label="Financial Reconciliation"
-              value={stats?.financial_reconciled_pct ?? 99.4}
+              value={stats?.financial_reconciled_pct ?? 0}
               suffix="%"
               accentColor="#D97706"
               icon="💳"

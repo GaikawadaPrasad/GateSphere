@@ -41,6 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="en"
+      data-scroll-behavior="smooth"
       className={`${inter.variable} ${outfit.variable} ${plusJakartaSans.variable} ${syne.variable}`}
     >
       <body className="font-sans antialiased">

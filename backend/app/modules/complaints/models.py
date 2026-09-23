@@ -146,8 +146,12 @@ class TicketStatusHistory(Base, TimestampMixin):
         ForeignKey("users.id", ondelete="SET NULL")
     )
     remarks: Mapped[str | None] = mapped_column(Text)
+    # clock_timestamp(), not now(): a ticket's lifecycle inserts several of these rows
+    # inside one request transaction, and now()/CURRENT_TIMESTAMP is frozen for the whole
+    # transaction — every row would get an identical changed_at, making `ORDER BY
+    # changed_at` (list_history) non-deterministic for ties (migration 0039).
     changed_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=text("now()")
+        DateTime(timezone=True), server_default=text("clock_timestamp()")
     )
 
     ticket: Mapped[ServiceTicket] = relationship(back_populates="history")

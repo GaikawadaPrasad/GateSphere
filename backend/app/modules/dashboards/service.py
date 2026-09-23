@@ -215,10 +215,15 @@ class DashboardService:
         )
         unit_id = occ.unit_id if occ else None
         now = datetime.now(UTC)
+        ticket_filter = (
+            (ServiceTicket.unit_id == unit_id) | (ServiceTicket.raised_by_user_id == self.actor.id)
+            if unit_id
+            else (ServiceTicket.raised_by_user_id == self.actor.id)
+        )
         my_tickets = await self._count(
             ServiceTicket,
             ServiceTicket.community_id == cid,
-            ServiceTicket.raised_by_user_id == self.actor.id,
+            ticket_filter,
             ServiceTicket.status.in_(_OPEN_TICKET),
         )
         if unit_id:
@@ -233,12 +238,17 @@ class DashboardService:
             visitor_filter,
             VisitorRequest.status == "pending",
         )
+        booking_filter = (
+            (AmenityBooking.unit_id == unit_id) | (AmenityBooking.resident_user_id == self.actor.id)
+            if unit_id
+            else (AmenityBooking.resident_user_id == self.actor.id)
+        )
         my_bookings = await self._count(
             AmenityBooking,
             AmenityBooking.community_id == cid,
-            AmenityBooking.resident_user_id == self.actor.id,
+            booking_filter,
             AmenityBooking.status == "confirmed",
-            AmenityBooking.start_at >= now,
+            (AmenityBooking.end_at >= now) | (AmenityBooking.booking_date >= now.date()),
         )
         my_active_deliveries = await self._count(
             Delivery,

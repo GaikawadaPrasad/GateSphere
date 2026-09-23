@@ -36,6 +36,11 @@ export default function SecuritySupervisorVisitorManagementPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [selectedVisitor, setSelectedVisitor] = useState<SupervisorVisitorRow | null>(null);
+  const [previewPhoto, setPreviewPhoto] = useState<{
+    url: string;
+    title: string;
+    subtitle?: string;
+  } | null>(null);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -127,35 +132,8 @@ export default function SecuritySupervisorVisitorManagementPage() {
     loadData();
   }, []);
 
-  // const handleApprove = async (id: string, name: string) => {
-  //   setActionMessage(null);
-  //   try {
-  //     await visitorsApi.approve(id, "Approved by Security Supervisor");
-  //     const msg = `Visitor request approved for ${name}.`;
-  //     setActionMessage({ type: "success", text: msg });
-  //     toast.success(msg);
-  //     await loadData();
-  //   } catch (err: any) {
-  //     const errMsg = err?.message || "Failed to approve visitor request.";
-  //     setActionMessage({ type: "error", text: errMsg });
-  //     toast.error(errMsg);
-  //   }
-  // };
 
-  const handleReject = async (id: string, name: string) => {
-    setActionMessage(null);
-    try {
-      await visitorsApi.reject(id, "Rejected by Security Supervisor");
-      const msg = `Visitor request rejected for ${name}.`;
-      setActionMessage({ type: "success", text: msg });
-      toast.success(msg);
-      await loadData();
-    } catch (err: any) {
-      const errMsg = err?.message || "Failed to reject visitor request.";
-      setActionMessage({ type: "error", text: errMsg });
-      toast.error(errMsg);
-    }
-  };
+  
 
   const filteredVisitors = visitors.filter((v) => {
     const q = search.toLowerCase();
@@ -186,25 +164,81 @@ export default function SecuritySupervisorVisitorManagementPage() {
       header: "Visitor Name",
       sortable: true,
       render: (v) => (
-        <button
-          type="button"
-          onClick={() => setSelectedVisitor(v)}
-          style={{
-            background: "none",
-            border: "none",
-            padding: 0,
-            cursor: "pointer",
-            fontWeight: 600,
-            color: "var(--primary, #2563eb)",
-            textAlign: "left",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "0.25rem",
-          }}
-          title="Click to view full visitor details"
-        >
-          👤 {v.name}
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+          {v.photo_url ? (
+            <div
+              style={{ position: "relative", cursor: "pointer", flexShrink: 0 }}
+              onClick={() =>
+                setPreviewPhoto({
+                  url: v.photo_url!,
+                  title: v.name,
+                  subtitle: `Pass: ${v.pass_code} • Unit: ${v.unit} • Phone: ${v.phone} • Type: ${v.type}`,
+                })
+              }
+              title="Click to view full photograph"
+            >
+              <img
+                src={v.photo_url}
+                alt={v.name}
+                style={{
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "6px",
+                  objectFit: "cover",
+                  border: "1.5px solid #86EFAC",
+                }}
+              />
+              <span
+                style={{
+                  position: "absolute",
+                  bottom: -2,
+                  right: -2,
+                  fontSize: "8px",
+                  background: "#059669",
+                  color: "white",
+                  borderRadius: "3px",
+                  padding: "0 2px",
+                  fontWeight: 800,
+                }}
+              >
+                🔍
+              </span>
+            </div>
+          ) : (
+            <div
+              style={{
+                width: "36px",
+                height: "36px",
+                borderRadius: "6px",
+                background: "var(--bg-subtle, #f1f5f9)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "15px",
+                border: "1px dashed var(--border)",
+                flexShrink: 0,
+              }}
+            >
+              👤
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => setSelectedVisitor(v)}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+              fontWeight: 600,
+              color: "var(--primary, #2563eb)",
+              textAlign: "left",
+            }}
+            title="Click to view full visitor details"
+          >
+            {v.name}
+          </button>
+        </div>
       ),
     },
     {
@@ -246,24 +280,7 @@ export default function SecuritySupervisorVisitorManagementPage() {
           >
             👁️ View
           </button>
-          {/* {v.status === "Pending Approval" ? (
-  <>
-    <button
-      type="button"
-      className="btn btn-primary"
-      onClick={() => handleApprove(v.id, v.name)}
-    >
-      Approve
-    </button>
-    <button
-      type="button"
-      className="btn btn-danger"
-      onClick={() => handleReject(v.id, v.name)}
-    >
-      Reject
-    </button>
-  </>
-) : null} */}
+          
         </div>
       ),
     },
@@ -378,30 +395,7 @@ export default function SecuritySupervisorVisitorManagementPage() {
           size="md"
           footer={
             <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", width: "100%" }}>
-              {/* {selectedVisitor.status === "Pending Approval" && (
-                <>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={() => {
-                      handleApprove(selectedVisitor.id, selectedVisitor.name);
-                      setSelectedVisitor(null);
-                    }}
-                  >
-                    Approve Request
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-danger"
-                    onClick={() => {
-                      handleReject(selectedVisitor.id, selectedVisitor.name);
-                      setSelectedVisitor(null);
-                    }}
-                  >
-                    Reject Request
-                  </button>
-                </>
-              )} */}
+              
               <button
                 type="button"
                 className="btn btn-secondary"
@@ -427,12 +421,18 @@ export default function SecuritySupervisorVisitorManagementPage() {
             >
               <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
                 {selectedVisitor.photo_url ? (
-                  <a
-                    href={selectedVisitor.photo_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <div
+                    onClick={() => {
+                      if (selectedVisitor.photo_url) {
+                        setPreviewPhoto({
+                          url: selectedVisitor.photo_url,
+                          title: selectedVisitor.name,
+                          subtitle: `Pass: ${selectedVisitor.pass_code} • Unit: ${selectedVisitor.unit} • Phone: ${selectedVisitor.phone} • Type: ${selectedVisitor.type}`,
+                        });
+                      }
+                    }}
                     title="Click to view full photograph"
-                    style={{ position: "relative", display: "inline-block", flexShrink: 0 }}
+                    style={{ position: "relative", display: "inline-block", flexShrink: 0, cursor: "pointer" }}
                   >
                     <img
                       src={selectedVisitor.photo_url}
@@ -444,8 +444,10 @@ export default function SecuritySupervisorVisitorManagementPage() {
                         objectFit: "cover",
                         border: "2px solid #86efac",
                         boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-                        cursor: "pointer",
+                        transition: "transform 0.15s ease",
                       }}
+                      onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.05)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
                     />
                     <span
                       style={{
@@ -460,9 +462,9 @@ export default function SecuritySupervisorVisitorManagementPage() {
                         fontWeight: 700,
                       }}
                     >
-                      📷 PHOTO
+                      🔍 VIEW FULL
                     </span>
-                  </a>
+                  </div>
                 ) : (
                   <div
                     style={{
@@ -657,6 +659,57 @@ export default function SecuritySupervisorVisitorManagementPage() {
                   {selectedVisitor.created_at}
                 </div>
               </div>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Photo Lightbox Modal */}
+      {previewPhoto && (
+        <Modal
+          isOpen={Boolean(previewPhoto)}
+          onClose={() => setPreviewPhoto(null)}
+          title={`📷 ${previewPhoto.title}`}
+          size="md"
+        >
+          <div style={{ textAlign: "center", padding: "0.5rem 0" }}>
+            <div
+              style={{
+                borderRadius: 12,
+                overflow: "hidden",
+                background: "#0f172a",
+                maxHeight: "70vh",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: "0.75rem",
+                boxShadow: "inset 0 0 20px rgba(0,0,0,0.5)",
+              }}
+            >
+              <img
+                src={previewPhoto.url}
+                alt={previewPhoto.title}
+                style={{
+                  maxWidth: "100%",
+                  maxHeight: "65vh",
+                  objectFit: "contain",
+                  display: "block",
+                }}
+              />
+            </div>
+            {previewPhoto.subtitle && (
+              <p style={{ fontSize: "0.85rem", color: "var(--muted)", margin: 0 }}>
+                {previewPhoto.subtitle}
+              </p>
+            )}
+            <div style={{ marginTop: "1rem", display: "flex", justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setPreviewPhoto(null)}
+              >
+                Close Preview
+              </button>
             </div>
           </div>
         </Modal>

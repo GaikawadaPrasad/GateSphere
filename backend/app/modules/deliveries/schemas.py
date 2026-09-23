@@ -84,9 +84,15 @@ class DeliveryArrival(_Write):
     executive_phone: str | None = Field(default=None, max_length=20)
 
 
+class DeliveryNotify(_Write):
+    notes: str | None = Field(default=None, max_length=2000)
+
+
+
 class DeliveryRead(_Read):
     community_id: uuid.UUID
     unit_id: uuid.UUID
+    unit_number: str | None = None
     resident_user_id: uuid.UUID | None
     protocol_id: uuid.UUID | None
     delivery_type: str

@@ -123,8 +123,8 @@ export function WalkInVisitorModal({
       case "visitorName": {
         const trimmed = (value || "").trim();
         if (!trimmed) return "Visitor full name is required.";
-        if (trimmed.length < 2) return "Visitor name must be at least 2 characters.";
-        if (trimmed.length > 100) return "Visitor name cannot exceed 100 characters.";
+        if (trimmed.length < 2) return "Visitor name is too short (must be at least 2 characters).";
+        if (trimmed.length > 35) return "Visitor name exceeds maximum length (cannot exceed 35 characters).";
         if (!isValidPersonName(trimmed)) {
           return "Visitor name must contain only alphabetic letters and spaces (no numbers or symbols).";
         }
@@ -221,7 +221,11 @@ export function WalkInVisitorModal({
   };
 
   const handleFieldChange = (name: string, value: any, context?: any) => {
-    if (touchedFields[name] || fieldErrors[name as keyof typeof fieldErrors]) {
+    if (
+      touchedFields[name] ||
+      fieldErrors[name as keyof typeof fieldErrors] ||
+      (typeof value === "string" && value.length > 35)
+    ) {
       const error = validateField(name, value, context);
       setFieldErrors((prev) => ({ ...prev, [name]: error }));
     }
@@ -420,6 +424,11 @@ export function WalkInVisitorModal({
           risk_level: err?.fields?.risk_level || "high",
         });
         setErrorMessage("⛔ ENTRY DENIED: Visitor is blacklisted by community security!");
+      } else if (
+        err?.code === "VISITOR_ALREADY_INSIDE" ||
+        (err?.message && err.message.toLowerCase().includes("inside the premises"))
+      ) {
+        setErrorMessage("⚠️ VISITOR ALREADY INSIDE: This visitor is currently checked in at the community. They must check out before a new entry pass or walk-in request can be created.");
       } else {
         let detailMsg = err?.message || "Failed to initiate visitor approval request. Please check blacklist / unit status.";
         if (err?.fields && typeof err.fields === "object" && Object.keys(err.fields).length > 0) {
@@ -517,14 +526,14 @@ export function WalkInVisitorModal({
             marginBottom: "1rem",
             padding: "0.75rem 1rem",
             borderRadius: "var(--radius-sm)",
-            background: "var(--danger-light)",
-            border: "1px solid var(--danger-border)",
-            color: "#991b1b",
+            background: errorMessage.includes("ALREADY INSIDE") ? "#FEF3C7" : "var(--danger-light)",
+            border: errorMessage.includes("ALREADY INSIDE") ? "1px solid #F59E0B" : "1px solid var(--danger-border)",
+            color: errorMessage.includes("ALREADY INSIDE") ? "#92400E" : "#991b1b",
             fontSize: "0.9rem",
             fontWeight: 600,
           }}
         >
-          ⚠️ {errorMessage}
+          {errorMessage.startsWith("⚠️") || errorMessage.startsWith("⛔") ? errorMessage : `⚠️ ${errorMessage}`}
         </div>
       )}
 
@@ -543,13 +552,24 @@ export function WalkInVisitorModal({
             }}
           >
             <div>
-              <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, marginBottom: "0.35rem" }}>
-                Visitor Full Name <span style={{ color: "red" }}>*</span>
-              </label>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+                <label style={{ fontSize: "0.85rem", fontWeight: 700 }}>
+                  Visitor Full Name <span style={{ color: "red" }}>*</span>
+                </label>
+                <span
+                  style={{
+                    fontSize: "0.75rem",
+                    color: visitorName.length > 35 ? "#DC2626" : visitorName.length > 0 && visitorName.trim().length < 2 ? "#D97706" : "var(--muted)",
+                    fontWeight: visitorName.length > 35 ? 700 : 400,
+                  }}
+                >
+                  {visitorName.length}/35
+                </span>
+              </div>
               <input
                 type="text"
                 className="input-field"
-                placeholder="e.g. Ramesh Kumar"
+                placeholder="e.g. Ramesh Kumar (2-35 chars)"
                 value={visitorName}
                 onChange={(e) => {
                   setVisitorName(e.target.value);
@@ -933,22 +953,7 @@ export function WalkInVisitorModal({
             )}
           </div>
 
-          {errorMessage && (
-            <div
-              style={{
-                marginBottom: "1rem",
-                padding: "0.75rem 1rem",
-                borderRadius: "var(--radius-sm)",
-                background: "#FEF2F2",
-                border: "1px solid #F87171",
-                color: "#991B1B",
-                fontSize: "0.85rem",
-                fontWeight: 600,
-              }}
-            >
-              ⚠️ {errorMessage}
-            </div>
-          )}
+
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "1.5rem" }}>
             <button type="button" className="btn btn-secondary" onClick={onClose} disabled={isSubmitting}>

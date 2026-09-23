@@ -184,20 +184,30 @@ class UserService:
         )
         self.db.add(user)
         await self.db.flush()
-        await self._audit("user.create", str(user.id))
+        target_cid = payload.community_id
+        if (
+            target_cid is None
+            and not self.scope.is_global
+            and len(self.scope.community_ids) == 1
+            and (not payload.role_slug or payload.role_slug not in ("super_admin", "auditor"))
+        ):
+            target_cid = next(iter(self.scope.community_ids))
+        await self._audit("user.create", str(user.id), community_id=target_cid)
         if payload.role_slug:
             await self.grant_role(
                 user.id,
-                schemas.RoleGrantIn(role_slug=payload.role_slug, community_id=payload.community_id),
+                schemas.RoleGrantIn(role_slug=payload.role_slug, community_id=target_cid),
             )
         return await self._get_visible(user.id)
 
     async def update_user(self, user_id: uuid.UUID, payload: schemas.UserUpdate) -> User:
         user = await self._get_visible(user_id)
+        if not self.scope.is_global and not user.roles:
+            raise ForbiddenError("Cannot modify an unaffiliated user", code="UNAFFILIATED_TAKEOVER")
         patch = payload.model_dump(exclude_unset=True)
         was_active = user.is_active
 
-        if "email" in patch and patch["email"]:
+        if patch.get("email"):
             new_email = str(patch.pop("email")).strip().lower()
             if new_email != user.email:
                 existing = await self.db.scalar(
@@ -207,7 +217,7 @@ class UserService:
                     raise ConflictError("Email already registered", code="EMAIL_TAKEN")
                 user.email = new_email
 
-        if "password" in patch and patch["password"]:
+        if patch.get("password"):
             raw_pwd = str(patch.pop("password"))
             user.password_hash = hash_password(raw_pwd)
             await revoke_all_user_sessions_async(self.db, user.id)
@@ -225,8 +235,52 @@ class UserService:
         role = await self.db.scalar(select(Role).where(Role.slug == payload.role_slug))
         if role is None:
             raise NotFoundError("Role not found")
-        self._require_community(payload.community_id)
-        if role.slug == "super_admin" and payload.community_id is not None:
+        target_cid = payload.community_id
+        if (
+            target_cid is None
+            and not self.scope.is_global
+            and len(self.scope.community_ids) == 1
+            and role.slug not in ("super_admin", "auditor")
+        ):
+            target_cid = next(iter(self.scope.community_ids))
+        self._require_community(target_cid)
+
+        is_super = (
+            await self.db.scalar(
+                select(UserRole.id)
+                .join(Role, Role.id == UserRole.role_id)
+                .where(UserRole.user_id == self.actor.id, Role.slug == "super_admin")
+                .limit(1)
+            )
+            is not None
+        )
+        if (
+            role.slug == "super_admin" or (role.slug == "auditor" and target_cid is None)
+        ) and not is_super:
+            raise ForbiddenError(
+                f"Only super_admin can grant global {role.slug}", code="HIERARCHY_VIOLATION"
+            )
+
+        from app.core.rbac import ROLES
+
+        role_order = list(ROLES.keys())
+        target_idx = role_order.index(role.slug)
+        caller_roles = (
+            await self.db.scalars(
+                select(Role.slug)
+                .join(UserRole, UserRole.role_id == Role.id)
+                .where(UserRole.user_id == self.actor.id)
+            )
+        ).all()
+        caller_idx = min(
+            [role_order.index(r) for r in caller_roles if r in role_order] + [len(role_order)]
+        )
+        if target_idx < caller_idx:
+            raise ForbiddenError(
+                "Cannot grant a role higher than your own", code="HIERARCHY_VIOLATION"
+            )
+
+        if role.slug == "super_admin" and target_cid is not None:
             raise BusinessRuleError(
                 f"{role.slug} is a platform-global role", code="GLOBAL_ROLE_ONLY"
             )
@@ -234,20 +288,20 @@ class UserService:
             select(UserRole).where(
                 UserRole.user_id == user.id,
                 UserRole.role_id == role.id,
-                UserRole.community_id == payload.community_id,
+                UserRole.community_id == target_cid,
             )
         )
         if dupe is not None:
             raise ConflictError("Grant already exists", code="GRANT_EXISTS")
-        ur = UserRole(user_id=user.id, role_id=role.id, community_id=payload.community_id)
+        ur = UserRole(user_id=user.id, role_id=role.id, community_id=target_cid)
         self.db.add(ur)
         await self.db.flush()
         await invalidate_user_permissions_async(self.db, [user.id])
         await self._audit(
             "role.grant",
             str(user.id),
-            community_id=payload.community_id,
-            new={"role": role.slug, "community_id": str(payload.community_id or "global")},
+            community_id=target_cid,
+            new={"role": role.slug, "community_id": str(target_cid or "global")},
         )
         return await self.db.scalar(
             select(UserRole).options(selectinload(UserRole.role)).where(UserRole.id == ur.id)
@@ -259,6 +313,22 @@ class UserService:
         if ur is None or ur.user_id != user.id:
             raise NotFoundError("Grant not found")
         self._require_community(ur.community_id)
+
+        is_super = (
+            await self.db.scalar(
+                select(UserRole.id)
+                .join(Role, Role.id == UserRole.role_id)
+                .where(UserRole.user_id == self.actor.id, Role.slug == "super_admin")
+                .limit(1)
+            )
+            is not None
+        )
+        role_slug = await self.db.scalar(select(Role.slug).where(Role.id == ur.role_id))
+        if role_slug in ("super_admin", "auditor", "community_admin") and not is_super:
+            raise ForbiddenError(
+                f"Only super_admin can revoke {role_slug}", code="HIERARCHY_VIOLATION"
+            )
+
         await self.db.delete(ur)
         await self.db.flush()
         await invalidate_user_permissions_async(self.db, [user.id])
@@ -272,4 +342,3 @@ class UserService:
         await self.db.delete(user)
         await self.db.flush()
         await self._audit("user.delete", str(user_id))
-

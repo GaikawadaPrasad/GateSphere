@@ -171,12 +171,14 @@ class GateService:
     async def list_events(
         self,
         *,
-        community_id: uuid.UUID | None,
-        gate_id: uuid.UUID | None,
-        event_type: str | None,
-        offset: int,
-        limit: int,
+        community_id: uuid.UUID | None = None,
+        gate_id: uuid.UUID | None = None,
+        event_type: str | None = None,
+        cursor: str | None = None,
+        offset: int = 0,
+        limit: int = 20,
     ):
+        import base64
         _enum("event_type", event_type)
         stmt = select(GateEvent)
         if community_id is not None:
@@ -186,10 +188,34 @@ class GateService:
             stmt = stmt.where(GateEvent.gate_id == gate_id)
         if event_type:
             stmt = stmt.where(GateEvent.event_type == event_type)
-        stmt = stmt.order_by(GateEvent.occurred_at.desc())
-        return await self.events.list(
-            offset=offset, limit=limit, extra=stmt
-        ), await self.events.count(extra=stmt)
+
+        if cursor:
+            try:
+                decoded = base64.b64decode(cursor).decode("utf-8")
+                ts, last_id = decoded.split("|")
+                dt = datetime.fromtimestamp(float(ts), UTC)
+                # Keyset pagination condition: (occurred_at, id) < (dt, last_id)
+                from sqlalchemy import tuple_
+
+                stmt = stmt.where(tuple_(GateEvent.occurred_at, GateEvent.id) < tuple_(dt, last_id))
+            except Exception:
+                pass
+
+            stmt = stmt.order_by(GateEvent.occurred_at.desc(), GateEvent.id.desc())
+            rows = list((await self.db.scalars(self.events._scoped(stmt).limit(limit + 1))).all())
+            next_cursor = None
+            if len(rows) > limit:
+                rows.pop()
+                last = rows[-1]
+                ts = last.occurred_at.timestamp()
+                next_cursor = base64.b64encode(f"{ts}|{last.id}".encode()).decode("utf-8")
+
+            return rows, next_cursor
+
+        stmt = stmt.order_by(GateEvent.occurred_at.desc(), GateEvent.id.desc())
+        rows = await self.events.list(offset=offset, limit=limit, extra=stmt)
+        total = await self.events.count(extra=stmt)
+        return rows, total
 
     # -- guard rosters ------------------------------------------ #
     async def create_roster(self, payload, *, community_id: uuid.UUID | None) -> GuardRoster:
@@ -362,19 +388,64 @@ class GateService:
             cid = await self._gate_community(payload.gate_id)
         else:
             cid = self._one_community(payload.community_id)
+
+        # Resolve resident's location (Tower/Block and Unit Number) if triggered by a user
+        unit_label = None
+        if self.actor and self.actor.id:
+            try:
+                from app.modules.communities.models import Tower, Unit
+                from app.modules.residents.models import ResidentProfile, UnitOccupancy
+
+                occ_res = await self.db.execute(
+                    select(Unit, Tower)
+                    .join(UnitOccupancy, UnitOccupancy.unit_id == Unit.id)
+                    .join(ResidentProfile, ResidentProfile.id == UnitOccupancy.resident_profile_id)
+                    .outerjoin(Tower, Tower.id == Unit.tower_id)
+                    .where(
+                        ResidentProfile.user_id == self.actor.id, UnitOccupancy.is_active.is_(True)
+                    )
+                )
+                row = occ_res.first()
+                if row:
+                    u, t = row
+                    tower_name = t.name if t else ""
+                    u_num = u.unit_number if u else ""
+                    if tower_name and u_num:
+                        unit_label = f"{tower_name} - Unit {u_num}"
+                    elif u_num:
+                        unit_label = f"Unit {u_num}"
+            except Exception:
+                unit_label = None
+
+        msg = payload.message or "Emergency SOS triggered by resident from portal"
+        if unit_label and "Location:" not in msg and unit_label not in msg:
+            msg = f"Location: {unit_label} — {msg}"
+
         obj = PanicAlert(
             community_id=cid,
             triggered_by_user_id=self.actor.id,
             gate_id=payload.gate_id,
             alert_type=payload.alert_type,
             severity=payload.severity,
-            message=payload.message,
+            message=msg,
         )
         await self.alerts.add(obj)
         await self._audit(
             "alert.raise", cid, "panic_alert", obj.id, new={"type": payload.alert_type}
         )
         await self.db.flush()
+
+        notif_title = (
+            f"🚨 SOS EMERGENCY: {unit_label}"
+            if unit_label
+            else f"PANIC: {payload.alert_type} ({payload.severity})"
+        )
+        notif_message = (
+            f"Emergency SOS triggered from {unit_label}. Details: {msg}"
+            if unit_label
+            else (msg or f"A {payload.alert_type} alert was raised. Respond now.")
+        )
+
         await notif_events.emit_to_roles(
             self.db,
             self.scope,
@@ -383,8 +454,8 @@ class GateService:
             community_id=cid,
             role_slugs=["security_supervisor", "security_guard", "community_admin"],
             notification_type="gate.panic_alert",
-            title=f"PANIC: {payload.alert_type} ({payload.severity})",
-            message=payload.message or f"A {payload.alert_type} alert was raised. Respond now.",
+            title=notif_title,
+            message=notif_message,
             reference_type="panic_alert",
             reference_id=obj.id,
             channels=["in_app", "push", "sms", "whatsapp"],

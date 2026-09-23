@@ -490,17 +490,93 @@ export const VENDOR_TECHNICIAN_NAV: DashboardNavConfig = {
   ],
 };
 
+export const FACILITY_MANAGER_NAV: DashboardNavConfig = {
+  role: "facility_manager",
+  title: "Facility Manager",
+  subtitle: "Community Operations & Upkeep",
+  basePath: "/facility-manager",
+  color: "#059669",
+  navItems: [
+    {
+      id: "overview",
+      label: "Dashboard",
+      href: "/facility-manager/dashboard",
+      icon: "📊",
+      accentColor: "#059669",
+      description: "Facilities overview & metrics",
+    },
+    {
+      id: "facilities",
+      label: "Property & Infrastructure",
+      href: "/facility-manager/facilities",
+      icon: "🏢",
+      accentColor: "#2563EB",
+      description: "Core property infrastructure tracking",
+    },
+    {
+      id: "maintenance",
+      label: "Maintenance & Service",
+      href: "/facility-manager/complaints",
+      icon: "🔧",
+      accentColor: "#16A34A",
+      description: "Manage maintenance tickets & SLA",
+    },
+    {
+      id: "amenities",
+      label: "Amenities",
+      href: "/facility-manager/amenities",
+      icon: "🏊",
+      accentColor: "#9333EA",
+      description: "Manage amenity bookings",
+    },
+    {
+      id: "vendors",
+      label: "Vendors & Techs",
+      href: "/facility-manager/vendors",
+      icon: "👷",
+      accentColor: "#D97706",
+      description: "Manage external vendors",
+    },
+    {
+      id: "incidents",
+      label: "Incidents",
+      href: "/facility-manager/incidents",
+      icon: "🚨",
+      accentColor: "#DC2626",
+      description: "Track property incidents",
+    },
+    {
+      id: "reports",
+      label: "Reports",
+      href: "/facility-manager/reports",
+      icon: "📈",
+      accentColor: "#475569",
+      description: "Operations and maintenance reporting",
+    },
+    {
+      id: "notifications",
+      label: "Notifications",
+      href: "/facility-manager/notifications",
+      icon: "🔔",
+      accentColor: "#EA580C",
+      description: "Facility alerts and broadcasts",
+    },
+  ],
+};
+
 export const AUDITOR_NAV_ITEMS = AUDITOR_NAV.navItems;
 export const DOMESTIC_STAFF_NAV_ITEMS = DOMESTIC_STAFF_NAV.navItems;
 export const RESIDENT_NAV_ITEMS = OWNER_TENANT_NAV.navItems;
 export const SECURITY_GUARD_NAV_ITEMS = SECURITY_GUARD_NAV.navItems;
 export const VENDOR_TECHNICIAN_NAV_ITEMS = VENDOR_TECHNICIAN_NAV.navItems;
+export const FACILITY_MANAGER_NAV_ITEMS = FACILITY_MANAGER_NAV.navItems;
 
 export function getDashboardNavForRole(roleSlug: string): DashboardNavConfig {
   if (roleSlug === "auditor") return AUDITOR_NAV;
   if (roleSlug === "domestic_staff") return DOMESTIC_STAFF_NAV;
   if (roleSlug === "security_guard") return SECURITY_GUARD_NAV;
   if (roleSlug === "vendor_technician") return VENDOR_TECHNICIAN_NAV;
+  if (roleSlug === "facility_manager") return FACILITY_MANAGER_NAV;
   return OWNER_TENANT_NAV;
 }
 

@@ -131,7 +131,7 @@ export function useAssignedHomes() {
     queryKey: ["staff", "assigned-homes"],
     staleTime: 5_000,
     queryFn: async () => {
-      const res = await api.get<any[]>("/domestic-staff/me/assignments");
+      const res = await api.get<any[]>("/domestic-staff/me/assignments?page_size=100");
       if (!Array.isArray(res)) return [];
       return res.map((a: any) => ({
         id: a.id,
@@ -159,7 +159,7 @@ export function useStaffAttendance() {
     queryKey: ["staff", "attendance"],
     staleTime: 5_000,
     queryFn: async () => {
-      const res = await api.get<any[]>("/domestic-staff/me/attendance");
+      const res = await api.get<any[]>("/domestic-staff/me/attendance?page_size=100");
       if (!Array.isArray(res)) return [];
       return res.map((att: any) => {
         const isOverdue =
@@ -203,7 +203,7 @@ export function useStaffVisits() {
     queryKey: ["staff", "visits"],
     staleTime: 5_000,
     queryFn: async () => {
-      const res = await api.get<any[]>("/domestic-staff/me/visits");
+      const res = await api.get<any[]>("/domestic-staff/me/visits?page_size=100");
       if (!Array.isArray(res)) return [];
       return res.map((v: any) => ({
         id: v.id,

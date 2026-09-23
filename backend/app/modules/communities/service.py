@@ -253,9 +253,15 @@ class CommunityService:
 
     async def delete_gate(self, gate_id: uuid.UUID) -> None:
         obj = await self.get_gate(gate_id)
+        old = {
+            "name": obj.name,
+            "code": obj.code,
+            "gate_type": obj.gate_type,
+            "is_active": obj.is_active,
+        }
         await self.db.delete(obj)
         await self.db.flush()
-        await self._audit("gate.delete", obj.community_id, "gate", gate_id)
+        await self._audit("gate.delete", obj.community_id, "gate", gate_id, old=old)
 
     # -- towers ------------------------------------------------------- #
     async def list_towers(
@@ -302,9 +308,16 @@ class CommunityService:
 
     async def delete_tower(self, tower_id: uuid.UUID) -> None:
         obj = await self.get_tower(tower_id)
+        old = {
+            "name": obj.name,
+            "code": obj.code,
+            "structure_type": obj.structure_type,
+            "total_floors": obj.total_floors,
+            "is_active": obj.is_active,
+        }
         await self.db.delete(obj)
         await self.db.flush()
-        await self._audit("tower.delete", obj.community_id, "tower", tower_id)
+        await self._audit("tower.delete", obj.community_id, "tower", tower_id, old=old)
 
     # -- floors ---------------------------------------------------- #
     async def list_floors(
@@ -358,9 +371,15 @@ class CommunityService:
 
     async def delete_floor(self, floor_id: uuid.UUID) -> None:
         obj = await self.get_floor(floor_id)
+        old = {
+            "floor_number": obj.floor_number,
+            "label": obj.label,
+            "tower_id": str(obj.tower_id),
+            "is_active": obj.is_active,
+        }
         await self.db.delete(obj)
         await self.db.flush()
-        await self._audit("floor.delete", obj.community_id, "floor", floor_id)
+        await self._audit("floor.delete", obj.community_id, "floor", floor_id, old=old)
 
     # -- units --------------------------------------------------- #
     async def list_units(
@@ -439,6 +458,15 @@ class CommunityService:
 
     async def delete_unit(self, unit_id: uuid.UUID) -> None:
         obj = await self.get_unit(unit_id)
+        old = {
+            "unit_number": obj.unit_number,
+            "unit_type": obj.unit_type,
+            "bedrooms": obj.bedrooms,
+            "area_sqft": float(obj.area_sqft) if obj.area_sqft is not None else None,
+            "floor_id": str(obj.floor_id),
+            "tower_id": str(obj.tower_id),
+            "is_active": obj.is_active,
+        }
         await self.db.delete(obj)
         await self.db.flush()
-        await self._audit("unit.delete", obj.community_id, "unit", unit_id)
+        await self._audit("unit.delete", obj.community_id, "unit", unit_id, old=old)

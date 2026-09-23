@@ -2,7 +2,9 @@
 
 After N failed logins for one email inside the window, the account locks for the
 lock duration — even the correct password gets 429 ACCOUNT_LOCKED. A successful
-login clears the counter. Fails open when Redis is down.
+login clears the counter. Fails CLOSED when Redis is down (M-01,
+backend/REMEDIATION_LOG.md) — every login attempt, even with the right password, is
+rejected rather than silently unmetered while Redis is unreachable.
 """
 
 from __future__ import annotations
@@ -103,7 +105,12 @@ def test_lockout_unit_helpers(_lockout):
     assert login_lockout.lock_remaining(PROBE) > 0
 
 
-def test_fails_open_when_redis_is_down(monkeypatch, _lockout):
+def test_fails_closed_when_redis_is_down(monkeypatch, _lockout):
+    """M-01: simulates Redis becoming unreachable mid-request (every call on the client
+    raises RedisError, exactly what a dead connection/timeout looks like to the caller).
+    Before this fix every attempt here returned 401 (open); now every attempt — including
+    one with the *correct* password — must be rejected as if locked, since the module can
+    no longer prove the account isn't already over its failure threshold."""
     from redis.exceptions import RedisError
 
     class _Boom:
@@ -116,4 +123,9 @@ def test_fails_open_when_redis_is_down(monkeypatch, _lockout):
     monkeypatch.setattr(login_lockout, "redis_client", _Boom())
     c = TestClient(app)
     for i in range(6):
-        assert _try(c, PROBE, f"wrong-{i}").status_code == 401
+        r = _try(c, PROBE, f"wrong-{i}")
+        assert r.status_code == 429, r.text
+        assert r.json()["error"]["code"] == "ACCOUNT_LOCKED"
+    r = _try(c, RESIDENT, RESIDENT_PW)
+    assert r.status_code == 429, r.text
+    assert r.json()["error"]["code"] == "ACCOUNT_LOCKED"

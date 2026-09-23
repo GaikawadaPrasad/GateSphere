@@ -19,6 +19,7 @@ import {
   FamilyMemberPassModal,
   FamilyMemberPassData,
 } from "@/components/common/FamilyMemberPassModal";
+import { GATESPHERE_LOGO_BASE64 } from "@/lib/logo-base64";
 
 const QrCodeSvg = dynamic(
   () => import("@/components/common/QrCodeSvg").then((m) => m.QrCodeSvg),
@@ -71,8 +72,9 @@ import {
 import { useAnnouncements, useEventRsvp } from "@/hooks/use-communication";
 import { useMyNotifications } from "@/hooks/use-notifications";
 import { useTableControls } from "@/hooks/use-table-controls";
-import { formatDate, formatCurrency, getAmenityIcon, isValidPersonName } from "@/lib/utils";
-import { authApi } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
+import { formatDate, formatDateTime, formatCurrency, getAmenityIcon, isValidPersonName } from "@/lib/utils";
+import { authApi, gateApi } from "@/lib/api";
 import { useUiStore } from "@/store/ui";
 
 export type OwnerTenantTab =
@@ -119,6 +121,27 @@ export function OwnerTenantDashboardView({
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceItem | null>(null);
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [currentReceiptNumber, setCurrentReceiptNumber] = useState("");
+  const [activeReceiptData, setActiveReceiptData] = useState<{
+    receipt_number: string;
+    payment_reference: string;
+    invoice_number: string;
+    title: string;
+    amount_paid: number;
+    total_amount: number;
+    balance_due: number;
+    paid_at: string;
+    payment_method: string;
+    unit_number?: string;
+    payer_name?: string;
+    line_items?: {
+      head: string;
+      description?: string;
+      quantity?: number;
+      unit_rate?: number;
+      amount: number;
+      taxable?: boolean;
+    }[];
+  } | null>(null);
   const [addMemberModalOpen, setAddMemberModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<FamilyMember | null>(null);
   const [memberToDelete, setMemberToDelete] = useState<FamilyMember | null>(null);
@@ -226,6 +249,18 @@ export function OwnerTenantDashboardView({
   const [dismissedVisitorId, setDismissedVisitorId] = useState<string | null>(null);
   const [deliveryBannerDismissed, setDeliveryBannerDismissed] = useState(false);
 
+  // Visitor Photo Lightbox Preview state
+  const [previewPhoto, setPreviewPhoto] = useState<{
+    url: string;
+    title: string;
+    subtitle?: string;
+  } | null>(null);
+
+  // Emergency SOS state
+  const [emergencyType, setEmergencyType] = useState<string>("medical");
+  const [emergencyNote, setEmergencyNote] = useState<string>("");
+  const [emergencyLocationDetail, setEmergencyLocationDetail] = useState<string>("");
+
   // Data queries
   const { data: stats, isLoading: statsLoading, isError: statsError, refetch: refetchStats } = useResidentOverview(activeCommunityId);
   const visitors = useResidentVisitors();
@@ -250,13 +285,53 @@ export function OwnerTenantDashboardView({
   const invoiceList = payments.data || [];
   const myOccupancy = profile.data?.occupancies?.[0];
 
+  const { data: myAlerts = [], refetch: refetchAlerts } = useQuery({
+    queryKey: ["resident", "alerts"],
+    queryFn: async () => {
+      try {
+        const res = await gateApi.alerts({ page_size: 20 });
+        return Array.isArray(res) ? res : [];
+      } catch {
+        return [];
+      }
+    },
+    refetchInterval: 5000,
+  });
+  const activeResidentAlert = (myAlerts as any[]).find(
+    (a: any) => a.status === "active" || a.status === "acknowledged",
+  );
+
   const ledger = useResidentLedger(myOccupancy?.unit_id);
   const ledgerList = ledger.data || [];
-
   const nextDueInvoice = invoiceList.find((i) => i.balance_due > 0);
-  const openTicket = complaintList.find((t) => t.status !== "resolved" && t.status !== "closed");
+
+  // Dynamic Open Service Tickets from real-time records
+  const openTicketsList = complaintList.filter(
+    (t) => t.status !== "resolved" && t.status !== "closed" && t.status !== "cancelled"
+  );
+  const openServiceTicketsCount = complaints.data !== undefined
+    ? openTicketsList.length
+    : (stats?.open_service_tickets ?? 0);
+  const openTicket = openTicketsList.length > 0
+    ? [...openTicketsList].sort(
+        (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+      )[0]
+    : undefined;
+
   const activeStaffCount = (domesticStaff.data || []).filter((s) => s.is_active).length;
-  const nextBooking = (amenities.bookings.data || []).find((b) => b.status === "confirmed");
+
+  // Dynamic Booked Amenities from real-time records
+  const activeBookingsList = (amenities.bookings.data || []).filter(
+    (b) => b.status === "confirmed" && (!b.date || new Date(`${b.date}T23:59:59`).getTime() >= Date.now() - 86400000)
+  );
+  const bookedAmenitiesCount = amenities.bookings.data !== undefined
+    ? activeBookingsList.length
+    : (stats?.upcoming_amenity_bookings ?? 0);
+  const nextBooking = activeBookingsList.length > 0
+    ? [...activeBookingsList].sort(
+        (a, b) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime()
+      )[0]
+    : undefined;
 
   const pendingVisitor = visitorList.find((v) => v.status === "pending");
   const visitorBannerDismissed = Boolean(pendingVisitor && dismissedVisitorId === pendingVisitor.id);
@@ -495,8 +570,16 @@ export function OwnerTenantDashboardView({
       return;
     }
     const trimmedVisitorName = passVisitorName.trim();
-    if (!trimmedVisitorName || trimmedVisitorName.length < 2) {
+    if (!trimmedVisitorName) {
       toast.error("Please enter the visitor's full name.", "Visitor Name Required");
+      return;
+    }
+    if (trimmedVisitorName.length < 2) {
+      toast.error("Visitor name is too short (must be at least 2 characters).", "Validation Error");
+      return;
+    }
+    if (trimmedVisitorName.length > 35) {
+      toast.error("Visitor name exceeds maximum length (cannot exceed 35 characters).", "Validation Error");
       return;
     }
     if (!isValidPersonName(trimmedVisitorName)) {
@@ -888,9 +971,10 @@ export function OwnerTenantDashboardView({
   const handleSimulatedPayment = async () => {
     if (!selectedInvoice) return;
     try {
+      const invToPay = selectedInvoice;
       const res = await payments.payDues.mutateAsync({
-        invoiceId: selectedInvoice.id,
-        amount: selectedInvoice.balance_due,
+        invoiceId: invToPay.id,
+        amount: invToPay.balance_due,
         method: "simulated_gateway",
       });
       await payments.refetch();
@@ -898,16 +982,44 @@ export function OwnerTenantDashboardView({
       refetchStats?.();
       const generatedRcp =
         res?.receipt_number ||
+        invToPay.receipt_number ||
         (res?.id ? `RCP-${res.id.slice(0, 8).toUpperCase()}` : `RCP-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
+      const generatedRef = res?.payment_reference || `PAY-${Date.now().toString(36).toUpperCase()}`;
+
       setCurrentReceiptNumber(generatedRcp);
+      setActiveReceiptData({
+        receipt_number: generatedRcp,
+        payment_reference: generatedRef,
+        invoice_number: invToPay.invoice_number,
+        title: invToPay.title,
+        amount_paid: invToPay.balance_due,
+        total_amount: invToPay.total_amount,
+        balance_due: 0,
+        paid_at: new Date().toISOString(),
+        payment_method: "Simulated Instant UPI / NetBanking Gateway",
+        unit_number: residentUnit,
+        payer_name: profile.data?.full_name || "Primary Resident",
+        line_items: invToPay.line_items,
+      });
+      setSelectedInvoice((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: "paid",
+              balance_due: 0,
+              amount_paid: prev.total_amount,
+              receipt_number: generatedRcp,
+            }
+          : null
+      );
       setPaymentModalOpen(false);
       setReceiptModalOpen(true);
       toast.success(
-        `Payment of ${formatCurrency(selectedInvoice.balance_due)} processed successfully.`,
-        "Dues Paid",
+        `Payment of ${formatCurrency(invToPay.balance_due)} processed successfully. Receipt #${generatedRcp} issued.`,
+        "Payment Processed & Settled",
       );
     } catch (err: any) {
-      toast.error(err?.message || "Payment failed. Please try again.", "Error");
+      toast.error(err?.message || "Payment processing failed. Please try again.", "Payment Error");
     }
   };
 
@@ -915,23 +1027,499 @@ export function OwnerTenantDashboardView({
     ? `${myOccupancy.unit_number.startsWith("Unit") ? myOccupancy.unit_number : `Unit ${myOccupancy.unit_number}`}${myOccupancy.tower_name ? `, ${myOccupancy.tower_name}` : ""}`
     : "Registered Unit";
 
-  const handleTriggerPanic = async () => {
+  const handleDownloadInvoice = (inv: InvoiceItem | null) => {
+    if (!inv) return;
     try {
+      const lineItemsHtml = (inv.line_items && inv.line_items.length > 0)
+        ? inv.line_items.map((item) => `
+          <tr>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0;">
+              <strong>${item.head}</strong>
+              ${item.description && item.description !== item.head ? `<br/><span style="color: #64748b; font-size: 12px;">${item.description}</span>` : ""}
+            </td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: center;">
+              ${item.taxable ? "GST 18%" : "Exempt"}
+            </td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: right;">${item.quantity ?? 1}</td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: right;">${formatCurrency(item.unit_rate ?? item.amount)}</td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: bold;">${formatCurrency(item.amount)}</td>
+          </tr>
+        `).join("")
+        : `
+          <tr>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0;"><strong>Monthly Society Maintenance Charge</strong></td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: center;">Standard</td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: right;">1</td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: right;">${formatCurrency(inv.total_amount)}</td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: bold;">${formatCurrency(inv.total_amount)}</td>
+          </tr>
+        `;
+
+      const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Invoice - ${inv.invoice_number}</title>
+  <style>
+    @page { size: A4 portrait; margin: 15mm; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #0f172a; padding: 36px; margin: 0; background: #fff; position: relative; }
+    .watermark {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-28deg);
+      text-align: center;
+      pointer-events: none;
+      user-select: none;
+      z-index: 0;
+      opacity: 0.055;
+      border: 5px dashed #0f172a;
+      border-radius: 20px;
+      padding: 24px 48px;
+      white-space: nowrap;
+    }
+    .watermark-img {
+      width: 120px;
+      height: 120px;
+      object-fit: contain;
+      margin-bottom: 12px;
+      filter: grayscale(100%);
+      opacity: 0.85;
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
+      image-rendering: -webkit-optimize-contrast;
+    }
+    .watermark-title { font-size: 54px; font-weight: 900; letter-spacing: 0.12em; color: #0f172a; line-height: 1.1; }
+    .watermark-sub { font-size: 16px; font-weight: 800; letter-spacing: 0.25em; color: #0f172a; margin-top: 6px; }
+    .content-layer { position: relative; z-index: 1; }
+    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 20px; margin-bottom: 24px; }
+    .brand-section { display: flex; align-items: center; gap: 14px; }
+    .brand-logo { width: 50px; height: 50px; object-fit: contain; border-radius: 10px; box-shadow: 0 3px 8px rgba(0,0,0,0.1); image-rendering: -webkit-optimize-contrast; }
+    .brand-title { font-size: 22px; font-weight: 800; color: #1e40af; letter-spacing: -0.01em; }
+    .brand-subtitle { font-size: 12.5px; color: #64748b; margin-top: 2px; }
+    .invoice-title { font-size: 18px; font-weight: 800; text-align: right; }
+    .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 24px; font-size: 13.5px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+    th { background: #f1f5f9; border-bottom: 2px solid #cbd5e1; padding: 10px 12px; text-align: left; font-size: 13px; font-weight: 700; color: #1e293b; }
+    td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
+    .totals { width: 360px; margin-left: auto; margin-bottom: 26px; font-size: 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; }
+    .totals-row { display: flex; justify-content: space-between; padding: 6px 0; }
+    .grand-total { border-top: 2px solid #0f172a; font-weight: 800; font-size: 16px; padding-top: 10px; margin-top: 6px; }
+    .footer { border-top: 1px solid #e2e8f0; padding-top: 16px; font-size: 12px; color: #64748b; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="watermark">
+    <img src="${GATESPHERE_LOGO_BASE64}" alt="" class="watermark-img" />
+    <div class="watermark-title">OFFICIAL INVOICE</div>
+    <div class="watermark-sub">GATESPHERE RESIDENTIAL SERVICES</div>
+  </div>
+
+  <div class="content-layer">
+    <div class="header">
+      <div class="brand-section">
+        <img src="${GATESPHERE_LOGO_BASE64}" alt="GateSphere Logo" class="brand-logo" />
+        <div>
+          <div class="brand-title">GateSphere Residential Management</div>
+          <div class="brand-subtitle">Smart Community Operating System • Official Billing Document</div>
+        </div>
+      </div>
+      <div class="invoice-title">
+        <div style="font-size: 11.5px; color: #64748b; font-weight: 700; text-transform: uppercase;">INVOICE NUMBER</div>
+        <div style="font-size: 17px; font-family: monospace; color: #1e40af; margin-top: 2px;"># ${inv.invoice_number}</div>
+        <div style="font-size: 11.5px; color: #64748b; margin-top: 2px; text-transform: uppercase;">Status: <strong>${inv.status}</strong></div>
+      </div>
+    </div>
+
+    <div class="meta-grid">
+      <div>
+        <strong style="color: #64748b; font-size: 11.5px; text-transform: uppercase;">Billed To / Assigned Unit:</strong><br/>
+        <span style="font-size: 15px; font-weight: 700; color: #0f172a;">${profile.data?.full_name || "Primary Resident"}</span><br/>
+        <span style="color: #334155;">${residentUnit}</span><br/>
+        <span style="font-size: 12px; color: #64748b;">${profile.data?.email || ""}</span>
+      </div>
+      <div style="text-align: right;">
+        <strong>Invoice Date:</strong> ${formatDate(inv.issue_date)}<br/>
+        <strong>Payment Due Date:</strong> ${formatDate(inv.due_date)}<br/>
+        <strong>Billing Period:</strong> ${inv.billing_period_start && inv.billing_period_end ? `${formatDate(inv.billing_period_start)} — ${formatDate(inv.billing_period_end)}` : "Monthly Operations"}
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Charge Description</th>
+          <th style="text-align: center;">Tax Status</th>
+          <th style="text-align: right;">Qty</th>
+          <th style="text-align: right;">Rate</th>
+          <th style="text-align: right;">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${lineItemsHtml}
+      </tbody>
+    </table>
+
+    <div class="totals">
+      <div class="totals-row"><span>Subtotal Charges:</span><span>${formatCurrency(inv.subtotal || inv.total_amount)}</span></div>
+      <div class="totals-row"><span>Taxes &amp; Levies:</span><span>${Number(inv.tax || 0) > 0 ? formatCurrency(inv.tax) : "₹0.00 (Exempt)"}</span></div>
+      ${Number(inv.late_fee || 0) > 0 ? `<div class="totals-row" style="color: #dc2626;"><span>Late Payment Fee:</span><span>+${formatCurrency(inv.late_fee)}</span></div>` : ""}
+      ${Number(inv.discount || 0) > 0 ? `<div class="totals-row" style="color: #059669;"><span>Rebate / Discount:</span><span>-${formatCurrency(inv.discount)}</span></div>` : ""}
+      <div class="totals-row grand-total"><span>Total Invoice Amount:</span><span>${formatCurrency(inv.total_amount)}</span></div>
+      <div class="totals-row" style="color: #059669;"><span>Amount Paid:</span><span>${formatCurrency(inv.amount_paid)}</span></div>
+      <div class="totals-row" style="font-weight: 800; color: #1e40af; font-size: 16px; border-top: 1px dashed #cbd5e1; padding-top: 8px; margin-top: 4px;"><span>Balance Due:</span><span>${formatCurrency(inv.balance_due)}</span></div>
+    </div>
+
+    <div class="footer">
+      🔒 This is an authentic digital invoice issued securely by GateSphere. For billing inquiries, contact your community management office.
+    </div>
+  </div>
+</body>
+</html>`;
+
+      const blob = new Blob([htmlContent], { type: "text/html;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Invoice-${inv.invoice_number}.html`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success(`Invoice ${inv.invoice_number} downloaded successfully.`, "Invoice Downloaded");
+    } catch (err: any) {
+      toast.error("Failed to download invoice document.", "Download Error");
+    }
+  };
+
+  const handleDownloadReceipt = (data: {
+    receipt_number: string;
+    payment_reference?: string;
+    invoice_number?: string;
+    amount_paid: number;
+    paid_at?: string;
+    payment_method?: string;
+    unit_number?: string;
+    payer_name?: string;
+    line_items?: any[];
+  } | null) => {
+    if (!data) return;
+    try {
+      const rcpNumber = data.receipt_number || currentReceiptNumber || `RCP-${Date.now()}`;
+      const itemsHtml = (data.line_items && data.line_items.length > 0)
+        ? data.line_items.map((i: any) => `
+          <tr>
+            <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0;">${i.head || i.description || "Maintenance Charge"}</td>
+            <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: 600;">${formatCurrency(i.amount)}</td>
+          </tr>
+        `).join("")
+        : `
+          <tr>
+            <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0;">Maintenance & Operations Settlement</td>
+            <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: 600;">${formatCurrency(data.amount_paid)}</td>
+          </tr>
+        `;
+
+      const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Payment Receipt - ${rcpNumber}</title>
+  <style>
+    @page { size: A4 portrait; margin: 15mm; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      color: #0f172a;
+      background: #ffffff;
+      padding: 36px;
+      margin: 0;
+      position: relative;
+    }
+    .watermark {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-28deg);
+      text-align: center;
+      pointer-events: none;
+      user-select: none;
+      z-index: 0;
+      opacity: 0.045;
+      border: 6px dashed #0f172a;
+      border-radius: 20px;
+      padding: 24px 50px;
+      white-space: nowrap;
+    }
+    .watermark-title {
+      font-size: 56px;
+      font-weight: 900;
+      letter-spacing: 0.12em;
+      color: #0f172a;
+      line-height: 1.1;
+    }
+    .watermark-sub {
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 0.25em;
+      color: #0f172a;
+      margin-top: 6px;
+    }
+    .content-layer {
+      position: relative;
+      z-index: 1;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #0f172a;
+      padding-bottom: 20px;
+      margin-bottom: 24px;
+    }
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .brand-title {
+      font-size: 22px;
+      font-weight: 800;
+      color: #1e40af;
+      letter-spacing: -0.01em;
+    }
+    .brand-subtitle {
+      font-size: 12.5px;
+      color: #64748b;
+      margin-top: 2px;
+    }
+    .badge {
+      background: #ecfdf5;
+      border: 1px solid #86efac;
+      color: #15803d;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-weight: 800;
+      font-size: 14px;
+      margin-bottom: 22px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      margin-bottom: 24px;
+      font-size: 13.5px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 16px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 22px;
+    }
+    th {
+      background: #f1f5f9;
+      border-bottom: 2px solid #cbd5e1;
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 13px;
+      font-weight: 700;
+      color: #1e293b;
+    }
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #e2e8f0;
+      font-size: 13px;
+    }
+    .totals {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 24px;
+      font-size: 14px;
+    }
+    .footer {
+      border-top: 1px solid #e2e8f0;
+      padding-top: 16px;
+      font-size: 12px;
+      color: #64748b;
+      text-align: center;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="watermark">
+    <img src="${GATESPHERE_LOGO_BASE64}" alt="" style="width: 130px; height: 130px; object-fit: contain; margin-bottom: 12px; filter: grayscale(100%); opacity: 0.85; display: block; margin-left: auto; margin-right: auto; image-rendering: -webkit-optimize-contrast;" />
+    <div class="watermark-title">PAID &amp; SETTLED</div>
+    <div class="watermark-sub">GATESPHERE OFFICIAL RECEIPT</div>
+  </div>
+
+  <div class="content-layer">
+    <div class="header">
+      <div class="brand-section">
+        <img src="${GATESPHERE_LOGO_BASE64}" alt="GateSphere Logo" width="52" height="52" style="object-fit: contain; border-radius: 10px; box-shadow: 0 3px 8px rgba(0,0,0,0.1); image-rendering: -webkit-optimize-contrast;" />
+        <div>
+          <div class="brand-title">GateSphere Residential Management</div>
+          <div class="brand-subtitle">Smart Community Operating System • Official Audit Proof</div>
+        </div>
+      </div>
+      <div style="text-align: right;">
+        <div style="font-size: 11.5px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">RECEIPT NUMBER</div>
+        <div style="font-size: 18px; font-weight: 800; font-family: monospace; color: #0f172a; margin-top: 2px;">${rcpNumber}</div>
+      </div>
+    </div>
+
+    <div class="badge">
+      <span>✓ OFFICIAL AUDITED PAYMENT RECEIPT — SETTLED IN FULL</span>
+      <span style="font-size: 12px; font-family: monospace; color: #166534;">STATUS: SETTLED</span>
+    </div>
+
+    <div class="meta-grid">
+      <div>
+        <strong style="color: #64748b; font-size: 11.5px; text-transform: uppercase;">Payer / Registered Unit:</strong><br/>
+        <span style="font-size: 15px; font-weight: 700; color: #0f172a;">${data.payer_name || profile.data?.full_name || "Primary Resident"}</span><br/>
+        <span style="color: #334155;">${data.unit_number || residentUnit}</span>
+      </div>
+      <div style="text-align: right;">
+        <strong>Payment Date:</strong> ${formatDateTime(data.paid_at || new Date().toISOString())}<br/>
+        <strong>Payment Mode:</strong> ${data.payment_method || "Simulated UPI / NetBanking Gateway"}<br/>
+        <strong>Transaction Ref:</strong> <span style="font-family: monospace; font-weight: 700;">${data.payment_reference || "PAY-SIMULATED"}</span><br/>
+        <strong>Related Invoice:</strong> <span style="font-family: monospace;">${data.invoice_number || "INV-SETTLED"}</span>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Settled Account Item</th>
+          <th style="text-align: right;">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemsHtml}
+      </tbody>
+    </table>
+
+    <div class="totals">
+      <div style="display: flex; justify-content: space-between; font-weight: 800; font-size: 16px; color: #15803d;">
+        <span>Total Amount Paid &amp; Settled:</span>
+        <span>${formatCurrency(data.amount_paid)}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 13px; color: #64748b; border-top: 1px dashed #cbd5e1; padding-top: 8px;">
+        <span>Remaining Invoice Dues:</span>
+        <span style="font-weight: 700; color: #15803d;">₹0.00 (Settled in Full)</span>
+      </div>
+    </div>
+
+    <div class="footer">
+      🔒 <strong>Verified Digital Instrument:</strong> Generated securely by GateSphere Community Services platform.
+      <br/>
+      No physical signature is required. This document serves as legal and tax proof of settlement.
+    </div>
+  </div>
+</body>
+</html>`;
+
+      const blob = new Blob([htmlContent], { type: "text/html;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Receipt-${rcpNumber}.html`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success(`Receipt ${rcpNumber} downloaded successfully.`, "Receipt Downloaded");
+    } catch (err: any) {
+      toast.error("Failed to download payment receipt.", "Download Error");
+    }
+  };
+
+  const openReceiptForInvoice = (inv: InvoiceItem) => {
+    const rcpNum =
+      inv.receipt_number ||
+      `RCP-${inv.invoice_number.replace(/[^a-zA-Z0-9]/g, "")}`;
+    setCurrentReceiptNumber(rcpNum);
+    setActiveReceiptData({
+      receipt_number: rcpNum,
+      payment_reference: `PAY-${inv.invoice_number.replace(/[^a-zA-Z0-9]/g, "")}`,
+      invoice_number: inv.invoice_number,
+      title: inv.title,
+      amount_paid: inv.amount_paid || inv.total_amount,
+      total_amount: inv.total_amount,
+      balance_due: inv.balance_due || 0,
+      paid_at: inv.issue_date || new Date().toISOString(),
+      payment_method: "Simulated Instant UPI / NetBanking Gateway",
+      unit_number: residentUnit,
+      payer_name: profile.data?.full_name || "Primary Resident",
+      line_items: inv.line_items,
+    });
+    setReceiptModalOpen(true);
+  };
+
+  const downloadReceiptForInvoice = (inv: InvoiceItem) => {
+    const rcpNum =
+      inv.receipt_number ||
+      `RCP-${inv.invoice_number.replace(/[^a-zA-Z0-9]/g, "")}`;
+    handleDownloadReceipt({
+      receipt_number: rcpNum,
+      payment_reference: `PAY-${inv.invoice_number.replace(/[^a-zA-Z0-9]/g, "")}`,
+      invoice_number: inv.invoice_number,
+      amount_paid: inv.amount_paid || inv.total_amount,
+      paid_at: inv.issue_date || new Date().toISOString(),
+      payment_method: "Simulated Instant UPI / NetBanking Gateway",
+      unit_number: residentUnit,
+      payer_name: profile.data?.full_name || "Primary Resident",
+      line_items: inv.line_items,
+    });
+  };
+
+  const handleTriggerPanic = async (overrideType?: string, overrideNote?: string) => {
+    try {
+      const typeToUse = overrideType || emergencyType || "medical";
+      const activeUnit = myOccupancy;
+      const towerPrefix = activeUnit?.tower_name ? `${activeUnit.tower_name} - ` : "";
+      const unitNum = activeUnit?.unit_number || "A-107";
+      const unitLabel = `${towerPrefix}Unit ${unitNum}`.trim();
+
+      const locDetail = emergencyLocationDetail.trim();
+      const finalLocation = locDetail ? `${unitLabel} (${locDetail})` : unitLabel;
+
+      const typeLabelMap: Record<string, string> = {
+        medical: "Medical Emergency",
+        fire: "Fire & Smoke Outbreak",
+        security: "Security Threat / Intruder",
+        gas_leak: "Gas Leak & Hazard",
+        elevator: "Elevator Malfunction / Trapped Occupant",
+        other: "General Emergency SOS",
+      };
+      const notePrefix = typeLabelMap[typeToUse] || "Emergency SOS";
+      const customNote = overrideNote !== undefined ? overrideNote : emergencyNote;
+      const finalNote = customNote ? `[${notePrefix}] ${customNote}` : `[${notePrefix}] Resident requested urgent on-ground assistance`;
+
       await panicMutation.mutateAsync({
-        unit_id: residentUnit,
-        note: "Emergency SOS triggered by resident from portal",
+        unit_id: activeUnit?.unit_id,
+        alert_type: typeToUse === "gas_leak" || typeToUse === "elevator" ? "other" : typeToUse,
+        location: finalLocation,
+        note: finalNote,
       });
       setSosModalOpen(false);
+      setEmergencyNote("");
       toast.success(
-        "Security Guards and Supervisors have received your alert with your unit coordinates.",
-        "🚨 Emergency SOS Dispatched",
+        `🚨 ${notePrefix} dispatched to Security Guards & Supervisors for ${finalLocation}.`,
+        "Emergency SOS Dispatched",
       );
-    } catch {
+    } catch (err: unknown) {
       setSosModalOpen(false);
-      toast.success(
-        "Emergency SOS alert recorded and dispatched to security team.",
-        "🚨 Emergency SOS Dispatched",
-      );
+      const msg = err instanceof Error ? err.message : "Failed to dispatch emergency alert.";
+      toast.error(msg, "Dispatch Error");
     }
   };
 
@@ -1056,97 +1644,189 @@ export function OwnerTenantDashboardView({
       {/* TAB 1: OVERVIEW */}
       {activeTab === "overview" && (
         <div>
-          {/* REAL-TIME VISITOR APPROVAL PROMPT (Sticky Banner on Pending Visitor or Live Gate Alert) */}
-          {!visitorBannerDismissed && pendingVisitor && (
-            <div
-              className="gs-card card-hover"
-              style={{
-                background: "linear-gradient(135deg, #1E40AF, #1D4ED8)",
-                color: "#FFFFFF",
-                padding: "1.25rem 1.5rem",
-                marginBottom: "1.5rem",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: "1rem",
-                boxShadow: "0 8px 32px rgba(29, 78, 216, 0.35)",
-                border: "none",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                <div
-                  style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: "50%",
-                    background: "rgba(255, 255, 255, 0.2)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "1.5rem",
-                  }}
-                >
-                  🔔
-                </div>
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                    <span
+          {/* REAL-TIME VISITOR / CAB APPROVAL PROMPT (Sticky Banner on Pending Visitor or Live Gate Alert) */}
+          {!visitorBannerDismissed && pendingVisitor && (() => {
+            const isCab =
+              (pendingVisitor as any).visitor_type === "cab_taxi" ||
+              pendingVisitor.purpose?.toLowerCase().includes("cab") ||
+              pendingVisitor.purpose?.toLowerCase().includes("taxi") ||
+              pendingVisitor.purpose?.toLowerCase().includes("uber") ||
+              pendingVisitor.purpose?.toLowerCase().includes("ola") ||
+              pendingVisitor.purpose?.toLowerCase().includes("rapido");
+
+            return (
+              <div
+                className="gs-card card-hover"
+                style={{
+                  background: isCab
+                    ? "linear-gradient(135deg, #1E293B, #0F172A)"
+                    : "linear-gradient(135deg, #1E40AF, #1D4ED8)",
+                  color: "#FFFFFF",
+                  padding: "1.25rem 1.5rem",
+                  marginBottom: "1.5rem",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: "1.25rem",
+                  boxShadow: isCab
+                    ? "0 8px 32px rgba(234, 88, 12, 0.25)"
+                    : "0 8px 32px rgba(29, 78, 216, 0.35)",
+                  border: isCab ? "1px solid rgba(245, 158, 11, 0.4)" : "1px solid rgba(147, 197, 253, 0.3)",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "1.25rem", flexWrap: "wrap", flex: 1, minWidth: 260 }}>
+                  {/* Visitor Photograph or Category Avatar */}
+                  {pendingVisitor.photo_url ? (
+                    <div
+                      style={{ position: "relative", flexShrink: 0, cursor: "pointer" }}
+                      onClick={() =>
+                        setPreviewPhoto({
+                          url: pendingVisitor.photo_url!,
+                          title: pendingVisitor.visitor_name,
+                          subtitle: `Gate check-in photo • ${pendingVisitor.phone || "No phone"} • ${pendingVisitor.purpose || "General Visit"}`,
+                        })
+                      }
+                      title="Click to view full photograph"
+                    >
+                      <img
+                        src={pendingVisitor.photo_url}
+                        alt={pendingVisitor.visitor_name}
+                        style={{
+                          width: 64,
+                          height: 64,
+                          borderRadius: "50%",
+                          objectFit: "cover",
+                          border: "2.5px solid #FFFFFF",
+                          boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+                          background: "#FFFFFF",
+                          transition: "transform 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.08)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                      />
+                      <span
+                        style={{
+                          position: "absolute",
+                          bottom: -2,
+                          right: -2,
+                          background: isCab ? "#D97706" : "#2563EB",
+                          borderRadius: "50%",
+                          width: 22,
+                          height: 22,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "11px",
+                          border: "1.5px solid #FFFFFF",
+                          color: "#FFFFFF",
+                          boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+                        }}
+                        title="Click to view full photograph"
+                      >
+                        🔍
+                      </span>
+                    </div>
+                  ) : (
+                    <div
                       style={{
-                        fontSize: "11px",
-                        fontWeight: 800,
-                        textTransform: "uppercase",
-                        background: "rgba(255,255,255,0.25)",
-                        padding: "0.2rem 0.6rem",
-                        borderRadius: "9999px",
+                        width: 60,
+                        height: 60,
+                        borderRadius: "50%",
+                        background: isCab ? "rgba(245, 158, 11, 0.2)" : "rgba(255, 255, 255, 0.2)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "1.75rem",
+                        flexShrink: 0,
+                        border: "1px solid rgba(255, 255, 255, 0.3)",
                       }}
                     >
-                      GATE APPROVAL REQUEST
-                    </span>
-                    <span style={{ fontSize: "12px", color: "#93C5FD" }}>
-                      Awaiting your decision
-                    </span>
+                      {isCab ? "🚖" : "👤"}
+                    </div>
+                  )}
+
+                  <div style={{ flex: 1, minWidth: 200 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                      <span
+                        style={{
+                          fontSize: "11px",
+                          fontWeight: 800,
+                          textTransform: "uppercase",
+                          background: isCab ? "#D97706" : "rgba(255,255,255,0.25)",
+                          color: "#FFFFFF",
+                          padding: "0.2rem 0.6rem",
+                          borderRadius: "9999px",
+                        }}
+                      >
+                        {isCab ? "🚖 CAB ARRIVAL APPROVAL" : "GATE APPROVAL REQUEST"}
+                      </span>
+                      <span style={{ fontSize: "12px", color: isCab ? "#FCD34D" : "#93C5FD", fontWeight: 600 }}>
+                        Awaiting your decision
+                      </span>
+                    </div>
+                    <h3
+                      style={{
+                        fontSize: "1.3rem",
+                        fontWeight: 800,
+                        marginTop: "0.3rem",
+                        marginBottom: "0.2rem",
+                        color: "#FFFFFF",
+                        letterSpacing: "-0.01em",
+                      }}
+                    >
+                      {isCab
+                        ? `Cab Driver ${pendingVisitor.visitor_name} (${pendingVisitor.purpose || "Cab Arrival"})`
+                        : pendingVisitor.visitor_name}
+                    </h3>
+                    <p style={{ fontSize: "13.5px", color: isCab ? "#E2E8F0" : "#DBEAFE", margin: 0, lineHeight: 1.4 }}>
+                      {isCab ? (
+                        <>
+                          <strong style={{ color: "#FDE68A" }}>Plate:</strong> {pendingVisitor.vehicle_number || "—"} ·{" "}
+                          <strong style={{ color: "#FDE68A" }}>Provider:</strong> {pendingVisitor.purpose || "Cab"} ·{" "}
+                          <strong style={{ color: "#FDE68A" }}>Phone:</strong> {pendingVisitor.phone || "—"}
+                        </>
+                      ) : (
+                        <>
+                          <strong style={{ color: "#FFFFFF" }}>Phone:</strong> {pendingVisitor.phone || "—"} ·{" "}
+                          <strong style={{ color: "#FFFFFF" }}>Purpose:</strong> {pendingVisitor.purpose || "General Visit"}{" "}
+                          {pendingVisitor.vehicle_number ? `· Vehicle: ${pendingVisitor.vehicle_number}` : ""}
+                        </>
+                      )}
+                    </p>
                   </div>
-                  <h3
+                </div>
+
+                <div style={{ display: "flex", gap: "0.75rem", flexShrink: 0 }}>
+                  <BrandButton
+                    variant="outline"
+                    size="sm"
                     style={{
-                      fontSize: "1.25rem",
-                      fontWeight: 800,
-                      marginTop: "0.25rem",
+                      background: "rgba(255,255,255,0.15)",
                       color: "white",
+                      borderColor: "rgba(255,255,255,0.3)",
+                      fontWeight: 700,
                     }}
+                    onClick={() => handleVisitorDecision(pendingVisitor.id, false)}
                   >
-                    {pendingVisitor.visitor_name} is requesting entry for your unit
-                  </h3>
-                  <p style={{ fontSize: "13px", color: "#DBEAFE" }}>
-                    Purpose: {pendingVisitor.purpose || "—"} · Vehicle:{" "}
-                    {pendingVisitor.vehicle_number || "—"} · Phone: {pendingVisitor.phone || "—"}
-                  </p>
+                    ✕ Reject Entry
+                  </BrandButton>
+                  <BrandButton
+                    size="sm"
+                    style={{
+                      background: isCab ? "#F59E0B" : "#FFFFFF",
+                      color: isCab ? "#000000" : "#1D4ED8",
+                      fontWeight: 800,
+                      boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                    }}
+                    onClick={() => handleVisitorDecision(pendingVisitor.id, true)}
+                  >
+                    {isCab ? "✓ Allow Cab Entry" : "✓ Approve Entry"}
+                  </BrandButton>
                 </div>
               </div>
-
-              <div style={{ display: "flex", gap: "0.75rem" }}>
-                <BrandButton
-                  variant="outline"
-                  size="sm"
-                  style={{
-                    background: "rgba(255,255,255,0.15)",
-                    color: "white",
-                    borderColor: "rgba(255,255,255,0.3)",
-                  }}
-                  onClick={() => handleVisitorDecision(pendingVisitor.id, false)}
-                >
-                  ✕ Reject Entry
-                </BrandButton>
-                <BrandButton
-                  size="sm"
-                  style={{ background: "#FFFFFF", color: "#1D4ED8", fontWeight: 800 }}
-                  onClick={() => handleVisitorDecision(pendingVisitor.id, true)}
-                >
-                  ✓ Approve Entry
-                </BrandButton>
-              </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* REAL-TIME DELIVERY APPROVAL PROMPT (Courier Waiting at Gate) */}
           {!deliveryBannerDismissed && pendingDelivery && (
@@ -1292,12 +1972,12 @@ export function OwnerTenantDashboardView({
               />
               <StatMetric
                 label="Open Service Tickets"
-                value={stats?.open_service_tickets ?? 0}
+                value={openServiceTicketsCount}
                 accentColor="#DC2626"
                 icon="🎫"
                 description={
                   openTicket
-                    ? `${openTicket.category_name} (${openTicket.status.replace(/_/g, " ")})`
+                    ? `${openTicket.category_name || openTicket.subject} (${openTicket.status.replace(/_/g, " ")})`
                     : "No open tickets"
                 }
                 onClick={() => router.push("/owner-tenant/complaints")}
@@ -1316,7 +1996,7 @@ export function OwnerTenantDashboardView({
               />
               <StatMetric
                 label="Booked Amenities"
-                value={stats?.upcoming_amenity_bookings ?? 0}
+                value={bookedAmenitiesCount}
                 accentColor="#9333EA"
                 icon={nextBooking ? getAmenityIcon(nextBooking.amenity_name) : "🏊"}
                 description={
@@ -1902,7 +2582,81 @@ export function OwnerTenantDashboardView({
           ) : (
             <DataTable<VisitorRequest>
               columns={[
-                { key: "visitor_name", header: "Visitor Name", sortable: true },
+                {
+                  key: "visitor_name",
+                  header: "Visitor Name",
+                  sortable: true,
+                  render: (i) => (
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                      {i.photo_url ? (
+                        <div
+                          style={{ position: "relative", cursor: "pointer" }}
+                          onClick={() =>
+                            setPreviewPhoto({
+                              url: i.photo_url!,
+                              title: i.visitor_name,
+                              subtitle: `Phone: ${i.phone || "—"} • Purpose: ${i.purpose || "—"}`,
+                            })
+                          }
+                          title="Click to view full photograph"
+                        >
+                          <img
+                            src={i.photo_url}
+                            alt={i.visitor_name}
+                            style={{
+                              width: 34,
+                              height: 34,
+                              borderRadius: "50%",
+                              objectFit: "cover",
+                              border: "1.5px solid #93C5FD",
+                            }}
+                          />
+                          <span
+                            style={{
+                              position: "absolute",
+                              bottom: -2,
+                              right: -2,
+                              fontSize: "9px",
+                              background: "#2563EB",
+                              color: "white",
+                              borderRadius: "50%",
+                              width: 14,
+                              height: 14,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            🔍
+                          </span>
+                        </div>
+                      ) : (
+                        <div
+                          style={{
+                            width: 34,
+                            height: 34,
+                            borderRadius: "50%",
+                            background: "var(--brand-surface, #F1F5F9)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "14px",
+                          }}
+                        >
+                          👤
+                        </div>
+                      )}
+                      <div>
+                        <span style={{ fontWeight: 600 }}>{i.visitor_name}</span>
+                        {i.visitor_type && (
+                          <span style={{ display: "block", fontSize: "11px", color: "var(--brand-muted)" }}>
+                            {i.visitor_type.replace(/_/g, " ")}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ),
+                },
                 { key: "phone", header: "Phone" },
                 { key: "purpose", header: "Purpose" },
                 { key: "status", header: "Status", render: (i) => <StatusBadge status={i.status} /> },
@@ -3126,30 +3880,57 @@ export function OwnerTenantDashboardView({
                     },
                     {
                       key: "actions",
-                      header: "Action",
-                      render: (i) =>
-                        i.status !== "paid" ? (
+                      header: "Actions",
+                      render: (i) => (
+                        <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>
                           <BrandButton
                             size="sm"
+                            variant="outline"
                             onClick={() => {
                               setSelectedInvoice(i);
                               setPaymentModalOpen(true);
                             }}
                           >
-                            Pay Now
+                            📄 View Invoice
                           </BrandButton>
-                        ) : (
                           <BrandButton
                             size="sm"
                             variant="outline"
-                            onClick={() => {
-                              setCurrentReceiptNumber(i.receipt_number || `RCP-${i.invoice_number}`);
-                              setReceiptModalOpen(true);
-                            }}
+                            onClick={() => handleDownloadInvoice(i)}
                           >
-                            Receipt
+                            📥 Download Invoice
                           </BrandButton>
-                        ),
+                          {i.status !== "paid" ? (
+                            <BrandButton
+                              size="sm"
+                              variant="primary"
+                              onClick={() => {
+                                setSelectedInvoice(i);
+                                setPaymentModalOpen(true);
+                              }}
+                            >
+                              💳 Pay Now
+                            </BrandButton>
+                          ) : (
+                            <>
+                              <BrandButton
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openReceiptForInvoice(i)}
+                              >
+                                🧾 View Receipt
+                              </BrandButton>
+                              <BrandButton
+                                size="sm"
+                                variant="outline"
+                                onClick={() => downloadReceiptForInvoice(i)}
+                              >
+                                📥 Download Receipt
+                              </BrandButton>
+                            </>
+                          )}
+                        </div>
+                      ),
                     },
                   ]}
                   data={invoiceControls.paginatedData}
@@ -3274,10 +4055,16 @@ export function OwnerTenantDashboardView({
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
               {(myNotifications.data || []).map((n) => {
+                const isCabNotif =
+                  n.reference_type === "cab_request" ||
+                  (n.notification_type && n.notification_type.includes("cab")) ||
+                  (n.title && n.title.toLowerCase().includes("cab"));
                 const isDeliveryNotif =
-                  n.reference_type === "delivery" || (n.notification_type && n.notification_type.includes("delivery"));
+                  !isCabNotif &&
+                  (n.reference_type === "delivery" || (n.notification_type && n.notification_type.includes("delivery")));
                 const isVisitorNotif =
-                  n.reference_type === "visitor_request" || (n.notification_type && n.notification_type.includes("visitor"));
+                  !isCabNotif &&
+                  (n.reference_type === "visitor_request" || (n.notification_type && n.notification_type.includes("visitor")));
                 const refId = n.reference_id;
 
                 return (
@@ -3287,9 +4074,15 @@ export function OwnerTenantDashboardView({
                       padding: "1rem",
                       border: n.is_read
                         ? "1px solid var(--border-standard)"
-                        : "1px solid var(--brand-primary)",
+                        : isCabNotif
+                          ? "1px solid #F59E0B"
+                          : "1px solid var(--brand-primary)",
                       borderRadius: "8px",
-                      background: n.is_read ? "#F8FAFC" : "#EFF6FF",
+                      background: n.is_read
+                        ? "#F8FAFC"
+                        : isCabNotif
+                          ? "#FFFBEB"
+                          : "#EFF6FF",
                     }}
                   >
                     <div
@@ -3301,20 +4094,44 @@ export function OwnerTenantDashboardView({
                         gap: "0.5rem",
                       }}
                     >
-                      <h4
-                        style={{ fontWeight: 700, fontSize: "14px", color: "var(--brand-heading)", margin: 0 }}
-                      >
-                        {n.title}
-                      </h4>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        {isCabNotif && (
+                          <span
+                            style={{
+                              fontSize: "10.5px",
+                              fontWeight: 800,
+                              background: "#D97706",
+                              color: "#FFFFFF",
+                              padding: "0.15rem 0.5rem",
+                              borderRadius: "9999px",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "0.25rem",
+                            }}
+                          >
+                            🚖 CAB ARRIVAL
+                          </span>
+                        )}
+                        <h4
+                          style={{
+                            fontWeight: 700,
+                            fontSize: "14px",
+                            color: "var(--brand-heading)",
+                            margin: 0,
+                          }}
+                        >
+                          {n.title}
+                        </h4>
+                      </div>
                       <span style={{ fontSize: "11px", color: "var(--brand-body)" }}>
                         {formatDate(n.created_at)}
                       </span>
                     </div>
-                    <p style={{ fontSize: "13px", color: "var(--brand-body)", margin: 0 }}>
+                    <p style={{ fontSize: "13px", color: "var(--brand-body)", margin: "0.35rem 0 0 0", lineHeight: 1.4 }}>
                       {n.body || (n as any).message}
                     </p>
 
-                    {(isDeliveryNotif || isVisitorNotif) && refId && (
+                    {(isDeliveryNotif || isVisitorNotif || isCabNotif) && refId && (
                       <div style={{ marginTop: "0.75rem", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
                         <button
                           type="button"
@@ -3322,8 +4139,8 @@ export function OwnerTenantDashboardView({
                           style={{
                             fontSize: "0.775rem",
                             padding: "0.3rem 0.75rem",
-                            background: "#059669",
-                            borderColor: "#059669",
+                            background: isCabNotif ? "#D97706" : "#059669",
+                            borderColor: isCabNotif ? "#D97706" : "#059669",
                             color: "#FFFFFF",
                             fontWeight: 700,
                           }}
@@ -3336,7 +4153,7 @@ export function OwnerTenantDashboardView({
                             myNotifications.refetch();
                           }}
                         >
-                          ✓ Approve
+                          {isCabNotif ? "✓ Approve Cab" : "✓ Approve"}
                         </button>
                         <button
                           type="button"
@@ -3355,7 +4172,7 @@ export function OwnerTenantDashboardView({
                             myNotifications.refetch();
                           }}
                         >
-                          ✕ Reject
+                          {isCabNotif ? "✕ Turn Away" : "✕ Reject"}
                         </button>
                       </div>
                     )}
@@ -3369,83 +4186,379 @@ export function OwnerTenantDashboardView({
 
       {/* TAB 14: EMERGENCY SOS */}
       {activeTab === "emergency" && (
-        <div
-          className="gs-card"
-          style={{ maxWidth: 680, border: "2px solid #FCA5A5", background: "#FEF2F2" }}
-        >
-          <div
-            style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1rem" }}
-          >
-            <span style={{ fontSize: "2rem" }}>🚨</span>
-            <div>
-              <h3 style={{ fontSize: "1.25rem", fontWeight: 800, color: "#991B1B" }}>
-                Resident Emergency Dispatch
-              </h3>
-              <p style={{ color: "#7F1D1D", fontSize: "13px", margin: 0 }}>
-                Instantly alert security control rooms, gate supervisors, and towers.
-              </p>
-            </div>
-          </div>
+        <div style={{ maxWidth: 880, display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+          {/* Active Alert Banner if Alert in Progress */}
+          {activeResidentAlert && (
+            <div
+              style={{
+                padding: "1.25rem 1.5rem",
+                borderRadius: "14px",
+                background: "linear-gradient(135deg, #7F1D1D, #991B1B)",
+                border: "2px solid #EF4444",
+                color: "white",
+                boxShadow: "0 10px 25px -5px rgba(220, 38, 38, 0.4)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: "1rem",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
+                <span
+                  style={{
+                    width: 14,
+                    height: 14,
+                    borderRadius: "50%",
+                    background: "#F87171",
+                    boxShadow: "0 0 0 5px rgba(248, 113, 113, 0.4)",
+                    animation: "pulse 1.5s infinite",
+                    display: "inline-block",
+                  }}
+                />
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: "1.1rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <span>🚨 ACTIVE SOS EMERGENCY IN PROGRESS</span>
+                    <span style={{ fontSize: "0.8rem", background: "rgba(255,255,255,0.2)", padding: "0.15rem 0.5rem", borderRadius: "9999px", textTransform: "capitalize" }}>
+                      {activeResidentAlert.alert_type}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: "0.85rem", opacity: 0.9, marginTop: "0.25rem" }}>
+                    {activeResidentAlert.message || "Security guards & supervisors have been dispatched."}
+                  </div>
+                </div>
+              </div>
 
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                <BrandButton
+                  type="button"
+                  variant="outline"
+                  style={{
+                    background: "rgba(255,255,255,0.15)",
+                    border: "1px solid rgba(255,255,255,0.4)",
+                    color: "white",
+                    fontWeight: 700,
+                    fontSize: "0.85rem",
+                  }}
+                  onClick={async () => {
+                    try {
+                      await gateApi.cancelAlert(activeResidentAlert.id);
+                      toast.success("Active emergency SOS cancelled. Situation marked safe.", "Alert Cancelled");
+                      refetchAlerts();
+                    } catch {
+                      try {
+                        await gateApi.resolveAlert(activeResidentAlert.id, "Cancelled by resident");
+                        toast.success("Emergency alert resolved and cleared.", "Alert Cleared");
+                        refetchAlerts();
+                      } catch {
+                        toast.error("Failed to cancel alert. Please inform security at the gate.", "Error");
+                      }
+                    }
+                  }}
+                >
+                  ✕ Stand Down / Cancel SOS
+                </BrandButton>
+              </div>
+            </div>
+          )}
+
+          {/* Main Emergency Card */}
           <div
+            className="gs-card"
             style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))",
-              gap: "0.75rem",
-              marginBottom: "1.5rem",
+              border: "2px solid #F87171",
+              background: "linear-gradient(180deg, #FEF2F2 0%, #FFFFFF 100%)",
+              boxShadow: "0 10px 25px -5px rgba(239, 68, 68, 0.15)",
+              borderRadius: "16px",
+              padding: "1.75rem",
             }}
           >
             <div
               style={{
-                background: "white",
-                padding: "0.85rem",
-                borderRadius: "8px",
-                border: "1px solid #FCA5A5",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: "1rem",
+                marginBottom: "1.25rem",
+                paddingBottom: "1rem",
+                borderBottom: "1px solid #FEE2E2",
               }}
             >
-              <div style={{ fontSize: "11px", color: "#991B1B", fontWeight: 700 }}>
-                YOUR REGISTERED UNIT
+              <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
+                <span
+                  style={{
+                    fontSize: "2.2rem",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 56,
+                    height: 56,
+                    background: "#FEE2E2",
+                    borderRadius: "14px",
+                    border: "1px solid #FCA5A5",
+                  }}
+                >
+                  🚨
+                </span>
+                <div>
+                  <h3 style={{ fontSize: "1.35rem", fontWeight: 800, color: "#991B1B", margin: 0 }}>
+                    Resident Emergency SOS & Incident Dispatch
+                  </h3>
+                  <p style={{ color: "#7F1D1D", fontSize: "13.5px", margin: "0.2rem 0 0 0" }}>
+                    Select your emergency category and instantly notify on-duty Security Guards & Gate Supervisors.
+                  </p>
+                </div>
               </div>
               <div
-                style={{ fontWeight: 800, fontSize: "15px", color: "#0F172A", marginTop: "0.2rem" }}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.45rem",
+                  padding: "0.35rem 0.75rem",
+                  background: "#FEE2E2",
+                  border: "1px solid #FCA5A5",
+                  borderRadius: "9999px",
+                  fontSize: "12px",
+                  fontWeight: 800,
+                  color: "#991B1B",
+                }}
               >
-                {myOccupancy
-                  ? `Unit ${myOccupancy.unit_number}${myOccupancy.tower_name ? `, ${myOccupancy.tower_name}` : ""}`
-                  : "—"}
+                <span
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    background: "#EF4444",
+                    boxShadow: "0 0 8px #EF4444",
+                    animation: "pulse 1.5s infinite",
+                  }}
+                />
+                GATE SECURITY 24x7 LIVE
               </div>
             </div>
-            <div
-              style={{
-                background: "white",
-                padding: "0.85rem",
-                borderRadius: "8px",
-                border: "1px solid #FCA5A5",
-              }}
-            >
-              <div style={{ fontSize: "11px", color: "#991B1B", fontWeight: 700 }}>
-                GATE COMMAND DISPATCH
-              </div>
-              <div
-                style={{ fontWeight: 800, fontSize: "15px", color: "#0F172A", marginTop: "0.2rem" }}
-              >
-                Security control room notified instantly
-              </div>
-            </div>
-          </div>
 
-          <BrandButton
-            variant="danger"
-            size="lg"
-            style={{
-              width: "100%",
-              justifyContent: "center",
-              fontSize: "15px",
-              padding: "0.85rem",
-            }}
-            onClick={() => setSosModalOpen(true)}
-          >
-            🚨 TRIGGER EMERGENCY DISPATCH NOW
-          </BrandButton>
+            {/* Emergency Type Selector */}
+            <div style={{ marginBottom: "1.5rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  color: "#991B1B",
+                  marginBottom: "0.65rem",
+                  letterSpacing: "0.02em",
+                  textTransform: "uppercase",
+                }}
+              >
+                1. Select Emergency Type <span style={{ color: "#DC2626" }}>*</span>
+              </label>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                  gap: "0.75rem",
+                }}
+              >
+                {[
+                  {
+                    id: "medical",
+                    icon: "🚑",
+                    title: "Medical Emergency",
+                    desc: "Ambulance / Cardiac / Acute illness / Injury",
+                    accent: "#DC2626",
+                  },
+                  {
+                    id: "fire",
+                    icon: "🔥",
+                    title: "Fire & Smoke Alert",
+                    desc: "Fire outbreak / Heavy smoke / Flame hazard",
+                    accent: "#EA580C",
+                  },
+                  {
+                    id: "security",
+                    icon: "🚨",
+                    title: "Security Threat",
+                    desc: "Intruder / Physical safety / Suspicious person",
+                    accent: "#B91C1C",
+                  },
+                  {
+                    id: "gas_leak",
+                    icon: "⚠️",
+                    title: "Gas Leak & Hazard",
+                    desc: "LPG or PNG odor / Hazardous chemical leak",
+                    accent: "#D97706",
+                  },
+                  {
+                    id: "elevator",
+                    icon: "🛗",
+                    title: "Elevator Malfunction",
+                    desc: "Lift stuck / Trapped occupant inside shaft",
+                    accent: "#4F46E5",
+                  },
+                  {
+                    id: "other",
+                    icon: "🆘",
+                    title: "General Emergency SOS",
+                    desc: "Urgent on-ground security guard assistance",
+                    accent: "#7C3AED",
+                  },
+                ].map((cat) => {
+                  const isSelected = emergencyType === cat.id;
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setEmergencyType(cat.id)}
+                      style={{
+                        textAlign: "left",
+                        padding: "0.9rem 1rem",
+                        borderRadius: "12px",
+                        border: isSelected ? `2px solid ${cat.accent}` : "1.5px solid #E2E8F0",
+                        background: isSelected ? "#FEF2F2" : "white",
+                        boxShadow: isSelected ? `0 0 0 3px ${cat.accent}20` : "0 1px 3px rgba(0,0,0,0.05)",
+                        cursor: "pointer",
+                        transition: "all 0.15s ease",
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: "0.75rem",
+                      }}
+                    >
+                      <span style={{ fontSize: "1.6rem", lineHeight: 1 }}>{cat.icon}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontWeight: 800,
+                            fontSize: "14px",
+                            color: isSelected ? "#991B1B" : "#0F172A",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <span>{cat.title}</span>
+                          {isSelected && (
+                            <span
+                              style={{
+                                color: cat.accent,
+                                fontSize: "11px",
+                                fontWeight: 800,
+                                background: `${cat.accent}15`,
+                                padding: "0.1rem 0.4rem",
+                                borderRadius: "4px",
+                              }}
+                            >
+                              ✓ SELECTED
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: "12px", color: "#64748B", marginTop: "0.25rem", lineHeight: 1.3 }}>
+                          {cat.desc}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Location & Details Inputs */}
+            <div style={{ marginBottom: "1.5rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  color: "#991B1B",
+                  marginBottom: "0.65rem",
+                  letterSpacing: "0.02em",
+                  textTransform: "uppercase",
+                }}
+              >
+                2. Location & Dispatch Coordinates
+              </label>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+                  gap: "0.75rem",
+                  marginBottom: "0.75rem",
+                }}
+              >
+                <div
+                  style={{
+                    background: "white",
+                    padding: "0.85rem 1rem",
+                    borderRadius: "10px",
+                    border: "1.5px solid #FCA5A5",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "center",
+                  }}
+                >
+                  <div style={{ fontSize: "11px", color: "#991B1B", fontWeight: 700, letterSpacing: "0.04em" }}>
+                    REGISTERED UNIT (AUTO-DISPATCHED)
+                  </div>
+                  <div style={{ fontWeight: 800, fontSize: "15px", color: "#0F172A", marginTop: "0.25rem" }}>
+                    📍 {residentUnit}
+                  </div>
+                </div>
+
+                <div>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="Specific location in unit (e.g. Master Bed, Balcony, Kitchen)"
+                    value={emergencyLocationDetail}
+                    onChange={(e) => setEmergencyLocationDetail(e.target.value)}
+                    style={{ height: "100%", minHeight: 48, fontSize: "13.5px" }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "12.5px",
+                    fontWeight: 600,
+                    color: "#475569",
+                    marginBottom: "0.35rem",
+                  }}
+                >
+                  Situational Notes for Responding Security Guards & Supervisors (Optional)
+                </label>
+                <textarea
+                  className="textarea-field"
+                  rows={2}
+                  placeholder="e.g. Patient is conscious but unable to move; please bring stretcher and first-aid kit."
+                  value={emergencyNote}
+                  onChange={(e) => setEmergencyNote(e.target.value)}
+                  style={{ fontSize: "13.5px", width: "100%", resize: "vertical" }}
+                />
+              </div>
+            </div>
+
+            {/* Dispatch Action */}
+            <BrandButton
+              variant="danger"
+              size="lg"
+              style={{
+                width: "100%",
+                justifyContent: "center",
+                fontSize: "15.5px",
+                fontWeight: 800,
+                padding: "0.95rem",
+                boxShadow: "0 4px 14px rgba(220, 38, 38, 0.4)",
+              }}
+              onClick={() => handleTriggerPanic()}
+              isLoading={panicMutation.isPending}
+            >
+              🚨 TRIGGER EMERGENCY DISPATCH NOW ({emergencyType.replace(/_/g, " ").toUpperCase()})
+            </BrandButton>
+          </div>
         </div>
       )}
 
@@ -3491,23 +4604,47 @@ export function OwnerTenantDashboardView({
             </select>
           </div>
           <div>
-            <label
-              style={{
-                display: "block",
-                fontSize: "13px",
-                fontWeight: 600,
-                marginBottom: "0.35rem",
-              }}
-            >
-              Visitor Name <span style={{ color: "var(--danger)" }}>*</span>
-            </label>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 600,
+                }}
+              >
+                Visitor Name <span style={{ color: "var(--danger)" }}>*</span>
+              </label>
+              <span
+                style={{
+                  fontSize: "11px",
+                  color: passVisitorName.length > 35 ? "var(--danger)" : passVisitorName.length > 0 && passVisitorName.trim().length < 2 ? "#D97706" : "var(--muted)",
+                  fontWeight: passVisitorName.length > 35 ? 700 : 400,
+                }}
+              >
+                {passVisitorName.length}/35
+              </span>
+            </div>
             <input
               className="input-field"
-              placeholder="e.g. Vikram Sharma"
+              placeholder="e.g. Vikram Sharma (2-35 characters)"
               value={passVisitorName}
               onChange={(e) => setPassVisitorName(e.target.value)}
+              style={
+                (passVisitorName.length > 35 || (passVisitorName.length > 0 && passVisitorName.trim().length < 2))
+                  ? { borderColor: "#EF4444", background: "#FEF2F2" }
+                  : undefined
+              }
               required
             />
+            {passVisitorName.length > 35 && (
+              <div style={{ color: "#DC2626", fontSize: "11px", marginTop: "0.25rem", fontWeight: 600 }}>
+                Visitor name exceeds maximum length (cannot exceed 35 characters).
+              </div>
+            )}
+            {passVisitorName.length > 0 && passVisitorName.trim().length < 2 && (
+              <div style={{ color: "#DC2626", fontSize: "11px", marginTop: "0.25rem", fontWeight: 600 }}>
+                Visitor name is too short (must be at least 2 characters).
+              </div>
+            )}
           </div>
           <div>
             <label
@@ -4821,67 +5958,686 @@ export function OwnerTenantDashboardView({
         </form>
       </Modal>
 
-      {/* Simulated Payment Modal */}
+      {/* Complete Invoice Payment / Details Modal */}
       <Modal
         isOpen={paymentModalOpen}
         onClose={() => setPaymentModalOpen(false)}
-        title="Simulated Dues Payment Gateway"
-        size="md"
+        title={selectedInvoice?.status === "paid" || selectedInvoice?.balance_due === 0 ? `📄 Invoice Details: ${selectedInvoice?.invoice_number || ""}` : "💳 Settle Invoice & Maintenance Dues"}
+        size="lg"
       >
-        <div style={{ padding: "0.5rem 0" }}>
+        <div style={{ padding: "0.25rem 0", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+          {/* Invoice Header Card */}
           <div
             style={{
-              background: "#F1F5F9",
-              padding: "1rem",
-              borderRadius: "8px",
-              marginBottom: "1rem",
+              background: "linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)",
+              border: "1px solid var(--border-light)",
+              borderRadius: "10px",
+              padding: "1rem 1.25rem",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "0.75rem",
             }}
           >
+            <div>
+              <div style={{ fontSize: "11.5px", color: "var(--brand-muted)", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.04em" }}>
+                Official Maintenance Invoice
+              </div>
+              <div style={{ fontSize: "18px", fontWeight: 800, color: "var(--brand-heading)", marginTop: "0.15rem" }}>
+                {selectedInvoice?.invoice_number ?? "INV-2026-001"}
+              </div>
+              <div style={{ fontSize: "13px", color: "var(--brand-body)", marginTop: "0.2rem" }}>
+                {selectedInvoice?.title || "Monthly Maintenance & Community Services"} • {residentUnit}
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.35rem" }}>
+              <span style={{ fontSize: "11.5px", color: "var(--brand-muted)", fontWeight: 600 }}>Payment Status</span>
+              <StatusBadge status={selectedInvoice?.status || "posted"} />
+            </div>
+          </div>
+
+          {/* Dates & Billing Metadata Grid */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+              gap: "0.85rem",
+              background: "#FFFFFF",
+              border: "1px solid var(--border-light)",
+              borderRadius: "8px",
+              padding: "0.85rem 1rem",
+            }}
+          >
+            <div>
+              <div style={{ fontSize: "11.5px", color: "var(--brand-muted)", fontWeight: 600 }}>Invoice Date</div>
+              <div style={{ fontSize: "13.5px", fontWeight: 700, color: "var(--brand-heading)", marginTop: "0.2rem" }}>
+                {formatDate(selectedInvoice?.issue_date)}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: "11.5px", color: "var(--brand-muted)", fontWeight: 600 }}>Payment Due Date</div>
+              <div style={{ fontSize: "13.5px", fontWeight: 700, color: "#DC2626", marginTop: "0.2rem" }}>
+                {formatDate(selectedInvoice?.due_date)}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: "11.5px", color: "var(--brand-muted)", fontWeight: 600 }}>Billing Period</div>
+              <div style={{ fontSize: "13.5px", fontWeight: 700, color: "var(--brand-heading)", marginTop: "0.2rem" }}>
+                {selectedInvoice?.billing_period_start && selectedInvoice?.billing_period_end
+                  ? `${formatDate(selectedInvoice.billing_period_start)} — ${formatDate(selectedInvoice.billing_period_end)}`
+                  : "Current Monthly Cycle"}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: "11.5px", color: "var(--brand-muted)", fontWeight: 600 }}>Assigned Property</div>
+              <div style={{ fontSize: "13.5px", fontWeight: 700, color: "var(--brand-heading)", marginTop: "0.2rem" }}>
+                {residentUnit}
+              </div>
+            </div>
+          </div>
+
+          {/* Itemized Charges Breakdown Table */}
+          <div>
+            <div style={{ fontSize: "13.5px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.5rem" }}>
+              📋 Charge Description & Line Items Breakdown
+            </div>
             <div
               style={{
-                fontSize: "12px",
-                color: "var(--brand-body)",
-                textTransform: "uppercase",
-                fontWeight: 700,
+                border: "1px solid var(--border-light)",
+                borderRadius: "8px",
+                overflow: "hidden",
               }}
             >
-              Invoice #
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                <thead>
+                  <tr style={{ background: "#F8FAFC", borderBottom: "1px solid var(--border-light)", textAlign: "left" }}>
+                    <th style={{ padding: "0.6rem 0.85rem", fontWeight: 700, color: "var(--brand-heading)" }}>Charge Description</th>
+                    <th style={{ padding: "0.6rem 0.85rem", fontWeight: 700, color: "var(--brand-heading)", textAlign: "center" }}>Tax Status</th>
+                    <th style={{ padding: "0.6rem 0.85rem", fontWeight: 700, color: "var(--brand-heading)", textAlign: "right" }}>Qty</th>
+                    <th style={{ padding: "0.6rem 0.85rem", fontWeight: 700, color: "var(--brand-heading)", textAlign: "right" }}>Rate</th>
+                    <th style={{ padding: "0.6rem 0.85rem", fontWeight: 700, color: "var(--brand-heading)", textAlign: "right" }}>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(selectedInvoice?.line_items && selectedInvoice.line_items.length > 0) ? (
+                    selectedInvoice.line_items.map((item, idx) => (
+                      <tr key={idx} style={{ borderBottom: idx < selectedInvoice.line_items!.length - 1 ? "1px solid #F1F5F9" : "none" }}>
+                        <td style={{ padding: "0.65rem 0.85rem" }}>
+                          <div style={{ fontWeight: 600, color: "var(--brand-heading)" }}>{item.head}</div>
+                          {item.description && item.description !== item.head && (
+                            <div style={{ fontSize: "11.5px", color: "var(--brand-muted)" }}>{item.description}</div>
+                          )}
+                        </td>
+                        <td style={{ padding: "0.65rem 0.85rem", textAlign: "center" }}>
+                          <span
+                            style={{
+                              fontSize: "11px",
+                              padding: "0.15rem 0.45rem",
+                              borderRadius: "4px",
+                              background: item.taxable ? "#FEF3C7" : "#F1F5F9",
+                              color: item.taxable ? "#92400E" : "#475569",
+                              fontWeight: 600,
+                            }}
+                          >
+                            {item.taxable ? "GST 18%" : "Exempt"}
+                          </span>
+                        </td>
+                        <td style={{ padding: "0.65rem 0.85rem", textAlign: "right", color: "var(--brand-body)" }}>
+                          {item.quantity ?? 1}
+                        </td>
+                        <td style={{ padding: "0.65rem 0.85rem", textAlign: "right", color: "var(--brand-body)" }}>
+                          {formatCurrency(item.unit_rate ?? item.amount)}
+                        </td>
+                        <td style={{ padding: "0.65rem 0.85rem", textAlign: "right", fontWeight: 700, color: "var(--brand-heading)" }}>
+                          {formatCurrency(item.amount)}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td style={{ padding: "0.65rem 0.85rem" }}>
+                        <div style={{ fontWeight: 600, color: "var(--brand-heading)" }}>Monthly Society Maintenance Charge</div>
+                        <div style={{ fontSize: "11.5px", color: "var(--brand-muted)" }}>General common area upkeep, security, and facility operations</div>
+                      </td>
+                      <td style={{ padding: "0.65rem 0.85rem", textAlign: "center" }}>
+                        <span style={{ fontSize: "11px", padding: "0.15rem 0.45rem", borderRadius: "4px", background: "#F1F5F9", color: "#475569", fontWeight: 600 }}>
+                          Standard
+                        </span>
+                      </td>
+                      <td style={{ padding: "0.65rem 0.85rem", textAlign: "right", color: "var(--brand-body)" }}>1</td>
+                      <td style={{ padding: "0.65rem 0.85rem", textAlign: "right", color: "var(--brand-body)" }}>
+                        {formatCurrency(selectedInvoice?.total_amount || 0)}
+                      </td>
+                      <td style={{ padding: "0.65rem 0.85rem", textAlign: "right", fontWeight: 700, color: "var(--brand-heading)" }}>
+                        {formatCurrency(selectedInvoice?.total_amount || 0)}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
-            <div style={{ fontSize: "16px", fontWeight: 800, color: "var(--brand-heading)" }}>
-              {selectedInvoice?.invoice_number ?? "INV-2026-09"}
+          </div>
+
+          {/* Financial Breakdown Summary */}
+          <div
+            style={{
+              background: "#F8FAFC",
+              border: "1px solid var(--border-light)",
+              borderRadius: "8px",
+              padding: "1rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.45rem",
+              fontSize: "13px",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", color: "var(--brand-body)" }}>
+              <span>Subtotal Charges:</span>
+              <span style={{ fontWeight: 600 }}>
+                {formatCurrency(selectedInvoice?.subtotal || selectedInvoice?.total_amount || 0)}
+              </span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", color: "var(--brand-body)" }}>
+              <span>Applicable Taxes & Levies:</span>
+              <span style={{ fontWeight: 600 }}>
+                {Number(selectedInvoice?.tax || 0) > 0 ? formatCurrency(selectedInvoice?.tax) : "₹0.00 (Exempt / Inclusive)"}
+              </span>
+            </div>
+            {Number(selectedInvoice?.late_fee || 0) > 0 && (
+              <div style={{ display: "flex", justifyContent: "space-between", color: "#DC2626" }}>
+                <span>Late Payment Surcharge:</span>
+                <span style={{ fontWeight: 700 }}>+{formatCurrency(selectedInvoice?.late_fee)}</span>
+              </div>
+            )}
+            {Number(selectedInvoice?.discount || 0) > 0 && (
+              <div style={{ display: "flex", justifyContent: "space-between", color: "#059669" }}>
+                <span>Early Payment / Rebate Discount:</span>
+                <span style={{ fontWeight: 700 }}>-{formatCurrency(selectedInvoice?.discount)}</span>
+              </div>
+            )}
+            <div style={{ borderTop: "1px solid var(--border-light)", paddingTop: "0.5rem", display: "flex", justifyContent: "space-between", fontWeight: 700, color: "var(--brand-heading)" }}>
+              <span>Total Invoice Amount:</span>
+              <span>{formatCurrency(selectedInvoice?.total_amount || 0)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", color: "#059669" }}>
+              <span>Amount Paid:</span>
+              <span style={{ fontWeight: 600 }}>{formatCurrency(selectedInvoice?.amount_paid || 0)}</span>
             </div>
             <div
               style={{
+                borderTop: "2px solid var(--border-standard)",
+                marginTop: "0.25rem",
+                paddingTop: "0.65rem",
                 display: "flex",
                 justifyContent: "space-between",
-                marginTop: "0.5rem",
-                fontSize: "14px",
+                alignItems: "center",
               }}
             >
-              <span>Payable Balance:</span>
-              <strong style={{ color: "var(--brand-primary)", fontSize: "16px" }}>
-                {formatCurrency(selectedInvoice?.balance_due ?? 350.0)}
+              <div>
+                <div style={{ fontSize: "14px", fontWeight: 800, color: "var(--brand-heading)" }}>
+                  Net Outstanding Balance Due
+                </div>
+                <div style={{ fontSize: "11.5px", color: "var(--brand-muted)" }}>
+                  Payable immediately via simulated gateway
+                </div>
+              </div>
+              <strong style={{ color: "var(--brand-primary)", fontSize: "20px", fontWeight: 800 }}>
+                {formatCurrency(selectedInvoice?.balance_due ?? 0)}
               </strong>
             </div>
           </div>
-          <p style={{ fontSize: "13px", color: "var(--brand-body)" }}>
-            ⚡ This uses GateSphere's simulated payment engine. Upon clicking below, the payment
-            ledger will update immediately and issue an official `RCP-` receipt.
-          </p>
+
+          {selectedInvoice?.status === "paid" || selectedInvoice?.balance_due === 0 ? (
+            <div
+              style={{
+                padding: "0.85rem 1.15rem",
+                borderRadius: "8px",
+                background: "#ECFDF5",
+                border: "1px solid #A7F3D0",
+                color: "#065F46",
+                fontSize: "13px",
+                lineHeight: 1.4,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: "0.5rem",
+              }}
+            >
+              <div>
+                ✅ <strong>Invoice Paid & Cleared:</strong> This invoice is fully settled with zero outstanding balance.
+                {selectedInvoice?.receipt_number && (
+                  <span style={{ marginLeft: "0.35rem", fontWeight: 700 }}>
+                    (Receipt #{selectedInvoice.receipt_number})
+                  </span>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                <BrandButton
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setPaymentModalOpen(false);
+                    openReceiptForInvoice(selectedInvoice);
+                  }}
+                >
+                  🧾 View Receipt
+                </BrandButton>
+                <BrandButton
+                  size="sm"
+                  variant="outline"
+                  onClick={() => downloadReceiptForInvoice(selectedInvoice)}
+                >
+                  📥 Download Receipt
+                </BrandButton>
+              </div>
+            </div>
+          ) : (
+            <div
+              style={{
+                padding: "0.75rem 1rem",
+                borderRadius: "6px",
+                background: "#EFF6FF",
+                border: "1px solid #BFDBFE",
+                color: "#1E40AF",
+                fontSize: "12.5px",
+                lineHeight: 1.4,
+              }}
+            >
+              ⚡ <strong>Instant Simulated Gateway:</strong> Clicking &ldquo;Simulate Instant Payment&rdquo; will immediately process the transaction, credit your unit financial ledger, update your balance to ₹0.00, and generate an official verifiable <strong>RCP-</strong> receipt.
+            </div>
+          )}
+
           <div
             style={{
               display: "flex",
-              justifyContent: "flex-end",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
               gap: "0.75rem",
-              marginTop: "1rem",
+              marginTop: "0.25rem",
             }}
           >
-            <BrandButton variant="outline" onClick={() => setPaymentModalOpen(false)}>
-              Cancel
-            </BrandButton>
-            <BrandButton onClick={handleSimulatedPayment} isLoading={payments.payDues.isPending}>
-              Simulate Instant Payment
-            </BrandButton>
+            <div>
+              <BrandButton
+                type="button"
+                variant="outline"
+                onClick={() => handleDownloadInvoice(selectedInvoice)}
+              >
+                📥 Download Invoice
+              </BrandButton>
+            </div>
+            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+              {selectedInvoice?.status === "paid" || selectedInvoice?.balance_due === 0 ? (
+                <>
+                  <BrandButton
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setPaymentModalOpen(false);
+                      openReceiptForInvoice(selectedInvoice);
+                    }}
+                  >
+                    🧾 View Receipt
+                  </BrandButton>
+                  <BrandButton
+                    type="button"
+                    variant="outline"
+                    onClick={() => downloadReceiptForInvoice(selectedInvoice)}
+                  >
+                    📥 Download Receipt
+                  </BrandButton>
+                  <BrandButton variant="primary" onClick={() => setPaymentModalOpen(false)}>
+                    Close
+                  </BrandButton>
+                </>
+              ) : (
+                <>
+                  <BrandButton variant="outline" onClick={() => setPaymentModalOpen(false)}>
+                    Cancel
+                  </BrandButton>
+                  <BrandButton onClick={handleSimulatedPayment} isLoading={payments.payDues.isPending}>
+                    Simulate Instant Payment
+                  </BrandButton>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Official Payment Receipt Modal */}
+      <Modal
+        isOpen={receiptModalOpen}
+        onClose={() => setReceiptModalOpen(false)}
+        title="🧾 Official Payment Receipt"
+        size="lg"
+      >
+        <div style={{ padding: "0.25rem 0", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+          {/* Success Confirmation Banner */}
+          <div
+            style={{
+              background: "linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)",
+              border: "1px solid #A7F3D0",
+              borderRadius: "10px",
+              padding: "1rem 1.25rem",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.85rem",
+            }}
+          >
+            <span style={{ fontSize: "2rem", lineHeight: 1 }}>✅</span>
+            <div>
+              <div style={{ fontSize: "15px", fontWeight: 800, color: "#065F46" }}>
+                Payment Processed & Settled Successfully
+              </div>
+              <div style={{ fontSize: "12.5px", color: "#047857", marginTop: "0.2rem" }}>
+                Transaction has been posted to the financial journal ledger and credited to your unit account.
+              </div>
+            </div>
+          </div>
+
+          {/* Receipt Details Card with Brand Logo & Watermark Background */}
+          <div
+            style={{
+              background: "#FFFFFF",
+              border: "1px solid var(--border-light)",
+              borderRadius: "10px",
+              padding: "1.35rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: "1.1rem",
+              position: "relative",
+              overflow: "hidden",
+            }}
+          >
+            {/* Watermark Background Stamp */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                transform: "translate(-50%, -50%) rotate(-24deg)",
+                pointerEvents: "none",
+                userSelect: "none",
+                zIndex: 0,
+                textAlign: "center",
+                opacity: 0.055,
+                border: "4px dashed #0F172A",
+                borderRadius: "16px",
+                padding: "16px 36px",
+                whiteSpace: "nowrap",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <img
+                src="/images/gatesphere-logo.webp"
+                alt=""
+                style={{
+                  width: "76px",
+                  height: "76px",
+                  objectFit: "contain",
+                  filter: "grayscale(100%)",
+                  marginBottom: "8px",
+                  opacity: 0.9,
+                }}
+              />
+              <div style={{ fontSize: "40px", fontWeight: 900, letterSpacing: "0.08em", color: "#0F172A", lineHeight: 1 }}>
+                PAID &amp; VERIFIED
+              </div>
+              <div style={{ fontSize: "12px", fontWeight: 800, letterSpacing: "0.22em", color: "#0F172A", marginTop: "6px" }}>
+                GATESPHERE OFFICIAL RECEIPT
+              </div>
+            </div>
+
+            {/* Brand Logo & Header */}
+            <div
+              style={{
+                position: "relative",
+                zIndex: 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                borderBottom: "1px solid var(--border-light)",
+                paddingBottom: "0.85rem",
+                flexWrap: "wrap",
+                gap: "0.75rem",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                <img
+                  src="/images/gatesphere-logo.webp"
+                  alt="GateSphere Logo"
+                  width={44}
+                  height={44}
+                  style={{
+                    objectFit: "contain",
+                    borderRadius: "10px",
+                    boxShadow: "0 2px 8px rgba(30, 64, 175, 0.2)",
+                    flexShrink: 0,
+                  }}
+                />
+                <div>
+                  <div style={{ fontSize: "15.5px", fontWeight: 800, color: "var(--brand-heading)", letterSpacing: "-0.01em" }}>
+                    GateSphere Residential
+                  </div>
+                  <div style={{ fontSize: "11.5px", color: "var(--brand-muted)" }}>
+                    Smart Community Operating System • Verified Digital Receipt
+                  </div>
+                </div>
+              </div>
+              <span
+                style={{
+                  background: "#ECFDF5",
+                  border: "1px solid #A7F3D0",
+                  color: "#065F46",
+                  padding: "0.25rem 0.65rem",
+                  borderRadius: "9999px",
+                  fontSize: "11.5px",
+                  fontWeight: 700,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.3rem",
+                }}
+              >
+                <span>✓</span> VERIFIED PAYMENT
+              </span>
+            </div>
+
+            <div style={{ position: "relative", zIndex: 1, display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "1px solid var(--border-light)", paddingBottom: "0.75rem", flexWrap: "wrap", gap: "0.5rem" }}>
+              <div>
+                <div style={{ fontSize: "11px", color: "var(--brand-muted)", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.05em" }}>
+                  Receipt Number
+                </div>
+                <div style={{ fontSize: "17px", fontWeight: 800, color: "var(--brand-heading)", fontFamily: "monospace", marginTop: "0.15rem" }}>
+                  {activeReceiptData?.receipt_number || currentReceiptNumber}
+                </div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: "11px", color: "var(--brand-muted)", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.05em" }}>
+                  Transaction Reference
+                </div>
+                <div style={{ fontSize: "13.5px", fontWeight: 700, color: "var(--brand-heading)", fontFamily: "monospace", marginTop: "0.15rem" }}>
+                  {activeReceiptData?.payment_reference || "PAY-SIMULATED"}
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                position: "relative",
+                zIndex: 1,
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gap: "0.85rem",
+                fontSize: "13px",
+              }}
+            >
+              <div>
+                <div style={{ fontSize: "11.5px", color: "var(--brand-muted)", fontWeight: 600 }}>Payment Date & Time</div>
+                <div style={{ fontWeight: 700, color: "var(--brand-heading)", marginTop: "0.2rem" }}>
+                  {formatDateTime(activeReceiptData?.paid_at || new Date().toISOString())}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: "11.5px", color: "var(--brand-muted)", fontWeight: 600 }}>Payment Mode</div>
+                <div style={{ fontWeight: 700, color: "var(--brand-heading)", marginTop: "0.2rem" }}>
+                  {activeReceiptData?.payment_method || "Simulated UPI Gateway"}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: "11.5px", color: "var(--brand-muted)", fontWeight: 600 }}>Related Invoice</div>
+                <div style={{ fontWeight: 700, color: "var(--brand-heading)", marginTop: "0.2rem" }}>
+                  {activeReceiptData?.invoice_number || selectedInvoice?.invoice_number || "INV-2026-001"}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: "11.5px", color: "var(--brand-muted)", fontWeight: 600 }}>Payer / Registered Unit</div>
+                <div style={{ fontWeight: 700, color: "var(--brand-heading)", marginTop: "0.2rem" }}>
+                  {activeReceiptData?.payer_name || profile.data?.full_name || "Resident"} ({activeReceiptData?.unit_number || residentUnit})
+                </div>
+              </div>
+            </div>
+
+            {/* Line Items Summary */}
+            <div style={{ borderTop: "1px solid var(--border-light)", paddingTop: "0.75rem" }}>
+              <div style={{ fontSize: "12.5px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.4rem" }}>
+                Settled Account Items
+              </div>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12.5px" }}>
+                <tbody>
+                  {(activeReceiptData?.line_items && activeReceiptData.line_items.length > 0) ? (
+                    activeReceiptData.line_items.map((item, idx) => (
+                      <tr key={idx} style={{ borderBottom: "1px solid #F1F5F9" }}>
+                        <td style={{ padding: "0.45rem 0", color: "var(--brand-heading)", fontWeight: 600 }}>{item.head}</td>
+                        <td style={{ padding: "0.45rem 0", textAlign: "right", fontWeight: 700, color: "var(--brand-heading)" }}>
+                          {formatCurrency(item.amount)}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr style={{ borderBottom: "1px solid #F1F5F9" }}>
+                      <td style={{ padding: "0.45rem 0", color: "var(--brand-heading)", fontWeight: 600 }}>
+                        {activeReceiptData?.title || "Maintenance & Operations Dues"}
+                      </td>
+                      <td style={{ padding: "0.45rem 0", textAlign: "right", fontWeight: 700, color: "var(--brand-heading)" }}>
+                        {formatCurrency(activeReceiptData?.amount_paid || 0)}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Financial Totals */}
+            <div
+              style={{
+                background: "#F8FAFC",
+                borderRadius: "6px",
+                padding: "0.75rem 1rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.35rem",
+                fontSize: "13px",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", color: "var(--brand-body)" }}>
+                <span>Total Amount Settled:</span>
+                <span style={{ fontWeight: 700, color: "#059669", fontSize: "15px" }}>
+                  {formatCurrency(activeReceiptData?.amount_paid || 0)}
+                </span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", color: "var(--brand-muted)", fontSize: "12px" }}>
+                <span>Remaining Dues on Invoice:</span>
+                <span style={{ fontWeight: 700, color: "#059669" }}>₹0.00 (Settled in Full)</span>
+              </div>
+            </div>
+
+            <div style={{ fontSize: "11px", color: "var(--brand-muted)", textAlign: "center", fontStyle: "italic" }}>
+              🔒 This is a system-verified digital receipt generated by GateSphere Resident Services. No physical signature is required.
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "0.75rem",
+              marginTop: "0.25rem",
+            }}
+          >
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+              <BrandButton
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  const inv =
+                    invoiceList.find(
+                      (i) => i.invoice_number === activeReceiptData?.invoice_number
+                    ) || selectedInvoice;
+                  if (inv) {
+                    setSelectedInvoice({
+                      ...inv,
+                      status: "paid",
+                      balance_due: 0,
+                      amount_paid: inv.total_amount,
+                      receipt_number: activeReceiptData?.receipt_number || inv.receipt_number,
+                    });
+                  }
+                  setReceiptModalOpen(false);
+                  setPaymentModalOpen(true);
+                }}
+              >
+                📄 View Invoice
+              </BrandButton>
+              <BrandButton
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  const inv =
+                    invoiceList.find(
+                      (i) => i.invoice_number === activeReceiptData?.invoice_number
+                    ) || selectedInvoice;
+                  if (inv) {
+                    handleDownloadInvoice(inv);
+                  } else {
+                    toast.error("Invoice document could not be retrieved.");
+                  }
+                }}
+              >
+                📥 Download Invoice
+              </BrandButton>
+            </div>
+            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+              <BrandButton
+                type="button"
+                variant="primary"
+                onClick={() => handleDownloadReceipt(activeReceiptData)}
+              >
+                📥 Download Receipt
+              </BrandButton>
+              <BrandButton
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  if (typeof window !== "undefined") {
+                    window.print();
+                  }
+                }}
+              >
+                🖨️ Print Receipt
+              </BrandButton>
+              <BrandButton variant="outline" onClick={() => setReceiptModalOpen(false)}>
+                Close
+              </BrandButton>
+            </div>
           </div>
         </div>
       </Modal>
@@ -4890,25 +6646,66 @@ export function OwnerTenantDashboardView({
       <Modal
         isOpen={sosModalOpen}
         onClose={() => setSosModalOpen(false)}
-        title="Confirm Emergency SOS Dispatch"
-        size="sm"
+        title="🚨 Confirm Emergency SOS Dispatch"
+        size="md"
       >
-        <div style={{ padding: "1rem 0" }}>
-          <p style={{ fontSize: "14px", marginBottom: "1rem" }}>
-            Are you sure you want to trigger an emergency SOS alert? Security Guards and Supervisors
-            will instantly be dispatched to your registered address (<strong>{residentUnit}</strong>
-            ).
+        <div style={{ padding: "0.5rem 0" }}>
+          <p style={{ fontSize: "14px", color: "#334155", marginBottom: "0.85rem" }}>
+            Select an emergency category to immediately alert Security Guards and dispatch responders to (<strong>{residentUnit}</strong>):
           </p>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+              gap: "0.6rem",
+              marginBottom: "1.25rem",
+            }}
+          >
+            {[
+              { id: "medical", icon: "🚑", label: "Medical" },
+              { id: "fire", icon: "🔥", label: "Fire / Smoke" },
+              { id: "security", icon: "🚨", label: "Security Threat" },
+              { id: "gas_leak", icon: "⚠️", label: "Gas Leak" },
+              { id: "elevator", icon: "🛗", label: "Elevator" },
+              { id: "other", icon: "🆘", label: "General SOS" },
+            ].map((cat) => (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setEmergencyType(cat.id)}
+                style={{
+                  padding: "0.75rem 0.5rem",
+                  borderRadius: "8px",
+                  border: emergencyType === cat.id ? "2px solid #DC2626" : "1px solid #CBD5E1",
+                  background: emergencyType === cat.id ? "#FEF2F2" : "white",
+                  cursor: "pointer",
+                  textAlign: "center",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: "0.3rem",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <span style={{ fontSize: "1.5rem" }}>{cat.icon}</span>
+                <span style={{ fontSize: "12px", fontWeight: 700, color: emergencyType === cat.id ? "#991B1B" : "#1E293B" }}>
+                  {cat.label}
+                </span>
+              </button>
+            ))}
+          </div>
+
           <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
             <BrandButton variant="outline" onClick={() => setSosModalOpen(false)}>
               Cancel
             </BrandButton>
             <BrandButton
               variant="danger"
-              onClick={handleTriggerPanic}
+              onClick={() => handleTriggerPanic()}
               isLoading={panicMutation.isPending}
             >
-              Yes, Dispatch Security
+              🚨 Yes, Dispatch Security Now
             </BrandButton>
           </div>
         </div>
@@ -5661,6 +7458,53 @@ export function OwnerTenantDashboardView({
           </div>
         </form>
       </Modal>
+
+      {/* Lightbox / Full-size Photo Preview Modal */}
+      {previewPhoto && (
+        <Modal
+          isOpen={Boolean(previewPhoto)}
+          onClose={() => setPreviewPhoto(null)}
+          title={`📷 ${previewPhoto.title}`}
+          size="md"
+        >
+          <div style={{ textAlign: "center", padding: "0.5rem 0" }}>
+            <div
+              style={{
+                borderRadius: 12,
+                overflow: "hidden",
+                background: "#0f172a",
+                maxHeight: "70vh",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: "0.75rem",
+                boxShadow: "inset 0 0 20px rgba(0,0,0,0.5)",
+              }}
+            >
+              <img
+                src={previewPhoto.url}
+                alt={previewPhoto.title}
+                style={{
+                  maxWidth: "100%",
+                  maxHeight: "65vh",
+                  objectFit: "contain",
+                  display: "block",
+                }}
+              />
+            </div>
+            {previewPhoto.subtitle && (
+              <p style={{ fontSize: "0.85rem", color: "var(--muted)", margin: 0 }}>
+                {previewPhoto.subtitle}
+              </p>
+            )}
+            <div style={{ marginTop: "1rem", display: "flex", justifyContent: "flex-end" }}>
+              <BrandButton variant="outline" onClick={() => setPreviewPhoto(null)}>
+                Close Preview
+              </BrandButton>
+            </div>
+          </div>
+        </Modal>
+      )}
     </DashboardShell>
   );
 }

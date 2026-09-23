@@ -1,7 +1,10 @@
 name: CI
 
-# Lint & format checks only for now. No tests, migrations, build, or SAST yet
-# (see AGENTS.md §12 for the full target pipeline).
+# Lint/format/types + backend & frontend test suites (real Postgres/Redis/MinIO for
+# backend) + dependency and secret scanning. See AGENTS.md §12 for the target pipeline;
+# CR-02/HP-05/M-03/M-04 (backend/REMEDIATION_LOG.md) closed the remaining gap between
+# this file and that target — build/migrations were already reproducible, tests just
+# weren't wired in here and there was no scanning.
 
 on:
   push:
@@ -33,7 +36,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -r requirements.txt
+      - run: pip install --require-hashes -r requirements.lock.txt
       # Ratchet: fails only if the mypy error count grew vs backend/.mypy-baseline (TYP-1).
       - run: bash scripts/mypy-ratchet.sh
 
@@ -48,6 +51,83 @@ jobs:
       # backend/.repo-layering-baseline (C-3). New queries belong in repository.py.
       - run: bash scripts/repo-layering-ratchet.sh
 
+  backend-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: gatesphere
+          POSTGRES_PASSWORD: gatesphere
+          POSTGRES_DB: gatesphere
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U gatesphere"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      minio:
+        image: bitnami/minio:2024
+        env:
+          MINIO_ROOT_USER: gatesphere
+          MINIO_ROOT_PASSWORD: gatesphere-secret
+          MINIO_DEFAULT_BUCKETS: gatesphere-local
+        ports: ["9000:9000"]
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/live"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      ENVIRONMENT: local
+      DEBUG: "true"
+      SECRET_KEY: ci-test-secret-key-not-for-production-0000
+      DATABASE_URL: postgresql+psycopg://gatesphere:gatesphere@localhost:5432/gatesphere
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+      REDIS_URL: redis://localhost:6379/0
+      REDIS_HOST: localhost
+      REDIS_PORT: "6379"
+      CELERY_BROKER_URL: redis://localhost:6379/1
+      CELERY_RESULT_BACKEND: redis://localhost:6379/2
+      S3_ENDPOINT_URL: http://localhost:9000
+      S3_PUBLIC_URL: http://localhost:9000
+      S3_ACCESS_KEY: gatesphere
+      S3_SECRET_KEY: gatesphere-secret
+      S3_BUCKET: gatesphere-local
+      S3_REGION: us-east-1
+      EMAIL_BACKEND: console
+      SEED_ON_START: "false"
+      RATE_LIMIT_ENABLED: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install --require-hashes -r requirements.lock.txt
+      - run: alembic upgrade head
+      - run: python -m app.scripts.seed --reset
+      - run: pytest -q
+
+  backend-dependency-scan:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pip-audit==2.7.3
+      # Scans the fully-pinned transitive lockfile, not the loose top-level requirements.txt.
+      - run: pip-audit --require-hashes -r requirements.lock.txt
+
   frontend-lint:
     runs-on: ubuntu-latest
     defaults:
@@ -58,6 +138,78 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - run: npm install
+      # `ci`, not `install` (CR-02/M-04): fails if package.json and package-lock.json
+      # disagree, and never writes to the lockfile — package-lock.json is enforced, not
+      # just present.
+      - run: npm ci
       - run: npm run lint
+      - run: npm run typecheck
       - run: npx prettier --check .
+
+  backend-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: gatesphere
+          POSTGRES_PASSWORD: secretpassword
+          POSTGRES_DB: gatesphere_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Run migrations
+        run: alembic upgrade head
+        env:
+          DATABASE_URL: postgresql+psycopg://gatesphere:secretpassword@localhost:5432/gatesphere_test
+      - name: Run tests
+        run: pytest
+        env:
+          DATABASE_URL: postgresql+psycopg://gatesphere:secretpassword@localhost:5432/gatesphere_test
+          REDIS_URL: redis://localhost:6379/0
+
+  frontend-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm install
+      - run: npm run test
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Backend
+        run: docker build -t gatesphere-backend ./backend
+      - name: Build Frontend
+        run: docker build -t gatesphere-frontend ./frontend

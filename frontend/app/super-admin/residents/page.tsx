@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SearchInput } from "@/components/forms/SearchInput";
@@ -110,18 +110,34 @@ export default function ResidentsPage() {
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       errs.email = "Please enter a valid email address (e.g. resident@example.com).";
     }
-    if (phone.trim() && !/^[+0-9][0-9 \-]{4,19}$/.test(phone.trim())) {
-      errs.phone = "Enter a valid phone number (10-15 digits).";
+    if (phone.trim()) {
+      const phoneDigits = phone.replace(/\D/g, "");
+      if (phoneDigits.length < 7 || phoneDigits.length > 15 || !/^\+?[0-9\s\-()]+$/.test(phone.trim())) {
+        errs.phone = "Enter a valid phone number (7-15 digits, plus optional country code).";
+      }
     }
     if (password.trim() && password.trim().length < 10) {
       errs.password = "Initial password must be at least 10 characters.";
+    }
+    const trimmedAgreement = agreementRef.trim();
+    if (occupancyRole === "tenant" && !trimmedAgreement) {
+      errs.agreementRef = "Agreement reference is required for tenants.";
+    } else if (trimmedAgreement) {
+      if (trimmedAgreement.length < 3 || trimmedAgreement.length > 50) {
+        errs.agreementRef = "Agreement reference must be between 3 and 50 characters.";
+      } else if (!/^[A-Z0-9\-_/]+$/.test(trimmedAgreement)) {
+        errs.agreementRef = "Agreement reference must be uppercase letters, numbers, and allowed symbols (e.g. LEASE-2026-081).";
+      }
     }
     setFieldErrors(errs);
     return errs;
   };
 
+  const isSubmittingRef = useRef(false);
+
   const handleAddResidentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current) return;
     const errs = validateForm();
     if (Object.keys(errs).length > 0) {
       setFormError("Please fill in all required fields marked below.");
@@ -136,6 +152,7 @@ export default function ResidentsPage() {
 
     setFormError("");
     setIsSubmitting(true);
+    isSubmittingRef.current = true;
     try {
       await addResidentMutation.mutateAsync({
         communityId: targetCommunityId,
@@ -158,6 +175,7 @@ export default function ResidentsPage() {
       setFormError(err?.message || "Failed to onboard resident.");
     } finally {
       setIsSubmitting(false);
+      isSubmittingRef.current = false;
     }
   };
 
@@ -701,7 +719,7 @@ export default function ResidentsPage() {
 
                 <div>
                   <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#475569", marginBottom: "0.35rem" }}>
-                    Agreement Reference (Optional)
+                    Agreement Reference {occupancyRole === "tenant" ? <span style={{ color: "#dc2626" }}>*</span> : "(Optional)"}
                   </label>
                   <input
                     type="text"

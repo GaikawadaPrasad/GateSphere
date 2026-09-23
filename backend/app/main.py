@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import re
 import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
@@ -17,6 +18,9 @@ from app.core.ratelimit import RateLimitMiddleware
 from app.core.responses import ok
 
 log = structlog.get_logger(__name__)
+
+_SWAGGER_CSS_HASH = "sha256-GsMk99zSfkuThrS9ZCEnHsFH6SKiLAW6JLEVFemqYyE"
+_SWAGGER_JS_HASH = "sha256-Yt9UFSkIBGSnZgrceT6rcSjGGTzjviTdweDgpKY-3C8"
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -36,8 +40,34 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
                 "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
                 "img-src 'self' data: https://fastapi.tiangolo.com; "
                 "connect-src 'self'; "
-                "frame-ancestors 'none'"
+                "frame-ancestors 'none'; "
+                "form-action 'self'; "
+                "base-uri 'self'; "
+                "object-src 'self'"
             )
+            # Add Subresource Integrity hashes to Swagger UI assets
+            try:
+                body = response.body.decode("utf-8")
+                # Add integrity to CSS stylesheet link
+                body = re.sub(
+                    r'(<link type="text/css" rel="stylesheet" href=")(https://cdn\.jsdelivr\.net/npm/swagger-ui-dist@5/swagger-ui\.css)(")',
+                    r'\1\2 integrity="_SWAGGER_CSS_HASH"\3',
+                    body,
+                ).replace("_SWAGGER_CSS_HASH", _SWAGGER_CSS_HASH)
+                # Add integrity to JS bundle script
+                body = re.sub(
+                    r'(<script src=")(https://cdn\.jsdelivr\.net/npm/swagger-ui-dist@5/swagger-ui-bundle\.js)(")',
+                    r'\1\2 integrity="_SWAGGER_JS_HASH"\3',
+                    body,
+                ).replace("_SWAGGER_JS_HASH", _SWAGGER_JS_HASH)
+                response = Response(
+                    content=body.encode("utf-8"),
+                    status_code=response.status_code,
+                    headers=dict(response.headers),
+                    media_type=response.media_type,
+                )
+            except Exception:
+                pass
         else:
             response.headers.setdefault(
                 "Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'"
@@ -61,6 +91,38 @@ def create_app() -> FastAPI:
     )
 
     register_exception_handlers(app)
+
+    from fastapi.openapi.utils import get_openapi
+    def custom_openapi() -> dict:
+        if app.openapi_schema:
+            return app.openapi_schema
+        openapi_schema = get_openapi(
+            title=app.title,
+            version=app.version,
+            openapi_version=app.openapi_version,
+            description=app.description,
+            routes=app.routes,
+        )
+        if "components" not in openapi_schema:
+            openapi_schema["components"] = {}
+        openapi_schema["components"]["securitySchemes"] = {
+            "sessionCookie": {
+                "type": "apiKey",
+                "in": "cookie",
+                "name": "gs_session",
+            },
+            "csrfToken": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-CSRF-Token",
+            },
+        }
+        # Apply to all routes
+        openapi_schema["security"] = [{"sessionCookie": [], "csrfToken": []}]
+        app.openapi_schema = openapi_schema
+        return app.openapi_schema
+
+    app.openapi = custom_openapi
 
     # Middleware runs bottom-up on the request: TrustedHost → CORS → CorrelationId →
     # RateLimit → SecurityHeaders → route.
