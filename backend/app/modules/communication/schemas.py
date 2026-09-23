@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
 
@@ -14,6 +15,10 @@ ALLOWED = {
     "priority": set(PRIORITIES),
     "poll_status": set(POLL_STATUS),
 }
+
+# `GET /announcements?status=` list filter (admin tabs). Residents are always limited to
+# published rows by the service, whatever they send.
+AnnouncementListStatus = Literal["all", "published", "draft", "expired"]
 
 
 class _Write(BaseModel):

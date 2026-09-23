@@ -1,16 +1,30 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, type CSSProperties } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useInvoices, usePayments } from "@/hooks/use-billing";
+import { billingApi } from "@/lib/api";
+import { InvoiceDetailModal } from "@/components/billing/InvoiceDetailModal";
+import { PaymentReceiptModal } from "@/components/billing/PaymentReceiptModal";
 import { useCommunities } from "@/hooks/use-communities";
 import { useUiStore } from "@/store/ui";
 import { ScopeBanner } from "@/components/common/ScopeBanner";
 import type { MaintenanceInvoice, Payment } from "@/types/billing";
 import type { Community } from "@/types/communities";
+
+const linkStyle: CSSProperties = {
+  fontWeight: 600,
+  color: "var(--primary)",
+  background: "none",
+  border: "none",
+  padding: 0,
+  cursor: "pointer",
+  textDecoration: "underline",
+  textUnderlineOffset: "2px",
+};
 
 export default function BillingPage() {
   const { activeCommunityId, setActiveCommunity } = useUiStore();
@@ -18,6 +32,30 @@ export default function BillingPage() {
   const [communityId, setCommunityId] = useState(activeCommunityId || "");
   const [page, setPage] = useState(1);
   const pageSize = 15;
+  const [selectedInvoice, setSelectedInvoice] = useState<MaintenanceInvoice | null>(null);
+  const [selectedPaymentReceipt, setSelectedPaymentReceipt] = useState<unknown>(null);
+
+  // GS-017: open the detail view immediately from the list row, then swap in the full
+  // record (invoice line items / receipt) — same flow as the Community Admin billing page.
+  const openInvoice = async (inv: MaintenanceInvoice) => {
+    setSelectedInvoice(inv);
+    try {
+      const full = await billingApi.getInvoice(inv.id);
+      if (full) setSelectedInvoice(full);
+    } catch {
+      // keep the list row — it already carries the header + totals
+    }
+  };
+
+  const openPayment = async (p: Payment) => {
+    setSelectedPaymentReceipt(p);
+    try {
+      const receipt = await billingApi.getPaymentReceipt(p.id);
+      if (receipt) setSelectedPaymentReceipt(receipt);
+    } catch {
+      // keep the list row as the fallback receipt
+    }
+  };
 
   useEffect(() => {
     setCommunityId(activeCommunityId || "");
@@ -43,7 +81,14 @@ export default function BillingPage() {
       header: "Invoice #",
       render: (inv) => (
         <div>
-          <span style={{ fontWeight: 600, color: "var(--fg)" }}>{inv.invoice_number}</span>
+          <button
+            type="button"
+            onClick={() => openInvoice(inv)}
+            aria-label={`View invoice ${inv.invoice_number}`}
+            style={linkStyle}
+          >
+            {inv.invoice_number}
+          </button>
           <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
             Unit {inv.unit_number || "–"}
           </div>
@@ -89,7 +134,16 @@ export default function BillingPage() {
     {
       key: "payment_reference",
       header: "Reference",
-      render: (p) => <span style={{ fontWeight: 600 }}>{p.payment_reference}</span>,
+      render: (p) => (
+        <button
+          type="button"
+          onClick={() => openPayment(p)}
+          aria-label={`View payment ${p.payment_reference}`}
+          style={linkStyle}
+        >
+          {p.payment_reference}
+        </button>
+      ),
     },
     {
       key: "amount",
@@ -208,6 +262,12 @@ export default function BillingPage() {
           />
         )}
       </div>
+
+      <InvoiceDetailModal invoice={selectedInvoice} onClose={() => setSelectedInvoice(null)} />
+      <PaymentReceiptModal
+        receipt={selectedPaymentReceipt}
+        onClose={() => setSelectedPaymentReceipt(null)}
+      />
     </div>
   );
 }

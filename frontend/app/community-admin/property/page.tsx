@@ -802,18 +802,11 @@ export default function CommunityAdminPropertyPage() {
 
     const errors: Record<string, string> = {};
     const trimmedName = editGateForm.name.trim();
-    const trimmedCode = editGateForm.code.trim();
 
     if (!trimmedName) {
       errors.gate_name = "Gate name is required.";
     } else if (trimmedName.length < 2 || trimmedName.length > 120) {
       errors.gate_name = "Gate name must be between 2 and 120 characters.";
-    }
-
-    if (!trimmedCode) {
-      errors.gate_code = "Gate code is required.";
-    } else if (trimmedCode.length < 1 || trimmedCode.length > 32) {
-      errors.gate_code = "Gate code must be between 1 and 32 characters.";
     }
 
     if (Object.keys(errors).length > 0) {
@@ -829,8 +822,8 @@ export default function CommunityAdminPropertyPage() {
         id: editingGate.id,
         communityId: activeCommunityId || undefined,
         data: {
+          // `code` is immutable after creation — `GateUpdate` rejects it (GS-020).
           name: trimmedName,
-          code: trimmedCode.toUpperCase(),
           gate_type: editGateForm.gate_type,
           is_active: editGateForm.is_active,
         },
@@ -2840,15 +2833,23 @@ export default function CommunityAdminPropertyPage() {
                   marginBottom: "0.25rem",
                 }}
               >
-                Gate Code <span style={{ color: "#ef4444" }}>*</span>
+                Gate Code
               </label>
               <input
                 id="edit-gate-code-input"
                 type="text"
                 className="input-field"
                 value={editGateForm.code}
-                onChange={(e) => setEditGateForm({ ...editGateForm, code: e.target.value })}
+                readOnly
+                disabled
+                aria-describedby="edit-gate-code-hint"
               />
+              <p
+                id="edit-gate-code-hint"
+                style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.25rem" }}
+              >
+                Gate code can&apos;t be changed after the gate is created.
+              </p>
             </div>
 
             <div>

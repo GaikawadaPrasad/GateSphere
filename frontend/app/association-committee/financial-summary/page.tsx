@@ -727,7 +727,7 @@ export default function FinancialSummaryPage() {
                   <div>
                     <div style={{ fontWeight: 600, color: "var(--fg)" }}>{ch.name}</div>
                     <div style={{ fontSize: "0.725rem", color: "var(--muted)" }}>
-                      Code: {ch.code} · Type: {ch.charge_type}
+                      Code: {ch.code} · Type: {ch.calculation_type}
                     </div>
                   </div>
                   <div style={{ fontWeight: 600, color: "var(--fg)" }}>

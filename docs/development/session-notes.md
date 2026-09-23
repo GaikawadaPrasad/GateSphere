@@ -18,6 +18,43 @@ Format per entry:
 
 ---
 
+## 2026-09-23 — Sivion batch: GS-010/011/016/017/020/021/022/023
+
+**By:** Claude Code (with johnalexanderkondepoguVPD)
+**Branch / commit:** `feature-superadmin` (uncommitted at time of writing)
+**What changed:**
+- **Security (found while fixing GS-010):** a resident could list *draft* announcements by
+  sending `?published_only=false`, and could open any draft by id. `CommunicationService`
+  now builds viewer predicates once (`_viewer_predicates`) — unit-restricted actors are always
+  limited to `is_published AND targeted-at-me` on both the list and
+  `get_visible_announcement` (detail → `404`). Query lives in `AnnouncementRepository.matches`.
+- **GS-010/021/022:** `GET /communication/announcements?status=all|published|draft|expired`.
+  `published` excludes expired, `draft` = unpublished and not expired (matches the UI badge).
+  Legacy `published_only` default kept so the resident dashboard is unchanged. Admin tabs send
+  `status`. `useCreateAnnouncement` no longer injects the new draft into every cached list
+  (that made drafts look published, then vanish on refetch) — invalidate only.
+- **GS-016:** `admin_phone` / `CommunityAdminProvision.phone` = exactly 10 digits
+  (`app/core/constants.py::PHONE_10_DIGIT_PATTERN`; frontend `PHONE_10_DIGIT_RE` +
+  `toPhoneDigits` in `lib/utils.ts`; inputs capped at 10 digits).
+- **GS-020:** gate edit no longer sends immutable `code` (`GateUpdate` is `extra="forbid"`);
+  code shown read-only.
+- **GS-023:** charge-head form sent `charge_type`/`is_active`; now `calculation_type`
+  (`flat|per_sqft|per_unit|percentage`) + `taxable`. Frontend `ChargeHead` type fixed to match
+  `ChargeHeadRead`; table + association-committee summary read `calculation_type`.
+- **GS-011:** badge = server `meta.total` via `useUnreadNotificationCount()` (was the length of
+  one page, capped at 20). Used by both headers + both sidebars.
+- **GS-017:** Super Admin billing invoice numbers / payment references open the invoice detail /
+  payment receipt. Both modals extracted from the Community Admin page into
+  `components/billing/{InvoiceDetailModal,PaymentReceiptModal}.tsx` and shared.
+**Verified:** `ruff` + `black` + `mypy` clean on changed backend lines; frontend `tsc --noEmit`
+clean; `eslint` 0 errors on changed files. **Not run:** backend pytest (local `.venv` has an old
+Starlette — `HTTP_422_UNPROCESSABLE_CONTENT` missing — so the app can't import; Docker not
+running), Postman regeneration (`build_collection.py` imports the app — same blocker), manual UI.
+**Open / next:** run `make test` + `make test-api` and regenerate `docs/postman/` once the env
+is fixed; `backend-layering` ratchet already fails on this branch before these changes
+(222 vs baseline 218) — find the 4 added service `select()`s; GS-025 (app-wide phone/name
+rules) should reuse `PHONE_10_DIGIT_PATTERN`.
+
 ## 2026-08-28 — Async migration COMPLETE (ADR-010)
 
 **By:** async stack migration — finished

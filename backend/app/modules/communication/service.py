@@ -13,7 +13,7 @@ import uuid
 from datetime import UTC, datetime
 
 import structlog
-from sqlalchemy import func, select
+from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -465,50 +465,87 @@ class CommunicationService(UnitScopedAccess):
             await self._audit("announcement.expire", ann.community_id, "announcement", ann.id)
         return await self.get_announcement(ann.id)
 
+    async def _viewer_predicates(self) -> list[ColumnElement[bool]]:
+        """Row filters for a unit-restricted viewer (plain resident), else ``[]``.
+
+        Such a viewer only ever sees *published* announcements targeted at the whole
+        community, one of their units/towers, or one of their resident groups — drafts are
+        staff-only no matter which filter the client sends (GS-010 hardening).
+        """
+        if not await self.is_unit_restricted():
+            return []
+        scope = await self._unit_scope()
+        unit_ids = list(scope) if scope else []
+        tower_ids: list[uuid.UUID] = []
+        if unit_ids:
+            tower_ids = list(
+                await self.db.scalars(
+                    select(Unit.tower_id).where(Unit.id.in_(unit_ids), Unit.tower_id.is_not(None))
+                )
+            )
+        grp_ids = list(
+            await self.db.scalars(
+                select(ResidentGroupMember.group_id).where(
+                    ResidentGroupMember.user_id == self.actor.id
+                )
+            )
+        )
+        target_match = ~Announcement.targets.any() | Announcement.targets.any(
+            AnnouncementTarget.target_all_community.is_(True)
+        )
+        if unit_ids:
+            target_match = target_match | Announcement.targets.any(
+                AnnouncementTarget.unit_id.in_(unit_ids)
+            )
+        if tower_ids:
+            target_match = target_match | Announcement.targets.any(
+                AnnouncementTarget.tower_id.in_(tower_ids)
+            )
+        if grp_ids:
+            target_match = target_match | Announcement.targets.any(
+                AnnouncementTarget.resident_group_id.in_(grp_ids)
+            )
+        return [Announcement.is_published.is_(True), target_match]
+
+    async def get_visible_announcement(self, announcement_id: uuid.UUID) -> Announcement:
+        """Detail read for the API: a resident gets 404 for a draft or an untargeted notice."""
+        ann = await self.get_announcement(announcement_id)
+        preds = await self._viewer_predicates()
+        if preds and not await self.announcements.matches(ann.id, *preds):
+            raise NotFoundError("Announcement not found")
+        return ann
+
     async def list_announcements(
-        self, *, community_id: uuid.UUID | None, published_only: bool, offset: int, limit: int
-    ):
+        self,
+        *,
+        community_id: uuid.UUID | None,
+        published_only: bool,
+        status: str | None = None,
+        offset: int,
+        limit: int,
+    ) -> tuple[list[Announcement], int]:
+        """``status`` (all/published/draft/expired) wins over the legacy ``published_only``.
+
+        ``published`` = published and not yet expired (GS-021); ``draft`` = never published
+        and not expired (GS-022); ``expired`` = past ``expires_at``. Mirrors the UI badge.
+        """
         stmt = select(Announcement).options(selectinload(Announcement.targets))
         if community_id is not None:
             self.scope.require(community_id)
             stmt = stmt.where(Announcement.community_id == community_id)
-        if published_only:
+        now = datetime.now(UTC)
+        not_expired = Announcement.expires_at.is_(None) | (Announcement.expires_at > now)
+        if status == "published":
+            stmt = stmt.where(Announcement.is_published.is_(True), not_expired)
+        elif status == "draft":
+            stmt = stmt.where(Announcement.is_published.is_(False), not_expired)
+        elif status == "expired":
+            stmt = stmt.where(Announcement.expires_at <= now)
+        elif status is None and published_only:
             stmt = stmt.where(Announcement.is_published.is_(True))
-        if await self.is_unit_restricted():
-            scope = await self._unit_scope()
-            unit_ids = list(scope) if scope else []
-            tower_ids: list[uuid.UUID] = []
-            if unit_ids:
-                tower_ids = list(
-                    await self.db.scalars(
-                        select(Unit.tower_id).where(
-                            Unit.id.in_(unit_ids), Unit.tower_id.is_not(None)
-                        )
-                    )
-                )
-            grp_ids = list(
-                await self.db.scalars(
-                    select(ResidentGroupMember.group_id).where(
-                        ResidentGroupMember.user_id == self.actor.id
-                    )
-                )
-            )
-            target_match = ~Announcement.targets.any() | Announcement.targets.any(
-                AnnouncementTarget.target_all_community.is_(True)
-            )
-            if unit_ids:
-                target_match = target_match | Announcement.targets.any(
-                    AnnouncementTarget.unit_id.in_(unit_ids)
-                )
-            if tower_ids:
-                target_match = target_match | Announcement.targets.any(
-                    AnnouncementTarget.tower_id.in_(tower_ids)
-                )
-            if grp_ids:
-                target_match = target_match | Announcement.targets.any(
-                    AnnouncementTarget.resident_group_id.in_(grp_ids)
-                )
-            stmt = stmt.where(target_match)
+        preds = await self._viewer_predicates()
+        if preds:
+            stmt = stmt.where(*preds)
         stmt = stmt.order_by(Announcement.created_at.desc())
         return (
             await self.announcements.list(offset=offset, limit=limit, extra=stmt),

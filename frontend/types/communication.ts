@@ -1,5 +1,7 @@
 export type AnnouncementPriority = "low" | "normal" | "urgent" | "emergency";
 export type AnnouncementType = "notice" | "event" | "emergency" | "maintenance" | "poll";
+/** `GET /communication/announcements?status=` filter (admin tabs). */
+export type AnnouncementListStatus = "all" | "published" | "draft" | "expired";
 export type TargetAudienceType = "all" | "tower" | "resident_group" | "unit";
 
 /** Matches backend TargetIn schema */

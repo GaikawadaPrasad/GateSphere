@@ -2,11 +2,12 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { communicationApi } from "@/lib/api";
-import type { AnnouncementCreate } from "@/types/communication";
+import type { AnnouncementCreate, AnnouncementListStatus } from "@/types/communication";
 
 export function useAnnouncements(params?: {
   community_id?: string;
   published_only?: boolean;
+  status?: AnnouncementListStatus;
   page?: number;
   page_size?: number;
 }) {
@@ -31,13 +32,9 @@ export function useCreateAnnouncement() {
   return useMutation({
     mutationFn: ({ payload, communityId }: { payload: AnnouncementCreate; communityId?: string }) =>
       communicationApi.createAnnouncement(payload, communityId),
-    onSuccess: (newAnnouncement) => {
-      queryClient.setQueriesData({ queryKey: ["announcements"] }, (old: any) => {
-        if (Array.isArray(old)) {
-          return [newAnnouncement, ...old];
-        }
-        return old;
-      });
+    // Invalidate only: an optimistic insert put the new *draft* into every cached list
+    // (incl. "Published Only"), so it looked published and then vanished on refetch (GS-010).
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["announcements"] });
     },
   });

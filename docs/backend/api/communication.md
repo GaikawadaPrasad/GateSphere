@@ -9,9 +9,9 @@ global caller on the collection routes.
 | Method & path | Permission | Body | Success | Notes |
 |---|---|---|---|---|
 | `GET /communication/health` | – (session) | – | `200` | liveness |
-| `GET /communication/announcements` | `communication:view` | – | `200` list | `?published_only=` (default true), `?community_id=` |
+| `GET /communication/announcements` | `communication:view` | – | `200` list | `?status=all\|published\|draft\|expired` (admin tabs; `published` = published **and** not expired, `draft` = unpublished and not expired); without `status`, legacy `?published_only=` (default true) applies. `?community_id=`. **Unit-restricted viewers (residents) only ever get published rows targeted at them, whatever filter they send.** |
 | `POST /communication/announcements` | `communication:create` | `AnnouncementCreate` | `201` single | draft; targets validated against the community |
-| `GET /communication/announcements/{announcement_id}` | `communication:view` | – | `200` single | includes `targets` |
+| `GET /communication/announcements/{announcement_id}` | `communication:view` | – | `200` single | includes `targets`; `404` to a resident for a draft or an announcement not targeted at them |
 | `PATCH /communication/announcements/{announcement_id}` | `communication:update` | `AnnouncementUpdate` | `200` single | `422 ALREADY_PUBLISHED` |
 | `POST /communication/announcements/{announcement_id}/publish` | `communication:approve` | – | `200` single | `422 NO_TARGET` / `ALREADY_PUBLISHED` |
 | `POST /communication/announcements/{announcement_id}/expire` | `communication:update` | – | `200` single | sets `expires_at = now` |

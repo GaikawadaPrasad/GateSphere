@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import selectinload
 
 from app.db.repository import AsyncTenantRepository
@@ -25,6 +25,13 @@ class AnnouncementRepository(AsyncTenantRepository[Announcement]):
             .execution_options(populate_existing=True)
             .options(selectinload(Announcement.targets))
         )
+
+    async def matches(self, obj_id: uuid.UUID, *predicates: ColumnElement[bool]) -> bool:
+        """True if announcement ``obj_id`` satisfies every extra predicate (viewer filters)."""
+        found = await self.db.scalar(
+            self._scoped(select(Announcement.id).where(Announcement.id == obj_id, *predicates))
+        )
+        return found is not None
 
 
 class PollRepository(AsyncTenantRepository[Poll]):

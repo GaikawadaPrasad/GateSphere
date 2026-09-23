@@ -31,6 +31,9 @@ own community — anything outside → `404`.
 
 - **CommunityCreate**: `code` (1–32, `^[A-Za-z0-9][A-Za-z0-9 _\-/]*$`, stored lower-case),
   `name`, `address_line1/2?`, `city?`, `state?`, `postal_code?`, `country="India"`, `timezone="Asia/Kolkata"`.
+  Optional first-admin fields `admin_name?`, `admin_email?`, `admin_password?`, `admin_phone?`
+  — `admin_phone` (and `CommunityAdminProvision.phone`) must be **exactly 10 digits**
+  (`app.core.constants.PHONE_10_DIGIT_PATTERN`, GS-016) → otherwise `422`.
 - **GateCreate**: `code`, `name`, `gate_type="main"`, `latitude?` (−90..90), `longitude?` (−180..180).
 - **TowerCreate**: `code`, `name`, `structure_type="tower"`, `total_floors=0` (0..300).
 - **FloorCreate**: `tower_id`, `floor_number` (−10..300), `label?`.

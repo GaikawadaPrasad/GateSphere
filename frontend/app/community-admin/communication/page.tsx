@@ -23,6 +23,7 @@ import type {
   AnnouncementType,
   ResidentGroup,
   AnnouncementPriority,
+  AnnouncementListStatus,
   TargetAudienceType,
 } from "@/types/communication";
 import { formatDateTime } from "@/lib/utils";
@@ -33,7 +34,7 @@ export default function CommunityAdminCommunicationPage() {
   const [activeTab, setActiveTab] = useState<"announcements" | "emergency" | "groups">(
     "announcements",
   );
-  const [publishedFilter, setPublishedFilter] = useState<boolean | undefined>(undefined);
+  const [statusFilter, setStatusFilter] = useState<AnnouncementListStatus>("all");
 
   // Queries
   const {
@@ -42,7 +43,7 @@ export default function CommunityAdminCommunicationPage() {
     refetch: refetchAnnouncements,
   } = useAnnouncements({
     community_id: activeCommunityId || undefined,
-    published_only: publishedFilter,
+    status: statusFilter,
   });
 
   const { data: towers } = useTowers(activeCommunityId || undefined);
@@ -539,25 +540,25 @@ export default function CommunityAdminCommunicationPage() {
             <div style={{ display: "flex", gap: "0.5rem" }}>
               <button
                 type="button"
-                className={`btn ${publishedFilter === undefined ? "btn-primary" : "btn-secondary"}`}
+                className={`btn ${statusFilter === "all" ? "btn-primary" : "btn-secondary"}`}
                 style={{ fontSize: "0.8rem", padding: "0.3rem 0.75rem" }}
-                onClick={() => setPublishedFilter(undefined)}
+                onClick={() => setStatusFilter("all")}
               >
                 All
               </button>
               <button
                 type="button"
-                className={`btn ${publishedFilter === true ? "btn-primary" : "btn-secondary"}`}
+                className={`btn ${statusFilter === "published" ? "btn-primary" : "btn-secondary"}`}
                 style={{ fontSize: "0.8rem", padding: "0.3rem 0.75rem" }}
-                onClick={() => setPublishedFilter(true)}
+                onClick={() => setStatusFilter("published")}
               >
                 Published Only
               </button>
               <button
                 type="button"
-                className={`btn ${publishedFilter === false ? "btn-primary" : "btn-secondary"}`}
+                className={`btn ${statusFilter === "draft" ? "btn-primary" : "btn-secondary"}`}
                 style={{ fontSize: "0.8rem", padding: "0.3rem 0.75rem" }}
-                onClick={() => setPublishedFilter(false)}
+                onClick={() => setStatusFilter("draft")}
               >
                 Drafts
               </button>

@@ -12,6 +12,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.constants import PHONE_10_DIGIT_PATTERN
 from app.modules.communities.models import GATE_TYPES, STRUCTURE_TYPES, UNIT_TYPES
 
 _Code = Annotated[
@@ -45,7 +46,7 @@ class CommunityCreate(_Write):
     admin_name: str | None = Field(default=None, max_length=255)
     admin_email: str | None = Field(default=None, max_length=255)
     admin_password: str | None = Field(default=None, min_length=8, max_length=128)
-    admin_phone: str | None = Field(default=None, max_length=20)
+    admin_phone: str | None = Field(default=None, pattern=PHONE_10_DIGIT_PATTERN)
 
 
 class CommunityUpdate(_Write):
@@ -79,7 +80,7 @@ class CommunityAdminProvision(_Write):
     email: str = Field(min_length=3, max_length=255)
     password: str = Field(min_length=8, max_length=128)
     full_name: str | None = Field(default=None, max_length=255)
-    phone: str | None = Field(default=None, max_length=20)
+    phone: str | None = Field(default=None, pattern=PHONE_10_DIGIT_PATTERN)
 
 
 class CommunityAdminRead(_Read):

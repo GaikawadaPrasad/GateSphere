@@ -30,7 +30,7 @@ import {
 import type { Community, Tower, Gate, Floor } from "@/types/communities";
 import type { ResidentProfile } from "@/types/residents";
 import { PasswordField } from "@/components/forms/PasswordField";
-import { generateInitialPassword } from "@/lib/utils";
+import { generateInitialPassword, PHONE_10_DIGIT_RE, toPhoneDigits } from "@/lib/utils";
 import { CreateCommunityModal } from "@/components/super-admin/CreateCommunityModal";
 import { CreateUserModal } from "@/components/super-admin/CreateUserModal";
 import { EditUserModal, type UserRecord } from "@/components/super-admin/EditUserModal";
@@ -139,8 +139,8 @@ export default function CommunitiesPage() {
       return;
     }
     const trimmedPhone = updateAdminPhone.trim();
-    if (trimmedPhone && !/^[+0-9][0-9 \-]{4,19}$/.test(trimmedPhone)) {
-      setUpdateAdminCredsError("Please enter a valid phone number (5-20 digits).");
+    if (trimmedPhone && !PHONE_10_DIGIT_RE.test(trimmedPhone)) {
+      setUpdateAdminCredsError("Admin phone must be exactly 10 digits.");
       return;
     }
 
@@ -924,11 +924,13 @@ export default function CommunitiesPage() {
                       Phone
                     </label>
                     <input
-                      type="number"
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
                       className="input-field"
                       value={updateAdminPhone}
-                      onChange={(e) => setUpdateAdminPhone(e.target.value)}
-                      placeholder="+91 98765 43210"
+                      onChange={(e) => setUpdateAdminPhone(toPhoneDigits(e.target.value))}
+                      placeholder="9876543210"
                     />
                   </div>
                 </div>

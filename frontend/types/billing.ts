@@ -68,14 +68,24 @@ export interface Payment {
   allocations?: PaymentAllocation[];
 }
 
+/** Mirrors backend `billing.models.CALCULATION_TYPES`. */
+export type ChargeHeadCalculationType = "flat" | "per_sqft" | "per_unit" | "percentage";
+
+export const CALCULATION_TYPE_LABELS: Record<ChargeHeadCalculationType, string> = {
+  flat: "Flat amount",
+  per_sqft: "Per sq. ft.",
+  per_unit: "Per unit",
+  percentage: "Percentage",
+};
+
 export interface ChargeHead {
   id: string;
   community_id: string;
   name: string;
   code: string;
-  description?: string | null;
-  charge_type: "fixed" | "per_sqft" | "utility" | "ad_hoc";
+  calculation_type: ChargeHeadCalculationType;
   default_amount: string;
+  taxable: boolean;
   is_active: boolean;
 }
 

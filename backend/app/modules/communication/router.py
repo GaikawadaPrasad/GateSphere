@@ -84,12 +84,14 @@ async def module_health() -> dict:
 async def list_announcements(
     community_id: uuid.UUID | None = None,
     published_only: bool = True,
+    status: schemas.AnnouncementListStatus | None = None,
     params: PageParams = Depends(page_params),
     svc: Svc = Depends(communication_service),
 ) -> dict:
     rows, total = await svc.list_announcements(
         community_id=community_id,
         published_only=published_only,
+        status=status,
         offset=params.offset,
         limit=params.page_size,
     )
@@ -125,7 +127,11 @@ async def create_announcement(
 async def get_announcement(
     announcement_id: uuid.UUID, svc: Svc = Depends(communication_service)
 ) -> dict:
-    return ok(schemas.AnnouncementRead.model_validate(await svc.get_announcement(announcement_id)))
+    return ok(
+        schemas.AnnouncementRead.model_validate(
+            await svc.get_visible_announcement(announcement_id)
+        )
+    )
 
 
 @router.patch(

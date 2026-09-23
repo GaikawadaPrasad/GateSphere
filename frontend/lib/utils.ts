@@ -350,4 +350,11 @@ export function isValidPersonName(name: string): boolean {
   return /^[a-zA-Z\s.\-',()]+$/.test(trimmed) && (trimmed.match(/[a-zA-Z]/g) || []).length >= 2;
 }
 
+/** 10-digit mobile number, digits only (mirrors backend `PHONE_10_DIGIT_PATTERN`, GS-016). */
+export const PHONE_10_DIGIT_RE = /^\d{10}$/;
+
+/** Keep only digits and cap at 10 so a phone input can't hold anything else. */
+export function toPhoneDigits(value: string): string {
+  return value.replace(/\D/g, "").slice(0, 10);
+}
 

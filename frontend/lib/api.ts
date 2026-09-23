@@ -715,9 +715,9 @@ export const billingApi = {
     data: {
       name: string;
       code: string;
-      charge_type: string;
+      calculation_type: string;
       default_amount: number;
-      is_active?: boolean;
+      taxable?: boolean;
     },
     communityId?: string,
   ) =>
@@ -1310,6 +1310,14 @@ export const incidentsApi = {
 export const notificationsApi = {
   list: (params?: { unread_only?: boolean; page?: number; page_size?: number }) =>
     apiGet<AppNotification[]>("/notifications", params as Record<string, unknown>),
+  /** Server-side unread total (`meta.total` of a 1-row page) — not a page length (GS-011). */
+  unreadCount: async () => {
+    const { meta } = await apiList<AppNotification>("/notifications", {
+      unread_only: true,
+      page_size: 1,
+    });
+    return meta?.total ?? 0;
+  },
   markRead: (id: string) => apiSend<void>("POST", `/notifications/${id}/read`),
   markAllRead: () => apiSend<void>("POST", "/notifications/read-all"),
   preferences: () => apiGet<NotificationPreference[]>("/notifications/me/preferences"),
