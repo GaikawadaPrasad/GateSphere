@@ -173,6 +173,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "vehicles:view",
         "vehicles:create",
         "vehicles:update",
+        "gate:view",
     ],
     "domestic_staff": [
         "communities:view",

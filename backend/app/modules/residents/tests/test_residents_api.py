@@ -224,3 +224,35 @@ def test_family_members_authorization_and_scoping(as_role, seed_ids, resident_un
     del_res = res_client.delete(f"{P}/family-members/{member_id}")
     assert del_res.status_code == 204
 
+
+def test_resident_me_emergency_contact_validation(as_role):
+    res_client = as_role("resident")
+
+    # Reject numeric emergency contact name -> 422
+    bad_res = res_client.patch(
+        f"{P}/me",
+        json={"emergency_contact_name": "856588", "emergency_contact_phone": "+91 98765 43210"},
+    )
+    assert bad_res.status_code == 422, bad_res.text
+
+    # Reject numeric full name -> 422
+    bad_name = res_client.patch(
+        f"{P}/me",
+        json={"full_name": "123456"},
+    )
+    assert bad_name.status_code == 422, bad_name.text
+
+    # Accept valid alphabetic emergency contact name and phone -> 200
+    good_res = res_client.patch(
+        f"{P}/me",
+        json={
+            "emergency_contact_name": "Jane Doe",
+            "emergency_contact_phone": "+91 98765 43210",
+            "emergency_contact_relationship": "Spouse",
+        },
+    )
+    assert good_res.status_code == 200, good_res.text
+    data = good_res.json()["data"]
+    assert any(c["name"] == "Jane Doe" for c in data["emergency_contacts"])
+
+
