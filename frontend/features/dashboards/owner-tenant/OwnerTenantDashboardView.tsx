@@ -182,6 +182,7 @@ export function OwnerTenantDashboardView({
   const [passVehicleNumber, setPassVehicleNumber] = useState("");
   const [passPartySize, setPassPartySize] = useState(1);
   const [passGroupLabel, setPassGroupLabel] = useState("");
+  const [passFieldErrors, setPassFieldErrors] = useState<Record<string, string>>({});
   const [blockedAlert, setBlockedAlert] = useState<{
     name: string;
     phone: string;
@@ -568,68 +569,117 @@ export function OwnerTenantDashboardView({
 
   const handleCreatePass = async (e: React.FormEvent) => {
     e.preventDefault();
+    const errors: Record<string, string> = {};
+
     if (!passCategory) {
-      toast.error("Please select a visitor category.", "Category Required");
-      return;
+      errors.category = "Please select a visitor category.";
     }
+
     const trimmedVisitorName = passVisitorName.trim();
     if (!trimmedVisitorName) {
-      toast.error("Please enter the visitor's full name.", "Visitor Name Required");
-      return;
+      errors.visitor_name = "Please enter the visitor's full name.";
+    } else if (trimmedVisitorName.length < 2) {
+      errors.visitor_name = "Visitor name is too short (must be at least 2 characters).";
+    } else if (trimmedVisitorName.length > 35) {
+      errors.visitor_name = "Visitor name exceeds maximum length (cannot exceed 35 characters).";
+    } else if (!isValidPersonName(trimmedVisitorName)) {
+      errors.visitor_name = "Visitor name must contain only alphabetic letters and spaces.";
     }
-    if (trimmedVisitorName.length < 2) {
-      toast.error("Visitor name is too short (must be at least 2 characters).", "Validation Error");
-      return;
-    }
-    if (trimmedVisitorName.length > 35) {
-      toast.error("Visitor name exceeds maximum length (cannot exceed 35 characters).", "Validation Error");
-      return;
-    }
-    if (!isValidPersonName(trimmedVisitorName)) {
-      toast.error("Visitor name must contain only alphabetic letters and spaces.", "Validation Error");
-      return;
-    }
-    const cleanPhone = passVisitorPhone.trim().replace(/[\s\-()]/g, "");
-    if (!cleanPhone || !/^\+?[0-9]{7,15}$/.test(cleanPhone)) {
-      toast.error("Please enter a valid mobile number (7-15 digits).", "Mobile Number Required");
-      return;
+
+    const rawPhone = passVisitorPhone.trim();
+    if (!rawPhone) {
+      errors.phone = "Visitor mobile number is required.";
+    } else {
+      const cleanPhoneRaw = rawPhone.replace(/[\s\-()]/g, "");
+      if (!/^\+?[0-9]+$/.test(cleanPhoneRaw)) {
+        errors.phone = "Mobile number must contain digits only.";
+      } else {
+        let digits = cleanPhoneRaw;
+        if (digits.startsWith("+91")) {
+          digits = digits.slice(3);
+        } else if (digits.startsWith("+")) {
+          digits = digits.slice(1);
+        } else if (digits.startsWith("0") && digits.length === 11) {
+          digits = digits.slice(1);
+        }
+
+        if (digits.length === 10) {
+          if (!/^[6-9]\d{9}$/.test(digits)) {
+            errors.phone = "Valid 10-digit mobile number must start with 6, 7, 8, or 9.";
+          }
+        } else {
+          errors.phone = "Mobile number must be a valid 10-digit number (e.g. 9876543210 or +91 9876543210).";
+        }
+      }
     }
 
     const trimmedId = passIdNumber.trim();
     if (trimmedId) {
       const idTypeNorm = passIdType.toLowerCase();
+      const cleanId = trimmedId.replace(/[\s-]/g, "").toUpperCase();
       if (idTypeNorm === "aadhaar") {
-        const cleanAadhaar = trimmedId.replace(/[\s-]/g, "");
-        if (!/^\d{12}$/.test(cleanAadhaar)) {
-          toast.error("Aadhaar number must be exactly 12 numeric digits.", "Invalid Aadhaar");
-          return;
-        }
-        if (/^(\d)\1{11}$/.test(cleanAadhaar)) {
-          toast.error("Aadhaar number cannot contain all identical repeating digits.", "Invalid Aadhaar");
-          return;
+        if (!/^\d{12}$/.test(cleanId)) {
+          errors.id_number = "Aadhaar number must be exactly 12 numeric digits.";
+        } else if (/^(\d)\1{11}$/.test(cleanId)) {
+          errors.id_number = "Aadhaar number cannot contain all identical repeating digits.";
         }
       } else if (idTypeNorm === "pan") {
-        const cleanPan = trimmedId.replace(/[\s-]/g, "").toUpperCase();
-        if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(cleanPan)) {
-          toast.error("PAN Card must be 10 characters in format ABCDE1234F.", "Invalid PAN");
-          return;
+        if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(cleanId)) {
+          errors.id_number = "PAN Card must be 10 characters in format ABCDE1234F.";
         }
       } else if (idTypeNorm === "voter_id") {
-        const cleanVoter = trimmedId.replace(/[\s-]/g, "").toUpperCase();
-        if (!/^[A-Z]{3}[0-9]{7}$/.test(cleanVoter)) {
-          toast.error("Voter ID must be 10 characters (e.g. ABC1234567).", "Invalid Voter ID");
-          return;
+        if (!/^[A-Z0-9]{8,16}$/.test(cleanId)) {
+          errors.id_number = "Voter ID must be 8-16 alphanumeric characters (e.g. ABC1234567).";
         }
+      } else if (idTypeNorm === "driving_license") {
+        if (!/^[A-Z0-9]{10,20}$/.test(cleanId)) {
+          errors.id_number = "Driving license must be 10-20 alphanumeric characters.";
+        }
+      } else if (idTypeNorm === "passport") {
+        if (!/^[A-Z][0-9]{7,8}$/.test(cleanId) && !/^[A-Z0-9]{8,9}$/.test(cleanId)) {
+          errors.id_number = "Passport number must be 8-9 characters starting with a letter (e.g. A1234567).";
+        }
+      } else {
+        if (cleanId.length < 4 || cleanId.length > 40) {
+          errors.id_number = "Govt ID number must be between 4 and 40 characters.";
+        }
+      }
+    }
+
+    const trimmedVeh = passVehicleNumber.trim();
+    if (trimmedVeh) {
+      const cleanVeh = trimmedVeh.replace(/[\s-]/g, "").toUpperCase();
+      if (!/^[A-Z0-9]{4,15}$/.test(cleanVeh)) {
+        errors.vehicle_number = "Please enter a valid vehicle plate (e.g. MH12AB1234).";
+      }
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setPassFieldErrors(errors);
+      const firstMsg = Object.values(errors)[0];
+      toast.error(firstMsg, "Validation Error");
+      return;
+    }
+    setPassFieldErrors({});
+
+    let cleanPhone = rawPhone.replace(/[\s\-()]/g, "");
+    if (!cleanPhone.startsWith("+")) {
+      if (cleanPhone.length === 10) {
+        cleanPhone = `+91${cleanPhone}`;
+      } else if (cleanPhone.startsWith("0") && cleanPhone.length === 11) {
+        cleanPhone = `+91${cleanPhone.slice(1)}`;
+      } else {
+        cleanPhone = `+${cleanPhone}`;
       }
     }
 
     try {
       const activeUnitId = profile.data?.occupancies?.[0]?.unit_id;
       const res = await visitors.createPass.mutateAsync({
-        visitor_name: passVisitorName.trim(),
+        visitor_name: trimmedVisitorName,
         phone: cleanPhone,
-        id_type: passIdNumber.trim() ? passIdType : undefined,
-        id_number: passIdNumber.trim() ? passIdNumber.trim().toUpperCase() : undefined,
+        id_type: trimmedId ? passIdType : undefined,
+        id_number: trimmedId ? trimmedId.replace(/[\s-]/g, "").toUpperCase() : undefined,
         category: passCategory,
         reason: passReason.trim(),
         valid_for_hours: passDuration,
@@ -644,7 +694,7 @@ export function OwnerTenantDashboardView({
       setActivePassResult({
         token: res.token,
         pin: res.pin,
-        visitor_name: res.visitor_name || passVisitorName.trim(),
+        visitor_name: res.visitor_name || trimmedVisitorName,
         category: res.category || passCategory,
         reason: res.reason || passReason.trim() || "Visitor Entry",
         valid_from: res.valid_from,
@@ -664,6 +714,7 @@ export function OwnerTenantDashboardView({
       setPassVehicleNumber("");
       setPassPartySize(1);
       setPassGroupLabel("");
+      setPassFieldErrors({});
       toast.success(
         "A QR & 6-digit PIN code have been issued for your visitor.",
         "Visitor Pass Generated",
@@ -675,10 +726,10 @@ export function OwnerTenantDashboardView({
       ) {
         setVisitorPassModalOpen(false);
         setBlockedAlert({
-          name: passVisitorName.trim() || "Visitor",
+          name: trimmedVisitorName || "Visitor",
           phone: cleanPhone,
-          id_type: passIdNumber.trim() ? passIdType : undefined,
-          id_number: passIdNumber.trim() ? passIdNumber.trim().toUpperCase() : undefined,
+          id_type: trimmedId ? passIdType : undefined,
+          id_number: trimmedId ? trimmedId.replace(/[\s-]/g, "").toUpperCase() : undefined,
           reason: err?.fields?.reason || err?.message || "Visitor is flagged on the community blacklist.",
           risk_level: err?.fields?.risk_level || "HIGH",
         });
@@ -2052,7 +2103,10 @@ export function OwnerTenantDashboardView({
                 <BrandButton
                   variant="outline"
                   size="sm"
-                  onClick={() => setVisitorPassModalOpen(true)}
+                  onClick={() => {
+                    setPassFieldErrors({});
+                    setVisitorPassModalOpen(true);
+                  }}
                 >
                   🎟️ Pre-Approve Pass
                 </BrandButton>
@@ -2592,7 +2646,12 @@ export function OwnerTenantDashboardView({
                 onChange={visitorControls.setSortPreset}
               />
             </FilterPanel>
-            <BrandButton onClick={() => setVisitorPassModalOpen(true)}>
+            <BrandButton
+              onClick={() => {
+                setPassFieldErrors({});
+                setVisitorPassModalOpen(true);
+              }}
+            >
               🎟️ Generate Guest Pass
             </BrandButton>
           </div>
@@ -4591,7 +4650,10 @@ export function OwnerTenantDashboardView({
       {/* Visitor Pass Modal */}
       <Modal
         isOpen={visitorPassModalOpen}
-        onClose={() => setVisitorPassModalOpen(false)}
+        onClose={() => {
+          setVisitorPassModalOpen(false);
+          setPassFieldErrors({});
+        }}
         title="Issue Gate Visitor Pass"
       >
         <form
@@ -4612,7 +4674,11 @@ export function OwnerTenantDashboardView({
             <select
               className="select-field"
               value={passCategory}
-              onChange={(e) => setPassCategory(e.target.value)}
+              onChange={(e) => {
+                setPassCategory(e.target.value);
+                if (passFieldErrors.category) setPassFieldErrors((prev) => ({ ...prev, category: "" }));
+              }}
+              style={{ borderColor: passFieldErrors.category ? "#EF4444" : undefined }}
               required
             >
               <option value="Personal Guest">Personal Guest / Family & Friends</option>
@@ -4626,6 +4692,11 @@ export function OwnerTenantDashboardView({
               <option value="Recurring / Daily Help">Recurring Visitor / Daily Help</option>
               <option value="Other">Other Visitor</option>
             </select>
+            {passFieldErrors.category && (
+              <div style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", fontWeight: 600 }}>
+                {passFieldErrors.category}
+              </div>
+            )}
           </div>
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
@@ -4651,28 +4722,44 @@ export function OwnerTenantDashboardView({
               className="input-field"
               placeholder="e.g. Vikram Sharma (2-35 characters)"
               value={passVisitorName}
-              onChange={(e) => setPassVisitorName(e.target.value)}
-              style={
-                (passVisitorName.length > 35 || (passVisitorName.length > 0 && passVisitorName.trim().length < 2) || (passVisitorName.length >= 2 && !isValidPersonName(passVisitorName)))
-                  ? { borderColor: "#EF4444", background: "#FEF2F2" }
-                  : undefined
-              }
+              onChange={(e) => {
+                setPassVisitorName(e.target.value);
+                if (passFieldErrors.visitor_name) setPassFieldErrors((prev) => ({ ...prev, visitor_name: "" }));
+              }}
+              style={{
+                borderColor: passFieldErrors.visitor_name
+                  ? "#EF4444"
+                  : (passVisitorName.length > 35 || (passVisitorName.length > 0 && passVisitorName.trim().length < 2) || (passVisitorName.length >= 2 && !isValidPersonName(passVisitorName)))
+                    ? "#EF4444"
+                    : undefined,
+                background: (passFieldErrors.visitor_name || passVisitorName.length > 35 || (passVisitorName.length > 0 && passVisitorName.trim().length < 2) || (passVisitorName.length >= 2 && !isValidPersonName(passVisitorName)))
+                  ? "#FEF2F2"
+                  : undefined,
+              }}
               required
             />
-            {passVisitorName.length > 35 && (
-              <div style={{ color: "#DC2626", fontSize: "11px", marginTop: "0.25rem", fontWeight: 600 }}>
-                Visitor name exceeds maximum length (cannot exceed 35 characters).
+            {passFieldErrors.visitor_name ? (
+              <div style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", fontWeight: 600 }}>
+                {passFieldErrors.visitor_name}
               </div>
-            )}
-            {passVisitorName.length > 0 && passVisitorName.trim().length < 2 && (
-              <div style={{ color: "#DC2626", fontSize: "11px", marginTop: "0.25rem", fontWeight: 600 }}>
-                Visitor name is too short (must be at least 2 characters).
-              </div>
-            )}
-            {passVisitorName.length >= 2 && !isValidPersonName(passVisitorName) && (
-              <div style={{ color: "#DC2626", fontSize: "11px", marginTop: "0.25rem", fontWeight: 600 }}>
-                Visitor name must contain only alphabetic letters and spaces.
-              </div>
+            ) : (
+              <>
+                {passVisitorName.length > 35 && (
+                  <div style={{ color: "#DC2626", fontSize: "11px", marginTop: "0.25rem", fontWeight: 600 }}>
+                    Visitor name exceeds maximum length (cannot exceed 35 characters).
+                  </div>
+                )}
+                {passVisitorName.length > 0 && passVisitorName.trim().length < 2 && (
+                  <div style={{ color: "#DC2626", fontSize: "11px", marginTop: "0.25rem", fontWeight: 600 }}>
+                    Visitor name is too short (must be at least 2 characters).
+                  </div>
+                )}
+                {passVisitorName.length >= 2 && !isValidPersonName(passVisitorName) && (
+                  <div style={{ color: "#DC2626", fontSize: "11px", marginTop: "0.25rem", fontWeight: 600 }}>
+                    Visitor name must contain only alphabetic letters and spaces.
+                  </div>
+                )}
+              </>
             )}
           </div>
           <div>
@@ -4690,13 +4777,26 @@ export function OwnerTenantDashboardView({
               className="input-field"
               placeholder="e.g. 9876543210 or +91 98765 00000"
               value={passVisitorPhone}
-              onChange={(e) => setPassVisitorPhone(e.target.value)}
+              onChange={(e) => {
+                setPassVisitorPhone(e.target.value);
+                if (passFieldErrors.phone) setPassFieldErrors((prev) => ({ ...prev, phone: "" }));
+              }}
               type="tel"
+              style={{
+                borderColor: passFieldErrors.phone ? "#EF4444" : undefined,
+                background: passFieldErrors.phone ? "#FEF2F2" : undefined,
+              }}
               required
             />
-            <span style={{ fontSize: "11px", color: "var(--muted)", marginTop: "0.25rem", display: "block" }}>
-              10-digit mobile number required for gate security & pass delivery
-            </span>
+            {passFieldErrors.phone ? (
+              <div style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", fontWeight: 600 }}>
+                {passFieldErrors.phone}
+              </div>
+            ) : (
+              <span style={{ fontSize: "11px", color: "var(--muted)", marginTop: "0.25rem", display: "block" }}>
+                10-digit mobile number required for gate security & pass delivery
+              </span>
+            )}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
             <div>
@@ -4713,7 +4813,10 @@ export function OwnerTenantDashboardView({
               <select
                 className="select-field"
                 value={passIdType}
-                onChange={(e) => setPassIdType(e.target.value)}
+                onChange={(e) => {
+                  setPassIdType(e.target.value);
+                  if (passFieldErrors.id_number) setPassFieldErrors((prev) => ({ ...prev, id_number: "" }));
+                }}
               >
                 <option value="aadhaar">Aadhaar Card (12 digits)</option>
                 <option value="pan">PAN Card (10 chars)</option>
@@ -4744,9 +4847,21 @@ export function OwnerTenantDashboardView({
                       : "Enter Govt ID number"
                 }
                 value={passIdNumber}
-                onChange={(e) => setPassIdNumber(e.target.value.toUpperCase())}
-                style={{ fontFamily: "monospace" }}
+                onChange={(e) => {
+                  setPassIdNumber(e.target.value.toUpperCase());
+                  if (passFieldErrors.id_number) setPassFieldErrors((prev) => ({ ...prev, id_number: "" }));
+                }}
+                style={{
+                  fontFamily: "monospace",
+                  borderColor: passFieldErrors.id_number ? "#EF4444" : undefined,
+                  background: passFieldErrors.id_number ? "#FEF2F2" : undefined,
+                }}
               />
+              {passFieldErrors.id_number && (
+                <div style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", fontWeight: 600 }}>
+                  {passFieldErrors.id_number}
+                </div>
+              )}
             </div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
@@ -4765,8 +4880,20 @@ export function OwnerTenantDashboardView({
                 className="input-field"
                 placeholder="e.g. MH12AB1234"
                 value={passVehicleNumber}
-                onChange={(e) => setPassVehicleNumber(e.target.value)}
+                onChange={(e) => {
+                  setPassVehicleNumber(e.target.value);
+                  if (passFieldErrors.vehicle_number) setPassFieldErrors((prev) => ({ ...prev, vehicle_number: "" }));
+                }}
+                style={{
+                  borderColor: passFieldErrors.vehicle_number ? "#EF4444" : undefined,
+                  background: passFieldErrors.vehicle_number ? "#FEF2F2" : undefined,
+                }}
               />
+              {passFieldErrors.vehicle_number && (
+                <div style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", fontWeight: 600 }}>
+                  {passFieldErrors.vehicle_number}
+                </div>
+              )}
             </div>
             <div>
               <label
