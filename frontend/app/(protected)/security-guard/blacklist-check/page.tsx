@@ -129,21 +129,25 @@ export default function SecurityGuardBlacklistCheckPage() {
                   <div style={{ fontSize: "0.75rem", textTransform: "uppercase", fontWeight: 600 }}>
                     Blacklisted Person / Entity
                   </div>
-                  <div style={{ fontSize: "1.1rem", fontWeight: 700 }}>{result.entry.name}</div>
+                  <div style={{ fontSize: "1.1rem", fontWeight: 700 }}>
+                    {result.entry?.name || result.name || "Restricted Individual"}
+                  </div>
                 </div>
                 <div>
                   <div style={{ fontSize: "0.75rem", textTransform: "uppercase", fontWeight: 600 }}>
                     Vehicle Plate #
                   </div>
                   <div style={{ fontSize: "1.1rem", fontWeight: 700, fontFamily: "monospace" }}>
-                    {result.entry.vehicle_number || "N/A"}
+                    {result.entry?.vehicle_number || result.vehicle_number || "N/A"}
                   </div>
                 </div>
                 <div>
                   <div style={{ fontSize: "0.75rem", textTransform: "uppercase", fontWeight: 600 }}>
                     Recorded Security Reason
                   </div>
-                  <div style={{ fontSize: "0.95rem", fontWeight: 600 }}>{result.entry.reason}</div>
+                  <div style={{ fontSize: "0.95rem", fontWeight: 600 }}>
+                    {result.entry?.reason || result.reason || "Security restriction recorded."}
+                  </div>
                 </div>
               </div>
               <div

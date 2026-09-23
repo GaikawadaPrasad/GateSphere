@@ -413,9 +413,10 @@ class AmenityService(UnitScopedAccess):
                 "booking_date does not fall on the slot's weekday", code="SLOT_WEEKDAY_MISMATCH"
             )
         local_tz = await self._community_tz(amenity.community_id)
-        today = datetime.now(local_tz).date()
+        now_local = datetime.now(local_tz)
+        today = now_local.date()
         if payload.booking_date < today:
-            raise BusinessRuleError("booking_date is in the past", code="DATE_IN_PAST")
+            raise BusinessRuleError("Cannot book a completed or past date", code="DATE_IN_PAST")
 
         max_adv = await self._rule_int(amenity.id, "max_advance_days")
         if max_adv is not None and (payload.booking_date - today).days > max_adv:
@@ -425,6 +426,10 @@ class AmenityService(UnitScopedAccess):
 
         start_local = datetime.combine(payload.booking_date, slot.start_time, tzinfo=local_tz)
         end_local = datetime.combine(payload.booking_date, slot.end_time, tzinfo=local_tz)
+
+        if start_local < now_local:
+            raise BusinessRuleError("Cannot book a completed or past time slot", code="TIME_IN_PAST")
+
         start_at = start_local.astimezone(UTC)
         end_at = end_local.astimezone(UTC)
 

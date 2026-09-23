@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from app.db.repository import AsyncTenantRepository
 from app.modules.visitors.models import (
@@ -31,23 +32,33 @@ class BlacklistRepository(AsyncTenantRepository[VisitorBlacklist]):
     model = VisitorBlacklist
 
     async def match(
-        self, community_id: uuid.UUID, phone_hash: str | None, id_hash: str | None
+        self,
+        community_id: uuid.UUID,
+        phone_hash: str | None = None,
+        id_hash: str | None = None,
+        query: str | None = None,
     ) -> VisitorBlacklist | None:
-        from sqlalchemy import or_
-
         conditions = []
         if phone_hash and phone_hash.strip():
             conditions.append(VisitorBlacklist.phone_hash == phone_hash.strip())
         if id_hash and id_hash.strip():
             conditions.append(VisitorBlacklist.id_number_hash == id_hash.strip())
+        if query and query.strip():
+            q_clean = query.strip()
+            compact = re.sub(r"[\s\-]", "", q_clean)
+            conditions.append(VisitorBlacklist.reason.ilike(f"%{q_clean}%"))
+            if compact != q_clean and len(compact) >= 3:
+                conditions.append(VisitorBlacklist.reason.ilike(f"%{compact}%"))
         if not conditions:
             return None
         return await self.db.scalar(
-            select(VisitorBlacklist).where(
+            select(VisitorBlacklist)
+            .where(
                 VisitorBlacklist.community_id == community_id,
                 VisitorBlacklist.is_active.is_(True),
                 or_(*conditions),
             )
+            .order_by(VisitorBlacklist.created_at.desc())
         )
 
 
