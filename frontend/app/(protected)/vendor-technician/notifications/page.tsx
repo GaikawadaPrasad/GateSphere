@@ -22,7 +22,7 @@ export default function VendorNotificationsPage() {
 
   const handleMarkRead = async (id: string) => {
     await notificationsApi.markRead(id);
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
   };
 
   return (
@@ -51,15 +51,15 @@ export default function VendorNotificationsPage() {
                   justifyContent: "space-between",
                   padding: "1rem",
                   borderRadius: "var(--radius-sm)",
-                  background: n.read ? "white" : "var(--primary-light)",
-                  border: n.read ? "1px solid var(--border)" : "1px solid #bfdbfe",
+                  background: n.is_read ? "white" : "var(--primary-light)",
+                  border: n.is_read ? "1px solid var(--border)" : "1px solid #bfdbfe",
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
                   <StatusBadge status={n.type || "Info"} />
                   <div>
                     <div style={{ fontWeight: 600, color: "var(--fg)", fontSize: "0.9rem" }}>
-                      {n.title} {!n.read && <span style={{ color: "var(--primary)" }}>●</span>}
+                      {n.title} {!n.is_read && <span style={{ color: "var(--primary)" }}>●</span>}
                     </div>
                     <div style={{ fontSize: "0.8rem", color: "var(--muted)", marginTop: "0.2rem" }}>
                       {n.message} · <span style={{ fontStyle: "italic" }}>{n.timestamp}</span>
@@ -67,7 +67,7 @@ export default function VendorNotificationsPage() {
                   </div>
                 </div>
 
-                {!n.read && (
+                {!n.is_read && (
                   <button
                     className="btn btn-secondary"
                     style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}
