@@ -1,18 +1,29 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { authApi, getActiveRole, setActiveRole, type CurrentUser } from "@/lib/api";
-import { clearQueryCache } from "@/lib/query";
+import {
+  authApi,
+  getActiveRole,
+  hasSessionCookie,
+  setActiveRole,
+  type CurrentUser,
+} from "@/lib/api";
+import { hardNavigate } from "@/lib/navigation";
 
 export const authKeys = {
   me: ["auth", "me"] as const,
 };
 
-/** Current user. `null` when unauthenticated (a 401 is an expected result, not an error state). */
+/**
+ * Current user. `null` when unauthenticated (a 401 is an expected result, not an error state).
+ * With no session cookie at all we already know the answer, so `/auth/me` is not called —
+ * a fresh visit to /login or a public page makes no protected request.
+ */
 export function useMe(options?: { enabled?: boolean }) {
   return useQuery<CurrentUser | null>({
     queryKey: authKeys.me,
     queryFn: async () => {
+      if (!hasSessionCookie()) return null;
       try {
         return await authApi.me();
       } catch (err: any) {
@@ -68,17 +79,29 @@ export function useLogin() {
   });
 }
 
+/**
+ * Sign out the active role's session, then **hard-navigate** to /login.
+ *
+ * The cache is deliberately not cleared here: clearing it while the dashboard is still
+ * mounted made every mounted query (header notifications, community details, …) rebuild and
+ * refetch against the session that had just been revoked — a burst of 401s on the way to
+ * /login. A full page load discards the whole in-memory cache instead, which is the
+ * strongest form of the AGENTS.md §5.3 "clear on sign-out" rule, and aborts anything in
+ * flight. Callers must not navigate themselves.
+ */
 export function useLogout() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => authApi.logout(),
+    mutationFn: async () => {
+      // Stop in-flight reads so none completes against a revoked session.
+      await qc.cancelQueries();
+      return authApi.logout();
+    },
     onSettled: () => {
-      if (typeof window !== "undefined") {
-        setActiveRole(null);
-        sessionStorage.setItem("gatesphere_logged_out", "true");
-      }
-      clearQueryCache(qc);
-      qc.setQueryData(authKeys.me, null);
+      if (typeof window === "undefined") return;
+      setActiveRole(null);
+      sessionStorage.setItem("gatesphere_logged_out", "true");
+      hardNavigate("/login");
     },
   });
 }

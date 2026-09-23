@@ -18,6 +18,40 @@ Format per entry:
 
 ---
 
+## 2026-09-23 — Console 401 burst on sign-out / session loss (login page)
+
+**By:** Claude Code (with johnalexanderkondepoguVPD)
+**Branch / commit:** `feature-superadmin` (uncommitted at time of writing)
+**Root cause:** `useLogout` called `queryClient.clear()` while the dashboard was still
+mounted. The header then re-rendered (`logout.isPending` flipped) and every mounted query
+rebuilt against the empty cache and refetched — `/communities/{id}`, `/notifications`,
+`?unread_only=true`, the unread count — against the session the server had *just* revoked
+(and with `X-Session-Role` still derived from the dashboard URL). Four 401s, then a client
+navigation to /login kept them in the console. The global 401 handler had the same
+clear-then-redirect shape and redirected once per failing query.
+**What changed:**
+- `useLogout`: cancel in-flight queries → `POST /auth/logout` → `hardNavigate("/login")` on
+  success *and* failure. No cache clear: the page load discards the cache (strongest form of
+  §5.3) without the refetch burst. Call sites no longer navigate themselves.
+- `redirectToLoginOnUnauthorized` (`lib/query.ts`, used by `providers.tsx`): first 401 →
+  one hard redirect to `/login?next=…`; no pre-clear.
+- `useMe`: returns `null` without calling `/auth/me` when no GateSphere CSRF cookie exists
+  (`hasSessionCookie()` — the JS-readable CSRF cookie is set/deleted with the HttpOnly
+  session cookie), so /login and public pages make no protected request.
+- Kept the in-progress (previously uncommitted) auth guards on the notification hooks and fixed
+  the build break they left in `Header.tsx` (`unreadNotifications` undefined → "Unread" tab
+  now filters the fetched list).
+**Verified:** vitest 137/137 (new `__tests__/unit/auth-lifecycle.test.tsx`, 8 tests; old
+logout shape reproduced the refetch in a throwaway test), `tsc` clean, `next build` exit 0,
+eslint 0 errors on changed files. Prod: Vercel `/api/v1/auth/me` without cookie → 401 (the
+call now skipped); `gatesphere-03aq` `/healthz` 200; `gatesphere-l98m` `/healthz` 503.
+**Not verified:** browser/Network-tab run locally or on Vercel (fix not deployed yet), per-role
+manual matrix, session-expiry in a real browser.
+**Open / next:** AGENTS.md §5.3 literally says `queryClient.clear()` on sign-out — sign-out now
+uses a full page load instead; update the rule's wording. `gatesphere-l98m` is unhealthy.
+
+---
+
 ## 2026-09-23 — Sivion batch: GS-010/011/016/017/020/021/022/023
 
 **By:** Claude Code (with johnalexanderkondepoguVPD)
