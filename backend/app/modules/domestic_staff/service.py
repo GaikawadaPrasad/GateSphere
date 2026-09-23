@@ -207,8 +207,6 @@ class DomesticStaffService(UnitScopedAccess):
     async def list_staff(
         self, *, community_id: uuid.UUID | None, q: str | None, offset: int, limit: int
     ):
-        cid = self._one_community(community_id)
-        
         from app.modules.users.models import Role, UserRole
         slugs = await self.db.scalars(
             select(Role.slug)
@@ -219,7 +217,18 @@ class DomesticStaffService(UnitScopedAccess):
         if not self.actor.is_superadmin and "resident" not in slug_set and not slug_set.intersection(_CROSS_UNIT_ROLE_SLUGS):
             raise ForbiddenError("You do not have permission to view the staff registry", code="PERMISSION_DENIED")
 
-        stmt = select(DomesticStaff).where(DomesticStaff.community_id == cid)
+        if community_id is not None:
+            cid = self.scope.require(community_id)
+            stmt = select(DomesticStaff).where(DomesticStaff.community_id == cid)
+        elif not self.scope.is_global and len(self.scope.community_ids) == 1:
+            cid = next(iter(self.scope.community_ids))
+            stmt = select(DomesticStaff).where(DomesticStaff.community_id == cid)
+        elif self.scope.is_global:
+            stmt = select(DomesticStaff)
+        else:
+            cid = self._one_community(community_id)
+            stmt = select(DomesticStaff).where(DomesticStaff.community_id == cid)
+
         if q:
             stmt = stmt.where(
                 DomesticStaff.full_name.ilike(f"%{q}%") | DomesticStaff.phone.ilike(f"%{q}%")
