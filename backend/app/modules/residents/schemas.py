@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.modules.residents.models import (
     KYC_STATUS,
@@ -183,6 +184,14 @@ class EmergencyContactCreate(_Write):
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True, populate_by_name=True)
 
+    @field_validator("name", mode="after")
+    @classmethod
+    def validate_contact_name(cls, v: str) -> str:
+        trimmed = v.strip()
+        if not re.match(r"^[a-zA-Z\s.\-',()]+$", trimmed) or len(re.findall(r"[a-zA-Z]", trimmed)) < 2:
+            raise ValueError("Contact name must contain only alphabetic letters, spaces, and standard punctuation (min 2 letters).")
+        return trimmed
+
 
 class EmergencyContactRead(_Read):
     resident_profile_id: uuid.UUID
@@ -262,3 +271,16 @@ class ResidentMeUpdate(_Write):
     emergency_contact_name: str | None = Field(default=None, max_length=180)
     emergency_contact_phone: str | None = _Phone
     emergency_contact_relationship: str | None = Field(default=None, max_length=40)
+
+    @field_validator("full_name", "emergency_contact_name", mode="after")
+    @classmethod
+    def validate_person_name(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        trimmed = v.strip()
+        if not trimmed:
+            return None
+        if not re.match(r"^[a-zA-Z\s.\-',()]+$", trimmed) or len(re.findall(r"[a-zA-Z]", trimmed)) < 2:
+            raise ValueError("Name must contain only alphabetic letters, spaces, and standard punctuation (min 2 letters).")
+        return trimmed
+

@@ -32,11 +32,10 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
 const TERMINAL_STATUSES = ["closed", "cancelled", "resolved", "resident_confirmation"];
 
 export default function FacilityManagerComplaintsPage() {
-  const PAGE_SIZE = 50;
+  const [pageSize, setPageSize] = useState(10);
+  const [total, setTotal] = useState(0);
   const [complaints, setComplaints] = useState<any[]>([]);
   const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [categoryMap, setCategoryMap] = useState<Record<string, string>>({});
   const [search, setSearch] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("all");
@@ -61,56 +60,65 @@ export default function FacilityManagerComplaintsPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [ticketFeedback, setTicketFeedback] = useState<{ rating: number; comments: string | null } | null>(null);
 
-  const loadData = async (reset = true) => {
-    const currentPage = reset ? 1 : page + 1;
-    if (reset) {
-      setIsLoading(true);
-    } else {
-      setIsLoadingMore(true);
-    }
+  const loadData = async (targetPage = page, loadCategories = false) => {
+    setIsLoading(true);
     setLoadError(null);
     try {
-      const [ticketsRes, categoriesRes, vendorsRes] = await Promise.allSettled([
-        complaintsApi.list({ page: currentPage, page_size: PAGE_SIZE }),
-        complaintsApi.categories(),
-        vendorsApi.list(),
-      ]);
+      const q = search.trim() || undefined;
+      const status = statusFilter === "all" ? undefined : statusFilter;
+      const priority = priorityFilter === "all" ? undefined : priorityFilter;
 
-      if (reset && categoriesRes.status === "fulfilled") {
-        const map: Record<string, string> = {};
-        for (const c of categoriesRes.value || []) if (c?.id) map[c.id] = c.name;
-        setCategoryMap(map);
+      const promises: any[] = [
+        complaintsApi.listPaginated({ page: targetPage, page_size: pageSize, q, ticket_status: status, priority })
+      ];
+      if (loadCategories) {
+        promises.push(complaintsApi.categories());
+        promises.push(vendorsApi.list());
       }
+      
+      const results = await Promise.allSettled(promises);
+      const ticketsRes = results[0];
 
-      if (reset && vendorsRes.status === "fulfilled") {
-        setVendors((vendorsRes.value || []).map((v: any) => ({
-          id: v.id,
-          name: v.full_name || v.name || v.email,
-        })));
+      if (loadCategories) {
+        const categoriesRes = results[1];
+        const vendorsRes = results[2];
+        if (categoriesRes?.status === "fulfilled") {
+          const map: Record<string, string> = {};
+          for (const c of categoriesRes.value || []) if (c?.id) map[c.id] = c.name;
+          setCategoryMap(map);
+        }
+        if (vendorsRes?.status === "fulfilled") {
+          setVendors((vendorsRes.value || []).map((v: any) => ({
+            id: v.id,
+            name: v.full_name || v.name || v.email,
+          })));
+        }
       }
 
       if (ticketsRes.status === "fulfilled") {
-        const items = (ticketsRes.value || []).sort((a: any, b: any) =>
-          b.ticket_number.localeCompare(a.ticket_number),
+        const res = ticketsRes.value as any;
+        const items = (res.data || []).sort((a: any, b: any) =>
+          new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
         );
-        setComplaints((prev) => reset ? items : [...prev, ...items]);
-        setHasMore(items.length === PAGE_SIZE);
-        if (!reset) setPage(currentPage);
+        setComplaints(items);
+        setTotal(res.meta?.total || items.length);
+        setPage(targetPage);
       } else {
-        setLoadError((ticketsRes as any).reason?.message || "Failed to load complaints.");
+        setLoadError(ticketsRes.reason?.message || "Failed to load complaints.");
       }
     } catch (err: any) {
       setLoadError(err?.message || "Failed to load complaints.");
     } finally {
-      if (reset) {
-        setIsLoading(false);
-      } else {
-        setIsLoadingMore(false);
-      }
+      setIsLoading(false);
     }
   };
 
-  useEffect(() => { loadData(true); }, []);
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      loadData(1, Object.keys(categoryMap).length === 0);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [search, statusFilter, priorityFilter, pageSize]);
 
   const handleStatusChange = async (id: string, status: string) => {
     try {
@@ -196,18 +204,7 @@ export default function FacilityManagerComplaintsPage() {
     }
   };
 
-  const filteredComplaints = complaints.filter((c) => {
-    const subject = (c.subject || "").toLowerCase();
-    const ticketNum = (c.ticket_number || "").toLowerCase();
-    const category = (categoryMap[c.category_id] || "").toLowerCase();
-    const matchSearch =
-      ticketNum.includes(search.toLowerCase()) ||
-      subject.includes(search.toLowerCase()) ||
-      category.includes(search.toLowerCase());
-    const matchPriority = priorityFilter === "all" || c.priority === priorityFilter;
-    const matchStatus = statusFilter === "all" || c.status === statusFilter;
-    return matchSearch && matchPriority && matchStatus;
-  });
+  const filteredComplaints = complaints;
 
   return (
     <div>
@@ -226,7 +223,7 @@ export default function FacilityManagerComplaintsPage() {
           <div>
             <h3 className="card-title">Resident Complaints Log</h3>
             <p style={{ fontSize: "0.775rem", color: "var(--muted)" }}>
-              {filteredComplaints.length} complaints
+              {total} total complaints
             </p>
           </div>
 
@@ -331,12 +328,10 @@ export default function FacilityManagerComplaintsPage() {
                     </tr>
                   );
                 })}
-                {hasMore && !search && priorityFilter === "all" && statusFilter === "all" && (
+                {filteredComplaints.length === 0 && !isLoading && (
                   <tr>
                     <td colSpan={8} style={{ textAlign: "center", padding: "1rem" }}>
-                      <button className="btn btn-secondary" onClick={() => loadData(false)} disabled={isLoadingMore}>
-                        {isLoadingMore ? "Loading…" : "Load More"}
-                      </button>
+                      No complaints found.
                     </td>
                   </tr>
                 )}
@@ -344,6 +339,49 @@ export default function FacilityManagerComplaintsPage() {
               )}
             </tbody>
           </table>
+          
+          {/* Pagination Controls */}
+          {total > 0 && (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1rem", borderTop: "1px solid var(--border)", background: "var(--surface)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <span style={{ fontSize: "0.85rem", color: "var(--muted)" }}>Rows per page:</span>
+                <select 
+                  className="select-field" 
+                  style={{ width: "auto", height: 30, padding: "0 0.5rem" }} 
+                  value={pageSize} 
+                  onChange={(e) => setPageSize(Number(e.target.value))}
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                <span style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
+                  Showing {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, total)} of {total}
+                </span>
+                <div style={{ display: "flex", gap: "0.25rem" }}>
+                  <button 
+                    className="btn btn-secondary" 
+                    style={{ padding: "0.25rem 0.75rem" }} 
+                    disabled={page === 1 || isLoading}
+                    onClick={() => loadData(page - 1)}
+                  >
+                    Previous
+                  </button>
+                  <button 
+                    className="btn btn-secondary" 
+                    style={{ padding: "0.25rem 0.75rem" }} 
+                    disabled={page * pageSize >= total || isLoading}
+                    onClick={() => loadData(page + 1)}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

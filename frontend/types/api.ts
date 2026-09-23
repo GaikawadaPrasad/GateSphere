@@ -21,4 +21,6 @@ export interface ListQueryParams {
   q?: string;
   community_id?: string;
   active?: boolean;
+  priority?: string;
+  ticket_status?: string;
 }

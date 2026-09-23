@@ -283,6 +283,35 @@ export async function apiGet<T>(
   return handleResponse<T>(res);
 }
 
+export async function apiGetPaginated<T>(
+  path: string,
+  params?: Record<string, unknown>,
+  role?: string,
+): Promise<{ data: T; meta?: PaginationMeta }> {
+  const url = buildUrl(path, params);
+  const activeRole = role || getActiveRole();
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (activeRole) headers["X-Session-Role"] = activeRole;
+
+  const res = await fetch(url, { method: "GET", credentials: "include", headers });
+  
+  const contentType = res.headers.get("content-type");
+  if (!res.ok) {
+    if (contentType?.includes("application/json")) {
+      const errData = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, errData.message || `HTTP error ${res.status}`);
+    }
+    throw new ApiError(res.status, `HTTP error ${res.status}`);
+  }
+  
+  const json: ApiResponse<T> = await res.json();
+  if (json && typeof json === "object" && "success" in json) {
+    if (!json.success) throw new ApiError(res.status, json.message || "Request failed");
+    return { data: json.data, meta: json.meta };
+  }
+  return { data: json as unknown as T };
+}
+
 export async function apiSend<T>(
   method: string,
   path: string,
@@ -590,6 +619,8 @@ export const complaintsApi = {
     apiGet<ServiceTicket[]>("/complaints/tickets", params as Record<string, unknown>),
   list: (params?: ListQueryParams) =>
     apiGet<ServiceTicket[]>("/complaints/tickets", params as Record<string, unknown>),
+  listPaginated: (params?: ListQueryParams) =>
+    apiGetPaginated<ServiceTicket[]>("/complaints/tickets", params as Record<string, unknown>),
   categories: (communityId?: string) =>
     apiGet<ServiceCategory[]>(
       "/complaints/categories",
