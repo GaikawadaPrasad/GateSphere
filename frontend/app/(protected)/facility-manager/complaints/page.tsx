@@ -69,7 +69,7 @@ export default function FacilityManagerComplaintsPage() {
       const priority = priorityFilter === "all" ? undefined : priorityFilter;
 
       const promises: any[] = [
-        complaintsApi.list({ page: targetPage, page_size: pageSize, q, ticket_status: status, priority })
+        complaintsApi.listPaginated({ page: targetPage, page_size: pageSize, q, ticket_status: status, priority })
       ];
       if (loadCategories) {
         promises.push(complaintsApi.categories());
