@@ -52,6 +52,23 @@ async def require_financial_dashboard_async(
     return scope
 
 
+async def require_security_dashboard_async(
+    scope: TenantScope = Depends(get_tenant_scope_async),
+    user: User = Depends(require_auth_async),
+    db: AsyncSession = Depends(get_async_db),
+) -> TenantScope:
+    if not scope.can("gate:view"):
+        raise ForbiddenError("Missing permission: gate:view", code="PERMISSION_DENIED")
+    active_cid = next(iter(scope.community_ids)) if len(scope.community_ids) == 1 else None
+    unit_scope = await actor_unit_scope(db, user, community_id=active_cid)
+    if unit_scope is not None:
+        raise ForbiddenError(
+            "Residents cannot access community security dashboard", code="PERMISSION_DENIED"
+        )
+    return scope
+
+
+SECURITY_DASHBOARD = Depends(require_security_dashboard_async)
 FINANCIAL_DASHBOARD = Depends(require_financial_dashboard_async)
 Svc = DashboardService
 
@@ -98,7 +115,7 @@ async def overview(
     return ok(data)
 
 
-@router.get("/security", response_model=Envelope[schemas.SecurityStats], dependencies=[GATE_VIEW])
+@router.get("/security", response_model=Envelope[schemas.SecurityStats], dependencies=[SECURITY_DASHBOARD])
 async def security(
     community_id: uuid.UUID | None = None,
     refresh: bool = False,

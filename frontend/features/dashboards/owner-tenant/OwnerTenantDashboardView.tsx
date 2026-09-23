@@ -150,6 +150,8 @@ export function OwnerTenantDashboardView({
   const [newMemberRelation, setNewMemberRelation] = useState("Spouse");
   const [newMemberPhone, setNewMemberPhone] = useState("");
   const [newMemberAccess, setNewMemberAccess] = useState(true);
+  const [addMemberErrors, setAddMemberErrors] = useState<Record<string, string>>({});
+  const [editMemberErrors, setEditMemberErrors] = useState<Record<string, string>>({});
 
   // Resident Profile edit state
   const [editProfileOpen, setEditProfileOpen] = useState(false);
@@ -159,6 +161,7 @@ export function OwnerTenantDashboardView({
   const [profileEmergencyPhone, setProfileEmergencyPhone] = useState("");
   const [profileEmergencyRel, setProfileEmergencyRel] = useState("Spouse");
   const [profileEmergencyNotes, setProfileEmergencyNotes] = useState("");
+  const [profileFieldErrors, setProfileFieldErrors] = useState<Record<string, string>>({});
 
   // Change Password state
   const [changePasswordModalOpen, setChangePasswordModalOpen] = useState(false);
@@ -835,20 +838,24 @@ export function OwnerTenantDashboardView({
 
   const handleSaveMember = async (e: React.FormEvent) => {
     e.preventDefault();
+    const errors: Record<string, string> = {};
     const trimmedName = newMemberName.trim();
     if (!trimmedName || trimmedName.length < 2) {
-      toast.error("Please enter family member's full name (at least 2 characters).", "Validation Error");
-      return;
-    }
-    if (!isValidPersonName(trimmedName)) {
-      toast.error("Family member name must contain only alphabetic letters and spaces.", "Validation Error");
-      return;
+      errors.name = "Please enter family member's full name (at least 2 characters).";
+    } else if (!isValidPersonName(trimmedName)) {
+      errors.name = "Family member name must contain only alphabetic letters and spaces.";
     }
     const cleanPhone = newMemberPhone.trim().replace(/[\s\-()]/g, "");
     if (!cleanPhone || !/^\+?[0-9]{7,15}$/.test(cleanPhone)) {
-      toast.error("Please enter a valid mobile number (7-15 digits).", "Validation Error");
+      errors.phone = "Please enter a valid mobile number (7-15 digits).";
+    }
+    if (Object.keys(errors).length > 0) {
+      setAddMemberErrors(errors);
+      const firstMsg = Object.values(errors)[0];
+      toast.error(firstMsg, "Validation Error");
       return;
     }
+    setAddMemberErrors({});
     try {
       await family.addMember.mutateAsync({
         name: trimmedName,
@@ -865,6 +872,7 @@ export function OwnerTenantDashboardView({
       setNewMemberPhone("");
       setNewMemberRelation("Spouse");
       setNewMemberAccess(true);
+      setAddMemberErrors({});
       toast.success(
         `${addedName} has been added and pre-approved on the gate whitelist.`,
         "Family Member Added",
@@ -877,20 +885,24 @@ export function OwnerTenantDashboardView({
   const handleUpdateMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingMember) return;
+    const errors: Record<string, string> = {};
     const trimmedName = (editingMember.name || "").trim();
     if (!trimmedName || trimmedName.length < 2) {
-      toast.error("Please enter family member's full name (at least 2 characters).", "Validation Error");
-      return;
-    }
-    if (!isValidPersonName(trimmedName)) {
-      toast.error("Family member name must contain only alphabetic letters and spaces.", "Validation Error");
-      return;
+      errors.name = "Please enter family member's full name (at least 2 characters).";
+    } else if (!isValidPersonName(trimmedName)) {
+      errors.name = "Family member name must contain only alphabetic letters and spaces.";
     }
     const cleanPhone = (editingMember.phone || "").trim().replace(/[\s\-()]/g, "");
     if (!cleanPhone || !/^\+?[0-9]{7,15}$/.test(cleanPhone)) {
-      toast.error("Please enter a valid mobile number (7-15 digits).", "Validation Error");
+      errors.phone = "Please enter a valid mobile number (7-15 digits).";
+    }
+    if (Object.keys(errors).length > 0) {
+      setEditMemberErrors(errors);
+      const firstMsg = Object.values(errors)[0];
+      toast.error(firstMsg, "Validation Error");
       return;
     }
+    setEditMemberErrors({});
     try {
       await family.updateMember.mutateAsync({
         id: editingMember.id,
@@ -904,6 +916,7 @@ export function OwnerTenantDashboardView({
       refetchStats?.();
       const updatedName = trimmedName;
       setEditingMember(null);
+      setEditMemberErrors({});
       toast.success(
         `${updatedName}'s record and gate pre-approval status updated.`,
         "Family Member Updated",
@@ -921,35 +934,42 @@ export function OwnerTenantDashboardView({
     setProfileEmergencyPhone(contact?.phone || "");
     setProfileEmergencyRel(contact?.relationship || "Spouse");
     setProfileEmergencyNotes(profile.data?.emergency_notes || "");
+    setProfileFieldErrors({});
     setEditProfileOpen(true);
   };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    const errors: Record<string, string> = {};
+
     const trimmedFullName = profileFullName.trim();
     if (trimmedFullName && !isValidPersonName(trimmedFullName)) {
-      toast.error("Full name must contain only alphabetic letters and spaces.", "Validation Error");
-      return;
+      errors.full_name = "Full name must contain only alphabetic letters and spaces.";
     }
 
     const trimmedEmergencyName = profileEmergencyName.trim();
     if (trimmedEmergencyName && !isValidPersonName(trimmedEmergencyName)) {
-      toast.error("Emergency contact name must contain only alphabetic letters and spaces.", "Validation Error");
-      return;
+      errors.emergency_name = "Emergency contact name must contain only alphabetic letters and spaces.";
     }
 
     const cleanPhone = profilePhone.trim().replace(/[\s\-()]/g, "");
     if (cleanPhone && !/^\+?[0-9]{7,15}$/.test(cleanPhone)) {
-      toast.error("Please enter a valid primary phone number (7-15 digits).", "Validation Error");
-      return;
+      errors.phone = "Please enter a valid primary phone number (7-15 digits).";
     }
 
     const cleanEmergencyPhone = profileEmergencyPhone.trim().replace(/[\s\-()]/g, "");
     if (cleanEmergencyPhone && !/^\+?[0-9]{7,15}$/.test(cleanEmergencyPhone)) {
-      toast.error("Please enter a valid emergency contact phone number (7-15 digits).", "Validation Error");
+      errors.emergency_phone = "Please enter a valid emergency contact phone number (7-15 digits).";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setProfileFieldErrors(errors);
+      const firstMsg = Object.values(errors)[0];
+      toast.error(firstMsg, "Validation Error");
       return;
     }
 
+    setProfileFieldErrors({});
     try {
       await profile.updateProfile.mutateAsync({
         full_name: trimmedFullName || undefined,
@@ -2378,6 +2398,7 @@ export function OwnerTenantDashboardView({
                 setNewMemberPhone("");
                 setNewMemberRelation("Spouse");
                 setNewMemberAccess(true);
+                setAddMemberErrors({});
                 setAddMemberModalOpen(true);
               }}
             >
@@ -2511,7 +2532,10 @@ export function OwnerTenantDashboardView({
                         type="button"
                         className="btn btn-secondary"
                         style={{ padding: "0.25rem 0.6rem", fontSize: "12px" }}
-                        onClick={() => setEditingMember(m)}
+                        onClick={() => {
+                          setEditingMember(m);
+                          setEditMemberErrors({});
+                        }}
                       >
                         ✏️ Edit
                       </button>
@@ -4629,7 +4653,7 @@ export function OwnerTenantDashboardView({
               value={passVisitorName}
               onChange={(e) => setPassVisitorName(e.target.value)}
               style={
-                (passVisitorName.length > 35 || (passVisitorName.length > 0 && passVisitorName.trim().length < 2))
+                (passVisitorName.length > 35 || (passVisitorName.length > 0 && passVisitorName.trim().length < 2) || (passVisitorName.length >= 2 && !isValidPersonName(passVisitorName)))
                   ? { borderColor: "#EF4444", background: "#FEF2F2" }
                   : undefined
               }
@@ -4643,6 +4667,11 @@ export function OwnerTenantDashboardView({
             {passVisitorName.length > 0 && passVisitorName.trim().length < 2 && (
               <div style={{ color: "#DC2626", fontSize: "11px", marginTop: "0.25rem", fontWeight: 600 }}>
                 Visitor name is too short (must be at least 2 characters).
+              </div>
+            )}
+            {passVisitorName.length >= 2 && !isValidPersonName(passVisitorName) && (
+              <div style={{ color: "#DC2626", fontSize: "11px", marginTop: "0.25rem", fontWeight: 600 }}>
+                Visitor name must contain only alphabetic letters and spaces.
               </div>
             )}
           </div>
@@ -5150,9 +5179,18 @@ export function OwnerTenantDashboardView({
               className="input-field"
               placeholder="e.g. Ananya Mehta"
               value={newMemberName}
-              onChange={(e) => setNewMemberName(e.target.value)}
+              onChange={(e) => {
+                setNewMemberName(e.target.value);
+                if (addMemberErrors.name) setAddMemberErrors((prev) => ({ ...prev, name: "" }));
+              }}
+              style={{ borderColor: addMemberErrors.name ? "#EF4444" : undefined }}
               required
             />
+            {addMemberErrors.name && (
+              <span style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", display: "block" }}>
+                {addMemberErrors.name}
+              </span>
+            )}
           </div>
           <div>
             <label
@@ -5195,9 +5233,18 @@ export function OwnerTenantDashboardView({
               className="input-field"
               placeholder="+91 98765 43210"
               value={newMemberPhone}
-              onChange={(e) => setNewMemberPhone(e.target.value)}
+              onChange={(e) => {
+                setNewMemberPhone(e.target.value);
+                if (addMemberErrors.phone) setAddMemberErrors((prev) => ({ ...prev, phone: "" }));
+              }}
+              style={{ borderColor: addMemberErrors.phone ? "#EF4444" : undefined }}
               required
             />
+            {addMemberErrors.phone && (
+              <span style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", display: "block" }}>
+                {addMemberErrors.phone}
+              </span>
+            )}
           </div>
           <div
             style={{
@@ -5277,9 +5324,18 @@ export function OwnerTenantDashboardView({
               <input
                 className="input-field"
                 value={editingMember.name}
-                onChange={(e) => setEditingMember({ ...editingMember, name: e.target.value })}
+                onChange={(e) => {
+                  setEditingMember({ ...editingMember, name: e.target.value });
+                  if (editMemberErrors.name) setEditMemberErrors((prev) => ({ ...prev, name: "" }));
+                }}
+                style={{ borderColor: editMemberErrors.name ? "#EF4444" : undefined }}
                 required
               />
+              {editMemberErrors.name && (
+                <span style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", display: "block" }}>
+                  {editMemberErrors.name}
+                </span>
+              )}
             </div>
             <div>
               <label
@@ -5322,9 +5378,18 @@ export function OwnerTenantDashboardView({
                 type="tel"
                 className="input-field"
                 value={editingMember.phone}
-                onChange={(e) => setEditingMember({ ...editingMember, phone: e.target.value })}
+                onChange={(e) => {
+                  setEditingMember({ ...editingMember, phone: e.target.value });
+                  if (editMemberErrors.phone) setEditMemberErrors((prev) => ({ ...prev, phone: "" }));
+                }}
+                style={{ borderColor: editMemberErrors.phone ? "#EF4444" : undefined }}
                 required
               />
+              {editMemberErrors.phone && (
+                <span style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", display: "block" }}>
+                  {editMemberErrors.phone}
+                </span>
+              )}
             </div>
             <div
               style={{
@@ -6798,9 +6863,18 @@ export function OwnerTenantDashboardView({
               className="input-field"
               placeholder="e.g. John Doe"
               value={profileFullName}
-              onChange={(e) => setProfileFullName(e.target.value)}
+              onChange={(e) => {
+                setProfileFullName(e.target.value);
+                if (profileFieldErrors.full_name) setProfileFieldErrors((prev) => ({ ...prev, full_name: "" }));
+              }}
+              style={{ borderColor: profileFieldErrors.full_name ? "#EF4444" : undefined }}
               required
             />
+            {profileFieldErrors.full_name && (
+              <span style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", display: "block" }}>
+                {profileFieldErrors.full_name}
+              </span>
+            )}
           </div>
 
           <div>
@@ -6828,8 +6902,17 @@ export function OwnerTenantDashboardView({
               className="input-field"
               placeholder="e.g. +91 98765 43210"
               value={profilePhone}
-              onChange={(e) => setProfilePhone(e.target.value)}
+              onChange={(e) => {
+                setProfilePhone(e.target.value);
+                if (profileFieldErrors.phone) setProfileFieldErrors((prev) => ({ ...prev, phone: "" }));
+              }}
+              style={{ borderColor: profileFieldErrors.phone ? "#EF4444" : undefined }}
             />
+            {profileFieldErrors.phone && (
+              <span style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", display: "block" }}>
+                {profileFieldErrors.phone}
+              </span>
+            )}
           </div>
 
           <div style={{ borderTop: "1px solid var(--border-standard)", paddingTop: "1rem" }}>
@@ -6846,8 +6929,17 @@ export function OwnerTenantDashboardView({
                   className="input-field"
                   placeholder="e.g. Jane Doe"
                   value={profileEmergencyName}
-                  onChange={(e) => setProfileEmergencyName(e.target.value)}
+                  onChange={(e) => {
+                    setProfileEmergencyName(e.target.value);
+                    if (profileFieldErrors.emergency_name) setProfileFieldErrors((prev) => ({ ...prev, emergency_name: "" }));
+                  }}
+                  style={{ borderColor: profileFieldErrors.emergency_name ? "#EF4444" : undefined }}
                 />
+                {profileFieldErrors.emergency_name && (
+                  <span style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", display: "block" }}>
+                    {profileFieldErrors.emergency_name}
+                  </span>
+                )}
               </div>
               <div>
                 <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--brand-heading)", marginBottom: "0.25rem" }}>
@@ -6878,8 +6970,17 @@ export function OwnerTenantDashboardView({
                 className="input-field"
                 placeholder="e.g. +91 98765 43211"
                 value={profileEmergencyPhone}
-                onChange={(e) => setProfileEmergencyPhone(e.target.value)}
+                onChange={(e) => {
+                  setProfileEmergencyPhone(e.target.value);
+                  if (profileFieldErrors.emergency_phone) setProfileFieldErrors((prev) => ({ ...prev, emergency_phone: "" }));
+                }}
+                style={{ borderColor: profileFieldErrors.emergency_phone ? "#EF4444" : undefined }}
               />
+              {profileFieldErrors.emergency_phone && (
+                <span style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", display: "block" }}>
+                  {profileFieldErrors.emergency_phone}
+                </span>
+              )}
             </div>
           </div>
 

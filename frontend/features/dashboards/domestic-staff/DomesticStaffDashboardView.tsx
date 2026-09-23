@@ -181,7 +181,7 @@ export function DomesticStaffDashboardView({
     } else if (trimmedName.length < 2) {
       errors.full_name = "Full name must be at least 2 characters.";
     } else if (!isValidPersonName(trimmedName)) {
-      errors.full_name = "Full name must contain only alphabetic letters and spaces.";
+      errors.full_name = "Please enter a valid full name (at least 2 characters).";
     }
 
     // Phone validation
@@ -199,7 +199,7 @@ export function DomesticStaffDashboardView({
     } else if (trimmedEmergName.length < 2) {
       errors.emergency_name = "Emergency contact name must be at least 2 characters.";
     } else if (!isValidPersonName(trimmedEmergName)) {
-      errors.emergency_name = "Emergency contact name must contain only alphabetic letters and spaces.";
+      errors.emergency_name = "Please enter a valid emergency contact name (at least 2 characters).";
     }
 
     // Emergency Contact Phone validation

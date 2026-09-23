@@ -341,11 +341,13 @@ export function getAmenityIcon(
 }
 
 /**
- * Validates that a person's full name contains only alphabetical characters, spaces,
- * dots (e.g. initials), hyphens, and apostrophes (no numbers or special characters).
+ * Validates that a person's full name or contact name is valid (letters, spaces,
+ * dots, hyphens, parentheses, and apostrophes, at least 2 characters, no digits).
  */
 export function isValidPersonName(name: string): boolean {
   const trimmed = (name || "").trim();
   if (trimmed.length < 2) return false;
-  return /^[a-zA-Z\s.\-']+$/.test(trimmed) && (trimmed.match(/[a-zA-Z]/g) || []).length >= 2;
+  return /^[a-zA-Z\s.\-',()]+$/.test(trimmed) && (trimmed.match(/[a-zA-Z]/g) || []).length >= 2;
 }
+
+
