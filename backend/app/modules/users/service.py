@@ -284,6 +284,48 @@ class UserService:
             raise BusinessRuleError(
                 f"{role.slug} is a platform-global role", code="GLOBAL_ROLE_ONLY"
             )
+
+        existing_role_slugs = set(
+            (
+                await self.db.scalars(
+                    select(Role.slug)
+                    .join(UserRole, UserRole.role_id == Role.id)
+                    .where(UserRole.user_id == user.id)
+                )
+            ).all()
+        )
+
+        role_titles = {
+            "super_admin": "Super Admin",
+            "community_admin": "Community Admin",
+            "association_committee": "Association Committee",
+            "facility_manager": "Facility Manager",
+            "security_supervisor": "Security Supervisor",
+            "security_guard": "Security Guard",
+            "resident": "Resident",
+            "domestic_staff": "Domestic Staff",
+            "vendor_technician": "Vendor/Technician",
+            "auditor": "Auditor",
+        }
+
+        incompatible_pairs = [
+            ("security_guard", "vendor_technician"),
+            ("security_supervisor", "vendor_technician"),
+            ("security_guard", "domestic_staff"),
+            ("vendor_technician", "domestic_staff"),
+        ]
+
+        for r1, r2 in incompatible_pairs:
+            if role.slug == r1 and r2 in existing_role_slugs:
+                raise BusinessRuleError(
+                    f"First revoke the {role_titles.get(r2, r2)} role, then {role_titles.get(r1, r1)} can be granted.",
+                    code="INCOMPATIBLE_ROLE",
+                )
+            if role.slug == r2 and r1 in existing_role_slugs:
+                raise BusinessRuleError(
+                    f"First revoke the {role_titles.get(r1, r1)} role, then {role_titles.get(r2, r2)} can be granted.",
+                    code="INCOMPATIBLE_ROLE",
+                )
         dupe = await self.db.scalar(
             select(UserRole).where(
                 UserRole.user_id == user.id,

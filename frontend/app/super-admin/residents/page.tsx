@@ -699,7 +699,15 @@ export default function ResidentsPage() {
                   <select
                     className="input-field"
                     value={occupancyRole}
-                    onChange={(e) => setOccupancyRole(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setOccupancyRole(val);
+                      if (val === "secondary_owner" || val === "occupant") {
+                        setIsPrimary(false);
+                      } else if (val === "primary_owner") {
+                        setIsPrimary(true);
+                      }
+                    }}
                     style={{
                       width: "100%",
                       padding: "0.5rem 0.75rem",
@@ -712,7 +720,6 @@ export default function ResidentsPage() {
                     <option value="primary_owner">Primary Owner</option>
                     <option value="secondary_owner">Secondary Owner / Co-Owner</option>
                     <option value="tenant">Tenant / Renter</option>
-                    <option value="family">Family Member</option>
                     <option value="occupant">Occupant</option>
                   </select>
                 </div>

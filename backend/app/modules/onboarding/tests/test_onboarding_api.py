@@ -182,3 +182,60 @@ def test_add_and_remove_tenant_directly(as_role, seed_ids, unique_code):
             assert grant is None
     finally:
         _cleanup_email(email)
+
+
+def test_regenerate_and_revoke_invitation_flow(as_role, seed_ids, unique_code):
+    ca = as_role("community_admin")
+    community_id = seed_ids["community_id"]
+    unit_id = _a_unit_in(community_id)
+    email = f"regen-{unique_code}@example.com"
+    try:
+        # Create invitation
+        r = ca.post(
+            f"{P}/communities/{community_id}/invitations",
+            json={
+                "unit_id": unit_id,
+                "invited_email": email,
+                "full_name": "Regen Test User",
+                "occupancy_role": "tenant",
+                "is_primary": False,
+            },
+        )
+        assert r.status_code == 201, r.text
+        inv_id = r.json()["data"]["id"]
+        original_token = r.json()["data"]["token"]
+        assert original_token
+
+        # List invitations -> verify populated
+        r_list = ca.get(f"{P}/communities/{community_id}/invitations")
+        assert r_list.status_code == 200, r_list.text
+        invs = r_list.json()["data"]
+        matching = [i for i in invs if i["id"] == inv_id]
+        assert len(matching) == 1
+        assert matching[0]["invited_email"] == email.lower()
+
+        # Regenerate invitation link
+        r_regen = ca.post(f"{P}/communities/{community_id}/invitations/{inv_id}/regenerate")
+        assert r_regen.status_code == 200, r_regen.text
+        data = r_regen.json()["data"]
+        new_token = data["token"]
+        assert new_token != original_token
+        assert data["accept_url"].endswith(new_token)
+        assert data["status"] == "pending"
+
+        # Public view works with new token
+        pub = TestClient(app)
+        rv = pub.get(f"{P}/invitations/{new_token}")
+        assert rv.status_code == 200, rv.text
+        assert rv.json()["data"]["invited_email"] == email.lower()
+
+        # Revoke invitation
+        r_rev = ca.post(f"{P}/communities/{community_id}/invitations/{inv_id}/revoke")
+        assert r_rev.status_code == 200, r_rev.text
+        assert r_rev.json()["data"]["status"] == "revoked"
+
+        # Cannot regenerate a revoked invitation -> 400/422
+        r_regen_rev = ca.post(f"{P}/communities/{community_id}/invitations/{inv_id}/regenerate")
+        assert r_regen_rev.status_code in (400, 422), r_regen_rev.text
+    finally:
+        _cleanup_email(email)
