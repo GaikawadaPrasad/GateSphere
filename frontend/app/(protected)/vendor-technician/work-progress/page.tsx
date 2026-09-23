@@ -34,6 +34,7 @@ export default function VendorWorkProgressPage() {
           title: t.subject || "Service Ticket",
           facility: t.vendor_name || "Community Grounds",
           location: t.description || "Community Facility",
+          priority: (t.priority || "medium").toUpperCase(),
           status: t.status || "created",
         })),
       );

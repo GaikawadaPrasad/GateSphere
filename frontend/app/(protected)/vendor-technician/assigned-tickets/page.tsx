@@ -59,11 +59,11 @@ export default function VendorAssignedTicketsPage() {
   const filteredTickets = useMemo(() => {
     return tickets.filter((t) => {
       const matchSearch =
-        t.ticket_number.toLowerCase().includes(search.toLowerCase()) ||
-        t.title.toLowerCase().includes(search.toLowerCase()) ||
-        t.facility.toLowerCase().includes(search.toLowerCase());
+        (t.ticket_number || "").toLowerCase().includes(search.toLowerCase()) ||
+        (t.title || t.subject || "").toLowerCase().includes(search.toLowerCase()) ||
+        (t.facility || "").toLowerCase().includes(search.toLowerCase());
       const matchPriority =
-        priorityFilter === "all" || t.priority.toLowerCase() === priorityFilter.toLowerCase();
+        priorityFilter === "all" || (t.priority || "").toLowerCase() === priorityFilter.toLowerCase();
       return matchSearch && matchPriority;
     });
   }, [tickets, search, priorityFilter]);
