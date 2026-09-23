@@ -35,24 +35,89 @@ export default function SecuritySupervisorGuardManagementPage() {
   const [newStatus, setNewStatus] = useState("active");
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // Schedule New Shift Modal
+  // Schedule New Shift Modal (Predefined Standard Shifts - GS-002)
   const STANDARD_SHIFTS = [
-    { id: "morning", label: "Morning Shift (06:00 - 14:00)", start: "06:00", end: "14:00" },
-    { id: "general", label: "General / Day Shift (08:00 - 16:00)", start: "08:00", end: "16:00" },
-    { id: "afternoon", label: "Afternoon / Evening Shift (14:00 - 22:00)", start: "14:00", end: "22:00" },
-    { id: "night", label: "Night Shift (16:00 - 00:00)", start: "16:00", end: "23:59" },
-    { id: "custom", label: "Custom Shift Timing", start: "", end: "" },
+    {
+      id: "morning",
+      label: "Morning Shift (06:00 - 14:00)",
+      start: "06:00",
+      end: "14:00",
+      startLabel: "06:00 AM (Morning Shift Start)",
+      endLabel: "02:00 PM / 14:00 (Morning Shift End)",
+    },
+    {
+      id: "general",
+      label: "General / Day Shift (08:00 - 16:00)",
+      start: "08:00",
+      end: "16:00",
+      startLabel: "08:00 AM (General Shift Start)",
+      endLabel: "04:00 PM / 16:00 (General Shift End)",
+    },
+    {
+      id: "afternoon",
+      label: "Afternoon / Evening Shift (14:00 - 22:00)",
+      start: "14:00",
+      end: "22:00",
+      startLabel: "02:00 PM / 14:00 (Afternoon Shift Start)",
+      endLabel: "10:00 PM / 22:00 (Afternoon Shift End)",
+    },
+    {
+      id: "night",
+      label: "Night Shift (22:00 - 06:00)",
+      start: "22:00",
+      end: "06:00",
+      startLabel: "10:00 PM / 22:00 (Night Shift Start)",
+      endLabel: "06:00 AM / 06:00 (Night Shift End)",
+    },
   ];
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedGuardId, setSelectedGuardId] = useState("");
   const [manualGuardId, setManualGuardId] = useState("");
   const [shiftDate, setShiftDate] = useState(() => new Date().toISOString().split("T")[0]);
-  const [selectedShiftPreset, setSelectedShiftPreset] = useState("general");
-  const [shiftStart, setShiftStart] = useState("08:00");
-  const [shiftEnd, setShiftEnd] = useState("16:00");
+  const [selectedShiftPreset, setSelectedShiftPreset] = useState("morning");
+  const [shiftStart, setShiftStart] = useState("06:00");
+  const [shiftEnd, setShiftEnd] = useState("14:00");
   const [shiftNotes, setShiftNotes] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+
+  const handleShiftPresetChange = (presetId: string) => {
+    setSelectedShiftPreset(presetId);
+    const preset = STANDARD_SHIFTS.find((s) => s.id === presetId);
+    if (preset) {
+      setShiftStart(preset.start);
+      setShiftEnd(preset.end);
+    }
+  };
+
+  const handleShiftStartChange = (startVal: string) => {
+    setShiftStart(startVal);
+    const matched = STANDARD_SHIFTS.find((s) => s.start === startVal);
+    if (matched) {
+      setSelectedShiftPreset(matched.id);
+      setShiftEnd(matched.end);
+    }
+  };
+
+  const handleShiftEndChange = (endVal: string) => {
+    setShiftEnd(endVal);
+    const matched = STANDARD_SHIFTS.find((s) => s.end === endVal);
+    if (matched) {
+      setSelectedShiftPreset(matched.id);
+      setShiftStart(matched.start);
+    }
+  };
+
+  const handleOpenScheduleModal = () => {
+    setSelectedGuardId(guardsList[0]?.id || "");
+    setManualGuardId("");
+    setShiftDate(new Date().toISOString().split("T")[0]);
+    setSelectedShiftPreset("morning");
+    setShiftStart("06:00");
+    setShiftEnd("14:00");
+    setShiftNotes("");
+    setIsCreateModalOpen(true);
+  };
 
   // Register New Guard Modal
   const [isRegisterGuardOpen, setIsRegisterGuardOpen] = useState(false);
@@ -330,7 +395,7 @@ export default function SecuritySupervisorGuardManagementPage() {
             <button className="btn btn-secondary" onClick={handleOpenRegisterGuard}>
               👮 + Register Security Guard
             </button>
-            <button className="btn btn-primary" onClick={() => setIsCreateModalOpen(true)}>
+            <button className="btn btn-primary" onClick={handleOpenScheduleModal}>
               ➕ Schedule Guard Shift
             </button>
           </div>
@@ -461,15 +526,8 @@ export default function SecuritySupervisorGuardManagementPage() {
             <select
               className="select-field"
               value={selectedShiftPreset}
-              onChange={(e) => {
-                const val = e.target.value;
-                setSelectedShiftPreset(val);
-                const preset = STANDARD_SHIFTS.find((s) => s.id === val);
-                if (preset && preset.id !== "custom") {
-                  setShiftStart(preset.start);
-                  setShiftEnd(preset.end);
-                }
-              }}
+              onChange={(e) => handleShiftPresetChange(e.target.value)}
+              required
             >
               {STANDARD_SHIFTS.map((shift) => (
                 <option key={shift.id} value={shift.id}>
@@ -501,29 +559,14 @@ export default function SecuritySupervisorGuardManagementPage() {
               <select
                 className="select-field"
                 value={shiftStart}
-                onChange={(e) => {
-                  setShiftStart(e.target.value);
-                  setSelectedShiftPreset("custom");
-                }}
+                onChange={(e) => handleShiftStartChange(e.target.value)}
                 required
               >
-                <option value="06:00">06:00 AM</option>
-                <option value="07:00">07:00 AM</option>
-                <option value="08:00">08:00 AM</option>
-                <option value="10:00">10:00 AM</option>
-                <option value="12:00">12:00 PM</option>
-                <option value="14:00">02:00 PM (14:00)</option>
-                <option value="16:00">04:00 PM (16:00)</option>
-                <option value="18:00">06:00 PM (18:00)</option>
-                <option value="20:00">08:00 PM (20:00)</option>
-                <option value="22:00">10:00 PM (22:00)</option>
-                <option value="23:00">11:00 PM (23:00)</option>
-                {![
-                  "06:00", "07:00", "08:00", "10:00", "12:00",
-                  "14:00", "16:00", "18:00", "20:00", "22:00", "23:00"
-                ].includes(shiftStart) && (
-                  <option value={shiftStart}>{shiftStart}</option>
-                )}
+                {STANDARD_SHIFTS.map((shift) => (
+                  <option key={shift.id} value={shift.start}>
+                    {shift.startLabel}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -541,28 +584,37 @@ export default function SecuritySupervisorGuardManagementPage() {
               <select
                 className="select-field"
                 value={shiftEnd}
-                onChange={(e) => {
-                  setShiftEnd(e.target.value);
-                  setSelectedShiftPreset("custom");
-                }}
+                onChange={(e) => handleShiftEndChange(e.target.value)}
                 required
               >
-                <option value="12:00">12:00 PM</option>
-                <option value="14:00">02:00 PM (14:00)</option>
-                <option value="15:00">03:00 PM (15:00)</option>
-                <option value="16:00">04:00 PM (16:00)</option>
-                <option value="18:00">06:00 PM (18:00)</option>
-                <option value="20:00">08:00 PM (20:00)</option>
-                <option value="22:00">10:00 PM (22:00)</option>
-                <option value="23:59">12:00 AM (23:59)</option>
-                {![
-                  "12:00", "14:00", "15:00", "16:00", "18:00",
-                  "20:00", "22:00", "23:59"
-                ].includes(shiftEnd) && (
-                  <option value={shiftEnd}>{shiftEnd}</option>
-                )}
+                {STANDARD_SHIFTS.map((shift) => (
+                  <option key={shift.id} value={shift.end}>
+                    {shift.endLabel}
+                  </option>
+                ))}
               </select>
             </div>
+          </div>
+
+          <div
+            style={{
+              padding: "0.6rem 0.85rem",
+              borderRadius: "6px",
+              background: "#F0FDF4",
+              border: "1px solid #BBF7D0",
+              color: "#166534",
+              fontSize: "0.8rem",
+              marginBottom: "1rem",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+            }}
+          >
+            <span>⏱️</span>
+            <span>
+              <strong>Standardized 8-Hour Guard Shift:</strong> {shiftStart} to {shiftEnd} (
+              {STANDARD_SHIFTS.find((s) => s.id === selectedShiftPreset)?.label || "Standard Shift"})
+            </span>
           </div>
 
           <div>

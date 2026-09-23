@@ -116,7 +116,13 @@ export function OwnerTenantDashboardView({
   const [amenityBookingModalOpen, setAmenityBookingModalOpen] = useState(false);
   const [bookingToCancel, setBookingToCancel] = useState<AmenityBooking | null>(null);
   const [selectedAmenity, setSelectedAmenity] = useState<Amenity | null>(null);
-  const todayDateStr = new Date().toISOString().split("T")[0];
+  const todayDateStr = (() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(now.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  })();
   const [bookingDate, setBookingDate] = useState(todayDateStr);
   const [selectedSlotId, setSelectedSlotId] = useState<string>("");
   const [bookingGuests, setBookingGuests] = useState<number>(1);
@@ -797,6 +803,22 @@ export function OwnerTenantDashboardView({
     (s) => s.is_active && s.day_of_week === currentDayOfWeek
   );
 
+  // Helper to determine if a slot has already completed / elapsed on the given date
+  const isSlotInPast = (slot: AmenitySlot | undefined, dateStr: string) => {
+    if (!slot || !dateStr) return false;
+    if (dateStr < todayDateStr) return true;
+    if (dateStr === todayDateStr) {
+      const now = new Date();
+      const currentHour = now.getHours();
+      const currentMin = now.getMinutes();
+      const currentTimeMinutes = currentHour * 60 + currentMin;
+      const [sHour, sMin] = (slot.start_time || "00:00").split(":").map((v) => parseInt(v, 10));
+      const slotStartMinutes = (sHour || 0) * 60 + (sMin || 0);
+      return slotStartMinutes <= currentTimeMinutes;
+    }
+    return false;
+  };
+
   // Real database slots filtered for the selected reservation day of week
   const availableDaySlots: AmenitySlot[] = React.useMemo(() => {
     return rawDaySlots;
@@ -805,10 +827,11 @@ export function OwnerTenantDashboardView({
   useEffect(() => {
     if (availableDaySlots.length > 0) {
       setSelectedSlotId((prev) => {
-        if (prev && availableDaySlots.some((s) => s.id === prev)) {
+        if (prev && availableDaySlots.some((s) => s.id === prev && !isSlotInPast(s, bookingDate))) {
           return prev;
         }
-        return availableDaySlots[0].id;
+        const firstUpcoming = availableDaySlots.find((s) => !isSlotInPast(s, bookingDate));
+        return firstUpcoming ? firstUpcoming.id : availableDaySlots[0].id;
       });
     } else {
       setSelectedSlotId("");
@@ -818,6 +841,9 @@ export function OwnerTenantDashboardView({
   const activeSelectedSlot =
     availableDaySlots.find((s) => s.id === selectedSlotId) || availableDaySlots[0];
   const slotTotalCapacity = activeSelectedSlot?.capacity || selectedAmenity?.capacity || 20;
+
+  const isDateInPast = bookingDate < todayDateStr;
+  const isSelectedSlotPast = isSlotInPast(activeSelectedSlot, bookingDate);
 
   const bookedParticipantCount = (amenities.bookings.data || [])
     .filter(
@@ -844,10 +870,22 @@ export function OwnerTenantDashboardView({
   const handleBookAmenity = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedAmenity) return;
+
+    if (bookingDate < todayDateStr) {
+      toast.error("Cannot book a completed or past date. Please select today or a future date.", "Invalid Date");
+      return;
+    }
+
     if (!activeSelectedSlot) {
       toast.error("Please select an available time slot for this date.", "Slot Required");
       return;
     }
+
+    if (isSlotInPast(activeSelectedSlot, bookingDate)) {
+      toast.error("Cannot book a completed or past time slot. Please choose an upcoming time slot.", "Time Slot Expired");
+      return;
+    }
+
     if (bookingGuests > remainingSpots) {
       toast.error(
         `Only ${remainingSpots} spot(s) remaining for this slot. Please reduce the number of people.`,
@@ -6208,6 +6246,7 @@ export function OwnerTenantDashboardView({
                   required
                 >
                   {availableDaySlots.map((s) => {
+                    const isPast = isSlotInPast(s, bookingDate);
                     const slotCap = s.capacity || selectedAmenity?.capacity || 20;
                     const bookedForThisSlot = (amenities.bookings.data || [])
                       .filter(
@@ -6220,13 +6259,18 @@ export function OwnerTenantDashboardView({
                       .reduce((sum, b) => sum + (b.guests_count || 1), 0);
                     const spotsLeft = Math.max(0, slotCap - bookedForThisSlot);
                     const isFull = spotsLeft <= 0;
+                    const isDisabled = isPast || isFull;
                     const startHour = parseInt((s.start_time || "06:00").split(":")[0], 10);
                     const periodName = startHour < 12 ? "Morning" : startHour < 17 ? "Afternoon" : "Evening";
                     const feeText = s.fee && Number(s.fee) > 0 ? ` • ${formatCurrency(s.fee)}` : "";
-                    const capacityStatus = isFull ? " (🔴 Fully Booked)" : ` (${spotsLeft} of ${slotCap} spots left)`;
+                    const capacityStatus = isPast
+                      ? " (⏰ Completed / Past Slot)"
+                      : isFull
+                        ? " (🔴 Fully Booked)"
+                        : ` (${spotsLeft} of ${slotCap} spots left)`;
 
                     return (
-                      <option key={s.id} value={s.id} disabled={isFull}>
+                      <option key={s.id} value={s.id} disabled={isDisabled}>
                         {formatSlotTime(s.start_time)} – {formatSlotTime(s.end_time)} ({periodName}){feeText} — {capacityStatus}
                       </option>
                     );
@@ -6238,8 +6282,8 @@ export function OwnerTenantDashboardView({
                   <div
                     style={{
                       padding: "0.65rem 0.85rem",
-                      background: "#F8FAFC",
-                      border: "1px solid var(--border-standard)",
+                      background: isSelectedSlotPast ? "#FEF2F2" : "#F8FAFC",
+                      border: `1px solid ${isSelectedSlotPast ? "#FECACA" : "var(--border-standard)"}`,
                       borderRadius: "8px",
                       display: "flex",
                       justifyContent: "space-between",
@@ -6248,7 +6292,7 @@ export function OwnerTenantDashboardView({
                   >
                     <div>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                        <strong style={{ fontSize: "13.5px", color: "var(--brand-heading)" }}>
+                        <strong style={{ fontSize: "13.5px", color: isSelectedSlotPast ? "#991B1B" : "var(--brand-heading)" }}>
                           {formatSlotTime(activeSelectedSlot.start_time)} – {formatSlotTime(activeSelectedSlot.end_time)}
                         </strong>
                         <span
@@ -6256,15 +6300,17 @@ export function OwnerTenantDashboardView({
                             fontSize: "10.5px",
                             padding: "0.1rem 0.4rem",
                             borderRadius: "4px",
-                            background: "#E2E8F0",
-                            color: "#334155",
+                            background: isSelectedSlotPast ? "#FEE2E2" : "#E2E8F0",
+                            color: isSelectedSlotPast ? "#991B1B" : "#334155",
                             fontWeight: 600,
                           }}
                         >
-                          {(() => {
-                            const startHour = parseInt((activeSelectedSlot.start_time || "06:00").split(":")[0], 10);
-                            return startHour < 12 ? "🌅 Morning" : startHour < 17 ? "☀️ Afternoon" : "🌙 Evening";
-                          })()}
+                          {isSelectedSlotPast
+                            ? "⏰ Completed Time Slot"
+                            : (() => {
+                                const startHour = parseInt((activeSelectedSlot.start_time || "06:00").split(":")[0], 10);
+                                return startHour < 12 ? "🌅 Morning" : startHour < 17 ? "☀️ Afternoon" : "🌙 Evening";
+                              })()}
                         </span>
                       </div>
                       {activeSelectedSlot.fee && Number(activeSelectedSlot.fee) > 0 && (
@@ -6275,7 +6321,11 @@ export function OwnerTenantDashboardView({
                     </div>
 
                     <div>
-                      {remainingSpots <= 0 ? (
+                      {isSelectedSlotPast ? (
+                        <span style={{ fontSize: "11.5px", fontWeight: 700, padding: "0.2rem 0.5rem", borderRadius: "9999px", background: "#FEE2E2", color: "#991B1B" }}>
+                          ⏰ Time Elapsed
+                        </span>
+                      ) : remainingSpots <= 0 ? (
                         <span style={{ fontSize: "11.5px", fontWeight: 700, padding: "0.2rem 0.5rem", borderRadius: "9999px", background: "#FEE2E2", color: "#991B1B" }}>
                           🔴 Slot Full (0 Left)
                         </span>
@@ -6319,7 +6369,7 @@ export function OwnerTenantDashboardView({
                 className="btn btn-secondary"
                 style={{ width: 38, height: 38, padding: 0, fontSize: "1.2rem", fontWeight: 700 }}
                 onClick={() => setBookingGuests((prev) => Math.max(1, prev - 1))}
-                disabled={bookingGuests <= 1}
+                disabled={bookingGuests <= 1 || isDateInPast || isSelectedSlotPast}
               >
                 –
               </button>
@@ -6336,6 +6386,7 @@ export function OwnerTenantDashboardView({
                     setBookingGuests(Math.max(1, Math.min(val, Math.max(1, remainingSpots))));
                   }
                 }}
+                disabled={isDateInPast || isSelectedSlotPast}
                 required
               />
               <button
@@ -6343,7 +6394,7 @@ export function OwnerTenantDashboardView({
                 className="btn btn-secondary"
                 style={{ width: 38, height: 38, padding: 0, fontSize: "1.2rem", fontWeight: 700 }}
                 onClick={() => setBookingGuests((prev) => Math.min(remainingSpots, prev + 1))}
-                disabled={bookingGuests >= remainingSpots}
+                disabled={bookingGuests >= remainingSpots || isDateInPast || isSelectedSlotPast}
               >
                 +
               </button>
@@ -6367,10 +6418,10 @@ export function OwnerTenantDashboardView({
                       background: bookingGuests === num ? "#EFF6FF" : "#F8FAFC",
                       color: bookingGuests === num ? "#1D4ED8" : "var(--brand-heading)",
                       fontWeight: 600,
-                      cursor: num > remainingSpots ? "not-allowed" : "pointer",
-                      opacity: num > remainingSpots ? 0.4 : 1,
+                      cursor: num > remainingSpots || isDateInPast || isSelectedSlotPast ? "not-allowed" : "pointer",
+                      opacity: num > remainingSpots || isDateInPast || isSelectedSlotPast ? 0.4 : 1,
                     }}
-                    disabled={num > remainingSpots}
+                    disabled={num > remainingSpots || isDateInPast || isSelectedSlotPast}
                     onClick={() => setBookingGuests(num)}
                   >
                     {num} {num === 1 ? "Person" : "People"}
@@ -6390,8 +6441,10 @@ export function OwnerTenantDashboardView({
                       background: bookingGuests === remainingSpots ? "#EFF6FF" : "#F8FAFC",
                       color: bookingGuests === remainingSpots ? "#1D4ED8" : "var(--brand-heading)",
                       fontWeight: 600,
-                      cursor: "pointer",
+                      cursor: isDateInPast || isSelectedSlotPast ? "not-allowed" : "pointer",
+                      opacity: isDateInPast || isSelectedSlotPast ? 0.4 : 1,
                     }}
+                    disabled={isDateInPast || isSelectedSlotPast}
                     onClick={() => setBookingGuests(remainingSpots)}
                   >
                     Max ({remainingSpots})
@@ -6401,7 +6454,19 @@ export function OwnerTenantDashboardView({
             </div>
 
             {/* Validation helper alert */}
-            {remainingSpots <= 0 ? (
+            {isDateInPast ? (
+              <p
+                style={{ fontSize: "12px", color: "#DC2626", marginTop: "0.4rem", fontWeight: 600 }}
+              >
+                ⚠️ Cannot book a completed or past date. Please select today or an upcoming date.
+              </p>
+            ) : isSelectedSlotPast ? (
+              <p
+                style={{ fontSize: "12px", color: "#DC2626", marginTop: "0.4rem", fontWeight: 600 }}
+              >
+                ⚠️ Cannot book a completed or past time slot. Please choose an upcoming time slot.
+              </p>
+            ) : remainingSpots <= 0 ? (
               <p
                 style={{ fontSize: "12px", color: "#DC2626", marginTop: "0.4rem", fontWeight: 600 }}
               >
@@ -6443,6 +6508,8 @@ export function OwnerTenantDashboardView({
               type="submit"
               isLoading={amenities.book.isPending}
               disabled={
+                isDateInPast ||
+                isSelectedSlotPast ||
                 !activeSelectedSlot ||
                 remainingSpots <= 0 ||
                 bookingGuests > remainingSpots ||

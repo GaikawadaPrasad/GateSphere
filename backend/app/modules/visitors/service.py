@@ -233,19 +233,28 @@ class VisitorService(UnitScopedAccess):
         _enum("risk_level", payload.risk_level)
         clean_phone = payload.phone.strip() if payload.phone else ""
         norm_id = normalize_id_number(payload.id_number)
+        if not norm_id and payload.vehicle_number:
+            norm_id = normalize_id_number(payload.vehicle_number)
+
+        reason = payload.reason
+        if payload.vehicle_number:
+            v_clean = payload.vehicle_number.strip().upper()
+            if f"Vehicle: {v_clean}" not in reason and v_clean not in reason:
+                reason = f"{reason} (Vehicle: {v_clean})"
+
         obj = VisitorBlacklist(
             community_id=cid,
             visitor_id=payload.visitor_id,
             phone_hash=digest(clean_phone) if clean_phone else "",
             id_number_hash=digest_opt(norm_id),
-            reason=payload.reason,
+            reason=reason,
             risk_level=payload.risk_level,
             active_until=payload.active_until.date() if payload.active_until else None,
             created_by_user_id=self.actor.id,
         )
         await self.blacklist.add(obj)
         await self._audit(
-            "blacklist.add", cid, "visitor_blacklist", obj.id, new={"reason": payload.reason}
+            "blacklist.add", cid, "visitor_blacklist", obj.id, new={"reason": reason}
         )
         return obj
 
@@ -284,21 +293,40 @@ class VisitorService(UnitScopedAccess):
             hit = await self._blacklist_hit(cid, phone, id_number or None)
         elif id_number:
             norm_id = normalize_id_number(id_number)
-            hit = await self.blacklist.match(cid, "", digest_opt(norm_id))
+            hit = await self.blacklist.match(cid, "", digest_opt(norm_id), query=id_number)
         elif query:
             clean_phone = re.sub(r"[^\d+]", "", query)
             norm_q = normalize_id_number(query)
             if clean_phone and len(clean_phone) >= 7:
                 hit = await self._blacklist_hit(cid, clean_phone, query)
             if not hit:
-                hit = await self.blacklist.match(cid, "", digest_opt(norm_q))
+                hit = await self.blacklist.match(cid, "", digest_opt(norm_q), query=query)
 
         if hit:
+            extracted_vehicle = None
+            extracted_name = None
+            if hit.reason:
+                v_match = re.search(r"\(Vehicle:\s*([^)]+)\)", hit.reason, re.IGNORECASE)
+                if v_match:
+                    extracted_vehicle = v_match.group(1).strip()
+                n_match = re.match(r"^([^:]+):", hit.reason)
+                if n_match:
+                    extracted_name = n_match.group(1).strip()
+
+            entry_data = {
+                "name": extracted_name or "Restricted Individual",
+                "vehicle_number": extracted_vehicle,
+                "reason": hit.reason,
+                "risk_level": hit.risk_level,
+                "active_since": str(hit.active_from) if hit.active_from else None,
+            }
             return {
                 "blacklisted": True,
                 "reason": hit.reason,
                 "risk_level": hit.risk_level,
                 "active_since": str(hit.active_from) if hit.active_from else None,
+                "entry": entry_data,
+                **entry_data,
             }
         return {"blacklisted": False}
 
@@ -386,6 +414,8 @@ class VisitorService(UnitScopedAccess):
         hit = await self._blacklist_hit(
             unit.community_id, visitor.phone, raw_id_num, visitor.id_number_hash
         )
+        if not hit and payload.vehicle_number:
+            hit = await self.blacklist.match(unit.community_id, query=payload.vehicle_number)
         if hit and policy.blacklist_mode == "block":
             await self._audit(
                 "request.blacklisted",
