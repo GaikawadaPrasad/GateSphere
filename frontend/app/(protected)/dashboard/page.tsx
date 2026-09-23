@@ -64,14 +64,8 @@ export default function DashboardPage() {
             type="button"
             className="btn btn-secondary"
             disabled={logout.isPending}
-            onClick={async () => {
-              try {
-                await logout.mutateAsync();
-              } catch {
-                // Ignore sign out network error and proceed to login
-              }
-              router.replace("/login");
-            }}
+            // useLogout hard-navigates to /login on success and failure.
+            onClick={() => logout.mutate()}
           >
             {logout.isPending ? "Signing out…" : "Sign out"}
           </button>

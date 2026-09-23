@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMe, useLogout } from "@/hooks/use-auth";
 import { useCommunities, useCommunityDetails } from "@/hooks/use-communities";
@@ -41,7 +40,6 @@ function getCategoryIcon(category?: string) {
 }
 
 export function Header() {
-  const router = useRouter();
   const queryClient = useQueryClient();
   const { data: user } = useMe();
   const logout = useLogout();
@@ -52,12 +50,10 @@ export function Header() {
   const notifDropdownRef = useRef<HTMLDivElement>(null);
 
   const { data: allNotifications = [] } = useMyNotifications();
-  const { data: unreadNotifications = [] } = useMyNotifications({ unread_only: true });
-  const { data: serverUnreadCount = 0 } = useUnreadNotificationCount();
+  const { data: unreadCount = 0 } = useUnreadNotificationCount();
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();
 
-  const unreadCount = serverUnreadCount ?? unreadNotifications?.length ?? 0;
   const isSuperAdmin = Boolean(user?.is_superadmin || user?.active_role === "super_admin");
   const { data: communities } = useCommunities(undefined, { enabled: isSuperAdmin });
 
@@ -92,14 +88,8 @@ export function Header() {
 
   const { data: currentCommunity } = useCommunityDetails(effectiveCommunityId || undefined);
 
-  const handleSignOut = async () => {
-    try {
-      await logout.mutateAsync();
-      router.replace("/login");
-    } catch {
-      router.replace("/login");
-    }
-  };
+  // useLogout hard-navigates to /login on success *and* failure — don't navigate here.
+  const handleSignOut = () => logout.mutate();
 
   const roleName = user?.active_role
     ? user.active_role.replace(/_/g, " ").toUpperCase()
@@ -107,8 +97,12 @@ export function Header() {
       ? "SUPER ADMIN"
       : "USER";
 
+  // "Unread" tab filters the already-fetched recent list (same read test as the row below)
+  // rather than polling a second list endpoint; the badge uses the server-side total.
   const displayedNotifications = (
-    notifFilter === "unread" ? unreadNotifications : allNotifications
+    notifFilter === "unread"
+      ? (allNotifications as AppNotification[]).filter((n) => !n.is_read && !n.read)
+      : allNotifications
   ) as AppNotification[];
 
   return (

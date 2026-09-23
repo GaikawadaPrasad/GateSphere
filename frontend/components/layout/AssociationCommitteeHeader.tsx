@@ -163,14 +163,8 @@ export function AssociationCommitteeHeader() {
     }
   };
 
-  const handleSignOut = async () => {
-    try {
-      await logout.mutateAsync();
-      router.replace("/login");
-    } catch {
-      router.replace("/login");
-    }
-  };
+  // useLogout hard-navigates to /login on success *and* failure — don't navigate here.
+  const handleSignOut = () => logout.mutate();
 
   const getCategoryIcon = (category: string) => {
     switch (category) {

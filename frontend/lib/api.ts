@@ -176,6 +176,20 @@ export function setActiveRole(role: string | null): void {
   inMemoryActiveRole = role;
 }
 
+/**
+ * True when the browser holds *any* GateSphere session. The session cookie itself is
+ * HttpOnly, but the backend always sets and deletes the JS-readable CSRF cookie together
+ * with it (`app/core/security.py`), so "no CSRF cookie" means "no session": asking
+ * `/auth/me` would be a guaranteed 401. A present cookie is only a hint — the backend
+ * still decides whether the session is valid.
+ */
+export function hasSessionCookie(): boolean {
+  if (typeof document === "undefined") return false;
+  return document.cookie
+    .split(";")
+    .some((c) => /^(gs_csrf|gatesphere_[a-z0-9_]+_csrf)=/.test(c.trim()));
+}
+
 export function getCsrfToken(role?: string): string | null {
   if (typeof document === "undefined") return null;
   const cookieStr = document.cookie;
