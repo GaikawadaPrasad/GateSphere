@@ -404,7 +404,7 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
           >
             <StatMetric
               label="Open Audit Events"
-              value={stats?.open_audit_events ?? 14}
+              value={stats?.open_audit_events ?? rawLogs.length ?? 0}
               accentColor="#1D4ED8"
               icon="📋"
               description="Unresolved verification checkpoints"
@@ -412,7 +412,7 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
             />
             <StatMetric
               label="Actions Logged Today"
-              value={stats?.total_actions_today ?? 182}
+              value={stats?.total_actions_today ?? rawLogs.length ?? 0}
               accentColor="#0D9488"
               icon="⚡"
               description="Across all 20 domain modules"
@@ -420,7 +420,11 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
             />
             <StatMetric
               label="Flagged Gate Anomalies"
-              value={stats?.flagged_anomalies ?? 2}
+              value={
+                stats?.flagged_anomalies ??
+                gateEvents.filter((e: any) => e.anomaly_flag).length ??
+                0
+              }
               accentColor="#DC2626"
               icon="🚨"
               description="Open entries without exit match"
@@ -986,7 +990,16 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
           </div>
           <DataTable
             columns={[
-              { key: "id", header: "Incident ID", sortable: true },
+              {
+                key: "incident_number",
+                header: "Incident ID",
+                sortable: true,
+                render: (i) => (
+                  <span style={{ fontWeight: 600, fontFamily: "monospace", fontSize: "12.5px" }}>
+                    {i.incident_number || i.id}
+                  </span>
+                ),
+              },
               {
                 key: "type",
                 header: "Incident Type",

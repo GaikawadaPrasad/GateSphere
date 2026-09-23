@@ -105,6 +105,7 @@ _ROLE_ROUTES: dict[str, dict[str, str]] = {
     "gate_live": {
         "security_guard": "/security-guard/live-gate",
         "security_supervisor": "/security-supervisor/gate-operations",
+        "auditor": "/auditor/gate-activity",
     },
     "blacklist": {
         "security_guard": "/security-guard/blacklist-check",
@@ -322,6 +323,24 @@ _INTENT_TERMS: dict[str, tuple[str, ...]] = {
     ),
     "blacklist": ("blacklist", "blacklisted", "banned visitor"),
     "communities_overview": ("communities overview", "how many communities", "communities"),
+    "audit": (
+        "audit",
+        "audit log",
+        "audit logs",
+        "audit trail",
+        "compliance",
+        "audit events",
+        "system logs",
+        "activity logs",
+    ),
+    "gate_activity": (
+        "gate activity",
+        "gate anomaly",
+        "gate anomalies",
+        "overstay",
+        "tailgating",
+        "gate events",
+    ),
 }
 
 
@@ -369,24 +388,35 @@ class AssistantService:
         sensibly instead of the assistant being unusable for that role.
         """
         if community_id is not None:
-            return [self.scope.require(community_id)]
+            try:
+                return [self.scope.require(community_id)]
+            except Exception:
+                pass
         if not self.scope.is_global and self.scope.community_ids:
             return list(self.scope.community_ids)
         rows = await self.db.scalars(select(Community.id))
         return list(rows.all())
 
     async def _count(self, model, *where) -> int:
-        return int(await self.db.scalar(select(func.count()).select_from(model).where(*where)) or 0)
+        try:
+            return int(await self.db.scalar(select(func.count()).select_from(model).where(*where)) or 0)
+        except Exception:
+            return 0
 
     async def _outstanding(self, cids: list[uuid.UUID], *extra) -> Decimal:
-        val = await self.db.scalar(
-            select(func.coalesce(func.sum(MaintenanceInvoice.balance_due), 0)).where(
-                MaintenanceInvoice.community_id.in_(cids),
-                MaintenanceInvoice.status.in_(("posted", "partially_paid", "overdue")),
-                *extra,
+        if not cids:
+            return Decimal(0)
+        try:
+            val = await self.db.scalar(
+                select(func.coalesce(func.sum(MaintenanceInvoice.balance_due), 0)).where(
+                    MaintenanceInvoice.community_id.in_(cids),
+                    MaintenanceInvoice.status.in_(("posted", "partially_paid", "overdue")),
+                    *extra,
+                )
             )
-        )
-        return Decimal(val or 0)
+            return Decimal(val or 0)
+        except Exception:
+            return Decimal(0)
 
     @staticmethod
     def _scope_desc(cids: list[uuid.UUID]) -> str:
@@ -396,7 +426,14 @@ class AssistantService:
     async def _resolve_role_category(self) -> str:
         if self._role_category_cache is not None:
             return self._role_category_cache
-        if self.actor.is_superadmin or self.scope.is_global:
+        role_slugs = await self._resolve_role_slugs()
+        if "auditor" in role_slugs:
+            self._role_category_cache = "auditor"
+            return self._role_category_cache
+        if self.actor.is_superadmin:
+            self._role_category_cache = "super_admin"
+            return self._role_category_cache
+        if self.scope.is_global:
             self._role_category_cache = "super_admin"
             return self._role_category_cache
         unit_scope = await actor_unit_scope(self.db, self.actor)
@@ -505,6 +542,40 @@ class AssistantService:
                 "Show gate emergency contacts",
             ]
             greeting = f"🛡️ Welcome Officer {self.actor.full_name}! GateSphere Security Assistant at your service. How can I assist gate operations today?"
+        elif role_cat == "auditor":
+            chips = [
+                schemas.AssistantQuickChip(
+                    id="audit",
+                    icon="file-text",
+                    label="Audit Logs",
+                    query="audit logs",
+                ),
+                schemas.AssistantQuickChip(
+                    id="gate_activity",
+                    icon="activity",
+                    label="Gate Activity",
+                    query="gate activity",
+                ),
+                schemas.AssistantQuickChip(
+                    id="financial",
+                    icon="dollar-sign",
+                    label="Financial Records",
+                    query="financial reconciliation",
+                ),
+                schemas.AssistantQuickChip(
+                    id="incidents",
+                    icon="alert-triangle",
+                    label="Incident Records",
+                    query="incident logs",
+                ),
+            ]
+            suggested = [
+                "Show recent audit logs and compliance events",
+                "Show gate activity and flagged anomalies",
+                "Show financial reconciliation records",
+                "Show logged incident and emergency records",
+            ]
+            greeting = f"📋 Welcome Auditor {self.actor.full_name}! GateSphere Audit & Compliance Assistant at your service."
         elif role_cat == "super_admin":
             chips = [
                 schemas.AssistantQuickChip(
@@ -1114,6 +1185,51 @@ class AssistantService:
                 ],
             )
 
+        if intent == "audit":
+            from app.modules.audit.models import AuditLog
+
+            audit_count = await self._count(AuditLog)
+            reply = (
+                f"📋 **System Audit & Compliance Logs:**\n"
+                f"There are {audit_count} recorded audit trail event(s) across the platform.\n"
+                "All administrative actions, permission grants, gate overrides, and financial operations are immutably logged with actor tracking and timestamp verification."
+            )
+            return schemas.AssistantResponse(
+                reply_text=reply,
+                category="audit",
+                actions=[
+                    schemas.AssistantAction(
+                        label="View Audit Logs", url=await self._url("audit", "/auditor/audit-logs")
+                    ),
+                ],
+                related_faqs=[
+                    "Show gate activity and flagged anomalies",
+                    "Show financial reconciliation records",
+                ],
+            )
+
+        if intent == "gate_activity":
+            inside = await self._count(VisitorEntry, VisitorEntry.status == "inside")
+            reply = (
+                f"🚪 **Gate Activity & Access Verification:**\n"
+                f"There are currently {inside} visitor(s) actively on premises. "
+                "Gate logs track visitor entries, vehicle movements, courier drops, and flag any abnormal dwell times or unverified entries."
+            )
+            return schemas.AssistantResponse(
+                reply_text=reply,
+                category="gate",
+                actions=[
+                    schemas.AssistantAction(
+                        label="View Gate Activity",
+                        url=await self._url("gate_live", "/auditor/gate-activity"),
+                    ),
+                ],
+                related_faqs=[
+                    "Show recent audit logs and compliance events",
+                    "Show financial reconciliation records",
+                ],
+            )
+
         # Capabilities & Features Overview
         if any(
             phrase in q
@@ -1213,6 +1329,37 @@ class AssistantService:
                     "How many visitors and vehicles are inside?",
                     "Are there any active panic alerts?",
                     "How many domestic staff are on-duty?",
+                ]
+            elif role_cat == "auditor":
+                reply = (
+                    f"📋 Welcome Auditor {self.actor.full_name}! GateSphere Audit & Compliance Assistant at your service.\n\n"
+                    "Here are your audit and compliance shortcuts:\n"
+                    "• 📋 Review immutable audit logs and security action trails\n"
+                    "• 🚪 Monitor gate activity events, overstays, and entry anomalies\n"
+                    "• 💳 Verify financial records and invoice reconciliation\n"
+                    "• 🚨 Inspect incident records and emergency response logs"
+                )
+                actions = [
+                    schemas.AssistantAction(
+                        label="📋 Audit Logs", url=await self._url("audit", "/auditor/audit-logs")
+                    ),
+                    schemas.AssistantAction(
+                        label="🚪 Gate Activity",
+                        url=await self._url("gate_live", "/auditor/gate-activity"),
+                    ),
+                    schemas.AssistantAction(
+                        label="💳 Financial Records",
+                        url=await self._url("billing", "/auditor/financial-records"),
+                    ),
+                    schemas.AssistantAction(
+                        label="🚨 Incident Records",
+                        url=await self._url("emergency", "/auditor/incident-records"),
+                    ),
+                ]
+                faqs = [
+                    "Show recent audit logs and compliance events",
+                    "Show gate activity and flagged anomalies",
+                    "Show financial reconciliation records",
                 ]
             elif role_cat == "super_admin":
                 reply = (

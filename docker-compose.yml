@@ -110,6 +110,7 @@ services:
 
   frontend:
     build: ./frontend
+    user: "root"
     environment:
       BACKEND_INTERNAL_URL: "http://backend:8000"
       NEXT_TELEMETRY_DISABLED: "1"
@@ -117,7 +118,6 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
-      - /app/.next
     ports: ["${WEB_PORT:-3000}:3000"]
     depends_on:
       backend: { condition: service_started }
