@@ -618,6 +618,8 @@ export const complaintsApi = {
   tickets: (params?: ListQueryParams) =>
     apiGet<ServiceTicket[]>("/complaints/tickets", params as Record<string, unknown>),
   list: (params?: ListQueryParams) =>
+    apiGet<ServiceTicket[]>("/complaints/tickets", params as Record<string, unknown>),
+  listPaginated: (params?: ListQueryParams) =>
     apiGetPaginated<ServiceTicket[]>("/complaints/tickets", params as Record<string, unknown>),
   categories: (communityId?: string) =>
     apiGet<ServiceCategory[]>(
