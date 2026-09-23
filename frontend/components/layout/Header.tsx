@@ -29,11 +29,13 @@ export function Header() {
         ? "/vendor-technician/notifications"
         : pathname.startsWith("/security-guard")
           ? "/security-guard/notifications"
-          : pathname.startsWith("/security-supervisor")
-            ? "/security-supervisor/notifications"
-            : pathname.startsWith("/admin")
-              ? "/admin/notifications"
-              : "/owner-tenant/notifications";
+            : pathname.startsWith("/security-supervisor")
+              ? "/security-supervisor/notifications"
+              : pathname.startsWith("/facility-manager")
+                ? "/facility-manager/notifications"
+                : pathname.startsWith("/admin")
+                  ? "/admin/notifications"
+                  : "/owner-tenant/notifications";
 
   const assignedCommunityId =
     user?.community_ids?.[0] ||

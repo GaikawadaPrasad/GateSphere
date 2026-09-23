@@ -300,6 +300,7 @@ class ComplaintService(UnitScopedAccess):
         community_id: uuid.UUID | None,
         unit_id: uuid.UUID | None,
         ticket_status: str | None,
+        priority: str | None = None,
         q: str | None = None,
         offset: int,
         limit: int,
@@ -313,6 +314,8 @@ class ComplaintService(UnitScopedAccess):
             stmt = stmt.where(ServiceTicket.unit_id == unit_id)
         if ticket_status:
             stmt = stmt.where(ServiceTicket.status == ticket_status)
+        if priority:
+            stmt = stmt.where(ServiceTicket.priority == priority)
         if q:
             like = f"%{q}%"
             stmt = stmt.where(
@@ -383,6 +386,22 @@ class ComplaintService(UnitScopedAccess):
         await self._mark_first_response(ticket)
         await self.db.flush()
         await self._audit("ticket.assign", ticket.community_id, "service_ticket", ticket.id)
+
+        if payload.assigned_to_user_id:
+            await notif_events.emit(
+                self.db,
+                self.scope,
+                self.actor,
+                self.ctx,
+                recipient_user_id=payload.assigned_to_user_id,
+                community_id=ticket.community_id,
+                notification_type="ticket.assigned",
+                title=f"New Ticket: {ticket.ticket_number}",
+                message=f"You have been assigned to ticket: {ticket.subject}",
+                reference_type="ticket",
+                reference_id=ticket.id,
+            )
+
         return ticket
 
     async def transition_ticket(
