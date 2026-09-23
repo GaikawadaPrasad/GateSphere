@@ -21,7 +21,7 @@ import {
   isValidPersonName,
 } from "@/constants/locations";
 import { PasswordField } from "@/components/forms/PasswordField";
-import { generateInitialPassword } from "@/lib/utils";
+import { generateInitialPassword, PHONE_10_DIGIT_RE, toPhoneDigits } from "@/lib/utils";
 
 interface CreateCommunityModalProps {
   isOpen: boolean;
@@ -279,8 +279,8 @@ export function CreateCommunityModal({
     }
 
     const trimmedAdminPhone = adminPhone.trim();
-    if (trimmedAdminPhone && !/^[+0-9][0-9 \-]{4,19}$/.test(trimmedAdminPhone)) {
-      errs.adminPhone = "Phone must be 5-20 digits (e.g. +91 9876543210)";
+    if (trimmedAdminPhone && !PHONE_10_DIGIT_RE.test(trimmedAdminPhone)) {
+      errs.adminPhone = "Admin phone must be exactly 10 digits";
     }
 
     return errs;
@@ -1099,12 +1099,14 @@ export function CreateCommunityModal({
               <div>
                 {inputLabel("Admin Phone", false, true)}
                 <input
-                  type="text"
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
                   className="input-field"
-                  placeholder="e.g. +91 9876543210"
+                  placeholder="e.g. 9876543210"
                   value={adminPhone}
                   onChange={(e) => {
-                    setAdminPhone(e.target.value);
+                    setAdminPhone(toPhoneDigits(e.target.value));
                     if (!touched.adminPhone) setTouched((t) => ({ ...t, adminPhone: true }));
                   }}
                   onBlur={() => setTouched((t) => ({ ...t, adminPhone: true }))}

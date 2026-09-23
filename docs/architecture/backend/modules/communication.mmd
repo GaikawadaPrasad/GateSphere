@@ -13,9 +13,9 @@ flowchart TD
 
     subgraph ANN["Announcements"]
         direction TB
-        AN_L["GET /communication/announcements → list_announcements (?published_only)"]
+        AN_L["GET /communication/announcements → list_announcements (?status all/published/draft/expired, legacy ?published_only)<br/>_viewer_predicates: resident ⇒ is_published AND targeted (always)"]
         AN_C["POST /communication/announcements → create_announcement  [communication:create]<br/>_validate_targets (tower/unit/role/group must be in community);<br/>INSERT announcements + announcement_targets; audit"]
-        AN_G["GET /communication/announcements/{id} → get_announcement (repo _scoped)"]
+        AN_G["GET /communication/announcements/{id} → get_visible_announcement (repo _scoped)<br/>resident + (draft or untargeted) ⇒ 404 (AnnouncementRepository.matches)"]
         AN_U{"PATCH /communication/announcements/{id} → update_announcement  [communication:update]<br/>is_published?"}
         AN_U -->|yes| AN_UE["409 ALREADY_PUBLISHED (published = immutable)"]
         AN_U -->|no| AN_UU["apply patch; re-validate targets; audit"]

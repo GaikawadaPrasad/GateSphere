@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useUiStore } from "@/store/ui";
-import { useMyNotifications } from "@/hooks/use-notifications";
+import { useUnreadNotificationCount } from "@/hooks/use-notifications";
 
 const navItems = [
   { label: "Dashboard", href: "/community-admin/dashboard", icon: "📊" },
@@ -25,8 +25,7 @@ const navItems = [
 export function CommunityAdminSidebar() {
   const pathname = usePathname();
   const { sidebarOpen, toggleSidebar } = useUiStore();
-  const { data: notifications } = useMyNotifications({ unread_only: true });
-  const unreadCount = notifications?.length || 0;
+  const { data: unreadCount = 0 } = useUnreadNotificationCount();
 
   const handleLinkClick = (e: React.MouseEvent, href: string) => {
     if (pathname === href) {

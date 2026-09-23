@@ -4,7 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useUiStore } from "@/store/ui";
-import { useMyNotifications } from "@/hooks/use-notifications";
+import { useUnreadNotificationCount } from "@/hooks/use-notifications";
 import {
   AUDITOR_NAV,
   DOMESTIC_STAFF_NAV,
@@ -43,8 +43,7 @@ const COMMUNITY_ADMIN_NAV_ITEMS: NavItem[] = [
 export function Sidebar() {
   const pathname = usePathname();
   const { sidebarOpen, toggleSidebar } = useUiStore();
-  const { data: unreadNotifications } = useMyNotifications({ unread_only: true });
-  const unreadCount = unreadNotifications?.length || 0;
+  const { data: unreadCount = 0 } = useUnreadNotificationCount();
 
   // Determine current active dashboard
   let navConfig = {

@@ -21,7 +21,16 @@ import { DataTable, type Column } from "@/components/tables/DataTable";
 import { FilterPanel } from "@/components/common/FilterPanel";
 import { Modal } from "@/components/common/Modal";
 import { StatusBadge } from "@/components/common/StatusBadge";
-import type { MaintenanceInvoice, Payment, ChargeHead, UnitLedgerEntry } from "@/types/billing";
+import type {
+  MaintenanceInvoice,
+  Payment,
+  ChargeHead,
+  ChargeHeadCalculationType,
+  UnitLedgerEntry,
+} from "@/types/billing";
+import { CALCULATION_TYPE_LABELS } from "@/types/billing";
+import { InvoiceDetailModal } from "@/components/billing/InvoiceDetailModal";
+import { PaymentReceiptModal } from "@/components/billing/PaymentReceiptModal";
 import { billingApi } from "@/lib/api";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 import { toast } from "@/store/toast";
@@ -114,9 +123,9 @@ export default function CommunityAdminBillingPage() {
   const [chargeHeadForm, setChargeHeadForm] = useState({
     name: "",
     code: "",
-    charge_type: "maintenance",
+    calculation_type: "flat" as ChargeHeadCalculationType,
     default_amount: 1500,
-    is_active: true,
+    taxable: false,
   });
   const [isSubmittingChargeHead, setIsSubmittingChargeHead] = useState(false);
   const [chargeHeadError, setChargeHeadError] = useState("");
@@ -422,9 +431,9 @@ export default function CommunityAdminBillingPage() {
         data: {
           name: trimmedName,
           code: trimmedCode,
-          charge_type: chargeHeadForm.charge_type,
+          calculation_type: chargeHeadForm.calculation_type,
           default_amount: Number(chargeHeadForm.default_amount),
-          is_active: chargeHeadForm.is_active,
+          taxable: chargeHeadForm.taxable,
         },
       });
       toast.success(`Charge head "${trimmedName}" created successfully.`, "Charge Head Created");
@@ -632,11 +641,11 @@ export default function CommunityAdminBillingPage() {
       render: (c) => <span className="badge badge-neutral">{c.code}</span>,
     },
     {
-      key: "charge_type",
-      header: "Type",
+      key: "calculation_type",
+      header: "Calculation",
       render: (c) => (
-        <span className="badge badge-primary" style={{ textTransform: "capitalize" }}>
-          {c.charge_type}
+        <span className="badge badge-primary">
+          {CALCULATION_TYPE_LABELS[c.calculation_type] ?? c.calculation_type}
         </span>
       ),
     },
@@ -769,9 +778,9 @@ export default function CommunityAdminBillingPage() {
                   setChargeHeadForm({
                     name: "",
                     code: "",
-                    charge_type: "maintenance",
+                    calculation_type: "flat",
                     default_amount: 1500,
-                    is_active: true,
+                    taxable: false,
                   });
                   setIsAddChargeHeadOpen(true);
                 }}
@@ -1026,9 +1035,9 @@ export default function CommunityAdminBillingPage() {
                   setChargeHeadForm({
                     name: "",
                     code: "",
-                    charge_type: "maintenance",
+                    calculation_type: "flat",
                     default_amount: 1500,
-                    is_active: true,
+                    taxable: false,
                   });
                   setIsAddChargeHeadOpen(true);
                 }}
@@ -1388,366 +1397,12 @@ export default function CommunityAdminBillingPage() {
         </div>
       </Modal>
 
-      {/* Invoice Details Modal */}
-      <Modal
-        isOpen={Boolean(selectedInvoice)}
-        onClose={() => setSelectedInvoice(null)}
-        title={
-          selectedInvoice
-            ? `Invoice Details — ${selectedInvoice.invoice_number}`
-            : "Invoice Details"
-        }
-      >
-        {selectedInvoice && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-            {/* Header info grid */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-                gap: "0.75rem",
-                padding: "0.85rem",
-                background: "var(--bg-card, #f8fafc)",
-                borderRadius: "6px",
-                border: "1px solid var(--border)",
-              }}
-            >
-              <div>
-                <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Unit</div>
-                <div style={{ fontWeight: 600, fontSize: "0.9rem" }}>
-                  Unit {selectedInvoice.unit_number || selectedInvoice.unit_id?.slice(0, 8)}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Status</div>
-                <div style={{ marginTop: "0.2rem" }}>
-                  <StatusBadge status={selectedInvoice.status} />
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Due Date</div>
-                <div style={{ fontWeight: 600, fontSize: "0.9rem" }}>
-                  {selectedInvoice.due_date || "–"}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Billing Period</div>
-                <div style={{ fontSize: "0.8rem", fontWeight: 500 }}>
-                  {selectedInvoice.billing_period_start || "–"} to{" "}
-                  {selectedInvoice.billing_period_end || "–"}
-                </div>
-              </div>
-            </div>
+      <InvoiceDetailModal invoice={selectedInvoice} onClose={() => setSelectedInvoice(null)} />
 
-            {/* Line Items List */}
-            <div>
-              <h4 style={{ fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.5rem" }}>
-                Invoice Line Items
-              </h4>
-              {selectedInvoice.items && selectedInvoice.items.length > 0 ? (
-                <div
-                  style={{
-                    border: "1px solid var(--border)",
-                    borderRadius: "6px",
-                    overflow: "hidden",
-                  }}
-                >
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
-                    <thead>
-                      <tr style={{ background: "var(--bg-muted, #f1f5f9)", textAlign: "left" }}>
-                        <th style={{ padding: "0.5rem 0.75rem" }}>Description</th>
-                        <th style={{ padding: "0.5rem 0.75rem", textAlign: "right" }}>Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedInvoice.items.map((item, idx) => (
-                        <tr key={item.id || idx} style={{ borderTop: "1px solid var(--border)" }}>
-                          <td style={{ padding: "0.5rem 0.75rem" }}>
-                            <div style={{ fontWeight: 500 }}>{item.description}</div>
-                            {item.charge_head_name && (
-                              <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-                                {item.charge_head_name}
-                              </div>
-                            )}
-                          </td>
-                          <td style={{ padding: "0.5rem 0.75rem", textAlign: "right", fontWeight: 600 }}>
-                            {formatCurrency(Number(item.amount))}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div
-                  style={{
-                    padding: "0.75rem",
-                    background: "var(--bg-card, #f8fafc)",
-                    borderRadius: "6px",
-                    border: "1px dashed var(--border)",
-                    fontSize: "0.85rem",
-                    color: "var(--muted)",
-                    textAlign: "center",
-                  }}
-                >
-                  Standard monthly maintenance assessment
-                </div>
-              )}
-            </div>
-
-            {/* Financial Summary Breakdown */}
-            <div
-              style={{
-                background: "#f1f5f9",
-                borderRadius: "6px",
-                padding: "0.85rem 1rem",
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.35rem",
-                fontSize: "0.85rem",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "var(--muted)" }}>Subtotal:</span>
-                <span style={{ fontWeight: 600 }}>
-                  {formatCurrency(
-                    Number(selectedInvoice.subtotal || selectedInvoice.total_amount),
-                  )}
-                </span>
-              </div>
-              {Number(selectedInvoice.discount) > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", color: "#059669" }}>
-                  <span>Discount:</span>
-                  <span>-{formatCurrency(Number(selectedInvoice.discount))}</span>
-                </div>
-              )}
-              {Number(selectedInvoice.tax) > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ color: "var(--muted)" }}>Tax:</span>
-                  <span>+{formatCurrency(Number(selectedInvoice.tax))}</span>
-                </div>
-              )}
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  borderTop: "1px solid var(--border)",
-                  paddingTop: "0.4rem",
-                  fontWeight: 700,
-                  color: "var(--fg)",
-                }}
-              >
-                <span>Total Amount:</span>
-                <span>{formatCurrency(Number(selectedInvoice.total_amount))}</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", color: "#059669" }}>
-                <span>Amount Paid:</span>
-                <span style={{ fontWeight: 600 }}>
-                  {formatCurrency(Number(selectedInvoice.amount_paid))}
-                </span>
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  borderTop: "1px solid var(--border)",
-                  paddingTop: "0.3rem",
-                  fontSize: "0.95rem",
-                  fontWeight: 700,
-                  color: Number(selectedInvoice.balance_due) > 0 ? "#dc2626" : "#059669",
-                }}
-              >
-                <span>Balance Due:</span>
-                <span>{formatCurrency(Number(selectedInvoice.balance_due))}</span>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setSelectedInvoice(null)}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* Payment Receipt Modal */}
-      <Modal
-        isOpen={Boolean(selectedPaymentReceipt)}
+      <PaymentReceiptModal
+        receipt={selectedPaymentReceipt}
         onClose={() => setSelectedPaymentReceipt(null)}
-        title={
-          selectedPaymentReceipt?.receipt_number
-            ? `Payment Receipt #${selectedPaymentReceipt.receipt_number}`
-            : "Payment Receipt"
-        }
-      >
-        {selectedPaymentReceipt && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-            <div
-              style={{
-                border: "2px dashed var(--border)",
-                borderRadius: "8px",
-                padding: "1.25rem",
-                background: "#fcfdfe",
-                display: "flex",
-                flexDirection: "column",
-                gap: "1rem",
-              }}
-            >
-              {/* Receipt Header */}
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                  borderBottom: "1px solid var(--border)",
-                  paddingBottom: "0.75rem",
-                }}
-              >
-                <div>
-                  <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700, color: "var(--fg)" }}>
-                    {selectedPaymentReceipt.community_name || "GateSphere Enterprise"}
-                  </h3>
-                  <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.15rem" }}>
-                    Official Maintenance Collection Receipt
-                  </div>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <StatusBadge
-                    status={
-                      selectedPaymentReceipt.payment_status ||
-                      selectedPaymentReceipt.status ||
-                      "success"
-                    }
-                  />
-                  {selectedPaymentReceipt.receipt_number && (
-                    <div style={{ fontSize: "0.8rem", fontWeight: 600, marginTop: "0.25rem" }}>
-                      Receipt #{selectedPaymentReceipt.receipt_number}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Receipt Key-Value Rows */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "0.75rem",
-                  fontSize: "0.85rem",
-                }}
-              >
-                <div>
-                  <span style={{ color: "var(--muted)", display: "block", fontSize: "0.75rem" }}>
-                    Payment Reference
-                  </span>
-                  <strong>{selectedPaymentReceipt.payment_reference}</strong>
-                </div>
-                <div>
-                  <span style={{ color: "var(--muted)", display: "block", fontSize: "0.75rem" }}>
-                    Payment Date
-                  </span>
-                  <span>{formatDateTime(selectedPaymentReceipt.paid_at)}</span>
-                </div>
-                <div>
-                  <span style={{ color: "var(--muted)", display: "block", fontSize: "0.75rem" }}>
-                    Payer / Resident
-                  </span>
-                  <span>
-                    {selectedPaymentReceipt.payer_name ||
-                      selectedPaymentReceipt.resident_type ||
-                      "Unit Resident"}
-                  </span>
-                </div>
-                <div>
-                  <span style={{ color: "var(--muted)", display: "block", fontSize: "0.75rem" }}>
-                    Unit
-                  </span>
-                  <span>
-                    {selectedPaymentReceipt.unit_number
-                      ? `Unit ${selectedPaymentReceipt.unit_number}`
-                      : selectedPaymentReceipt.unit_id
-                      ? `Unit ${selectedPaymentReceipt.unit_id.slice(0, 8)}`
-                      : "–"}
-                  </span>
-                </div>
-                <div>
-                  <span style={{ color: "var(--muted)", display: "block", fontSize: "0.75rem" }}>
-                    Payment Method
-                  </span>
-                  <span style={{ textTransform: "uppercase", fontWeight: 600 }}>
-                    {selectedPaymentReceipt.payment_method}
-                  </span>
-                </div>
-                <div>
-                  <span style={{ color: "var(--muted)", display: "block", fontSize: "0.75rem" }}>
-                    Amount Collected
-                  </span>
-                  <strong style={{ color: "#059669", fontSize: "1.1rem" }}>
-                    {formatCurrency(Number(selectedPaymentReceipt.amount))}
-                  </strong>
-                </div>
-              </div>
-
-              {/* Allocations Breakdown */}
-              {selectedPaymentReceipt.allocations &&
-                selectedPaymentReceipt.allocations.length > 0 && (
-                  <div style={{ borderTop: "1px solid var(--border)", paddingTop: "0.75rem" }}>
-                    <div
-                      style={{
-                        fontSize: "0.75rem",
-                        fontWeight: 600,
-                        color: "var(--muted)",
-                        marginBottom: "0.35rem",
-                      }}
-                    >
-                      Invoice Allocations
-                    </div>
-                    {selectedPaymentReceipt.allocations.map((alloc: any, idx: number) => (
-                      <div
-                        key={idx}
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          fontSize: "0.8rem",
-                          padding: "0.25rem 0",
-                        }}
-                      >
-                        <span>
-                          Invoice #{alloc.invoice_number || alloc.invoice_id?.slice(0, 8)}
-                        </span>
-                        <strong>
-                          {formatCurrency(Number(alloc.amount || alloc.allocated_amount))}
-                        </strong>
-                      </div>
-                    ))}
-                  </div>
-                )}
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => window.print()}
-              >
-                🖨️ Print Receipt
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => setSelectedPaymentReceipt(null)}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
+      />
 
       {/* Record Offline Payment Modal */}
       <Modal
@@ -2029,23 +1684,26 @@ export default function CommunityAdminBillingPage() {
                     marginBottom: "0.3rem",
                   }}
                 >
-                  Charge Type <span style={{ color: "#dc2626" }}>*</span>
+                  Calculation Type <span style={{ color: "#dc2626" }}>*</span>
                 </label>
                 <select
                   className="select-field"
-                  value={chargeHeadForm.charge_type}
+                  value={chargeHeadForm.calculation_type}
                   onChange={(e) =>
-                    setChargeHeadForm((prev) => ({ ...prev, charge_type: e.target.value }))
+                    setChargeHeadForm((prev) => ({
+                      ...prev,
+                      calculation_type: e.target.value as ChargeHeadCalculationType,
+                    }))
                   }
                   style={{ width: "100%" }}
                 >
-                  <option value="maintenance">Maintenance</option>
-                  <option value="utility">Utility</option>
-                  <option value="penalty">Penalty</option>
-                  <option value="event">Event / Facility</option>
-                  <option value="parking">Parking</option>
-                  <option value="fine">Fine</option>
-                  <option value="other">Other</option>
+                  {(Object.keys(CALCULATION_TYPE_LABELS) as ChargeHeadCalculationType[]).map(
+                    (t) => (
+                      <option key={t} value={t}>
+                        {CALCULATION_TYPE_LABELS[t]}
+                      </option>
+                    ),
+                  )}
                 </select>
               </div>
             </div>
@@ -2090,12 +1748,12 @@ export default function CommunityAdminBillingPage() {
               >
                 <input
                   type="checkbox"
-                  checked={chargeHeadForm.is_active}
+                  checked={chargeHeadForm.taxable}
                   onChange={(e) =>
-                    setChargeHeadForm((prev) => ({ ...prev, is_active: e.target.checked }))
+                    setChargeHeadForm((prev) => ({ ...prev, taxable: e.target.checked }))
                   }
                 />
-                <span>Active (available for new invoices and assessments)</span>
+                <span>Taxable (tax is applied on invoices using this charge head)</span>
               </label>
             </div>
 

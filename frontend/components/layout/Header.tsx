@@ -8,6 +8,7 @@ import { useCommunities, useCommunityDetails } from "@/hooks/use-communities";
 import { useUiStore } from "@/store/ui";
 import {
   useMyNotifications,
+  useUnreadNotificationCount,
   useMarkNotificationRead,
   useMarkAllNotificationsRead,
 } from "@/hooks/use-notifications";
@@ -52,10 +53,11 @@ export function Header() {
 
   const { data: allNotifications = [] } = useMyNotifications();
   const { data: unreadNotifications = [] } = useMyNotifications({ unread_only: true });
+  const { data: serverUnreadCount = 0 } = useUnreadNotificationCount();
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();
 
-  const unreadCount = unreadNotifications?.length || 0;
+  const unreadCount = serverUnreadCount ?? unreadNotifications?.length ?? 0;
   const isSuperAdmin = Boolean(user?.is_superadmin || user?.active_role === "super_admin");
   const { data: communities } = useCommunities(undefined, { enabled: isSuperAdmin });
 

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMe, useLogout } from "@/hooks/use-auth";
 import { useCommunityDetails } from "@/hooks/use-communities";
 import { useUiStore } from "@/store/ui";
-import { useMyNotifications } from "@/hooks/use-notifications";
+import { useUnreadNotificationCount } from "@/hooks/use-notifications";
 
 export function CommunityAdminHeader() {
   const router = useRouter();
@@ -13,8 +13,7 @@ export function CommunityAdminHeader() {
   const logout = useLogout();
   const { activeCommunityId, toggleSidebar } = useUiStore();
   const { data: community } = useCommunityDetails(activeCommunityId || undefined);
-  const { data: notifications } = useMyNotifications({ unread_only: true });
-  const unreadCount = notifications?.length || 0;
+  const { data: unreadCount = 0 } = useUnreadNotificationCount();
 
   const handleSignOut = async () => {
     try {

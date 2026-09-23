@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import select
 
-from app.core.errors import BusinessRuleError, ConflictError
+from app.core.errors import BusinessRuleError, ConflictError, NotFoundError
 from app.modules.communication import schemas
 from app.modules.communication.service import CommunicationService
 from app.modules.notifications.models import NotificationDeadLetter
@@ -146,3 +146,58 @@ async def test_closed_poll_rejects_votes(db, scope_for, community, superadmin, m
     with pytest.raises(BusinessRuleError) as exc:
         await v.vote(poll.id, schemas.VoteIn(option_ids=[poll.options[0].id]))
     assert exc.value.code == "POLL_NOT_OPEN"
+
+
+# -- GS-010 / GS-021 / GS-022: list status filter + resident draft isolation -- #
+async def _seed_three(svc, community):
+    """One draft, one live published, one published-then-expired announcement."""
+    draft = await _announcement(svc, community)
+    live = await _announcement(svc, community)
+    await svc.publish_announcement(live.id)
+    expired = await _announcement(svc, community)
+    await svc.publish_announcement(expired.id)
+    await svc.expire_announcement(expired.id)
+    return draft, live, expired
+
+
+async def _ids(svc, community, **kw):
+    rows, total = await svc.list_announcements(community_id=community.id, offset=0, limit=100, **kw)
+    assert total == len(rows)
+    return {r.id for r in rows}
+
+
+async def test_list_status_filter_separates_draft_published_expired(
+    db, scope_for, community, superadmin
+):
+    svc = _svc(db, scope_for(community.id), superadmin)
+    draft, live, expired = await _seed_three(svc, community)
+
+    assert await _ids(svc, community, published_only=True, status="all") == {
+        draft.id,
+        live.id,
+        expired.id,
+    }
+    assert await _ids(svc, community, published_only=True, status="published") == {live.id}
+    assert await _ids(svc, community, published_only=True, status="draft") == {draft.id}
+    assert await _ids(svc, community, published_only=True, status="expired") == {expired.id}
+    # Legacy default (no status) is unchanged: every published row, expired included.
+    assert await _ids(svc, community, published_only=True) == {live.id, expired.id}
+
+
+async def test_resident_never_sees_drafts_whatever_filter_is_sent(
+    db, scope_for, community, superadmin, make_user
+):
+    draft, live, expired = await _seed_three(
+        _svc(db, scope_for(community.id), superadmin), community
+    )
+    # A plain user with no cross-unit role is unit-restricted (resident semantics).
+    resident = _svc(db, scope_for(community.id), await make_user())
+
+    for status in (None, "all", "draft"):
+        seen = await _ids(resident, community, published_only=False, status=status)
+        assert draft.id not in seen
+    assert await _ids(resident, community, published_only=False, status="draft") == set()
+
+    with pytest.raises(NotFoundError):
+        await resident.get_visible_announcement(draft.id)
+    assert (await resident.get_visible_announcement(live.id)).id == live.id

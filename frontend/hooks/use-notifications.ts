@@ -18,6 +18,20 @@ export function useMyNotifications(params?: {
   });
 }
 
+/**
+ * Unread badge count. Lives under the `["notifications"]` prefix so every mark-read /
+ * mark-all-read invalidation refreshes it together with the Notification Center list.
+ */
+export function useUnreadNotificationCount() {
+  return useQuery({
+    queryKey: ["notifications", "unread-count"],
+    queryFn: () => notificationsApi.unreadCount(),
+    staleTime: 10_000,
+    refetchInterval: 30_000,
+    retry: 1,
+  });
+}
+
 export function useDispatchNotification() {
   const queryClient = useQueryClient();
   return useMutation({

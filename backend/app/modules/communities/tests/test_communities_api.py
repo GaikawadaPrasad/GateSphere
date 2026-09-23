@@ -197,7 +197,7 @@ def test_create_community_with_admin_credentials_and_login(auth_client, client, 
     import random
 
     phone_digits = "".join(random.choices("0123456789", k=8))
-    admin_phone = f"+9198{phone_digits}"
+    admin_phone = f"98{phone_digits}"
     admin_email = f"admin_{unique_code.lower()}@gatesphere.com"
     admin_password = "AdminPassword123!"
     r = auth_client.post(
@@ -231,3 +231,14 @@ def test_create_community_with_admin_credentials_and_login(auth_client, client, 
         assert community_id in login_data["community_ids"]
     finally:
         auth_client.delete(f"{P}/{community_id}")
+
+
+def test_create_community_rejects_admin_phone_not_10_digits(auth_client, unique_code):
+    """GS-016: Admin Phone is optional, but when given it must be exactly 10 digits."""
+    for bad in ("98765432101", "987654321", "+919876543210", "98765-4321"):
+        r = auth_client.post(
+            P,
+            json={"code": unique_code, "name": f"Community {unique_code}", "admin_phone": bad},
+        )
+        assert r.status_code == 422, (bad, r.text)
+        assert "admin_phone" in (r.json().get("error") or {}).get("fields", {}), r.text

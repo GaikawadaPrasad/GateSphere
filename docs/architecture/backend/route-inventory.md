@@ -246,7 +246,7 @@ is emitted by `docs/architecture/backend/gen_route_inventory.py`; keep in sync w
 
 | Method | Path | Auth | Perm | Scope | Mutation | Conditionals |
 |---|---|---|---|---|---|---|
-| GET | `/communication/announcements` | session | `communication:view` | T | – | `?published_only=` |
+| GET | `/communication/announcements` | session | `communication:view` | T | – | `?status=` (all/published/draft/expired), legacy `?published_only=`; residents forced to published + targeted |
 | POST | `/communication/announcements` | session | `communication:create` | T | `announcements` + `announcement_targets` (insert) | targets validated against community (`_validate_targets`) |
 | GET/PATCH | `/communication/announcements/{id}` | session | `:view` / `:update` | T | `announcements` (update) | `409 ALREADY_PUBLISHED` (published = immutable) |
 | POST | `/communication/announcements/{id}/publish` | session | `communication:approve` | T | `announcements.is_published=true` | freezes |
