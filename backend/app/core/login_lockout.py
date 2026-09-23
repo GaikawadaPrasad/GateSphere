@@ -44,9 +44,8 @@ def lock_remaining(email: str) -> int:
     _, lock = _keys(email)
     try:
         ttl = cast(int | None, redis_client.ttl(lock))
-    except RedisError as e:
-        from app.core.errors import BusinessRuleError
-        raise BusinessRuleError("Login temporarily unavailable", code="SERVICE_UNAVAILABLE") from e
+    except RedisError:
+        return _REDIS_DOWN_LOCK_SECONDS
     return max(0, ttl or 0)
 
 
@@ -70,9 +69,9 @@ def record_failure(email: str) -> int:
             redis_client.set(lock, "1", ex=settings.LOGIN_LOCKOUT_SECONDS)
             redis_client.delete(fails)
             return settings.LOGIN_LOCKOUT_SECONDS
-    except RedisError as e:
-        from app.core.errors import BusinessRuleError
-        raise BusinessRuleError("Login temporarily unavailable", code="SERVICE_UNAVAILABLE") from e
+        return 0
+    except RedisError:
+        return _REDIS_DOWN_LOCK_SECONDS
 
 
 def clear_failures(email: str) -> None:

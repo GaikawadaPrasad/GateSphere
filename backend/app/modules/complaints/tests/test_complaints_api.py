@@ -80,9 +80,45 @@ def test_resident_raises_fm_resolves_resident_confirms(as_role, seed_ids, reside
     )
     assert fm.post(f"{P}/tickets/{tid}/transition", json={"status": "resolved"}).status_code == 200
 
+    # Staff roles attempting confirm_ticket -> 403 NOT_AUTHORIZED
+    assert fm.post(f"{P}/tickets/{tid}/confirm", json={"confirmation_status": "confirmed"}).status_code == 403
+    assert as_role("community_admin").post(f"{P}/tickets/{tid}/confirm", json={"confirmation_status": "confirmed"}).status_code == 403
+    assert as_role("super_admin").post(f"{P}/tickets/{tid}/confirm", json={"confirmation_status": "confirmed"}).status_code == 403
+
     got = resident.post(f"{P}/tickets/{tid}/confirm", json={"confirmation_status": "confirmed"})
     assert got.status_code == 200 and got.json()["data"]["status"] == "closed"
     assert resident.post(f"{P}/tickets/{tid}/feedback", json={"rating": 5}).status_code == 201
+
+
+def test_staff_raised_ticket_cannot_be_self_closed_by_staff(as_role, seed_ids, resident_unit_id):
+    """S-02: Facility manager raises ticket on resident unit, but CANNOT self-confirm or close it."""
+    cid = seed_ids["community_id"]
+    fm = as_role("facility_manager")
+    r = fm.post(
+        f"{P}/tickets",
+        json={
+            "unit_id": resident_unit_id,
+            "category_id": _category_in(cid),
+            "subject": "Staff detected leak",
+        },
+    )
+    assert r.status_code == 201, r.text
+    tid = r.json()["data"]["id"]
+
+    assert fm.post(f"{P}/tickets/{tid}/assign", json={"vendor_name": "Acme"}).status_code == 200
+    assert fm.post(f"{P}/tickets/{tid}/transition", json={"status": "in_progress"}).status_code == 200
+    assert fm.post(f"{P}/tickets/{tid}/transition", json={"status": "resolved"}).status_code == 200
+
+    # FM who raised the ticket attempts self-closing -> 403 NOT_AUTHORIZED
+    self_confirm = fm.post(f"{P}/tickets/{tid}/confirm", json={"confirmation_status": "confirmed"})
+    assert self_confirm.status_code == 403
+    assert self_confirm.json()["error"]["code"] == "NOT_AUTHORIZED"
+
+    # Active resident occupant of that unit confirms -> 200 closed
+    resident = as_role("resident")
+    res_confirm = resident.post(f"{P}/tickets/{tid}/confirm", json={"confirmation_status": "confirmed"})
+    assert res_confirm.status_code == 200
+    assert res_confirm.json()["data"]["status"] == "closed"
 
 
 def test_resident_cannot_create_category(as_role):

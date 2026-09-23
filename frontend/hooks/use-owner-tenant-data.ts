@@ -353,11 +353,39 @@ export function useResidentDeliveries() {
   });
 
   const updateProtocol = useMutation({
-    mutationFn: async (payload: { category: string; protocol: string }) => {
-      return await api.put("/deliveries/protocols", payload);
+    mutationFn: async (payload: {
+      delivery_type?: string;
+      protocol_type?: string;
+      category?: string;
+      protocol?: string;
+      unit_id?: string;
+      requires_otp?: boolean;
+      allow_direct_entry?: boolean;
+      leave_at_gate?: boolean;
+      is_active?: boolean;
+    }) => {
+      const delivery_type = payload.delivery_type || payload.category;
+      const protocol_type = payload.protocol_type || payload.protocol;
+      const body: Record<string, unknown> = {
+        delivery_type,
+        protocol_type,
+        requires_otp: Boolean(payload.requires_otp),
+        allow_direct_entry:
+          payload.allow_direct_entry ??
+          (protocol_type === "allow_at_gate" || protocol_type === "direct_to_door"),
+        leave_at_gate:
+          payload.leave_at_gate ??
+          (protocol_type === "leave_at_gate_desk" || protocol_type === "leave_at_gate"),
+        is_active: payload.is_active !== false,
+      };
+      if (payload.unit_id) {
+        body.unit_id = payload.unit_id;
+      }
+      return await api.put("/deliveries/protocols", body);
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["resident", "deliveries"], refetchType: "all" });
+      await queryClient.invalidateQueries({ queryKey: ["resident", "delivery-protocols"], refetchType: "all" });
     },
   });
 

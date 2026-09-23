@@ -1,5 +1,5 @@
 # GateSphere backend — pinned top-level dependencies
-fastapi==0.115.6
+fastapi==0.141.1
 uvicorn[standard]==0.34.0
 gunicorn==23.0.0
 pydantic[email]==2.10.4

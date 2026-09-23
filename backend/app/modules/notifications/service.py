@@ -174,9 +174,48 @@ class NotificationService:
                 return "quiet"
         return "deliver"
 
+    async def _user_affiliated_with_community(self, user_id: uuid.UUID, cid: uuid.UUID) -> bool:
+        from app.modules.domestic_staff.models import DomesticStaff
+        from app.modules.residents.models import ResidentProfile
+        from app.modules.users.models import UserRole
+
+        has_role = await self.db.scalar(
+            select(UserRole.id)
+            .where(
+                UserRole.user_id == user_id,
+                (UserRole.community_id == cid) | (UserRole.community_id.is_(None)),
+            )
+            .limit(1)
+        )
+        if has_role is not None:
+            return True
+
+        has_resident = await self.db.scalar(
+            select(ResidentProfile.id)
+            .where(
+                ResidentProfile.user_id == user_id,
+                ResidentProfile.community_id == cid,
+            )
+            .limit(1)
+        )
+        if has_resident is not None:
+            return True
+
+        has_staff = await self.db.scalar(
+            select(DomesticStaff.id)
+            .where(
+                DomesticStaff.user_id == user_id,
+                DomesticStaff.community_id == cid,
+            )
+            .limit(1)
+        )
+        return has_staff is not None
+
     async def dispatch(self, payload: schemas.DispatchIn) -> Notification:
         cid = self._one_community(payload.community_id)
-        if await self.db.get(User, payload.recipient_user_id) is None:
+        if await self.db.get(User, payload.recipient_user_id) is None or not (
+            await self._user_affiliated_with_community(payload.recipient_user_id, cid)
+        ):
             raise NotFoundError("Recipient not found")
         channels = payload.channels or list(_DEFAULT_CHANNELS)
         for ch in channels:

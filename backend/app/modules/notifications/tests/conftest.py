@@ -26,14 +26,21 @@ async def community(db) -> Community:
 
 
 @pytest_asyncio.fixture()
-async def make_user(db):
-    async def _make() -> User:
+async def make_user(db, community):
+    async def _make(cid: uuid.UUID | None = None) -> User:
         u = User(
             email=f"nt-{uuid.uuid4().hex[:10]}@example.test",
             full_name="Recipient",
             password_hash=hash_password("x"),
         )
         db.add(u)
+        await db.flush()
+        from app.modules.residents.models import ResidentProfile
+
+        prof = ResidentProfile(
+            community_id=cid or community.id, user_id=u.id, profile_status="active"
+        )
+        db.add(prof)
         await db.flush()
         return u
 

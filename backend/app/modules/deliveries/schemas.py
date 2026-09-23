@@ -38,7 +38,7 @@ class _Read(BaseModel):
 class ProtocolUpsert(_Write):
     delivery_type: str
     unit_id: uuid.UUID | None = None
-    protocol_type: str = "collect_at_gate"
+    protocol_type: str = "resident_approval_required"
     requires_otp: bool = False
     allow_direct_entry: bool = False
     leave_at_gate: bool = True
@@ -86,6 +86,10 @@ class DeliveryArrival(_Write):
 
 class DeliveryNotify(_Write):
     notes: str | None = Field(default=None, max_length=2000)
+
+
+class DeliveryCollect(_Write):
+    remarks: str | None = Field(default=None, max_length=2000)
 
 
 

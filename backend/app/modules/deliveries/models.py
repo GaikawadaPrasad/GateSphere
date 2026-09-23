@@ -12,6 +12,7 @@ from datetime import datetime, time
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
@@ -21,7 +22,6 @@ from sqlalchemy import (
     Text,
     Time,
     UniqueConstraint,
-    CheckConstraint,
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -29,7 +29,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base, TenantMixin, TimestampMixin, pk
 from app.modules.communities.models import Unit
-
 
 DELIVERY_TYPES = (
     "food",
@@ -40,7 +39,17 @@ DELIVERY_TYPES = (
     "laundry",
     "other",
 )
-PROTOCOL_TYPES = ("leave_at_gate", "collect_at_gate", "direct_to_door", "call_resident", "direct_rejection")
+PROTOCOL_TYPES = (
+    "allow_at_gate",
+    "resident_approval_required",
+    "leave_at_gate_desk",
+    "direct_rejection",
+    # Legacy aliases for backward compatibility
+    "leave_at_gate",
+    "collect_at_gate",
+    "direct_to_door",
+    "call_resident",
+)
 APPROVAL_STATUS = ("pending", "approved", "rejected", "auto_approved")
 DELIVERY_STATUS = (
     "expected",
@@ -74,8 +83,8 @@ class DeliveryProtocol(Base, TimestampMixin, TenantMixin):
             postgresql_where=text("unit_id IS NOT NULL"),
         ),
         CheckConstraint(
-            "protocol_type IN ('leave_at_gate', 'collect_at_gate', 'direct_to_door', 'call_resident', 'direct_rejection')",
-            name="ck_delivery_protocol_type"
+            "protocol_type IN ('allow_at_gate', 'resident_approval_required', 'leave_at_gate_desk', 'direct_rejection', 'leave_at_gate', 'collect_at_gate', 'direct_to_door', 'call_resident')",
+            name="ck_delivery_protocol_type",
         ),
     )
 
@@ -84,7 +93,7 @@ class DeliveryProtocol(Base, TimestampMixin, TenantMixin):
         ForeignKey("units.id", ondelete="CASCADE"), nullable=True
     )
     delivery_type: Mapped[str] = mapped_column(String(20))
-    protocol_type: Mapped[str] = mapped_column(String(20), default="collect_at_gate")
+    protocol_type: Mapped[str] = mapped_column(String(40), default="resident_approval_required")
     requires_otp: Mapped[bool] = mapped_column(Boolean, default=False)
     allow_direct_entry: Mapped[bool] = mapped_column(Boolean, default=False)
     leave_at_gate: Mapped[bool] = mapped_column(Boolean, default=True)

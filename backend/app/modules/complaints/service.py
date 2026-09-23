@@ -459,11 +459,53 @@ class ComplaintService(UnitScopedAccess):
         self, ticket_id: uuid.UUID, payload: schemas.TicketConfirm
     ) -> ServiceTicket:
         ticket = await self.get_ticket(ticket_id)
-        if ticket.raised_by_user_id != self.actor.id:
+
+        from app.modules.residents.access import CROSS_UNIT_ROLES
+        from app.modules.residents.models import ResidentProfile, UnitOccupancy
+        from app.modules.users.models import Role, UserRole
+
+        is_staff = bool(
+            await self.db.scalar(
+                select(UserRole.id)
+                .join(Role, Role.id == UserRole.role_id)
+                .where(
+                    UserRole.user_id == self.actor.id,
+                    Role.slug.in_(CROSS_UNIT_ROLES),
+                    (UserRole.community_id == ticket.community_id) | (UserRole.community_id.is_(None)),
+                )
+                .limit(1)
+            )
+        )
+        if is_staff or self.actor.is_superadmin:
+            raise ForbiddenError(
+                "Staff cannot confirm tickets; only a resident occupying the unit can confirm resolution",
+                code="NOT_AUTHORIZED",
+            )
+
+        if ticket.unit_id is not None:
+            is_occupant = bool(
+                await self.db.scalar(
+                    select(UnitOccupancy.id)
+                    .join(ResidentProfile, ResidentProfile.id == UnitOccupancy.resident_profile_id)
+                    .where(
+                        ResidentProfile.user_id == self.actor.id,
+                        UnitOccupancy.unit_id == ticket.unit_id,
+                        UnitOccupancy.is_active.is_(True),
+                    )
+                    .limit(1)
+                )
+            )
+            if not is_occupant:
+                raise ForbiddenError(
+                    "Only an active resident of the ticket's unit can confirm it",
+                    code="NOT_AUTHORIZED",
+                )
+        elif ticket.raised_by_user_id != self.actor.id:
             raise ForbiddenError(
                 "Only the resident who raised the ticket can confirm it",
                 code="NOT_AUTHORIZED",
             )
+
         _enum("confirmation_status", payload.confirmation_status)
         if ticket.status != "resident_confirmation":
             raise BusinessRuleError(

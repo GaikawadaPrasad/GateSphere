@@ -98,12 +98,50 @@ def test_community_admin_cannot_grant_global_role(as_role, seed_ids):
     email = f"x-{uuid.uuid4().hex[:8]}@example.com"
     try:
         uid = admin.post(
-            P, json={"email": email, "full_name": "X", "password": "longpassword12"}
+            P,
+            json={
+                "email": email,
+                "full_name": "X",
+                "password": "longpassword12",
+                "role_slug": "resident",
+            },
         ).json()["data"]["id"]
         r = admin.post(f"{P}/{uid}/roles", json={"role_slug": "auditor"})
         assert r.status_code == 403  # GLOBAL_ONLY
     finally:
         _cleanup_email(email)
+
+
+def test_community_admin_cannot_create_or_view_unaffiliated_user(as_role, auth_client, seed_ids):
+    """S-05: Non-global admins cannot create unaffiliated users or enumerate them."""
+    admin = as_role("community_admin")
+    email_unaff = f"unaff-{uuid.uuid4().hex[:8]}@example.com"
+    try:
+        # 1. Community admin cannot create a user without assigning a role
+        res_create = admin.post(
+            P, json={"email": email_unaff, "full_name": "No Role", "password": "longpassword12"}
+        )
+        assert res_create.status_code == 422
+        assert res_create.json()["error"]["code"] == "ROLE_REQUIRED"
+
+        # 2. Super admin creates an unaffiliated user
+        res_super = auth_client.post(
+            P, json={"email": email_unaff, "full_name": "No Role", "password": "longpassword12"}
+        )
+        assert res_super.status_code == 201
+        unaff_id = res_super.json()["data"]["id"]
+
+        # 3. Community admin cannot access unaffiliated user directly (404)
+        assert admin.get(f"{P}/{unaff_id}").status_code == 404
+
+        # 4. Community admin does not see unaffiliated user in list
+        list_res = admin.get(P)
+        assert list_res.status_code == 200
+        emails = [u["email"] for u in list_res.json()["data"]]
+        assert email_unaff not in emails
+    finally:
+        _cleanup_email(email_unaff)
+
 
 
 def test_community_admin_can_create_community_auditor(as_role, seed_ids):

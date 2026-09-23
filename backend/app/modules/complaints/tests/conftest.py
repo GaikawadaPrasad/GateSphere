@@ -86,3 +86,33 @@ def scope_for(superadmin):
         return TenantScope(superadmin.id, is_global=False, community_ids=frozenset({cid}))
 
     return _make
+
+
+@pytest_asyncio.fixture()
+async def resident_occupant(db, community, unit) -> User:
+    u = User(
+        email=f"res-{uuid.uuid4().hex[:10]}@example.test",
+        full_name="Unit Resident",
+        password_hash=hash_password("x"),
+    )
+    db.add(u)
+    await db.flush()
+    from app.modules.residents.models import ResidentProfile, UnitOccupancy
+
+    prof = ResidentProfile(
+        community_id=community.id, user_id=u.id, profile_status="active", kyc_status="verified"
+    )
+    db.add(prof)
+    await db.flush()
+    occ = UnitOccupancy(
+        community_id=community.id,
+        unit_id=unit.id,
+        resident_profile_id=prof.id,
+        occupancy_role="primary_owner",
+        is_primary=True,
+        is_active=True,
+    )
+    db.add(occ)
+    await db.flush()
+    return u
+

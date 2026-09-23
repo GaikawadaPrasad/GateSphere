@@ -94,6 +94,10 @@ class ServiceTicket(Base, TimestampMixin, TenantMixin):
         ),
         UniqueConstraint("community_id", "ticket_number"),
         UniqueConstraint("id", "community_id"),
+        CheckConstraint(
+            "status != 'closed' OR resident_confirmation_status = 'confirmed'",
+            name="ck_service_tickets_closed_confirmed",
+        ),
     )
 
     id: Mapped[uuid.UUID] = pk()

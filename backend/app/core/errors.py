@@ -175,6 +175,17 @@ def register_exception_handlers(app: FastAPI) -> None:
         """A DB constraint fired that the service layer did not pre-check (usually a race).
         Map to a client-correctable status; never leak the SQL / constraint internals."""
         sqlstate = getattr(getattr(exc, "orig", None), "sqlstate", None)
+        err_str = str(getattr(exc, "orig", exc))
+        if sqlstate == "23514" and (
+            "amenity_booking_capacity_exceeded" in err_str
+            or "gs_amenity_booking_capacity_guard" in err_str
+        ):
+            log.warning("db.integrity.amenity_capacity", sqlstate=sqlstate, request_id=_request_id(request))
+            return JSONResponse(
+                status_code=status.HTTP_409_CONFLICT,
+                content=_envelope("BOOKING_CONFLICT", "No capacity left for that slot; overlapping booking confirmed."),
+            )
+
         mapping = {
             "23505": (status.HTTP_409_CONFLICT, "CONFLICT", "That record already exists."),
             "23503": (status.HTTP_409_CONFLICT, "FK_VIOLATION", "A referenced record is missing."),

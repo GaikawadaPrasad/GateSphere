@@ -184,3 +184,144 @@ def test_guard_sends_approval_request_to_resident(as_role, resident_unit_id):
     assert len(notified_events) >= 1
     assert "Please confirm" in (notified_events[0]["remarks"] or "")
 
+
+def test_protocol_allow_at_gate_workflow(as_role, resident_unit_id):
+    """Protocol allow_at_gate: auto-approved, arrives, marks delivered."""
+    admin = as_role("community_admin")
+    guard = as_role("security_guard")
+
+    # Set protocol for food to allow_at_gate
+    r = admin.put(
+        f"{P}/protocols",
+        json={"delivery_type": "food", "protocol_type": "allow_at_gate"},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["data"]["protocol_type"] == "allow_at_gate"
+
+    # Guard creates food delivery
+    res = guard.post(
+        P,
+        json={
+            "unit_id": resident_unit_id,
+            "delivery_type": "food",
+            "provider_name": "Swiggy",
+        },
+    )
+    assert res.status_code == 201, res.text
+    d = res.json()["data"]
+    assert d["approval_status"] == "auto_approved"
+    assert d["status"] == "expected"
+
+    # Executive arrives at gate
+    arr = guard.post(f"{P}/{d['id']}/arrival", json={})
+    assert arr.status_code == 200
+    assert arr.json()["data"]["status"] == "at_gate"
+
+    # Guard completes delivery
+    done = guard.post(f"{P}/{d['id']}/delivered")
+    assert done.status_code == 200
+    assert done.json()["data"]["status"] == "delivered"
+
+
+def test_protocol_resident_approval_required_workflow(as_role, resident_unit_id):
+    """Protocol resident_approval_required: pending until resident approves, then arrives and delivers."""
+    admin = as_role("community_admin")
+    guard = as_role("security_guard")
+    resident = as_role("resident")
+
+    r = admin.put(
+        f"{P}/protocols",
+        json={"delivery_type": "medicine", "protocol_type": "resident_approval_required"},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["data"]["protocol_type"] == "resident_approval_required"
+
+    # Guard creates delivery
+    res = guard.post(
+        P,
+        json={
+            "unit_id": resident_unit_id,
+            "delivery_type": "medicine",
+            "provider_name": "Apollo Pharmacy",
+        },
+    )
+    assert res.status_code == 201, res.text
+    d = res.json()["data"]
+    assert d["approval_status"] == "pending"
+
+    # Resident approves
+    dec = resident.post(f"{P}/{d['id']}/decision", json={"decision": "approved"})
+    assert dec.status_code == 200
+    assert dec.json()["data"]["approval_status"] == "approved"
+
+    # Arrival and delivery
+    arr = guard.post(f"{P}/{d['id']}/arrival", json={})
+    assert arr.status_code == 200
+    assert arr.json()["data"]["status"] == "at_gate"
+
+
+def test_protocol_leave_at_gate_desk_and_collect_endpoint(as_role, resident_unit_id):
+    """Protocol leave_at_gate_desk: auto-approved, arrives at gate, and collected via POST /collect."""
+    admin = as_role("community_admin")
+    guard = as_role("security_guard")
+    resident = as_role("resident")
+
+    r = admin.put(
+        f"{P}/protocols",
+        json={"delivery_type": "ecommerce", "protocol_type": "leave_at_gate_desk"},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["data"]["protocol_type"] == "leave_at_gate_desk"
+
+    # Create delivery
+    res = guard.post(
+        P,
+        json={
+            "unit_id": resident_unit_id,
+            "delivery_type": "ecommerce",
+            "provider_name": "Flipkart",
+            "tracking_reference": "FK-12345",
+        },
+    )
+    assert res.status_code == 201, res.text
+    d = res.json()["data"]
+    assert d["approval_status"] == "auto_approved"
+
+    # Arrive at gate desk
+    arr = guard.post(f"{P}/{d['id']}/arrival", json={})
+    assert arr.status_code == 200
+    assert arr.json()["data"]["status"] == "at_gate"
+
+    # Resident or guard collects package from gate desk
+    col = resident.post(f"{P}/{d['id']}/collect", json={"remarks": "Picked up from desk"})
+    assert col.status_code == 200, col.text
+    assert col.json()["data"]["status"] == "collected"
+    assert col.json()["message"] == "Package collected from gate desk"
+
+
+def test_protocol_direct_rejection_workflow(as_role, resident_unit_id):
+    """Protocol direct_rejection: automatically rejected and cancelled on logging."""
+    admin = as_role("community_admin")
+    guard = as_role("security_guard")
+
+    r = admin.put(
+        f"{P}/protocols",
+        json={"delivery_type": "laundry", "protocol_type": "direct_rejection"},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["data"]["protocol_type"] == "direct_rejection"
+
+    # Create delivery -> rejected and cancelled immediately
+    res = guard.post(
+        P,
+        json={
+            "unit_id": resident_unit_id,
+            "delivery_type": "laundry",
+            "provider_name": "Local Laundry",
+        },
+    )
+    assert res.status_code == 201, res.text
+    d = res.json()["data"]
+    assert d["approval_status"] == "rejected"
+    assert d["status"] == "cancelled"
+

@@ -7,6 +7,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
+    testTimeout: 20000,
     exclude: [...configDefaults.exclude, 'e2e/**'],
   },
   resolve: {

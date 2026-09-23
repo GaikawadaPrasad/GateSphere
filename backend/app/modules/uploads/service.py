@@ -151,17 +151,15 @@ class UploadService:
             )
 
         candidates = detect(file_bytes[:32] or b"")
-        detected = next(iter(candidates), None)
-        if candidates and not (candidates & set(kind.content_types)):
+        if not candidates:
+            raise BusinessRuleError("Unrecognized file format", code="UNRECOGNIZED_FORMAT")
+        allowed = candidates & set(kind.content_types)
+        if not allowed:
             raise BusinessRuleError(
                 f"file contents ({sorted(candidates)}) not allowed for {kind.slug}",
                 code="CONTENT_TYPE_NOT_ALLOWED",
             )
-        if not detected:
-            if content_type in kind.content_types:
-                detected = content_type
-            else:
-                raise BusinessRuleError("Unrecognized file format", code="UNRECOGNIZED_FORMAT")
+        detected = next(iter(allowed))
 
         cid = await self._community(community_id) if kind.scope == "community" else None
         ns = str(cid) if cid is not None else str(self.actor.id)

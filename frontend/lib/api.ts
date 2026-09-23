@@ -1216,6 +1216,8 @@ export const deliveriesApi = {
   ) => apiSend<Record<string, unknown>>("POST", `/deliveries/${id}/arrival`, data || {}),
   markDelivered: (id: string) =>
     apiSend<Record<string, unknown>>("POST", `/deliveries/${id}/delivered`),
+  collect: (id: string, remarks?: string) =>
+    apiSend<Record<string, unknown>>("POST", `/deliveries/${id}/collect`, { remarks }),
   cancel: (id: string) => apiSend<Record<string, unknown>>("POST", `/deliveries/${id}/cancel`),
   decide: (id: string, decision: string, remarks?: string) =>
     apiSend<Record<string, unknown>>("POST", `/deliveries/${id}/decision`, { decision, remarks }),
