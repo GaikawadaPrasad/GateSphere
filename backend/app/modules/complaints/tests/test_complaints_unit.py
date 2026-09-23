@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.core.errors import BusinessRuleError, ConflictError
+from app.core.errors import BusinessRuleError, ConflictError, ForbiddenError
 from app.modules.complaints import schemas
 from app.modules.complaints.service import ComplaintService
 
@@ -32,7 +32,7 @@ async def test_ticket_inherits_category_priority_and_sla(
 
 
 async def test_full_lifecycle_to_closed_needs_confirmation(
-    db, scope_for, community, unit, category, superadmin, make_user
+    db, scope_for, community, unit, category, superadmin, make_user, resident_occupant
 ):
     svc = _svc(db, scope_for(community.id), superadmin)
     t = await _ticket(svc, unit, category)
@@ -49,7 +49,12 @@ async def test_full_lifecycle_to_closed_needs_confirmation(
     with pytest.raises(BusinessRuleError):
         await svc.transition_ticket(t.id, schemas.TicketTransition(status="closed"))
 
-    await svc.confirm_ticket(t.id, schemas.TicketConfirm(confirmation_status="confirmed"))
+    # staff cannot confirm ticket
+    with pytest.raises(ForbiddenError):
+        await svc.confirm_ticket(t.id, schemas.TicketConfirm(confirmation_status="confirmed"))
+
+    res_svc = _svc(db, scope_for(community.id), resident_occupant)
+    await res_svc.confirm_ticket(t.id, schemas.TicketConfirm(confirmation_status="confirmed"))
     assert t.status == "closed" and t.closed_at is not None
 
     hist = [h.to_status for h in await svc.list_history(t.id)]
@@ -96,14 +101,15 @@ async def test_ticket_history_timestamps_strictly_increase(
 
 
 async def test_disputed_confirmation_reopens(
-    db, scope_for, community, unit, category, superadmin, make_user
+    db, scope_for, community, unit, category, superadmin, make_user, resident_occupant
 ):
     svc = _svc(db, scope_for(community.id), superadmin)
     t = await _ticket(svc, unit, category)
     await svc.assign_ticket(t.id, schemas.TicketAssign(vendor_name="Acme Plumbers"))
     await svc.transition_ticket(t.id, schemas.TicketTransition(status="in_progress"))
     await svc.transition_ticket(t.id, schemas.TicketTransition(status="resolved"))
-    await svc.confirm_ticket(t.id, schemas.TicketConfirm(confirmation_status="disputed"))
+    res_svc = _svc(db, scope_for(community.id), resident_occupant)
+    await res_svc.confirm_ticket(t.id, schemas.TicketConfirm(confirmation_status="disputed"))
     assert t.status == "reopened" and t.resident_confirmation_status == "disputed"
 
 
@@ -117,7 +123,7 @@ async def test_assignment_executor_xor():
 
 
 async def test_feedback_only_after_close_and_once(
-    db, scope_for, community, unit, category, superadmin, make_user
+    db, scope_for, community, unit, category, superadmin, make_user, resident_occupant
 ):
     svc = _svc(db, scope_for(community.id), superadmin)
     t = await _ticket(svc, unit, category)
@@ -128,7 +134,8 @@ async def test_feedback_only_after_close_and_once(
     await svc.assign_ticket(t.id, schemas.TicketAssign(vendor_name="Acme"))
     await svc.transition_ticket(t.id, schemas.TicketTransition(status="in_progress"))
     await svc.transition_ticket(t.id, schemas.TicketTransition(status="resolved"))
-    await svc.confirm_ticket(t.id, schemas.TicketConfirm(confirmation_status="confirmed"))
+    res_svc = _svc(db, scope_for(community.id), resident_occupant)
+    await res_svc.confirm_ticket(t.id, schemas.TicketConfirm(confirmation_status="confirmed"))
     await svc.add_feedback(t.id, schemas.FeedbackCreate(rating=4, comments="ok"))
     with pytest.raises(ConflictError):
         await svc.add_feedback(t.id, schemas.FeedbackCreate(rating=3))

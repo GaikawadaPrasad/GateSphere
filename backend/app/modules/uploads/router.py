@@ -11,6 +11,7 @@ import uuid
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 
 from app.core.context import RequestContext
+from app.core.errors import BusinessRuleError, NotFoundError
 from app.core.responses import Response as Envelope
 from app.core.responses import ok
 from app.core.security import require_auth_async
@@ -64,7 +65,34 @@ async def direct_upload(
     community_id: uuid.UUID | None = Form(None),
     svc: UploadService = Depends(upload_service),
 ) -> dict:
-    content = await file.read()
+    kind_obj = KINDS.get(kind)
+    if kind_obj is None:
+        raise NotFoundError("Unknown upload kind")
+
+    if file.size is not None and file.size > kind_obj.max_bytes:
+        raise BusinessRuleError(
+            f"{kind_obj.slug} files must be <= {kind_obj.max_bytes} bytes",
+            code="FILE_TOO_LARGE",
+            fields={"size_bytes": f"<= {kind_obj.max_bytes}"},
+        )
+
+    chunks: list[bytes] = []
+    total = 0
+    chunk_size = 64 * 1024
+    while True:
+        chunk = await file.read(chunk_size)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > kind_obj.max_bytes:
+            raise BusinessRuleError(
+                f"{kind_obj.slug} files must be <= {kind_obj.max_bytes} bytes",
+                code="FILE_TOO_LARGE",
+                fields={"size_bytes": f"<= {kind_obj.max_bytes}"},
+            )
+        chunks.append(chunk)
+
+    content = b"".join(chunks)
     res = await svc.direct_upload(
         file_bytes=content,
         filename=file.filename or "photo.jpg",

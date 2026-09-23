@@ -154,6 +154,24 @@ async def mark_delivered(delivery_id: uuid.UUID, svc: Svc = Depends(delivery_ser
 
 
 @router.post(
+    "/{delivery_id}/collect",
+    response_model=Envelope[schemas.DeliveryRead],
+    dependencies=[UPDATE],
+)
+async def collect_delivery(
+    delivery_id: uuid.UUID,
+    payload: schemas.DeliveryCollect = schemas.DeliveryCollect(),
+    svc: Svc = Depends(delivery_service),
+) -> dict:
+    return ok(
+        schemas.DeliveryRead.model_validate(
+            await svc.mark_collected(delivery_id, payload.remarks)
+        ),
+        message="Package collected from gate desk",
+    )
+
+
+@router.post(
     "/{delivery_id}/cancel",
     response_model=Envelope[schemas.DeliveryRead],
     dependencies=[UPDATE],

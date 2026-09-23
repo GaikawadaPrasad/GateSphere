@@ -95,3 +95,47 @@ def test_domain_event_lands_in_inbox(as_role, seed_ids):
     resident = as_role("resident")
     lst = resident.get(P, params={"unread_only": True}).json()["data"]
     assert any(n["notification_type"] == "billing.invoice_posted" for n in lst)
+
+
+def test_dispatch_to_non_community_user_returns_404(as_role, seed_ids):
+    """S-04: Dispatching to an existing user with no grant/membership in target community returns 404."""
+    import uuid
+
+    admin = as_role("community_admin")
+    cid = seed_ids["community_id"]
+
+    # 1. Dispatching to a non-existent UUID -> 404 Recipient not found
+    random_uid = str(uuid.uuid4())
+    res_random = admin.post(
+        f"{P}/dispatch",
+        json={
+            "recipient_user_id": random_uid,
+            "notification_type": "notice",
+            "title": "Alert",
+            "message": "Test",
+            "community_id": cid,
+        },
+    )
+    assert res_random.status_code == 404
+    assert res_random.json()["message"] == "Recipient not found"
+    assert res_random.json()["error"]["code"] == "NOT_FOUND"
+
+    # 2. Dispatching to an existing user who does NOT belong to this community -> identical 404
+    with SessionLocal() as db:
+        other_user = db.scalar(select(User).where(User.email == "system@gatesphere.com"))
+        other_uid = str(other_user.id)
+
+    res_other = admin.post(
+        f"{P}/dispatch",
+        json={
+            "recipient_user_id": other_uid,
+            "notification_type": "notice",
+            "title": "Alert",
+            "message": "Test",
+            "community_id": cid,
+        },
+    )
+    assert res_other.status_code == 404
+    assert res_other.json()["message"] == "Recipient not found"
+    assert res_other.json()["error"]["code"] == "NOT_FOUND"
+

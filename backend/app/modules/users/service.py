@@ -65,9 +65,9 @@ class UserService:
     def _visible(self, user: User) -> bool:
         if self.scope.is_global:
             return True
-        grant_cids = {ur.community_id for ur in user.roles if ur.community_id is not None}
         if not user.roles:
-            return True  # unaffiliated user — claimable by any admin
+            return False  # unaffiliated users are only visible to platform super_admins
+        grant_cids = {ur.community_id for ur in user.roles if ur.community_id is not None}
         return bool(grant_cids & self.scope.community_ids)
 
     async def _get_visible(self, user_id: uuid.UUID) -> User:
@@ -130,12 +130,7 @@ class UserService:
                 self.scope.require(community_id)
                 stmt = stmt.where(UserRole.community_id == community_id)
             elif not self.scope.is_global:
-                stmt = stmt.where(
-                    or_(
-                        UserRole.community_id.in_(self.scope.community_ids),
-                        UserRole.id.is_(None),
-                    )
-                )
+                stmt = stmt.where(UserRole.community_id.in_(self.scope.community_ids))
         stmt = stmt.distinct().order_by(User.created_at.desc(), User.email)
         total = int(
             await self.db.scalar(select(func.count()).select_from(stmt.order_by(None).subquery()))
@@ -173,6 +168,11 @@ class UserService:
 
     # -- writes -------------------------------------------- #
     async def create_user(self, payload: schemas.UserCreate) -> User:
+        if not self.scope.is_global and not payload.role_slug:
+            raise BusinessRuleError(
+                "A role must be assigned when creating a user in your community",
+                code="ROLE_REQUIRED",
+            )
         email = payload.email.lower()
         if await self.db.scalar(select(User).where(User.email == email)):
             raise ConflictError("Email already registered", code="EMAIL_TAKEN")
@@ -197,6 +197,7 @@ class UserService:
             await self.grant_role(
                 user.id,
                 schemas.RoleGrantIn(role_slug=payload.role_slug, community_id=target_cid),
+                user=user,
             )
         return await self._get_visible(user.id)
 
@@ -230,8 +231,15 @@ class UserService:
         await self._audit("user.update", str(user.id), new=payload.model_dump(exclude_unset=True))
         return await self._get_visible(user_id)
 
-    async def grant_role(self, user_id: uuid.UUID, payload: schemas.RoleGrantIn) -> UserRole:
-        user = await self._get_visible(user_id)
+    async def grant_role(
+        self,
+        user_id: uuid.UUID,
+        payload: schemas.RoleGrantIn,
+        *,
+        user: User | None = None,
+    ) -> UserRole:
+        if user is None:
+            user = await self._get_visible(user_id)
         role = await self.db.scalar(select(Role).where(Role.slug == payload.role_slug))
         if role is None:
             raise NotFoundError("Role not found")

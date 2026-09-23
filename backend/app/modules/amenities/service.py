@@ -437,6 +437,9 @@ class AmenityService(UnitScopedAccess):
         if max_hours is not None and (end_at - start_at).total_seconds() > max_hours * 3600:
             raise BusinessRuleError("Slot exceeds the per-booking limit", code="TOO_LONG")
 
+        # atomic conflict check
+        await self.amenities.lock(amenity.id)
+
         unit_id = await self._actor_unit()
         max_active = await self._rule_int(amenity.id, "max_active_per_unit")
         if max_active is not None and (
@@ -446,8 +449,6 @@ class AmenityService(UnitScopedAccess):
                 "Your unit has reached its active-booking limit", code="UNIT_BOOKING_LIMIT"
             )
 
-        # atomic conflict check
-        await self.amenities.lock(amenity.id)
         if await self.blocks.overlapping(amenity.id, start_at, end_at):
             raise ConflictError("Amenity is blocked for maintenance", code="AMENITY_BLOCKED")
         cap = slot.capacity or amenity.capacity

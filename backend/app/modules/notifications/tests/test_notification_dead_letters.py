@@ -97,6 +97,13 @@ async def test_retry_dead_letters_resolves_single():
         )
         sync_db.add(recipient)
         sync_db.flush()
+        from app.modules.residents.models import ResidentProfile
+
+        prof = ResidentProfile(
+            community_id=community.id, user_id=recipient.id, profile_status="active"
+        )
+        sync_db.add(prof)
+        sync_db.flush()
         dl = NotificationDeadLetter(
             community_id=community.id,
             kind="single",

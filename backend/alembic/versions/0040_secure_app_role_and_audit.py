@@ -17,16 +17,23 @@ depends_on = None
  
  
 def upgrade() -> None:
-    # 1. Create restricted app role
+    # 1. Create restricted app role without hardcoded credentials
+    import os
+
     op.execute("""
     DO $$
     BEGIN
         IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'gatesphere_app') THEN
-            CREATE ROLE gatesphere_app WITH LOGIN PASSWORD 'gatesphere_app_pass' NOSUPERUSER NOBYPASSRLS;
+            CREATE ROLE gatesphere_app WITH LOGIN NOSUPERUSER NOBYPASSRLS;
         END IF;
     END
     $$;
     """)
+
+    app_db_password = os.getenv("GATESPHERE_APP_DB_PASSWORD") or os.getenv("APP_DB_PASSWORD")
+    if app_db_password:
+        safe_pw = app_db_password.replace("'", "''")
+        op.execute(f"ALTER ROLE gatesphere_app WITH PASSWORD '{safe_pw}';")
     
     op.execute("GRANT USAGE ON SCHEMA public TO gatesphere_app;")
     op.execute("GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO gatesphere_app;")

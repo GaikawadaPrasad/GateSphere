@@ -1084,14 +1084,40 @@ def reset_data(db: Session) -> None:
     """TRUNCATE every data table (schema + `alembic_version` kept) so `main()` re-seeds
     from a guaranteed-clean state. `CASCADE` handles FK order; `RESTART IDENTITY` resets
     the few `Identity` sequences (e.g. `ledger_entries.entry_seq`)."""
+    from app.core.config import settings
+
+    if getattr(settings, "ENVIRONMENT", "").lower() in ("production", "staging", "prod"):
+        raise RuntimeError(
+            f"Database reset is strictly prohibited in {settings.ENVIRONMENT} environment."
+        )
+
     import app.db.base  # noqa: F401 — register every model on Base.metadata
     from app.db.base_class import Base
 
     names = [t.name for t in Base.metadata.sorted_tables if t.name != "alembic_version"]
     if names:
         cols = ", ".join(f'"{n}"' for n in names)
-        db.execute(text(f"TRUNCATE {cols} RESTART IDENTITY CASCADE"))
-        db.commit()
+        has_audit_trigger = False
+        try:
+            db.execute(text("ALTER TABLE audit_logs DISABLE TRIGGER tr_prevent_audit_truncate;"))
+            db.commit()
+            has_audit_trigger = True
+        except Exception:
+            db.rollback()
+
+        try:
+            db.execute(text(f"TRUNCATE {cols} RESTART IDENTITY CASCADE"))
+            db.commit()
+        finally:
+            if has_audit_trigger:
+                try:
+                    db.execute(
+                        text("ALTER TABLE audit_logs ENABLE TRIGGER tr_prevent_audit_truncate;")
+                    )
+                    db.commit()
+                except Exception:
+                    db.rollback()
+
     log.info("seed.reset", tables=len(names))
 
 

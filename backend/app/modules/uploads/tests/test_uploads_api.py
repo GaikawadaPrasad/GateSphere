@@ -223,3 +223,44 @@ def test_direct_upload_happy_path(as_role, seed_ids):
     assert data["status"] == "confirmed"
     assert data["detected_content_type"] == "image/jpeg"
     assert data["file_url"].startswith("http")
+
+
+def test_direct_upload_rejects_unrecognized_signature_disguised_as_jpeg(as_role, seed_ids):
+    """S-07: Direct upload must reject bytes with unrecognised magic signature even if declared as image/jpeg."""
+    guard = as_role("security_guard")
+    html_data = b"<html><script>alert('xss')</script></html>"
+    r = guard.post(
+        f"{P}/direct",
+        data={"kind": "visitor_photo", "community_id": seed_ids["community_id"]},
+        files={"file": ("malicious.jpg", html_data, "image/jpeg")},
+    )
+    assert r.status_code == 422, r.text
+    assert r.json()["error"]["code"] == "UNRECOGNIZED_FORMAT"
+
+
+def test_direct_upload_rejects_disallowed_type(as_role, seed_ids):
+    """S-07: Direct upload must reject detected types not permitted for the kind."""
+    guard = as_role("security_guard")
+    pdf_data = b"%PDF-1.4\n%testpdfcontent"
+    r = guard.post(
+        f"{P}/direct",
+        data={"kind": "visitor_photo", "community_id": seed_ids["community_id"]},
+        files={"file": ("document.jpg", pdf_data, "image/jpeg")},
+    )
+    assert r.status_code == 422, r.text
+    assert r.json()["error"]["code"] == "CONTENT_TYPE_NOT_ALLOWED"
+
+
+def test_direct_upload_rejects_oversize(as_role, seed_ids):
+    """S-07: Direct upload rejects payload exceeding kind's max_bytes."""
+    guard = as_role("security_guard")
+    # visitor_photo max is 5MB (5_242_880 bytes).
+    oversize = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00" + b"x" * (5_242_880 + 10)
+    r = guard.post(
+        f"{P}/direct",
+        data={"kind": "visitor_photo", "community_id": seed_ids["community_id"]},
+        files={"file": ("huge.jpg", oversize, "image/jpeg")},
+    )
+    assert r.status_code == 422, r.text
+    assert r.json()["error"]["code"] == "FILE_TOO_LARGE"
+

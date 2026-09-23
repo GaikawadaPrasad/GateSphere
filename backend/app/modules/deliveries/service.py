@@ -33,7 +33,7 @@ from app.modules.residents.models import ResidentProfile, UnitOccupancy
 from app.modules.users.models import User
 
 _DEFAULT_PROTOCOL = {
-    "protocol_type": "collect_at_gate",
+    "protocol_type": "resident_approval_required",
     "requires_otp": False,
     "allow_direct_entry": False,
     "leave_at_gate": True,
@@ -163,6 +163,19 @@ class DeliveryService(UnitScopedAccess):
         cid = self._one_community(community_id)
         _enum("delivery_type", payload.delivery_type)
         _enum("protocol_type", payload.protocol_type)
+        # Keep flags in sync with protocol_type
+        if payload.protocol_type in ("allow_at_gate", "direct_to_door"):
+            payload.allow_direct_entry = True
+            payload.leave_at_gate = False
+        elif payload.protocol_type in ("leave_at_gate_desk", "leave_at_gate"):
+            payload.allow_direct_entry = False
+            payload.leave_at_gate = True
+        elif payload.protocol_type == "direct_rejection":
+            payload.allow_direct_entry = False
+            payload.leave_at_gate = False
+        elif payload.allow_direct_entry and payload.protocol_type in (None, "collect_at_gate", "resident_approval_required"):
+            payload.protocol_type = "allow_at_gate"
+
         if await self.is_unit_restricted():
             scope = await self._unit_scope()
             if not scope:
@@ -209,11 +222,15 @@ class DeliveryService(UnitScopedAccess):
         protocol = await self._protocol_for(
             unit.community_id, payload.delivery_type, unit_id=unit.id
         )
+        ptype = protocol.protocol_type
         auto = protocol.allow_direct_entry and not protocol.requires_otp
-        if protocol.protocol_type == "direct_rejection":
+        if ptype == "direct_rejection":
             app_status = "rejected"
             del_status = "cancelled"
-        elif auto:
+        elif (
+            ptype in ("allow_at_gate", "direct_to_door", "leave_at_gate_desk", "leave_at_gate")
+            or auto
+        ):
             app_status = "auto_approved"
             del_status = "expected"
         else:
@@ -398,10 +415,42 @@ class DeliveryService(UnitScopedAccess):
                 f"Delivery is '{obj.status}', cannot complete", code="INVALID_TRANSITION"
             )
         protocol = await self.db.get(DeliveryProtocol, obj.protocol_id) if obj.protocol_id else None
-        obj.status = "delivered" if (protocol and not protocol.leave_at_gate) else "collected"
+        is_gate_desk = (
+            protocol is not None
+            and (protocol.protocol_type in ("leave_at_gate_desk", "leave_at_gate") or protocol.leave_at_gate)
+        )
+        obj.status = "collected" if is_gate_desk else "delivered"
         await self._event(obj, "delivered")
         await self.db.flush()
         await self._audit("delivery.delivered", obj.community_id, "delivery", obj.id)
+        return obj
+
+    async def mark_collected(
+        self, delivery_id: uuid.UUID, remarks: str | None = None
+    ) -> Delivery:
+        obj = await self.get_delivery(delivery_id)
+        if obj.status not in ("at_gate", "in_transit"):
+            raise BusinessRuleError(
+                f"Delivery is '{obj.status}', cannot mark as collected", code="INVALID_TRANSITION"
+            )
+        obj.status = "collected"
+        await self._event(obj, "delivered", remarks=remarks or "Package collected from gate desk")
+        await self.db.flush()
+        await self._audit("delivery.collected", obj.community_id, "delivery", obj.id)
+        if obj.resident_user_id:
+            await notif_events.emit(
+                self.db,
+                self.scope,
+                self.actor,
+                self.ctx,
+                recipient_user_id=obj.resident_user_id,
+                community_id=obj.community_id,
+                notification_type="delivery.collected",
+                title="Delivery Collected",
+                message=f"Your {obj.delivery_type} package has been collected from the gate desk.",
+                reference_type="delivery",
+                reference_id=obj.id,
+            )
         return obj
 
     async def cancel_delivery(self, delivery_id: uuid.UUID) -> Delivery:
