@@ -25,6 +25,10 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "reports:read",
   ],
   security_supervisor: [
+    "users:view",
+    "users:read",
+    "users:create",
+    "users:update",
     "gate:read",
     "gate:override",
     "guards:read",

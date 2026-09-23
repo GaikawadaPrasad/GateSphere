@@ -127,3 +127,32 @@ def test_community_admin_can_create_community_auditor(as_role, seed_ids):
         assert data["roles"][0]["community_id"] == seed_ids["community_id"]
     finally:
         _cleanup_email(email)
+
+
+def test_security_supervisor_can_register_security_guard(as_role, seed_ids):
+    supervisor = as_role("security_supervisor")
+    email = f"guard-{uuid.uuid4().hex[:8]}@example.com"
+    try:
+        # 1. Register guard without passing community_id (matches frontend guardsApi.create)
+        r = supervisor.post(
+            P,
+            json={
+                "email": email,
+                "full_name": "New Gate Guard",
+                "password": "GuardPassword123!",
+                "role_slug": "security_guard",
+            },
+        )
+        assert r.status_code == 201, r.text
+        data = r.json()["data"]
+        assert len(data["roles"]) == 1
+        assert data["roles"][0]["role_slug"] == "security_guard"
+        assert data["roles"][0]["community_id"] == seed_ids["community_id"]
+
+        # 2. Check guard appears in supervisor's guard list
+        list_r = supervisor.get(f"{P}?role_slug=security_guard")
+        assert list_r.status_code == 200
+        guard_emails = [u["email"] for u in list_r.json()["data"]]
+        assert email in guard_emails
+    finally:
+        _cleanup_email(email)

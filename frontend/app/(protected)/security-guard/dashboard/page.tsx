@@ -15,6 +15,7 @@ import {
   type PanicAlert,
   type GuardRoster,
 } from "@/lib/api";
+import { useSecurityGuardLive } from "@/hooks/use-security-guard-live";
 import type { SecurityStats } from "@/types/dashboards";
 import { formatDateTime } from "@/lib/utils";
 import { toast } from "@/store/toast";
@@ -31,8 +32,13 @@ const EMERGENCY_TYPES = [
 export default function SecurityGuardDashboardPage() {
   const router = useRouter();
 
+  // Production-grade live real-time sync with tiered polling
+  const live = useSecurityGuardLive();
+
   // Active Emergency State
-  const [activeSos, setActiveSos] = useState<PanicAlert | null>(null);
+  const [localSos, setLocalSos] = useState<PanicAlert | null>(null);
+  const activeSos = localSos || live.activeSos;
+  const setActiveSos = (alert: PanicAlert | null) => setLocalSos(alert);
 
   // Modal Step Control
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -48,86 +54,19 @@ export default function SecurityGuardDashboardPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Operational stats
-  const [securityStats, setSecurityStats] = useState<SecurityStats | null>(null);
-  const [pendingVisitors, setPendingVisitors] = useState<any[]>([]);
-  const [pendingDeliveryCount, setPendingDeliveryCount] = useState(0);
-  const [activeRoster, setActiveRoster] = useState<GuardRoster | null>(null);
-  const [isLoadingStats, setIsLoadingStats] = useState(true);
-
-  // Fetch initial active emergency alert + operational KPIs
-  useEffect(() => {
-    let mounted = true;
-    gateApi
-      .alerts()
-      .then((alerts) => {
-        if (mounted && alerts && alerts.length > 0) {
-          const live = alerts.find((a) => a.status === "active" || a.status === "acknowledged");
-          if (live) setActiveSos(live);
-        }
-      })
-      .catch(() => {});
-
-    Promise.allSettled([
-      dashboardsApi.security(),
-      visitorsApi.requests(),
-      deliveriesApi.list(),
-      gateApi.rosters(),
-    ]).then(([statsRes, visitorsRes, deliveriesRes, rostersRes]) => {
-      if (!mounted) return;
-      if (statsRes.status === "fulfilled") setSecurityStats(statsRes.value);
-      if (visitorsRes.status === "fulfilled") {
-        setPendingVisitors((visitorsRes.value || []).filter((v: any) => v.status === "pending"));
-      }
-      if (deliveriesRes.status === "fulfilled") {
-        setPendingDeliveryCount(
-          (deliveriesRes.value || []).filter(
-            (d: any) => d.status === "expected" || d.status === "at_gate",
-          ).length,
-        );
-      }
-      if (rostersRes.status === "fulfilled") {
-        setActiveRoster((rostersRes.value || []).find((r) => r.status === "active") || null);
-      }
-      setIsLoadingStats(false);
-    });
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  // Live operational data from reactive hook
+  const securityStats = live.securityStats;
+  const pendingVisitors = live.pendingVisitors;
+  const pendingDeliveryCount = live.pendingDeliveryCount;
+  const activeRoster = live.activeRoster;
+  const isLoadingStats = live.isLoading;
 
   const handleManualRefresh = async () => {
-    setIsLoadingStats(true);
     try {
-      const [alertsRes, statsRes, visitorsRes, deliveriesRes, rostersRes] = await Promise.allSettled([
-        gateApi.alerts(),
-        dashboardsApi.security(),
-        visitorsApi.requests(),
-        deliveriesApi.list(),
-        gateApi.rosters(),
-      ]);
-      if (alertsRes.status === "fulfilled" && alertsRes.value?.length) {
-        const live = alertsRes.value.find((a) => a.status === "active" || a.status === "acknowledged");
-        setActiveSos(live || null);
-      }
-      if (statsRes.status === "fulfilled") setSecurityStats(statsRes.value);
-      if (visitorsRes.status === "fulfilled") {
-        setPendingVisitors((visitorsRes.value || []).filter((v: any) => v.status === "pending"));
-      }
-      if (deliveriesRes.status === "fulfilled") {
-        setPendingDeliveryCount(
-          (deliveriesRes.value || []).filter((d: any) => d.status === "expected" || d.status === "at_gate").length,
-        );
-      }
-      if (rostersRes.status === "fulfilled") {
-        setActiveRoster((rostersRes.value || []).find((r) => r.status === "active") || null);
-      }
+      await live.refetchAll();
       toast.success("Security gate stats and live alerts updated.", "Refreshed");
     } catch {
       toast.error("Failed to refresh gate data.", "Error");
-    } finally {
-      setIsLoadingStats(false);
     }
   };
 
