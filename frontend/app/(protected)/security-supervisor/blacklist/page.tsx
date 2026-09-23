@@ -49,9 +49,9 @@ export default function SecuritySupervisorBlacklistPage() {
         errors.name = "Name must contain only alphabetic letters and spaces (min 2 characters).";
       }
     }
-    if (!cleanPhone && !cleanId) {
-      errors.phone = "Provide either a mobile number or Government ID number to blacklist.";
-      errors.idNumber = "Provide either a mobile number or Government ID number to blacklist.";
+    if (!cleanPhone && !cleanId && !cleanVehicle) {
+      errors.phone = "Provide either a mobile number, Government ID, or Vehicle Plate to blacklist.";
+      errors.idNumber = "Provide either a mobile number, Government ID, or Vehicle Plate to blacklist.";
     }
     if (cleanPhone) {
       const phoneDigits = cleanPhone.replace(/\D/g, "");
@@ -86,6 +86,7 @@ export default function SecuritySupervisorBlacklistPage() {
         phone: formattedPhone,
         id_type: cleanId ? idType : undefined,
         id_number: cleanId || undefined,
+        vehicle_number: cleanVehicle || undefined,
         reason: `${cleanName ? cleanName + ": " : ""}${reason.trim()}${cleanId ? ` [${idType.toUpperCase()}: ${cleanId}]` : ""}${cleanVehicle ? " (Vehicle: " + cleanVehicle + ")" : ""}`,
         risk_level: "high",
       });

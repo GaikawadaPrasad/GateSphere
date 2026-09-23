@@ -76,6 +76,7 @@ class VisitorRead(_Read):
 class BlacklistCreate(_Write):
     phone: str | None = Field(default=None, max_length=20, pattern=r"^[+0-9][0-9 \-]{4,19}$")
     id_number: str | None = Field(default=None, max_length=40)
+    vehicle_number: str | None = Field(default=None, max_length=20)
     visitor_id: uuid.UUID | None = None
     reason: str = Field(min_length=1, max_length=2000)
     risk_level: str = "medium"
@@ -83,8 +84,8 @@ class BlacklistCreate(_Write):
 
     @model_validator(mode="after")
     def _require_identifier(self) -> Self:
-        if not self.phone and not self.id_number and not self.visitor_id:
-            raise ValueError("Provide at least a phone number, ID number, or visitor ID")
+        if not self.phone and not self.id_number and not self.visitor_id and not self.vehicle_number:
+            raise ValueError("Provide at least a phone number, ID number, vehicle number, or visitor ID")
         return self
 
 
@@ -111,6 +112,9 @@ class BlacklistCheckResponse(BaseModel):
     reason: str | None = None
     risk_level: str | None = None
     active_since: str | None = None
+    entry: dict[str, Any] | None = None
+    name: str | None = None
+    vehicle_number: str | None = None
 
 
 class RequestCreate(_Write):

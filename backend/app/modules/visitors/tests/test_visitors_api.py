@@ -272,3 +272,44 @@ def test_duplicate_request_blocked_while_visitor_inside(
     )
     assert r_after.status_code == 201, r_after.text
 
+
+def test_supervisor_blacklist_vehicle_recognized_by_guard(as_role, seed_ids):
+    sup = as_role("security_supervisor")
+    guard = as_role("security_guard")
+    vehicle_plate = f"AP{uuid.uuid4().hex[:2].upper()}KV{uuid.uuid4().hex[:4].upper()}"
+
+    # 1. Supervisor adds blacklist entry with vehicle plate (matching GS-009 scenario)
+    r = sup.post(
+        "/api/v1/visitors/blacklist",
+        json={
+            "phone": _phone(),
+            "reason": f"Syam: Not accept that person Because the person don't have any flat in this Community (Vehicle: {vehicle_plate})",
+            "risk_level": "high",
+        },
+    )
+    assert r.status_code == 201, r.text
+    bl_id = r.json()["data"]["id"]
+
+    try:
+        # 2. Guard searches for the exact vehicle plate
+        check_res = guard.post(
+            f"{P}/blacklist/check",
+            json={"query": vehicle_plate},
+        )
+        assert check_res.status_code == 200, check_res.text
+        data = check_res.json()["data"]
+        assert data["blacklisted"] is True
+        assert data["vehicle_number"] == vehicle_plate
+        assert vehicle_plate in data["reason"]
+
+        # 3. Guard also checks with lowercase query
+        check_plate = guard.post(
+            f"{P}/blacklist/check",
+            json={"query": vehicle_plate.lower()},
+        )
+        assert check_plate.status_code == 200
+        assert check_plate.json()["data"]["blacklisted"] is True
+    finally:
+        sup.delete(f"/api/v1/visitors/blacklist/{bl_id}")
+
+
