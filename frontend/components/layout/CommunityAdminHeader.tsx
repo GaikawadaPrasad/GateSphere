@@ -1,28 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useMe, useLogout } from "@/hooks/use-auth";
 import { useCommunityDetails } from "@/hooks/use-communities";
 import { useUiStore } from "@/store/ui";
 import { useUnreadNotificationCount } from "@/hooks/use-notifications";
 
 export function CommunityAdminHeader() {
-  const router = useRouter();
   const { data: user } = useMe();
   const logout = useLogout();
   const { activeCommunityId, toggleSidebar } = useUiStore();
   const { data: community } = useCommunityDetails(activeCommunityId || undefined);
   const { data: unreadCount = 0 } = useUnreadNotificationCount();
 
-  const handleSignOut = async () => {
-    try {
-      await logout.mutateAsync();
-      router.replace("/login");
-    } catch {
-      router.replace("/login");
-    }
-  };
+  // useLogout hard-navigates to /login on success *and* failure — don't navigate here.
+  const handleSignOut = () => logout.mutate();
 
   return (
     <header

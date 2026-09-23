@@ -104,6 +104,8 @@ vi.mock("@/lib/api", () => {
       setPreference: vi.fn(() => Promise.resolve({})),
       dispatch: vi.fn(() => Promise.resolve({})),
     },
+    // Signed-in resident: a session cookie is present, so useMe asks authApi.me.
+    hasSessionCookie: vi.fn(() => true),
     authApi: {
       me: vi.fn(() =>
         Promise.resolve({
@@ -193,7 +195,8 @@ describe("GS-033: Resident Notifications State & Action Updates", () => {
       expect(screen.getByText("Notifications & Gate Alerts")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("2 Unread")).toBeInTheDocument();
+    // Notifications load only after the session (/auth/me) resolves — wait for the data.
+    expect(await screen.findByText("2 Unread")).toBeInTheDocument();
     expect(screen.getByText("Cab Uber KA01AB1234 Arrived at Gate 1")).toBeInTheDocument();
     expect(screen.getByText("Amazon Courier at Gate 2")).toBeInTheDocument();
 
@@ -212,7 +215,8 @@ describe("GS-033: Resident Notifications State & Action Updates", () => {
     });
 
     const markAllBtn = screen.getByRole("button", { name: /✓ Mark All as Read/i });
-    expect(markAllBtn).toBeInTheDocument();
+    // Enabled once the (auth-gated) notifications have loaded with unread items.
+    await waitFor(() => expect(markAllBtn).not.toBeDisabled());
 
     fireEvent.click(markAllBtn);
 
