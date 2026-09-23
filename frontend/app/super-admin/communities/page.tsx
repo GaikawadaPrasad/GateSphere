@@ -827,15 +827,7 @@ export default function CommunitiesPage() {
               {copiedAll ? "✓ All Credentials Copied!" : "📋 Copy All Credentials"}
             </button>
             <div style={{ display: "flex", gap: "0.5rem" }}>
-              <a
-                href="/login"
-                target="_blank"
-                rel="noreferrer"
-                className="btn btn-secondary"
-                style={{ fontSize: "0.8rem", textDecoration: "none" }}
-              >
-                🚀 Open Login
-              </a>
+              
               <button
                 type="button"
                 className="btn btn-primary"
@@ -2107,15 +2099,7 @@ export default function CommunitiesPage() {
                       >
                         {copiedAll ? "✓ All Credentials Copied!" : "📋 Copy All Credentials"}
                       </button>
-                      <a
-                        href="/login"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="btn btn-primary"
-                        style={{ fontSize: "0.8rem", textDecoration: "none" }}
-                      >
-                        🚀 Open Login Portal
-                      </a>
+                      
                     </div>
                   </div>
                 )}
