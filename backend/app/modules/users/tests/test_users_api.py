@@ -156,3 +156,36 @@ def test_security_supervisor_can_register_security_guard(as_role, seed_ids):
         assert email in guard_emails
     finally:
         _cleanup_email(email)
+
+
+def test_incompatible_role_grant_blocked(as_role, seed_ids):
+    admin = as_role("super_admin")
+    email = f"mukesh-{uuid.uuid4().hex[:8]}@example.com"
+    cid = seed_ids["community_id"]
+    try:
+        # 1. Create user with security_guard role
+        create_res = admin.post(
+            P,
+            json={
+                "email": email,
+                "full_name": "mukeshreddy",
+                "password": "Password123!",
+                "role_slug": "security_guard",
+                "community_id": cid,
+            },
+        )
+        assert create_res.status_code == 201, create_res.text
+        user_id = create_res.json()["data"]["id"]
+
+        # 2. Attempt to grant vendor_technician while security_guard is active
+        grant_res = admin.post(
+            f"{P}/{user_id}/roles",
+            json={"role_slug": "vendor_technician", "community_id": cid},
+        )
+        assert grant_res.status_code == 422, grant_res.text
+        err = grant_res.json()["error"]
+        assert err["code"] == "INCOMPATIBLE_ROLE"
+        assert grant_res.json()["message"] == "First revoke the Security Guard role, then Vendor/Technician can be granted."
+    finally:
+        _cleanup_email(email)
+

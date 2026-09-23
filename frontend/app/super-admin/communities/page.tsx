@@ -192,9 +192,10 @@ export default function CommunitiesPage() {
   const [towerFloorsList, setTowerFloorsList] = useState<Floor[]>([]);
   const [unitFloorId, setUnitFloorId] = useState("");
   const [unitNumber, setUnitNumber] = useState("");
-  const [unitType, setUnitType] = useState("2BHK");
-  const [unitBedrooms, setUnitBedrooms] = useState(2);
-  const [unitSqFt, setUnitSqFt] = useState(1200);
+  const [unitType, setUnitType] = useState("apartment");
+  const [unitBedrooms, setUnitBedrooms] = useState<number | string>(2);
+  const [unitSqFt, setUnitSqFt] = useState<number | string>(1200);
+  const [unitError, setUnitError] = useState("");
 
   const [isAddResidentOpen, setIsAddResidentOpen] = useState(false);
   const [residentTowerId, setResidentTowerId] = useState("");
@@ -506,9 +507,10 @@ export default function CommunitiesPage() {
     const tId = towerId || communityTowers[0]?.id || "";
     setUnitTowerId(tId);
     setUnitNumber("");
-    setUnitType("2BHK");
+    setUnitType("apartment");
     setUnitBedrooms(2);
     setUnitSqFt(1200);
+    setUnitError("");
     setDetailsFeedback(null);
 
     if (tId) {
@@ -530,22 +532,31 @@ export default function CommunitiesPage() {
   const handleSaveUnit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!unitFloorId || !unitNumber.trim()) return;
+    setUnitError("");
     try {
       await createUnitMutation.mutateAsync({
         floor_id: unitFloorId,
         unit_number: unitNumber.trim(),
         unit_type: unitType,
-        bedrooms: Number(unitBedrooms),
-        area_sqft: Number(unitSqFt),
+        bedrooms:
+          unitBedrooms !== "" && !isNaN(Number(unitBedrooms))
+            ? Number(unitBedrooms)
+            : undefined,
+        area_sqft:
+          unitSqFt !== "" && !isNaN(Number(unitSqFt)) && Number(unitSqFt) > 0
+            ? Number(unitSqFt)
+            : undefined,
       });
       setIsAddUnitOpen(false);
       setDetailsFeedback({ type: "success", message: `Unit "${unitNumber}" created successfully.` });
       if (viewingCommunity) await refreshCommunityDetails(viewingCommunity.id);
       refetch();
     } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to create unit.";
+      setUnitError(msg);
       setDetailsFeedback({
         type: "error",
-        message: err instanceof Error ? err.message : "Failed to create unit.",
+        message: msg,
       });
     }
   };
@@ -2513,6 +2524,21 @@ export default function CommunitiesPage() {
         }
       >
         <form id="add-unit-form" onSubmit={handleSaveUnit}>
+          {unitError && (
+            <div
+              style={{
+                padding: "0.6rem 0.8rem",
+                background: "#fef2f2",
+                border: "1px solid #fecaca",
+                borderRadius: "var(--radius-sm, 6px)",
+                color: "#b91c1c",
+                fontSize: "0.85rem",
+                marginBottom: "1rem",
+              }}
+            >
+              ⚠️ {unitError}
+            </div>
+          )}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
             <div>
               <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
@@ -2573,20 +2599,20 @@ export default function CommunitiesPage() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
             <div>
               <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
-                Unit Type
+                Unit Type <span style={{ color: "var(--danger)" }}>*</span>
               </label>
               <select
                 className="select-field"
                 value={unitType}
                 onChange={(e) => setUnitType(e.target.value)}
+                required
               >
-                <option value="1BHK">1 BHK</option>
-                <option value="2BHK">2 BHK</option>
-                <option value="3BHK">3 BHK</option>
-                <option value="4BHK">4 BHK</option>
-                <option value="Penthouse">Penthouse</option>
-                <option value="Studio">Studio</option>
-                <option value="Villa">Villa</option>
+                <option value="apartment">Apartment</option>
+                <option value="office">Office</option>
+                <option value="penthouse">Penthouse</option>
+                <option value="shop">Shop</option>
+                <option value="studio">Studio</option>
+                <option value="villa">Villa</option>
               </select>
             </div>
             <div>
@@ -2599,7 +2625,7 @@ export default function CommunitiesPage() {
                 max="10"
                 className="input-field"
                 value={unitBedrooms}
-                onChange={(e) => setUnitBedrooms(Number(e.target.value))}
+                onChange={(e) => setUnitBedrooms(e.target.value === "" ? "" : Number(e.target.value))}
               />
             </div>
             <div>
@@ -2612,7 +2638,7 @@ export default function CommunitiesPage() {
                 max="50000"
                 className="input-field"
                 value={unitSqFt}
-                onChange={(e) => setUnitSqFt(Number(e.target.value))}
+                onChange={(e) => setUnitSqFt(e.target.value === "" ? "" : Number(e.target.value))}
               />
             </div>
           </div>
@@ -2769,12 +2795,19 @@ export default function CommunitiesPage() {
                   <select
                     className="select-field"
                     value={residentRole}
-                    onChange={(e) => setResidentRole(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setResidentRole(val);
+                      if (val === "secondary_owner") {
+                        setResidentIsPrimary(false);
+                      } else if (val === "primary_owner") {
+                        setResidentIsPrimary(true);
+                      }
+                    }}
                   >
                     <option value="primary_owner">Primary Owner</option>
                     <option value="secondary_owner">Secondary Owner</option>
                     <option value="tenant">Tenant</option>
-                    <option value="family_member">Family Member</option>
                   </select>
                 </div>
               </div>

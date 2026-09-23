@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import React from "react";
 import { CreateUserModal } from "@/components/super-admin/CreateUserModal";
+import { EditUserModal } from "@/components/super-admin/EditUserModal";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { usersApi, communitiesApi } from "@/lib/api";
 
@@ -25,7 +26,10 @@ vi.mock("@/lib/api", () => ({
   usersApi: {
     create: vi.fn(),
     list: vi.fn(),
+    update: vi.fn(),
     delete: vi.fn(),
+    grantRole: vi.fn(),
+    revokeRole: vi.fn(),
   },
   communitiesApi: {
     list: vi.fn(),
@@ -257,3 +261,169 @@ describe("Super Admin Users Page: Sorting & Search", () => {
     });
   });
 });
+
+describe("Super Admin Personnel Management: EditUserModal Single-Role Validation", () => {
+  const mockRoles = [
+    { id: "role-sg", slug: "security_guard", name: "Security Guard" },
+    { id: "role-vt", slug: "vendor_technician", name: "Vendor / Technician" },
+    { id: "role-fm", slug: "facility_manager", name: "Facility Manager" },
+  ];
+
+  const userWithSecurityGuard = {
+    id: "user-mukesh",
+    full_name: "Mukesh Reddy",
+    email: "mukesh@example.com",
+    phone: "+91 9876543210",
+    is_active: true,
+    roles: [
+      {
+        id: "grant-1",
+        role_slug: "security_guard",
+        role_name: "Security Guard",
+        community_id: "comm-1",
+      },
+    ],
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(usersApi.update).mockResolvedValue({} as any);
+    vi.mocked(usersApi.grantRole).mockResolvedValue({ id: "grant-new" } as any);
+    vi.mocked(usersApi.revokeRole).mockResolvedValue(undefined as any);
+  });
+
+  it("blocks granting Vendor/Technician when user already holds Security Guard on + Grant Role", async () => {
+    renderWithClient(
+      <EditUserModal
+        isOpen={true}
+        onClose={vi.fn()}
+        onSuccess={vi.fn()}
+        user={userWithSecurityGuard}
+        availableRoles={mockRoles as any}
+      />
+    );
+
+    // Select Vendor / Technician
+    const roleSelect = screen.getByLabelText(/Select Role to Grant/i) as HTMLSelectElement;
+    fireEvent.change(roleSelect, { target: { value: "vendor_technician" } });
+
+    // Warning banner should appear immediately
+    expect(
+      screen.getByText(
+        "First revoke the Security Guard role, then Vendor/Technician can be granted."
+      )
+    ).toBeInTheDocument();
+
+    // Click + Grant Role button
+    const grantBtn = screen.getByRole("button", { name: /\+ Grant Role/i });
+    fireEvent.click(grantBtn);
+
+    expect(usersApi.grantRole).not.toHaveBeenCalled();
+  });
+
+  it("blocks Save Changes and displays error message when conflicting role is selected", async () => {
+    renderWithClient(
+      <EditUserModal
+        isOpen={true}
+        onClose={vi.fn()}
+        onSuccess={vi.fn()}
+        user={userWithSecurityGuard}
+        availableRoles={mockRoles as any}
+      />
+    );
+
+    // Select Vendor / Technician
+    const roleSelect = screen.getByLabelText(/Select Role to Grant/i) as HTMLSelectElement;
+    fireEvent.change(roleSelect, { target: { value: "vendor_technician" } });
+
+    // Click Save Changes
+    const saveBtn = screen.getByRole("button", { name: /Save Changes/i });
+    fireEvent.click(saveBtn);
+
+    await waitFor(() => {
+      expect(usersApi.grantRole).not.toHaveBeenCalled();
+      expect(usersApi.update).not.toHaveBeenCalled();
+    });
+  });
+
+  it("grants role when selected role is compatible and Save Changes is clicked", async () => {
+    const handleSuccess = vi.fn();
+    const handleClose = vi.fn();
+
+    renderWithClient(
+      <EditUserModal
+        isOpen={true}
+        onClose={handleClose}
+        onSuccess={handleSuccess}
+        user={userWithSecurityGuard}
+        availableRoles={mockRoles as any}
+      />
+    );
+
+    // Select compatible role: Facility Manager
+    const roleSelect = screen.getByLabelText(/Select Role to Grant/i) as HTMLSelectElement;
+    fireEvent.change(roleSelect, { target: { value: "facility_manager" } });
+
+    // Click Save Changes
+    const saveBtn = screen.getByRole("button", { name: /Save Changes/i });
+    fireEvent.click(saveBtn);
+
+    await waitFor(() => {
+      expect(usersApi.update).toHaveBeenCalledWith("user-mukesh", {
+        full_name: "Mukesh Reddy",
+        email: "mukesh@example.com",
+        phone: "+91 9876543210",
+        is_active: true,
+      });
+      expect(usersApi.grantRole).toHaveBeenCalledWith("user-mukesh", {
+        role_slug: "facility_manager",
+        community_id: "comm-1",
+      });
+      expect(handleSuccess).toHaveBeenCalled();
+      expect(handleClose).toHaveBeenCalled();
+    });
+  });
+
+  it("allows granting Vendor/Technician after Security Guard grant is revoked", async () => {
+    renderWithClient(
+      <EditUserModal
+        isOpen={true}
+        onClose={vi.fn()}
+        onSuccess={vi.fn()}
+        user={userWithSecurityGuard}
+        availableRoles={mockRoles as any}
+      />
+    );
+
+    // Revoke Security Guard grant
+    const revokeBtn = screen.getByRole("button", { name: /Revoke Grant/i });
+    fireEvent.click(revokeBtn);
+
+    await waitFor(() => {
+      expect(usersApi.revokeRole).toHaveBeenCalledWith("user-mukesh", "grant-1");
+    });
+
+    // Now select Vendor/Technician
+    const roleSelect = screen.getByLabelText(/Select Role to Grant/i) as HTMLSelectElement;
+    fireEvent.change(roleSelect, { target: { value: "vendor_technician" } });
+
+    // Warning banner should NOT be present now
+    expect(
+      screen.queryByText(
+        "First revoke the Security Guard role, then Vendor/Technician can be granted."
+      )
+    ).not.toBeInTheDocument();
+
+    // Click + Grant Role
+    const grantBtn = screen.getByRole("button", { name: /\+ Grant Role/i });
+    fireEvent.click(grantBtn);
+
+    await waitFor(() => {
+      expect(usersApi.grantRole).toHaveBeenCalledWith("user-mukesh", {
+        role_slug: "vendor_technician",
+        community_id: "comm-1",
+      });
+    });
+  });
+});
+

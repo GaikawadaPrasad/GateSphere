@@ -50,6 +50,7 @@ from app.modules.residents.models import (
 from app.modules.users.models import Role, User, UserRole
 
 _TOKEN_BYTES = 32
+_INVITE_EXPIRY_DAYS = 14
 
 
 def _hash(token: str) -> str:
@@ -77,14 +78,22 @@ class OnboardingService:
     # ------------------------------------------------------------------ #
     # shared helpers
     # ------------------------------------------------------------------ #
-    async def _audit(self, action: str, entity_id, *, community_id=None, **kw) -> None:
+    async def _audit(
+        self,
+        action: str,
+        entity_id,
+        *,
+        community_id=None,
+        entity_type: str = "resident_profile",
+        **kw,
+    ) -> None:
         await record_audit_async(
             self.db,
             module="onboarding",
             action=action,
             actor=self.actor,
             community_id=community_id,
-            entity_type="resident_profile",
+            entity_type=entity_type,
             entity_id=str(entity_id),
             ctx=self.ctx,
             **kw,
@@ -289,20 +298,17 @@ class OnboardingService:
             "invitation.create",
             inv.id,
             community_id=community_id,
+            entity_type="community_invitation",
             new={"email": email, "unit_id": str(payload.unit_id)},
         )
-        data = schemas.InvitationCreated.model_validate(
-            {
-                **schemas.InvitationRead.model_validate(inv).model_dump(),
-                "token": token,
-                "accept_url": f"{settings.FRONTEND_ORIGIN}/invitations/{token}",
-            }
-        )
-        return data
+        inv_data = schemas.InvitationRead.model_validate(inv).model_dump()
+        inv_data["token"] = token
+        inv_data["accept_url"] = f"{settings.FRONTEND_ORIGIN}/invitations/{token}"
+        return schemas.InvitationCreated.model_validate(inv_data)
 
     async def list_invitations(
         self, community_id: uuid.UUID, *, status: str | None, offset: int, limit: int
-    ) -> tuple[list[CommunityInvitation], int]:
+    ) -> tuple[list[schemas.InvitationRead], int]:
         self._require_scope(community_id)
         stmt = select(CommunityInvitation).where(CommunityInvitation.community_id == community_id)
         if status:
@@ -318,7 +324,7 @@ class OnboardingService:
                 )
             ).all()
         )
-        return rows, total
+        return [schemas.InvitationRead.model_validate(r) for r in rows], total
 
     async def revoke_invitation(
         self, community_id: uuid.UUID, invitation_id: uuid.UUID
@@ -339,17 +345,16 @@ class OnboardingService:
 
         inv.status = "revoked"
         inv.updated_at = _now()
-        await self.db.commit()
+        await self.db.flush()
 
         # Audit
-        unit, ctx_str = await self._unit_ctx(inv.unit_id, community_id)
-        if self.ctx:
-            await record_audit_async(
-                self.ctx,
-                action="residents:revoke_invitation",
-                target_id=inv.id,
-                description=f"Revoked invitation for {inv.invited_email} ({ctx_str})",
-            )
+        await self._audit(
+            "invitation.revoke",
+            inv.id,
+            community_id=community_id,
+            entity_type="community_invitation",
+            new={"email": inv.invited_email, "unit_id": str(inv.unit_id), "status": "revoked"},
+        )
 
         return inv
 
@@ -374,22 +379,21 @@ class OnboardingService:
         inv.token_hash = _hash(token)
         inv.expires_at = _now() + timedelta(days=_INVITE_EXPIRY_DAYS)
         inv.updated_at = _now()
-        await self.db.commit()
+        await self.db.flush()
 
         # Audit
-        unit, ctx_str = await self._unit_ctx(inv.unit_id, community_id)
-        if self.ctx:
-            await record_audit_async(
-                self.ctx,
-                action="residents:regenerate_invitation",
-                target_id=inv.id,
-                description=f"Regenerated invitation link for {inv.invited_email} ({ctx_str})",
-            )
+        await self._audit(
+            "invitation.regenerate",
+            inv.id,
+            community_id=community_id,
+            entity_type="community_invitation",
+            new={"email": inv.invited_email, "unit_id": str(inv.unit_id)},
+        )
 
-        resp = schemas.InvitationCreated.model_validate(inv)
-        resp.token = token
-        resp.accept_url = f"{settings.FRONTEND_ORIGIN}/invitations/{token}"
-        return resp
+        inv_data = schemas.InvitationRead.model_validate(inv).model_dump()
+        inv_data["token"] = token
+        inv_data["accept_url"] = f"{settings.FRONTEND_ORIGIN}/invitations/{token}"
+        return schemas.InvitationCreated.model_validate(inv_data)
 
     # ------------------------------------------------------------------ #
     # invitations — public (token)

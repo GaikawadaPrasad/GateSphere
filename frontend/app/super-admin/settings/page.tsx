@@ -436,7 +436,10 @@ export default function SettingsPage() {
         <EditUserModal
           isOpen={!!editingUser}
           onClose={() => setEditingUser(null)}
-          user={editingUser}
+          user={
+            (usersData as unknown as UserRecord[] | undefined)?.find((u) => u.id === editingUser.id) ||
+            editingUser
+          }
           availableRoles={roles}
           onSuccess={() => {
             queryClient.invalidateQueries({ queryKey: ["users"] });

@@ -8,6 +8,38 @@ import type { Role } from "@/types/rbac";
 import { toast } from "@/store/toast";
 import { isValidPersonName } from "@/constants/locations";
 
+const INCOMPATIBLE_ROLE_PAIRS: [string, string][] = [
+  ["security_guard", "vendor_technician"],
+  ["security_supervisor", "vendor_technician"],
+  ["security_guard", "domestic_staff"],
+  ["vendor_technician", "domestic_staff"],
+];
+
+const ROLE_DISPLAY_NAMES: Record<string, string> = {
+  super_admin: "Super Admin",
+  community_admin: "Community Admin",
+  association_committee: "Association Committee",
+  facility_manager: "Facility Manager",
+  security_supervisor: "Security Supervisor",
+  security_guard: "Security Guard",
+  resident: "Resident",
+  domestic_staff: "Domestic Staff",
+  vendor_technician: "Vendor/Technician",
+  auditor: "Auditor",
+};
+
+function getIncompatibleRoleError(activeRoleSlugs: string[], targetRoleSlug: string): string | null {
+  for (const [r1, r2] of INCOMPATIBLE_ROLE_PAIRS) {
+    if (targetRoleSlug === r1 && activeRoleSlugs.includes(r2)) {
+      return `First revoke the ${ROLE_DISPLAY_NAMES[r2] || r2} role, then ${ROLE_DISPLAY_NAMES[r1] || r1} can be granted.`;
+    }
+    if (targetRoleSlug === r2 && activeRoleSlugs.includes(r1)) {
+      return `First revoke the ${ROLE_DISPLAY_NAMES[r1] || r1} role, then ${ROLE_DISPLAY_NAMES[r2] || r2} can be granted.`;
+    }
+  }
+  return null;
+}
+
 export interface UserRoleGrant {
   id: string;
   role_id?: string;
@@ -48,6 +80,7 @@ export function EditUserModal({
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [isActive, setIsActive] = useState(true);
+  const [assignedRoles, setAssignedRoles] = useState<UserRoleGrant[]>(user?.roles || []);
 
   const [selectedRoleSlug, setSelectedRoleSlug] = useState("");
   const [communityIdInput, setCommunityIdInput] = useState("");
@@ -66,10 +99,16 @@ export function EditUserModal({
       setEmail(user.email || "");
       setPhone(user.phone || "");
       setIsActive(user.is_active !== false);
+      setAssignedRoles(user.roles || []);
       setConfirmDelete(false);
       setErrorMessage(null);
     }
   }, [user]);
+
+  const activeRoleSlugs = assignedRoles.map((r) => r.role_slug);
+  const selectedRoleConflict = selectedRoleSlug
+    ? getIncompatibleRoleError(activeRoleSlugs, selectedRoleSlug)
+    : null;
 
   if (!user || !isOpen) return null;
 
@@ -97,6 +136,15 @@ export function EditUserModal({
 
     if (!validateProfile()) return;
 
+    if (selectedRoleSlug) {
+      const conflictMsg = getIncompatibleRoleError(activeRoleSlugs, selectedRoleSlug);
+      if (conflictMsg) {
+        setErrorMessage(conflictMsg);
+        toast.error(conflictMsg, "Role Assignment Blocked");
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     try {
       await usersApi.update(user.id, {
@@ -105,6 +153,20 @@ export function EditUserModal({
         phone: phone.trim() || undefined,
         is_active: isActive,
       });
+
+      if (selectedRoleSlug && !activeRoleSlugs.includes(selectedRoleSlug)) {
+        const targetCommunityId =
+          communityIdInput ||
+          assignedRoles.find((r) => r.community_id)?.community_id ||
+          user.roles?.find((r) => r.community_id)?.community_id ||
+          undefined;
+
+        await usersApi.grantRole(user.id, {
+          role_slug: selectedRoleSlug,
+          community_id: targetCommunityId,
+        });
+      }
+
       toast.success(`Updated profile and access for ${fullName.trim()}.`, "User Updated");
       await queryClient.invalidateQueries({ queryKey: ["users"], refetchType: "all" });
       onSuccess();
@@ -120,17 +182,41 @@ export function EditUserModal({
 
   const handleGrantRole = async () => {
     if (!selectedRoleSlug) return;
-    setIsGrantingRole(true);
     setErrorMessage(null);
+
+    const conflictMsg = getIncompatibleRoleError(activeRoleSlugs, selectedRoleSlug);
+    if (conflictMsg) {
+      setErrorMessage(conflictMsg);
+      toast.error(conflictMsg, "Role Assignment Blocked");
+      return;
+    }
+
+    const targetCommunityId =
+      communityIdInput ||
+      assignedRoles.find((r) => r.community_id)?.community_id ||
+      user.roles?.find((r) => r.community_id)?.community_id ||
+      undefined;
+
+    setIsGrantingRole(true);
     try {
-      await usersApi.grantRole(user.id, {
+      const res = await usersApi.grantRole(user.id, {
         role_slug: selectedRoleSlug,
-        community_id: communityIdInput || undefined,
+        community_id: targetCommunityId,
       });
       toast.success(
         `Role "${selectedRoleSlug}" granted to ${user.full_name}.`,
         "Role Assigned"
       );
+
+      const grantedRole = availableRoles.find((r) => r.slug === selectedRoleSlug);
+      const newGrant: UserRoleGrant = {
+        id: (res as any)?.id || `${user.id}-${selectedRoleSlug}-${Date.now()}`,
+        role_slug: selectedRoleSlug,
+        role_name: grantedRole?.name || selectedRoleSlug,
+        community_id: targetCommunityId || null,
+      };
+      setAssignedRoles((prev) => [...prev.filter((r) => r.role_slug !== selectedRoleSlug), newGrant]);
+
       setSelectedRoleSlug("");
       setCommunityIdInput("");
       await queryClient.invalidateQueries({ queryKey: ["users"], refetchType: "all" });
@@ -150,6 +236,7 @@ export function EditUserModal({
     try {
       await usersApi.revokeRole(user.id, grantId);
       toast.success(`Role assignment revoked from ${user.full_name}.`, "Role Revoked");
+      setAssignedRoles((prev) => prev.filter((r) => r.id !== grantId));
       await queryClient.invalidateQueries({ queryKey: ["users"], refetchType: "all" });
       onSuccess();
     } catch (err: any) {
@@ -250,10 +337,11 @@ export function EditUserModal({
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
             <div>
-              <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.25rem" }}>
+              <label htmlFor="edit-user-fullname" style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.25rem" }}>
                 Full Name
               </label>
               <input
+                id="edit-user-fullname"
                 type="text"
                 className="form-control"
                 value={fullName}
@@ -274,10 +362,11 @@ export function EditUserModal({
             </div>
 
             <div>
-              <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.25rem" }}>
+              <label htmlFor="edit-user-email" style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.25rem" }}>
                 Email Address
               </label>
               <input
+                id="edit-user-email"
                 type="email"
                 className="form-control"
                 value={email}
@@ -298,10 +387,11 @@ export function EditUserModal({
             </div>
 
             <div>
-              <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.25rem" }}>
+              <label htmlFor="edit-user-phone" style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.25rem" }}>
                 Phone Number
               </label>
               <input
+                id="edit-user-phone"
                 type="text"
                 className="form-control"
                 value={phone}
@@ -322,10 +412,11 @@ export function EditUserModal({
             </div>
 
             <div>
-              <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.25rem" }}>
+              <label htmlFor="edit-user-status" style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.25rem" }}>
                 Account Status
               </label>
               <select
+                id="edit-user-status"
                 className="form-control"
                 value={isActive ? "active" : "inactive"}
                 onChange={(e) => setIsActive(e.target.value === "active")}
@@ -346,9 +437,9 @@ export function EditUserModal({
             2. Assigned RBAC Roles & Grants
           </h4>
 
-          {user.roles && user.roles.length > 0 ? (
+          {assignedRoles && assignedRoles.length > 0 ? (
             <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              {user.roles.map((grant) => (
+              {assignedRoles.map((grant) => (
                 <div
                   key={grant.id}
                   style={{
@@ -401,10 +492,11 @@ export function EditUserModal({
             }}
           >
             <div style={{ flex: 1 }}>
-              <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.2rem" }}>
+              <label htmlFor="select-role-to-grant" style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.2rem" }}>
                 Select Role to Grant
               </label>
               <select
+                id="select-role-to-grant"
                 className="form-control"
                 value={selectedRoleSlug}
                 onChange={(e) => setSelectedRoleSlug(e.target.value)}
@@ -429,6 +521,25 @@ export function EditUserModal({
               {isGrantingRole ? "Granting..." : "+ Grant Role"}
             </button>
           </div>
+
+          {selectedRoleConflict && (
+            <div
+              style={{
+                padding: "0.5rem 0.75rem",
+                background: "#fef2f2",
+                border: "1px solid #fca5a5",
+                color: "#991b1b",
+                borderRadius: "var(--radius-input)",
+                fontSize: "0.8rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem",
+              }}
+            >
+              <span>⚠️</span>
+              <span>{selectedRoleConflict}</span>
+            </div>
+          )}
         </div>
       </div>
     </Modal>

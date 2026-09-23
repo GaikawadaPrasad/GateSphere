@@ -747,11 +747,25 @@ export default function CommunityAdminResidentsPage() {
               {
                 key: "unit",
                 header: "Target Unit",
-                render: (row: any) => (
-                  <span>
-                    Unit {row.unit_number || "—"} ({row.tower_name || "Tower"})
-                  </span>
-                ),
+                render: (row: any) => {
+                  const unitNum =
+                    row.unit_number ||
+                    communityUnits?.find((u: any) => u.id === row.unit_id)?.unit_number ||
+                    "—";
+                  const towerName =
+                    row.tower_name ||
+                    towers?.find(
+                      (t: any) =>
+                        t.id ===
+                        communityUnits?.find((u: any) => u.id === row.unit_id)?.tower_id,
+                    )?.name ||
+                    "Tower";
+                  return (
+                    <span>
+                      Unit {unitNum} ({towerName})
+                    </span>
+                  );
+                },
               },
               {
                 key: "occupancy_role",
@@ -787,11 +801,32 @@ export default function CommunityAdminResidentsPage() {
                       type="button"
                       className="btn btn-secondary"
                       style={{ fontSize: "12px", padding: "0.25rem 0.6rem" }}
-                      onClick={() => {
+                      onClick={async () => {
                         markInvitationAsViewed(row.id);
-                        const link = `${window.location.origin}/invitations/${row.token}`;
-                        navigator.clipboard.writeText(link);
-                        toast.success("Invitation activation link copied to clipboard!", "Copied");
+                        if (row.token) {
+                          const link = `${window.location.origin}/invitations/${row.token}`;
+                          navigator.clipboard.writeText(link);
+                          toast.success("Invitation activation link copied to clipboard!", "Copied");
+                        } else if (row.status === "pending") {
+                          try {
+                            const res: any = await onboardingApi.regenerateInvitation(activeCommunityId!, row.id);
+                            const url =
+                              res?.accept_url ||
+                              res?.data?.accept_url ||
+                              (res?.token ? `${window.location.origin}/invitations/${res.token}` : null);
+                            if (url) {
+                              navigator.clipboard.writeText(url);
+                              toast.success("New link generated and copied to clipboard!", "Copied");
+                              fetchInvitations();
+                            } else {
+                              toast.error("Failed to generate link");
+                            }
+                          } catch (err: any) {
+                            toast.error(err?.message || "Failed to generate link", "Error");
+                          }
+                        } else {
+                          toast.error(`Cannot copy link for ${row.status} invitation`, "Error");
+                        }
                       }}
                     >
                       📋 Copy Link
@@ -803,9 +838,13 @@ export default function CommunityAdminResidentsPage() {
                         style={{ fontSize: "12px", padding: "0.25rem 0.6rem" }}
                         onClick={async () => {
                           try {
-                            const res = await onboardingApi.regenerateInvitation(activeCommunityId!, row.id);
-                            if (res?.data?.accept_url) {
-                              navigator.clipboard.writeText(res.data.accept_url);
+                            const res: any = await onboardingApi.regenerateInvitation(activeCommunityId!, row.id);
+                            const url =
+                              res?.accept_url ||
+                              res?.data?.accept_url ||
+                              (res?.token ? `${window.location.origin}/invitations/${res.token}` : null);
+                            if (url) {
+                              navigator.clipboard.writeText(url);
                               toast.success("New link generated and copied to clipboard!", "Copied");
                               fetchInvitations();
                             } else {
@@ -1854,21 +1893,52 @@ export default function CommunityAdminResidentsPage() {
                       type="text"
                       readOnly
                       className="input-field"
-                      value="Link expires after generation (Click Regenerate to create new link)"
-                      style={{ flex: 1, fontSize: "0.8rem", background: "#f8fafc", fontStyle: "italic", color: "#64748b" }}
+                      value={
+                        selectedInvitation.token
+                          ? `${typeof window !== "undefined" ? window.location.origin : ""}/invitations/${selectedInvitation.token}`
+                          : "Link token hidden for security (Click Regenerate to issue new link)"
+                      }
+                      style={{
+                        flex: 1,
+                        fontSize: "0.8rem",
+                        background: "#f8fafc",
+                        fontStyle: selectedInvitation.token ? "normal" : "italic",
+                        color: selectedInvitation.token ? "#1e293b" : "#64748b",
+                      }}
                     />
+                    {selectedInvitation.token && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ flexShrink: 0 }}
+                        onClick={() => {
+                          const link = `${window.location.origin}/invitations/${selectedInvitation.token}`;
+                          navigator.clipboard.writeText(link);
+                          toast.success("Invitation link copied to clipboard!", "Copied");
+                        }}
+                      >
+                        📋 Copy Link
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="btn btn-secondary"
                       style={{ flexShrink: 0 }}
                       onClick={async () => {
                         try {
-                          const res = await onboardingApi.regenerateInvitation(activeCommunityId!, selectedInvitation.id);
-                          if (res?.data?.accept_url) {
-                            navigator.clipboard.writeText(res.data.accept_url);
+                          const res: any = await onboardingApi.regenerateInvitation(activeCommunityId!, selectedInvitation.id);
+                          const url =
+                            res?.accept_url ||
+                            res?.data?.accept_url ||
+                            (res?.token ? `${window.location.origin}/invitations/${res.token}` : null);
+                          if (url) {
+                            navigator.clipboard.writeText(url);
                             toast.success("New link generated and copied to clipboard!", "Copied");
                             fetchInvitations();
-                            setSelectedInvitation(null);
+                            setSelectedInvitation({
+                              ...selectedInvitation,
+                              token: res?.token || res?.data?.token,
+                            });
                           } else {
                             toast.error("Failed to generate link");
                           }
@@ -1887,24 +1957,26 @@ export default function CommunityAdminResidentsPage() {
                       readOnly
                       className="input-field"
                       value={
-                        typeof window !== "undefined"
-                          ? `${window.location.origin}/invitations/${selectedInvitation.token}`
-                          : `/invitations/${selectedInvitation.token}`
+                        selectedInvitation.token
+                          ? `${typeof window !== "undefined" ? window.location.origin : ""}/invitations/${selectedInvitation.token}`
+                          : `Invitation is ${selectedInvitation.status}`
                       }
                       style={{ flex: 1, fontSize: "0.8rem", background: "#f8fafc" }}
                     />
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      style={{ flexShrink: 0 }}
-                      onClick={() => {
-                        const link = `${window.location.origin}/invitations/${selectedInvitation.token}`;
-                        navigator.clipboard.writeText(link);
-                        toast.success("Invitation link copied to clipboard!", "Copied");
-                      }}
-                    >
-                      📋 Copy Link
-                    </button>
+                    {selectedInvitation.token && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ flexShrink: 0 }}
+                        onClick={() => {
+                          const link = `${window.location.origin}/invitations/${selectedInvitation.token}`;
+                          navigator.clipboard.writeText(link);
+                          toast.success("Invitation link copied to clipboard!", "Copied");
+                        }}
+                      >
+                        📋 Copy Link
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
