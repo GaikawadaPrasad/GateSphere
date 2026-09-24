@@ -72,6 +72,7 @@ async def _sweep_ticket_sla() -> dict:
                 module="complaints",
                 action=f"ticket.sla_{target}",
                 actor=actor,
+                role_slug="system",
                 community_id=t.community_id,
                 entity_type="service_ticket",
                 entity_id=t.id,

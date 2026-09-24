@@ -127,12 +127,17 @@ def test_duplicate_handover_is_rejected_without_double_effect(as_role, seed_ids,
         resident = as_role("resident")
         assert resident.post(f"{P}/{d['id']}/decision", json={"decision": "approved"})
         assert guard.post(f"{P}/{d['id']}/arrival", json={}).status_code == 200
-        assert guard.post(f"{P}/{d['id']}/delivered").status_code == 200
+        first = guard.post(f"{P}/{d['id']}/delivered")
+        assert first.status_code == 200, first.text
+        # `delivered` or `collected` depending on the unit's protocol (F5); either way the
+        # retry must not change it.
+        final_status = first.json()["data"]["status"]
+        assert final_status in ("delivered", "collected")
 
         dup = guard.post(f"{P}/{d['id']}/delivered")
         assert dup.status_code == 422, dup.text
         assert dup.json()["error"]["code"] == "INVALID_TRANSITION"
-        assert guard.get(f"{P}/{d['id']}").json()["data"]["status"] == "collected"
+        assert guard.get(f"{P}/{d['id']}").json()["data"]["status"] == final_status
         with SessionLocal() as db:
             completions = (
                 db.query(DeliveryEvent)
@@ -462,3 +467,28 @@ def test_delivery_read_exposes_resolved_unit_level_protocol(
                 )
                 db.execute(delete(DeliveryProtocol).where(DeliveryProtocol.id.in_(proto_ids)))
             db.commit()
+
+
+def test_deleting_a_referenced_protocol_nulls_only_protocol_id(
+    as_role: Callable[[str], TestClient], resident_unit_id: str
+) -> None:
+    """Re-audit #4 N-9: the composite FK used to null `community_id` too (NOT NULL -> error)."""
+    from sqlalchemy import delete
+
+    from app.db.session import SessionLocal
+    from app.modules.deliveries.models import Delivery, DeliveryProtocol
+
+    resident, guard = as_role("resident"), as_role("security_guard")
+    r = resident.put(
+        f"{P}/protocols", json={"delivery_type": "other", "protocol_type": "allow_at_gate"}
+    )
+    assert r.status_code == 200, r.text
+    d = guard.post(P, json={"unit_id": resident_unit_id, "delivery_type": "other"}).json()["data"]
+    assert d["protocol_id"]
+    with SessionLocal() as db:
+        db.execute(delete(DeliveryProtocol).where(DeliveryProtocol.id == d["protocol_id"]))
+        db.commit()
+        row = db.get(Delivery, d["id"])
+        assert row is not None
+        assert row.protocol_id is None
+        assert str(row.community_id) == d["community_id"]

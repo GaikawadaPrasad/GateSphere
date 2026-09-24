@@ -221,11 +221,10 @@ def test_cross_resident_staff_assignment_isolation(as_role, seed_ids, resident_u
 
     # Create Resident B in a distinct unit in the same community
     from app.core.security import hash_password
-    from app.modules.users.models import User, Role, UserRole
     from app.modules.residents.models import ResidentProfile, UnitOccupancy
+    from app.modules.users.models import Role, User, UserRole
 
     with SessionLocal() as db:
-        from app.modules.communities.models import Floor, Tower
 
         u1 = db.scalar(select(Unit).where(Unit.id == uuid.UUID(resident_unit_id)))
         u2 = Unit(
@@ -276,7 +275,9 @@ def test_cross_resident_staff_assignment_isolation(as_role, seed_ids, resident_u
 
     try:
         from starlette.testclient import TestClient
+
         from app.main import app
+
         client_b = TestClient(app)
         login_res = client_b.post(
             "/api/v1/auth/login",
@@ -294,7 +295,9 @@ def test_cross_resident_staff_assignment_isolation(as_role, seed_ids, resident_u
         assert r_b_cross.status_code == 404
     finally:
         with SessionLocal() as db:
-            occs = db.scalars(select(UnitOccupancy).where(UnitOccupancy.unit_id == uuid.UUID(u2_id))).all()
+            occs = db.scalars(
+                select(UnitOccupancy).where(UnitOccupancy.unit_id == uuid.UUID(u2_id))
+            ).all()
             for o in occs:
                 db.delete(o)
             p = db.get(ResidentProfile, prof_b_id)
@@ -307,4 +310,3 @@ def test_cross_resident_staff_assignment_isolation(as_role, seed_ids, resident_u
             if unit_obj:
                 db.delete(unit_obj)
             db.commit()
-

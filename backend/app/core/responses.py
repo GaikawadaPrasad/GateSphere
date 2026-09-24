@@ -27,13 +27,20 @@ class PageMeta(BaseModel):
     total: int
 
 
+class CursorMeta(BaseModel):
+    """Keyset page metadata (AGENTS.md §4.3): no `total`; `next_cursor` null on the last page."""
+
+    page_size: int
+    next_cursor: str | None
+
+
 class Response(BaseModel, Generic[T]):
     """Success envelope for a single object."""
 
     success: bool = True
     message: str = "OK"
     data: T | None = None
-    meta: PageMeta | None = None
+    meta: PageMeta | CursorMeta | None = None
 
 
 class PageResponse(BaseModel, Generic[T]):
@@ -84,6 +91,19 @@ def paginated(rows: Sequence[T], *, total: int, params: PageParams, message: str
         "message": message,
         "data": list(rows),
         "meta": {"page": params.page, "page_size": params.page_size, "total": total},
+    }
+
+
+def cursor_page(
+    rows: Sequence[T], *, next_cursor: str | None, page_size: int, message: str = "OK"
+) -> dict:
+    """Keyset page (AGENTS.md §4.3): no `total` — counting a hot append-only table on every
+    page is the slow path. `next_cursor` is null on the last page."""
+    return {
+        "success": True,
+        "message": message,
+        "data": list(rows),
+        "meta": {"page_size": page_size, "next_cursor": next_cursor},
     }
 
 

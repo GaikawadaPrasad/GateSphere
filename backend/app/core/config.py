@@ -92,6 +92,10 @@ class Settings(BaseSettings):
     RATE_LIMIT_WRITE: str = "120/60"
     RATE_LIMIT_PAYMENT: str = "20/60"
     RATE_LIMIT_DEFAULT: str = "600/60"
+    # Reverse proxies in front of the API that append to X-Forwarded-For (Render's load
+    # balancer = 1). 0 = connect directly: the header is ignored, the socket peer is the client.
+    # Never set it higher than the real hop count: the extra entries are client-controlled.
+    TRUSTED_PROXY_HOPS: int = Field(default=0, ge=0, le=5)
 
     # --- per-account login lockout (AGENTS.md §7: 5 failed attempts → temporary lockout) ---
     # Redis counters keyed by normalized email. Fails CLOSED (M-01): a Redis error is

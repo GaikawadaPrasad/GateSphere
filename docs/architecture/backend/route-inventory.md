@@ -136,7 +136,7 @@ is emitted by `docs/architecture/backend/gen_route_inventory.py`; keep in sync w
 
 | Method | Path | Auth | Perm | Scope | Mutation | Conditionals |
 |---|---|---|---|---|---|---|
-| GET/POST | `/gate/events` | session | `gate:view` / `:create` | T | `gate_events` (append-only insert) | `422 INVALID_ENUM` |
+| GET/POST | `/gate/events` | session | `gate:view` / `:create` | T | `gate_events` (append-only insert) | `422 INVALID_ENUM`; GET supports `?keyset=true` / `?cursor=` keyset pagination (`400 INVALID_CURSOR`) |
 | POST | `/gate/checkpoint-override` | session | `gate:approve` (Security Supervisor / Community Admin) | T | `gate_events` (`checkpoint_override`, reason in metadata) | `reason` 3–500 chars; emit `gate.checkpoint_override` → supervisors + admin |
 | GET/POST | `/gate/rosters` | session | `:view` / `:create` | T | `guard_rosters` (insert) | `422 INVALID_TIME_RANGE`; `409 ROSTER_EXISTS` |
 | PATCH | `/gate/rosters/{id}` | session | `gate:update` | T | `guard_rosters` (details only) | status is a separate endpoint |

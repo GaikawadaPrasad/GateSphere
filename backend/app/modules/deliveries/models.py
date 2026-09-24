@@ -114,6 +114,8 @@ class Delivery(Base, TimestampMixin, TenantMixin):
         ForeignKeyConstraint(
             ["unit_id", "community_id"], ["units.id", "units.community_id"], ondelete="CASCADE"
         ),
+        # DB: `ON DELETE SET NULL (protocol_id)` (migration 0047) so only protocol_id is
+        # nulled; reflection reports it as plain SET NULL, which this matches.
         ForeignKeyConstraint(
             ["protocol_id", "community_id"],
             ["delivery_protocols.id", "delivery_protocols.community_id"],

@@ -45,6 +45,7 @@ async def _expire_stale_requests() -> dict:
                 module="visitors",
                 action="request.expired",
                 actor=actor,
+                role_slug="system",
                 community_id=req.community_id,
                 entity_type="visitor_request",
                 entity_id=req.id,

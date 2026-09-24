@@ -21,9 +21,11 @@ must not be able to reference another community's users.
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 from sqlalchemy import Select, false, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import QueryableAttribute
 from sqlalchemy.sql.elements import ColumnElement
 
 from app.core.errors import NotFoundError
@@ -45,6 +47,9 @@ CROSS_UNIT_ROLES = frozenset(
 )
 
 _MISSING = object()
+
+# A mapped column (`Model.col`, an InstrumentedAttribute) or any column expression.
+_Column = ColumnElement[Any] | QueryableAttribute[Any]
 
 
 async def user_in_community(db: AsyncSession, user_id: uuid.UUID, community_id: uuid.UUID) -> bool:
@@ -142,9 +147,9 @@ class UnitScopedAccess:
     async def _scope_unit_column(
         self,
         stmt: Select,
-        unit_col: ColumnElement,
+        unit_col: _Column,
         *,
-        or_owned: ColumnElement | None = None,
+        or_owned: _Column | None = None,
         community_id: uuid.UUID | None = None,
     ) -> Select:
         """Narrow a list query to the actor's units (optionally OR a `created_by == me`
@@ -162,7 +167,7 @@ class UnitScopedAccess:
     async def _scope_owned(
         self,
         stmt: Select,
-        owner_col: ColumnElement,
+        owner_col: _Column,
         community_id: uuid.UUID | None = None,
     ) -> Select:
         """Narrow a list query to rows the actor owns (by user id). No-op if unrestricted."""

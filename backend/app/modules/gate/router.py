@@ -13,7 +13,7 @@ import structlog
 from fastapi import APIRouter, Depends, status
 
 from app.core.export import EXPORT_ROW_CAP, csv_response
-from app.core.responses import PageParams, ok, page_params, paginated
+from app.core.responses import PageParams, cursor_page, ok, page_params, paginated
 from app.core.responses import Response as Envelope
 from app.core.tenancy import require_permission_async
 from app.modules.gate import schemas
@@ -42,19 +42,31 @@ async def list_events(
     community_id: uuid.UUID | None = None,
     gate_id: uuid.UUID | None = None,
     event_type: str | None = None,
+    keyset: bool = False,
+    cursor: str | None = None,
     params: PageParams = Depends(page_params),
     svc: GateService = Depends(gate_service),
 ) -> dict:
-    rows, total = await svc.list_events(
+    """Offset pagination by default (`meta.total`). `?keyset=true` (first page) or
+    `?cursor=<meta.next_cursor>` switches to keyset pagination: no `total`, stable under
+    concurrent inserts (AGENTS.md §4.3)."""
+    rows, marker = await svc.list_events(
         community_id=community_id,
         gate_id=gate_id,
         event_type=event_type,
+        cursor=cursor,
+        keyset=keyset,
         offset=params.offset,
         limit=params.page_size,
     )
-    return paginated(
-        [schemas.EventRead.model_validate(r) for r in rows], total=total, params=params
-    )
+    data = [schemas.EventRead.model_validate(r) for r in rows]
+    if keyset or cursor:
+        return cursor_page(
+            data,
+            next_cursor=marker if isinstance(marker, str) else None,
+            page_size=params.page_size,
+        )
+    return paginated(data, total=int(marker or 0), params=params)
 
 
 @router.get("/events.csv", dependencies=[EXPORT])

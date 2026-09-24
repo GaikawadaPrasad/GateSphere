@@ -10,7 +10,13 @@ import path from "node:path";
 import { expect, request, type APIRequestContext, type Browser, type Page } from "@playwright/test";
 
 export const DEMO_DOMAIN = "gatesphere.com";
-export const ROLES = ["resident", "security_guard", "community_admin", "super_admin"] as const;
+export const ROLES = [
+  "resident",
+  "security_guard",
+  "community_admin",
+  "facility_manager",
+  "super_admin",
+] as const;
 export type Role = (typeof ROLES)[number];
 
 export const demoEmail = (role: Role) => `${role}@${DEMO_DOMAIN}`;
@@ -35,9 +41,21 @@ export class RoleApi {
 
   static async open(baseURL: string, role: Role): Promise<RoleApi> {
     const ctx = await request.newContext({ baseURL, storageState: authFile(role) });
+    return RoleApi.fromContext(ctx, role);
+  }
+
+  /** Sign in any seeded account (e.g. a second resident) through the real login endpoint. */
+  static async login(baseURL: string, email: string, password: string): Promise<RoleApi> {
+    const ctx = await request.newContext({ baseURL });
+    const res = await ctx.post("/api/v1/auth/login", { data: { email, password } });
+    expect(res.status(), `login ${email}: ${await res.text()}`).toBe(200);
+    return RoleApi.fromContext(ctx, email);
+  }
+
+  private static async fromContext(ctx: APIRequestContext, who: string): Promise<RoleApi> {
     const state = await ctx.storageState();
     const csrf = state.cookies.find((c) => /^gatesphere_[a-z0-9_]+_csrf$/.test(c.name));
-    if (!csrf) throw new Error(`no csrf cookie in ${role} storage state`);
+    if (!csrf) throw new Error(`no csrf cookie for ${who}`);
     return new RoleApi(ctx, csrf.value);
   }
 

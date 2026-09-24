@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import secrets
+from collections.abc import Callable
 
+from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from app.db.session import SessionLocal
@@ -175,3 +177,35 @@ def test_checkpoint_override_requires_reason(as_role, seed_ids):
         sup.post(f"{P}/checkpoint-override", json={"gate_id": gate_id, "reason": "x"}).status_code
         == 422
     )
+
+
+def test_events_keyset_pagination_walks_every_row_once(
+    as_role: Callable[[str], TestClient], seed_ids: dict[str, str]
+) -> None:
+    """Re-audit #4 N-10: `?keyset=true` / `?cursor=` expose keyset pagination (no total)."""
+    guard = as_role("security_guard")
+    cid = seed_ids["community_id"]
+    offset_page = guard.get(f"{P}/events", params={"community_id": cid, "page_size": 100})
+    total = offset_page.json()["meta"]["total"]
+    assert total >= 3, "seed must contain gate events for this community"
+
+    seen: list[str] = []
+    params: dict[str, str | int] = {"community_id": cid, "page_size": 2, "keyset": "true"}
+    for _ in range(total + 2):  # bounded: must terminate
+        r = guard.get(f"{P}/events", params=params)
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert "total" not in body["meta"]
+        seen += [e["id"] for e in body["data"]]
+        nxt = body["meta"]["next_cursor"]
+        if nxt is None:
+            break
+        params = {"community_id": cid, "page_size": 2, "cursor": nxt}
+    assert len(seen) == len(set(seen)), "keyset pages must not repeat rows"
+    assert len(seen) == total, "keyset pages must cover every row exactly once"
+
+
+def test_events_invalid_cursor_is_400(as_role: Callable[[str], TestClient]) -> None:
+    r = as_role("security_guard").get(f"{P}/events", params={"cursor": "!!not-a-cursor"})
+    assert r.status_code == 400
+    assert r.json()["error"]["code"] == "INVALID_CURSOR"

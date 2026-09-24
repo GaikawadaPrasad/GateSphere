@@ -34,7 +34,7 @@ APPROVE = Depends(require_permission_async("communication:approve"))
 async def require_participate_async(
     scope: TenantScope = Depends(get_tenant_scope_async),
     user: User = Depends(require_auth_async),
-    db: AsyncSession = Depends(get_async_db),
+    db: AsyncSession = Depends(get_async_db, scope="function"),
 ) -> TenantScope:
     if not scope.can("communication:view"):
         raise ForbiddenError("Missing permission: communication:view", code="PERMISSION_DENIED")

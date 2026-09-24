@@ -99,7 +99,7 @@ and saves `e2e/.auth/<role>.json` (gitignored — live cookies).
 ```bash
 # backend (any stack with the seed loaded; keep the login limiter roomy for 4 role sign-ins)
 alembic upgrade head && python -m app.scripts.seed --reset
-RATE_LIMIT_LOGIN=100/60 uvicorn app.main:app --port 8000
+RATE_LIMIT_LOGIN=100/60 RATE_LIMIT_DEFAULT=3000/60 uvicorn app.main:app --port 8000
 # frontend — rewrites are resolved at BUILD time, so point the build at that backend
 cd frontend && BACKEND_INTERNAL_URL=http://127.0.0.1:8000 npm run build
 npx playwright install chromium && npx playwright test      # PORT=… moves server + baseURL
@@ -109,6 +109,10 @@ Journeys: sign-in (redirect, validation, uniform error, real session), visitor a
 (guard logs → resident approves in the portal → `approved` server-side), delivery protocol
 (resident sets *Leave at gate desk* → auto-approved → guard *Collected at desk* → `collected`),
 invoice payment (staff posts → resident pays in the portal → `paid`, balance 0), tenant
-isolation (community admin gets `404` for another community's unit via URL manipulation).
-Not yet covered by E2E: amenity booking conflict, complaint lifecycle, gate entry (covered by
-backend API tests only). CI job: `frontend-e2e`.
+isolation (community admin gets `404` for another community's unit via URL manipulation),
+amenity booking conflict (a second resident takes the only place mid-flow → the portal shows
+the server's 409 and nothing is booked), complaint lifecycle (resident raises in the portal →
+facility manager assigns / progresses / resolves → staff close refused → resident *Confirm Fix*
+→ `closed`), gate entry (guard *Mark Entry* refused without a photo → real JPEG through the
+upload pipeline → `entered`). CI job: `frontend-e2e`. The seeded `resident<N>.<community>`
+accounts (password `Resident#2026`) can sign in and are used as "another resident".

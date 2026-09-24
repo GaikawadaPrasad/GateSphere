@@ -154,6 +154,15 @@ class CommunityRepository:
         return user
 
 
+async def gate_in_scope(db: AsyncSession, scope: TenantScope, gate_id: uuid.UUID) -> Gate | None:
+    """A gate by id, only if it lies inside `scope` (None otherwise). Shared by the gate,
+    vehicles and deliveries services, which each validate a client-supplied `gate_id`."""
+    stmt = select(Gate).where(Gate.id == gate_id)
+    if not scope.is_global:
+        stmt = stmt.where(Gate.community_id.in_(scope.community_ids))
+    return await db.scalar(stmt)
+
+
 class GateRepository(AsyncTenantRepository[Gate]):
     model = Gate
 
