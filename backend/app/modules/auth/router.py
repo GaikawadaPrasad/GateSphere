@@ -25,7 +25,7 @@ from app.modules.users.models import User
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
-def auth_service(db: AsyncSession = Depends(get_async_db, scope="function")) -> AuthService:
+def auth_service(db: AsyncSession = Depends(get_async_db)) -> AuthService:
     return AuthService(db)
 
 

@@ -39,7 +39,7 @@ PLATFORM_ADMIN = Depends(require_platform_admin)
 async def require_financial_dashboard_async(
     scope: TenantScope = Depends(get_tenant_scope_async),
     user: User = Depends(require_auth_async),
-    db: AsyncSession = Depends(get_async_db, scope="function"),
+    db: AsyncSession = Depends(get_async_db),
 ) -> TenantScope:
     if not scope.can("billing:view"):
         raise ForbiddenError("Missing permission: billing:view", code="PERMISSION_DENIED")
@@ -55,7 +55,7 @@ async def require_financial_dashboard_async(
 async def require_security_dashboard_async(
     scope: TenantScope = Depends(get_tenant_scope_async),
     user: User = Depends(require_auth_async),
-    db: AsyncSession = Depends(get_async_db, scope="function"),
+    db: AsyncSession = Depends(get_async_db),
 ) -> TenantScope:
     if not scope.can("gate:view"):
         raise ForbiddenError("Missing permission: gate:view", code="PERMISSION_DENIED")

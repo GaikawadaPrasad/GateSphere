@@ -1,7 +1,7 @@
 """Sync Association Committee role and RBAC.
 
-Revision ID: 0047_sync_assoc_comm_rbac
-Revises: 0046_notif_simulated
+Revision ID: 0048_sync_assoc_comm_rbac
+Revises: 0047_delivery_protocol_fk
 Create Date: 2026-09-24
 """
 
@@ -10,8 +10,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0047_sync_assoc_comm_rbac"
-down_revision = "0046_notif_simulated"
+revision = "0048_sync_assoc_comm_rbac"
+down_revision = "0047_delivery_protocol_fk"
 branch_labels = None
 depends_on = None
 
