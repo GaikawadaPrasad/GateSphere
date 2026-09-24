@@ -8,7 +8,8 @@ export type OperationalRoleSlug =
   | "security_supervisor"
   | "security_guard"
   | "auditor"
-  | "association_committee";
+  | "association_committee"
+  | "vendor_technician";
 
 export interface OperationalStaffGrant {
   id: string;
@@ -104,6 +105,20 @@ export const OPERATIONAL_ROLES: {
     ],
   },
   {
+    slug: "vendor_technician",
+    name: "Vendor / Technician",
+    icon: "🛠️",
+    badgeClass: "badge-warning",
+    description:
+      "Contracted vendor specialist resolving unit repair tickets, scheduled inspections, and facility maintenance.",
+    responsibilities: [
+      "Execute assigned plumbing, electrical, carpentry, and lift service tickets",
+      "Check in at security gate with issued technician entry pass",
+      "Visit assigned residential units and towers for service delivery",
+      "Log job completion notes and upload resolution proofs",
+    ],
+  },
+  {
     slug: "auditor",
     name: "Statutory Auditor",
     icon: "📋",
@@ -156,6 +171,7 @@ export function useOperationalStaff(communityId?: string) {
         "security_supervisor",
         "security_guard",
         "auditor",
+        "vendor_technician",
       ]);
 
       // Filter users that hold at least one of the operational roles in this community
