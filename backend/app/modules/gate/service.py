@@ -12,7 +12,6 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.context import RequestContext
@@ -34,6 +33,7 @@ from app.modules.gate.repository import (
     GateEventRepository,
     GuardRosterRepository,
     PanicAlertRepository,
+    enrich_alerts,
     guard_contacts,
 )
 from app.modules.gate.schemas import ALLOWED
@@ -388,37 +388,7 @@ class GateService:
         else:
             cid = self._one_community(payload.community_id)
 
-        # Resolve resident's location (Tower/Block and Unit Number) if triggered by a user
-        unit_label = None
-        if self.actor and self.actor.id:
-            try:
-                from app.modules.communities.models import Tower, Unit
-                from app.modules.residents.models import ResidentProfile, UnitOccupancy
-
-                occ_res = await self.db.execute(
-                    select(Unit, Tower)
-                    .join(UnitOccupancy, UnitOccupancy.unit_id == Unit.id)
-                    .join(ResidentProfile, ResidentProfile.id == UnitOccupancy.resident_profile_id)
-                    .outerjoin(Tower, Tower.id == Unit.tower_id)
-                    .where(
-                        ResidentProfile.user_id == self.actor.id, UnitOccupancy.is_active.is_(True)
-                    )
-                )
-                row = occ_res.first()
-                if row:
-                    u, t = row
-                    tower_name = t.name if t else ""
-                    u_num = u.unit_number if u else ""
-                    if tower_name and u_num:
-                        unit_label = f"{tower_name} - Unit {u_num}"
-                    elif u_num:
-                        unit_label = f"Unit {u_num}"
-            except Exception:
-                unit_label = None
-
         msg = payload.message or "Emergency SOS triggered by resident from portal"
-        if unit_label and "Location:" not in msg and unit_label not in msg:
-            msg = f"Location: {unit_label} — {msg}"
 
         obj = PanicAlert(
             community_id=cid,
@@ -434,13 +404,30 @@ class GateService:
         )
         await self.db.flush()
 
+        # Resolve the reporter's name/phone and unit/tower/floor (GS-SOS-001/002/023/024/026)
+        # so the guard/supervisor consoles have a dispatchable address rather than only the
+        # free-text `message`; also fold a short location line into the message itself as a
+        # legacy-compatible fallback for anything that only reads `message`.
+        await enrich_alerts(self.db, [obj])
+        unit_label = None
+        if obj.unit_number:
+            unit_label = (
+                f"{obj.tower_name} - Unit {obj.unit_number}"
+                if obj.tower_name
+                else f"Unit {obj.unit_number}"
+            )
+            if "Location:" not in msg and unit_label not in msg:
+                obj.message = msg = f"Location: {unit_label} — {msg}"
+
         notif_title = (
             f"🚨 SOS EMERGENCY: {unit_label}"
             if unit_label
             else f"PANIC: {payload.alert_type} ({payload.severity})"
         )
         notif_message = (
-            f"Emergency SOS triggered from {unit_label}. Details: {msg}"
+            f"Emergency SOS triggered from {unit_label}"
+            + (f" by {obj.reporter_name}" if obj.reporter_name else "")
+            + f". Details: {msg}"
             if unit_label
             else (msg or f"A {payload.alert_type} alert was raised. Respond now.")
         )
@@ -473,14 +460,15 @@ class GateService:
         if community_id is not None:
             self.scope.require(community_id)
         stmt = self.alerts.filtered(community_id=community_id, status=alert_status)
-        return await self.alerts.list(
-            offset=offset, limit=limit, extra=stmt
-        ), await self.alerts.count(extra=stmt)
+        rows = await self.alerts.list(offset=offset, limit=limit, extra=stmt)
+        await enrich_alerts(self.db, rows)
+        return rows, await self.alerts.count(extra=stmt)
 
     async def _get_alert(self, alert_id: uuid.UUID) -> PanicAlert:
         obj = await self.alerts.get(alert_id)
         if obj is None:
             raise NotFoundError("Alert not found")
+        await enrich_alerts(self.db, [obj])
         return obj
 
     async def acknowledge_alert(self, alert_id: uuid.UUID) -> PanicAlert:

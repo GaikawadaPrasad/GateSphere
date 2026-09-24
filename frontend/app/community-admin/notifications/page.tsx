@@ -5,7 +5,6 @@ import {
   useMyNotifications,
   useMarkNotificationRead,
   useMarkAllNotificationsRead,
-  useDispatchNotification,
 } from "@/hooks/use-notifications";
 import { useUiStore } from "@/store/ui";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -14,6 +13,7 @@ import { Modal } from "@/components/common/Modal";
 import type { AppNotification } from "@/types/notifications";
 import { formatDateTime } from "@/lib/utils";
 import { toast } from "@/store/toast";
+import { communicationApi } from "@/lib/api";
 
 export default function CommunityAdminNotificationsPage() {
   const { activeCommunityId } = useUiStore();
@@ -26,7 +26,6 @@ export default function CommunityAdminNotificationsPage() {
     title: "",
     body: "",
     category: "announcement",
-    action_url: "",
   });
   const [isDispatching, setIsDispatching] = useState(false);
 
@@ -44,7 +43,6 @@ export default function CommunityAdminNotificationsPage() {
   // Mutations
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();
-  const dispatchNotification = useDispatchNotification();
 
   const handleMarkRead = async (n: AppNotification) => {
     setSelectedNotification(n);
@@ -84,20 +82,29 @@ export default function CommunityAdminNotificationsPage() {
 
     try {
       setIsDispatching(true);
-      await dispatchNotification.mutateAsync({
-        community_id: activeCommunityId,
-        title: dispatchForm.title.trim(),
-        body: dispatchForm.body.trim(),
-        category: dispatchForm.category,
-        action_url: dispatchForm.action_url.trim() || undefined,
-      });
+      // "Dispatch Alert" is a community-wide broadcast (PRD: notices/emergency alerts
+      // targeting an entire community), so it goes through the announcements/broadcast
+      // API — the same one used by Communication → Notices — rather than
+      // POST /notifications/dispatch, which is a single-recipient endpoint and requires a
+      // `recipient_user_id` this form never had (GSE-BUG-021: always 422'd).
+      const isEmergency = dispatchForm.category === "emergency";
+      const created = await communicationApi.createAnnouncement(
+        {
+          announcement_type: isEmergency ? "emergency" : "notice",
+          title: dispatchForm.title.trim(),
+          body: dispatchForm.body.trim(),
+          priority: isEmergency ? "emergency" : "normal",
+          targets: [{ target_all_community: true }],
+        },
+        activeCommunityId,
+      );
+      await communicationApi.publishAnnouncement(created.id);
       toast.success("Administrative alert dispatched successfully.", "Alert Dispatched");
       setIsDispatchOpen(false);
       setDispatchForm({
         title: "",
         body: "",
         category: "announcement",
-        action_url: "",
       });
       refetch();
     } catch (err: unknown) {
@@ -384,25 +391,9 @@ export default function CommunityAdminNotificationsPage() {
               </select>
             </div>
 
-            <div>
-              <label
-                style={{
-                  fontSize: "0.85rem",
-                  fontWeight: 600,
-                  display: "block",
-                  marginBottom: "0.25rem",
-                }}
-              >
-                Action Link (Optional)
-              </label>
-              <input
-                type="text"
-                className="input-field"
-                placeholder="e.g. /community-admin/communication"
-                value={dispatchForm.action_url}
-                onChange={(e) => setDispatchForm({ ...dispatchForm, action_url: e.target.value })}
-              />
-            </div>
+            {/* Action Link removed: broadcasts now go through the announcements API
+                (see handleDispatch), which has no action_url field — showing an input
+                that was silently dropped would mislead admins. */}
           </div>
 
           <div>

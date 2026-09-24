@@ -151,3 +151,10 @@ class AlertRead(_Read):
     acknowledged_at: datetime | None = None
     resolved_at: datetime | None = None
     resolution_summary: str | None = None
+    # Reporter identity + location (GS-SOS-001/002/026), resolved via repository.enrich_alerts
+    # from `triggered_by_user_id`'s active unit occupancy — never persisted on the row itself.
+    reporter_name: str | None = None
+    reporter_phone: str | None = None
+    tower_name: str | None = None
+    floor_number: int | None = None
+    unit_number: str | None = None

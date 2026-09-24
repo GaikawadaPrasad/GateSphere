@@ -8468,10 +8468,56 @@ export function OwnerTenantDashboardView({
         size="md"
       >
         <div style={{ padding: "0.5rem 0" }}>
-          <p style={{ fontSize: "14px", color: "#334155", marginBottom: "0.85rem" }}>
+          <p style={{ fontSize: "14px", color: "#334155", marginBottom: "0.6rem" }}>
             Select an emergency category to immediately alert Security Guards and dispatch
-            responders to (<strong>{residentUnit}</strong>):
+            responders:
           </p>
+
+          {/* Responder dispatch details — Tower, Floor, Unit, Name & Phone must all be visible
+              before confirming so the guard can be sent to the right door (GS-SOS-003-025). */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+              gap: "0.5rem",
+              background: "#F8FAFC",
+              border: "1px solid var(--border-standard)",
+              borderRadius: "8px",
+              padding: "0.75rem 0.85rem",
+              marginBottom: "1rem",
+            }}
+          >
+            {[
+              { label: "Tower / Block", value: myOccupancy?.tower_name || "—" },
+              {
+                label: "Floor",
+                value:
+                  myOccupancy?.floor_number !== undefined && myOccupancy?.floor_number !== null
+                    ? String(myOccupancy.floor_number)
+                    : "—",
+              },
+              { label: "Unit", value: myOccupancy?.unit_number || "—" },
+              { label: "Resident Name", value: profile.data?.full_name || "—" },
+              { label: "Phone Number", value: profile.data?.phone || "—" },
+            ].map((f) => (
+              <div key={f.label}>
+                <div
+                  style={{
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.04em",
+                    color: "#64748B",
+                  }}
+                >
+                  {f.label}
+                </div>
+                <div style={{ fontSize: "13px", fontWeight: 600, color: "#0F172A" }}>
+                  {f.value}
+                </div>
+              </div>
+            ))}
+          </div>
 
           <div
             style={{

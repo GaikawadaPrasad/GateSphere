@@ -55,6 +55,9 @@ class CommunityInvitation(Base, TimestampMixin, TenantMixin):
         ForeignKey("users.id", ondelete="SET NULL")
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    # Idempotency stamp for the invitation email (AGENTS.md §9.3): set once the send actually
+    # happens, so a retried/duplicated task never re-sends (GS-BUG-006).
+    email_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     accepted_user_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL")

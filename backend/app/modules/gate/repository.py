@@ -129,3 +129,55 @@ async def guard_contacts(
         await db.execute(select(User.id, User.full_name, User.phone).where(User.id.in_(user_ids)))
     ).all()
     return {uid: (name, phone) for uid, name, phone in rows}
+
+
+async def enrich_alerts(db: AsyncSession, alerts: list[PanicAlert]) -> None:
+    """Resolve each alert's reporter name/phone and their active unit (tower, floor, unit
+    number) so the guard/supervisor consoles and the resident's own confirmation can show a
+    dispatchable address instead of only the free-text `message` (GS-SOS-001/002/003/004).
+    Two bulk queries, no N+1; missing/unresolvable data leaves the field `None`.
+    """
+    if not alerts:
+        return
+    from app.modules.communities.models import Floor, Tower, Unit
+    from app.modules.residents.models import ResidentProfile, UnitOccupancy
+
+    user_ids = {a.triggered_by_user_id for a in alerts if a.triggered_by_user_id}
+    contacts = await guard_contacts(db, user_ids)
+
+    unit_by_user: dict[uuid.UUID, tuple[str | None, str | None, int | None]] = {}
+    if user_ids:
+        rows = (
+            await db.execute(
+                select(
+                    ResidentProfile.user_id,
+                    Unit.unit_number,
+                    Tower.name,
+                    Floor.floor_number,
+                )
+                .select_from(UnitOccupancy)
+                .join(ResidentProfile, ResidentProfile.id == UnitOccupancy.resident_profile_id)
+                .join(Unit, Unit.id == UnitOccupancy.unit_id)
+                .outerjoin(Tower, Tower.id == Unit.tower_id)
+                .outerjoin(Floor, Floor.id == Unit.floor_id)
+                .where(
+                    ResidentProfile.user_id.in_(user_ids),
+                    UnitOccupancy.is_active.is_(True),
+                )
+                .order_by(UnitOccupancy.is_primary.desc())
+            )
+        ).all()
+        for uid, unit_number, tower_name, floor_number in rows:
+            if uid not in unit_by_user:
+                unit_by_user[uid] = (unit_number, tower_name, floor_number)
+
+    for a in alerts:
+        name, phone = contacts.get(a.triggered_by_user_id, (None, None))
+        unit_number, tower_name, floor_number = unit_by_user.get(
+            a.triggered_by_user_id, (None, None, None)
+        )
+        a.reporter_name = name
+        a.reporter_phone = phone
+        a.unit_number = unit_number
+        a.tower_name = tower_name
+        a.floor_number = floor_number

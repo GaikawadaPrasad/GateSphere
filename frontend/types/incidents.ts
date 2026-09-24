@@ -8,15 +8,17 @@ export type IncidentStatus =
   | "closed"
   | "false_alarm";
 
+// Must match backend INCIDENT_TYPES exactly (app/modules/incidents/models.py) — any value
+// here that isn't accepted by the API 422s with INVALID_ENUM (GS-INC-020).
 export type IncidentType =
   | "medical"
   | "fire"
   | "theft"
   | "suspicious"
   | "breach"
-  | "vandalism"
-  | "noise"
-  | "parking"
+  | "lift_entrapment"
+  | "assault"
+  | "natural"
   | "other";
 
 export type ActionType =

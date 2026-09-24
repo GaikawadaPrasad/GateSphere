@@ -196,16 +196,11 @@ export default function SecurityGuardEmergencyPage() {
       key: "location",
       header: "Location / Unit",
       render: (a) => {
-        const raw = (a as any).message || "";
-        const match = raw.match(/Location:\s*([^—\n]+)/i);
-        const titleRaw = (a as any).title || "";
-        const titleMatch =
-          titleRaw.match(/Location:\s*([^—\n]+)/i) || titleRaw.match(/SOS EMERGENCY:\s*(.+)/i);
-        const loc =
-          match?.[1]?.trim() ||
-          titleMatch?.[1]?.trim() ||
-          (a as any).location_coordinates ||
-          "Main Gate / Facility";
+        const loc = a.unit_number
+          ? [a.tower_name, a.floor_number != null ? `Floor ${a.floor_number}` : null, `Unit ${a.unit_number}`]
+              .filter(Boolean)
+              .join(" · ")
+          : "Main Gate / Facility";
         return (
           <span
             style={{
@@ -222,6 +217,16 @@ export default function SecurityGuardEmergencyPage() {
           </span>
         );
       },
+    },
+    {
+      key: "reporter",
+      header: "Reported By",
+      render: (a) => (
+        <span style={{ fontSize: "0.85rem" }}>
+          {a.reporter_name || "Unknown"}
+          {a.reporter_phone ? ` · ${a.reporter_phone}` : ""}
+        </span>
+      ),
     },
     {
       key: "message",
@@ -348,21 +353,33 @@ export default function SecurityGuardEmergencyPage() {
             </div>
             <div>
               <span style={{ opacity: 0.8, fontSize: "0.75rem", display: "block" }}>
-                📍 Tower / Unit Location
+                📍 Tower / Floor / Unit
               </span>
               <strong style={{ fontSize: "1.05rem", color: "#fef08a", fontWeight: 800 }}>
-                {(() => {
-                  const raw = (activeSos as any)?.message || "";
-                  const match = raw.match(/Location:\s*([^—\n]+)/i);
-                  if (match && match[1]?.trim()) return match[1].trim();
-                  const rawTitle = (activeSos as any)?.title || "";
-                  const titleMatch =
-                    rawTitle.match(/Location:\s*([^—\n]+)/i) ||
-                    rawTitle.match(/SOS EMERGENCY:\s*(.+)/i);
-                  if (titleMatch && titleMatch[1]?.trim()) return titleMatch[1].trim();
-                  return (activeSos as any)?.location_coordinates || "Main Gate / Facility";
-                })()}
+                {activeSos.unit_number
+                  ? [
+                      activeSos.tower_name,
+                      activeSos.floor_number !== null && activeSos.floor_number !== undefined
+                        ? `Floor ${activeSos.floor_number}`
+                        : null,
+                      `Unit ${activeSos.unit_number}`,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")
+                  : "Main Gate / Facility"}
               </strong>
+            </div>
+            <div>
+              <span style={{ opacity: 0.8, fontSize: "0.75rem", display: "block" }}>
+                👤 Reported By
+              </span>
+              <strong>{activeSos.reporter_name || "Unknown resident"}</strong>
+            </div>
+            <div>
+              <span style={{ opacity: 0.8, fontSize: "0.75rem", display: "block" }}>
+                📞 Phone Number
+              </span>
+              <strong>{activeSos.reporter_phone || "—"}</strong>
             </div>
             <div>
               <span style={{ opacity: 0.8, fontSize: "0.75rem", display: "block" }}>Details</span>

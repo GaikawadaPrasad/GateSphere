@@ -306,7 +306,17 @@ class OnboardingService:
         )
         inv_data = schemas.InvitationRead.model_validate(inv).model_dump()
         inv_data["token"] = token
-        inv_data["accept_url"] = f"{settings.FRONTEND_ORIGIN}/invitations/{token}"
+        accept_url = f"{settings.FRONTEND_ORIGIN}/invitations/{token}"
+        inv_data["accept_url"] = accept_url
+
+        from app.modules.onboarding.tasks import send_invitation_email
+
+        # `countdown=2` lets this request's transaction commit before the worker looks the
+        # invitation up in its own session (GS-BUG-006: this call was previously missing
+        # entirely, so no email was ever sent).
+        send_invitation_email.apply_async(
+            args=[str(inv.id), accept_url], countdown=2, queue="email"
+        )
         return schemas.InvitationCreated.model_validate(inv_data)
 
     async def list_invitations(
@@ -382,6 +392,7 @@ class OnboardingService:
         inv.token_hash = _hash(token)
         inv.expires_at = _now() + timedelta(days=_INVITE_EXPIRY_DAYS)
         inv.updated_at = _now()
+        inv.email_sent_at = None  # the old link is dead; the new one needs its own email
         await self.db.flush()
 
         # Audit
@@ -395,7 +406,14 @@ class OnboardingService:
 
         inv_data = schemas.InvitationRead.model_validate(inv).model_dump()
         inv_data["token"] = token
-        inv_data["accept_url"] = f"{settings.FRONTEND_ORIGIN}/invitations/{token}"
+        accept_url = f"{settings.FRONTEND_ORIGIN}/invitations/{token}"
+        inv_data["accept_url"] = accept_url
+
+        from app.modules.onboarding.tasks import send_invitation_email
+
+        send_invitation_email.apply_async(
+            args=[str(inv.id), accept_url], countdown=2, queue="email"
+        )
         return schemas.InvitationCreated.model_validate(inv_data)
 
     # ------------------------------------------------------------------ #

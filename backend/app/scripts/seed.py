@@ -259,6 +259,117 @@ def seed_residents(db: Session, communities: list[Community]) -> None:
             )
 
 
+def seed_move_records(db: Session, communities: list[Community]) -> None:
+    """Move-in/move-out clearance applications in mixed statuses (FR-03 statutory move
+    clearances; GS-MOVE-009 — the Move Approvals screen had no seed data at all, violating
+    the "empty screens are prohibited" requirement). Reuses the residents/units `seed_residents`
+    already created, so this must run after it.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from app.modules.communities.models import Unit
+    from app.modules.residents.models import MoveRecord, ResidentProfile
+
+    now = datetime.now(UTC)
+    for c in communities:
+        units = db.scalars(
+            select(Unit).where(Unit.community_id == c.id).order_by(Unit.unit_number).limit(6)
+        ).all()
+        admin = db.scalar(
+            select(User)
+            .join(UserRole, UserRole.user_id == User.id)
+            .join(Role, Role.id == UserRole.role_id)
+            .where(Role.slug == "community_admin", UserRole.community_id == c.id)
+        ) or db.scalar(select(User).where(User.email == f"community_admin@{DEMO_DOMAIN}"))
+
+        def profile_for(i: int) -> ResidentProfile | None:
+            email = f"resident{i}.{c.code}@{DEMO_DOMAIN}"
+            user = db.scalar(select(User).where(User.email == email))
+            if user is None:
+                return None
+            return db.scalar(
+                select(ResidentProfile).where(
+                    ResidentProfile.community_id == c.id, ResidentProfile.user_id == user.id
+                )
+            )
+
+        # (resident index, unit index, move_type, status, extra fields)
+        plan = [
+            (
+                1,
+                0,
+                "move_in",
+                "requested",
+                {
+                    "scheduled_at": now + timedelta(days=3),
+                    "clearance_notes": "Awaiting society NOC document verification.",
+                },
+            ),
+            (
+                2,
+                1,
+                "move_in",
+                "approved",
+                {
+                    "scheduled_at": now + timedelta(days=5),
+                    "approved_by_user_id": admin.id if admin else None,
+                    "approved_at": now,
+                },
+            ),
+            (
+                3,
+                2,
+                "move_out",
+                "rejected",
+                {
+                    "clearance_notes": (
+                        "Outstanding maintenance dues must be cleared before move-out "
+                        "clearance can be granted."
+                    ),
+                },
+            ),
+            (
+                4,
+                3,
+                "move_out",
+                "completed",
+                {
+                    "scheduled_at": now - timedelta(days=7),
+                    "approved_by_user_id": admin.id if admin else None,
+                    "approved_at": now - timedelta(days=10),
+                    "clearance_notes": "Move-out inspection completed; deposit settled.",
+                },
+            ),
+        ]
+        for res_idx, unit_idx, move_type, status, extra in plan:
+            if unit_idx >= len(units):
+                continue
+            profile = profile_for(res_idx)
+            if profile is None:
+                continue
+            unit = units[unit_idx]
+            exists = db.scalar(
+                select(MoveRecord).where(
+                    MoveRecord.community_id == c.id,
+                    MoveRecord.unit_id == unit.id,
+                    MoveRecord.resident_profile_id == profile.id,
+                    MoveRecord.move_type == move_type,
+                )
+            )
+            if exists is not None:
+                continue
+            db.add(
+                MoveRecord(
+                    community_id=c.id,
+                    unit_id=unit.id,
+                    resident_profile_id=profile.id,
+                    move_type=move_type,
+                    status=status,
+                    **extra,
+                )
+            )
+
+
 def seed_visitors(db: Session, communities: list[Community]) -> None:
     from app.modules.visitors.models import Visitor, VisitorPolicy
 
@@ -1161,6 +1272,7 @@ def main(*, reset: bool = False) -> None:
         communities = seed_property(db)
         seed_users(db, communities)
         seed_residents(db, communities)
+        seed_move_records(db, communities)
         seed_visitors(db, communities)
         seed_gate(db, communities)
         seed_domestic_staff(db, communities)
