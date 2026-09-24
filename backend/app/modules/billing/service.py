@@ -481,12 +481,19 @@ class BillingService(UnitScopedAccess):
 
         now = datetime.now(UTC)
         # a unit-restricted caller (plain resident) may only record their own payment —
-        # never attribute one to another user.
-        payer_id = (
-            self.actor.id
-            if await self.is_unit_restricted()
-            else (payload.payer_user_id or self.actor.id)
-        )
+        # never attribute one to another user. Staff recording an offline/counter payment on
+        # a resident's behalf don't know the resident's user id, so when `payer_user_id` is
+        # omitted, attribute the payment to the target unit's primary occupant rather than to
+        # the acting staff member — otherwise the receipt and ledger show the Community
+        # Admin's name as "Payer" instead of the actual resident (GS-BILL-018).
+        if await self.is_unit_restricted():
+            payer_id = self.actor.id
+        elif payload.payer_user_id:
+            payer_id = payload.payer_user_id
+        elif payload.unit_id and (billed_user := await self._primary_billed_user(payload.unit_id)):
+            payer_id = billed_user
+        else:
+            payer_id = self.actor.id
         rseq = await self.payments.next_receipt_sequence(cid)
         payment = Payment(
             community_id=cid,
@@ -699,9 +706,13 @@ class BillingService(UnitScopedAccess):
     async def get_receipt(self, payment_id: uuid.UUID) -> dict:
         from app.modules.communities.models import Community
 
+        # `get_payment` already runs `_enrich_payments`, which resolves the resident's name
+        # and unit the same way the Payments list does (unit derived from the invoice being
+        # paid, falling back to the payer's own occupancy) — reuse those fields instead of
+        # re-deriving `payer_name` from the raw `payer_user_id` a second time, which used to
+        # duplicate the query and diverge from the list view (GS-BILL-018).
         pay = await self.get_payment(payment_id)
         community = await self.db.get(Community, pay.community_id)
-        payer = await self.db.get(User, pay.payer_user_id) if pay.payer_user_id else None
         lines = []
         for alloc in pay.allocations:
             inv = await self.db.get(MaintenanceInvoice, alloc.invoice_id)
@@ -716,7 +727,7 @@ class BillingService(UnitScopedAccess):
             "receipt_number": pay.receipt_number,
             "payment_reference": pay.payment_reference,
             "community_name": community.name if community else None,
-            "payer_name": payer.full_name if payer else None,
+            "payer_name": getattr(pay, "payer_name", None),
             "unit_number": getattr(pay, "unit_number", None),
             "tower_name": getattr(pay, "tower_name", None),
             "amount": pay.amount,

@@ -34,6 +34,13 @@ export interface PanicAlert {
   acknowledged_at?: string | null;
   resolved_at?: string | null;
   resolution_summary?: string | null;
+  // Reporter identity + location, resolved server-side from `triggered_by_user_id`
+  // (GS-SOS-001/002/003/026) — null when the reporter has no active unit occupancy.
+  reporter_name?: string | null;
+  reporter_phone?: string | null;
+  tower_name?: string | null;
+  floor_number?: number | null;
+  unit_number?: string | null;
 }
 
 export interface GuardRoster {

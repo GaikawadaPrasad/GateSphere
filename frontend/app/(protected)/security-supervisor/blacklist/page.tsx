@@ -90,7 +90,10 @@ export default function SecuritySupervisorBlacklistPage() {
 
       await blacklistApi.add({
         phone: formattedPhone,
-        id_type: cleanId ? idType : undefined,
+        // `id_type` has no backing column on the backend (BlacklistCreate has no such field
+        // and write bodies are extra="forbid", so sending it 422s the whole request) — the ID
+        // type is already embedded in `reason` below for the human-readable audit trail, and
+        // the raw id_number is still sent/hashed server-side (GS-BUG-038).
         id_number: cleanId || undefined,
         vehicle_number: cleanVehicle || undefined,
         reason: `${cleanName ? cleanName + ": " : ""}${reason.trim()}${cleanId ? ` [${idType.toUpperCase()}: ${cleanId}]` : ""}${cleanVehicle ? " (Vehicle: " + cleanVehicle + ")" : ""}`,

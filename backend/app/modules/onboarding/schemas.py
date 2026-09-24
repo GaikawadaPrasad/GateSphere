@@ -52,6 +52,7 @@ class InvitationRead(BaseModel):
     status: str
     invited_by_user_id: uuid.UUID | None
     expires_at: datetime
+    email_sent_at: datetime | None = None
     accepted_at: datetime | None
     accepted_user_id: uuid.UUID | None
     resident_profile_id: uuid.UUID | None

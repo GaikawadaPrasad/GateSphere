@@ -153,6 +153,8 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
               <tr>
                 <th>Ref ID</th>
                 <th>Type</th>
+                <th>Reported By</th>
+                <th>Tower / Floor / Unit</th>
                 <th>Details</th>
                 <th>Triggered Time</th>
                 <th>Alert Status</th>
@@ -162,14 +164,14 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: "center", padding: "2rem" }}>
+                  <td colSpan={8} style={{ textAlign: "center", padding: "2rem" }}>
                     Loading…
                   </td>
                 </tr>
               ) : alerts.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={8}
                     style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
                   >
                     No emergency alerts recorded.
@@ -194,6 +196,25 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
                       }}
                     >
                       🚨 {a.alert_type}
+                    </td>
+                    <td style={{ fontSize: "0.85rem" }}>
+                      {a.reporter_name || "Unknown"}
+                      {a.reporter_phone ? (
+                        <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                          {a.reporter_phone}
+                        </div>
+                      ) : null}
+                    </td>
+                    <td style={{ fontSize: "0.85rem", whiteSpace: "nowrap" }}>
+                      {a.unit_number
+                        ? [
+                            a.tower_name,
+                            a.floor_number != null ? `Floor ${a.floor_number}` : null,
+                            `Unit ${a.unit_number}`,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")
+                        : "Main Gate / Facility"}
                     </td>
                     <td style={{ fontWeight: 600 }}>{a.message || "—"}</td>
                     <td>{formatDateTime(a.triggered_at)}</td>

@@ -17,6 +17,7 @@ const INCIDENT_CATEGORIES = [
   { value: "fire", label: "Fire / Smoke Hazard" },
   { value: "lift_entrapment", label: "Lift Entrapment" },
   { value: "assault", label: "Physical Altercation / Assault" },
+  { value: "natural", label: "Natural Disaster" },
   { value: "other", label: "Other Incident" },
 ];
 

@@ -568,14 +568,17 @@ export default function CommunityAdminIncidentsPage() {
                   })
                 }
               >
+                {/* Options must match the backend's INCIDENT_TYPES enum exactly — "vandalism",
+                    "noise" and "parking" were never accepted by the API and 422'd every
+                    submission (GS-INC-020). */}
                 <option value="suspicious">Suspicious Activity</option>
                 <option value="breach">Security Breach</option>
                 <option value="theft">Theft / Burglary</option>
                 <option value="fire">Fire Emergency</option>
                 <option value="medical">Medical Emergency</option>
-                <option value="vandalism">Vandalism</option>
-                <option value="noise">Noise Disturbance</option>
-                <option value="parking">Parking Violation</option>
+                <option value="lift_entrapment">Lift Entrapment</option>
+                <option value="assault">Assault</option>
+                <option value="natural">Natural Disaster</option>
                 <option value="other">Other Incident</option>
               </select>
             </div>

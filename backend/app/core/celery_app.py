@@ -20,6 +20,7 @@ celery = Celery(
         "app.modules.complaints.tasks",
         "app.modules.amenities.tasks",
         "app.modules.communication.tasks",
+        "app.modules.onboarding.tasks",
     ],
 )
 celery.conf.update(
@@ -42,6 +43,7 @@ celery.conf.update(
         "app.modules.notifications.tasks.*": {"queue": "notifications"},
         "app.modules.billing.tasks.send_dues_reminders": {"queue": "email"},
         "app.modules.billing.tasks.*": {"queue": "maintenance"},
+        "app.modules.onboarding.tasks.*": {"queue": "email"},
         "app.modules.complaints.tasks.*": {"queue": "maintenance"},
         "app.modules.visitors.tasks.*": {"queue": "maintenance"},
         "app.modules.amenities.tasks.*": {"queue": "maintenance"},
