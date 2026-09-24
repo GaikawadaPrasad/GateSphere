@@ -189,7 +189,8 @@ class GateService:
         _enum("event_type", event_type)
         stmt = select(GateEvent)
         if community_id is not None:
-            self.scope.require(community_id)
+            if not self.scope.is_global and self.scope.community_ids:
+                self.scope.require(community_id)
             stmt = stmt.where(GateEvent.community_id == community_id)
         if gate_id:
             stmt = stmt.where(GateEvent.gate_id == gate_id)

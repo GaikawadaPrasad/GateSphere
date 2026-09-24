@@ -18,6 +18,28 @@ Format per entry:
 
 ---
 
+## 2026-09-24 — Merge `dev` (PR #92, `c72319f`) into `feature-superadmin`
+
+**By:** Claude Code (with johnalexanderkondepoguVPD)
+**Branch / commit:** `feature-superadmin` (`d0173af`) ← `dev` (`cc480a6`), merge in progress
+**Conflicts resolved:** `frontend/eslint.config.mjs` (kept ours, a superset with Playwright
+ignores); `frontend/__tests__/unit/auth-lifecycle.test.tsx` (kept ours, same lint fix);
+`frontend/e2e/smoke.spec.ts` (kept deleted: replaced by the real-backend specs; `dev`'s fake
+`gs_session` cookie still ran against a mocked backend).
+**Auto-merged `dev` changes corrected:**
+- `core/config.py`: bare `postgresql://` was rewritten to `+asyncpg`, which is not installed;
+  restored `+psycopg`. The `asyncpg` passthrough is kept.
+- `communities/repository.py`: `except Exception: pass` (ruff S110, swallowed DB error) narrowed
+  to `SQLAlchemyError` + warning log.
+- `billing/tests/test_billing_unit.py::test_sweep_overdue_invoices_task` removed. It could
+  never pass (savepoint `db` fixture vs the task's own `job_session` connection) and it ran a
+  real global sweep; coverage already exists in `test_billing_tasks.py`.
+- `frontend/.prettierignore` += `tsconfig.json` (`next build` rewrites it: re-audit #4 N-6);
+  `DeliveriesTab.tsx` formatted. Note: `DeliveriesTab.tsx` (from `dev`) is not imported anywhere.
+**Verified:** fresh DB migrate 48 revisions + round-trip, seed reset ×2, pytest 416 passed /
+1 skipped / 0 failed; ruff, black 26.3.1, prettier, eslint (0 errors), tsc, vitest 149/149,
+`DOCKER_BUILD=1 next build`. mypy ratchet now 654 (was 651: +3 from `dev`); layering 232.
+
 ## 2026-09-24 — Re-audit #3 remediation (N-1…N-5, S-01/05/06/08/11/12, F1/F5, 10-B)
 
 **By:** Claude Code (with johnalexanderkondepoguVPD)

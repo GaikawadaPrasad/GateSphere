@@ -141,3 +141,9 @@ async def test_cannot_cancel_invoice_with_payments(db, scope_for, community, uni
     with pytest.raises(BusinessRuleError) as exc:
         await svc.cancel_invoice(inv.id)
     assert exc.value.code == "INVOICE_HAS_PAYMENTS"
+
+
+# The overdue sweep is covered by `test_billing_tasks.py`. It cannot be tested with the
+# savepoint-backed `db` fixture used here: the Celery task opens its own connection
+# (`app.core.jobs.job_session`) and never sees rows that were only written inside the
+# fixture's uncommitted outer transaction.
