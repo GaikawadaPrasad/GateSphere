@@ -223,6 +223,7 @@ export default function FacilityManagerDashboardPage() {
       key: "ticket_number",
       header: "Ticket #",
       sortable: true,
+      width: "120px",
       render: (t) => (
         <button
           type="button"
@@ -251,13 +252,14 @@ export default function FacilityManagerDashboardPage() {
       render: (t) => (
         <span
           style={{
-            maxWidth: 180,
-            display: "inline-block",
-            whiteSpace: "nowrap",
+            fontWeight: 500,
+            color: "var(--fg)",
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
             overflow: "hidden",
             textOverflow: "ellipsis",
-            verticalAlign: "middle",
-            fontWeight: 500,
+            lineHeight: 1.35,
           }}
           title={t.subject}
         >
@@ -269,6 +271,7 @@ export default function FacilityManagerDashboardPage() {
       key: "raised_by_name",
       header: "Resident / Unit",
       sortable: true,
+      width: "170px",
       render: (t) => {
         const residentName = t.raised_by_name || "Resident";
         const unitDisplay = t.unit_number
@@ -289,7 +292,9 @@ export default function FacilityManagerDashboardPage() {
               }}
             >
               <span>👤</span>
-              <span>{residentName}</span>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {residentName}
+              </span>
             </div>
             <div>
               <span
@@ -315,6 +320,7 @@ export default function FacilityManagerDashboardPage() {
     {
       key: "raised_by_phone",
       header: "Contact Info",
+      width: "160px",
       render: (t) => {
         const phone = t.raised_by_phone;
         const email = t.raised_by_email;
@@ -381,25 +387,32 @@ export default function FacilityManagerDashboardPage() {
       key: "category_name",
       header: "Category",
       sortable: true,
+      width: "130px",
     },
     {
       key: "priority",
       header: "Priority",
       sortable: true,
+      width: "110px",
+      align: "center",
       render: (t) => <StatusBadge status={t.priority} />,
     },
     {
       key: "status",
       header: "Status",
       sortable: true,
+      width: "120px",
+      align: "center",
       render: (t) => <StatusBadge status={t.status} />,
     },
     {
       key: "created_at",
       header: "Raised",
       sortable: true,
+      width: "120px",
+      align: "right",
       render: (t) => (
-        <span style={{ fontSize: "0.78rem", color: "var(--muted)" }}>
+        <span style={{ fontSize: "0.78rem", color: "var(--muted)", whiteSpace: "nowrap" }}>
           {formatDate(t.created_at)}
         </span>
       ),
@@ -589,164 +602,202 @@ export default function FacilityManagerDashboardPage() {
         </div>
       </div>
 
-      {/* Split Grid Layout */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 360px), 1fr))",
-          gap: "1.75rem",
-          alignItems: "start",
-        }}
-      >
-        {/* Left Side: Open Tickets Table with Pagination */}
-        <div style={{ minWidth: 0 }}>
-          <div className="card" style={{ marginBottom: "1.5rem" }}>
+      {/* SLA Warnings / Status Panel */}
+      {isLoading ? (
+        <div className="card" style={{ marginBottom: "1.75rem" }}>
+          <div className="card-header">
+            <div>
+              <h3 className="card-title">⚠️ SLA Warnings & Escalations</h3>
+              <p style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.15rem" }}>
+                Tickets exceeding or approaching response/resolution limits
+              </p>
+            </div>
+          </div>
+          <div style={{ padding: "0.75rem 0" }}>
             <div
-              className="card-header"
               style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: "0.5rem",
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 340px), 1fr))",
+                gap: "0.85rem",
               }}
             >
-              <div>
-                <h3 className="card-title">Open Service Tickets</h3>
-                <p style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.15rem" }}>
-                  Active complaints & maintenance requests across the community
-                </p>
-              </div>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
-                onClick={() => router.push("/facility-manager/complaints")}
-              >
-                View Full Queue ({openTickets.length}) →
-              </button>
-            </div>
-
-            <div style={{ padding: "0.5rem 0 0 0" }}>
-              <DataTable
-                columns={ticketColumns}
-                data={openTickets as (DashboardTicket & Record<string, unknown>)[]}
-                isLoading={isLoading}
-                emptyTitle="No open service tickets"
-                emptyDescription="All service and maintenance requests have been resolved."
-                enableClientPagination={true}
-                enableClientSort={true}
-                showSortDropdown={true}
-                pageSize={5}
-              />
+              <Skeleton width="100%" height={68} borderRadius={6} />
+              <Skeleton width="100%" height={68} borderRadius={6} />
             </div>
           </div>
         </div>
-
-        {/* Right Side: SLA Warnings & Action Items */}
-        <div style={{ minWidth: 0 }}>
-          <div className="card" style={{ height: "100%" }}>
-            <div
-              className="card-header"
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: "0.5rem",
-              }}
-            >
-              <div>
-                <h3 className="card-title">⚠️ SLA Warnings & Escalations</h3>
-                <p style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.15rem" }}>
-                  Tickets exceeding or approaching response/resolution limits
-                </p>
+      ) : slaWarnings.length === 0 ? (
+        <div
+          className="card"
+          style={{
+            marginBottom: "1.75rem",
+            padding: "0.85rem 1.25rem",
+            background: "var(--success-subtle, #f0fdf4)",
+            border: "1px solid var(--success-border, #bbf7d0)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "0.75rem",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
+            <span style={{ fontSize: "1.25rem" }}>🛡️</span>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: "0.875rem", color: "#166534" }}>
+                SLA Performance is Optimal
               </div>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
-                onClick={() => router.push("/facility-manager/complaints")}
-              >
-                Manage SLAs →
-              </button>
-            </div>
-
-            <div style={{ padding: "0.75rem 0" }}>
-              {isLoading ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                  <Skeleton width="100%" height={68} borderRadius={6} />
-                  <Skeleton width="100%" height={68} borderRadius={6} />
-                  <Skeleton width="100%" height={68} borderRadius={6} />
-                </div>
-              ) : slaWarnings.length === 0 ? (
-                <EmptyState
-                  icon="🛡️"
-                  title="SLA performance is optimal"
-                  description="All service tickets and maintenance tasks are well within SLA clocks."
-                />
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
-                  {slaWarnings.slice(0, 5).map((t) => (
-                    <div
-                      key={t.id}
-                      style={{
-                        padding: "0.85rem 1rem",
-                        borderRadius: "var(--radius-sm)",
-                        background:
-                          t.escalation_state === "breached"
-                            ? "var(--danger-light, #fef2f2)"
-                            : "var(--warning-light, #fffbeb)",
-                        border: `1px solid ${
-                          t.escalation_state === "breached"
-                            ? "var(--danger-border, #fecaca)"
-                            : "var(--warning-border, #fde68a)"
-                        }`,
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        flexWrap: "wrap",
-                        gap: "0.5rem",
-                      }}
-                    >
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <div
-                          style={{
-                            fontWeight: 600,
-                            fontSize: "0.85rem",
-                            color: t.escalation_state === "breached" ? "#991b1b" : "#92400e",
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}
-                        >
-                          {t.escalation_state === "breached" ? "🚨 SLA Breached" : "⚠️ SLA At Risk"}
-                          : {t.subject}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "0.75rem",
-                            color: t.escalation_state === "breached" ? "#b91c1c" : "#b45309",
-                            marginTop: "0.2rem",
-                          }}
-                        >
-                          {t.ticket_number} · {t.category_name} · Raised {formatDate(t.created_at)}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem", flexShrink: 0 }}
-                        onClick={() => router.push("/facility-manager/complaints")}
-                      >
-                        Triage →
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div style={{ fontSize: "0.75rem", color: "#15803d", marginTop: "0.1rem" }}>
+                All open service tickets and maintenance tasks are well within response and resolution limits.
+              </div>
             </div>
           </div>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem" }}
+            onClick={() => router.push("/facility-manager/complaints")}
+          >
+            View Complaints Queue →
+          </button>
+        </div>
+      ) : (
+        <div className="card" style={{ marginBottom: "1.75rem" }}>
+          <div
+            className="card-header"
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "0.5rem",
+            }}
+          >
+            <div>
+              <h3 className="card-title">⚠️ SLA Warnings & Escalations ({slaWarnings.length})</h3>
+              <p style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.15rem" }}>
+                Tickets exceeding or approaching response/resolution limits — immediate triage recommended
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
+              onClick={() => router.push("/facility-manager/complaints")}
+            >
+              Manage All in Complaints →
+            </button>
+          </div>
+
+          <div style={{ padding: "0.75rem 0" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 340px), 1fr))",
+                gap: "0.85rem",
+              }}
+            >
+              {slaWarnings.slice(0, 6).map((t) => (
+                <div
+                  key={t.id}
+                  style={{
+                    padding: "0.85rem 1rem",
+                    borderRadius: "var(--radius-sm)",
+                    background:
+                      t.escalation_state === "breached"
+                        ? "var(--danger-light, #fef2f2)"
+                        : "var(--warning-light, #fffbeb)",
+                    border: `1px solid ${
+                      t.escalation_state === "breached"
+                        ? "var(--danger-border, #fecaca)"
+                        : "var(--warning-border, #fde68a)"
+                    }`,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: "0.75rem",
+                  }}
+                >
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div
+                      style={{
+                        fontWeight: 600,
+                        fontSize: "0.85rem",
+                        color: t.escalation_state === "breached" ? "#991b1b" : "#92400e",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                      title={t.subject}
+                    >
+                      {t.escalation_state === "breached" ? "🚨 SLA Breached" : "⚠️ SLA At Risk"}:{" "}
+                      {t.subject}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "0.75rem",
+                        color: t.escalation_state === "breached" ? "#b91c1c" : "#b45309",
+                        marginTop: "0.2rem",
+                      }}
+                    >
+                      {t.ticket_number} · {t.category_name} · Raised {formatDate(t.created_at)}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem", flexShrink: 0 }}
+                    onClick={() => router.push("/facility-manager/complaints")}
+                  >
+                    Triage →
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Full-width Open Tickets Table with Sorting & Pagination */}
+      <div className="card" style={{ marginBottom: "1.5rem" }}>
+        <div
+          className="card-header"
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "0.5rem",
+          }}
+        >
+          <div>
+            <h3 className="card-title">Open Service Tickets</h3>
+            <p style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.15rem" }}>
+              Active complaints & maintenance requests across the community
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
+            onClick={() => router.push("/facility-manager/complaints")}
+          >
+            View Full Queue ({openTickets.length}) →
+          </button>
+        </div>
+
+        <div style={{ padding: "0.5rem 0 0 0" }}>
+          <DataTable
+            columns={ticketColumns}
+            data={openTickets as (DashboardTicket & Record<string, unknown>)[]}
+            isLoading={isLoading}
+            emptyTitle="No open service tickets"
+            emptyDescription="All service and maintenance requests have been resolved."
+            enableClientPagination={true}
+            enableClientSort={true}
+            showSortDropdown={true}
+            pageSize={10}
+          />
         </div>
       </div>
 
