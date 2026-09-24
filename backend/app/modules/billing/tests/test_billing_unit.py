@@ -139,3 +139,20 @@ async def test_cannot_cancel_invoice_with_payments(db, scope_for, community, uni
     with pytest.raises(BusinessRuleError) as exc:
         await svc.cancel_invoice(inv.id)
     assert exc.value.code == "INVOICE_HAS_PAYMENTS"
+
+
+async def test_sweep_overdue_invoices_task(db, scope_for, community, unit, superadmin):
+    from datetime import date, timedelta
+    from app.modules.billing.tasks import _sweep_overdue_invoices
+
+    svc = _svc(db, scope_for(community.id), superadmin)
+    inv = await _invoice(svc, unit)
+    await svc.post_invoice(inv.id)
+    inv.due_date = date.today() - timedelta(days=1)
+    await db.commit()
+
+    res = await _sweep_overdue_invoices()
+    assert res["invoices_marked"] >= 1
+    await db.refresh(inv)
+    assert inv.status == "overdue"
+

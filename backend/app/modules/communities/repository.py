@@ -30,6 +30,11 @@ class CommunityRepository:
     async def _populate_admin_info(self, comms: list[Community]) -> list[Community]:
         if not comms:
             return comms
+        for c in comms:
+            if not hasattr(c, "admin_email"):
+                c.admin_email = None
+            if not hasattr(c, "admin_name"):
+                c.admin_name = None
         from app.modules.users.models import Role, User, UserRole
         comm_map = {c.id: c for c in comms}
         stmt = (
@@ -41,11 +46,14 @@ class CommunityRepository:
                 UserRole.community_id.in_(list(comm_map.keys())),
             )
         )
-        res = await self.db.execute(stmt)
-        for community_id, email, full_name in res.all():
-            if community_id in comm_map:
-                comm_map[community_id].admin_email = email
-                comm_map[community_id].admin_name = full_name
+        try:
+            res = await self.db.execute(stmt)
+            for community_id, email, full_name in res.all():
+                if community_id in comm_map:
+                    comm_map[community_id].admin_email = email
+                    comm_map[community_id].admin_name = full_name
+        except Exception:
+            pass
         return comms
 
     async def get(self, community_id: uuid.UUID) -> Community | None:

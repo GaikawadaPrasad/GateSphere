@@ -94,6 +94,10 @@ test.describe("GateSphere Critical E2E Workflows", () => {
   test("Amenity Booking Journey — View amenities list and open reservation modal", async ({
     page,
   }) => {
+    await page.context().addCookies([
+      { name: "gs_session", value: "mock-session-token", url: "http://localhost:3000/" },
+      { name: "gatesphere_resident_csrf", value: "mock-csrf-token", url: "http://localhost:3000/" },
+    ]);
     // Mock user & resident profile
     await page.route("**/api/v1/auth/me", async (route) => {
       await route.fulfill({

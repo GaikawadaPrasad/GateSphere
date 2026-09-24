@@ -16,6 +16,7 @@ from sqlalchemy import select
 
 from app.core.celery_app import celery
 from app.core.jobs import job_session, run, system_actor, system_scope
+from app.modules.audit.service import record_audit_async
 from app.modules.billing.models import (
     BillingRule,
     ChargeHead,
