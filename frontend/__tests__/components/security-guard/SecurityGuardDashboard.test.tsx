@@ -297,7 +297,7 @@ describe("Security Guard Dashboard Components", () => {
       };
 
       // 1. Initial state: No flat pre-selected
-      let unitState = { selectedUnitId: "", filterText: "" };
+      const unitState = { selectedUnitId: "", filterText: "" };
 
       // 2. Guard filters for "A-105"
       const res1 = syncUnitSelection(unitState.selectedUnitId, "A-105", mockUnits);

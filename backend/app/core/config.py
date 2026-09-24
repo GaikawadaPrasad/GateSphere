@@ -143,10 +143,12 @@ class Settings(BaseSettings):
         `postgresql+psycopg://` scheme already works for `create_async_engine`.
         A bare `postgresql://` is normalised here."""
         url = str(self.DATABASE_URL)
+        if url.startswith("postgresql+asyncpg://"):
+            return url
         if url.startswith("postgresql+psycopg://"):
             return url
         if url.startswith("postgresql://"):
-            return "postgresql+psycopg://" + url[len("postgresql://") :]
+            return "postgresql+asyncpg://" + url[len("postgresql://") :]
         return url
 
 

@@ -69,7 +69,9 @@ class AsyncTenantRepository(AsyncRepository[M]):
 
     async def count(self, *, extra: Select | None = None) -> int:
         base = extra if extra is not None else select(self.model)
-        sub = self._scoped(base).order_by(None).subquery()
+        base_clean = base._clone()
+        base_clean._order_by_clauses = ()
+        sub = self._scoped(base_clean).subquery()
         stmt = select(func.count()).select_from(sub)
         return int(await self.db.scalar(stmt) or 0)
 
