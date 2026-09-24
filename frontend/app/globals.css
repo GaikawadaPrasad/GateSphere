@@ -1891,3 +1891,36 @@ svg text[font-family*="Syne"] {
   }
 }
 
+/* Header notification bell dropdown (Header.tsx / AssociationCommitteeHeader.tsx). The panel
+   is `position: absolute; right: 0` against a containing block that is only the 36px bell
+   button, not the full header — on desktop the bell happens to sit at the header's right
+   edge so this looks correct by accident, but on mobile the bell sits to the left of the
+   avatar/Sign-out controls, so the ~380px panel expands leftward from there and its left
+   portion runs off the viewport, truncating every line ("Notifications" -> "ations", etc).
+   `position: fixed` escapes that narrow containing block and anchors to the viewport
+   instead, at every width where the bug is possible (mobile through small tablet). */
+@media (max-width: 900px) {
+  .notif-popover {
+    position: fixed !important;
+    top: calc(var(--header-height, 64px) + 8px) !important;
+    right: 0.5rem !important;
+    left: 0.5rem !important;
+    width: auto !important;
+    max-width: none !important;
+  }
+}
+
+/* A `<PageHeader action={...}>` block is frequently a single un-wrapped inline flex row of
+   several buttons (e.g. Dispatch Alert / Mark All Read / Refresh) rather than using the
+   `.page-header-actions` class's own flex-wrap directly — that class only wraps its own
+   *children*, and here there is just one child (the caller's row), so nothing wraps and the
+   last button gets squeezed by `.btn`'s `white-space: nowrap` until it clips at the screen
+   edge. Force wrapping on any such nested flex row without requiring every call site to add
+   a class. */
+@media (max-width: 640px) {
+  .page-header-actions div[style*="display: flex"],
+  .page-header-actions div[style*="display:flex"] {
+    flex-wrap: wrap !important;
+  }
+}
+
