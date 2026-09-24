@@ -52,7 +52,8 @@ export const OPERATIONAL_ROLES: {
     name: "Association Committee",
     icon: "🏛️",
     badgeClass: "badge-primary",
-    description: "Executive oversight, financial governance, statutory compliance, and community policy administration.",
+    description:
+      "Executive oversight, financial governance, statutory compliance, and community policy administration.",
     responsibilities: [
       "Review financial ledgers, maintenance invoicing, and budget allocations",
       "Monitor resident tickets, escalations, and facility contracts",
@@ -65,7 +66,8 @@ export const OPERATIONAL_ROLES: {
     name: "Facility Manager",
     icon: "🏢",
     badgeClass: "badge-purple",
-    description: "Oversees community facilities, service tickets, amenities, and vendor operations.",
+    description:
+      "Oversees community facilities, service tickets, amenities, and vendor operations.",
     responsibilities: [
       "Manage community amenities, schedules, and bookings",
       "Coordinate maintenance tickets and service requests",
@@ -78,7 +80,8 @@ export const OPERATIONAL_ROLES: {
     name: "Security Supervisor",
     icon: "🛡️",
     badgeClass: "badge-warning",
-    description: "Perimeter security lead managing guard shifts, incident escalations, and live gate oversight.",
+    description:
+      "Perimeter security lead managing guard shifts, incident escalations, and live gate oversight.",
     responsibilities: [
       "Supervise security guards and gate checkpoint operations",
       "Manage emergency incident response and escalations",
@@ -91,7 +94,8 @@ export const OPERATIONAL_ROLES: {
     name: "Security Guard",
     icon: "👮",
     badgeClass: "badge-info",
-    description: "Frontline gate personnel conducting visitor check-in, pass verification, and delivery logging.",
+    description:
+      "Frontline gate personnel conducting visitor check-in, pass verification, and delivery logging.",
     responsibilities: [
       "Process visitor entry and exit at community gates",
       "Verify resident pre-approvals and QR/PIN passes",
@@ -104,7 +108,8 @@ export const OPERATIONAL_ROLES: {
     name: "Statutory Auditor",
     icon: "📋",
     badgeClass: "badge-neutral",
-    description: "Statutory and compliance auditor with read-only access to audit logs, financial records, and gate logs.",
+    description:
+      "Statutory and compliance auditor with read-only access to audit logs, financial records, and gate logs.",
     responsibilities: [
       "Review immutable audit trail across community operations",
       "Inspect financial ledgers, maintenance invoices, and reconciliation records",
@@ -140,8 +145,8 @@ export function useOperationalStaff(communityId?: string) {
       const rawList: any[] = Array.isArray(res)
         ? res
         : Array.isArray((res as any)?.data)
-        ? (res as any).data
-        : [];
+          ? (res as any).data
+          : [];
 
       if (rawList.length === 0) return [];
 

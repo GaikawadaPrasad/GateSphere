@@ -30,6 +30,7 @@ import uuid
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 
+import structlog
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from fastapi import Depends, Request, Response
@@ -49,6 +50,8 @@ from app.modules.users.models import (
     User,
     UserRole,
 )
+
+log = structlog.get_logger(__name__)
 
 _ph = PasswordHasher(time_cost=2, memory_cost=32768, parallelism=2)
 _SESSION_PREFIX = "session:"
@@ -422,8 +425,10 @@ async def user_permissions_async(
         cached = redis_client.get(cache_key)
         if cached:
             return set(json.loads(cached))
-    except Exception:
-        pass
+    except (RedisError, ValueError) as exc:
+        # Cache is an accelerator only (AGENTS.md §9.1): a miss / outage / corrupt entry
+        # falls through to the authoritative DB lookup below.
+        log.debug("perms.cache_read_failed", error=type(exc).__name__)
 
     # If user.roles is already loaded, reuse it to avoid a UserRole DB query
     roles_loaded = "roles" in user.__dict__
@@ -478,8 +483,8 @@ async def user_permissions_async(
 
     try:
         redis_client.setex(cache_key, 300, json.dumps(sorted(perms)))
-    except Exception:
-        pass
+    except RedisError as exc:
+        log.debug("perms.cache_write_failed", error=type(exc).__name__)
 
     return perms
 

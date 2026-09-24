@@ -10,6 +10,7 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.core.constants import PASSWORD_MIN_LENGTH
 from app.core.files import ManagedFileUrl
 from app.modules.domestic_staff.models import (
     ATTENDANCE_STATUS,
@@ -36,7 +37,9 @@ def _validate_id_doc(id_type: str | None, id_number: str | None) -> None:
     if id_type_norm in ("aadhaar", "aadhar"):
         clean_aadhaar = re.sub(r"[\s-]", "", raw_id)
         if not re.match(r"^\d{12}$", clean_aadhaar):
-            raise ValueError("Aadhaar number must be exactly 12 numeric digits (e.g. 1234 5678 9012)")
+            raise ValueError(
+                "Aadhaar number must be exactly 12 numeric digits (e.g. 1234 5678 9012)"
+            )
         if re.match(r"^(\d)\1{11}$", clean_aadhaar):
             raise ValueError("Aadhaar number cannot contain all identical repeating digits")
     elif id_type_norm in ("pan", "pan card", "pan_card"):
@@ -50,7 +53,9 @@ def _validate_id_doc(id_type: str | None, id_number: str | None) -> None:
     elif id_type_norm in ("passport",):
         clean_passport = re.sub(r"[\s-]", "", raw_id).upper()
         if not re.match(r"^[A-Z][0-9]{7,8}$", clean_passport):
-            raise ValueError("Passport number must be 1 letter followed by 7-8 digits (e.g. A1234567)")
+            raise ValueError(
+                "Passport number must be 1 letter followed by 7-8 digits (e.g. A1234567)"
+            )
     elif id_type_norm in ("driving license", "driving_license", "dl"):
         clean_dl = re.sub(r"[\s-]", "", raw_id).upper()
         if not re.match(r"^[A-Z]{2}[0-9A-Z]{8,18}$", clean_dl):
@@ -75,7 +80,7 @@ class StaffCreate(_Write):
     staff_type: str
     phone: str = _Phone
     email: str | None = Field(default=None, max_length=255)
-    password: str | None = Field(default=None, min_length=6, max_length=128)
+    password: str | None = Field(default=None, min_length=PASSWORD_MIN_LENGTH, max_length=128)
     user_id: uuid.UUID | None = None
     id_type: str | None = Field(default=None, max_length=30)
     id_number: str | None = Field(default=None, max_length=40)

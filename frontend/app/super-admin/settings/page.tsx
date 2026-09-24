@@ -101,7 +101,11 @@ export default function SettingsPage() {
       render: (r) => (
         <span
           className={`badge ${r.is_wildcard ? "badge-danger" : "badge-neutral"}`}
-          title={r.is_wildcard ? "Wildcard access granted across all modules" : "Granular module-scoped permissions"}
+          title={
+            r.is_wildcard
+              ? "Wildcard access granted across all modules"
+              : "Granular module-scoped permissions"
+          }
         >
           {r.is_wildcard ? "Wildcard (*)" : "Scoped"}
         </span>
@@ -218,7 +222,9 @@ export default function SettingsPage() {
       render: (u) => (
         <span
           className={`badge ${u.is_active !== false ? "badge-success" : "badge-neutral"}`}
-          title={u.is_active !== false ? "Account active and able to authenticate" : "Account disabled"}
+          title={
+            u.is_active !== false ? "Account active and able to authenticate" : "Account disabled"
+          }
         >
           {u.is_active !== false ? "Active" : "Disabled"}
         </span>
@@ -255,11 +261,13 @@ export default function SettingsPage() {
 
   const modalMod = editingPermission
     ? editingPermission.module ||
-    (editingPermission.code.includes(":") ? editingPermission.code.split(":")[0] : editingPermission.code)
+      (editingPermission.code.includes(":")
+        ? editingPermission.code.split(":")[0]
+        : editingPermission.code)
     : "";
   const modalAct = editingPermission
     ? editingPermission.action ||
-    (editingPermission.code.includes(":") ? editingPermission.code.split(":")[1] : "")
+      (editingPermission.code.includes(":") ? editingPermission.code.split(":")[1] : "")
     : "";
 
   return (
@@ -283,7 +291,16 @@ export default function SettingsPage() {
       <div style={{ display: "flex", flexDirection: "column", gap: "1.75rem" }}>
         {/* User Access & RBAC Assignments Matrix */}
         <div className="card">
-          <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.75rem" }}>
+          <div
+            className="card-header"
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "0.75rem",
+            }}
+          >
             <div>
               <h3 className="card-title">User Access & RBAC Assignments Matrix</h3>
               <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
@@ -380,10 +397,21 @@ export default function SettingsPage() {
             </>
           }
         >
-          <form onSubmit={handleSavePermission} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+          <form
+            onSubmit={handleSavePermission}
+            style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}
+          >
             <div style={{ display: "flex", gap: "1.5rem" }}>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.35rem" }}>
+                <label
+                  style={{
+                    fontSize: "0.85rem",
+                    fontWeight: 600,
+                    color: "var(--brand-heading)",
+                    display: "block",
+                    marginBottom: "0.35rem",
+                  }}
+                >
                   Permission Code
                 </label>
                 <input
@@ -396,7 +424,15 @@ export default function SettingsPage() {
               </div>
 
               <div style={{ width: "120px" }}>
-                <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.35rem" }}>
+                <label
+                  style={{
+                    fontSize: "0.85rem",
+                    fontWeight: 600,
+                    color: "var(--brand-heading)",
+                    display: "block",
+                    marginBottom: "0.35rem",
+                  }}
+                >
                   Module
                 </label>
                 <div style={{ paddingTop: "0.4rem" }}>
@@ -405,7 +441,15 @@ export default function SettingsPage() {
               </div>
 
               <div style={{ width: "120px" }}>
-                <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.35rem" }}>
+                <label
+                  style={{
+                    fontSize: "0.85rem",
+                    fontWeight: 600,
+                    color: "var(--brand-heading)",
+                    display: "block",
+                    marginBottom: "0.35rem",
+                  }}
+                >
                   Action
                 </label>
                 <div style={{ paddingTop: "0.4rem", textTransform: "capitalize", fontWeight: 600 }}>
@@ -415,7 +459,15 @@ export default function SettingsPage() {
             </div>
 
             <div>
-              <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  color: "var(--brand-heading)",
+                  display: "block",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Description
               </label>
               <textarea
@@ -424,7 +476,12 @@ export default function SettingsPage() {
                 value={descriptionInput}
                 onChange={(e) => setDescriptionInput(e.target.value)}
                 placeholder="Enter permission description..."
-                style={{ width: "100%", padding: "0.6rem 0.75rem", borderRadius: "var(--radius-input)", border: "1px solid var(--border-standard)" }}
+                style={{
+                  width: "100%",
+                  padding: "0.6rem 0.75rem",
+                  borderRadius: "var(--radius-input)",
+                  border: "1px solid var(--border-standard)",
+                }}
               />
             </div>
           </form>
@@ -437,8 +494,9 @@ export default function SettingsPage() {
           isOpen={!!editingUser}
           onClose={() => setEditingUser(null)}
           user={
-            (usersData as unknown as UserRecord[] | undefined)?.find((u) => u.id === editingUser.id) ||
-            editingUser
+            (usersData as unknown as UserRecord[] | undefined)?.find(
+              (u) => u.id === editingUser.id,
+            ) || editingUser
           }
           availableRoles={roles}
           onSuccess={() => {
@@ -476,7 +534,9 @@ export default function SettingsPage() {
           }
         >
           <p style={{ fontSize: "0.9rem", color: "var(--fg)", lineHeight: 1.5 }}>
-            Are you sure you want to delete <strong>{deletingUser.full_name}</strong> ({deletingUser.email})? This action will immediately revoke their access and delete their user profile.
+            Are you sure you want to delete <strong>{deletingUser.full_name}</strong> (
+            {deletingUser.email})? This action will immediately revoke their access and delete their
+            user profile.
           </p>
         </Modal>
       )}
@@ -509,5 +569,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-

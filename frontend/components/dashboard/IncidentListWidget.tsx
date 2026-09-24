@@ -13,9 +13,20 @@ interface IncidentListWidgetProps {
 export function IncidentListWidget({ incidents, isLoading }: IncidentListWidgetProps) {
   if (isLoading) {
     return (
-      <div className="card" style={{ height: "100%", minHeight: 280, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+      <div
+        className="card"
+        style={{
+          height: "100%",
+          minHeight: 280,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+        }}
+      >
         <div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1.25rem" }}>
+          <div
+            style={{ display: "flex", justifyContent: "space-between", marginBottom: "1.25rem" }}
+          >
             <Skeleton width={190} height={20} borderRadius={4} />
             <Skeleton width={90} height={20} borderRadius={4} />
           </div>
@@ -144,7 +155,12 @@ export function IncidentListWidget({ incidents, isLoading }: IncidentListWidgetP
                 <Link
                   href="/community-admin/incidents"
                   className="btn btn-secondary"
-                  style={{ fontSize: "0.7rem", padding: "0.25rem 0.5rem", height: 28, flexShrink: 0 }}
+                  style={{
+                    fontSize: "0.7rem",
+                    padding: "0.25rem 0.5rem",
+                    height: 28,
+                    flexShrink: 0,
+                  }}
                 >
                   Review
                 </Link>

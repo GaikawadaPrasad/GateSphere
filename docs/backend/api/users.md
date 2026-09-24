@@ -14,14 +14,14 @@ communities. A user outside that set → `404`.
 | `GET /users` | `users:view` | – | `200` list | `?q=`, `?role_slug=`, `?community_id=`, `?active=` |
 | `POST /users` | `users:create` | `UserCreate` | `201` single | `409 EMAIL_TAKEN`; optional inline `role_slug` (+ `community_id`) |
 | `GET /users/{user_id}` | `users:view` | – | `200` single | `404` outside scope |
-| `PATCH /users/{user_id}` | `users:update` | `UserUpdate` | `200` single | deactivating (`is_active=false`) revokes the user's sessions |
+| `PATCH /users/{user_id}` | `users:update` | `UserUpdate` | `200` single | deactivating (`is_active=false`) or a password change revokes the user's sessions. A **community-scoped** admin may change the account-wide fields (`email`, `password`, `is_active`) only when every grant the user holds is inside the admin's scope — otherwise `403 ACCOUNT_SHARED` (platform admin only) |
 | `POST /users/{user_id}/roles` | `users:update` | `RoleGrantIn` | `201` single | `403 GLOBAL_ONLY` (scoped caller, null community); `422 GLOBAL_ROLE_ONLY` (super_admin/auditor with a community); `409 GRANT_EXISTS`. Revokes the user's sessions. |
 | `DELETE /users/{user_id}/roles/{grant_id}` | `users:update` | – | `204` | revokes the user's sessions |
 
 ## Schemas (write — all `extra="forbid"`)
 
-- **UserCreate**: `email`, `full_name`, `password` (≥ 10), `phone?`, `role_slug?`, `community_id?`.
-- **UserUpdate**: `full_name?`, `phone?`, `is_active?`.
+- **UserCreate**: `email`, `full_name`, `password` (≥ `PASSWORD_MIN_LENGTH` = 10, `app/core/constants.py` — the same minimum for every password a user sets), `phone?`, `role_slug?`, `community_id?`.
+- **UserUpdate**: `full_name?`, `email?`, `password?` (≥ 10), `phone?`, `is_active?`.
 - **RoleGrantIn**: `role_slug`, `community_id?` (null = platform-global grant — global caller only).
 
 `UserRead` embeds `roles: [RoleGrantRead]` (`role_slug`, `role_name`, `community_id`).
@@ -29,7 +29,8 @@ communities. A user outside that set → `404`.
 ## Error codes
 
 `NOT_AUTHENTICATED` · `PERMISSION_DENIED` · `NOT_FOUND` · `VALIDATION_ERROR` · `EMAIL_TAKEN` ·
-`GLOBAL_ONLY` · `GLOBAL_ROLE_ONLY` · `GRANT_EXISTS` · `CSRF_INVALID`.
+`GLOBAL_ONLY` · `GLOBAL_ROLE_ONLY` · `GRANT_EXISTS` · `UNAFFILIATED_TAKEOVER` · `ACCOUNT_SHARED` ·
+`ROLE_REQUIRED` · `CSRF_INVALID`.
 
 ## Audit
 

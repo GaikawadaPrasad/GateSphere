@@ -12,8 +12,9 @@ Flows
   community ``resident`` grant (which bumps ``permission_version`` + kills live sessions).
 
 Authenticated methods are community-scoped via `TenantScope`. The two public methods
-(`public_view`, `accept`) run without a scope; RLS stays permissive because no
-`app.community_ids` GUC is bound on those requests.
+(`public_view`, `accept`) run without a caller scope. RLS is fail-closed (migration 0045),
+so `_load_token` binds the global sentinel only for the lookup keyed by the secret token
+hash, then narrows the RLS scope to the invitation's own community.
 """
 
 from __future__ import annotations
@@ -36,7 +37,7 @@ from app.core.security import (
     invalidate_user_permissions_async,
     verify_password,
 )
-from app.core.tenancy import TenantScope
+from app.core.tenancy import TenantScope, bind_rls_scope_async
 from app.modules.audit.service import record_audit_async
 from app.modules.communities.models import Community, Floor, Tower, Unit
 from app.modules.notifications.events import emit
@@ -51,6 +52,8 @@ from app.modules.users.models import Role, User, UserRole
 
 _TOKEN_BYTES = 32
 _INVITE_EXPIRY_DAYS = 14
+
+_NO_USER = uuid.UUID(int=0)  # scope placeholder for unauthenticated invitation lookups
 
 
 def _hash(token: str) -> str:
@@ -399,12 +402,18 @@ class OnboardingService:
     # invitations — public (token)
     # ------------------------------------------------------------------ #
     async def _load_token(self, token: str, *, for_update: bool = False) -> CommunityInvitation:
+        # The token hash is the capability: resolve it across communities, then pin the
+        # RLS scope to the one community the invitation belongs to.
+        await bind_rls_scope_async(self.db, TenantScope(_NO_USER, True, frozenset()))
         stmt = select(CommunityInvitation).where(CommunityInvitation.token_hash == _hash(token))
         if for_update:
             stmt = stmt.with_for_update()  # serialise concurrent accepts of the same token
         inv = await self.db.scalar(stmt)
         if inv is None:
             raise NotFoundError("Invitation not found")
+        await bind_rls_scope_async(
+            self.db, TenantScope(_NO_USER, False, frozenset({inv.community_id}))
+        )
         if inv.status == "pending" and inv.expires_at <= _now():
             inv.status = "expired"
             await self.db.flush()

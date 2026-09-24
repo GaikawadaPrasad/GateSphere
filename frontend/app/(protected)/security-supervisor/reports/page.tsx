@@ -2,7 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { gateApi, visitorsApi, deliveriesApi, blacklistApi, auditApi, incidentsApi } from "@/lib/api";
+import {
+  gateApi,
+  visitorsApi,
+  deliveriesApi,
+  blacklistApi,
+  auditApi,
+  incidentsApi,
+} from "@/lib/api";
 import { BrandButton } from "@/components/common/BrandButton";
 
 export default function SecuritySupervisorReportsPage() {
@@ -54,9 +61,15 @@ export default function SecuritySupervisorReportsPage() {
       });
 
       if (reportType === "gate_traffic") {
-        const gateGroups = new Map<string, { zone: string; entries: number; exits: number; denied: number; peak: string }>();
+        const gateGroups = new Map<
+          string,
+          { zone: string; entries: number; exits: number; denied: number; peak: string }
+        >();
         for (const e of filtered) {
-          const zone = e.gate_name || e.gate?.name || (e.gate_id ? `Gate #${e.gate_id.slice(0, 8)}` : "Main Gate");
+          const zone =
+            e.gate_name ||
+            e.gate?.name ||
+            (e.gate_id ? `Gate #${e.gate_id.slice(0, 8)}` : "Main Gate");
           if (!gateGroups.has(zone)) {
             gateGroups.set(zone, { zone, entries: 0, exits: 0, denied: 0, peak: "10:00 - 11:00" });
           }
@@ -72,13 +85,20 @@ export default function SecuritySupervisorReportsPage() {
         }
         setReportData(Array.from(gateGroups.values()));
       } else {
-        setReportData(filtered.map((item, idx) => ({
-          id: item.id || String(idx),
-          label: item.visitor_name || item.courier_company || item.phone || item.action || `Record #${idx + 1}`,
-          type: item.visitor_type || item.delivery_type || item.event_type || reportType,
-          status: item.status || item.decision || "logged",
-          date: item.created_at || item.entry_time || item.occurred_at || "Recent",
-        })));
+        setReportData(
+          filtered.map((item, idx) => ({
+            id: item.id || String(idx),
+            label:
+              item.visitor_name ||
+              item.courier_company ||
+              item.phone ||
+              item.action ||
+              `Record #${idx + 1}`,
+            type: item.visitor_type || item.delivery_type || item.event_type || reportType,
+            status: item.status || item.decision || "logged",
+            date: item.created_at || item.entry_time || item.occurred_at || "Recent",
+          })),
+        );
       }
     } catch {
       setReportData([]);
@@ -102,11 +122,7 @@ export default function SecuritySupervisorReportsPage() {
           { label: "Reports" },
         ]}
         actions={
-          <button
-            className="btn btn-secondary"
-            onClick={loadData}
-            disabled={isLoading}
-          >
+          <button className="btn btn-secondary" onClick={loadData} disabled={isLoading}>
             🔄 {isLoading ? "Refreshing…" : "Refresh"}
           </button>
         }
@@ -168,7 +184,16 @@ export default function SecuritySupervisorReportsPage() {
       </div>
 
       <div className="card">
-        <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
+        <div
+          className="card-header"
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "0.5rem",
+          }}
+        >
           <h3 className="card-title" style={{ margin: 0 }}>
             Security Analytics Data — {reportType.replace(/_/g, " ").toUpperCase()} ({timeframe})
           </h3>
@@ -180,13 +205,29 @@ export default function SecuritySupervisorReportsPage() {
               if (reportData.length === 0) return;
               let csvContent = "";
               if (reportType === "gate_traffic") {
-                const headers = ["Gate / Zone", "Total Entries", "Total Exits", "Denied / Blocked", "Peak Hour"];
+                const headers = [
+                  "Gate / Zone",
+                  "Total Entries",
+                  "Total Exits",
+                  "Denied / Blocked",
+                  "Peak Hour",
+                ];
                 const rows = reportData.map((r) => [r.zone, r.entries, r.exits, r.denied, r.peak]);
-                csvContent = [headers.join(","), ...rows.map((row) => row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))].join("\n");
+                csvContent = [
+                  headers.join(","),
+                  ...rows.map((row) =>
+                    row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","),
+                  ),
+                ].join("\n");
               } else {
                 const headers = ["Reference / Subject", "Category / Type", "Status", "Logged Date"];
                 const rows = reportData.map((r) => [r.label, r.type, r.status, r.date]);
-                csvContent = [headers.join(","), ...rows.map((row) => row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))].join("\n");
+                csvContent = [
+                  headers.join(","),
+                  ...rows.map((row) =>
+                    row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","),
+                  ),
+                ].join("\n");
               }
               const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
               const url = URL.createObjectURL(blob);
@@ -217,16 +258,32 @@ export default function SecuritySupervisorReportsPage() {
                 </thead>
                 <tbody>
                   {isLoading ? (
-                    <tr><td colSpan={5} style={{ textAlign: "center", padding: "2rem" }}>Loading analytics data…</td></tr>
+                    <tr>
+                      <td colSpan={5} style={{ textAlign: "center", padding: "2rem" }}>
+                        Loading analytics data…
+                      </td>
+                    </tr>
                   ) : reportData.length === 0 ? (
-                    <tr><td colSpan={5} style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>No analytics records logged.</td></tr>
+                    <tr>
+                      <td
+                        colSpan={5}
+                        style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
+                      >
+                        No analytics records logged.
+                      </td>
+                    </tr>
                   ) : (
                     reportData.map((r, idx) => (
                       <tr key={idx}>
                         <td style={{ fontWeight: 600 }}>{r.zone}</td>
                         <td>{r.entries} Entries</td>
                         <td>{r.exits} Exits</td>
-                        <td style={{ color: r.denied > 0 ? "var(--danger)" : "var(--success)", fontWeight: 600 }}>
+                        <td
+                          style={{
+                            color: r.denied > 0 ? "var(--danger)" : "var(--success)",
+                            fontWeight: 600,
+                          }}
+                        >
                           {r.denied} Denied
                         </td>
                         <td>{r.peak}</td>
@@ -247,15 +304,30 @@ export default function SecuritySupervisorReportsPage() {
                 </thead>
                 <tbody>
                   {isLoading ? (
-                    <tr><td colSpan={4} style={{ textAlign: "center", padding: "2rem" }}>Loading records…</td></tr>
+                    <tr>
+                      <td colSpan={4} style={{ textAlign: "center", padding: "2rem" }}>
+                        Loading records…
+                      </td>
+                    </tr>
                   ) : reportData.length === 0 ? (
-                    <tr><td colSpan={4} style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>No matching records found for selected period.</td></tr>
+                    <tr>
+                      <td
+                        colSpan={4}
+                        style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
+                      >
+                        No matching records found for selected period.
+                      </td>
+                    </tr>
                   ) : (
                     reportData.map((r, idx) => (
                       <tr key={r.id || idx}>
                         <td style={{ fontWeight: 600 }}>{r.label}</td>
-                        <td><span className="badge badge-secondary">{r.type}</span></td>
-                        <td><span className="badge badge-neutral">{r.status}</span></td>
+                        <td>
+                          <span className="badge badge-secondary">{r.type}</span>
+                        </td>
+                        <td>
+                          <span className="badge badge-neutral">{r.status}</span>
+                        </td>
                         <td>{r.date}</td>
                       </tr>
                     ))

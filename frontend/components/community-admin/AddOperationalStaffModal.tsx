@@ -43,12 +43,12 @@ export function AddOperationalStaffModal({
         slug === "association_committee"
           ? "Committee"
           : slug === "facility_manager"
-          ? "Facility"
-          : slug === "security_supervisor"
-          ? "Supervisor"
-          : slug === "auditor"
-          ? "Auditor"
-          : "Guard";
+            ? "Facility"
+            : slug === "security_supervisor"
+              ? "Supervisor"
+              : slug === "auditor"
+                ? "Auditor"
+                : "Guard";
       setPassword(`${prefix}@Gate2026!`);
     }
   };
@@ -98,7 +98,9 @@ export function AddOperationalStaffModal({
     }
 
     if (trimmedPhone && !/^[+0-9][0-9 \-]{4,19}$/.test(trimmedPhone)) {
-      setErrorMessage("Phone number must contain only digits, +, spaces or hyphens (5-20 characters).");
+      setErrorMessage(
+        "Phone number must contain only digits, +, spaces or hyphens (5-20 characters).",
+      );
       return;
     }
 
@@ -119,7 +121,7 @@ export function AddOperationalStaffModal({
 
       toast.success(
         `Successfully registered ${trimmedName} as ${roleSlug.replace(/_/g, " ")}.`,
-        "Staff Provisioned"
+        "Staff Provisioned",
       );
 
       if (onSuccess) onSuccess();
@@ -158,9 +160,13 @@ export function AddOperationalStaffModal({
         </div>
       }
     >
-      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+      <form
+        onSubmit={handleSubmit}
+        style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}
+      >
         <p style={{ fontSize: "0.85rem", color: "var(--muted)", margin: 0 }}>
-          Provision an operational user or statutory auditor with credentials to log into GateSphere for this community.
+          Provision an operational user or statutory auditor with credentials to log into GateSphere
+          for this community.
         </p>
 
         {errorMessage && (
@@ -181,7 +187,14 @@ export function AddOperationalStaffModal({
 
         {/* Role Selector Cards */}
         <div>
-          <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.5rem" }}>
+          <label
+            style={{
+              display: "block",
+              fontSize: "0.85rem",
+              fontWeight: 600,
+              marginBottom: "0.5rem",
+            }}
+          >
             Operational Role <span style={{ color: "var(--danger)" }}>*</span>
           </label>
           <div
@@ -206,13 +219,27 @@ export function AddOperationalStaffModal({
                     transition: "all 0.15s ease",
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.35rem" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.5rem",
+                      marginBottom: "0.35rem",
+                    }}
+                  >
                     <span style={{ fontSize: "1.2rem" }}>{r.icon}</span>
                     <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--fg)" }}>
                       {r.name}
                     </span>
                   </div>
-                  <p style={{ fontSize: "0.75rem", color: "var(--muted)", margin: 0, lineHeight: 1.3 }}>
+                  <p
+                    style={{
+                      fontSize: "0.75rem",
+                      color: "var(--muted)",
+                      margin: 0,
+                      lineHeight: 1.3,
+                    }}
+                  >
                     {r.description}
                   </p>
                 </div>
@@ -224,7 +251,14 @@ export function AddOperationalStaffModal({
         {/* Basic Details */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
           <div>
-            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                marginBottom: "0.35rem",
+              }}
+            >
               Full Name <span style={{ color: "var(--danger)" }}>*</span>
             </label>
             <input
@@ -239,7 +273,14 @@ export function AddOperationalStaffModal({
           </div>
 
           <div>
-            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                marginBottom: "0.35rem",
+              }}
+            >
               Email Address <span style={{ color: "var(--danger)" }}>*</span>
             </label>
             <input
@@ -256,8 +297,16 @@ export function AddOperationalStaffModal({
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
           <div>
-            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
-              Phone Number <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>(optional)</span>
+            <label
+              style={{
+                display: "block",
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                marginBottom: "0.35rem",
+              }}
+            >
+              Phone Number{" "}
+              <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>(optional)</span>
             </label>
             <input
               type="number"
@@ -270,7 +319,14 @@ export function AddOperationalStaffModal({
           </div>
 
           <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "0.35rem",
+              }}
+            >
               <label style={{ fontSize: "0.85rem", fontWeight: 600, margin: 0 }}>
                 Initial Password <span style={{ color: "var(--danger)" }}>*</span>
               </label>
@@ -298,7 +354,14 @@ export function AddOperationalStaffModal({
               onChange={(e) => setPassword(e.target.value)}
               style={{ width: "100%" }}
             />
-            <span style={{ fontSize: "0.7rem", color: "var(--muted)", marginTop: "0.2rem", display: "block" }}>
+            <span
+              style={{
+                fontSize: "0.7rem",
+                color: "var(--muted)",
+                marginTop: "0.2rem",
+                display: "block",
+              }}
+            >
               Minimum 10 characters. Provide this to the staff member for initial login.
             </span>
           </div>

@@ -63,7 +63,8 @@ export default function VendorAssignedTicketsPage() {
         (t.title || t.subject || "").toLowerCase().includes(search.toLowerCase()) ||
         (t.facility || "").toLowerCase().includes(search.toLowerCase());
       const matchPriority =
-        priorityFilter === "all" || (t.priority || "").toLowerCase() === priorityFilter.toLowerCase();
+        priorityFilter === "all" ||
+        (t.priority || "").toLowerCase() === priorityFilter.toLowerCase();
       return matchSearch && matchPriority;
     });
   }, [tickets, search, priorityFilter]);
@@ -201,4 +202,3 @@ export default function VendorAssignedTicketsPage() {
     </div>
   );
 }
-

@@ -13,7 +13,12 @@ import { FilterPanel } from "@/components/forms/FilterPanel";
 import { SortDropdown } from "@/components/common/SortDropdown";
 import { BrandButton } from "@/components/common/BrandButton";
 import { Modal } from "@/components/common/Modal";
-import { Skeleton, KpiCardSkeleton, TableSkeleton, CardSkeleton } from "@/components/common/LoadingSkeleton";
+import {
+  Skeleton,
+  KpiCardSkeleton,
+  TableSkeleton,
+  CardSkeleton,
+} from "@/components/common/LoadingSkeleton";
 import { ErrorState } from "@/components/common/ErrorState";
 import {
   FamilyMemberPassModal,
@@ -21,22 +26,19 @@ import {
 } from "@/components/common/FamilyMemberPassModal";
 import { GATESPHERE_LOGO_BASE64 } from "@/lib/logo-base64";
 
-const QrCodeSvg = dynamic(
-  () => import("@/components/common/QrCodeSvg").then((m) => m.QrCodeSvg),
-  {
-    ssr: false,
-    loading: () => (
-      <div
-        className="skeleton"
-        style={{
-          width: 180,
-          height: 180,
-          borderRadius: 12,
-        }}
-      />
-    ),
-  },
-);
+const QrCodeSvg = dynamic(() => import("@/components/common/QrCodeSvg").then((m) => m.QrCodeSvg), {
+  ssr: false,
+  loading: () => (
+    <div
+      className="skeleton"
+      style={{
+        width: 180,
+        height: 180,
+        borderRadius: 12,
+      }}
+    />
+  ),
+});
 import {
   useResidentOverview,
   useResidentVisitors,
@@ -77,7 +79,13 @@ import {
 } from "@/hooks/use-notifications";
 import { useTableControls } from "@/hooks/use-table-controls";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { formatDate, formatDateTime, formatCurrency, getAmenityIcon, isValidPersonName } from "@/lib/utils";
+import {
+  formatDate,
+  formatDateTime,
+  formatCurrency,
+  getAmenityIcon,
+  isValidPersonName,
+} from "@/lib/utils";
 import { authApi, gateApi } from "@/lib/api";
 import { useUiStore } from "@/store/ui";
 
@@ -98,6 +106,8 @@ export type OwnerTenantTab =
   | "emergency";
 
 import { toast } from "@/store/toast";
+import { PASSWORD_MIN_LENGTH } from "@/constants/password";
+import { DeliveryProtocolSettings } from "@/components/deliveries/DeliveryProtocolSettings";
 
 interface OwnerTenantDashboardViewProps {
   initialTab?: OwnerTenantTab;
@@ -155,7 +165,8 @@ export function OwnerTenantDashboardView({
   const [addMemberModalOpen, setAddMemberModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<FamilyMember | null>(null);
   const [memberToDelete, setMemberToDelete] = useState<FamilyMember | null>(null);
-  const [selectedFamilyPassMember, setSelectedFamilyPassMember] = useState<FamilyMemberPassData | null>(null);
+  const [selectedFamilyPassMember, setSelectedFamilyPassMember] =
+    useState<FamilyMemberPassData | null>(null);
   const [newMemberName, setNewMemberName] = useState("");
   const [newMemberRelation, setNewMemberRelation] = useState("Spouse");
   const [newMemberPhone, setNewMemberPhone] = useState("");
@@ -242,10 +253,18 @@ export function OwnerTenantDashboardView({
   const [assignStartDate, setAssignStartDate] = useState("");
   const [assignTimeFrom, setAssignTimeFrom] = useState("");
   const [assignTimeTo, setAssignTimeTo] = useState("");
-  const [assignDays, setAssignDays] = useState<string[]>(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]);
+  const [assignDays, setAssignDays] = useState<string[]>([
+    "Mon",
+    "Tue",
+    "Wed",
+    "Thu",
+    "Fri",
+    "Sat",
+  ]);
   const assignStaffMutation = useAssignDomesticStaff();
   const endAssignmentMutation = useEndDomesticStaffAssignment();
-  const { data: staffDirectory = [], isLoading: staffDirectoryLoading } = useCommunityStaffDirectory();
+  const { data: staffDirectory = [], isLoading: staffDirectoryLoading } =
+    useCommunityStaffDirectory();
 
   // Vehicle self-registration modal state
   const [registerVehicleModalOpen, setRegisterVehicleModalOpen] = useState(false);
@@ -276,7 +295,12 @@ export function OwnerTenantDashboardView({
   const [emergencyLocationDetail, setEmergencyLocationDetail] = useState<string>("");
 
   // Data queries
-  const { data: stats, isLoading: statsLoading, isError: statsError, refetch: refetchStats } = useResidentOverview(activeCommunityId);
+  const {
+    data: stats,
+    isLoading: statsLoading,
+    isError: statsError,
+    refetch: refetchStats,
+  } = useResidentOverview(activeCommunityId);
   const visitors = useResidentVisitors();
   const deliveries = useResidentDeliveries();
   const amenities = useResidentAmenities();
@@ -292,7 +316,9 @@ export function OwnerTenantDashboardView({
   const queryClient = useQueryClient();
   const markNotificationRead = useMarkNotificationRead();
   const markAllNotificationsRead = useMarkAllNotificationsRead();
-  const [actionedNotifications, setActionedNotifications] = useState<Record<string, "approved" | "rejected">>({});
+  const [actionedNotifications, setActionedNotifications] = useState<
+    Record<string, "approved" | "rejected">
+  >({});
   const [notifFilter, setNotifFilter] = useState<"all" | "unread">("all");
   const panicMutation = useSendResidentPanic();
   const submitStaffRating = useSubmitStaffRating();
@@ -326,34 +352,40 @@ export function OwnerTenantDashboardView({
 
   // Dynamic Open Service Tickets from real-time records
   const openTicketsList = complaintList.filter(
-    (t) => t.status !== "resolved" && t.status !== "closed" && t.status !== "cancelled"
+    (t) => t.status !== "resolved" && t.status !== "closed" && t.status !== "cancelled",
   );
-  const openServiceTicketsCount = complaints.data !== undefined
-    ? openTicketsList.length
-    : (stats?.open_service_tickets ?? 0);
-  const openTicket = openTicketsList.length > 0
-    ? [...openTicketsList].sort(
-        (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
-      )[0]
-    : undefined;
+  const openServiceTicketsCount =
+    complaints.data !== undefined ? openTicketsList.length : (stats?.open_service_tickets ?? 0);
+  const openTicket =
+    openTicketsList.length > 0
+      ? [...openTicketsList].sort(
+          (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
+        )[0]
+      : undefined;
 
   const activeStaffCount = (domesticStaff.data || []).filter((s) => s.is_active).length;
 
   // Dynamic Booked Amenities from real-time records
   const activeBookingsList = (amenities.bookings.data || []).filter(
-    (b) => b.status === "confirmed" && (!b.date || new Date(`${b.date}T23:59:59`).getTime() >= Date.now() - 86400000)
+    (b) =>
+      b.status === "confirmed" &&
+      (!b.date || new Date(`${b.date}T23:59:59`).getTime() >= Date.now() - 86400000),
   );
-  const bookedAmenitiesCount = amenities.bookings.data !== undefined
-    ? activeBookingsList.length
-    : (stats?.upcoming_amenity_bookings ?? 0);
-  const nextBooking = activeBookingsList.length > 0
-    ? [...activeBookingsList].sort(
-        (a, b) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime()
-      )[0]
-    : undefined;
+  const bookedAmenitiesCount =
+    amenities.bookings.data !== undefined
+      ? activeBookingsList.length
+      : (stats?.upcoming_amenity_bookings ?? 0);
+  const nextBooking =
+    activeBookingsList.length > 0
+      ? [...activeBookingsList].sort(
+          (a, b) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime(),
+        )[0]
+      : undefined;
 
   const pendingVisitor = visitorList.find((v) => v.status === "pending");
-  const visitorBannerDismissed = Boolean(pendingVisitor && dismissedVisitorId === pendingVisitor.id);
+  const visitorBannerDismissed = Boolean(
+    pendingVisitor && dismissedVisitorId === pendingVisitor.id,
+  );
   const pendingDelivery = deliveryList.find(
     (d) => d.status === "at_gate" || d.approval_status === "pending",
   );
@@ -535,7 +567,10 @@ export function OwnerTenantDashboardView({
     e.preventDefault();
     const plate = vehRegNumber.trim().toUpperCase();
     if (!plate || plate.length < 4 || !/^[A-Z0-9\s\-]+$/.test(plate)) {
-      toast.error("Please enter a valid license plate number (e.g. MH 12 AB 1234).", "Plate Required");
+      toast.error(
+        "Please enter a valid license plate number (e.g. MH 12 AB 1234).",
+        "Plate Required",
+      );
       return;
     }
     try {
@@ -548,10 +583,7 @@ export function OwnerTenantDashboardView({
       });
       await vehicles.refetch();
       refetchStats?.();
-      toast.success(
-        `Vehicle ${plate} registered successfully!`,
-        "Vehicle Registered",
-      );
+      toast.success(`Vehicle ${plate} registered successfully!`, "Vehicle Registered");
       setRegisterVehicleModalOpen(false);
       setVehRegNumber("");
       setVehMake("");
@@ -625,7 +657,8 @@ export function OwnerTenantDashboardView({
             errors.phone = "Valid 10-digit mobile number must start with 6, 7, 8, or 9.";
           }
         } else {
-          errors.phone = "Mobile number must be a valid 10-digit number (e.g. 9876543210 or +91 9876543210).";
+          errors.phone =
+            "Mobile number must be a valid 10-digit number (e.g. 9876543210 or +91 9876543210).";
         }
       }
     }
@@ -654,7 +687,8 @@ export function OwnerTenantDashboardView({
         }
       } else if (idTypeNorm === "passport") {
         if (!/^[A-Z][0-9]{7,8}$/.test(cleanId) && !/^[A-Z0-9]{8,9}$/.test(cleanId)) {
-          errors.id_number = "Passport number must be 8-9 characters starting with a letter (e.g. A1234567).";
+          errors.id_number =
+            "Passport number must be 8-9 characters starting with a letter (e.g. A1234567).";
         }
       } else {
         if (cleanId.length < 4 || cleanId.length > 40) {
@@ -747,14 +781,21 @@ export function OwnerTenantDashboardView({
           phone: cleanPhone,
           id_type: trimmedId ? passIdType : undefined,
           id_number: trimmedId ? trimmedId.replace(/[\s-]/g, "").toUpperCase() : undefined,
-          reason: err?.fields?.reason || err?.message || "Visitor is flagged on the community blacklist.",
+          reason:
+            err?.fields?.reason || err?.message || "Visitor is flagged on the community blacklist.",
           risk_level: err?.fields?.risk_level || "HIGH",
         });
-        toast.error("Pass generation blocked: Visitor is blacklisted by community security.", "Entry Denied");
+        toast.error(
+          "Pass generation blocked: Visitor is blacklisted by community security.",
+          "Entry Denied",
+        );
         return;
       }
       const fieldMsg = err?.fields ? Object.values(err.fields).join(" · ") : null;
-      toast.error(fieldMsg || err?.message || "Failed to generate visitor pass.", "Pass Generation Error");
+      toast.error(
+        fieldMsg || err?.message || "Failed to generate visitor pass.",
+        "Pass Generation Error",
+      );
     }
   };
 
@@ -762,12 +803,18 @@ export function OwnerTenantDashboardView({
     e.preventDefault();
     const subject = ticketSubject.trim();
     if (!subject || subject.length < 3) {
-      toast.error("Please enter a summary of the issue (at least 3 characters).", "Subject Required");
+      toast.error(
+        "Please enter a summary of the issue (at least 3 characters).",
+        "Subject Required",
+      );
       return;
     }
     const desc = ticketDescription.trim();
     if (!desc || desc.length < 5) {
-      toast.error("Please provide a description of the issue (at least 5 characters).", "Description Required");
+      toast.error(
+        "Please provide a description of the issue (at least 5 characters).",
+        "Description Required",
+      );
       return;
     }
     try {
@@ -800,7 +847,7 @@ export function OwnerTenantDashboardView({
 
   const currentDayOfWeek = getDayOfWeek(bookingDate);
   const rawDaySlots = (amenitySlots.data || []).filter(
-    (s) => s.is_active && s.day_of_week === currentDayOfWeek
+    (s) => s.is_active && s.day_of_week === currentDayOfWeek,
   );
 
   // Helper to determine if a slot has already completed / elapsed on the given date
@@ -851,7 +898,11 @@ export function OwnerTenantDashboardView({
         b.amenity_id === selectedAmenity?.id &&
         b.date === bookingDate &&
         b.status !== "cancelled" &&
-        (b.slot_id ? b.slot_id === activeSelectedSlot?.id : (b.start_time ? b.start_time === activeSelectedSlot?.start_time : true))
+        (b.slot_id
+          ? b.slot_id === activeSelectedSlot?.id
+          : b.start_time
+            ? b.start_time === activeSelectedSlot?.start_time
+            : true),
     )
     .reduce((sum, b) => sum + (b.guests_count || 1), 0);
 
@@ -872,7 +923,10 @@ export function OwnerTenantDashboardView({
     if (!selectedAmenity) return;
 
     if (bookingDate < todayDateStr) {
-      toast.error("Cannot book a completed or past date. Please select today or a future date.", "Invalid Date");
+      toast.error(
+        "Cannot book a completed or past date. Please select today or a future date.",
+        "Invalid Date",
+      );
       return;
     }
 
@@ -882,7 +936,10 @@ export function OwnerTenantDashboardView({
     }
 
     if (isSlotInPast(activeSelectedSlot, bookingDate)) {
-      toast.error("Cannot book a completed or past time slot. Please choose an upcoming time slot.", "Time Slot Expired");
+      toast.error(
+        "Cannot book a completed or past time slot. Please choose an upcoming time slot.",
+        "Time Slot Expired",
+      );
       return;
     }
 
@@ -1049,7 +1106,8 @@ export function OwnerTenantDashboardView({
 
     const trimmedEmergencyName = profileEmergencyName.trim();
     if (trimmedEmergencyName && !isValidPersonName(trimmedEmergencyName)) {
-      errors.emergency_name = "Emergency contact name must contain only alphabetic letters and spaces.";
+      errors.emergency_name =
+        "Emergency contact name must contain only alphabetic letters and spaces.";
     }
 
     const cleanPhone = profilePhone.trim().replace(/[\s\-()]/g, "");
@@ -1081,10 +1139,16 @@ export function OwnerTenantDashboardView({
       });
       await profile.refetch();
       refetchStats?.();
-      toast.success("Your resident profile and emergency contact details have been updated.", "Profile Saved");
+      toast.success(
+        "Your resident profile and emergency contact details have been updated.",
+        "Profile Saved",
+      );
       setEditProfileOpen(false);
     } catch (err: any) {
-      toast.error(err?.message || "Failed to update resident profile. Please check the fields and try again.", "Update Failed");
+      toast.error(
+        err?.message || "Failed to update resident profile. Please check the fields and try again.",
+        "Update Failed",
+      );
     }
   };
 
@@ -1103,7 +1167,9 @@ export function OwnerTenantDashboardView({
       const generatedRcp =
         res?.receipt_number ||
         invToPay.receipt_number ||
-        (res?.id ? `RCP-${res.id.slice(0, 8).toUpperCase()}` : `RCP-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
+        (res?.id
+          ? `RCP-${res.id.slice(0, 8).toUpperCase()}`
+          : `RCP-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
       const generatedRef = res?.payment_reference || `PAY-${Date.now().toString(36).toUpperCase()}`;
 
       setCurrentReceiptNumber(generatedRcp);
@@ -1130,7 +1196,7 @@ export function OwnerTenantDashboardView({
               amount_paid: prev.total_amount,
               receipt_number: generatedRcp,
             }
-          : null
+          : null,
       );
       setPaymentModalOpen(false);
       setReceiptModalOpen(true);
@@ -1150,8 +1216,11 @@ export function OwnerTenantDashboardView({
   const handleDownloadInvoice = (inv: InvoiceItem | null) => {
     if (!inv) return;
     try {
-      const lineItemsHtml = (inv.line_items && inv.line_items.length > 0)
-        ? inv.line_items.map((item) => `
+      const lineItemsHtml =
+        inv.line_items && inv.line_items.length > 0
+          ? inv.line_items
+              .map(
+                (item) => `
           <tr>
             <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0;">
               <strong>${item.head}</strong>
@@ -1164,8 +1233,10 @@ export function OwnerTenantDashboardView({
             <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: right;">${formatCurrency(item.unit_rate ?? item.amount)}</td>
             <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: bold;">${formatCurrency(item.amount)}</td>
           </tr>
-        `).join("")
-        : `
+        `,
+              )
+              .join("")
+          : `
           <tr>
             <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0;"><strong>Monthly Society Maintenance Charge</strong></td>
             <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: center;">Standard</td>
@@ -1313,28 +1384,35 @@ export function OwnerTenantDashboardView({
     }
   };
 
-  const handleDownloadReceipt = (data: {
-    receipt_number: string;
-    payment_reference?: string;
-    invoice_number?: string;
-    amount_paid: number;
-    paid_at?: string;
-    payment_method?: string;
-    unit_number?: string;
-    payer_name?: string;
-    line_items?: any[];
-  } | null) => {
+  const handleDownloadReceipt = (
+    data: {
+      receipt_number: string;
+      payment_reference?: string;
+      invoice_number?: string;
+      amount_paid: number;
+      paid_at?: string;
+      payment_method?: string;
+      unit_number?: string;
+      payer_name?: string;
+      line_items?: any[];
+    } | null,
+  ) => {
     if (!data) return;
     try {
       const rcpNumber = data.receipt_number || currentReceiptNumber || `RCP-${Date.now()}`;
-      const itemsHtml = (data.line_items && data.line_items.length > 0)
-        ? data.line_items.map((i: any) => `
+      const itemsHtml =
+        data.line_items && data.line_items.length > 0
+          ? data.line_items
+              .map(
+                (i: any) => `
           <tr>
             <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0;">${i.head || i.description || "Maintenance Charge"}</td>
             <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: 600;">${formatCurrency(i.amount)}</td>
           </tr>
-        `).join("")
-        : `
+        `,
+              )
+              .join("")
+          : `
           <tr>
             <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0;">Maintenance & Operations Settlement</td>
             <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: 600;">${formatCurrency(data.amount_paid)}</td>
@@ -1563,9 +1641,7 @@ export function OwnerTenantDashboardView({
   };
 
   const openReceiptForInvoice = (inv: InvoiceItem) => {
-    const rcpNum =
-      inv.receipt_number ||
-      `RCP-${inv.invoice_number.replace(/[^a-zA-Z0-9]/g, "")}`;
+    const rcpNum = inv.receipt_number || `RCP-${inv.invoice_number.replace(/[^a-zA-Z0-9]/g, "")}`;
     setCurrentReceiptNumber(rcpNum);
     setActiveReceiptData({
       receipt_number: rcpNum,
@@ -1585,9 +1661,7 @@ export function OwnerTenantDashboardView({
   };
 
   const downloadReceiptForInvoice = (inv: InvoiceItem) => {
-    const rcpNum =
-      inv.receipt_number ||
-      `RCP-${inv.invoice_number.replace(/[^a-zA-Z0-9]/g, "")}`;
+    const rcpNum = inv.receipt_number || `RCP-${inv.invoice_number.replace(/[^a-zA-Z0-9]/g, "")}`;
     handleDownloadReceipt({
       receipt_number: rcpNum,
       payment_reference: `PAY-${inv.invoice_number.replace(/[^a-zA-Z0-9]/g, "")}`,
@@ -1622,7 +1696,9 @@ export function OwnerTenantDashboardView({
       };
       const notePrefix = typeLabelMap[typeToUse] || "Emergency SOS";
       const customNote = overrideNote !== undefined ? overrideNote : emergencyNote;
-      const finalNote = customNote ? `[${notePrefix}] ${customNote}` : `[${notePrefix}] Resident requested urgent on-ground assistance`;
+      const finalNote = customNote
+        ? `[${notePrefix}] ${customNote}`
+        : `[${notePrefix}] Resident requested urgent on-ground assistance`;
 
       await panicMutation.mutateAsync({
         unit_id: activeUnit?.unit_id,
@@ -1765,188 +1841,230 @@ export function OwnerTenantDashboardView({
       {activeTab === "overview" && (
         <div>
           {/* REAL-TIME VISITOR / CAB APPROVAL PROMPT (Sticky Banner on Pending Visitor or Live Gate Alert) */}
-          {!visitorBannerDismissed && pendingVisitor && (() => {
-            const isCab =
-              (pendingVisitor as any).visitor_type === "cab_taxi" ||
-              pendingVisitor.purpose?.toLowerCase().includes("cab") ||
-              pendingVisitor.purpose?.toLowerCase().includes("taxi") ||
-              pendingVisitor.purpose?.toLowerCase().includes("uber") ||
-              pendingVisitor.purpose?.toLowerCase().includes("ola") ||
-              pendingVisitor.purpose?.toLowerCase().includes("rapido");
+          {!visitorBannerDismissed &&
+            pendingVisitor &&
+            (() => {
+              const isCab =
+                (pendingVisitor as any).visitor_type === "cab_taxi" ||
+                pendingVisitor.purpose?.toLowerCase().includes("cab") ||
+                pendingVisitor.purpose?.toLowerCase().includes("taxi") ||
+                pendingVisitor.purpose?.toLowerCase().includes("uber") ||
+                pendingVisitor.purpose?.toLowerCase().includes("ola") ||
+                pendingVisitor.purpose?.toLowerCase().includes("rapido");
 
-            return (
-              <div
-                className="gs-card card-hover"
-                style={{
-                  background: isCab
-                    ? "linear-gradient(135deg, #1E293B, #0F172A)"
-                    : "linear-gradient(135deg, #1E40AF, #1D4ED8)",
-                  color: "#FFFFFF",
-                  padding: "1.25rem 1.5rem",
-                  marginBottom: "1.5rem",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                  gap: "1.25rem",
-                  boxShadow: isCab
-                    ? "0 8px 32px rgba(234, 88, 12, 0.25)"
-                    : "0 8px 32px rgba(29, 78, 216, 0.35)",
-                  border: isCab ? "1px solid rgba(245, 158, 11, 0.4)" : "1px solid rgba(147, 197, 253, 0.3)",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: "1.25rem", flexWrap: "wrap", flex: 1, minWidth: 260 }}>
-                  {/* Visitor Photograph or Category Avatar */}
-                  {pendingVisitor.photo_url ? (
-                    <div
-                      style={{ position: "relative", flexShrink: 0, cursor: "pointer" }}
-                      onClick={() =>
-                        setPreviewPhoto({
-                          url: pendingVisitor.photo_url!,
-                          title: pendingVisitor.visitor_name,
-                          subtitle: `Gate check-in photo • ${pendingVisitor.phone || "No phone"} • ${pendingVisitor.purpose || "General Visit"}`,
-                        })
-                      }
-                      title="Click to view full photograph"
-                    >
-                      <img
-                        src={pendingVisitor.photo_url}
-                        alt={pendingVisitor.visitor_name}
+              return (
+                <div
+                  className="gs-card card-hover"
+                  style={{
+                    background: isCab
+                      ? "linear-gradient(135deg, #1E293B, #0F172A)"
+                      : "linear-gradient(135deg, #1E40AF, #1D4ED8)",
+                    color: "#FFFFFF",
+                    padding: "1.25rem 1.5rem",
+                    marginBottom: "1.5rem",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    gap: "1.25rem",
+                    boxShadow: isCab
+                      ? "0 8px 32px rgba(234, 88, 12, 0.25)"
+                      : "0 8px 32px rgba(29, 78, 216, 0.35)",
+                    border: isCab
+                      ? "1px solid rgba(245, 158, 11, 0.4)"
+                      : "1px solid rgba(147, 197, 253, 0.3)",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "1.25rem",
+                      flexWrap: "wrap",
+                      flex: 1,
+                      minWidth: 260,
+                    }}
+                  >
+                    {/* Visitor Photograph or Category Avatar */}
+                    {pendingVisitor.photo_url ? (
+                      <div
+                        style={{ position: "relative", flexShrink: 0, cursor: "pointer" }}
+                        onClick={() =>
+                          setPreviewPhoto({
+                            url: pendingVisitor.photo_url!,
+                            title: pendingVisitor.visitor_name,
+                            subtitle: `Gate check-in photo • ${pendingVisitor.phone || "No phone"} • ${pendingVisitor.purpose || "General Visit"}`,
+                          })
+                        }
+                        title="Click to view full photograph"
+                      >
+                        <img
+                          src={pendingVisitor.photo_url}
+                          alt={pendingVisitor.visitor_name}
+                          style={{
+                            width: 64,
+                            height: 64,
+                            borderRadius: "50%",
+                            objectFit: "cover",
+                            border: "2.5px solid #FFFFFF",
+                            boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+                            background: "#FFFFFF",
+                            transition: "transform 0.15s ease",
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.08)")}
+                          onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                        />
+                        <span
+                          style={{
+                            position: "absolute",
+                            bottom: -2,
+                            right: -2,
+                            background: isCab ? "#D97706" : "#2563EB",
+                            borderRadius: "50%",
+                            width: 22,
+                            height: 22,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "11px",
+                            border: "1.5px solid #FFFFFF",
+                            color: "#FFFFFF",
+                            boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+                          }}
+                          title="Click to view full photograph"
+                        >
+                          🔍
+                        </span>
+                      </div>
+                    ) : (
+                      <div
                         style={{
-                          width: 64,
-                          height: 64,
+                          width: 60,
+                          height: 60,
                           borderRadius: "50%",
-                          objectFit: "cover",
-                          border: "2.5px solid #FFFFFF",
-                          boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
-                          background: "#FFFFFF",
-                          transition: "transform 0.15s ease",
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.08)")}
-                        onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                      />
-                      <span
-                        style={{
-                          position: "absolute",
-                          bottom: -2,
-                          right: -2,
-                          background: isCab ? "#D97706" : "#2563EB",
-                          borderRadius: "50%",
-                          width: 22,
-                          height: 22,
+                          background: isCab
+                            ? "rgba(245, 158, 11, 0.2)"
+                            : "rgba(255, 255, 255, 0.2)",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          fontSize: "11px",
-                          border: "1.5px solid #FFFFFF",
-                          color: "#FFFFFF",
-                          boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+                          fontSize: "1.75rem",
+                          flexShrink: 0,
+                          border: "1px solid rgba(255, 255, 255, 0.3)",
                         }}
-                        title="Click to view full photograph"
                       >
-                        🔍
-                      </span>
-                    </div>
-                  ) : (
-                    <div
-                      style={{
-                        width: 60,
-                        height: 60,
-                        borderRadius: "50%",
-                        background: isCab ? "rgba(245, 158, 11, 0.2)" : "rgba(255, 255, 255, 0.2)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: "1.75rem",
-                        flexShrink: 0,
-                        border: "1px solid rgba(255, 255, 255, 0.3)",
-                      }}
-                    >
-                      {isCab ? "🚖" : "👤"}
-                    </div>
-                  )}
+                        {isCab ? "🚖" : "👤"}
+                      </div>
+                    )}
 
-                  <div style={{ flex: 1, minWidth: 200 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
-                      <span
+                    <div style={{ flex: 1, minWidth: 200 }}>
+                      <div
                         style={{
-                          fontSize: "11px",
-                          fontWeight: 800,
-                          textTransform: "uppercase",
-                          background: isCab ? "#D97706" : "rgba(255,255,255,0.25)",
-                          color: "#FFFFFF",
-                          padding: "0.2rem 0.6rem",
-                          borderRadius: "9999px",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.5rem",
+                          flexWrap: "wrap",
                         }}
                       >
-                        {isCab ? "🚖 CAB ARRIVAL APPROVAL" : "GATE APPROVAL REQUEST"}
-                      </span>
-                      <span style={{ fontSize: "12px", color: isCab ? "#FCD34D" : "#93C5FD", fontWeight: 600 }}>
-                        Awaiting your decision
-                      </span>
+                        <span
+                          style={{
+                            fontSize: "11px",
+                            fontWeight: 800,
+                            textTransform: "uppercase",
+                            background: isCab ? "#D97706" : "rgba(255,255,255,0.25)",
+                            color: "#FFFFFF",
+                            padding: "0.2rem 0.6rem",
+                            borderRadius: "9999px",
+                          }}
+                        >
+                          {isCab ? "🚖 CAB ARRIVAL APPROVAL" : "GATE APPROVAL REQUEST"}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: "12px",
+                            color: isCab ? "#FCD34D" : "#93C5FD",
+                            fontWeight: 600,
+                          }}
+                        >
+                          Awaiting your decision
+                        </span>
+                      </div>
+                      <h3
+                        style={{
+                          fontSize: "1.3rem",
+                          fontWeight: 800,
+                          marginTop: "0.3rem",
+                          marginBottom: "0.2rem",
+                          color: "#FFFFFF",
+                          letterSpacing: "-0.01em",
+                        }}
+                      >
+                        {isCab
+                          ? `Cab Driver ${pendingVisitor.visitor_name} (${pendingVisitor.purpose || "Cab Arrival"})`
+                          : pendingVisitor.visitor_name}
+                      </h3>
+                      <p
+                        style={{
+                          fontSize: "13.5px",
+                          color: isCab ? "#E2E8F0" : "#DBEAFE",
+                          margin: 0,
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        {isCab ? (
+                          <>
+                            <strong style={{ color: "#FDE68A" }}>Plate:</strong>{" "}
+                            {pendingVisitor.vehicle_number || "—"} ·{" "}
+                            <strong style={{ color: "#FDE68A" }}>Provider:</strong>{" "}
+                            {pendingVisitor.purpose || "Cab"} ·{" "}
+                            <strong style={{ color: "#FDE68A" }}>Phone:</strong>{" "}
+                            {pendingVisitor.phone || "—"}
+                          </>
+                        ) : (
+                          <>
+                            <strong style={{ color: "#FFFFFF" }}>Phone:</strong>{" "}
+                            {pendingVisitor.phone || "—"} ·{" "}
+                            <strong style={{ color: "#FFFFFF" }}>Purpose:</strong>{" "}
+                            {pendingVisitor.purpose || "General Visit"}{" "}
+                            {pendingVisitor.vehicle_number
+                              ? `· Vehicle: ${pendingVisitor.vehicle_number}`
+                              : ""}
+                          </>
+                        )}
+                      </p>
                     </div>
-                    <h3
+                  </div>
+
+                  <div style={{ display: "flex", gap: "0.75rem", flexShrink: 0 }}>
+                    <BrandButton
+                      variant="outline"
+                      size="sm"
                       style={{
-                        fontSize: "1.3rem",
-                        fontWeight: 800,
-                        marginTop: "0.3rem",
-                        marginBottom: "0.2rem",
-                        color: "#FFFFFF",
-                        letterSpacing: "-0.01em",
+                        background: "rgba(255,255,255,0.15)",
+                        color: "white",
+                        borderColor: "rgba(255,255,255,0.3)",
+                        fontWeight: 700,
                       }}
+                      onClick={() => handleVisitorDecision(pendingVisitor.id, false)}
                     >
-                      {isCab
-                        ? `Cab Driver ${pendingVisitor.visitor_name} (${pendingVisitor.purpose || "Cab Arrival"})`
-                        : pendingVisitor.visitor_name}
-                    </h3>
-                    <p style={{ fontSize: "13.5px", color: isCab ? "#E2E8F0" : "#DBEAFE", margin: 0, lineHeight: 1.4 }}>
-                      {isCab ? (
-                        <>
-                          <strong style={{ color: "#FDE68A" }}>Plate:</strong> {pendingVisitor.vehicle_number || "—"} ·{" "}
-                          <strong style={{ color: "#FDE68A" }}>Provider:</strong> {pendingVisitor.purpose || "Cab"} ·{" "}
-                          <strong style={{ color: "#FDE68A" }}>Phone:</strong> {pendingVisitor.phone || "—"}
-                        </>
-                      ) : (
-                        <>
-                          <strong style={{ color: "#FFFFFF" }}>Phone:</strong> {pendingVisitor.phone || "—"} ·{" "}
-                          <strong style={{ color: "#FFFFFF" }}>Purpose:</strong> {pendingVisitor.purpose || "General Visit"}{" "}
-                          {pendingVisitor.vehicle_number ? `· Vehicle: ${pendingVisitor.vehicle_number}` : ""}
-                        </>
-                      )}
-                    </p>
+                      ✕ Reject Entry
+                    </BrandButton>
+                    <BrandButton
+                      size="sm"
+                      style={{
+                        background: isCab ? "#F59E0B" : "#FFFFFF",
+                        color: isCab ? "#000000" : "#1D4ED8",
+                        fontWeight: 800,
+                        boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                      }}
+                      onClick={() => handleVisitorDecision(pendingVisitor.id, true)}
+                    >
+                      {isCab ? "✓ Allow Cab Entry" : "✓ Approve Entry"}
+                    </BrandButton>
                   </div>
                 </div>
-
-                <div style={{ display: "flex", gap: "0.75rem", flexShrink: 0 }}>
-                  <BrandButton
-                    variant="outline"
-                    size="sm"
-                    style={{
-                      background: "rgba(255,255,255,0.15)",
-                      color: "white",
-                      borderColor: "rgba(255,255,255,0.3)",
-                      fontWeight: 700,
-                    }}
-                    onClick={() => handleVisitorDecision(pendingVisitor.id, false)}
-                  >
-                    ✕ Reject Entry
-                  </BrandButton>
-                  <BrandButton
-                    size="sm"
-                    style={{
-                      background: isCab ? "#F59E0B" : "#FFFFFF",
-                      color: isCab ? "#000000" : "#1D4ED8",
-                      fontWeight: 800,
-                      boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                    }}
-                    onClick={() => handleVisitorDecision(pendingVisitor.id, true)}
-                  >
-                    {isCab ? "✓ Allow Cab Entry" : "✓ Approve Entry"}
-                  </BrandButton>
-                </div>
-              </div>
-            );
-          })()}
+              );
+            })()}
 
           {/* REAL-TIME DELIVERY APPROVAL PROMPT (Courier Waiting at Gate) */}
           {!deliveryBannerDismissed && pendingDelivery && (
@@ -2010,7 +2128,9 @@ export function OwnerTenantDashboardView({
                     {pendingDelivery.courier_company} ({pendingDelivery.package_type})
                   </h3>
                   <p style={{ fontSize: "13px", color: "#D1FAE5" }}>
-                    Executive: {pendingDelivery.driver_name || "Courier Partner"} · Phone: {pendingDelivery.driver_phone || "—"} · Tracking: {pendingDelivery.tracking_id || "—"}
+                    Executive: {pendingDelivery.driver_name || "Courier Partner"} · Phone:{" "}
+                    {pendingDelivery.driver_phone || "—"} · Tracking:{" "}
+                    {pendingDelivery.tracking_id || "—"}
                   </p>
                 </div>
               </div>
@@ -2230,7 +2350,15 @@ export function OwnerTenantDashboardView({
                     </div>
                   ))
                 ) : deliveryList.length === 0 ? (
-                  <p style={{ color: "var(--brand-body)", fontSize: "13px", margin: 0, fontStyle: "italic", padding: "0.5rem 0" }}>
+                  <p
+                    style={{
+                      color: "var(--brand-body)",
+                      fontSize: "13px",
+                      margin: 0,
+                      fontStyle: "italic",
+                      padding: "0.5rem 0",
+                    }}
+                  >
                     No recent parcel deliveries at the security gate.
                   </p>
                 ) : (
@@ -2248,7 +2376,9 @@ export function OwnerTenantDashboardView({
                       }}
                     >
                       <div>
-                        <div style={{ fontWeight: 700, fontSize: "14px" }}>{del.courier_company}</div>
+                        <div style={{ fontWeight: 700, fontSize: "14px" }}>
+                          {del.courier_company}
+                        </div>
                         <div style={{ fontSize: "12px", color: "var(--brand-body)" }}>
                           {del.package_type} · {del.tracking_id}
                         </div>
@@ -2266,11 +2396,30 @@ export function OwnerTenantDashboardView({
       {/* TAB 2: MY PROFILE */}
       {activeTab === "profile" && (
         <div className="gs-card" style={{ maxWidth: 750 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", flexWrap: "wrap", gap: "0.75rem" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "1.5rem",
+              flexWrap: "wrap",
+              gap: "0.75rem",
+            }}
+          >
             <div>
-              <h3 className="card-h3" style={{ margin: 0 }}>Resident Profile & Emergency Contacts</h3>
-              <p style={{ color: "var(--brand-body)", fontSize: "13px", marginTop: "0.25rem", margin: 0 }}>
-                Manage your personal identification, contact coordinates, and emergency escalation protocols.
+              <h3 className="card-h3" style={{ margin: 0 }}>
+                Resident Profile & Emergency Contacts
+              </h3>
+              <p
+                style={{
+                  color: "var(--brand-body)",
+                  fontSize: "13px",
+                  marginTop: "0.25rem",
+                  margin: 0,
+                }}
+              >
+                Manage your personal identification, contact coordinates, and emergency escalation
+                protocols.
               </p>
             </div>
             <div style={{ display: "flex", gap: "0.5rem" }}>
@@ -2287,10 +2436,7 @@ export function OwnerTenantDashboardView({
               >
                 🔒 Change Password
               </BrandButton>
-              <BrandButton
-                size="sm"
-                onClick={handleOpenEditProfile}
-              >
+              <BrandButton size="sm" onClick={handleOpenEditProfile}>
                 ✏️ Edit Profile
               </BrandButton>
             </div>
@@ -2302,9 +2448,19 @@ export function OwnerTenantDashboardView({
               onRetry={() => profile.refetch()}
             />
           ) : profile.isLoading ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: "1rem", marginBottom: "1.5rem" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
+                gap: "1rem",
+                marginBottom: "1.5rem",
+              }}
+            >
               {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
+                <div
+                  key={i}
+                  style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}
+                >
                   <Skeleton width="40%" height="0.75rem" borderRadius={4} />
                   <div style={{ marginTop: "0.4rem" }}>
                     <Skeleton width="70%" height="1.1rem" borderRadius={4} />
@@ -2314,27 +2470,88 @@ export function OwnerTenantDashboardView({
             </div>
           ) : (
             <>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: "1rem", marginBottom: "1.5rem" }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
+                  gap: "1rem",
+                  marginBottom: "1.5rem",
+                }}
+              >
                 <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
-                  <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>Full Name</div>
-                  <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>{profile.data?.full_name || "—"}</div>
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      color: "var(--brand-body)",
+                      textTransform: "uppercase",
+                      fontWeight: 700,
+                    }}
+                  >
+                    Full Name
+                  </div>
+                  <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>
+                    {profile.data?.full_name || "—"}
+                  </div>
                 </div>
                 <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
-                  <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>Registered Email</div>
-                  <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>{profile.data?.email || "—"}</div>
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      color: "var(--brand-body)",
+                      textTransform: "uppercase",
+                      fontWeight: 700,
+                    }}
+                  >
+                    Registered Email
+                  </div>
+                  <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>
+                    {profile.data?.email || "—"}
+                  </div>
                 </div>
                 <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
-                  <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>Primary Mobile</div>
-                  <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>{profile.data?.phone || "Not added"}</div>
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      color: "var(--brand-body)",
+                      textTransform: "uppercase",
+                      fontWeight: 700,
+                    }}
+                  >
+                    Primary Mobile
+                  </div>
+                  <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>
+                    {profile.data?.phone || "Not added"}
+                  </div>
                 </div>
                 <div style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
-                  <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>Emergency Contact</div>
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      color: "var(--brand-body)",
+                      textTransform: "uppercase",
+                      fontWeight: 700,
+                    }}
+                  >
+                    Emergency Contact
+                  </div>
                   <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>
                     {profile.data?.emergency_contacts?.[0] ? (
                       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                        <span>{profile.data.emergency_contacts[0].name} ({profile.data.emergency_contacts[0].phone})</span>
+                        <span>
+                          {profile.data.emergency_contacts[0].name} (
+                          {profile.data.emergency_contacts[0].phone})
+                        </span>
                         {profile.data.emergency_contacts[0].relationship && (
-                          <span style={{ fontSize: "11px", padding: "0.15rem 0.45rem", borderRadius: "4px", background: "#EEF2F6", color: "#475569", fontWeight: 600 }}>
+                          <span
+                            style={{
+                              fontSize: "11px",
+                              padding: "0.15rem 0.45rem",
+                              borderRadius: "4px",
+                              background: "#EEF2F6",
+                              color: "#475569",
+                              fontWeight: 600,
+                            }}
+                          >
                             {profile.data.emergency_contacts[0].relationship}
                           </span>
                         )}
@@ -2347,11 +2564,36 @@ export function OwnerTenantDashboardView({
               </div>
 
               {profile.data?.emergency_notes && (
-                <div style={{ padding: "0.85rem 1rem", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: "8px", marginBottom: "0.5rem" }}>
-                  <div style={{ fontSize: "11px", color: "#991B1B", textTransform: "uppercase", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                <div
+                  style={{
+                    padding: "0.85rem 1rem",
+                    background: "#FEF2F2",
+                    border: "1px solid #FECACA",
+                    borderRadius: "8px",
+                    marginBottom: "0.5rem",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      color: "#991B1B",
+                      textTransform: "uppercase",
+                      fontWeight: 700,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.35rem",
+                    }}
+                  >
                     <span>🚨 Medical & Emergency Notes</span>
                   </div>
-                  <div style={{ fontSize: "13.5px", color: "#7F1D1D", marginTop: "0.3rem", lineHeight: 1.4 }}>
+                  <div
+                    style={{
+                      fontSize: "13.5px",
+                      color: "#7F1D1D",
+                      marginTop: "0.3rem",
+                      lineHeight: 1.4,
+                    }}
+                  >
                     {profile.data.emergency_notes}
                   </div>
                 </div>
@@ -2374,9 +2616,19 @@ export function OwnerTenantDashboardView({
               onRetry={() => profile.refetch()}
             />
           ) : profile.isLoading ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: "1rem", marginBottom: "1.5rem" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
+                gap: "1rem",
+                marginBottom: "1.5rem",
+              }}
+            >
               {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}>
+                <div
+                  key={i}
+                  style={{ padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px" }}
+                >
                   <Skeleton width="40%" height="0.75rem" borderRadius={4} />
                   <div style={{ marginTop: "0.4rem" }}>
                     <Skeleton width="70%" height="1.1rem" borderRadius={4} />
@@ -2466,8 +2718,9 @@ export function OwnerTenantDashboardView({
                   Assigned Parking
                 </div>
                 <div style={{ fontSize: "14px", fontWeight: 600, marginTop: "0.25rem" }}>
-                  {(vehicles.vehiclesList || []).find((v: ResidentVehicle) => v.slot !== "Not Allocated")?.slot ||
-                    "No slot allocated"}
+                  {(vehicles.vehiclesList || []).find(
+                    (v: ResidentVehicle) => v.slot !== "Not Allocated",
+                  )?.slot || "No slot allocated"}
                 </div>
               </div>
             </div>
@@ -2489,9 +2742,14 @@ export function OwnerTenantDashboardView({
             }}
           >
             <div>
-              <h3 className="card-h3" style={{ margin: 0 }}>Family Members (Gate Pre-Approved)</h3>
-              <p style={{ color: "var(--brand-body)", fontSize: "13.5px", margin: "0.25rem 0 0 0" }}>
-                Family members have a permanent gate pass (reusable QR code & 6-digit gate PIN) that bypasses manual guard approval.
+              <h3 className="card-h3" style={{ margin: 0 }}>
+                Family Members (Gate Pre-Approved)
+              </h3>
+              <p
+                style={{ color: "var(--brand-body)", fontSize: "13.5px", margin: "0.25rem 0 0 0" }}
+              >
+                Family members have a permanent gate pass (reusable QR code & 6-digit gate PIN) that
+                bypasses manual guard approval.
               </p>
             </div>
             <BrandButton
@@ -2565,7 +2823,9 @@ export function OwnerTenantDashboardView({
                         {m.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <div style={{ fontWeight: 600, color: "var(--brand-heading)" }}>{m.name}</div>
+                        <div style={{ fontWeight: 600, color: "var(--brand-heading)" }}>
+                          {m.name}
+                        </div>
                         <div style={{ fontSize: "11.5px", color: "var(--brand-body)" }}>
                           {m.phone}
                         </div>
@@ -2781,7 +3041,13 @@ export function OwnerTenantDashboardView({
                       <div>
                         <span style={{ fontWeight: 600 }}>{i.visitor_name}</span>
                         {i.visitor_type && (
-                          <span style={{ display: "block", fontSize: "11px", color: "var(--brand-muted)" }}>
+                          <span
+                            style={{
+                              display: "block",
+                              fontSize: "11px",
+                              color: "var(--brand-muted)",
+                            }}
+                          >
                             {i.visitor_type.replace(/_/g, " ")}
                           </span>
                         )}
@@ -2791,7 +3057,11 @@ export function OwnerTenantDashboardView({
                 },
                 { key: "phone", header: "Phone" },
                 { key: "purpose", header: "Purpose" },
-                { key: "status", header: "Status", render: (i) => <StatusBadge status={i.status} /> },
+                {
+                  key: "status",
+                  header: "Status",
+                  render: (i) => <StatusBadge status={i.status} />,
+                },
                 {
                   key: "pass_code",
                   header: "Pass / PIN",
@@ -2804,7 +3074,13 @@ export function OwnerTenantDashboardView({
                         <button
                           type="button"
                           className="btn btn-secondary"
-                          style={{ padding: "0.2rem 0.5rem", fontSize: "11px", display: "inline-flex", alignItems: "center", gap: "0.25rem" }}
+                          style={{
+                            padding: "0.2rem 0.5rem",
+                            fontSize: "11px",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "0.25rem",
+                          }}
                           onClick={() => {
                             setActivePassResult({
                               token: i.qr_token || i.pass_code,
@@ -2856,60 +3132,15 @@ export function OwnerTenantDashboardView({
               Configure how the Security Guard handles deliveries automatically without calling your
               intercom.
             </p>
-            {deliveryProtocols.isLoading ? (
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
-                  gap: "1rem",
-                }}
-              >
-                {[1, 2, 3].map((n) => (
-                  <CardSkeleton key={n} lines={2} />
-                ))}
-              </div>
-            ) : (deliveryProtocols.data || []).length === 0 ? (
-              <p style={{ color: "var(--brand-body)", fontSize: "13px" }}>
-                No delivery protocols configured for this community yet.
-              </p>
-            ) : (
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
-                  gap: "1rem",
-                }}
-              >
-                {(deliveryProtocols.data || []).map((proto) => (
-                  <div
-                    key={proto.id}
-                    style={{
-                      padding: "0.85rem",
-                      background: "#F8FAFC",
-                      borderRadius: "8px",
-                      border: "1px solid var(--border-light)",
-                    }}
-                  >
-                    <div
-                      style={{ fontWeight: 700, fontSize: "13.5px", textTransform: "capitalize" }}
-                    >
-                      {proto.delivery_type}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        color: "var(--brand-primary)",
-                        marginTop: "0.25rem",
-                        fontWeight: 600,
-                      }}
-                    >
-                      Protocol: {proto.protocol_type.replace(/_/g, " ")}
-                      {proto.requires_otp ? " · OTP Required" : ""}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <DeliveryProtocolSettings
+              protocols={deliveryProtocols.data}
+              isLoading={deliveryProtocols.isLoading}
+              isError={deliveryProtocols.isError}
+              onRetry={() => deliveryProtocols.refetch()}
+              onSave={(delivery_type, protocol_type) =>
+                deliveries.updateProtocol.mutateAsync({ delivery_type, protocol_type })
+              }
+            />
           </div>
 
           <div
@@ -3033,7 +3264,9 @@ export function OwnerTenantDashboardView({
               <h3 className="card-h3" style={{ margin: 0 }}>
                 My Active Facility Bookings
               </h3>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}
+              >
                 <div style={{ width: "min(100%, 240px)" }}>
                   <DebouncedInput
                     value={bookingControls.searchTerm}
@@ -3154,12 +3387,16 @@ export function OwnerTenantDashboardView({
             ) : amenities.amenities.isError ? (
               <ErrorState
                 title="Failed to Load Amenities"
-                message={amenities.amenities.error?.message || "Could not retrieve community amenities."}
+                message={
+                  amenities.amenities.error?.message || "Could not retrieve community amenities."
+                }
                 onRetry={() => amenities.amenities.refetch()}
               />
             ) : (amenities.amenities.data || []).length === 0 ? (
               <div className="gs-card" style={{ textAlign: "center", padding: "2rem" }}>
-                <p style={{ color: "var(--brand-body)", margin: 0 }}>No amenities configured for this community.</p>
+                <p style={{ color: "var(--brand-body)", margin: 0 }}>
+                  No amenities configured for this community.
+                </p>
               </div>
             ) : (
               <div
@@ -3177,7 +3414,7 @@ export function OwnerTenantDashboardView({
                       (b) =>
                         b.amenity_id === amenity.id &&
                         b.date === todayStr &&
-                        b.status !== "cancelled"
+                        b.status !== "cancelled",
                     )
                     .reduce((sum, b) => sum + (b.guests_count || 1), 0);
                   const totalCap = amenity.capacity || 20;
@@ -3190,48 +3427,48 @@ export function OwnerTenantDashboardView({
                         : "#16a34a";
 
                   return (
-                  <div key={amenity.id} className="gs-card card-hover">
-                    <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>
-                      {getAmenityIcon(amenity.name, amenity.category, amenity.description)}
-                    </div>
-                    <h4 style={{ fontWeight: 800, fontSize: "16px" }}>{amenity.name}</h4>
-                    <p
-                      style={{
-                        fontSize: "13px",
-                        color: "var(--brand-body)",
-                        margin: "0.5rem 0 0.5rem 0",
-                      }}
-                    >
-                      {amenity.description}
-                    </p>
-                    {/* Dynamic remaining capacity badge */}
-                    <div
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "0.35rem",
-                        fontSize: "12px",
-                        fontWeight: 700,
-                        color: capColor,
-                        background: `${capColor}14`,
-                        borderRadius: "6px",
-                        padding: "3px 8px",
-                        marginBottom: "0.75rem",
-                      }}
-                    >
-                      <span
+                    <div key={amenity.id} className="gs-card card-hover">
+                      <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>
+                        {getAmenityIcon(amenity.name, amenity.category, amenity.description)}
+                      </div>
+                      <h4 style={{ fontWeight: 800, fontSize: "16px" }}>{amenity.name}</h4>
+                      <p
                         style={{
-                          width: "7px",
-                          height: "7px",
-                          borderRadius: "50%",
-                          background: capColor,
-                          display: "inline-block",
+                          fontSize: "13px",
+                          color: "var(--brand-body)",
+                          margin: "0.5rem 0 0.5rem 0",
                         }}
-                      />
-                      {remaining === 0
-                        ? "Fully Booked Today"
-                        : `${remaining} of ${totalCap} spots available today`}
-                    </div>
+                      >
+                        {amenity.description}
+                      </p>
+                      {/* Dynamic remaining capacity badge */}
+                      <div
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "0.35rem",
+                          fontSize: "12px",
+                          fontWeight: 700,
+                          color: capColor,
+                          background: `${capColor}14`,
+                          borderRadius: "6px",
+                          padding: "3px 8px",
+                          marginBottom: "0.75rem",
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: "7px",
+                            height: "7px",
+                            borderRadius: "50%",
+                            background: capColor,
+                            display: "inline-block",
+                          }}
+                        />
+                        {remaining === 0
+                          ? "Fully Booked Today"
+                          : `${remaining} of ${totalCap} spots available today`}
+                      </div>
                       <div
                         style={{
                           display: "flex",
@@ -3240,7 +3477,11 @@ export function OwnerTenantDashboardView({
                         }}
                       >
                         <span
-                          style={{ fontSize: "13px", fontWeight: 700, color: "var(--brand-primary)" }}
+                          style={{
+                            fontSize: "13px",
+                            fontWeight: 700,
+                            color: "var(--brand-primary)",
+                          }}
                         >
                           {amenity.price_per_hour > 0
                             ? `${formatCurrency(amenity.price_per_hour)}/hr`
@@ -3303,7 +3544,15 @@ export function OwnerTenantDashboardView({
                     border: "1px solid var(--border-light)",
                   }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.5rem", flexWrap: "wrap" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      gap: "0.5rem",
+                      flexWrap: "wrap",
+                    }}
+                  >
                     <div>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                         <span
@@ -3319,7 +3568,15 @@ export function OwnerTenantDashboardView({
                         >
                           {m.announcement_type || "Notice"}
                         </span>
-                        <div style={{ fontWeight: 700, fontSize: "14.5px", color: "var(--brand-heading)" }}>{m.title}</div>
+                        <div
+                          style={{
+                            fontWeight: 700,
+                            fontSize: "14.5px",
+                            color: "var(--brand-heading)",
+                          }}
+                        >
+                          {m.title}
+                        </div>
                       </div>
                       <div
                         style={{
@@ -3344,7 +3601,14 @@ export function OwnerTenantDashboardView({
                       </span>
                     )}
                   </div>
-                  <p style={{ fontSize: "13.5px", color: "var(--brand-body)", marginTop: "0.6rem", lineHeight: 1.5 }}>
+                  <p
+                    style={{
+                      fontSize: "13.5px",
+                      color: "var(--brand-body)",
+                      marginTop: "0.6rem",
+                      lineHeight: 1.5,
+                    }}
+                  >
                     {m.body}
                   </p>
                   {(m.announcement_type === "event" || m.event_start_at) && (
@@ -3365,7 +3629,13 @@ export function OwnerTenantDashboardView({
                         {m.event_end_at ? ` to ${formatDate(m.event_end_at)}` : ""}
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                        <span style={{ fontSize: "12px", color: "var(--brand-muted)", marginRight: "0.25rem" }}>
+                        <span
+                          style={{
+                            fontSize: "12px",
+                            color: "var(--brand-muted)",
+                            marginRight: "0.25rem",
+                          }}
+                        >
                           RSVP:
                         </span>
                         <BrandButton
@@ -3451,7 +3721,11 @@ export function OwnerTenantDashboardView({
                   header: "Priority",
                   render: (i) => <StatusBadge status={i.priority} />,
                 },
-                { key: "status", header: "Status", render: (i) => <StatusBadge status={i.status} /> },
+                {
+                  key: "status",
+                  header: "Status",
+                  render: (i) => <StatusBadge status={i.status} />,
+                },
                 {
                   key: "escalation_state",
                   header: "SLA Tracker",
@@ -3565,7 +3839,9 @@ export function OwnerTenantDashboardView({
                   Vehicles linked to your unit for gate boom barrier entry & parking allocation.
                 </p>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}
+              >
                 <div style={{ width: "min(100%, 220px)" }}>
                   <DebouncedInput
                     value={vehicleControls.searchTerm}
@@ -3608,7 +3884,13 @@ export function OwnerTenantDashboardView({
                     key: "plate",
                     header: "License Plate",
                     render: (i) => (
-                      <span style={{ fontFamily: "monospace", fontWeight: 800, color: "var(--brand-heading)" }}>
+                      <span
+                        style={{
+                          fontFamily: "monospace",
+                          fontWeight: 800,
+                          color: "var(--brand-heading)",
+                        }}
+                      >
                         🚗 {i.plate}
                       </span>
                     ),
@@ -3617,13 +3899,17 @@ export function OwnerTenantDashboardView({
                   {
                     key: "vehicle_type",
                     header: "Category",
-                    render: (i) => <span style={{ textTransform: "capitalize" }}>{i.vehicle_type}</span>,
+                    render: (i) => (
+                      <span style={{ textTransform: "capitalize" }}>{i.vehicle_type}</span>
+                    ),
                   },
                   {
                     key: "slot",
                     header: "Allocated Parking Slot",
                     render: (i) => (
-                      <span style={{ fontWeight: 700, color: "var(--brand-primary)" }}>🅿️ {i.slot}</span>
+                      <span style={{ fontWeight: 700, color: "var(--brand-primary)" }}>
+                        🅿️ {i.slot}
+                      </span>
                     ),
                   },
                   { key: "rfid_tag", header: "Gate FastTag / RFID Sticker" },
@@ -3695,7 +3981,8 @@ export function OwnerTenantDashboardView({
               Parking Violations & Gate Security Log
             </h3>
             <p style={{ color: "var(--brand-body)", fontSize: "13.5px", marginBottom: "1rem" }}>
-              Log of misparked vehicles, unauthorized parking, or security gate flags reported by guards.
+              Log of misparked vehicles, unauthorized parking, or security gate flags reported by
+              guards.
             </p>
             <DataTable
               columns={[
@@ -3703,7 +3990,9 @@ export function OwnerTenantDashboardView({
                   key: "plate_number",
                   header: "Vehicle Plate",
                   render: (v) => (
-                    <span style={{ fontFamily: "monospace", fontWeight: 700 }}>{v.plate_number}</span>
+                    <span style={{ fontFamily: "monospace", fontWeight: 700 }}>
+                      {v.plate_number}
+                    </span>
                   ),
                 },
                 { key: "violation_type", header: "Violation Type" },
@@ -3757,10 +4046,13 @@ export function OwnerTenantDashboardView({
             <div>
               <h3 className="card-h3">Assigned Domestic Staff</h3>
               <p style={{ color: "var(--brand-body)", fontSize: "13.5px" }}>
-                Domestic helpers assigned to your unit. Hire verified staff members, view real-time gate presence, and rate service.
+                Domestic helpers assigned to your unit. Hire verified staff members, view real-time
+                gate presence, and rate service.
               </p>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+            <div
+              style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}
+            >
               <div style={{ width: "min(100%, 240px)" }}>
                 <DebouncedInput
                   value={staffControls.searchTerm}
@@ -3786,7 +4078,9 @@ export function OwnerTenantDashboardView({
           {domesticStaff.isError ? (
             <ErrorState
               title="Failed to Load Domestic Staff"
-              message={domesticStaff.error?.message || "Could not retrieve assigned domestic staff."}
+              message={
+                domesticStaff.error?.message || "Could not retrieve assigned domestic staff."
+              }
               onRetry={() => domesticStaff.refetch()}
             />
           ) : (
@@ -3803,8 +4097,18 @@ export function OwnerTenantDashboardView({
                       <div>
                         <StatusBadge status="active" label="🟢 Inside Community" />
                         {i.last_check_in && (
-                          <div style={{ fontSize: "11px", color: "var(--brand-muted)", marginTop: "0.2rem" }}>
-                            In: {new Date(i.last_check_in).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          <div
+                            style={{
+                              fontSize: "11px",
+                              color: "var(--brand-muted)",
+                              marginTop: "0.2rem",
+                            }}
+                          >
+                            In:{" "}
+                            {new Date(i.last_check_in).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
                           </div>
                         )}
                       </div>
@@ -3850,7 +4154,9 @@ export function OwnerTenantDashboardView({
                           variant="ghost"
                           style={{ color: "var(--brand-danger, #ef4444)" }}
                           onClick={async () => {
-                            if (window.confirm(`Are you sure you want to end service for ${i.name}?`)) {
+                            if (
+                              window.confirm(`Are you sure you want to end service for ${i.name}?`)
+                            ) {
                               try {
                                 await endAssignmentMutation.mutateAsync(i.id);
                                 await domesticStaff.refetch();
@@ -3942,7 +4248,8 @@ export function OwnerTenantDashboardView({
                     fontWeight: 700,
                     fontSize: "13.5px",
                     cursor: "pointer",
-                    background: paymentsViewMode === "invoices" ? "var(--brand-primary)" : "#F1F5F9",
+                    background:
+                      paymentsViewMode === "invoices" ? "var(--brand-primary)" : "#F1F5F9",
                     color: paymentsViewMode === "invoices" ? "#FFFFFF" : "var(--brand-body)",
                   }}
                   onClick={() => setPaymentsViewMode("invoices")}
@@ -3967,18 +4274,40 @@ export function OwnerTenantDashboardView({
                 </button>
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}
+              >
                 <div style={{ width: "min(100%, 240px)" }}>
                   <DebouncedInput
-                    value={paymentsViewMode === "invoices" ? invoiceControls.searchTerm : ledgerControls.searchTerm}
-                    onChange={paymentsViewMode === "invoices" ? invoiceControls.setSearchTerm : ledgerControls.setSearchTerm}
-                    placeholder={paymentsViewMode === "invoices" ? "Search invoices, dues..." : "Search ledger entries..."}
+                    value={
+                      paymentsViewMode === "invoices"
+                        ? invoiceControls.searchTerm
+                        : ledgerControls.searchTerm
+                    }
+                    onChange={
+                      paymentsViewMode === "invoices"
+                        ? invoiceControls.setSearchTerm
+                        : ledgerControls.setSearchTerm
+                    }
+                    placeholder={
+                      paymentsViewMode === "invoices"
+                        ? "Search invoices, dues..."
+                        : "Search ledger entries..."
+                    }
                     icon="🔍"
                   />
                 </div>
                 <SortDropdown
-                  value={paymentsViewMode === "invoices" ? invoiceControls.sortPreset : ledgerControls.sortPreset}
-                  onChange={paymentsViewMode === "invoices" ? invoiceControls.setSortPreset : ledgerControls.setSortPreset}
+                  value={
+                    paymentsViewMode === "invoices"
+                      ? invoiceControls.sortPreset
+                      : ledgerControls.sortPreset
+                  }
+                  onChange={
+                    paymentsViewMode === "invoices"
+                      ? invoiceControls.setSortPreset
+                      : ledgerControls.setSortPreset
+                  }
                 />
               </div>
             </div>
@@ -4014,7 +4343,14 @@ export function OwnerTenantDashboardView({
                       key: "actions",
                       header: "Actions",
                       render: (i) => (
-                        <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "0.4rem",
+                            alignItems: "center",
+                            flexWrap: "wrap",
+                          }}
+                        >
                           <BrandButton
                             size="sm"
                             variant="outline"
@@ -4165,450 +4501,525 @@ export function OwnerTenantDashboardView({
       )}
 
       {/* TAB 13: NOTIFICATIONS & ALERTS */}
-      {activeTab === "notifications" && (() => {
-        const notifList = myNotifications.data || [];
-        const unreadCount = notifList.filter((n) => !n.is_read && !actionedNotifications[n.id]).length;
-        const displayedNotifs = notifList.filter((n) => {
-          if (notifFilter === "unread") {
-            return !n.is_read && !actionedNotifications[n.id];
-          }
-          return true;
-        });
+      {activeTab === "notifications" &&
+        (() => {
+          const notifList = myNotifications.data || [];
+          const unreadCount = notifList.filter(
+            (n) => !n.is_read && !actionedNotifications[n.id],
+          ).length;
+          const displayedNotifs = notifList.filter((n) => {
+            if (notifFilter === "unread") {
+              return !n.is_read && !actionedNotifications[n.id];
+            }
+            return true;
+          });
 
-        const handleMarkAllRead = async () => {
-          try {
-            await markAllNotificationsRead.mutateAsync();
-            toast.success("All notifications marked as read.", "Notifications Updated");
-            myNotifications.refetch();
-          } catch (err: any) {
-            toast.error(err?.message || "Failed to mark all notifications as read.", "Error");
-          }
-        };
+          const handleMarkAllRead = async () => {
+            try {
+              await markAllNotificationsRead.mutateAsync();
+              toast.success("All notifications marked as read.", "Notifications Updated");
+              myNotifications.refetch();
+            } catch (err: any) {
+              toast.error(err?.message || "Failed to mark all notifications as read.", "Error");
+            }
+          };
 
-        return (
-          <div className="gs-card">
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "1.25rem",
-                flexWrap: "wrap",
-                gap: "0.75rem",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                <h3 className="card-h3" style={{ margin: 0 }}>
-                  Notifications &amp; Gate Alerts
-                </h3>
-                {unreadCount > 0 && (
-                  <span
-                    className="badge badge-primary"
-                    style={{
-                      background: "var(--brand-primary, #1D4ED8)",
-                      color: "#FFFFFF",
-                      fontWeight: 700,
-                      fontSize: "0.75rem",
-                      padding: "0.2rem 0.6rem",
-                      borderRadius: "9999px",
-                    }}
-                  >
-                    {unreadCount} Unread
-                  </span>
-                )}
-              </div>
-
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
-                <div style={{ display: "flex", background: "var(--bg-secondary, #F1F5F9)", padding: "2px", borderRadius: "8px" }}>
-                  <button
-                    type="button"
-                    className={`btn ${notifFilter === "all" ? "btn-primary" : "btn-secondary"}`}
-                    style={{
-                      fontSize: "0.75rem",
-                      padding: "0.25rem 0.65rem",
-                      borderRadius: "6px",
-                      border: "none",
-                      background: notifFilter === "all" ? "var(--brand-primary, #1D4ED8)" : "transparent",
-                      color: notifFilter === "all" ? "#FFFFFF" : "var(--brand-body, #64748B)",
-                    }}
-                    onClick={() => setNotifFilter("all")}
-                  >
-                    All ({notifList.length})
-                  </button>
-                  <button
-                    type="button"
-                    className={`btn ${notifFilter === "unread" ? "btn-primary" : "btn-secondary"}`}
-                    style={{
-                      fontSize: "0.75rem",
-                      padding: "0.25rem 0.65rem",
-                      borderRadius: "6px",
-                      border: "none",
-                      background: notifFilter === "unread" ? "var(--brand-primary, #1D4ED8)" : "transparent",
-                      color: notifFilter === "unread" ? "#FFFFFF" : "var(--brand-body, #64748B)",
-                    }}
-                    onClick={() => setNotifFilter("unread")}
-                  >
-                    Unread ({unreadCount})
-                  </button>
-                </div>
-
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  style={{ fontSize: "0.75rem", padding: "0.3rem 0.75rem", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
-                  onClick={handleMarkAllRead}
-                  disabled={markAllNotificationsRead.isPending || unreadCount === 0}
-                >
-                  ✓ Mark All as Read
-                </button>
-
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  style={{ fontSize: "0.75rem", padding: "0.3rem 0.6rem" }}
-                  onClick={() => myNotifications.refetch()}
-                  title="Refresh Notifications"
-                >
-                  🔄
-                </button>
-              </div>
-            </div>
-
-            {myNotifications.isLoading ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
-                {[1, 2, 3, 4].map((n) => (
-                  <CardSkeleton key={n} lines={2} />
-                ))}
-              </div>
-            ) : myNotifications.isError ? (
-              <ErrorState
-                title="Failed to Load Notifications"
-                message={myNotifications.error?.message || "Could not retrieve notifications."}
-                onRetry={() => myNotifications.refetch()}
-              />
-            ) : displayedNotifs.length === 0 ? (
-              <p style={{ color: "var(--brand-body)", fontSize: "14px", padding: "1rem 0" }}>
-                {notifFilter === "unread" ? "No unread notifications! You are completely caught up." : "No notifications yet."}
-              </p>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
-                {displayedNotifs.map((n) => {
-                  const isCabNotif =
-                    n.reference_type === "cab_request" ||
-                    (n.notification_type && n.notification_type.includes("cab")) ||
-                    (n.title && n.title.toLowerCase().includes("cab"));
-                  const isDeliveryNotif =
-                    !isCabNotif &&
-                    (n.reference_type === "delivery" || (n.notification_type && n.notification_type.includes("delivery")));
-                  const isVisitorNotif =
-                    !isCabNotif &&
-                    (n.reference_type === "visitor_request" || (n.notification_type && n.notification_type.includes("visitor")));
-                  const refId = n.reference_id;
-
-                  const isLocalRead = Boolean(actionedNotifications[n.id]);
-                  const isRead = n.is_read || isLocalRead;
-
-                  // Find status in real-time collections
-                  const matchedVisitor = visitorList.find((v) => v.id === refId);
-                  const matchedDelivery = deliveryList.find((d) => d.id === refId);
-
-                  const localAction = actionedNotifications[n.id];
-                  const isVisitorApproved = matchedVisitor && (matchedVisitor.status === "approved" || matchedVisitor.status === "checked_in");
-                  const isVisitorRejected = matchedVisitor && matchedVisitor.status === "rejected";
-                  const isDeliveryApproved = matchedDelivery && (matchedDelivery.approval_status === "approved" || matchedDelivery.status === "delivered");
-                  const isDeliveryRejected = matchedDelivery && (matchedDelivery.approval_status === "rejected" || matchedDelivery.status === "rejected");
-
-                  const isApproved = localAction === "approved" || isVisitorApproved || isDeliveryApproved;
-                  const isRejected = localAction === "rejected" || isVisitorRejected || isDeliveryRejected;
-                  const isDecided = isApproved || isRejected;
-
-                  return (
-                    <div
-                      key={n.id}
+          return (
+            <div className="gs-card">
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "1.25rem",
+                  flexWrap: "wrap",
+                  gap: "0.75rem",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                  <h3 className="card-h3" style={{ margin: 0 }}>
+                    Notifications &amp; Gate Alerts
+                  </h3>
+                  {unreadCount > 0 && (
+                    <span
+                      className="badge badge-primary"
                       style={{
-                        padding: "1rem",
-                        border: isRead
-                          ? "1px solid var(--border-standard, #E2E8F0)"
-                          : isCabNotif
-                            ? "1px solid #F59E0B"
-                            : "1px solid var(--brand-primary, #3B82F6)",
-                        borderRadius: "8px",
-                        background: isRead
-                          ? "#F8FAFC"
-                          : isCabNotif
-                            ? "#FFFBEB"
-                            : "#EFF6FF",
-                        transition: "all 0.2s ease",
-                      }}
-                      onClick={async () => {
-                        if (!isRead) {
-                          try {
-                            await markNotificationRead.mutateAsync(n.id);
-                            myNotifications.refetch();
-                          } catch (e) {
-                            // ignore
-                          }
-                        }
+                        background: "var(--brand-primary, #1D4ED8)",
+                        color: "#FFFFFF",
+                        fontWeight: 700,
+                        fontSize: "0.75rem",
+                        padding: "0.2rem 0.6rem",
+                        borderRadius: "9999px",
                       }}
                     >
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          marginBottom: "0.25rem",
-                          flexWrap: "wrap",
-                          gap: "0.5rem",
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                          {isCabNotif ? (
-                            <span
-                              style={{
-                                fontSize: "10.5px",
-                                fontWeight: 800,
-                                background: "#D97706",
-                                color: "#FFFFFF",
-                                padding: "0.15rem 0.5rem",
-                                borderRadius: "9999px",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "0.25rem",
-                              }}
-                            >
-                              🚖 CAB ARRIVAL
-                            </span>
-                          ) : isDeliveryNotif ? (
-                            <span
-                              style={{
-                                fontSize: "10.5px",
-                                fontWeight: 800,
-                                background: "#0284C7",
-                                color: "#FFFFFF",
-                                padding: "0.15rem 0.5rem",
-                                borderRadius: "9999px",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "0.25rem",
-                              }}
-                            >
-                              📦 DELIVERY
-                            </span>
-                          ) : isVisitorNotif ? (
-                            <span
-                              style={{
-                                fontSize: "10.5px",
-                                fontWeight: 800,
-                                background: "#4F46E5",
-                                color: "#FFFFFF",
-                                padding: "0.15rem 0.5rem",
-                                borderRadius: "9999px",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "0.25rem",
-                              }}
-                            >
-                              👤 VISITOR PASS
-                            </span>
-                          ) : null}
-                          <h4
-                            style={{
-                              fontWeight: isRead ? 600 : 800,
-                              fontSize: "14px",
-                              color: "var(--brand-heading, #0F172A)",
-                              margin: 0,
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "0.4rem",
-                            }}
-                          >
-                            {n.title}
-                            {!isRead && (
-                              <span
-                                style={{
-                                  width: 8,
-                                  height: 8,
-                                  borderRadius: "50%",
-                                  background: "#EF4444",
-                                  display: "inline-block",
-                                }}
-                                title="Unread notification"
-                              />
-                            )}
-                          </h4>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                          {isRead ? (
-                            <span style={{ fontSize: "11px", color: "var(--brand-body, #64748B)", fontWeight: 500 }}>
-                              ✓ Seen
-                            </span>
-                          ) : (
-                            <span
-                              style={{
-                                fontSize: "10px",
-                                fontWeight: 700,
-                                color: "#1D4ED8",
-                                background: "#DBEAFE",
-                                padding: "0.1rem 0.4rem",
-                                borderRadius: "4px",
-                              }}
-                            >
-                              NEW
-                            </span>
-                          )}
-                          <span style={{ fontSize: "11px", color: "var(--brand-body, #64748B)" }}>
-                            {formatDate(n.created_at)}
-                          </span>
-                        </div>
-                      </div>
-                      <p style={{ fontSize: "13px", color: isRead ? "var(--brand-body, #64748B)" : "var(--brand-heading, #0F172A)", margin: "0.35rem 0 0 0", lineHeight: 1.4 }}>
-                        {n.body || (n as any).message}
-                      </p>
+                      {unreadCount} Unread
+                    </span>
+                  )}
+                </div>
 
-                      {/* Action buttons / Status badges */}
-                      {(isDeliveryNotif || isVisitorNotif || isCabNotif) && refId ? (
-                        <div style={{ marginTop: "0.75rem", display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
-                          {isApproved ? (
-                            <span
-                              className="badge badge-success"
-                              style={{
-                                fontWeight: 700,
-                                fontSize: "0.8rem",
-                                padding: "0.3rem 0.75rem",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "0.35rem",
-                                background: "#DCFCE7",
-                                color: "#15803D",
-                                border: "1px solid #86EFAC",
-                                borderRadius: "6px",
-                              }}
-                            >
-                              ✓ {isCabNotif ? "Cab Approved" : "Approved"}
-                            </span>
-                          ) : isRejected ? (
-                            <span
-                              className="badge badge-danger"
-                              style={{
-                                fontWeight: 700,
-                                fontSize: "0.8rem",
-                                padding: "0.3rem 0.75rem",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "0.35rem",
-                                background: "#FEE2E2",
-                                color: "#B91C1C",
-                                border: "1px solid #FCA5A5",
-                                borderRadius: "6px",
-                              }}
-                            >
-                              ✕ {isCabNotif ? "Cab Turned Away" : "Rejected"}
-                            </span>
-                          ) : (
-                            <>
-                              <button
-                                type="button"
-                                className="btn btn-primary"
-                                style={{
-                                  fontSize: "0.775rem",
-                                  padding: "0.35rem 0.85rem",
-                                  background: isCabNotif ? "#D97706" : "#059669",
-                                  borderColor: isCabNotif ? "#D97706" : "#059669",
-                                  color: "#FFFFFF",
-                                  fontWeight: 700,
-                                  cursor: "pointer",
-                                }}
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  setActionedNotifications((prev) => ({ ...prev, [n.id]: "approved" }));
-                                  try {
-                                    if (isDeliveryNotif) {
-                                      await handleDecideDelivery(refId, true);
-                                    } else {
-                                      await handleVisitorDecision(refId, true);
-                                    }
-                                    await markNotificationRead.mutateAsync(n.id);
-                                  } catch (err: any) {
-                                    toast.error(err?.message || "Failed to record approval.", "Error");
-                                  } finally {
-                                    myNotifications.refetch();
-                                    visitors.refetch();
-                                    deliveries.refetch();
-                                  }
-                                }}
-                              >
-                                {isCabNotif ? "✓ Approve Cab" : "✓ Approve"}
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-danger"
-                                style={{
-                                  fontSize: "0.775rem",
-                                  padding: "0.35rem 0.85rem",
-                                  fontWeight: 700,
-                                  cursor: "pointer",
-                                }}
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  setActionedNotifications((prev) => ({ ...prev, [n.id]: "rejected" }));
-                                  try {
-                                    if (isDeliveryNotif) {
-                                      await handleDecideDelivery(refId, false);
-                                    } else {
-                                      await handleVisitorDecision(refId, false);
-                                    }
-                                    await markNotificationRead.mutateAsync(n.id);
-                                  } catch (err: any) {
-                                    toast.error(err?.message || "Failed to record rejection.", "Error");
-                                  } finally {
-                                    myNotifications.refetch();
-                                    visitors.refetch();
-                                    deliveries.refetch();
-                                  }
-                                }}
-                              >
-                                {isCabNotif ? "✕ Turn Away" : "✕ Reject"}
-                              </button>
-                              {!isRead && (
-                                <button
-                                  type="button"
-                                  className="btn btn-secondary"
-                                  style={{ fontSize: "0.775rem", padding: "0.35rem 0.75rem" }}
-                                  onClick={async (e) => {
-                                    e.stopPropagation();
-                                    await markNotificationRead.mutateAsync(n.id);
-                                    myNotifications.refetch();
-                                  }}
-                                >
-                                  Mark as Seen
-                                </button>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      ) : !isRead ? (
-                        <div style={{ marginTop: "0.5rem", display: "flex", justifyContent: "flex-end" }}>
-                          <button
-                            type="button"
-                            className="btn btn-secondary"
-                            style={{ fontSize: "0.75rem", padding: "0.25rem 0.65rem" }}
-                            onClick={async (e) => {
-                              e.stopPropagation();
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      background: "var(--bg-secondary, #F1F5F9)",
+                      padding: "2px",
+                      borderRadius: "8px",
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className={`btn ${notifFilter === "all" ? "btn-primary" : "btn-secondary"}`}
+                      style={{
+                        fontSize: "0.75rem",
+                        padding: "0.25rem 0.65rem",
+                        borderRadius: "6px",
+                        border: "none",
+                        background:
+                          notifFilter === "all" ? "var(--brand-primary, #1D4ED8)" : "transparent",
+                        color: notifFilter === "all" ? "#FFFFFF" : "var(--brand-body, #64748B)",
+                      }}
+                      onClick={() => setNotifFilter("all")}
+                    >
+                      All ({notifList.length})
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn ${notifFilter === "unread" ? "btn-primary" : "btn-secondary"}`}
+                      style={{
+                        fontSize: "0.75rem",
+                        padding: "0.25rem 0.65rem",
+                        borderRadius: "6px",
+                        border: "none",
+                        background:
+                          notifFilter === "unread"
+                            ? "var(--brand-primary, #1D4ED8)"
+                            : "transparent",
+                        color: notifFilter === "unread" ? "#FFFFFF" : "var(--brand-body, #64748B)",
+                      }}
+                      onClick={() => setNotifFilter("unread")}
+                    >
+                      Unread ({unreadCount})
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{
+                      fontSize: "0.75rem",
+                      padding: "0.3rem 0.75rem",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "0.35rem",
+                    }}
+                    onClick={handleMarkAllRead}
+                    disabled={markAllNotificationsRead.isPending || unreadCount === 0}
+                  >
+                    ✓ Mark All as Read
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ fontSize: "0.75rem", padding: "0.3rem 0.6rem" }}
+                    onClick={() => myNotifications.refetch()}
+                    title="Refresh Notifications"
+                  >
+                    🔄
+                  </button>
+                </div>
+              </div>
+
+              {myNotifications.isLoading ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+                  {[1, 2, 3, 4].map((n) => (
+                    <CardSkeleton key={n} lines={2} />
+                  ))}
+                </div>
+              ) : myNotifications.isError ? (
+                <ErrorState
+                  title="Failed to Load Notifications"
+                  message={myNotifications.error?.message || "Could not retrieve notifications."}
+                  onRetry={() => myNotifications.refetch()}
+                />
+              ) : displayedNotifs.length === 0 ? (
+                <p style={{ color: "var(--brand-body)", fontSize: "14px", padding: "1rem 0" }}>
+                  {notifFilter === "unread"
+                    ? "No unread notifications! You are completely caught up."
+                    : "No notifications yet."}
+                </p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+                  {displayedNotifs.map((n) => {
+                    const isCabNotif =
+                      n.reference_type === "cab_request" ||
+                      (n.notification_type && n.notification_type.includes("cab")) ||
+                      (n.title && n.title.toLowerCase().includes("cab"));
+                    const isDeliveryNotif =
+                      !isCabNotif &&
+                      (n.reference_type === "delivery" ||
+                        (n.notification_type && n.notification_type.includes("delivery")));
+                    const isVisitorNotif =
+                      !isCabNotif &&
+                      (n.reference_type === "visitor_request" ||
+                        (n.notification_type && n.notification_type.includes("visitor")));
+                    const refId = n.reference_id;
+
+                    const isLocalRead = Boolean(actionedNotifications[n.id]);
+                    const isRead = n.is_read || isLocalRead;
+
+                    // Find status in real-time collections
+                    const matchedVisitor = visitorList.find((v) => v.id === refId);
+                    const matchedDelivery = deliveryList.find((d) => d.id === refId);
+
+                    const localAction = actionedNotifications[n.id];
+                    const isVisitorApproved =
+                      matchedVisitor &&
+                      (matchedVisitor.status === "approved" ||
+                        matchedVisitor.status === "checked_in");
+                    const isVisitorRejected =
+                      matchedVisitor && matchedVisitor.status === "rejected";
+                    const isDeliveryApproved =
+                      matchedDelivery &&
+                      (matchedDelivery.approval_status === "approved" ||
+                        matchedDelivery.status === "delivered");
+                    const isDeliveryRejected =
+                      matchedDelivery &&
+                      (matchedDelivery.approval_status === "rejected" ||
+                        matchedDelivery.status === "rejected");
+
+                    const isApproved =
+                      localAction === "approved" || isVisitorApproved || isDeliveryApproved;
+                    const isRejected =
+                      localAction === "rejected" || isVisitorRejected || isDeliveryRejected;
+                    const isDecided = isApproved || isRejected;
+
+                    return (
+                      <div
+                        key={n.id}
+                        style={{
+                          padding: "1rem",
+                          border: isRead
+                            ? "1px solid var(--border-standard, #E2E8F0)"
+                            : isCabNotif
+                              ? "1px solid #F59E0B"
+                              : "1px solid var(--brand-primary, #3B82F6)",
+                          borderRadius: "8px",
+                          background: isRead ? "#F8FAFC" : isCabNotif ? "#FFFBEB" : "#EFF6FF",
+                          transition: "all 0.2s ease",
+                        }}
+                        onClick={async () => {
+                          if (!isRead) {
+                            try {
                               await markNotificationRead.mutateAsync(n.id);
                               myNotifications.refetch();
+                            } catch (e) {
+                              // ignore
+                            }
+                          }
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            marginBottom: "0.25rem",
+                            flexWrap: "wrap",
+                            gap: "0.5rem",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                            {isCabNotif ? (
+                              <span
+                                style={{
+                                  fontSize: "10.5px",
+                                  fontWeight: 800,
+                                  background: "#D97706",
+                                  color: "#FFFFFF",
+                                  padding: "0.15rem 0.5rem",
+                                  borderRadius: "9999px",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "0.25rem",
+                                }}
+                              >
+                                🚖 CAB ARRIVAL
+                              </span>
+                            ) : isDeliveryNotif ? (
+                              <span
+                                style={{
+                                  fontSize: "10.5px",
+                                  fontWeight: 800,
+                                  background: "#0284C7",
+                                  color: "#FFFFFF",
+                                  padding: "0.15rem 0.5rem",
+                                  borderRadius: "9999px",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "0.25rem",
+                                }}
+                              >
+                                📦 DELIVERY
+                              </span>
+                            ) : isVisitorNotif ? (
+                              <span
+                                style={{
+                                  fontSize: "10.5px",
+                                  fontWeight: 800,
+                                  background: "#4F46E5",
+                                  color: "#FFFFFF",
+                                  padding: "0.15rem 0.5rem",
+                                  borderRadius: "9999px",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "0.25rem",
+                                }}
+                              >
+                                👤 VISITOR PASS
+                              </span>
+                            ) : null}
+                            <h4
+                              style={{
+                                fontWeight: isRead ? 600 : 800,
+                                fontSize: "14px",
+                                color: "var(--brand-heading, #0F172A)",
+                                margin: 0,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "0.4rem",
+                              }}
+                            >
+                              {n.title}
+                              {!isRead && (
+                                <span
+                                  style={{
+                                    width: 8,
+                                    height: 8,
+                                    borderRadius: "50%",
+                                    background: "#EF4444",
+                                    display: "inline-block",
+                                  }}
+                                  title="Unread notification"
+                                />
+                              )}
+                            </h4>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                            {isRead ? (
+                              <span
+                                style={{
+                                  fontSize: "11px",
+                                  color: "var(--brand-body, #64748B)",
+                                  fontWeight: 500,
+                                }}
+                              >
+                                ✓ Seen
+                              </span>
+                            ) : (
+                              <span
+                                style={{
+                                  fontSize: "10px",
+                                  fontWeight: 700,
+                                  color: "#1D4ED8",
+                                  background: "#DBEAFE",
+                                  padding: "0.1rem 0.4rem",
+                                  borderRadius: "4px",
+                                }}
+                              >
+                                NEW
+                              </span>
+                            )}
+                            <span style={{ fontSize: "11px", color: "var(--brand-body, #64748B)" }}>
+                              {formatDate(n.created_at)}
+                            </span>
+                          </div>
+                        </div>
+                        <p
+                          style={{
+                            fontSize: "13px",
+                            color: isRead
+                              ? "var(--brand-body, #64748B)"
+                              : "var(--brand-heading, #0F172A)",
+                            margin: "0.35rem 0 0 0",
+                            lineHeight: 1.4,
+                          }}
+                        >
+                          {n.body || (n as any).message}
+                        </p>
+
+                        {/* Action buttons / Status badges */}
+                        {(isDeliveryNotif || isVisitorNotif || isCabNotif) && refId ? (
+                          <div
+                            style={{
+                              marginTop: "0.75rem",
+                              display: "flex",
+                              gap: "0.5rem",
+                              flexWrap: "wrap",
+                              alignItems: "center",
                             }}
                           >
-                            ✓ Mark as Read
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        );
-      })()}
+                            {isApproved ? (
+                              <span
+                                className="badge badge-success"
+                                style={{
+                                  fontWeight: 700,
+                                  fontSize: "0.8rem",
+                                  padding: "0.3rem 0.75rem",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "0.35rem",
+                                  background: "#DCFCE7",
+                                  color: "#15803D",
+                                  border: "1px solid #86EFAC",
+                                  borderRadius: "6px",
+                                }}
+                              >
+                                ✓ {isCabNotif ? "Cab Approved" : "Approved"}
+                              </span>
+                            ) : isRejected ? (
+                              <span
+                                className="badge badge-danger"
+                                style={{
+                                  fontWeight: 700,
+                                  fontSize: "0.8rem",
+                                  padding: "0.3rem 0.75rem",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "0.35rem",
+                                  background: "#FEE2E2",
+                                  color: "#B91C1C",
+                                  border: "1px solid #FCA5A5",
+                                  borderRadius: "6px",
+                                }}
+                              >
+                                ✕ {isCabNotif ? "Cab Turned Away" : "Rejected"}
+                              </span>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  className="btn btn-primary"
+                                  style={{
+                                    fontSize: "0.775rem",
+                                    padding: "0.35rem 0.85rem",
+                                    background: isCabNotif ? "#D97706" : "#059669",
+                                    borderColor: isCabNotif ? "#D97706" : "#059669",
+                                    color: "#FFFFFF",
+                                    fontWeight: 700,
+                                    cursor: "pointer",
+                                  }}
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    setActionedNotifications((prev) => ({
+                                      ...prev,
+                                      [n.id]: "approved",
+                                    }));
+                                    try {
+                                      if (isDeliveryNotif) {
+                                        await handleDecideDelivery(refId, true);
+                                      } else {
+                                        await handleVisitorDecision(refId, true);
+                                      }
+                                      await markNotificationRead.mutateAsync(n.id);
+                                    } catch (err: any) {
+                                      toast.error(
+                                        err?.message || "Failed to record approval.",
+                                        "Error",
+                                      );
+                                    } finally {
+                                      myNotifications.refetch();
+                                      visitors.refetch();
+                                      deliveries.refetch();
+                                    }
+                                  }}
+                                >
+                                  {isCabNotif ? "✓ Approve Cab" : "✓ Approve"}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-danger"
+                                  style={{
+                                    fontSize: "0.775rem",
+                                    padding: "0.35rem 0.85rem",
+                                    fontWeight: 700,
+                                    cursor: "pointer",
+                                  }}
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    setActionedNotifications((prev) => ({
+                                      ...prev,
+                                      [n.id]: "rejected",
+                                    }));
+                                    try {
+                                      if (isDeliveryNotif) {
+                                        await handleDecideDelivery(refId, false);
+                                      } else {
+                                        await handleVisitorDecision(refId, false);
+                                      }
+                                      await markNotificationRead.mutateAsync(n.id);
+                                    } catch (err: any) {
+                                      toast.error(
+                                        err?.message || "Failed to record rejection.",
+                                        "Error",
+                                      );
+                                    } finally {
+                                      myNotifications.refetch();
+                                      visitors.refetch();
+                                      deliveries.refetch();
+                                    }
+                                  }}
+                                >
+                                  {isCabNotif ? "✕ Turn Away" : "✕ Reject"}
+                                </button>
+                                {!isRead && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    style={{ fontSize: "0.775rem", padding: "0.35rem 0.75rem" }}
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      await markNotificationRead.mutateAsync(n.id);
+                                      myNotifications.refetch();
+                                    }}
+                                  >
+                                    Mark as Seen
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        ) : !isRead ? (
+                          <div
+                            style={{
+                              marginTop: "0.5rem",
+                              display: "flex",
+                              justifyContent: "flex-end",
+                            }}
+                          >
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              style={{ fontSize: "0.75rem", padding: "0.25rem 0.65rem" }}
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                await markNotificationRead.mutateAsync(n.id);
+                                myNotifications.refetch();
+                              }}
+                            >
+                              ✓ Mark as Read
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
       {/* TAB 14: EMERGENCY SOS */}
       {activeTab === "emergency" && (
@@ -4643,14 +5054,31 @@ export function OwnerTenantDashboardView({
                   }}
                 />
                 <div>
-                  <div style={{ fontWeight: 800, fontSize: "1.1rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <div
+                    style={{
+                      fontWeight: 800,
+                      fontSize: "1.1rem",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.5rem",
+                    }}
+                  >
                     <span>🚨 ACTIVE SOS EMERGENCY IN PROGRESS</span>
-                    <span style={{ fontSize: "0.8rem", background: "rgba(255,255,255,0.2)", padding: "0.15rem 0.5rem", borderRadius: "9999px", textTransform: "capitalize" }}>
+                    <span
+                      style={{
+                        fontSize: "0.8rem",
+                        background: "rgba(255,255,255,0.2)",
+                        padding: "0.15rem 0.5rem",
+                        borderRadius: "9999px",
+                        textTransform: "capitalize",
+                      }}
+                    >
                       {activeResidentAlert.alert_type}
                     </span>
                   </div>
                   <div style={{ fontSize: "0.85rem", opacity: 0.9, marginTop: "0.25rem" }}>
-                    {activeResidentAlert.message || "Security guards & supervisors have been dispatched."}
+                    {activeResidentAlert.message ||
+                      "Security guards & supervisors have been dispatched."}
                   </div>
                 </div>
               </div>
@@ -4669,7 +5097,10 @@ export function OwnerTenantDashboardView({
                   onClick={async () => {
                     try {
                       await gateApi.cancelAlert(activeResidentAlert.id);
-                      toast.success("Active emergency SOS cancelled. Situation marked safe.", "Alert Cancelled");
+                      toast.success(
+                        "Active emergency SOS cancelled. Situation marked safe.",
+                        "Alert Cancelled",
+                      );
                       refetchAlerts();
                     } catch {
                       try {
@@ -4677,7 +5108,10 @@ export function OwnerTenantDashboardView({
                         toast.success("Emergency alert resolved and cleared.", "Alert Cleared");
                         refetchAlerts();
                       } catch {
-                        toast.error("Failed to cancel alert. Please inform security at the gate.", "Error");
+                        toast.error(
+                          "Failed to cancel alert. Please inform security at the gate.",
+                          "Error",
+                        );
                       }
                     }
                   }}
@@ -4732,7 +5166,8 @@ export function OwnerTenantDashboardView({
                     Resident Emergency SOS & Incident Dispatch
                   </h3>
                   <p style={{ color: "#7F1D1D", fontSize: "13.5px", margin: "0.2rem 0 0 0" }}>
-                    Select your emergency category and instantly notify on-duty Security Guards & Gate Supervisors.
+                    Select your emergency category and instantly notify on-duty Security Guards &
+                    Gate Supervisors.
                   </p>
                 </div>
               </div>
@@ -4843,7 +5278,9 @@ export function OwnerTenantDashboardView({
                         borderRadius: "12px",
                         border: isSelected ? `2px solid ${cat.accent}` : "1.5px solid #E2E8F0",
                         background: isSelected ? "#FEF2F2" : "white",
-                        boxShadow: isSelected ? `0 0 0 3px ${cat.accent}20` : "0 1px 3px rgba(0,0,0,0.05)",
+                        boxShadow: isSelected
+                          ? `0 0 0 3px ${cat.accent}20`
+                          : "0 1px 3px rgba(0,0,0,0.05)",
                         cursor: "pointer",
                         transition: "all 0.15s ease",
                         display: "flex",
@@ -4879,7 +5316,14 @@ export function OwnerTenantDashboardView({
                             </span>
                           )}
                         </div>
-                        <div style={{ fontSize: "12px", color: "#64748B", marginTop: "0.25rem", lineHeight: 1.3 }}>
+                        <div
+                          style={{
+                            fontSize: "12px",
+                            color: "#64748B",
+                            marginTop: "0.25rem",
+                            lineHeight: 1.3,
+                          }}
+                        >
                           {cat.desc}
                         </div>
                       </div>
@@ -4924,10 +5368,24 @@ export function OwnerTenantDashboardView({
                     justifyContent: "center",
                   }}
                 >
-                  <div style={{ fontSize: "11px", color: "#991B1B", fontWeight: 700, letterSpacing: "0.04em" }}>
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      color: "#991B1B",
+                      fontWeight: 700,
+                      letterSpacing: "0.04em",
+                    }}
+                  >
                     REGISTERED UNIT (AUTO-DISPATCHED)
                   </div>
-                  <div style={{ fontWeight: 800, fontSize: "15px", color: "#0F172A", marginTop: "0.25rem" }}>
+                  <div
+                    style={{
+                      fontWeight: 800,
+                      fontSize: "15px",
+                      color: "#0F172A",
+                      marginTop: "0.25rem",
+                    }}
+                  >
                     📍 {residentUnit}
                   </div>
                 </div>
@@ -5019,7 +5477,8 @@ export function OwnerTenantDashboardView({
               value={passCategory}
               onChange={(e) => {
                 setPassCategory(e.target.value);
-                if (passFieldErrors.category) setPassFieldErrors((prev) => ({ ...prev, category: "" }));
+                if (passFieldErrors.category)
+                  setPassFieldErrors((prev) => ({ ...prev, category: "" }));
               }}
               style={{ borderColor: passFieldErrors.category ? "#EF4444" : undefined }}
               required
@@ -5027,8 +5486,12 @@ export function OwnerTenantDashboardView({
               <option value="Personal Guest">Personal Guest / Family & Friends</option>
               <option value="Relative">Relative / Extended Family</option>
               <option value="Cab / Taxi">Cab / Taxi Driver (Uber / Ola)</option>
-              <option value="Delivery Executive">Delivery Executive (Amazon / Swiggy / Zomato)</option>
-              <option value="Service Technician">Service Technician (Plumbing / Electrical / AC)</option>
+              <option value="Delivery Executive">
+                Delivery Executive (Amazon / Swiggy / Zomato)
+              </option>
+              <option value="Service Technician">
+                Service Technician (Plumbing / Electrical / AC)
+              </option>
               <option value="Vendor / Contractor">Vendor / Contractor / Interior Worker</option>
               <option value="Interviewee">Interviewee / Applicant</option>
               <option value="Event Guest">Event Guest / Party Invite</option>
@@ -5036,13 +5499,27 @@ export function OwnerTenantDashboardView({
               <option value="Other">Other Visitor</option>
             </select>
             {passFieldErrors.category && (
-              <div style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", fontWeight: 600 }}>
+              <div
+                style={{
+                  color: "#DC2626",
+                  fontSize: "12px",
+                  marginTop: "0.25rem",
+                  fontWeight: 600,
+                }}
+              >
                 {passFieldErrors.category}
               </div>
             )}
           </div>
           <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "0.35rem",
+              }}
+            >
               <label
                 style={{
                   fontSize: "13px",
@@ -5054,7 +5531,12 @@ export function OwnerTenantDashboardView({
               <span
                 style={{
                   fontSize: "11px",
-                  color: passVisitorName.length > 35 ? "var(--danger)" : passVisitorName.length > 0 && passVisitorName.trim().length < 2 ? "#D97706" : "var(--muted)",
+                  color:
+                    passVisitorName.length > 35
+                      ? "var(--danger)"
+                      : passVisitorName.length > 0 && passVisitorName.trim().length < 2
+                        ? "#D97706"
+                        : "var(--muted)",
                   fontWeight: passVisitorName.length > 35 ? 700 : 400,
                 }}
               >
@@ -5067,38 +5549,73 @@ export function OwnerTenantDashboardView({
               value={passVisitorName}
               onChange={(e) => {
                 setPassVisitorName(e.target.value);
-                if (passFieldErrors.visitor_name) setPassFieldErrors((prev) => ({ ...prev, visitor_name: "" }));
+                if (passFieldErrors.visitor_name)
+                  setPassFieldErrors((prev) => ({ ...prev, visitor_name: "" }));
               }}
               style={{
                 borderColor: passFieldErrors.visitor_name
                   ? "#EF4444"
-                  : (passVisitorName.length > 35 || (passVisitorName.length > 0 && passVisitorName.trim().length < 2) || (passVisitorName.length >= 2 && !isValidPersonName(passVisitorName)))
+                  : passVisitorName.length > 35 ||
+                      (passVisitorName.length > 0 && passVisitorName.trim().length < 2) ||
+                      (passVisitorName.length >= 2 && !isValidPersonName(passVisitorName))
                     ? "#EF4444"
                     : undefined,
-                background: (passFieldErrors.visitor_name || passVisitorName.length > 35 || (passVisitorName.length > 0 && passVisitorName.trim().length < 2) || (passVisitorName.length >= 2 && !isValidPersonName(passVisitorName)))
-                  ? "#FEF2F2"
-                  : undefined,
+                background:
+                  passFieldErrors.visitor_name ||
+                  passVisitorName.length > 35 ||
+                  (passVisitorName.length > 0 && passVisitorName.trim().length < 2) ||
+                  (passVisitorName.length >= 2 && !isValidPersonName(passVisitorName))
+                    ? "#FEF2F2"
+                    : undefined,
               }}
               required
             />
             {passFieldErrors.visitor_name ? (
-              <div style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", fontWeight: 600 }}>
+              <div
+                style={{
+                  color: "#DC2626",
+                  fontSize: "12px",
+                  marginTop: "0.25rem",
+                  fontWeight: 600,
+                }}
+              >
                 {passFieldErrors.visitor_name}
               </div>
             ) : (
               <>
                 {passVisitorName.length > 35 && (
-                  <div style={{ color: "#DC2626", fontSize: "11px", marginTop: "0.25rem", fontWeight: 600 }}>
+                  <div
+                    style={{
+                      color: "#DC2626",
+                      fontSize: "11px",
+                      marginTop: "0.25rem",
+                      fontWeight: 600,
+                    }}
+                  >
                     Visitor name exceeds maximum length (cannot exceed 35 characters).
                   </div>
                 )}
                 {passVisitorName.length > 0 && passVisitorName.trim().length < 2 && (
-                  <div style={{ color: "#DC2626", fontSize: "11px", marginTop: "0.25rem", fontWeight: 600 }}>
+                  <div
+                    style={{
+                      color: "#DC2626",
+                      fontSize: "11px",
+                      marginTop: "0.25rem",
+                      fontWeight: 600,
+                    }}
+                  >
                     Visitor name is too short (must be at least 2 characters).
                   </div>
                 )}
                 {passVisitorName.length >= 2 && !isValidPersonName(passVisitorName) && (
-                  <div style={{ color: "#DC2626", fontSize: "11px", marginTop: "0.25rem", fontWeight: 600 }}>
+                  <div
+                    style={{
+                      color: "#DC2626",
+                      fontSize: "11px",
+                      marginTop: "0.25rem",
+                      fontWeight: 600,
+                    }}
+                  >
                     Visitor name must contain only alphabetic letters and spaces.
                   </div>
                 )}
@@ -5132,11 +5649,25 @@ export function OwnerTenantDashboardView({
               required
             />
             {passFieldErrors.phone ? (
-              <div style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", fontWeight: 600 }}>
+              <div
+                style={{
+                  color: "#DC2626",
+                  fontSize: "12px",
+                  marginTop: "0.25rem",
+                  fontWeight: 600,
+                }}
+              >
                 {passFieldErrors.phone}
               </div>
             ) : (
-              <span style={{ fontSize: "11px", color: "var(--muted)", marginTop: "0.25rem", display: "block" }}>
+              <span
+                style={{
+                  fontSize: "11px",
+                  color: "var(--muted)",
+                  marginTop: "0.25rem",
+                  display: "block",
+                }}
+              >
                 10-digit mobile number required for gate security & pass delivery
               </span>
             )}
@@ -5151,14 +5682,16 @@ export function OwnerTenantDashboardView({
                   marginBottom: "0.35rem",
                 }}
               >
-                Govt ID Type <span style={{ fontSize: "11px", color: "var(--muted)" }}>(Optional)</span>
+                Govt ID Type{" "}
+                <span style={{ fontSize: "11px", color: "var(--muted)" }}>(Optional)</span>
               </label>
               <select
                 className="select-field"
                 value={passIdType}
                 onChange={(e) => {
                   setPassIdType(e.target.value);
-                  if (passFieldErrors.id_number) setPassFieldErrors((prev) => ({ ...prev, id_number: "" }));
+                  if (passFieldErrors.id_number)
+                    setPassFieldErrors((prev) => ({ ...prev, id_number: "" }));
                 }}
               >
                 <option value="aadhaar">Aadhaar Card (12 digits)</option>
@@ -5178,7 +5711,8 @@ export function OwnerTenantDashboardView({
                   marginBottom: "0.35rem",
                 }}
               >
-                Govt ID Number <span style={{ fontSize: "11px", color: "var(--muted)" }}>(Optional)</span>
+                Govt ID Number{" "}
+                <span style={{ fontSize: "11px", color: "var(--muted)" }}>(Optional)</span>
               </label>
               <input
                 className="input-field"
@@ -5192,7 +5726,8 @@ export function OwnerTenantDashboardView({
                 value={passIdNumber}
                 onChange={(e) => {
                   setPassIdNumber(e.target.value.toUpperCase());
-                  if (passFieldErrors.id_number) setPassFieldErrors((prev) => ({ ...prev, id_number: "" }));
+                  if (passFieldErrors.id_number)
+                    setPassFieldErrors((prev) => ({ ...prev, id_number: "" }));
                 }}
                 style={{
                   fontFamily: "monospace",
@@ -5201,7 +5736,14 @@ export function OwnerTenantDashboardView({
                 }}
               />
               {passFieldErrors.id_number && (
-                <div style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", fontWeight: 600 }}>
+                <div
+                  style={{
+                    color: "#DC2626",
+                    fontSize: "12px",
+                    marginTop: "0.25rem",
+                    fontWeight: 600,
+                  }}
+                >
                   {passFieldErrors.id_number}
                 </div>
               )}
@@ -5217,7 +5759,8 @@ export function OwnerTenantDashboardView({
                   marginBottom: "0.35rem",
                 }}
               >
-                Vehicle Number <span style={{ fontSize: "11px", color: "var(--muted)" }}>(Optional)</span>
+                Vehicle Number{" "}
+                <span style={{ fontSize: "11px", color: "var(--muted)" }}>(Optional)</span>
               </label>
               <input
                 className="input-field"
@@ -5225,7 +5768,8 @@ export function OwnerTenantDashboardView({
                 value={passVehicleNumber}
                 onChange={(e) => {
                   setPassVehicleNumber(e.target.value);
-                  if (passFieldErrors.vehicle_number) setPassFieldErrors((prev) => ({ ...prev, vehicle_number: "" }));
+                  if (passFieldErrors.vehicle_number)
+                    setPassFieldErrors((prev) => ({ ...prev, vehicle_number: "" }));
                 }}
                 style={{
                   borderColor: passFieldErrors.vehicle_number ? "#EF4444" : undefined,
@@ -5233,7 +5777,14 @@ export function OwnerTenantDashboardView({
                 }}
               />
               {passFieldErrors.vehicle_number && (
-                <div style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", fontWeight: 600 }}>
+                <div
+                  style={{
+                    color: "#DC2626",
+                    fontSize: "12px",
+                    marginTop: "0.25rem",
+                    fontWeight: 600,
+                  }}
+                >
                   {passFieldErrors.vehicle_number}
                 </div>
               )}
@@ -5288,7 +5839,10 @@ export function OwnerTenantDashboardView({
                 marginBottom: "0.35rem",
               }}
             >
-              Reason / Purpose <span style={{ fontSize: "11.5px", color: "var(--muted)", fontWeight: 400 }}>(Optional)</span>
+              Reason / Purpose{" "}
+              <span style={{ fontSize: "11.5px", color: "var(--muted)", fontWeight: 400 }}>
+                (Optional)
+              </span>
             </label>
             <input
               className="input-field"
@@ -5351,7 +5905,14 @@ export function OwnerTenantDashboardView({
         title="🎟️ Dynamic Visitor Entry Pass"
       >
         {activePassResult && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", alignItems: "center" }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "1.25rem",
+              alignItems: "center",
+            }}
+          >
             <div
               style={{
                 width: "100%",
@@ -5388,11 +5949,18 @@ export function OwnerTenantDashboardView({
                 value={
                   activePassResult.token
                     ? activePassResult.token
-                    : (activePassResult.pin || "GSE-PASS")
+                    : activePassResult.pin || "GSE-PASS"
                 }
                 size={180}
               />
-              <div style={{ fontSize: "11px", color: "var(--muted)", marginTop: "0.5rem", fontWeight: 600 }}>
+              <div
+                style={{
+                  fontSize: "11px",
+                  color: "var(--muted)",
+                  marginTop: "0.5rem",
+                  fontWeight: 600,
+                }}
+              >
                 Scan at Security Gate
               </div>
             </div>
@@ -5409,7 +5977,15 @@ export function OwnerTenantDashboardView({
                   textAlign: "center",
                 }}
               >
-                <div style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.5px" }}>
+                <div
+                  style={{
+                    fontSize: "11px",
+                    color: "var(--brand-body)",
+                    textTransform: "uppercase",
+                    fontWeight: 700,
+                    letterSpacing: "0.5px",
+                  }}
+                >
                   Gate Entry PIN / OTP Code
                 </div>
                 <div
@@ -5444,32 +6020,86 @@ export function OwnerTenantDashboardView({
               }}
             >
               <div>
-                <div style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>Category</div>
-                <div style={{ fontWeight: 700, fontSize: "13.5px", color: "var(--brand-heading)", textTransform: "capitalize" }}>
+                <div
+                  style={{
+                    fontSize: "11px",
+                    color: "var(--muted)",
+                    textTransform: "uppercase",
+                    fontWeight: 600,
+                  }}
+                >
+                  Category
+                </div>
+                <div
+                  style={{
+                    fontWeight: 700,
+                    fontSize: "13.5px",
+                    color: "var(--brand-heading)",
+                    textTransform: "capitalize",
+                  }}
+                >
                   {activePassResult.category || "Guest"}
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>Visitor Name</div>
+                <div
+                  style={{
+                    fontSize: "11px",
+                    color: "var(--muted)",
+                    textTransform: "uppercase",
+                    fontWeight: 600,
+                  }}
+                >
+                  Visitor Name
+                </div>
                 <div style={{ fontWeight: 700, fontSize: "13.5px", color: "var(--brand-heading)" }}>
                   {activePassResult.visitor_name || "Visitor"}
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>Reason / Purpose</div>
+                <div
+                  style={{
+                    fontSize: "11px",
+                    color: "var(--muted)",
+                    textTransform: "uppercase",
+                    fontWeight: 600,
+                  }}
+                >
+                  Reason / Purpose
+                </div>
                 <div style={{ fontWeight: 600, fontSize: "13px", color: "var(--brand-heading)" }}>
                   {activePassResult.reason || "Visitor Entry"}
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>Valid Until</div>
+                <div
+                  style={{
+                    fontSize: "11px",
+                    color: "var(--muted)",
+                    textTransform: "uppercase",
+                    fontWeight: 600,
+                  }}
+                >
+                  Valid Until
+                </div>
                 <div style={{ fontWeight: 600, fontSize: "12.5px", color: "#B45309" }}>
-                  {activePassResult.valid_to ? formatDate(activePassResult.valid_to) : "Scheduled Visit"}
+                  {activePassResult.valid_to
+                    ? formatDate(activePassResult.valid_to)
+                    : "Scheduled Visit"}
                 </div>
               </div>
               {activePassResult.vehicle_number && (
                 <div>
-                  <div style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>Vehicle Plate</div>
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      color: "var(--muted)",
+                      textTransform: "uppercase",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Vehicle Plate
+                  </div>
                   <div style={{ fontWeight: 700, fontSize: "13px", color: "var(--brand-heading)" }}>
                     🚗 {activePassResult.vehicle_number}
                   </div>
@@ -5477,16 +6107,34 @@ export function OwnerTenantDashboardView({
               )}
               {activePassResult.party_size && activePassResult.party_size > 1 && (
                 <div>
-                  <div style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>Party Size / Group</div>
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      color: "var(--muted)",
+                      textTransform: "uppercase",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Party Size / Group
+                  </div>
                   <div style={{ fontWeight: 700, fontSize: "13px", color: "var(--brand-primary)" }}>
-                    👥 {activePassResult.party_size} Persons {activePassResult.group_label ? `(${activePassResult.group_label})` : ""}
+                    👥 {activePassResult.party_size} Persons{" "}
+                    {activePassResult.group_label ? `(${activePassResult.group_label})` : ""}
                   </div>
                 </div>
               )}
             </div>
 
             {/* Action Buttons */}
-            <div style={{ width: "100%", display: "flex", gap: "0.5rem", justifyContent: "space-between", flexWrap: "wrap" }}>
+            <div
+              style={{
+                width: "100%",
+                display: "flex",
+                gap: "0.5rem",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+              }}
+            >
               <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
                 <BrandButton
                   type="button"
@@ -5506,7 +6154,9 @@ export function OwnerTenantDashboardView({
                   type="button"
                   variant="outline"
                   onClick={() => {
-                    const shareText = encodeURIComponent(`*GateSphere Visitor Pass*\nVisitor: ${activePassResult.visitor_name || "Guest"}\nCategory: ${activePassResult.category || "Guest"}\nGate PIN: ${activePassResult.pin || activePassResult.token}${activePassResult.vehicle_number ? `\nVehicle: ${activePassResult.vehicle_number}` : ""}${activePassResult.party_size && activePassResult.party_size > 1 ? `\nParty Size: ${activePassResult.party_size} Persons` : ""}\nValid Until: ${activePassResult.valid_to ? new Date(activePassResult.valid_to).toLocaleString() : "Visit Duration"}`);
+                    const shareText = encodeURIComponent(
+                      `*GateSphere Visitor Pass*\nVisitor: ${activePassResult.visitor_name || "Guest"}\nCategory: ${activePassResult.category || "Guest"}\nGate PIN: ${activePassResult.pin || activePassResult.token}${activePassResult.vehicle_number ? `\nVehicle: ${activePassResult.vehicle_number}` : ""}${activePassResult.party_size && activePassResult.party_size > 1 ? `\nParty Size: ${activePassResult.party_size} Persons` : ""}\nValid Until: ${activePassResult.valid_to ? new Date(activePassResult.valid_to).toLocaleString() : "Visit Duration"}`,
+                    );
                     if (typeof window !== "undefined") {
                       window.open(`https://wa.me/?text=${shareText}`, "_blank");
                     }
@@ -5536,10 +6186,7 @@ export function OwnerTenantDashboardView({
                 )}
               </div>
 
-              <BrandButton
-                type="button"
-                onClick={() => setActivePassModalOpen(false)}
-              >
+              <BrandButton type="button" onClick={() => setActivePassModalOpen(false)}>
                 Done
               </BrandButton>
             </div>
@@ -5557,10 +6204,24 @@ export function OwnerTenantDashboardView({
         >
           <div style={{ textAlign: "center", padding: "0.5rem 0" }}>
             <div style={{ fontSize: "3.5rem", marginBottom: "0.5rem" }}>🚫</div>
-            <h3 style={{ color: "#991B1B", margin: "0 0 0.5rem 0", fontSize: "1.3rem", fontWeight: 800 }}>
+            <h3
+              style={{
+                color: "#991B1B",
+                margin: "0 0 0.5rem 0",
+                fontSize: "1.3rem",
+                fontWeight: 800,
+              }}
+            >
               COMMUNITY RESTRICTION WARNING
             </h3>
-            <p style={{ color: "#DC2626", fontSize: "0.95rem", fontWeight: 700, marginBottom: "1.25rem" }}>
+            <p
+              style={{
+                color: "#DC2626",
+                fontSize: "0.95rem",
+                fontWeight: 700,
+                marginBottom: "1.25rem",
+              }}
+            >
               PASS GENERATION CANNOT PROCEED
             </p>
 
@@ -5575,32 +6236,88 @@ export function OwnerTenantDashboardView({
               }}
             >
               <div style={{ marginBottom: "0.5rem" }}>
-                <span style={{ fontSize: "0.75rem", color: "#991B1B", fontWeight: 700, textTransform: "uppercase" }}>Visitor Name</span>
-                <div style={{ fontWeight: 700, fontSize: "1rem", color: "#111827" }}>{blockedAlert.name}</div>
+                <span
+                  style={{
+                    fontSize: "0.75rem",
+                    color: "#991B1B",
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Visitor Name
+                </span>
+                <div style={{ fontWeight: 700, fontSize: "1rem", color: "#111827" }}>
+                  {blockedAlert.name}
+                </div>
               </div>
               {blockedAlert.phone && (
                 <div style={{ marginBottom: "0.5rem" }}>
-                  <span style={{ fontSize: "0.75rem", color: "#991B1B", fontWeight: 700, textTransform: "uppercase" }}>Phone Number</span>
-                  <div style={{ fontFamily: "monospace", fontWeight: 600 }}>{blockedAlert.phone}</div>
+                  <span
+                    style={{
+                      fontSize: "0.75rem",
+                      color: "#991B1B",
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Phone Number
+                  </span>
+                  <div style={{ fontFamily: "monospace", fontWeight: 600 }}>
+                    {blockedAlert.phone}
+                  </div>
                 </div>
               )}
               {blockedAlert.id_number && (
                 <div style={{ marginBottom: "0.5rem" }}>
-                  <span style={{ fontSize: "0.75rem", color: "#991B1B", fontWeight: 700, textTransform: "uppercase" }}>Government ID</span>
+                  <span
+                    style={{
+                      fontSize: "0.75rem",
+                      color: "#991B1B",
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Government ID
+                  </span>
                   <div style={{ fontFamily: "monospace", fontWeight: 700, color: "#991B1B" }}>
-                    {blockedAlert.id_type ? `${blockedAlert.id_type.toUpperCase()}: ` : ""}{blockedAlert.id_number}
+                    {blockedAlert.id_type ? `${blockedAlert.id_type.toUpperCase()}: ` : ""}
+                    {blockedAlert.id_number}
                   </div>
                 </div>
               )}
-              <div style={{ marginTop: "0.5rem", paddingTop: "0.5rem", borderTop: "1px dashed #FCA5A5" }}>
-                <span style={{ fontSize: "0.75rem", color: "#991B1B", fontWeight: 700, textTransform: "uppercase" }}>Blacklist Reason</span>
+              <div
+                style={{
+                  marginTop: "0.5rem",
+                  paddingTop: "0.5rem",
+                  borderTop: "1px dashed #FCA5A5",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "0.75rem",
+                    color: "#991B1B",
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Blacklist Reason
+                </span>
                 <div style={{ fontWeight: 600, color: "#7F1D1D", marginTop: "0.15rem" }}>
                   {blockedAlert.reason}
                 </div>
               </div>
               {blockedAlert.risk_level && (
                 <div style={{ marginTop: "0.5rem" }}>
-                  <span style={{ fontSize: "0.75rem", color: "#991B1B", fontWeight: 700, textTransform: "uppercase" }}>Security Risk: </span>
+                  <span
+                    style={{
+                      fontSize: "0.75rem",
+                      color: "#991B1B",
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Security Risk:{" "}
+                  </span>
                   <span style={{ fontWeight: 800, color: "#B91C1C", textTransform: "uppercase" }}>
                     {blockedAlert.risk_level}
                   </span>
@@ -5609,7 +6326,8 @@ export function OwnerTenantDashboardView({
             </div>
 
             <p style={{ fontSize: "0.85rem", color: "var(--muted)", marginBottom: "1.5rem" }}>
-              This individual is listed on the community restricted visitor registry. Contact the Security Office or Association Committee for clarifications.
+              This individual is listed on the community restricted visitor registry. Contact the
+              Security Office or Association Committee for clarifications.
             </p>
 
             <BrandButton
@@ -5657,7 +6375,14 @@ export function OwnerTenantDashboardView({
               required
             />
             {addMemberErrors.name && (
-              <span style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", display: "block" }}>
+              <span
+                style={{
+                  color: "#DC2626",
+                  fontSize: "12px",
+                  marginTop: "0.25rem",
+                  display: "block",
+                }}
+              >
                 {addMemberErrors.name}
               </span>
             )}
@@ -5711,7 +6436,14 @@ export function OwnerTenantDashboardView({
               required
             />
             {addMemberErrors.phone && (
-              <span style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", display: "block" }}>
+              <span
+                style={{
+                  color: "#DC2626",
+                  fontSize: "12px",
+                  marginTop: "0.25rem",
+                  display: "block",
+                }}
+              >
                 {addMemberErrors.phone}
               </span>
             )}
@@ -5802,7 +6534,14 @@ export function OwnerTenantDashboardView({
                 required
               />
               {editMemberErrors.name && (
-                <span style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", display: "block" }}>
+                <span
+                  style={{
+                    color: "#DC2626",
+                    fontSize: "12px",
+                    marginTop: "0.25rem",
+                    display: "block",
+                  }}
+                >
                   {editMemberErrors.name}
                 </span>
               )}
@@ -5850,13 +6589,21 @@ export function OwnerTenantDashboardView({
                 value={editingMember.phone}
                 onChange={(e) => {
                   setEditingMember({ ...editingMember, phone: e.target.value });
-                  if (editMemberErrors.phone) setEditMemberErrors((prev) => ({ ...prev, phone: "" }));
+                  if (editMemberErrors.phone)
+                    setEditMemberErrors((prev) => ({ ...prev, phone: "" }));
                 }}
                 style={{ borderColor: editMemberErrors.phone ? "#EF4444" : undefined }}
                 required
               />
               {editMemberErrors.phone && (
-                <span style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", display: "block" }}>
+                <span
+                  style={{
+                    color: "#DC2626",
+                    fontSize: "12px",
+                    marginTop: "0.25rem",
+                    display: "block",
+                  }}
+                >
                   {editMemberErrors.phone}
                 </span>
               )}
@@ -6129,7 +6876,9 @@ export function OwnerTenantDashboardView({
                   <strong style={{ fontSize: "14px", color: "var(--brand-heading)" }}>
                     {selectedAmenity.name}
                   </strong>
-                  <div style={{ fontSize: "12px", color: "var(--brand-body)", marginTop: "0.15rem" }}>
+                  <div
+                    style={{ fontSize: "12px", color: "var(--brand-body)", marginTop: "0.15rem" }}
+                  >
                     Max Total Capacity: {selectedAmenity.capacity} persons
                   </div>
                 </div>
@@ -6234,7 +6983,11 @@ export function OwnerTenantDashboardView({
                             b.amenity_id === selectedAmenity?.id &&
                             b.date === bookingDate &&
                             b.status !== "cancelled" &&
-                            (b.slot_id ? b.slot_id === chosenSlot.id : (b.start_time ? b.start_time === chosenSlot.start_time : true))
+                            (b.slot_id
+                              ? b.slot_id === chosenSlot.id
+                              : b.start_time
+                                ? b.start_time === chosenSlot.start_time
+                                : true),
                         )
                         .reduce((sum, b) => sum + (b.guests_count || 1), 0);
                       const spotsLeft = Math.max(0, slotCap - bookedForThisSlot);
@@ -6254,14 +7007,19 @@ export function OwnerTenantDashboardView({
                           b.amenity_id === selectedAmenity?.id &&
                           b.date === bookingDate &&
                           b.status !== "cancelled" &&
-                          (b.slot_id ? b.slot_id === s.id : (b.start_time ? b.start_time === s.start_time : true))
+                          (b.slot_id
+                            ? b.slot_id === s.id
+                            : b.start_time
+                              ? b.start_time === s.start_time
+                              : true),
                       )
                       .reduce((sum, b) => sum + (b.guests_count || 1), 0);
                     const spotsLeft = Math.max(0, slotCap - bookedForThisSlot);
                     const isFull = spotsLeft <= 0;
                     const isDisabled = isPast || isFull;
                     const startHour = parseInt((s.start_time || "06:00").split(":")[0], 10);
-                    const periodName = startHour < 12 ? "Morning" : startHour < 17 ? "Afternoon" : "Evening";
+                    const periodName =
+                      startHour < 12 ? "Morning" : startHour < 17 ? "Afternoon" : "Evening";
                     const feeText = s.fee && Number(s.fee) > 0 ? ` • ${formatCurrency(s.fee)}` : "";
                     const capacityStatus = isPast
                       ? " (⏰ Completed / Past Slot)"
@@ -6271,7 +7029,8 @@ export function OwnerTenantDashboardView({
 
                     return (
                       <option key={s.id} value={s.id} disabled={isDisabled}>
-                        {formatSlotTime(s.start_time)} – {formatSlotTime(s.end_time)} ({periodName}){feeText} — {capacityStatus}
+                        {formatSlotTime(s.start_time)} – {formatSlotTime(s.end_time)} ({periodName})
+                        {feeText} — {capacityStatus}
                       </option>
                     );
                   })}
@@ -6292,8 +7051,14 @@ export function OwnerTenantDashboardView({
                   >
                     <div>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                        <strong style={{ fontSize: "13.5px", color: isSelectedSlotPast ? "#991B1B" : "var(--brand-heading)" }}>
-                          {formatSlotTime(activeSelectedSlot.start_time)} – {formatSlotTime(activeSelectedSlot.end_time)}
+                        <strong
+                          style={{
+                            fontSize: "13.5px",
+                            color: isSelectedSlotPast ? "#991B1B" : "var(--brand-heading)",
+                          }}
+                        >
+                          {formatSlotTime(activeSelectedSlot.start_time)} –{" "}
+                          {formatSlotTime(activeSelectedSlot.end_time)}
                         </strong>
                         <span
                           style={{
@@ -6308,8 +7073,15 @@ export function OwnerTenantDashboardView({
                           {isSelectedSlotPast
                             ? "⏰ Completed Time Slot"
                             : (() => {
-                                const startHour = parseInt((activeSelectedSlot.start_time || "06:00").split(":")[0], 10);
-                                return startHour < 12 ? "🌅 Morning" : startHour < 17 ? "☀️ Afternoon" : "🌙 Evening";
+                                const startHour = parseInt(
+                                  (activeSelectedSlot.start_time || "06:00").split(":")[0],
+                                  10,
+                                );
+                                return startHour < 12
+                                  ? "🌅 Morning"
+                                  : startHour < 17
+                                    ? "☀️ Afternoon"
+                                    : "🌙 Evening";
                               })()}
                         </span>
                       </div>
@@ -6322,19 +7094,55 @@ export function OwnerTenantDashboardView({
 
                     <div>
                       {isSelectedSlotPast ? (
-                        <span style={{ fontSize: "11.5px", fontWeight: 700, padding: "0.2rem 0.5rem", borderRadius: "9999px", background: "#FEE2E2", color: "#991B1B" }}>
+                        <span
+                          style={{
+                            fontSize: "11.5px",
+                            fontWeight: 700,
+                            padding: "0.2rem 0.5rem",
+                            borderRadius: "9999px",
+                            background: "#FEE2E2",
+                            color: "#991B1B",
+                          }}
+                        >
                           ⏰ Time Elapsed
                         </span>
                       ) : remainingSpots <= 0 ? (
-                        <span style={{ fontSize: "11.5px", fontWeight: 700, padding: "0.2rem 0.5rem", borderRadius: "9999px", background: "#FEE2E2", color: "#991B1B" }}>
+                        <span
+                          style={{
+                            fontSize: "11.5px",
+                            fontWeight: 700,
+                            padding: "0.2rem 0.5rem",
+                            borderRadius: "9999px",
+                            background: "#FEE2E2",
+                            color: "#991B1B",
+                          }}
+                        >
                           🔴 Slot Full (0 Left)
                         </span>
                       ) : remainingSpots <= 5 ? (
-                        <span style={{ fontSize: "11.5px", fontWeight: 700, padding: "0.2rem 0.5rem", borderRadius: "9999px", background: "#FEF3C7", color: "#92400E" }}>
+                        <span
+                          style={{
+                            fontSize: "11.5px",
+                            fontWeight: 700,
+                            padding: "0.2rem 0.5rem",
+                            borderRadius: "9999px",
+                            background: "#FEF3C7",
+                            color: "#92400E",
+                          }}
+                        >
                           🟠 {remainingSpots} of {slotTotalCapacity} spots left
                         </span>
                       ) : (
-                        <span style={{ fontSize: "11.5px", fontWeight: 700, padding: "0.2rem 0.5rem", borderRadius: "9999px", background: "#ECFDF5", color: "#065F46" }}>
+                        <span
+                          style={{
+                            fontSize: "11.5px",
+                            fontWeight: 700,
+                            padding: "0.2rem 0.5rem",
+                            borderRadius: "9999px",
+                            background: "#ECFDF5",
+                            color: "#065F46",
+                          }}
+                        >
                           🟢 {remainingSpots} of {slotTotalCapacity} spots left
                         </span>
                       )}
@@ -6418,7 +7226,10 @@ export function OwnerTenantDashboardView({
                       background: bookingGuests === num ? "#EFF6FF" : "#F8FAFC",
                       color: bookingGuests === num ? "#1D4ED8" : "var(--brand-heading)",
                       fontWeight: 600,
-                      cursor: num > remainingSpots || isDateInPast || isSelectedSlotPast ? "not-allowed" : "pointer",
+                      cursor:
+                        num > remainingSpots || isDateInPast || isSelectedSlotPast
+                          ? "not-allowed"
+                          : "pointer",
                       opacity: num > remainingSpots || isDateInPast || isSelectedSlotPast ? 0.4 : 1,
                     }}
                     disabled={num > remainingSpots || isDateInPast || isSelectedSlotPast}
@@ -6526,10 +7337,16 @@ export function OwnerTenantDashboardView({
       <Modal
         isOpen={paymentModalOpen}
         onClose={() => setPaymentModalOpen(false)}
-        title={selectedInvoice?.status === "paid" || selectedInvoice?.balance_due === 0 ? `📄 Invoice Details: ${selectedInvoice?.invoice_number || ""}` : "💳 Settle Invoice & Maintenance Dues"}
+        title={
+          selectedInvoice?.status === "paid" || selectedInvoice?.balance_due === 0
+            ? `📄 Invoice Details: ${selectedInvoice?.invoice_number || ""}`
+            : "💳 Settle Invoice & Maintenance Dues"
+        }
         size="lg"
       >
-        <div style={{ padding: "0.25rem 0", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+        <div
+          style={{ padding: "0.25rem 0", display: "flex", flexDirection: "column", gap: "1.25rem" }}
+        >
           {/* Invoice Header Card */}
           <div
             style={{
@@ -6545,18 +7362,43 @@ export function OwnerTenantDashboardView({
             }}
           >
             <div>
-              <div style={{ fontSize: "11.5px", color: "var(--brand-muted)", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.04em" }}>
+              <div
+                style={{
+                  fontSize: "11.5px",
+                  color: "var(--brand-muted)",
+                  textTransform: "uppercase",
+                  fontWeight: 700,
+                  letterSpacing: "0.04em",
+                }}
+              >
                 Official Maintenance Invoice
               </div>
-              <div style={{ fontSize: "18px", fontWeight: 800, color: "var(--brand-heading)", marginTop: "0.15rem" }}>
+              <div
+                style={{
+                  fontSize: "18px",
+                  fontWeight: 800,
+                  color: "var(--brand-heading)",
+                  marginTop: "0.15rem",
+                }}
+              >
                 {selectedInvoice?.invoice_number ?? "INV-2026-001"}
               </div>
               <div style={{ fontSize: "13px", color: "var(--brand-body)", marginTop: "0.2rem" }}>
-                {selectedInvoice?.title || "Monthly Maintenance & Community Services"} • {residentUnit}
+                {selectedInvoice?.title || "Monthly Maintenance & Community Services"} •{" "}
+                {residentUnit}
               </div>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.35rem" }}>
-              <span style={{ fontSize: "11.5px", color: "var(--brand-muted)", fontWeight: 600 }}>Payment Status</span>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-end",
+                gap: "0.35rem",
+              }}
+            >
+              <span style={{ fontSize: "11.5px", color: "var(--brand-muted)", fontWeight: 600 }}>
+                Payment Status
+              </span>
               <StatusBadge status={selectedInvoice?.status || "posted"} />
             </div>
           </div>
@@ -6574,28 +7416,64 @@ export function OwnerTenantDashboardView({
             }}
           >
             <div>
-              <div style={{ fontSize: "11.5px", color: "var(--brand-muted)", fontWeight: 600 }}>Invoice Date</div>
-              <div style={{ fontSize: "13.5px", fontWeight: 700, color: "var(--brand-heading)", marginTop: "0.2rem" }}>
+              <div style={{ fontSize: "11.5px", color: "var(--brand-muted)", fontWeight: 600 }}>
+                Invoice Date
+              </div>
+              <div
+                style={{
+                  fontSize: "13.5px",
+                  fontWeight: 700,
+                  color: "var(--brand-heading)",
+                  marginTop: "0.2rem",
+                }}
+              >
                 {formatDate(selectedInvoice?.issue_date)}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: "11.5px", color: "var(--brand-muted)", fontWeight: 600 }}>Payment Due Date</div>
-              <div style={{ fontSize: "13.5px", fontWeight: 700, color: "#DC2626", marginTop: "0.2rem" }}>
+              <div style={{ fontSize: "11.5px", color: "var(--brand-muted)", fontWeight: 600 }}>
+                Payment Due Date
+              </div>
+              <div
+                style={{
+                  fontSize: "13.5px",
+                  fontWeight: 700,
+                  color: "#DC2626",
+                  marginTop: "0.2rem",
+                }}
+              >
                 {formatDate(selectedInvoice?.due_date)}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: "11.5px", color: "var(--brand-muted)", fontWeight: 600 }}>Billing Period</div>
-              <div style={{ fontSize: "13.5px", fontWeight: 700, color: "var(--brand-heading)", marginTop: "0.2rem" }}>
+              <div style={{ fontSize: "11.5px", color: "var(--brand-muted)", fontWeight: 600 }}>
+                Billing Period
+              </div>
+              <div
+                style={{
+                  fontSize: "13.5px",
+                  fontWeight: 700,
+                  color: "var(--brand-heading)",
+                  marginTop: "0.2rem",
+                }}
+              >
                 {selectedInvoice?.billing_period_start && selectedInvoice?.billing_period_end
                   ? `${formatDate(selectedInvoice.billing_period_start)} — ${formatDate(selectedInvoice.billing_period_end)}`
                   : "Current Monthly Cycle"}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: "11.5px", color: "var(--brand-muted)", fontWeight: 600 }}>Assigned Property</div>
-              <div style={{ fontSize: "13.5px", fontWeight: 700, color: "var(--brand-heading)", marginTop: "0.2rem" }}>
+              <div style={{ fontSize: "11.5px", color: "var(--brand-muted)", fontWeight: 600 }}>
+                Assigned Property
+              </div>
+              <div
+                style={{
+                  fontSize: "13.5px",
+                  fontWeight: 700,
+                  color: "var(--brand-heading)",
+                  marginTop: "0.2rem",
+                }}
+              >
                 {residentUnit}
               </div>
             </div>
@@ -6603,7 +7481,14 @@ export function OwnerTenantDashboardView({
 
           {/* Itemized Charges Breakdown Table */}
           <div>
-            <div style={{ fontSize: "13.5px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.5rem" }}>
+            <div
+              style={{
+                fontSize: "13.5px",
+                fontWeight: 700,
+                color: "var(--brand-heading)",
+                marginBottom: "0.5rem",
+              }}
+            >
               📋 Charge Description & Line Items Breakdown
             </div>
             <div
@@ -6615,22 +7500,84 @@ export function OwnerTenantDashboardView({
             >
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
                 <thead>
-                  <tr style={{ background: "#F8FAFC", borderBottom: "1px solid var(--border-light)", textAlign: "left" }}>
-                    <th style={{ padding: "0.6rem 0.85rem", fontWeight: 700, color: "var(--brand-heading)" }}>Charge Description</th>
-                    <th style={{ padding: "0.6rem 0.85rem", fontWeight: 700, color: "var(--brand-heading)", textAlign: "center" }}>Tax Status</th>
-                    <th style={{ padding: "0.6rem 0.85rem", fontWeight: 700, color: "var(--brand-heading)", textAlign: "right" }}>Qty</th>
-                    <th style={{ padding: "0.6rem 0.85rem", fontWeight: 700, color: "var(--brand-heading)", textAlign: "right" }}>Rate</th>
-                    <th style={{ padding: "0.6rem 0.85rem", fontWeight: 700, color: "var(--brand-heading)", textAlign: "right" }}>Amount</th>
+                  <tr
+                    style={{
+                      background: "#F8FAFC",
+                      borderBottom: "1px solid var(--border-light)",
+                      textAlign: "left",
+                    }}
+                  >
+                    <th
+                      style={{
+                        padding: "0.6rem 0.85rem",
+                        fontWeight: 700,
+                        color: "var(--brand-heading)",
+                      }}
+                    >
+                      Charge Description
+                    </th>
+                    <th
+                      style={{
+                        padding: "0.6rem 0.85rem",
+                        fontWeight: 700,
+                        color: "var(--brand-heading)",
+                        textAlign: "center",
+                      }}
+                    >
+                      Tax Status
+                    </th>
+                    <th
+                      style={{
+                        padding: "0.6rem 0.85rem",
+                        fontWeight: 700,
+                        color: "var(--brand-heading)",
+                        textAlign: "right",
+                      }}
+                    >
+                      Qty
+                    </th>
+                    <th
+                      style={{
+                        padding: "0.6rem 0.85rem",
+                        fontWeight: 700,
+                        color: "var(--brand-heading)",
+                        textAlign: "right",
+                      }}
+                    >
+                      Rate
+                    </th>
+                    <th
+                      style={{
+                        padding: "0.6rem 0.85rem",
+                        fontWeight: 700,
+                        color: "var(--brand-heading)",
+                        textAlign: "right",
+                      }}
+                    >
+                      Amount
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(selectedInvoice?.line_items && selectedInvoice.line_items.length > 0) ? (
+                  {selectedInvoice?.line_items && selectedInvoice.line_items.length > 0 ? (
                     selectedInvoice.line_items.map((item, idx) => (
-                      <tr key={idx} style={{ borderBottom: idx < selectedInvoice.line_items!.length - 1 ? "1px solid #F1F5F9" : "none" }}>
+                      <tr
+                        key={idx}
+                        style={{
+                          borderBottom:
+                            idx < selectedInvoice.line_items!.length - 1
+                              ? "1px solid #F1F5F9"
+                              : "none",
+                        }}
+                      >
                         <td style={{ padding: "0.65rem 0.85rem" }}>
-                          <div style={{ fontWeight: 600, color: "var(--brand-heading)" }}>{item.head}</div>
+                          <div style={{ fontWeight: 600, color: "var(--brand-heading)" }}>
+                            {item.head}
+                          </div>
                           {item.description && item.description !== item.head && (
-                            <div style={{ fontSize: "11.5px", color: "var(--brand-muted)" }}>{item.description}</div>
+                            <div style={{ fontSize: "11.5px", color: "var(--brand-muted)" }}>
+                              {item.description}
+                            </div>
                           )}
                         </td>
                         <td style={{ padding: "0.65rem 0.85rem", textAlign: "center" }}>
@@ -6647,13 +7594,32 @@ export function OwnerTenantDashboardView({
                             {item.taxable ? "GST 18%" : "Exempt"}
                           </span>
                         </td>
-                        <td style={{ padding: "0.65rem 0.85rem", textAlign: "right", color: "var(--brand-body)" }}>
+                        <td
+                          style={{
+                            padding: "0.65rem 0.85rem",
+                            textAlign: "right",
+                            color: "var(--brand-body)",
+                          }}
+                        >
                           {item.quantity ?? 1}
                         </td>
-                        <td style={{ padding: "0.65rem 0.85rem", textAlign: "right", color: "var(--brand-body)" }}>
+                        <td
+                          style={{
+                            padding: "0.65rem 0.85rem",
+                            textAlign: "right",
+                            color: "var(--brand-body)",
+                          }}
+                        >
                           {formatCurrency(item.unit_rate ?? item.amount)}
                         </td>
-                        <td style={{ padding: "0.65rem 0.85rem", textAlign: "right", fontWeight: 700, color: "var(--brand-heading)" }}>
+                        <td
+                          style={{
+                            padding: "0.65rem 0.85rem",
+                            textAlign: "right",
+                            fontWeight: 700,
+                            color: "var(--brand-heading)",
+                          }}
+                        >
                           {formatCurrency(item.amount)}
                         </td>
                       </tr>
@@ -6661,19 +7627,53 @@ export function OwnerTenantDashboardView({
                   ) : (
                     <tr>
                       <td style={{ padding: "0.65rem 0.85rem" }}>
-                        <div style={{ fontWeight: 600, color: "var(--brand-heading)" }}>Monthly Society Maintenance Charge</div>
-                        <div style={{ fontSize: "11.5px", color: "var(--brand-muted)" }}>General common area upkeep, security, and facility operations</div>
+                        <div style={{ fontWeight: 600, color: "var(--brand-heading)" }}>
+                          Monthly Society Maintenance Charge
+                        </div>
+                        <div style={{ fontSize: "11.5px", color: "var(--brand-muted)" }}>
+                          General common area upkeep, security, and facility operations
+                        </div>
                       </td>
                       <td style={{ padding: "0.65rem 0.85rem", textAlign: "center" }}>
-                        <span style={{ fontSize: "11px", padding: "0.15rem 0.45rem", borderRadius: "4px", background: "#F1F5F9", color: "#475569", fontWeight: 600 }}>
+                        <span
+                          style={{
+                            fontSize: "11px",
+                            padding: "0.15rem 0.45rem",
+                            borderRadius: "4px",
+                            background: "#F1F5F9",
+                            color: "#475569",
+                            fontWeight: 600,
+                          }}
+                        >
                           Standard
                         </span>
                       </td>
-                      <td style={{ padding: "0.65rem 0.85rem", textAlign: "right", color: "var(--brand-body)" }}>1</td>
-                      <td style={{ padding: "0.65rem 0.85rem", textAlign: "right", color: "var(--brand-body)" }}>
+                      <td
+                        style={{
+                          padding: "0.65rem 0.85rem",
+                          textAlign: "right",
+                          color: "var(--brand-body)",
+                        }}
+                      >
+                        1
+                      </td>
+                      <td
+                        style={{
+                          padding: "0.65rem 0.85rem",
+                          textAlign: "right",
+                          color: "var(--brand-body)",
+                        }}
+                      >
                         {formatCurrency(selectedInvoice?.total_amount || 0)}
                       </td>
-                      <td style={{ padding: "0.65rem 0.85rem", textAlign: "right", fontWeight: 700, color: "var(--brand-heading)" }}>
+                      <td
+                        style={{
+                          padding: "0.65rem 0.85rem",
+                          textAlign: "right",
+                          fontWeight: 700,
+                          color: "var(--brand-heading)",
+                        }}
+                      >
                         {formatCurrency(selectedInvoice?.total_amount || 0)}
                       </td>
                     </tr>
@@ -6696,37 +7696,66 @@ export function OwnerTenantDashboardView({
               fontSize: "13px",
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", color: "var(--brand-body)" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                color: "var(--brand-body)",
+              }}
+            >
               <span>Subtotal Charges:</span>
               <span style={{ fontWeight: 600 }}>
                 {formatCurrency(selectedInvoice?.subtotal || selectedInvoice?.total_amount || 0)}
               </span>
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", color: "var(--brand-body)" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                color: "var(--brand-body)",
+              }}
+            >
               <span>Applicable Taxes & Levies:</span>
               <span style={{ fontWeight: 600 }}>
-                {Number(selectedInvoice?.tax || 0) > 0 ? formatCurrency(selectedInvoice?.tax) : "₹0.00 (Exempt / Inclusive)"}
+                {Number(selectedInvoice?.tax || 0) > 0
+                  ? formatCurrency(selectedInvoice?.tax)
+                  : "₹0.00 (Exempt / Inclusive)"}
               </span>
             </div>
             {Number(selectedInvoice?.late_fee || 0) > 0 && (
               <div style={{ display: "flex", justifyContent: "space-between", color: "#DC2626" }}>
                 <span>Late Payment Surcharge:</span>
-                <span style={{ fontWeight: 700 }}>+{formatCurrency(selectedInvoice?.late_fee)}</span>
+                <span style={{ fontWeight: 700 }}>
+                  +{formatCurrency(selectedInvoice?.late_fee)}
+                </span>
               </div>
             )}
             {Number(selectedInvoice?.discount || 0) > 0 && (
               <div style={{ display: "flex", justifyContent: "space-between", color: "#059669" }}>
                 <span>Early Payment / Rebate Discount:</span>
-                <span style={{ fontWeight: 700 }}>-{formatCurrency(selectedInvoice?.discount)}</span>
+                <span style={{ fontWeight: 700 }}>
+                  -{formatCurrency(selectedInvoice?.discount)}
+                </span>
               </div>
             )}
-            <div style={{ borderTop: "1px solid var(--border-light)", paddingTop: "0.5rem", display: "flex", justifyContent: "space-between", fontWeight: 700, color: "var(--brand-heading)" }}>
+            <div
+              style={{
+                borderTop: "1px solid var(--border-light)",
+                paddingTop: "0.5rem",
+                display: "flex",
+                justifyContent: "space-between",
+                fontWeight: 700,
+                color: "var(--brand-heading)",
+              }}
+            >
               <span>Total Invoice Amount:</span>
               <span>{formatCurrency(selectedInvoice?.total_amount || 0)}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", color: "#059669" }}>
               <span>Amount Paid:</span>
-              <span style={{ fontWeight: 600 }}>{formatCurrency(selectedInvoice?.amount_paid || 0)}</span>
+              <span style={{ fontWeight: 600 }}>
+                {formatCurrency(selectedInvoice?.amount_paid || 0)}
+              </span>
             </div>
             <div
               style={{
@@ -6770,7 +7799,8 @@ export function OwnerTenantDashboardView({
               }}
             >
               <div>
-                ✅ <strong>Invoice Paid & Cleared:</strong> This invoice is fully settled with zero outstanding balance.
+                ✅ <strong>Invoice Paid & Cleared:</strong> This invoice is fully settled with zero
+                outstanding balance.
                 {selectedInvoice?.receipt_number && (
                   <span style={{ marginLeft: "0.35rem", fontWeight: 700 }}>
                     (Receipt #{selectedInvoice.receipt_number})
@@ -6809,7 +7839,10 @@ export function OwnerTenantDashboardView({
                 lineHeight: 1.4,
               }}
             >
-              ⚡ <strong>Instant Simulated Gateway:</strong> Clicking &ldquo;Simulate Instant Payment&rdquo; will immediately process the transaction, credit your unit financial ledger, update your balance to ₹0.00, and generate an official verifiable <strong>RCP-</strong> receipt.
+              ⚡ <strong>Instant Simulated Gateway:</strong> Clicking &ldquo;Simulate Instant
+              Payment&rdquo; will immediately process the transaction, credit your unit financial
+              ledger, update your balance to ₹0.00, and generate an official verifiable{" "}
+              <strong>RCP-</strong> receipt.
             </div>
           )}
 
@@ -6861,7 +7894,10 @@ export function OwnerTenantDashboardView({
                   <BrandButton variant="outline" onClick={() => setPaymentModalOpen(false)}>
                     Cancel
                   </BrandButton>
-                  <BrandButton onClick={handleSimulatedPayment} isLoading={payments.payDues.isPending}>
+                  <BrandButton
+                    onClick={handleSimulatedPayment}
+                    isLoading={payments.payDues.isPending}
+                  >
                     Simulate Instant Payment
                   </BrandButton>
                 </>
@@ -6878,7 +7914,9 @@ export function OwnerTenantDashboardView({
         title="🧾 Official Payment Receipt"
         size="lg"
       >
-        <div style={{ padding: "0.25rem 0", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+        <div
+          style={{ padding: "0.25rem 0", display: "flex", flexDirection: "column", gap: "1.25rem" }}
+        >
           {/* Success Confirmation Banner */}
           <div
             style={{
@@ -6897,7 +7935,8 @@ export function OwnerTenantDashboardView({
                 Payment Processed & Settled Successfully
               </div>
               <div style={{ fontSize: "12.5px", color: "#047857", marginTop: "0.2rem" }}>
-                Transaction has been posted to the financial journal ledger and credited to your unit account.
+                Transaction has been posted to the financial journal ledger and credited to your
+                unit account.
               </div>
             </div>
           </div>
@@ -6951,10 +7990,26 @@ export function OwnerTenantDashboardView({
                   opacity: 0.9,
                 }}
               />
-              <div style={{ fontSize: "40px", fontWeight: 900, letterSpacing: "0.08em", color: "#0F172A", lineHeight: 1 }}>
+              <div
+                style={{
+                  fontSize: "40px",
+                  fontWeight: 900,
+                  letterSpacing: "0.08em",
+                  color: "#0F172A",
+                  lineHeight: 1,
+                }}
+              >
                 PAID &amp; VERIFIED
               </div>
-              <div style={{ fontSize: "12px", fontWeight: 800, letterSpacing: "0.22em", color: "#0F172A", marginTop: "6px" }}>
+              <div
+                style={{
+                  fontSize: "12px",
+                  fontWeight: 800,
+                  letterSpacing: "0.22em",
+                  color: "#0F172A",
+                  marginTop: "6px",
+                }}
+              >
                 GATESPHERE OFFICIAL RECEIPT
               </div>
             </div>
@@ -6987,7 +8042,14 @@ export function OwnerTenantDashboardView({
                   }}
                 />
                 <div>
-                  <div style={{ fontSize: "15.5px", fontWeight: 800, color: "var(--brand-heading)", letterSpacing: "-0.01em" }}>
+                  <div
+                    style={{
+                      fontSize: "15.5px",
+                      fontWeight: 800,
+                      color: "var(--brand-heading)",
+                      letterSpacing: "-0.01em",
+                    }}
+                  >
                     GateSphere Residential
                   </div>
                   <div style={{ fontSize: "11.5px", color: "var(--brand-muted)" }}>
@@ -7013,20 +8075,64 @@ export function OwnerTenantDashboardView({
               </span>
             </div>
 
-            <div style={{ position: "relative", zIndex: 1, display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "1px solid var(--border-light)", paddingBottom: "0.75rem", flexWrap: "wrap", gap: "0.5rem" }}>
+            <div
+              style={{
+                position: "relative",
+                zIndex: 1,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                borderBottom: "1px solid var(--border-light)",
+                paddingBottom: "0.75rem",
+                flexWrap: "wrap",
+                gap: "0.5rem",
+              }}
+            >
               <div>
-                <div style={{ fontSize: "11px", color: "var(--brand-muted)", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.05em" }}>
+                <div
+                  style={{
+                    fontSize: "11px",
+                    color: "var(--brand-muted)",
+                    textTransform: "uppercase",
+                    fontWeight: 700,
+                    letterSpacing: "0.05em",
+                  }}
+                >
                   Receipt Number
                 </div>
-                <div style={{ fontSize: "17px", fontWeight: 800, color: "var(--brand-heading)", fontFamily: "monospace", marginTop: "0.15rem" }}>
+                <div
+                  style={{
+                    fontSize: "17px",
+                    fontWeight: 800,
+                    color: "var(--brand-heading)",
+                    fontFamily: "monospace",
+                    marginTop: "0.15rem",
+                  }}
+                >
                   {activeReceiptData?.receipt_number || currentReceiptNumber}
                 </div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: "11px", color: "var(--brand-muted)", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.05em" }}>
+                <div
+                  style={{
+                    fontSize: "11px",
+                    color: "var(--brand-muted)",
+                    textTransform: "uppercase",
+                    fontWeight: 700,
+                    letterSpacing: "0.05em",
+                  }}
+                >
                   Transaction Reference
                 </div>
-                <div style={{ fontSize: "13.5px", fontWeight: 700, color: "var(--brand-heading)", fontFamily: "monospace", marginTop: "0.15rem" }}>
+                <div
+                  style={{
+                    fontSize: "13.5px",
+                    fontWeight: 700,
+                    color: "var(--brand-heading)",
+                    fontFamily: "monospace",
+                    marginTop: "0.15rem",
+                  }}
+                >
                   {activeReceiptData?.payment_reference || "PAY-SIMULATED"}
                 </div>
               </div>
@@ -7043,53 +8149,107 @@ export function OwnerTenantDashboardView({
               }}
             >
               <div>
-                <div style={{ fontSize: "11.5px", color: "var(--brand-muted)", fontWeight: 600 }}>Payment Date & Time</div>
-                <div style={{ fontWeight: 700, color: "var(--brand-heading)", marginTop: "0.2rem" }}>
+                <div style={{ fontSize: "11.5px", color: "var(--brand-muted)", fontWeight: 600 }}>
+                  Payment Date & Time
+                </div>
+                <div
+                  style={{ fontWeight: 700, color: "var(--brand-heading)", marginTop: "0.2rem" }}
+                >
                   {formatDateTime(activeReceiptData?.paid_at || new Date().toISOString())}
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: "11.5px", color: "var(--brand-muted)", fontWeight: 600 }}>Payment Mode</div>
-                <div style={{ fontWeight: 700, color: "var(--brand-heading)", marginTop: "0.2rem" }}>
+                <div style={{ fontSize: "11.5px", color: "var(--brand-muted)", fontWeight: 600 }}>
+                  Payment Mode
+                </div>
+                <div
+                  style={{ fontWeight: 700, color: "var(--brand-heading)", marginTop: "0.2rem" }}
+                >
                   {activeReceiptData?.payment_method || "Simulated UPI Gateway"}
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: "11.5px", color: "var(--brand-muted)", fontWeight: 600 }}>Related Invoice</div>
-                <div style={{ fontWeight: 700, color: "var(--brand-heading)", marginTop: "0.2rem" }}>
-                  {activeReceiptData?.invoice_number || selectedInvoice?.invoice_number || "INV-2026-001"}
+                <div style={{ fontSize: "11.5px", color: "var(--brand-muted)", fontWeight: 600 }}>
+                  Related Invoice
+                </div>
+                <div
+                  style={{ fontWeight: 700, color: "var(--brand-heading)", marginTop: "0.2rem" }}
+                >
+                  {activeReceiptData?.invoice_number ||
+                    selectedInvoice?.invoice_number ||
+                    "INV-2026-001"}
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: "11.5px", color: "var(--brand-muted)", fontWeight: 600 }}>Payer / Registered Unit</div>
-                <div style={{ fontWeight: 700, color: "var(--brand-heading)", marginTop: "0.2rem" }}>
-                  {activeReceiptData?.payer_name || profile.data?.full_name || "Resident"} ({activeReceiptData?.unit_number || residentUnit})
+                <div style={{ fontSize: "11.5px", color: "var(--brand-muted)", fontWeight: 600 }}>
+                  Payer / Registered Unit
+                </div>
+                <div
+                  style={{ fontWeight: 700, color: "var(--brand-heading)", marginTop: "0.2rem" }}
+                >
+                  {activeReceiptData?.payer_name || profile.data?.full_name || "Resident"} (
+                  {activeReceiptData?.unit_number || residentUnit})
                 </div>
               </div>
             </div>
 
             {/* Line Items Summary */}
             <div style={{ borderTop: "1px solid var(--border-light)", paddingTop: "0.75rem" }}>
-              <div style={{ fontSize: "12.5px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.4rem" }}>
+              <div
+                style={{
+                  fontSize: "12.5px",
+                  fontWeight: 700,
+                  color: "var(--brand-heading)",
+                  marginBottom: "0.4rem",
+                }}
+              >
                 Settled Account Items
               </div>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12.5px" }}>
                 <tbody>
-                  {(activeReceiptData?.line_items && activeReceiptData.line_items.length > 0) ? (
+                  {activeReceiptData?.line_items && activeReceiptData.line_items.length > 0 ? (
                     activeReceiptData.line_items.map((item, idx) => (
                       <tr key={idx} style={{ borderBottom: "1px solid #F1F5F9" }}>
-                        <td style={{ padding: "0.45rem 0", color: "var(--brand-heading)", fontWeight: 600 }}>{item.head}</td>
-                        <td style={{ padding: "0.45rem 0", textAlign: "right", fontWeight: 700, color: "var(--brand-heading)" }}>
+                        <td
+                          style={{
+                            padding: "0.45rem 0",
+                            color: "var(--brand-heading)",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {item.head}
+                        </td>
+                        <td
+                          style={{
+                            padding: "0.45rem 0",
+                            textAlign: "right",
+                            fontWeight: 700,
+                            color: "var(--brand-heading)",
+                          }}
+                        >
                           {formatCurrency(item.amount)}
                         </td>
                       </tr>
                     ))
                   ) : (
                     <tr style={{ borderBottom: "1px solid #F1F5F9" }}>
-                      <td style={{ padding: "0.45rem 0", color: "var(--brand-heading)", fontWeight: 600 }}>
+                      <td
+                        style={{
+                          padding: "0.45rem 0",
+                          color: "var(--brand-heading)",
+                          fontWeight: 600,
+                        }}
+                      >
                         {activeReceiptData?.title || "Maintenance & Operations Dues"}
                       </td>
-                      <td style={{ padding: "0.45rem 0", textAlign: "right", fontWeight: 700, color: "var(--brand-heading)" }}>
+                      <td
+                        style={{
+                          padding: "0.45rem 0",
+                          textAlign: "right",
+                          fontWeight: 700,
+                          color: "var(--brand-heading)",
+                        }}
+                      >
                         {formatCurrency(activeReceiptData?.amount_paid || 0)}
                       </td>
                     </tr>
@@ -7110,20 +8270,41 @@ export function OwnerTenantDashboardView({
                 fontSize: "13px",
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", color: "var(--brand-body)" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  color: "var(--brand-body)",
+                }}
+              >
                 <span>Total Amount Settled:</span>
                 <span style={{ fontWeight: 700, color: "#059669", fontSize: "15px" }}>
                   {formatCurrency(activeReceiptData?.amount_paid || 0)}
                 </span>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", color: "var(--brand-muted)", fontSize: "12px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  color: "var(--brand-muted)",
+                  fontSize: "12px",
+                }}
+              >
                 <span>Remaining Dues on Invoice:</span>
                 <span style={{ fontWeight: 700, color: "#059669" }}>₹0.00 (Settled in Full)</span>
               </div>
             </div>
 
-            <div style={{ fontSize: "11px", color: "var(--brand-muted)", textAlign: "center", fontStyle: "italic" }}>
-              🔒 This is a system-verified digital receipt generated by GateSphere Resident Services. No physical signature is required.
+            <div
+              style={{
+                fontSize: "11px",
+                color: "var(--brand-muted)",
+                textAlign: "center",
+                fontStyle: "italic",
+              }}
+            >
+              🔒 This is a system-verified digital receipt generated by GateSphere Resident
+              Services. No physical signature is required.
             </div>
           </div>
 
@@ -7144,7 +8325,7 @@ export function OwnerTenantDashboardView({
                 onClick={() => {
                   const inv =
                     invoiceList.find(
-                      (i) => i.invoice_number === activeReceiptData?.invoice_number
+                      (i) => i.invoice_number === activeReceiptData?.invoice_number,
                     ) || selectedInvoice;
                   if (inv) {
                     setSelectedInvoice({
@@ -7167,7 +8348,7 @@ export function OwnerTenantDashboardView({
                 onClick={() => {
                   const inv =
                     invoiceList.find(
-                      (i) => i.invoice_number === activeReceiptData?.invoice_number
+                      (i) => i.invoice_number === activeReceiptData?.invoice_number,
                     ) || selectedInvoice;
                   if (inv) {
                     handleDownloadInvoice(inv);
@@ -7215,7 +8396,8 @@ export function OwnerTenantDashboardView({
       >
         <div style={{ padding: "0.5rem 0" }}>
           <p style={{ fontSize: "14px", color: "#334155", marginBottom: "0.85rem" }}>
-            Select an emergency category to immediately alert Security Guards and dispatch responders to (<strong>{residentUnit}</strong>):
+            Select an emergency category to immediately alert Security Guards and dispatch
+            responders to (<strong>{residentUnit}</strong>):
           </p>
 
           <div
@@ -7253,7 +8435,13 @@ export function OwnerTenantDashboardView({
                 }}
               >
                 <span style={{ fontSize: "1.5rem" }}>{cat.icon}</span>
-                <span style={{ fontSize: "12px", fontWeight: 700, color: emergencyType === cat.id ? "#991B1B" : "#1E293B" }}>
+                <span
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    color: emergencyType === cat.id ? "#991B1B" : "#1E293B",
+                  }}
+                >
                   {cat.label}
                 </span>
               </button>
@@ -7352,9 +8540,20 @@ export function OwnerTenantDashboardView({
         title="Edit Resident Profile & Contacts"
         size="md"
       >
-        <form onSubmit={handleSaveProfile} style={{ display: "flex", flexDirection: "column", gap: "1.1rem", padding: "0.25rem 0" }}>
+        <form
+          onSubmit={handleSaveProfile}
+          style={{ display: "flex", flexDirection: "column", gap: "1.1rem", padding: "0.25rem 0" }}
+        >
           <div>
-            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "13px",
+                fontWeight: 700,
+                color: "var(--brand-heading)",
+                marginBottom: "0.35rem",
+              }}
+            >
               Full Name *
             </label>
             <input
@@ -7364,20 +8563,36 @@ export function OwnerTenantDashboardView({
               value={profileFullName}
               onChange={(e) => {
                 setProfileFullName(e.target.value);
-                if (profileFieldErrors.full_name) setProfileFieldErrors((prev) => ({ ...prev, full_name: "" }));
+                if (profileFieldErrors.full_name)
+                  setProfileFieldErrors((prev) => ({ ...prev, full_name: "" }));
               }}
               style={{ borderColor: profileFieldErrors.full_name ? "#EF4444" : undefined }}
               required
             />
             {profileFieldErrors.full_name && (
-              <span style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", display: "block" }}>
+              <span
+                style={{
+                  color: "#DC2626",
+                  fontSize: "12px",
+                  marginTop: "0.25rem",
+                  display: "block",
+                }}
+              >
                 {profileFieldErrors.full_name}
               </span>
             )}
           </div>
 
           <div>
-            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "13px",
+                fontWeight: 700,
+                color: "var(--brand-heading)",
+                marginBottom: "0.35rem",
+              }}
+            >
               Registered Email
             </label>
             <input
@@ -7387,13 +8602,28 @@ export function OwnerTenantDashboardView({
               disabled
               style={{ background: "#F1F5F9", cursor: "not-allowed", color: "var(--brand-muted)" }}
             />
-            <span style={{ fontSize: "11px", color: "var(--brand-muted)", marginTop: "0.2rem", display: "block" }}>
+            <span
+              style={{
+                fontSize: "11px",
+                color: "var(--brand-muted)",
+                marginTop: "0.2rem",
+                display: "block",
+              }}
+            >
               Registered email is linked to your authentication account and cannot be modified here.
             </span>
           </div>
 
           <div>
-            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "13px",
+                fontWeight: 700,
+                color: "var(--brand-heading)",
+                marginBottom: "0.35rem",
+              }}
+            >
               Primary Mobile Number
             </label>
             <input
@@ -7403,24 +8633,54 @@ export function OwnerTenantDashboardView({
               value={profilePhone}
               onChange={(e) => {
                 setProfilePhone(e.target.value);
-                if (profileFieldErrors.phone) setProfileFieldErrors((prev) => ({ ...prev, phone: "" }));
+                if (profileFieldErrors.phone)
+                  setProfileFieldErrors((prev) => ({ ...prev, phone: "" }));
               }}
               style={{ borderColor: profileFieldErrors.phone ? "#EF4444" : undefined }}
             />
             {profileFieldErrors.phone && (
-              <span style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", display: "block" }}>
+              <span
+                style={{
+                  color: "#DC2626",
+                  fontSize: "12px",
+                  marginTop: "0.25rem",
+                  display: "block",
+                }}
+              >
                 {profileFieldErrors.phone}
               </span>
             )}
           </div>
 
           <div style={{ borderTop: "1px solid var(--border-standard)", paddingTop: "1rem" }}>
-            <h4 style={{ fontSize: "14px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.75rem" }}>
+            <h4
+              style={{
+                fontSize: "14px",
+                fontWeight: 700,
+                color: "var(--brand-heading)",
+                marginBottom: "0.75rem",
+              }}
+            >
               🚨 Emergency Contact Details
             </h4>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "0.75rem" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "0.75rem",
+                marginBottom: "0.75rem",
+              }}
+            >
               <div>
-                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--brand-heading)", marginBottom: "0.25rem" }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    color: "var(--brand-heading)",
+                    marginBottom: "0.25rem",
+                  }}
+                >
                   Contact Name
                 </label>
                 <input
@@ -7430,18 +8690,34 @@ export function OwnerTenantDashboardView({
                   value={profileEmergencyName}
                   onChange={(e) => {
                     setProfileEmergencyName(e.target.value);
-                    if (profileFieldErrors.emergency_name) setProfileFieldErrors((prev) => ({ ...prev, emergency_name: "" }));
+                    if (profileFieldErrors.emergency_name)
+                      setProfileFieldErrors((prev) => ({ ...prev, emergency_name: "" }));
                   }}
                   style={{ borderColor: profileFieldErrors.emergency_name ? "#EF4444" : undefined }}
                 />
                 {profileFieldErrors.emergency_name && (
-                  <span style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", display: "block" }}>
+                  <span
+                    style={{
+                      color: "#DC2626",
+                      fontSize: "12px",
+                      marginTop: "0.25rem",
+                      display: "block",
+                    }}
+                  >
                     {profileFieldErrors.emergency_name}
                   </span>
                 )}
               </div>
               <div>
-                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--brand-heading)", marginBottom: "0.25rem" }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    color: "var(--brand-heading)",
+                    marginBottom: "0.25rem",
+                  }}
+                >
                   Relationship
                 </label>
                 <select
@@ -7461,7 +8737,15 @@ export function OwnerTenantDashboardView({
               </div>
             </div>
             <div>
-              <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--brand-heading)", marginBottom: "0.25rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  color: "var(--brand-heading)",
+                  marginBottom: "0.25rem",
+                }}
+              >
                 Emergency Contact Phone
               </label>
               <input
@@ -7471,12 +8755,20 @@ export function OwnerTenantDashboardView({
                 value={profileEmergencyPhone}
                 onChange={(e) => {
                   setProfileEmergencyPhone(e.target.value);
-                  if (profileFieldErrors.emergency_phone) setProfileFieldErrors((prev) => ({ ...prev, emergency_phone: "" }));
+                  if (profileFieldErrors.emergency_phone)
+                    setProfileFieldErrors((prev) => ({ ...prev, emergency_phone: "" }));
                 }}
                 style={{ borderColor: profileFieldErrors.emergency_phone ? "#EF4444" : undefined }}
               />
               {profileFieldErrors.emergency_phone && (
-                <span style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", display: "block" }}>
+                <span
+                  style={{
+                    color: "#DC2626",
+                    fontSize: "12px",
+                    marginTop: "0.25rem",
+                    display: "block",
+                  }}
+                >
                   {profileFieldErrors.emergency_phone}
                 </span>
               )}
@@ -7484,7 +8776,15 @@ export function OwnerTenantDashboardView({
           </div>
 
           <div>
-            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "13px",
+                fontWeight: 700,
+                color: "var(--brand-heading)",
+                marginBottom: "0.35rem",
+              }}
+            >
               Medical & Emergency Notes (Optional)
             </label>
             <textarea
@@ -7496,7 +8796,14 @@ export function OwnerTenantDashboardView({
             />
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: "0.75rem",
+              marginTop: "0.5rem",
+            }}
+          >
             <BrandButton type="button" variant="outline" onClick={() => setEditProfileOpen(false)}>
               Cancel
             </BrandButton>
@@ -7518,8 +8825,10 @@ export function OwnerTenantDashboardView({
           onSubmit={async (e) => {
             e.preventDefault();
             setPasswordError("");
-            if (newPassword.length < 8) {
-              setPasswordError("New password must be at least 8 characters long.");
+            if (newPassword.length < PASSWORD_MIN_LENGTH) {
+              setPasswordError(
+                `New password must be at least ${PASSWORD_MIN_LENGTH} characters long.`,
+              );
               return;
             }
             if (newPassword !== confirmPassword) {
@@ -7542,7 +8851,9 @@ export function OwnerTenantDashboardView({
               setConfirmPassword("");
               toast.success("Your password was changed successfully.", "Password Updated");
             } catch (err: any) {
-              setPasswordError(err?.message || "Failed to change password. Check your current password.");
+              setPasswordError(
+                err?.message || "Failed to change password. Check your current password.",
+              );
             } finally {
               setIsChangingPassword(false);
             }
@@ -7565,7 +8876,15 @@ export function OwnerTenantDashboardView({
           )}
 
           <div>
-            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "13px",
+                fontWeight: 700,
+                color: "var(--brand-heading)",
+                marginBottom: "0.35rem",
+              }}
+            >
               Current Password *
             </label>
             <input
@@ -7579,7 +8898,15 @@ export function OwnerTenantDashboardView({
           </div>
 
           <div>
-            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "13px",
+                fontWeight: 700,
+                color: "var(--brand-heading)",
+                marginBottom: "0.35rem",
+              }}
+            >
               New Password *
             </label>
             <input
@@ -7593,7 +8920,15 @@ export function OwnerTenantDashboardView({
           </div>
 
           <div>
-            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "13px",
+                fontWeight: 700,
+                color: "var(--brand-heading)",
+                marginBottom: "0.35rem",
+              }}
+            >
               Confirm New Password *
             </label>
             <input
@@ -7606,8 +8941,19 @@ export function OwnerTenantDashboardView({
             />
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
-            <BrandButton type="button" variant="outline" onClick={() => setChangePasswordModalOpen(false)}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: "0.75rem",
+              marginTop: "0.5rem",
+            }}
+          >
+            <BrandButton
+              type="button"
+              variant="outline"
+              onClick={() => setChangePasswordModalOpen(false)}
+            >
               Cancel
             </BrandButton>
             <BrandButton type="submit" isLoading={isChangingPassword}>
@@ -7624,10 +8970,16 @@ export function OwnerTenantDashboardView({
         title="⭐ Rate Maintenance Service"
         size="md"
       >
-        <form onSubmit={handleSubmitFeedback} style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}>
+        <form
+          onSubmit={handleSubmitFeedback}
+          style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}
+        >
           <div>
             <div style={{ fontSize: "13px", color: "var(--brand-muted)", marginBottom: "0.25rem" }}>
-              Ticket: <strong style={{ color: "var(--brand-heading)" }}>{feedbackTicket?.ticket_number}</strong>
+              Ticket:{" "}
+              <strong style={{ color: "var(--brand-heading)" }}>
+                {feedbackTicket?.ticket_number}
+              </strong>
             </div>
             <div style={{ fontSize: "14px", fontWeight: 700, color: "var(--brand-heading)" }}>
               {feedbackTicket?.subject}
@@ -7635,7 +8987,14 @@ export function OwnerTenantDashboardView({
           </div>
 
           <div>
-            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, marginBottom: "0.5rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "13px",
+                fontWeight: 700,
+                marginBottom: "0.5rem",
+              }}
+            >
               Service Satisfaction Rating *
             </label>
             <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
@@ -7658,7 +9017,14 @@ export function OwnerTenantDashboardView({
                   ⭐
                 </button>
               ))}
-              <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--brand-primary)", marginLeft: "0.5rem" }}>
+              <span
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  color: "var(--brand-primary)",
+                  marginLeft: "0.5rem",
+                }}
+              >
                 {feedbackRating === 5
                   ? "5/5 — Excellent"
                   : feedbackRating === 4
@@ -7673,7 +9039,14 @@ export function OwnerTenantDashboardView({
           </div>
 
           <div>
-            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "13px",
+                fontWeight: 700,
+                marginBottom: "0.35rem",
+              }}
+            >
               Feedback & Comments (Optional)
             </label>
             <textarea
@@ -7685,8 +9058,19 @@ export function OwnerTenantDashboardView({
             />
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
-            <BrandButton type="button" variant="outline" onClick={() => setFeedbackModalOpen(false)}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: "0.75rem",
+              marginTop: "0.5rem",
+            }}
+          >
+            <BrandButton
+              type="button"
+              variant="outline"
+              onClick={() => setFeedbackModalOpen(false)}
+            >
               Cancel
             </BrandButton>
             <BrandButton type="submit" isLoading={complaints.submitFeedback?.isPending}>
@@ -7703,18 +9087,35 @@ export function OwnerTenantDashboardView({
         title="⭐ Rate Domestic Staff"
         size="md"
       >
-        <form onSubmit={handleSubmitStaffRating} style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}>
+        <form
+          onSubmit={handleSubmitStaffRating}
+          style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}
+        >
           <div>
             <div style={{ fontSize: "13px", color: "var(--brand-muted)", marginBottom: "0.25rem" }}>
-              Staff Member: <strong style={{ color: "var(--brand-heading)" }}>{selectedStaff?.name}</strong>
+              Staff Member:{" "}
+              <strong style={{ color: "var(--brand-heading)" }}>{selectedStaff?.name}</strong>
             </div>
-            <div style={{ fontSize: "13.5px", color: "var(--brand-body)", textTransform: "capitalize" }}>
+            <div
+              style={{
+                fontSize: "13.5px",
+                color: "var(--brand-body)",
+                textTransform: "capitalize",
+              }}
+            >
               Role: {selectedStaff?.role}
             </div>
           </div>
 
           <div>
-            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, marginBottom: "0.5rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "13px",
+                fontWeight: 700,
+                marginBottom: "0.5rem",
+              }}
+            >
               Performance & Conduct Rating *
             </label>
             <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
@@ -7737,7 +9138,14 @@ export function OwnerTenantDashboardView({
                   ⭐
                 </button>
               ))}
-              <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--brand-primary)", marginLeft: "0.5rem" }}>
+              <span
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  color: "var(--brand-primary)",
+                  marginLeft: "0.5rem",
+                }}
+              >
                 {staffRatingValue === 5
                   ? "5/5 — Highly Recommended"
                   : staffRatingValue === 4
@@ -7752,7 +9160,14 @@ export function OwnerTenantDashboardView({
           </div>
 
           <div>
-            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "13px",
+                fontWeight: 700,
+                marginBottom: "0.35rem",
+              }}
+            >
               Feedback & Remarks (Optional)
             </label>
             <textarea
@@ -7764,8 +9179,19 @@ export function OwnerTenantDashboardView({
             />
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
-            <BrandButton type="button" variant="outline" onClick={() => setStaffRatingModalOpen(false)}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: "0.75rem",
+              marginTop: "0.5rem",
+            }}
+          >
+            <BrandButton
+              type="button"
+              variant="outline"
+              onClick={() => setStaffRatingModalOpen(false)}
+            >
               Cancel
             </BrandButton>
             <BrandButton type="submit" isLoading={submitStaffRating.isPending}>
@@ -7815,7 +9241,14 @@ export function OwnerTenantDashboardView({
           style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}
         >
           <div>
-            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "13px",
+                fontWeight: 700,
+                marginBottom: "0.35rem",
+              }}
+            >
               Select Verified Staff Member *
             </label>
             <select
@@ -7841,7 +9274,14 @@ export function OwnerTenantDashboardView({
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
             <div>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: 700, marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Service Type
               </label>
               <select
@@ -7855,7 +9295,14 @@ export function OwnerTenantDashboardView({
               </select>
             </div>
             <div>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: 700, marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Start Date
               </label>
               <input
@@ -7869,7 +9316,14 @@ export function OwnerTenantDashboardView({
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
             <div>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: 700, marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Working Hours From
               </label>
               <input
@@ -7880,7 +9334,14 @@ export function OwnerTenantDashboardView({
               />
             </div>
             <div>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: 700, marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Working Hours To
               </label>
               <input
@@ -7893,7 +9354,14 @@ export function OwnerTenantDashboardView({
           </div>
 
           <div>
-            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, marginBottom: "0.4rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "13px",
+                fontWeight: 700,
+                marginBottom: "0.4rem",
+              }}
+            >
               Working Days of Week
             </label>
             <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
@@ -7930,8 +9398,19 @@ export function OwnerTenantDashboardView({
             </div>
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
-            <BrandButton type="button" variant="outline" onClick={() => setAssignStaffModalOpen(false)}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: "0.75rem",
+              marginTop: "0.5rem",
+            }}
+          >
+            <BrandButton
+              type="button"
+              variant="outline"
+              onClick={() => setAssignStaffModalOpen(false)}
+            >
               Cancel
             </BrandButton>
             <BrandButton type="submit" isLoading={assignStaffMutation.isPending}>
@@ -7974,7 +9453,15 @@ export function OwnerTenantDashboardView({
           style={{ display: "flex", flexDirection: "column", gap: "1rem", padding: "0.25rem 0" }}
         >
           <div>
-            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "13px",
+                fontWeight: 700,
+                color: "var(--brand-heading)",
+                marginBottom: "0.35rem",
+              }}
+            >
               License Plate / Registration Number *
             </label>
             <input
@@ -7988,7 +9475,15 @@ export function OwnerTenantDashboardView({
           </div>
 
           <div>
-            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "13px",
+                fontWeight: 700,
+                color: "var(--brand-heading)",
+                marginBottom: "0.35rem",
+              }}
+            >
               Vehicle Type *
             </label>
             <select
@@ -8010,7 +9505,15 @@ export function OwnerTenantDashboardView({
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
             <div>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  color: "var(--brand-heading)",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Make / Brand
               </label>
               <input
@@ -8022,7 +9525,15 @@ export function OwnerTenantDashboardView({
               />
             </div>
             <div>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  color: "var(--brand-heading)",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Model
               </label>
               <input
@@ -8036,7 +9547,15 @@ export function OwnerTenantDashboardView({
           </div>
 
           <div>
-            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "13px",
+                fontWeight: 700,
+                color: "var(--brand-heading)",
+                marginBottom: "0.35rem",
+              }}
+            >
               Color
             </label>
             <input
@@ -8048,8 +9567,19 @@ export function OwnerTenantDashboardView({
             />
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
-            <BrandButton type="button" variant="outline" onClick={() => setRegisterVehicleModalOpen(false)}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: "0.75rem",
+              marginTop: "0.5rem",
+            }}
+          >
+            <BrandButton
+              type="button"
+              variant="outline"
+              onClick={() => setRegisterVehicleModalOpen(false)}
+            >
               Cancel
             </BrandButton>
             <BrandButton type="submit" isLoading={registerVehicleMutation.isPending}>

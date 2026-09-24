@@ -81,7 +81,11 @@ export default function CommunityAdminBillingPage() {
 
   // Queries
   const { data: financial } = useFinancialStats(activeCommunityId || undefined);
-  const { data: invoices, isLoading: invoicesLoading, refetch: refetchInvoices } = useInvoices({
+  const {
+    data: invoices,
+    isLoading: invoicesLoading,
+    refetch: refetchInvoices,
+  } = useInvoices({
     community_id: activeCommunityId || undefined,
     page_size: 50,
   });
@@ -223,10 +227,7 @@ export default function CommunityAdminBillingPage() {
   );
   const taxableSubtotal = lineItems
     .filter((i) => i.taxable)
-    .reduce(
-      (sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unit_rate) || 0),
-      0,
-    );
+    .reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unit_rate) || 0), 0);
   const estimatedTax = (taxableSubtotal * taxRatePercent) / 100;
   const totalCalculated = Math.max(0, itemsSubtotal - (Number(discount) || 0) + estimatedTax);
 
@@ -255,9 +256,13 @@ export default function CommunityAdminBillingPage() {
     }
     if (
       lineItems.length === 0 ||
-      lineItems.some((i) => !i.description.trim() || Number(i.quantity) <= 0 || Number(i.unit_rate) < 0)
+      lineItems.some(
+        (i) => !i.description.trim() || Number(i.quantity) <= 0 || Number(i.unit_rate) < 0,
+      )
     ) {
-      setFormError("Please ensure all line items have a description (min 2 chars), quantity > 0, and rate >= 0.");
+      setFormError(
+        "Please ensure all line items have a description (min 2 chars), quantity > 0, and rate >= 0.",
+      );
       return;
     }
 
@@ -415,7 +420,9 @@ export default function CommunityAdminBillingPage() {
     }
     const trimmedCode = chargeHeadForm.code.trim().toUpperCase();
     if (!trimmedCode || !/^[A-Z0-9_-]{2,20}$/.test(trimmedCode)) {
-      setChargeHeadError("Charge head code must be 2-20 alphanumeric characters or dashes (e.g. MAINT-01).");
+      setChargeHeadError(
+        "Charge head code must be 2-20 alphanumeric characters or dashes (e.g. MAINT-01).",
+      );
       return;
     }
     if (Number(chargeHeadForm.default_amount) < 0) {
@@ -506,7 +513,10 @@ export default function CommunityAdminBillingPage() {
                   try {
                     await postInvoiceMutation.mutateAsync(i.id);
                     await refetchInvoices();
-                    toast.success(`Invoice ${i.invoice_number} posted successfully.`, "Invoice Posted");
+                    toast.success(
+                      `Invoice ${i.invoice_number} posted successfully.`,
+                      "Invoice Posted",
+                    );
                   } catch (err: any) {
                     toast.error(err?.message || "Failed to post invoice.", "Action Failed");
                   }
@@ -1082,7 +1092,14 @@ export default function CommunityAdminBillingPage() {
 
             {/* Target Unit */}
             <div>
-              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.3rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.8rem",
+                  fontWeight: 600,
+                  marginBottom: "0.3rem",
+                }}
+              >
                 Target Residential Unit <span style={{ color: "#dc2626" }}>*</span>
               </label>
               <select
@@ -1096,7 +1113,8 @@ export default function CommunityAdminBillingPage() {
                 {units && units.length > 0 ? (
                   units.map((u) => (
                     <option key={u.id} value={u.id}>
-                      Unit {u.unit_number} {u.unit_type ? `(${u.unit_type})` : ""} {u.sq_ft ? `• ${u.sq_ft} sqft` : ""}
+                      Unit {u.unit_number} {u.unit_type ? `(${u.unit_type})` : ""}{" "}
+                      {u.sq_ft ? `• ${u.sq_ft} sqft` : ""}
                     </option>
                   ))
                 ) : (
@@ -1110,7 +1128,14 @@ export default function CommunityAdminBillingPage() {
             {/* Billing Period */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
               <div>
-                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.3rem" }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
+                    marginBottom: "0.3rem",
+                  }}
+                >
                   Period Start
                 </label>
                 <input
@@ -1122,7 +1147,14 @@ export default function CommunityAdminBillingPage() {
                 />
               </div>
               <div>
-                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.3rem" }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
+                    marginBottom: "0.3rem",
+                  }}
+                >
                   Period End
                 </label>
                 <input
@@ -1138,7 +1170,14 @@ export default function CommunityAdminBillingPage() {
             {/* Issue Date & Due Date */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
               <div>
-                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.3rem" }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
+                    marginBottom: "0.3rem",
+                  }}
+                >
                   Issue Date
                 </label>
                 <input
@@ -1150,7 +1189,14 @@ export default function CommunityAdminBillingPage() {
                 />
               </div>
               <div>
-                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.3rem" }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
+                    marginBottom: "0.3rem",
+                  }}
+                >
                   Due Date
                 </label>
                 <input
@@ -1164,8 +1210,21 @@ export default function CommunityAdminBillingPage() {
             </div>
 
             {/* Line Items Section */}
-            <div style={{ borderTop: "1px solid var(--border)", paddingTop: "0.85rem", marginTop: "0.25rem" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.6rem" }}>
+            <div
+              style={{
+                borderTop: "1px solid var(--border)",
+                paddingTop: "0.85rem",
+                marginTop: "0.25rem",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "0.6rem",
+                }}
+              >
                 <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>Invoice Line Items</span>
                 <button
                   type="button"
@@ -1193,7 +1252,14 @@ export default function CommunityAdminBillingPage() {
                   >
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
                       <div>
-                        <label style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block", marginBottom: "0.2rem" }}>
+                        <label
+                          style={{
+                            fontSize: "0.75rem",
+                            color: "var(--muted)",
+                            display: "block",
+                            marginBottom: "0.2rem",
+                          }}
+                        >
                           Charge Head Preset
                         </label>
                         <select
@@ -1211,7 +1277,14 @@ export default function CommunityAdminBillingPage() {
                         </select>
                       </div>
                       <div>
-                        <label style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block", marginBottom: "0.2rem" }}>
+                        <label
+                          style={{
+                            fontSize: "0.75rem",
+                            color: "var(--muted)",
+                            display: "block",
+                            marginBottom: "0.2rem",
+                          }}
+                        >
                           Description *
                         </label>
                         <input
@@ -1226,9 +1299,23 @@ export default function CommunityAdminBillingPage() {
                       </div>
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr auto", gap: "0.5rem", alignItems: "flex-end" }}>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr 1fr auto",
+                        gap: "0.5rem",
+                        alignItems: "flex-end",
+                      }}
+                    >
                       <div>
-                        <label style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block", marginBottom: "0.2rem" }}>
+                        <label
+                          style={{
+                            fontSize: "0.75rem",
+                            color: "var(--muted)",
+                            display: "block",
+                            marginBottom: "0.2rem",
+                          }}
+                        >
                           Qty
                         </label>
                         <input
@@ -1242,7 +1329,14 @@ export default function CommunityAdminBillingPage() {
                         />
                       </div>
                       <div>
-                        <label style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block", marginBottom: "0.2rem" }}>
+                        <label
+                          style={{
+                            fontSize: "0.75rem",
+                            color: "var(--muted)",
+                            display: "block",
+                            marginBottom: "0.2rem",
+                          }}
+                        >
                           Unit Rate (₹)
                         </label>
                         <input
@@ -1256,11 +1350,27 @@ export default function CommunityAdminBillingPage() {
                         />
                       </div>
                       <div>
-                        <label style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block", marginBottom: "0.2rem" }}>
+                        <label
+                          style={{
+                            fontSize: "0.75rem",
+                            color: "var(--muted)",
+                            display: "block",
+                            marginBottom: "0.2rem",
+                          }}
+                        >
                           Total Amount
                         </label>
-                        <div style={{ fontSize: "0.85rem", fontWeight: 600, padding: "0.35rem 0", color: "var(--fg)" }}>
-                          {formatCurrency((Number(item.quantity) || 0) * (Number(item.unit_rate) || 0))}
+                        <div
+                          style={{
+                            fontSize: "0.85rem",
+                            fontWeight: 600,
+                            padding: "0.35rem 0",
+                            color: "var(--fg)",
+                          }}
+                        >
+                          {formatCurrency(
+                            (Number(item.quantity) || 0) * (Number(item.unit_rate) || 0),
+                          )}
                         </div>
                       </div>
                       <div>
@@ -1269,7 +1379,11 @@ export default function CommunityAdminBillingPage() {
                             type="button"
                             className="btn btn-secondary"
                             onClick={() => removeLineItem(idx)}
-                            style={{ fontSize: "0.75rem", padding: "0.35rem 0.5rem", color: "#dc2626" }}
+                            style={{
+                              fontSize: "0.75rem",
+                              padding: "0.35rem 0.5rem",
+                              color: "#dc2626",
+                            }}
                           >
                             ✕
                           </button>
@@ -1282,9 +1396,23 @@ export default function CommunityAdminBillingPage() {
             </div>
 
             {/* Discount & Immediate Post */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", alignItems: "center" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "0.75rem",
+                alignItems: "center",
+              }}
+            >
               <div>
-                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.3rem" }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
+                    marginBottom: "0.3rem",
+                  }}
+                >
                   Discount (₹)
                 </label>
                 <input
@@ -1299,7 +1427,15 @@ export default function CommunityAdminBillingPage() {
               </div>
 
               <div style={{ paddingTop: "1.2rem" }}>
-                <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.85rem", cursor: "pointer" }}>
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    fontSize: "0.85rem",
+                    cursor: "pointer",
+                  }}
+                >
                   <input
                     type="checkbox"
                     checked={postImmediately}
@@ -1355,7 +1491,14 @@ export default function CommunityAdminBillingPage() {
             </div>
 
             {/* Modal Actions */}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "0.5rem" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "0.5rem",
+                marginTop: "0.5rem",
+              }}
+            >
               <button
                 type="button"
                 className="btn btn-secondary"
@@ -1369,7 +1512,11 @@ export default function CommunityAdminBillingPage() {
                 className="btn btn-primary"
                 disabled={isSubmitting || !createUnitId}
               >
-                {isSubmitting ? "Generating..." : postImmediately ? "🧾 Generate & Post Invoice" : "💾 Save as Draft"}
+                {isSubmitting
+                  ? "Generating..."
+                  : postImmediately
+                    ? "🧾 Generate & Post Invoice"
+                    : "💾 Save as Draft"}
               </button>
             </div>
           </div>
@@ -1441,9 +1588,7 @@ export default function CommunityAdminBillingPage() {
               <select
                 className="select-field"
                 value={paymentForm.unit_id}
-                onChange={(e) =>
-                  setPaymentForm((prev) => ({ ...prev, unit_id: e.target.value }))
-                }
+                onChange={(e) => setPaymentForm((prev) => ({ ...prev, unit_id: e.target.value }))}
                 style={{ width: "100%" }}
                 required
               >
@@ -1560,9 +1705,7 @@ export default function CommunityAdminBillingPage() {
                 type="text"
                 className="input-field"
                 value={paymentForm.remarks}
-                onChange={(e) =>
-                  setPaymentForm((prev) => ({ ...prev, remarks: e.target.value }))
-                }
+                onChange={(e) => setPaymentForm((prev) => ({ ...prev, remarks: e.target.value }))}
                 placeholder="e.g. Cheque #49281 HDFC Bank or UTR 328910"
                 style={{ width: "100%" }}
               />
@@ -1588,9 +1731,7 @@ export default function CommunityAdminBillingPage() {
                 type="submit"
                 className="btn btn-primary"
                 disabled={
-                  isRecordingPayment ||
-                  !paymentForm.unit_id ||
-                  Number(paymentForm.amount) <= 0
+                  isRecordingPayment || !paymentForm.unit_id || Number(paymentForm.amount) <= 0
                 }
               >
                 {isRecordingPayment ? "Recording..." : "💾 Record Payment"}
@@ -1638,9 +1779,7 @@ export default function CommunityAdminBillingPage() {
                 type="text"
                 className="input-field"
                 value={chargeHeadForm.name}
-                onChange={(e) =>
-                  setChargeHeadForm((prev) => ({ ...prev, name: e.target.value }))
-                }
+                onChange={(e) => setChargeHeadForm((prev) => ({ ...prev, name: e.target.value }))}
                 placeholder="e.g. Diesel Generator Backup"
                 style={{ width: "100%" }}
                 required

@@ -239,13 +239,11 @@ def upgrade() -> None:
         perm_params.append({"code": perm_code, "desc": desc})
 
     conn.execute(
-        sa.text(
-            """
+        sa.text("""
             INSERT INTO permissions (id, code, description)
             VALUES (gen_random_uuid(), :code, :desc)
             ON CONFLICT (code) DO NOTHING;
-            """
-        ),
+            """),
         perm_params,
     )
 
@@ -254,13 +252,11 @@ def upgrade() -> None:
         {"slug": slug, "name": name, "desc": desc} for slug, (name, desc) in ROLES.items()
     ]
     conn.execute(
-        sa.text(
-            """
+        sa.text("""
             INSERT INTO roles (id, slug, name, description)
             VALUES (gen_random_uuid(), :slug, :name, :desc)
             ON CONFLICT (slug) DO NOTHING;
-            """
-        ),
+            """),
         role_params,
     )
 
@@ -271,16 +267,14 @@ def upgrade() -> None:
         for perm_code in perms
     ]
     conn.execute(
-        sa.text(
-            """
+        sa.text("""
             INSERT INTO role_permissions (id, role_id, permission_id)
             SELECT gen_random_uuid(), r.id, p.id
             FROM roles r
             CROSS JOIN permissions p
             WHERE r.slug = :role_slug AND p.code = :perm_code
             ON CONFLICT (role_id, permission_id) DO NOTHING;
-            """
-        ),
+            """),
         rp_params,
     )
 

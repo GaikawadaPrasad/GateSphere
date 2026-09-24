@@ -12,8 +12,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential libpq-dev curl \
  && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt requirements.lock.txt ./
-RUN pip install --upgrade pip && pip install --require-hashes -r requirements.lock.txt
+# Runtime-only lock by default (no pytest/black/ruff/mypy in the production image).
+# The local docker-compose stack passes REQUIREMENTS=requirements-dev.lock.txt so
+# `make test` / `make lint` work inside the container.
+ARG REQUIREMENTS=requirements.lock.txt
+COPY requirements.txt requirements.lock.txt requirements-dev.lock.txt ./
+RUN pip install --upgrade pip && pip install --require-hashes -r "${REQUIREMENTS}"
 
 RUN useradd -m -d /app -s /bin/bash appuser && chown -R appuser:appuser /app
 USER appuser

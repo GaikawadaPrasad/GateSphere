@@ -94,9 +94,9 @@ async def test_ticket_history_timestamps_strictly_increase(
 
     hist = await svc.list_history(t.id)
     timestamps = [h.changed_at for h in hist]
-    assert len(timestamps) == len(set(timestamps)), (
-        f"expected distinct changed_at per row (clock_timestamp()), got duplicates: {timestamps}"
-    )
+    assert len(timestamps) == len(
+        set(timestamps)
+    ), f"expected distinct changed_at per row (clock_timestamp()), got duplicates: {timestamps}"
     assert timestamps == sorted(timestamps), timestamps
 
 

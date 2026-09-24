@@ -71,9 +71,7 @@ export default function GateTrafficPage() {
             {item.guard_name || `Guard #${item.guard_user_id.slice(0, 8)}`}
           </div>
           {item.guard_phone ? (
-            <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-              📞 {item.guard_phone}
-            </div>
+            <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>📞 {item.guard_phone}</div>
           ) : (
             <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
               ID: {item.guard_user_id.slice(0, 8)}
@@ -133,10 +131,7 @@ export default function GateTrafficPage() {
       />
 
       {/* Active Scope Banner */}
-      <ScopeBanner
-        entityName="gate traffic & security"
-        onClear={() => setCommunityId("")}
-      />
+      <ScopeBanner entityName="gate traffic & security" onClear={() => setCommunityId("")} />
 
       {/* Panic Alerts Alert Box */}
       {alerts && alerts.length > 0 && (

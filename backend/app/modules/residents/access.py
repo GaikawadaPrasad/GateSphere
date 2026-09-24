@@ -79,13 +79,12 @@ async def actor_unit_scope(
 
     role_filter = [UserRole.user_id == actor.id, Role.slug.in_(CROSS_UNIT_ROLES)]
     if community_id is not None:
-        role_filter.append((UserRole.community_id == community_id) | (UserRole.community_id.is_(None)))
+        role_filter.append(
+            (UserRole.community_id == community_id) | (UserRole.community_id.is_(None))
+        )
 
     cross = await db.scalar(
-        select(UserRole.id)
-        .join(Role, Role.id == UserRole.role_id)
-        .where(*role_filter)
-        .limit(1)
+        select(UserRole.id).join(Role, Role.id == UserRole.role_id).where(*role_filter).limit(1)
     )
     if cross is not None:
         return None
@@ -111,14 +110,16 @@ class UnitScopedAccess:
     db: AsyncSession
     actor: User
 
-    async def _unit_scope(self, community_id: uuid.UUID | None = None) -> frozenset[uuid.UUID] | None:
+    async def _unit_scope(
+        self, community_id: uuid.UUID | None = None
+    ) -> frozenset[uuid.UUID] | None:
         cid = community_id
         if cid is None:
             scope = getattr(self, "scope", None)
             if scope and hasattr(scope, "community_ids") and len(scope.community_ids) == 1:
                 cid = next(iter(scope.community_ids))
             elif hasattr(self, "community_id"):
-                cid = getattr(self, "community_id")
+                cid = self.community_id
 
         cache_key = f"_unit_scope_val_{cid}"
         cached = getattr(self, cache_key, _MISSING)
@@ -130,7 +131,9 @@ class UnitScopedAccess:
     async def is_unit_restricted(self, community_id: uuid.UUID | None = None) -> bool:
         return (await self._unit_scope(community_id)) is not None
 
-    async def _assert_unit_visible(self, unit_id: uuid.UUID | None, community_id: uuid.UUID | None = None) -> None:
+    async def _assert_unit_visible(
+        self, unit_id: uuid.UUID | None, community_id: uuid.UUID | None = None
+    ) -> None:
         scope = await self._unit_scope(community_id)
         if scope is not None and unit_id not in scope:
             # Same shape as a real 404 — never reveal that the record exists in the community.

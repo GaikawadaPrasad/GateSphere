@@ -72,7 +72,9 @@ describe("QR Code Decoder & Parser", () => {
     });
 
     it("parses URL containing token or pin query parameters", () => {
-      const parsed = parseQrPayload("https://gate-sphere.vercel.app/verify?token=pass-token-555&pin=1234");
+      const parsed = parseQrPayload(
+        "https://gate-sphere.vercel.app/verify?token=pass-token-555&pin=1234",
+      );
       expect(parsed.token).toBe("pass-token-555");
       expect(parsed.pin).toBe("1234");
       expect(parsed.type).toBe("token");
@@ -99,7 +101,7 @@ describe("QR Code Decoder & Parser", () => {
           const isDark = qrData.modules.get(modX, modY);
           const idx = (y * width + x) * 4;
           const val = isDark ? 0 : 255;
-          rgba[idx] = val;     // R
+          rgba[idx] = val; // R
           rgba[idx + 1] = val; // G
           rgba[idx + 2] = val; // B
           rgba[idx + 3] = 255; // A

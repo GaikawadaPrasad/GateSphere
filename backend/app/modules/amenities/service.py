@@ -11,8 +11,9 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, date, datetime, time
+from datetime import UTC, datetime, time
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -43,7 +44,6 @@ from app.modules.notifications import events as notif_events
 from app.modules.residents.access import UnitScopedAccess
 from app.modules.residents.models import ResidentProfile, UnitOccupancy
 from app.modules.users.models import User
-from zoneinfo import ZoneInfo
 
 
 def _enum(field: str, value: str | None) -> None:
@@ -139,7 +139,7 @@ class AmenityService(UnitScopedAccess):
             raise ConflictError("That code exists", code="AMENITY_EXISTS")
         obj = Amenity(community_id=cid, **payload.model_dump())
         await self.amenities.add(obj)
-        # Auto-provision standard 2-hour slots (06:00–22:00) for every day of the week
+        # Auto-provision standard 2-hour slots (06:00-22:00) for every day of the week
         _standard_slots = [
             (time(6, 0), time(8, 0)),
             (time(8, 0), time(10, 0)),
@@ -152,16 +152,18 @@ class AmenityService(UnitScopedAccess):
         ]
         for day in range(7):
             for st, et in _standard_slots:
-                self.db.add(AmenitySlot(
-                    community_id=cid,
-                    amenity_id=obj.id,
-                    day_of_week=day,
-                    start_time=st,
-                    end_time=et,
-                    capacity=obj.capacity or 20,
-                    fee=Decimal("0"),
-                    is_active=True,
-                ))
+                self.db.add(
+                    AmenitySlot(
+                        community_id=cid,
+                        amenity_id=obj.id,
+                        day_of_week=day,
+                        start_time=st,
+                        end_time=et,
+                        capacity=obj.capacity or 20,
+                        fee=Decimal("0"),
+                        is_active=True,
+                    )
+                )
         await self.db.flush()
         await self._audit("amenity.create", cid, "amenity", obj.id)
         return obj
@@ -307,9 +309,10 @@ class AmenityService(UnitScopedAccess):
         await self.db.flush()
         await self._audit("block.delete", obj.community_id, "amenity_block", obj.id)
 
-
     # -- bookings ------------------------------------- #
-    async def _populate_booking_details(self, bookings: list[AmenityBooking]) -> list[AmenityBooking]:
+    async def _populate_booking_details(
+        self, bookings: list[AmenityBooking]
+    ) -> list[AmenityBooking]:
         if not bookings:
             return bookings
 
@@ -325,7 +328,8 @@ class AmenityService(UnitScopedAccess):
 
         unit_map: dict[uuid.UUID, dict[str, str | None]] = {}
         if unit_ids:
-            from app.modules.communities.models import Unit, Tower
+            from app.modules.communities.models import Tower, Unit
+
             un_stmt = (
                 select(Unit.id, Unit.unit_number, Tower.name)
                 .outerjoin(Tower, Tower.id == Unit.tower_id)
@@ -428,7 +432,9 @@ class AmenityService(UnitScopedAccess):
         end_local = datetime.combine(payload.booking_date, slot.end_time, tzinfo=local_tz)
 
         if start_local < now_local:
-            raise BusinessRuleError("Cannot book a completed or past time slot", code="TIME_IN_PAST")
+            raise BusinessRuleError(
+                "Cannot book a completed or past time slot", code="TIME_IN_PAST"
+            )
 
         start_at = start_local.astimezone(UTC)
         end_at = end_local.astimezone(UTC)
@@ -465,11 +471,13 @@ class AmenityService(UnitScopedAccess):
                 AmenityBooking.slot_id == slot.id,
                 AmenityBooking.booking_date == payload.booking_date,
                 AmenityBooking.resident_user_id == self.actor.id,
-                AmenityBooking.status == "confirmed"
+                AmenityBooking.status == "confirmed",
             )
         )
         if existing_duplicate is not None:
-            raise ConflictError("You already have a confirmed booking for this exact slot", code="DUPLICATE_BOOKING")
+            raise ConflictError(
+                "You already have a confirmed booking for this exact slot", code="DUPLICATE_BOOKING"
+            )
 
         obj = AmenityBooking(
             community_id=amenity.community_id,

@@ -152,7 +152,13 @@ export function useUpdateTower() {
     }: {
       id: string;
       communityId?: string;
-      data: { name?: string; code?: string; structure_type?: string; total_floors?: number; is_active?: boolean };
+      data: {
+        name?: string;
+        code?: string;
+        structure_type?: string;
+        total_floors?: number;
+        is_active?: boolean;
+      };
     }) => communitiesApi.updateTower(id, data),
     onSuccess: (_, { communityId }) => {
       if (communityId) {

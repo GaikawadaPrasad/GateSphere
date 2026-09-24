@@ -44,10 +44,16 @@ export default function SecuritySupervisorDomesticStaffPage() {
           return {
             id: s.id,
             name: s.full_name || "Domestic Staff",
-            role: s.service_type || s.staff_type
-              ? (s.service_type || s.staff_type).replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
-              : "Housekeeping",
-            assigned_units: s.assigned_units && s.assigned_units.length > 0 ? s.assigned_units : ["Verified Staff"],
+            role:
+              s.service_type || s.staff_type
+                ? (s.service_type || s.staff_type)
+                    .replace(/_/g, " ")
+                    .replace(/\b\w/g, (c: string) => c.toUpperCase())
+                : "Housekeeping",
+            assigned_units:
+              s.assigned_units && s.assigned_units.length > 0
+                ? s.assigned_units
+                : ["Verified Staff"],
             check_in_time: att?.check_in_at
               ? new Date(att.check_in_at).toLocaleTimeString([], {
                   hour: "2-digit",
@@ -61,7 +67,11 @@ export default function SecuritySupervisorDomesticStaffPage() {
                 })
               : null,
             is_overdue: isOverdue,
-            status: isOverdue ? "Overdue Checkout (>12h)" : isInside ? "Inside Premises" : "Checked Out",
+            status: isOverdue
+              ? "Overdue Checkout (>12h)"
+              : isInside
+                ? "Inside Premises"
+                : "Checked Out",
           };
         }),
       );
@@ -118,7 +128,7 @@ export default function SecuritySupervisorDomesticStaffPage() {
       key: "status",
       header: "Attendance Status",
       sortable: true,
-      render: (s) => (
+      render: (s) =>
         s.is_overdue ? (
           <span
             style={{
@@ -137,9 +147,11 @@ export default function SecuritySupervisorDomesticStaffPage() {
             ⚠️ Overdue Checkout (&gt;12h)
           </span>
         ) : (
-          <StatusBadge status={s.status === "Inside Premises" ? "approved" : "completed"} label={s.status} />
-        )
-      ),
+          <StatusBadge
+            status={s.status === "Inside Premises" ? "approved" : "completed"}
+            label={s.status}
+          />
+        ),
     },
   ];
 
@@ -154,11 +166,7 @@ export default function SecuritySupervisorDomesticStaffPage() {
           { label: "Domestic Staff" },
         ]}
         actions={
-          <button
-            className="btn btn-secondary"
-            onClick={loadData}
-            disabled={isLoading}
-          >
+          <button className="btn btn-secondary" onClick={loadData} disabled={isLoading}>
             🔄 {isLoading ? "Refreshing…" : "Refresh"}
           </button>
         }

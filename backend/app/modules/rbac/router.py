@@ -62,7 +62,6 @@ async def update_permission_put(
     return ok(await svc.update_permission(code, payload), message="Permission updated")
 
 
-
 @router.get("/roles", response_model=Envelope[list[schemas.RolePermsRead]], dependencies=[VIEW])
 async def list_roles(svc: Svc = Depends(rbac_service)) -> dict:
     return ok(await svc.list_roles())

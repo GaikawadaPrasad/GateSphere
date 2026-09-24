@@ -21,7 +21,10 @@ export function DashboardShell({
   accentColor,
 }: DashboardShellProps) {
   return (
-    <div className="dashboard-content-wrapper" style={{ width: "100%", minWidth: 0, maxWidth: "100%" }}>
+    <div
+      className="dashboard-content-wrapper"
+      style={{ width: "100%", minWidth: 0, maxWidth: "100%" }}
+    >
       {(title || eyebrow || headerActions) && (
         <div
           style={{

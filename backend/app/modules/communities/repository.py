@@ -31,6 +31,7 @@ class CommunityRepository:
         if not comms:
             return comms
         from app.modules.users.models import Role, User, UserRole
+
         comm_map = {c.id: c for c in comms}
         stmt = (
             select(UserRole.community_id, User.email, User.full_name)

@@ -138,4 +138,3 @@ def test_dispatch_to_non_community_user_returns_404(as_role, seed_ids):
     assert res_other.status_code == 404
     assert res_other.json()["message"] == "Recipient not found"
     assert res_other.json()["error"]["code"] == "NOT_FOUND"
-

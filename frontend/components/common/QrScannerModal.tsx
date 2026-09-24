@@ -42,7 +42,8 @@ export function QrScannerModal({
   const playBeep = useCallback(() => {
     try {
       const AudioContextClass =
-        window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       if (!AudioContextClass) return;
       const audioCtx = new AudioContextClass();
       const osc = audioCtx.createOscillator();
@@ -68,7 +69,7 @@ export function QrScannerModal({
       onScan(raw, parsed);
       onClose();
     },
-    [onScan, onClose, playBeep]
+    [onScan, onClose, playBeep],
   );
 
   // Stop camera stream & release hardware
@@ -120,7 +121,7 @@ export function QrScannerModal({
       !navigator.mediaDevices.getUserMedia
     ) {
       setCameraError(
-        "Camera access is not supported by your browser or requires HTTPS. Please use the Upload & Scan option."
+        "Camera access is not supported by your browser or requires HTTPS. Please use the Upload & Scan option.",
       );
       return;
     }
@@ -147,15 +148,15 @@ export function QrScannerModal({
       console.warn("[QrScannerModal] Camera error:", err);
       if (err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError") {
         setCameraError(
-          "Camera permission was denied. Please allow camera access in browser settings or use the Upload & Scan option."
+          "Camera permission was denied. Please allow camera access in browser settings or use the Upload & Scan option.",
         );
       } else if (err?.name === "NotFoundError" || err?.name === "DevicesNotFoundError") {
         setCameraError(
-          "No camera hardware detected on this device. Please use the Upload & Scan option."
+          "No camera hardware detected on this device. Please use the Upload & Scan option.",
         );
       } else {
         setCameraError(
-          `Unable to access camera: ${err?.message || "Unknown error"}. Please use the Upload & Scan option.`
+          `Unable to access camera: ${err?.message || "Unknown error"}. Please use the Upload & Scan option.`,
         );
       }
       setIsCameraActive(false);
@@ -187,7 +188,7 @@ export function QrScannerModal({
       } else {
         setUploadError(
           result.error ||
-            "No QR code found in the image. Please make sure the QR code is clear, well-lit, and in focus."
+            "No QR code found in the image. Please make sure the QR code is clear, well-lit, and in focus.",
         );
       }
     } catch (err: any) {
@@ -318,9 +319,7 @@ export function QrScannerModal({
               }}
               onClick={() => fileInputRef.current?.click()}
               style={{
-                border: isDragging
-                  ? "2px dashed var(--brand-primary)"
-                  : "2px dashed #cbd5e1",
+                border: isDragging ? "2px dashed var(--brand-primary)" : "2px dashed #cbd5e1",
                 background: isDragging ? "var(--primary-light)" : "#f8fafc",
                 borderRadius: "12px",
                 padding: "2rem 1.5rem",
@@ -467,7 +466,9 @@ export function QrScannerModal({
                     border: "1px solid #cbd5e1",
                   }}
                 />
-                <div style={{ flex: 1, minWidth: 0, fontSize: "0.85rem", color: "var(--brand-body)" }}>
+                <div
+                  style={{ flex: 1, minWidth: 0, fontSize: "0.85rem", color: "var(--brand-body)" }}
+                >
                   Uploaded file loaded. If scanning fails, try cropping closer to the QR code.
                 </div>
               </div>
@@ -489,9 +490,7 @@ export function QrScannerModal({
                   fontSize: "0.95rem",
                 }}
               >
-                <div style={{ fontWeight: 700, marginBottom: "0.5rem" }}>
-                  📷 Camera Unavailable
-                </div>
+                <div style={{ fontWeight: 700, marginBottom: "0.5rem" }}>📷 Camera Unavailable</div>
                 <div>{cameraError}</div>
                 <button
                   type="button"
@@ -624,7 +623,9 @@ export function QrScannerModal({
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
-                {isCameraActive ? "🟢 Camera active • Looking for QR code..." : "Connecting camera..."}
+                {isCameraActive
+                  ? "🟢 Camera active • Looking for QR code..."
+                  : "Connecting camera..."}
               </span>
               <button
                 type="button"

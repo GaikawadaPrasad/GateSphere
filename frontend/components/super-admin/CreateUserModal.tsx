@@ -148,7 +148,9 @@ export function CreateUserModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={roleSlug === "community_admin" ? "Create New Community Admin" : "Create User & Assign Role"}
+      title={
+        roleSlug === "community_admin" ? "Create New Community Admin" : "Create User & Assign Role"
+      }
       size="md"
       footer={
         <>
@@ -171,7 +173,10 @@ export function CreateUserModal({
         </>
       }
     >
-      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+      <form
+        onSubmit={handleSubmit}
+        style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}
+      >
         {errorMessage && (
           <div
             style={{
@@ -189,7 +194,16 @@ export function CreateUserModal({
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
           <div>
-            <label htmlFor="createUserFullName" style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.35rem" }}>
+            <label
+              htmlFor="createUserFullName"
+              style={{
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                color: "var(--brand-heading)",
+                display: "block",
+                marginBottom: "0.35rem",
+              }}
+            >
               Full Name <span style={{ color: "var(--danger)" }}>*</span>
             </label>
             <input
@@ -208,14 +222,30 @@ export function CreateUserModal({
               }}
             />
             {fieldErrors.fullName && (
-              <span style={{ fontSize: "0.75rem", color: "#ef4444", marginTop: "0.25rem", display: "block" }}>
+              <span
+                style={{
+                  fontSize: "0.75rem",
+                  color: "#ef4444",
+                  marginTop: "0.25rem",
+                  display: "block",
+                }}
+              >
                 {fieldErrors.fullName}
               </span>
             )}
           </div>
 
           <div>
-            <label htmlFor="createUserEmail" style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.35rem" }}>
+            <label
+              htmlFor="createUserEmail"
+              style={{
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                color: "var(--brand-heading)",
+                display: "block",
+                marginBottom: "0.35rem",
+              }}
+            >
               Email Address <span style={{ color: "var(--danger)" }}>*</span>
             </label>
             <input
@@ -234,14 +264,30 @@ export function CreateUserModal({
               }}
             />
             {fieldErrors.email && (
-              <span style={{ fontSize: "0.75rem", color: "#ef4444", marginTop: "0.25rem", display: "block" }}>
+              <span
+                style={{
+                  fontSize: "0.75rem",
+                  color: "#ef4444",
+                  marginTop: "0.25rem",
+                  display: "block",
+                }}
+              >
                 {fieldErrors.email}
               </span>
             )}
           </div>
 
           <div>
-            <label htmlFor="createUserPassword" style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.35rem" }}>
+            <label
+              htmlFor="createUserPassword"
+              style={{
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                color: "var(--brand-heading)",
+                display: "block",
+                marginBottom: "0.35rem",
+              }}
+            >
               Initial Password <span style={{ color: "var(--danger)" }}>*</span>
             </label>
             <input
@@ -259,14 +305,30 @@ export function CreateUserModal({
               }}
             />
             {fieldErrors.password && (
-              <span style={{ fontSize: "0.75rem", color: "#ef4444", marginTop: "0.25rem", display: "block" }}>
+              <span
+                style={{
+                  fontSize: "0.75rem",
+                  color: "#ef4444",
+                  marginTop: "0.25rem",
+                  display: "block",
+                }}
+              >
                 {fieldErrors.password}
               </span>
             )}
           </div>
 
           <div>
-            <label htmlFor="createUserPhone" style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.35rem" }}>
+            <label
+              htmlFor="createUserPhone"
+              style={{
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                color: "var(--brand-heading)",
+                display: "block",
+                marginBottom: "0.35rem",
+              }}
+            >
               Phone Number
             </label>
             <input
@@ -284,14 +346,30 @@ export function CreateUserModal({
               }}
             />
             {fieldErrors.phone && (
-              <span style={{ fontSize: "0.75rem", color: "#ef4444", marginTop: "0.25rem", display: "block" }}>
+              <span
+                style={{
+                  fontSize: "0.75rem",
+                  color: "#ef4444",
+                  marginTop: "0.25rem",
+                  display: "block",
+                }}
+              >
                 {fieldErrors.phone}
               </span>
             )}
           </div>
 
           <div>
-            <label htmlFor="createUserRole" style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.35rem" }}>
+            <label
+              htmlFor="createUserRole"
+              style={{
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                color: "var(--brand-heading)",
+                display: "block",
+                marginBottom: "0.35rem",
+              }}
+            >
               Assign Role <span style={{ color: "var(--danger)" }}>*</span>
             </label>
             <select
@@ -299,18 +377,27 @@ export function CreateUserModal({
               className="form-control"
               value={roleSlug}
               onChange={(e) => setRoleSlug(e.target.value)}
-              style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: "var(--radius-input)", border: "1px solid var(--border-standard)" }}
+              style={{
+                width: "100%",
+                padding: "0.5rem 0.75rem",
+                borderRadius: "var(--radius-input)",
+                border: "1px solid var(--border-standard)",
+              }}
             >
               <optgroup label="Community Administrative & Management">
                 <option value="community_admin">Community Admin (community_admin)</option>
-                <option value="association_committee">Association Committee (association_committee)</option>
+                <option value="association_committee">
+                  Association Committee (association_committee)
+                </option>
                 <option value="facility_manager">Facility Manager (facility_manager)</option>
               </optgroup>
               <optgroup label="Operations, Compliance & Staff">
                 <option value="vendor_technician">Vendor Technician (vendor_technician)</option>
                 <option value="auditor">Auditor — Read-Only (auditor)</option>
                 <option value="domestic_staff">Domestic Staff (domestic_staff)</option>
-                <option value="security_supervisor">Security Supervisor (security_supervisor)</option>
+                <option value="security_supervisor">
+                  Security Supervisor (security_supervisor)
+                </option>
                 <option value="security_guard">Security Guard (security_guard)</option>
               </optgroup>
               <optgroup label="Platform System">
@@ -329,7 +416,7 @@ export function CreateUserModal({
                       "domestic_staff",
                       "security_supervisor",
                       "security_guard",
-                    ].includes(r.slug)
+                    ].includes(r.slug),
                 )
                 .map((r) => (
                   <option key={r.slug} value={r.slug}>
@@ -340,8 +427,18 @@ export function CreateUserModal({
           </div>
 
           <div>
-            <label htmlFor="createUserCommunity" style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.35rem" }}>
-              Assigned Community {roleSlug !== "super_admin" && <span style={{ color: "var(--danger)" }}>*</span>}
+            <label
+              htmlFor="createUserCommunity"
+              style={{
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                color: "var(--brand-heading)",
+                display: "block",
+                marginBottom: "0.35rem",
+              }}
+            >
+              Assigned Community{" "}
+              {roleSlug !== "super_admin" && <span style={{ color: "var(--danger)" }}>*</span>}
             </label>
             <select
               id="createUserCommunity"
@@ -365,12 +462,26 @@ export function CreateUserModal({
               ))}
             </select>
             {fieldErrors.communityId && (
-              <span style={{ fontSize: "0.75rem", color: "#ef4444", marginTop: "0.25rem", display: "block" }}>
+              <span
+                style={{
+                  fontSize: "0.75rem",
+                  color: "#ef4444",
+                  marginTop: "0.25rem",
+                  display: "block",
+                }}
+              >
                 {fieldErrors.communityId}
               </span>
             )}
             {lockCommunity && (
-              <span style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.25rem", display: "block" }}>
+              <span
+                style={{
+                  fontSize: "0.75rem",
+                  color: "var(--muted)",
+                  marginTop: "0.25rem",
+                  display: "block",
+                }}
+              >
                 🔒 Locked to active community
               </span>
             )}

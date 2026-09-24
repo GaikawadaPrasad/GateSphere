@@ -57,11 +57,7 @@ const visitorColumns: Column<MockVisitor>[] = [
 describe("DataTable Responsive Views (Option 1 Cards & Option 2 Scroller)", () => {
   it("renders standard table layout in desktop viewMode", () => {
     const { container } = render(
-      <DataTable<MockVisitor>
-        columns={visitorColumns}
-        data={mockVisitors}
-        viewMode="table"
-      />
+      <DataTable<MockVisitor> columns={visitorColumns} data={mockVisitors} viewMode="table" />,
     );
 
     const table = container.querySelector("table.data-table");
@@ -73,11 +69,7 @@ describe("DataTable Responsive Views (Option 1 Cards & Option 2 Scroller)", () =
 
   it("renders mobile-friendly card layout in cards viewMode (Option 1)", () => {
     const { container } = render(
-      <DataTable<MockVisitor>
-        columns={visitorColumns}
-        data={mockVisitors}
-        viewMode="cards"
-      />
+      <DataTable<MockVisitor> columns={visitorColumns} data={mockVisitors} viewMode="cards" />,
     );
 
     // Should NOT render a standard table
@@ -105,11 +97,7 @@ describe("DataTable Responsive Views (Option 1 Cards & Option 2 Scroller)", () =
 
   it("supports interactive view switching when showViewToggle is enabled", () => {
     const { container } = render(
-      <DataTable<MockVisitor>
-        columns={visitorColumns}
-        data={mockVisitors}
-        showViewToggle={true}
-      />
+      <DataTable<MockVisitor> columns={visitorColumns} data={mockVisitors} showViewToggle={true} />,
     );
 
     expect(container.querySelector("table.data-table")).toBeInTheDocument();
@@ -142,7 +130,7 @@ describe("DataTable Responsive Views (Option 1 Cards & Option 2 Scroller)", () =
             <p>Reason: {item.purpose}</p>
           </div>
         )}
-      />
+      />,
     );
 
     const customCards = container.querySelectorAll(".custom-visitor-card");
@@ -158,7 +146,7 @@ describe("DataTable Responsive Views (Option 1 Cards & Option 2 Scroller)", () =
         data={mockVisitors}
         viewMode="cards"
         onRowClick={handleRowClick}
-      />
+      />,
     );
 
     const cards = container.querySelectorAll(".data-table-mobile-card");

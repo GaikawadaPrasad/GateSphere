@@ -78,7 +78,7 @@ vi.mock("@/lib/api", () => {
           const parts = url.split("/");
           const notifId = parts[2];
           mockNotifications = mockNotifications.map((n) =>
-            n.id === notifId ? { ...n, is_read: true } : n
+            n.id === notifId ? { ...n, is_read: true } : n,
           );
           return Promise.resolve({ success: true });
         }
@@ -92,7 +92,7 @@ vi.mock("@/lib/api", () => {
       list: vi.fn(() => Promise.resolve(mockNotifications)),
       markRead: vi.fn((id: string) => {
         mockNotifications = mockNotifications.map((n) =>
-          n.id === id ? { ...n, is_read: true } : n
+          n.id === id ? { ...n, is_read: true } : n,
         );
         return Promise.resolve();
       }),
@@ -114,7 +114,7 @@ vi.mock("@/lib/api", () => {
           full_name: "Rahul Sharma",
           active_role: "resident",
           community_ids: ["comm-1"],
-        })
+        }),
       ),
     },
     gateApi: {
@@ -133,7 +133,7 @@ function renderDashboard(initialTab: any = "notifications") {
   return render(
     <QueryClientProvider client={queryClient}>
       <OwnerTenantDashboardView initialTab={initialTab} />
-    </QueryClientProvider>
+    </QueryClientProvider>,
   );
 }
 

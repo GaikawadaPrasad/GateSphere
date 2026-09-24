@@ -54,9 +54,7 @@ export default function ComplaintsPage() {
       header: "Community (Where)",
       render: (t) => {
         const commName =
-          t.community_name ||
-          communities?.find((c) => c.id === t.community_id)?.name ||
-          "–";
+          t.community_name || communities?.find((c) => c.id === t.community_id)?.name || "–";
         return (
           <div>
             <div
@@ -300,7 +298,9 @@ export default function ComplaintsPage() {
                     "Community"}
                 </div>
                 <div style={{ fontSize: "0.825rem", color: "var(--muted)", marginTop: "0.2rem" }}>
-                  {selectedTicket.unit_number ? `Unit ${selectedTicket.unit_number}` : "Common Area"}
+                  {selectedTicket.unit_number
+                    ? `Unit ${selectedTicket.unit_number}`
+                    : "Common Area"}
                 </div>
               </div>
 
@@ -328,12 +328,8 @@ export default function ComplaintsPage() {
                   {selectedTicket.raised_by_name || "Resident"}
                 </div>
                 <div style={{ fontSize: "0.825rem", color: "var(--muted)", marginTop: "0.2rem" }}>
-                  {selectedTicket.raised_by_phone && (
-                    <div>📞 {selectedTicket.raised_by_phone}</div>
-                  )}
-                  {selectedTicket.raised_by_email && (
-                    <div>✉️ {selectedTicket.raised_by_email}</div>
-                  )}
+                  {selectedTicket.raised_by_phone && <div>📞 {selectedTicket.raised_by_phone}</div>}
+                  {selectedTicket.raised_by_email && <div>✉️ {selectedTicket.raised_by_email}</div>}
                   {!selectedTicket.raised_by_phone && !selectedTicket.raised_by_email && (
                     <div>No direct contact registered</div>
                   )}

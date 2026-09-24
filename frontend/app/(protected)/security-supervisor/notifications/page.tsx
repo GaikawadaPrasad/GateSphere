@@ -34,7 +34,7 @@ export default function SecuritySupervisorNotificationsPage() {
     try {
       await notificationsApi.markRead(id);
       setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, is_read: true, read: true } : n))
+        prev.map((n) => (n.id === id ? { ...n, is_read: true, read: true } : n)),
       );
     } catch (err: any) {
       alert(err?.message || "Failed to mark as read.");
@@ -75,11 +75,7 @@ export default function SecuritySupervisorNotificationsPage() {
             >
               ✓ Mark All Read
             </button>
-            <button
-              className="btn btn-secondary"
-              onClick={loadData}
-              disabled={isLoading}
-            >
+            <button className="btn btn-secondary" onClick={loadData} disabled={isLoading}>
               🔄 {isLoading ? "Refreshing…" : "Refresh"}
             </button>
           </div>
@@ -109,7 +105,14 @@ export default function SecuritySupervisorNotificationsPage() {
 
         <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
           {isLoading ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", padding: "0.5rem" }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.75rem",
+                padding: "0.5rem",
+              }}
+            >
               {[1, 2, 3, 4].map((i) => (
                 <div
                   key={i}
@@ -122,13 +125,22 @@ export default function SecuritySupervisorNotificationsPage() {
                   }}
                 >
                   <div style={{ display: "flex", gap: "1rem", alignItems: "center", width: "80%" }}>
-                    <div className="skeleton" style={{ width: 60, height: 24, borderRadius: "var(--radius-sm)" }} />
+                    <div
+                      className="skeleton"
+                      style={{ width: 60, height: 24, borderRadius: "var(--radius-sm)" }}
+                    />
                     <div style={{ flex: 1 }}>
-                      <div className="skeleton" style={{ width: "40%", height: 16, marginBottom: "0.4rem" }} />
+                      <div
+                        className="skeleton"
+                        style={{ width: "40%", height: 16, marginBottom: "0.4rem" }}
+                      />
                       <div className="skeleton" style={{ width: "70%", height: 12 }} />
                     </div>
                   </div>
-                  <div className="skeleton" style={{ width: 80, height: 28, borderRadius: "var(--radius-sm)" }} />
+                  <div
+                    className="skeleton"
+                    style={{ width: 80, height: 28, borderRadius: "var(--radius-sm)" }}
+                  />
                 </div>
               ))}
             </div>
@@ -166,8 +178,15 @@ export default function SecuritySupervisorNotificationsPage() {
                       <div style={{ fontWeight: 600, color: "var(--fg)", fontSize: "0.9rem" }}>
                         {title} {!isRead && <span style={{ color: "var(--primary)" }}>●</span>}
                       </div>
-                      <div style={{ fontSize: "0.8rem", color: "var(--muted)", marginTop: "0.2rem" }}>
-                        {message} {timestamp && <>· <span style={{ fontStyle: "italic" }}>{timestamp}</span></>}
+                      <div
+                        style={{ fontSize: "0.8rem", color: "var(--muted)", marginTop: "0.2rem" }}
+                      >
+                        {message}{" "}
+                        {timestamp && (
+                          <>
+                            · <span style={{ fontStyle: "italic" }}>{timestamp}</span>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>

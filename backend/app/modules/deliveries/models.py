@@ -50,6 +50,11 @@ PROTOCOL_TYPES = (
     "direct_to_door",
     "call_resident",
 )
+# The four PRD protocols (FR-07). They alone decide routing; the `allow_direct_entry` /
+# `leave_at_gate` flags are derived from them and only consulted for legacy types.
+CANONICAL_PROTOCOLS = frozenset(PROTOCOL_TYPES[:4])
+# Protocols whose parcel is left at the gate desk and handed over there (`/collect`).
+GATE_DESK_PROTOCOLS = frozenset({"leave_at_gate_desk", "leave_at_gate", "collect_at_gate"})
 APPROVAL_STATUS = ("pending", "approved", "rejected", "auto_approved")
 DELIVERY_STATUS = (
     "expected",
@@ -147,6 +152,20 @@ class Delivery(Base, TimestampMixin, TenantMixin):
     @property
     def unit_number(self) -> str | None:
         return self.unit.unit_number if self.unit else None
+
+    # The protocol this delivery was routed by (community- or unit-level). Exposed so the
+    # guard console can offer the right hand-over action without re-deriving routing.
+    protocol: Mapped[DeliveryProtocol | None] = relationship(
+        "DeliveryProtocol",
+        foreign_keys=[protocol_id],
+        primaryjoin="Delivery.protocol_id == DeliveryProtocol.id",
+        lazy="selectin",
+        viewonly=True,
+    )
+
+    @property
+    def protocol_type(self) -> str | None:
+        return self.protocol.protocol_type if self.protocol else None
 
     events: Mapped[list[DeliveryEvent]] = relationship(
         back_populates="delivery", cascade="all, delete-orphan"

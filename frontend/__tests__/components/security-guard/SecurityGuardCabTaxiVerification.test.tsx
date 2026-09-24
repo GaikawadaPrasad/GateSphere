@@ -112,7 +112,10 @@ describe("SecurityGuardCabTaxiPage - Verification & Gate Actions (Bug 043)", () 
   it("allows sending real-time approval request notification to resident for pending cab arrival", async () => {
     (visitorsApi.requests as any).mockResolvedValue(mockCabs);
     (visitorsApi.entries as any).mockResolvedValue(mockEntries);
-    (visitorsApi.sendApprovalRequest as any).mockResolvedValue({ id: "cab-req-2", status: "pending" });
+    (visitorsApi.sendApprovalRequest as any).mockResolvedValue({
+      id: "cab-req-2",
+      status: "pending",
+    });
 
     render(<SecurityGuardCabTaxiPage />);
 
@@ -129,7 +132,7 @@ describe("SecurityGuardCabTaxiPage - Verification & Gate Actions (Bug 043)", () 
     await waitFor(() => {
       expect(visitorsApi.sendApprovalRequest).toHaveBeenCalledWith("cab-req-2");
       expect(
-        screen.getByText(/Approval request notification dispatched to resident/i)
+        screen.getByText(/Approval request notification dispatched to resident/i),
       ).toBeInTheDocument();
     });
   });
@@ -163,7 +166,10 @@ describe("SecurityGuardCabTaxiPage - Verification & Gate Actions (Bug 043)", () 
   it("allows 1-click direct entry without photo capture for approved cabs", async () => {
     (visitorsApi.requests as any).mockResolvedValue(mockCabs);
     (visitorsApi.entries as any).mockResolvedValue(mockEntries);
-    (visitorsApi.recordEntry as any).mockResolvedValue({ id: "entry-cab-1", entry_at: "2026-09-18T10:05:00Z" });
+    (visitorsApi.recordEntry as any).mockResolvedValue({
+      id: "entry-cab-1",
+      entry_at: "2026-09-18T10:05:00Z",
+    });
 
     render(<SecurityGuardCabTaxiPage />);
 
@@ -180,7 +186,7 @@ describe("SecurityGuardCabTaxiPage - Verification & Gate Actions (Bug 043)", () 
       expect(visitorsApi.recordEntry).toHaveBeenCalledWith(
         expect.objectContaining({
           request_id: "cab-req-1",
-        })
+        }),
       );
       expect(screen.getByText(/Gate entry recorded for cab/i)).toBeInTheDocument();
     });
@@ -189,7 +195,10 @@ describe("SecurityGuardCabTaxiPage - Verification & Gate Actions (Bug 043)", () 
   it("allows marking gate exit for entered cabs", async () => {
     (visitorsApi.requests as any).mockResolvedValue(mockCabs);
     (visitorsApi.entries as any).mockResolvedValue(mockEntries);
-    (visitorsApi.recordExit as any).mockResolvedValue({ id: "entry-cab-3", exit_at: "2026-09-18T10:30:00Z" });
+    (visitorsApi.recordExit as any).mockResolvedValue({
+      id: "entry-cab-3",
+      exit_at: "2026-09-18T10:30:00Z",
+    });
 
     render(<SecurityGuardCabTaxiPage />);
 

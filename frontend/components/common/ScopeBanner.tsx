@@ -16,7 +16,7 @@ export function ScopeBanner({ entityName = "data", onClear }: ScopeBannerProps) 
 
   const activeCommunity = useMemo(
     () => communities?.find((c: Community) => c.id === activeCommunityId),
-    [communities, activeCommunityId]
+    [communities, activeCommunityId],
   );
 
   if (!activeCommunityId || !activeCommunity) return null;

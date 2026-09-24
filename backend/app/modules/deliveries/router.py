@@ -164,9 +164,7 @@ async def collect_delivery(
     svc: Svc = Depends(delivery_service),
 ) -> dict:
     return ok(
-        schemas.DeliveryRead.model_validate(
-            await svc.mark_collected(delivery_id, payload.remarks)
-        ),
+        schemas.DeliveryRead.model_validate(await svc.mark_collected(delivery_id, payload.remarks)),
         message="Package collected from gate desk",
     )
 
@@ -199,4 +197,3 @@ async def notify_resident(
         ),
         message="Approval request sent to resident",
     )
-

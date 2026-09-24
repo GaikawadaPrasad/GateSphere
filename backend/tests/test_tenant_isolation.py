@@ -132,3 +132,104 @@ def test_write_outside_scope_is_blocked(restricted_conn, two_communities):
                 (b,),
             )
         cur.execute("SELECT set_config('app.community_ids', '', false)")
+
+
+# --- migration 0045: fail-closed policies, child-table coverage, app-role hardening ------ #
+
+# child table -> (fk column, parent table). Mirrors migration 0045.
+_CHILD_TABLES = {
+    "announcement_targets": ("announcement_id", "announcements"),
+    "delivery_events": ("delivery_id", "deliveries"),
+    "incident_actions": ("incident_id", "security_incidents"),
+    "invoice_items": ("invoice_id", "maintenance_invoices"),
+    "notification_deliveries": ("notification_id", "notifications"),
+    "payment_allocations": ("payment_id", "payments"),
+    "poll_options": ("poll_id", "polls"),
+    "ticket_status_history": ("ticket_id", "service_tickets"),
+    "ticket_messages": ("ticket_id", "service_tickets"),
+    "visitor_approvals": ("request_id", "visitor_requests"),
+    "visitor_passes": ("request_id", "visitor_requests"),
+}
+
+
+def _count(conn, sql: str, guc: str | None, params: tuple = ()) -> int:
+    with conn.cursor() as cur:
+        if guc is not None:
+            cur.execute("SELECT set_config('app.community_ids', %s, false)", (guc,))
+        try:
+            cur.execute(sql, params)
+            return cur.fetchone()[0]
+        finally:
+            cur.execute("SELECT set_config('app.community_ids', '', false)")
+
+
+def test_unset_or_empty_scope_sees_nothing(restricted_conn):
+    """Fail-closed: no bound scope => zero rows (re-audit #3, S-01)."""
+    with psycopg.connect(_restricted_dsn(), autocommit=True) as fresh:  # GUC never set
+        unset = {t: _count(fresh, f"SELECT count(*) FROM {t}", None) for t in _TENANT_TABLES}
+    empty = {t: _count(restricted_conn, f"SELECT count(*) FROM {t}", "") for t in _TENANT_TABLES}
+    assert not {t: n for t, n in unset.items() if n}, f"unset GUC leaked rows: {unset}"
+    assert not {t: n for t, n in empty.items() if n}, f"empty GUC leaked rows: {empty}"
+
+
+def test_global_sentinel_sees_every_community(restricted_conn, two_communities):
+    a, b = two_communities
+    seen = _visible_communities(restricted_conn, "units", "*")
+    assert {a, b} <= seen
+
+
+def test_child_tables_inherit_parent_isolation(restricted_conn, two_communities):
+    a, _b = two_communities
+    leaks: dict[str, tuple[int, int]] = {}
+    with psycopg.connect(_admin_dsn(), autocommit=True) as admin:
+        for table, (fk, parent) in _CHILD_TABLES.items():
+            expected = admin.execute(
+                f"SELECT count(*) FROM {table} c JOIN {parent} p ON p.id = c.{fk} "
+                "WHERE p.community_id = %s",
+                (a,),
+            ).fetchone()[0]
+            visible = _count(restricted_conn, f"SELECT count(*) FROM {table}", a)
+            if visible != expected:
+                leaks[table] = (visible, expected)
+            assert _count(restricted_conn, f"SELECT count(*) FROM {table}", "") == 0, table
+    assert not leaks, f"child-table RLS mismatch (visible, expected): {leaks}"
+
+
+def test_scoped_reader_cannot_see_platform_audit_rows(restricted_conn, two_communities):
+    a, _b = two_communities
+    n = _count(restricted_conn, "SELECT count(*) FROM audit_logs WHERE community_id IS NULL", a)
+    assert n == 0
+
+
+def test_app_role_audit_logs_is_append_only():
+    """`gatesphere_app` may INSERT/SELECT audit_logs but never UPDATE/DELETE/TRUNCATE."""
+    with psycopg.connect(_admin_dsn(), autocommit=True) as admin:
+        exists = admin.execute("SELECT 1 FROM pg_roles WHERE rolname = 'gatesphere_app'").fetchone()
+        if not exists:
+            pytest.fail("gatesphere_app role missing — migration 0040 not applied")
+        for stmt in (
+            "UPDATE audit_logs SET action = action WHERE false",
+            "DELETE FROM audit_logs WHERE false",
+            "TRUNCATE audit_logs",
+        ):
+            with admin.cursor() as cur:
+                cur.execute("BEGIN")
+                try:
+                    cur.execute("SET LOCAL ROLE gatesphere_app")
+                    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                        cur.execute(stmt)
+                finally:
+                    cur.execute("ROLLBACK")
+
+
+def test_app_role_has_no_legacy_password():
+    """R-4: 0045 clears the hard-coded password on DBs migrated before 0040 was edited."""
+    import os
+
+    if os.getenv("GATESPHERE_APP_DB_PASSWORD") or os.getenv("APP_DB_PASSWORD"):
+        pytest.skip("password intentionally supplied from a secret in this environment")
+    with psycopg.connect(_admin_dsn(), autocommit=True) as admin:
+        row = admin.execute(
+            "SELECT rolpassword IS NULL FROM pg_authid WHERE rolname = 'gatesphere_app'"
+        ).fetchone()
+    assert row is not None and row[0] is True

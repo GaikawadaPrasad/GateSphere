@@ -184,7 +184,10 @@ export default function SecuritySupervisorGuardManagementPage() {
         phone: guardPhone.trim() || undefined,
         community_id: communityId,
       });
-      toast.success(`Security guard "${guardFullName.trim()}" registered successfully.`, "Guard Created");
+      toast.success(
+        `Security guard "${guardFullName.trim()}" registered successfully.`,
+        "Guard Created",
+      );
       setIsRegisterGuardOpen(false);
       setGuardFieldErrors({});
       await loadData();
@@ -209,13 +212,25 @@ export default function SecuritySupervisorGuardManagementPage() {
 
       if (meData.status === "fulfilled" && meData.value) {
         const me: any = meData.value;
-        const cid = me?.community_ids?.[0] || me?.community_id || me?.roles?.find((r: any) => r.community_id)?.community_id;
+        const cid =
+          me?.community_ids?.[0] ||
+          me?.community_id ||
+          me?.roles?.find((r: any) => r.community_id)?.community_id;
         if (cid) setCommunityId(cid);
       }
 
-      const rawRoster = rosterData.status === "fulfilled" && Array.isArray(rosterData.value) ? rosterData.value : [];
-      const rawAssigns = assignData.status === "fulfilled" && Array.isArray(assignData.value) ? assignData.value : [];
-      const rawGuards = guardsData.status === "fulfilled" && Array.isArray(guardsData.value) ? guardsData.value : [];
+      const rawRoster =
+        rosterData.status === "fulfilled" && Array.isArray(rosterData.value)
+          ? rosterData.value
+          : [];
+      const rawAssigns =
+        assignData.status === "fulfilled" && Array.isArray(assignData.value)
+          ? assignData.value
+          : [];
+      const rawGuards =
+        guardsData.status === "fulfilled" && Array.isArray(guardsData.value)
+          ? guardsData.value
+          : [];
 
       const guards: { id: string; name: string }[] = [];
       const seenIds = new Set<string>();
@@ -256,7 +271,9 @@ export default function SecuritySupervisorGuardManagementPage() {
       setRoster(
         rawRoster.map((r: any) => ({
           id: r.id,
-          guard_name: guardNameMap.get(r.guard_user_id) || `Guard (${r.guard_user_id ? r.guard_user_id.slice(0, 8) : "Personnel"})`,
+          guard_name:
+            guardNameMap.get(r.guard_user_id) ||
+            `Guard (${r.guard_user_id ? r.guard_user_id.slice(0, 8) : "Personnel"})`,
           guard_user_id: r.guard_user_id,
           shift: `${r.shift_start || "08:00"} - ${r.shift_end || "16:00"}`,
           assigned_gate: r.gate_id ? `Gate #${r.gate_id.slice(0, 8)}` : "Perimeter Security Post",
@@ -385,11 +402,7 @@ export default function SecuritySupervisorGuardManagementPage() {
         ]}
         actions={
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-            <button
-              className="btn btn-secondary"
-              onClick={loadData}
-              disabled={isLoading}
-            >
+            <button className="btn btn-secondary" onClick={loadData} disabled={isLoading}>
               🔄 {isLoading ? "Refreshing…" : "Refresh"}
             </button>
             <button className="btn btn-secondary" onClick={handleOpenRegisterGuard}>
@@ -438,11 +451,7 @@ export default function SecuritySupervisorGuardManagementPage() {
             >
               Cancel
             </button>
-            <button
-              className="btn btn-primary"
-              onClick={handleCreateRoster}
-              disabled={isCreating}
-            >
+            <button className="btn btn-primary" onClick={handleCreateRoster} disabled={isCreating}>
               {isCreating ? "Scheduling…" : "Confirm Shift Assignment"}
             </button>
           </>
@@ -613,7 +622,8 @@ export default function SecuritySupervisorGuardManagementPage() {
             <span>⏱️</span>
             <span>
               <strong>Standardized 8-Hour Guard Shift:</strong> {shiftStart} to {shiftEnd} (
-              {STANDARD_SHIFTS.find((s) => s.id === selectedShiftPreset)?.label || "Standard Shift"})
+              {STANDARD_SHIFTS.find((s) => s.id === selectedShiftPreset)?.label || "Standard Shift"}
+              )
             </span>
           </div>
 
@@ -653,11 +663,7 @@ export default function SecuritySupervisorGuardManagementPage() {
             >
               Cancel
             </button>
-            <button
-              className="btn btn-primary"
-              onClick={handleSaveStatus}
-              disabled={isUpdating}
-            >
+            <button className="btn btn-primary" onClick={handleSaveStatus} disabled={isUpdating}>
               {isUpdating ? "Updating…" : "Update Status"}
             </button>
           </>
@@ -791,7 +797,14 @@ export default function SecuritySupervisorGuardManagementPage() {
                   }}
                 />
                 {guardFieldErrors.fullName && (
-                  <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                  <span
+                    style={{
+                      color: "var(--danger, #ef4444)",
+                      fontSize: "0.75rem",
+                      display: "block",
+                      marginTop: "0.25rem",
+                    }}
+                  >
                     {guardFieldErrors.fullName}
                   </span>
                 )}
@@ -821,7 +834,14 @@ export default function SecuritySupervisorGuardManagementPage() {
                   }}
                 />
                 {guardFieldErrors.phone && (
-                  <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                  <span
+                    style={{
+                      color: "var(--danger, #ef4444)",
+                      fontSize: "0.75rem",
+                      display: "block",
+                      marginTop: "0.25rem",
+                    }}
+                  >
                     {guardFieldErrors.phone}
                   </span>
                 )}
@@ -857,7 +877,14 @@ export default function SecuritySupervisorGuardManagementPage() {
                   }}
                 />
                 {guardFieldErrors.email && (
-                  <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                  <span
+                    style={{
+                      color: "var(--danger, #ef4444)",
+                      fontSize: "0.75rem",
+                      display: "block",
+                      marginTop: "0.25rem",
+                    }}
+                  >
                     {guardFieldErrors.email}
                   </span>
                 )}
@@ -877,7 +904,14 @@ export default function SecuritySupervisorGuardManagementPage() {
                   minLength={10}
                 />
                 {guardFieldErrors.password && (
-                  <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                  <span
+                    style={{
+                      color: "var(--danger, #ef4444)",
+                      fontSize: "0.75rem",
+                      display: "block",
+                      marginTop: "0.25rem",
+                    }}
+                  >
                     {guardFieldErrors.password}
                   </span>
                 )}
@@ -885,7 +919,9 @@ export default function SecuritySupervisorGuardManagementPage() {
             </div>
 
             <p style={{ margin: 0, fontSize: "11.5px", color: "var(--muted)" }}>
-              💡 Providing an email and password allows this security guard to sign in to the <strong>Security Guard Live Gate Dashboard</strong> to verify visitors, scan entry QR codes, and record cab/delivery logs.
+              💡 Providing an email and password allows this security guard to sign in to the{" "}
+              <strong>Security Guard Live Gate Dashboard</strong> to verify visitors, scan entry QR
+              codes, and record cab/delivery logs.
             </p>
           </div>
         </form>

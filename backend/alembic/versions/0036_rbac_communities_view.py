@@ -27,16 +27,14 @@ def upgrade() -> None:
 
     # Ensure communities:view is inserted into role_permissions for these roles
     conn.execute(
-        sa.text(
-            """
+        sa.text("""
             INSERT INTO role_permissions (id, role_id, permission_id)
             SELECT gen_random_uuid(), r.id, p.id
             FROM roles r
             CROSS JOIN permissions p
             WHERE r.slug = :role_slug AND p.code = :perm_code
             ON CONFLICT (role_id, permission_id) DO NOTHING;
-            """
-        ),
+            """),
         NEW_ROLE_PERMS,
     )
 

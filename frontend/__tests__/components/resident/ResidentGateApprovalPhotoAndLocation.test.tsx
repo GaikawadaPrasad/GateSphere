@@ -32,11 +32,13 @@ describe("Resident Gate Approval, Emergency Categories & Security Guard SOS Dism
           <span data-testid="visitor-name">{mockPendingVisitor.visitor_name}</span>
           <span data-testid="visitor-purpose">Purpose: {mockPendingVisitor.purpose}</span>
           <span data-testid="visitor-phone">Phone: {mockPendingVisitor.phone}</span>
-        </div>
+        </div>,
       );
 
       expect(screen.getByTestId("visitor-name")).toHaveTextContent("John Doe");
-      expect(screen.getByTestId("visitor-purpose")).toHaveTextContent("Purpose: Maintenance Inspection");
+      expect(screen.getByTestId("visitor-purpose")).toHaveTextContent(
+        "Purpose: Maintenance Inspection",
+      );
       expect(screen.getByTestId("visitor-phone")).toHaveTextContent("Phone: +919876543210");
 
       const img = screen.getByTestId("visitor-photo-img");
@@ -133,7 +135,8 @@ describe("Resident Gate Approval, Emergency Categories & Security Guard SOS Dism
         const match = raw.match(/Location:\s*([^—\n]+)/i);
         if (match && match[1]?.trim()) return match[1].trim();
         const rawTitle = alert?.title || "";
-        const titleMatch = rawTitle.match(/Location:\s*([^—\n]+)/i) || rawTitle.match(/SOS EMERGENCY:\s*(.+)/i);
+        const titleMatch =
+          rawTitle.match(/Location:\s*([^—\n]+)/i) || rawTitle.match(/SOS EMERGENCY:\s*(.+)/i);
         if (titleMatch && titleMatch[1]?.trim()) return titleMatch[1].trim();
         return alert?.location_coordinates || "Main Gate / Facility";
       };

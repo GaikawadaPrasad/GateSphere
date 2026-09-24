@@ -15,7 +15,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.context import RequestContext
-from app.core.errors import BusinessRuleError, ConflictError, ForbiddenError, NotFoundError
+from app.core.errors import (
+    AppError,
+    BusinessRuleError,
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+)
 from app.core.state_machine import ensure_transition
 from app.core.tenancy import TenantScope
 from app.modules.audit.service import record_audit_async
@@ -179,6 +185,7 @@ class GateService:
         limit: int = 20,
     ):
         import base64
+
         _enum("event_type", event_type)
         stmt = select(GateEvent)
         if community_id is not None:
@@ -195,11 +202,14 @@ class GateService:
                 ts, last_id = decoded.split("|")
                 dt = datetime.fromtimestamp(float(ts), UTC)
                 # Keyset pagination condition: (occurred_at, id) < (dt, last_id)
-                from sqlalchemy import tuple_
+                from sqlalchemy import literal, tuple_
 
-                stmt = stmt.where(tuple_(GateEvent.occurred_at, GateEvent.id) < tuple_(dt, last_id))
-            except Exception:
-                pass
+                stmt = stmt.where(
+                    tuple_(GateEvent.occurred_at, GateEvent.id)
+                    < tuple_(literal(dt), literal(uuid.UUID(last_id)))
+                )
+            except (ValueError, TypeError, UnicodeDecodeError) as exc:
+                raise AppError("Invalid cursor", code="INVALID_CURSOR") from exc
 
             stmt = stmt.order_by(GateEvent.occurred_at.desc(), GateEvent.id.desc())
             rows = list((await self.db.scalars(self.events._scoped(stmt).limit(limit + 1))).all())

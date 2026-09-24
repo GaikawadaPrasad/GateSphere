@@ -89,9 +89,7 @@ async def test_pass_issue_and_use(db, scope_for, community, unit, superadmin, co
     await db.refresh(req)
     assert req.status == "approved"  # a pass pre-approves
     photo_url = confirmed_upload("visitor_photo")
-    entry = await svc.record_entry(
-        schemas.EntryCreate(pass_token=token, entry_photo_url=photo_url)
-    )
+    entry = await svc.record_entry(schemas.EntryCreate(pass_token=token, entry_photo_url=photo_url))
     assert entry.status == "inside"
     await db.refresh(vpass)
     assert vpass.entry_count == 1

@@ -56,9 +56,7 @@ export default function SuperAdminUsersPage() {
     const filtered = rawList.filter((u) => {
       // Community filter (if user has any role matching community)
       if (selectedCommunityId) {
-        const matchesComm = u.roles?.some(
-          (r) => r.community_id === selectedCommunityId
-        );
+        const matchesComm = u.roles?.some((r) => r.community_id === selectedCommunityId);
         if (!matchesComm) return false;
       }
 
@@ -98,9 +96,7 @@ export default function SuperAdminUsersPage() {
       if (sortBy === "name") {
         const nameA = (a.full_name || "").toLowerCase();
         const nameB = (b.full_name || "").toLowerCase();
-        return sortDirection === "asc"
-          ? nameA.localeCompare(nameB)
-          : nameB.localeCompare(nameA);
+        return sortDirection === "asc" ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
       }
       if (sortBy === "email") {
         const emailA = (a.email || "").toLowerCase();
@@ -111,7 +107,15 @@ export default function SuperAdminUsersPage() {
       }
       return 0;
     });
-  }, [usersData, selectedCommunityId, selectedRole, statusFilter, searchQuery, sortBy, sortDirection]);
+  }, [
+    usersData,
+    selectedCommunityId,
+    selectedRole,
+    statusFilter,
+    searchQuery,
+    sortBy,
+    sortDirection,
+  ]);
 
   const handleDeleteUser = async () => {
     if (!deletingUser) return;
@@ -133,10 +137,13 @@ export default function SuperAdminUsersPage() {
       key: "user_details",
       header: "User Details",
       render: (u) => {
-        const isRecent = u.created_at && Date.now() - new Date(u.created_at).getTime() < 86400000 * 2;
+        const isRecent =
+          u.created_at && Date.now() - new Date(u.created_at).getTime() < 86400000 * 2;
         return (
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexWrap: "wrap" }}>
+            <div
+              style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexWrap: "wrap" }}
+            >
               <span style={{ fontWeight: 600, color: "var(--fg)" }}>{u.full_name}</span>
               {isRecent && (
                 <span
@@ -157,8 +164,15 @@ export default function SuperAdminUsersPage() {
               {u.email} {u.phone ? `• ${u.phone}` : ""}
             </div>
             {u.created_at && (
-              <div style={{ fontSize: "0.7rem", color: "var(--muted-foreground, #94a3b8)", marginTop: "0.15rem" }}>
-                Added: {new Date(u.created_at).toLocaleDateString(undefined, {
+              <div
+                style={{
+                  fontSize: "0.7rem",
+                  color: "var(--muted-foreground, #94a3b8)",
+                  marginTop: "0.15rem",
+                }}
+              >
+                Added:{" "}
+                {new Date(u.created_at).toLocaleDateString(undefined, {
                   year: "numeric",
                   month: "short",
                   day: "numeric",
@@ -197,7 +211,7 @@ export default function SuperAdminUsersPage() {
       header: "Assigned Community",
       render: (u) => {
         const commIds = Array.from(
-          new Set(u.roles?.map((r) => r.community_id).filter(Boolean) as string[])
+          new Set(u.roles?.map((r) => r.community_id).filter(Boolean) as string[]),
         );
 
         if (commIds.length === 0) {
@@ -226,7 +240,9 @@ export default function SuperAdminUsersPage() {
                     {comm ? comm.name : `#${cid.slice(0, 8)}`}
                   </span>
                   {comm?.code && (
-                    <span style={{ fontSize: "0.725rem", color: "var(--muted)", marginLeft: "0.35rem" }}>
+                    <span
+                      style={{ fontSize: "0.725rem", color: "var(--muted)", marginLeft: "0.35rem" }}
+                    >
                       ({comm.code})
                     </span>
                   )}
@@ -421,7 +437,13 @@ export default function SuperAdminUsersPage() {
                 setSelectedCommunityId(val);
                 setActiveCommunity(val || null);
               }}
-              style={{ width: "auto", height: 38, fontSize: "0.85rem", padding: "0 0.75rem", borderRadius: "var(--radius-sm, 8px)" }}
+              style={{
+                width: "auto",
+                height: 38,
+                fontSize: "0.85rem",
+                padding: "0 0.75rem",
+                borderRadius: "var(--radius-sm, 8px)",
+              }}
             >
               <option value="">All Communities</option>
               {(communities || []).map((c: Community) => (
@@ -436,7 +458,13 @@ export default function SuperAdminUsersPage() {
               className="select-field"
               value={selectedRole}
               onChange={(e) => setSelectedRole(e.target.value)}
-              style={{ width: "auto", height: 38, fontSize: "0.85rem", padding: "0 0.75rem", borderRadius: "var(--radius-sm, 8px)" }}
+              style={{
+                width: "auto",
+                height: 38,
+                fontSize: "0.85rem",
+                padding: "0 0.75rem",
+                borderRadius: "var(--radius-sm, 8px)",
+              }}
             >
               <option value="">All System Roles</option>
               <option value="community_admin">Community Admin</option>
@@ -455,7 +483,13 @@ export default function SuperAdminUsersPage() {
               className="select-field"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              style={{ width: "auto", height: 38, fontSize: "0.85rem", padding: "0 0.75rem", borderRadius: "var(--radius-sm, 8px)" }}
+              style={{
+                width: "auto",
+                height: 38,
+                fontSize: "0.85rem",
+                padding: "0 0.75rem",
+                borderRadius: "var(--radius-sm, 8px)",
+              }}
             >
               <option value="all">All Statuses</option>
               <option value="active">Active Only</option>
@@ -496,7 +530,9 @@ export default function SuperAdminUsersPage() {
                 whiteSpace: "nowrap",
               }}
             >
-              <span style={{ fontSize: "0.95rem", color: "var(--primary, #2563eb)", fontWeight: 700 }}>
+              <span
+                style={{ fontSize: "0.95rem", color: "var(--primary, #2563eb)", fontWeight: 700 }}
+              >
                 {sortDirection === "desc" ? "↓" : "↑"}
               </span>
               <span>
@@ -505,8 +541,8 @@ export default function SuperAdminUsersPage() {
                     ? "Newest First"
                     : "Oldest First"
                   : sortDirection === "asc"
-                  ? "Name (A-Z)"
-                  : "Name (Z-A)"}
+                    ? "Name (A-Z)"
+                    : "Name (Z-A)"}
               </span>
             </button>
 
@@ -602,8 +638,8 @@ export default function SuperAdminUsersPage() {
           }
         >
           <p style={{ fontSize: "0.9rem" }}>
-            Are you sure you want to delete user <strong>{deletingUser.full_name}</strong> ({deletingUser.email})?
-            This will revoke all role grants and session tokens.
+            Are you sure you want to delete user <strong>{deletingUser.full_name}</strong> (
+            {deletingUser.email})? This will revoke all role grants and session tokens.
           </p>
         </Modal>
       )}

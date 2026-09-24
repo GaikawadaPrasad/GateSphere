@@ -91,7 +91,9 @@ async def test_over_allocation_rejected(db, scope_for, community, unit, superadm
 
 async def test_allocation_sum_must_match(db, scope_for, community, unit, superadmin):
     svc = _svc(db, scope_for(community.id), superadmin)
-    await svc.update_rule(schemas.RuleUpdate(allow_advance_payment=False), community_id=community.id)
+    await svc.update_rule(
+        schemas.RuleUpdate(allow_advance_payment=False), community_id=community.id
+    )
     inv = await _invoice(svc, unit)
     await svc.post_invoice(inv.id)
     with pytest.raises(BusinessRuleError) as exc:

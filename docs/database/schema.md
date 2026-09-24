@@ -18,6 +18,19 @@ must update this page in the same PR.
   trigger/RLS in staging.
 - Money `NUMERIC(12,2)`. Timestamps `TIMESTAMPTZ`. Enums `VARCHAR` + `CHECK`.
 - FKs enforced at DB level with explicit `ON DELETE`. RLS on tenant tables in staging/prod.
+- **RLS is fail-closed (migration 0045).** Every `tenant_isolation` policy requires the
+  transaction GUC `app.community_ids`: unset / empty ⇒ **no rows**; a comma list ⇒ those
+  communities; the sentinel `*` ⇒ all (global scope — Super Admin, system jobs via
+  `app.core.jobs.job_session`). `audit_logs` hides NULL-community (platform) rows from a
+  tenant-scoped reader. Child tables without `community_id` (ticket / incident / delivery /
+  invoice / poll / visitor-approval children, `announcement_targets`,
+  `resident_group_members`) inherit isolation via `EXISTS (SELECT 1 FROM <parent> …)`.
+  Not tenant-RLS'd by design: `users`, `user_sessions`, `roles`, `permissions`,
+  `role_permissions`, `communities` (read before any scope exists). The restricted role
+  `gatesphere_app` has no password unless `GATESPHERE_APP_DB_PASSWORD` is supplied at
+  migration time, and holds only INSERT/SELECT on `audit_logs`. The app **still connects as
+  the owner role** — switching `DATABASE_URL` to `gatesphere_app` is an open item (see
+  `docs/development/session-notes.md`, 2026-09-24).
 
 ## Enforcement split (ERD banner, every diagram)
 
@@ -179,7 +192,7 @@ must update this page in the same PR.
 |-------|-------------|-------|
 | `notification_templates` | `community_id`, `code`, `channel`, `title_template`, `body_template`, `is_active` | |
 | `notifications` | `community_id`, `recipient_user_id`, `template_id`, `notification_type`, `title`, `message`, `reference_type`, `reference_id`, `is_read`, `read_at`, `created_at` | Derived from an originating event. |
-| `notification_deliveries` | `notification_id`, `channel`, `provider`, `status`, `provider_message_id`, `sent_at`, `delivered_at`, `failed_at`, `failure_reason`, `attempt_count` | **Append-only.** Records mock SMS/WhatsApp + real push/email dispatch. |
+| `notification_deliveries` | `notification_id`, `channel`, `provider`, `status`, `provider_message_id`, `sent_at`, `delivered_at`, `failed_at`, `failure_reason`, `attempt_count` | **Append-only.** `CHECK status IN (queued, sent, delivered, simulated, failed, skipped)` (0046). Mocked channels are recorded as `simulated` (provider `simulated`), never `delivered`. |
 | `user_notification_preferences` | `user_id`, `community_id`, `channel`, `event_type`, `is_enabled`, `quiet_hours_start`, `quiet_hours_end` | UQ `(user_id, community_id, channel)` where channel-specific. |
 | `audit_logs` | `community_id`, `user_id`, `session_id`, `action`, `module`, `entity_type`, `entity_id`, `old_values` JSONB, `new_values` JSONB, `ip_address` INET, `user_agent`, `created_at` | **Immutable, insert-only.** `REVOKE UPDATE/DELETE`; RLS/trigger protection in staging. Keeps `created_at` only. |
 

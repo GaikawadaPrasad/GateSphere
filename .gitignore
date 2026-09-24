@@ -256,3 +256,8 @@ docs/postman/newman-report.*
 # Temporary debug/test files
 cookies.txt
 *.cookie
+
+# Playwright E2E — per-role storageState files hold live session cookies (never commit)
+frontend/e2e/.auth/
+frontend/test-results/
+frontend/playwright-report/

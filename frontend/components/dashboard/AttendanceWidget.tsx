@@ -14,9 +14,20 @@ interface AttendanceWidgetProps {
 export function AttendanceWidget({ attendance, totalStaff = 0, isLoading }: AttendanceWidgetProps) {
   if (isLoading) {
     return (
-      <div className="card" style={{ height: "100%", minHeight: 280, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+      <div
+        className="card"
+        style={{
+          height: "100%",
+          minHeight: 280,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+        }}
+      >
         <div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1.25rem" }}>
+          <div
+            style={{ display: "flex", justifyContent: "space-between", marginBottom: "1.25rem" }}
+          >
             <Skeleton width={190} height={20} borderRadius={4} />
             <Skeleton width={90} height={20} borderRadius={4} />
           </div>
@@ -127,7 +138,15 @@ export function AttendanceWidget({ attendance, totalStaff = 0, isLoading }: Atte
                   gap: "0.5rem",
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", minWidth: 0, flex: 1 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.6rem",
+                    minWidth: 0,
+                    flex: 1,
+                  }}
+                >
                   <div
                     style={{
                       width: 28,

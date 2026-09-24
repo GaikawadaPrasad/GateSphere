@@ -79,11 +79,7 @@ class UploadService:
                 code="FILE_TOO_LARGE",
                 fields={"size_bytes": f"<= {kind.max_bytes}"},
             )
-        cid = (
-            await self._community(payload.community_id)
-            if kind.scope == "community"
-            else None
-        )
+        cid = await self._community(payload.community_id) if kind.scope == "community" else None
         ns = str(cid) if cid is not None else str(self.actor.id)
         ext = extension_for(payload.content_type)
         key = f"{kind.prefix}/{ns}/{uuid.uuid4().hex}-{_safe_stem(payload.filename)}{ext}"

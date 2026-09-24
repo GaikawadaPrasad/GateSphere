@@ -77,6 +77,7 @@ Every response has the shape `{ success, message, data, meta }`. Implemented in
 | 422 | schema-valid but business-rule-invalid (e.g. closing a ticket without resident confirmation) |
 | 429 | rate limit exceeded on a sensitive endpoint (login, OTP, payment-sim) |
 | 500 | unhandled server error — logged with request id, generic message returned |
+| 503 | a backing service is unreachable — `DATABASE_UNAVAILABLE` (connection lost / refused), `STORAGE_UNAVAILABLE` (object storage), `EMAIL_UNAVAILABLE`; carries `Retry-After`, never leaks the endpoint |
 
 ## Security controls applied at the API layer (uniform)
 

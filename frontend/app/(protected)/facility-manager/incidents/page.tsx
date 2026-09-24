@@ -10,10 +10,28 @@ import { formatDate } from "@/lib/utils";
 import type { Incident, IncidentType, IncidentSeverity, IncidentStatus } from "@/types/incidents";
 
 // Real backend enums from backend/app/modules/incidents/models.py
-const INCIDENT_TYPES: IncidentType[] = ["medical", "fire", "theft", "suspicious", "breach", "lift_entrapment", "assault", "natural", "other"] as IncidentType[];
+const INCIDENT_TYPES: IncidentType[] = [
+  "medical",
+  "fire",
+  "theft",
+  "suspicious",
+  "breach",
+  "lift_entrapment",
+  "assault",
+  "natural",
+  "other",
+] as IncidentType[];
 const SEVERITIES: IncidentSeverity[] = ["low", "medium", "high", "critical"];
 const TERMINAL_STATUSES: IncidentStatus[] = ["closed", "false_alarm"];
-const ACTION_TYPES = ["note", "dispatch", "escalation", "authority_contacted", "evacuation", "medical_aid", "update"] as const;
+const ACTION_TYPES = [
+  "note",
+  "dispatch",
+  "escalation",
+  "authority_contacted",
+  "evacuation",
+  "medical_aid",
+  "update",
+] as const;
 
 // Valid transitions matching backend IncidentStatus state machine
 const VALID_INCIDENT_TRANSITIONS: Record<string, IncidentStatus[]> = {
@@ -119,7 +137,10 @@ export default function FacilityManagerIncidentsPage() {
     if (!actionIncidentId) return;
     setIsSubmittingAction(true);
     try {
-      await incidentsApi.addAction(actionIncidentId, { action_type: actionType, details: actionDetails || undefined });
+      await incidentsApi.addAction(actionIncidentId, {
+        action_type: actionType,
+        details: actionDetails || undefined,
+      });
       setIsActionModalOpen(false);
       setSuccessMsg(`Action "${actionType.replace(/_/g, " ")}" logged successfully.`);
       setTimeout(() => setSuccessMsg(null), 4000);
@@ -176,7 +197,17 @@ export default function FacilityManagerIncidentsPage() {
       />
 
       {successMsg && (
-        <div style={{ marginBottom: "1rem", padding: "0.75rem 1rem", background: "#dcfce7", border: "1px solid #86efac", borderRadius: 6, color: "#166534", fontSize: "0.875rem" }}>
+        <div
+          style={{
+            marginBottom: "1rem",
+            padding: "0.75rem 1rem",
+            background: "#dcfce7",
+            border: "1px solid #86efac",
+            borderRadius: 6,
+            color: "#166534",
+            fontSize: "0.875rem",
+          }}
+        >
           ✅ {successMsg}
         </div>
       )}
@@ -185,7 +216,9 @@ export default function FacilityManagerIncidentsPage() {
         <div className="card-header" style={{ flexWrap: "wrap", gap: "0.75rem" }}>
           <div>
             <h3 className="card-title">Operational Incident Logs</h3>
-            <p style={{ fontSize: "0.775rem", color: "var(--muted)" }}>{filtered.length} incidents</p>
+            <p style={{ fontSize: "0.775rem", color: "var(--muted)" }}>
+              {filtered.length} incidents
+            </p>
           </div>
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
             <div style={{ width: "100%", maxWidth: 220 }}>
@@ -248,98 +281,155 @@ export default function FacilityManagerIncidentsPage() {
                 <tr>
                   <td
                     colSpan={7}
-                    style={{ textAlign: "center", padding: "2rem", color: "var(--danger, #dc2626)" }}
+                    style={{
+                      textAlign: "center",
+                      padding: "2rem",
+                      color: "var(--danger, #dc2626)",
+                    }}
                   >
                     {loadError}
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
+                  <td
+                    colSpan={7}
+                    style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
+                  >
                     No incidents found.
                   </td>
                 </tr>
               ) : (
                 filtered.map((inc) => (
                   <React.Fragment key={inc.id}>
-                  <tr>
-                    <td style={{ fontWeight: 600 }}>{inc.incident_number}</td>
-                    <td style={{ textTransform: "capitalize" }}>
-                      {inc.incident_type.replace(/_/g, " ")}
-                    </td>
-                    <td>
-                      <StatusBadge status={inc.severity} />
-                    </td>
-                    <td>{inc.location_text || "—"}</td>
-                    <td>{formatDate(inc.reported_at)}</td>
-                    <td>
-                      <StatusBadge status={inc.status} />
-                    </td>
-                    <td>
-                      <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>
-                        {TERMINAL_STATUSES.includes(inc.status as IncidentStatus) ? (
-                          <StatusBadge status={inc.status} />
-                        ) : (
-                          <select
-                            className="select-field"
-                            value={inc.status}
-                            onChange={(e) => handleStatusChange(inc.id, e.target.value as IncidentStatus)}
-                            style={{ height: 28, fontSize: "0.75rem" }}
-                          >
-                            <option value={inc.status}>{inc.status.replace(/_/g, " ")}</option>
-                            {(VALID_INCIDENT_TRANSITIONS[inc.status] || []).map((s) => (
-                              <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
-                            ))}
-                          </select>
-                        )}
-        <button
-                          className="btn btn-secondary"
-                          style={{ fontSize: "0.72rem", padding: "0.15rem 0.4rem", height: 28 }}
-                          onClick={() => openActionModal(inc.id)}
+                    <tr>
+                      <td style={{ fontWeight: 600 }}>{inc.incident_number}</td>
+                      <td style={{ textTransform: "capitalize" }}>
+                        {inc.incident_type.replace(/_/g, " ")}
+                      </td>
+                      <td>
+                        <StatusBadge status={inc.severity} />
+                      </td>
+                      <td>{inc.location_text || "—"}</td>
+                      <td>{formatDate(inc.reported_at)}</td>
+                      <td>
+                        <StatusBadge status={inc.status} />
+                      </td>
+                      <td>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "0.4rem",
+                            alignItems: "center",
+                            flexWrap: "wrap",
+                          }}
                         >
-                          + Action
-                        </button>
-                        <button
-                          className="btn btn-secondary"
-                          style={{ fontSize: "0.72rem", padding: "0.15rem 0.4rem", height: 28 }}
-                          onClick={() => toggleActionsPanel(inc.id)}
-                        >
-                          {expandedIncidentId === inc.id ? "▲ Hide" : "▼ Log"}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                  {expandedIncidentId === inc.id && (
-                    <tr key={`${inc.id}-actions`}>
-                      <td colSpan={7} style={{ background: "#f8fafc", padding: "0.75rem 1.25rem" }}>
-                        <strong style={{ fontSize: "0.8rem" }}>Logged Actions</strong>
-                        {!incidentActions[inc.id] ? (
-                          <p style={{ fontSize: "0.8rem", color: "var(--muted)", margin: "0.4rem 0 0" }}>Loading…</p>
-                        ) : incidentActions[inc.id].length === 0 ? (
-                          <p style={{ fontSize: "0.8rem", color: "var(--muted)", margin: "0.4rem 0 0" }}>No actions logged yet.</p>
-                        ) : (
-                          <table style={{ width: "100%", marginTop: "0.5rem", fontSize: "0.8rem", borderCollapse: "collapse" }}>
-                            <thead>
-                              <tr style={{ color: "var(--muted)", textAlign: "left" }}>
-                                <th style={{ padding: "0.2rem 0.5rem" }}>Type</th>
-                                <th style={{ padding: "0.2rem 0.5rem" }}>Details</th>
-                                <th style={{ padding: "0.2rem 0.5rem" }}>At</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {incidentActions[inc.id].map((a: any) => (
-                                <tr key={a.id} style={{ borderTop: "1px solid var(--border-standard)" }}>
-                                  <td style={{ padding: "0.3rem 0.5rem", textTransform: "capitalize", whiteSpace: "nowrap" }}>{a.action_type.replace(/_/g, " ")}</td>
-                                  <td style={{ padding: "0.3rem 0.5rem" }}>{a.details || "—"}</td>
-                                  <td style={{ padding: "0.3rem 0.5rem", whiteSpace: "nowrap" }}>{formatDate(a.action_at)}</td>
-                                </tr>
+                          {TERMINAL_STATUSES.includes(inc.status as IncidentStatus) ? (
+                            <StatusBadge status={inc.status} />
+                          ) : (
+                            <select
+                              className="select-field"
+                              value={inc.status}
+                              onChange={(e) =>
+                                handleStatusChange(inc.id, e.target.value as IncidentStatus)
+                              }
+                              style={{ height: 28, fontSize: "0.75rem" }}
+                            >
+                              <option value={inc.status}>{inc.status.replace(/_/g, " ")}</option>
+                              {(VALID_INCIDENT_TRANSITIONS[inc.status] || []).map((s) => (
+                                <option key={s} value={s}>
+                                  {s.replace(/_/g, " ")}
+                                </option>
                               ))}
-                            </tbody>
-                          </table>
-                        )}
+                            </select>
+                          )}
+                          <button
+                            className="btn btn-secondary"
+                            style={{ fontSize: "0.72rem", padding: "0.15rem 0.4rem", height: 28 }}
+                            onClick={() => openActionModal(inc.id)}
+                          >
+                            + Action
+                          </button>
+                          <button
+                            className="btn btn-secondary"
+                            style={{ fontSize: "0.72rem", padding: "0.15rem 0.4rem", height: 28 }}
+                            onClick={() => toggleActionsPanel(inc.id)}
+                          >
+                            {expandedIncidentId === inc.id ? "▲ Hide" : "▼ Log"}
+                          </button>
+                        </div>
                       </td>
                     </tr>
-                  )}
+                    {expandedIncidentId === inc.id && (
+                      <tr key={`${inc.id}-actions`}>
+                        <td
+                          colSpan={7}
+                          style={{ background: "#f8fafc", padding: "0.75rem 1.25rem" }}
+                        >
+                          <strong style={{ fontSize: "0.8rem" }}>Logged Actions</strong>
+                          {!incidentActions[inc.id] ? (
+                            <p
+                              style={{
+                                fontSize: "0.8rem",
+                                color: "var(--muted)",
+                                margin: "0.4rem 0 0",
+                              }}
+                            >
+                              Loading…
+                            </p>
+                          ) : incidentActions[inc.id].length === 0 ? (
+                            <p
+                              style={{
+                                fontSize: "0.8rem",
+                                color: "var(--muted)",
+                                margin: "0.4rem 0 0",
+                              }}
+                            >
+                              No actions logged yet.
+                            </p>
+                          ) : (
+                            <table
+                              style={{
+                                width: "100%",
+                                marginTop: "0.5rem",
+                                fontSize: "0.8rem",
+                                borderCollapse: "collapse",
+                              }}
+                            >
+                              <thead>
+                                <tr style={{ color: "var(--muted)", textAlign: "left" }}>
+                                  <th style={{ padding: "0.2rem 0.5rem" }}>Type</th>
+                                  <th style={{ padding: "0.2rem 0.5rem" }}>Details</th>
+                                  <th style={{ padding: "0.2rem 0.5rem" }}>At</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {incidentActions[inc.id].map((a: any) => (
+                                  <tr
+                                    key={a.id}
+                                    style={{ borderTop: "1px solid var(--border-standard)" }}
+                                  >
+                                    <td
+                                      style={{
+                                        padding: "0.3rem 0.5rem",
+                                        textTransform: "capitalize",
+                                        whiteSpace: "nowrap",
+                                      }}
+                                    >
+                                      {a.action_type.replace(/_/g, " ")}
+                                    </td>
+                                    <td style={{ padding: "0.3rem 0.5rem" }}>{a.details || "—"}</td>
+                                    <td style={{ padding: "0.3rem 0.5rem", whiteSpace: "nowrap" }}>
+                                      {formatDate(a.action_at)}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
+                        </td>
+                      </tr>
+                    )}
                   </React.Fragment>
                 ))
               )}
@@ -355,8 +445,14 @@ export default function FacilityManagerIncidentsPage() {
         title="Log Corrective Action"
         footer={
           <>
-            <button className="btn btn-secondary" onClick={() => setIsActionModalOpen(false)}>Cancel</button>
-            <button className="btn btn-primary" onClick={handleLogAction} disabled={isSubmittingAction}>
+            <button className="btn btn-secondary" onClick={() => setIsActionModalOpen(false)}>
+              Cancel
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={handleLogAction}
+              disabled={isSubmittingAction}
+            >
               {isSubmittingAction ? "Logging…" : "Log Action"}
             </button>
           </>
@@ -364,14 +460,46 @@ export default function FacilityManagerIncidentsPage() {
       >
         <div>
           <div style={{ marginBottom: "1rem" }}>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>Action Type</label>
-            <select className="select-field" value={actionType} onChange={(e) => setActionType(e.target.value)}>
-              {ACTION_TYPES.map((t) => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
+              Action Type
+            </label>
+            <select
+              className="select-field"
+              value={actionType}
+              onChange={(e) => setActionType(e.target.value)}
+            >
+              {ACTION_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t.replace(/_/g, " ")}
+                </option>
+              ))}
             </select>
           </div>
           <div>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>Details</label>
-            <textarea className="input-field" style={{ minHeight: 70 }} placeholder="Describe the action taken…" value={actionDetails} onChange={(e) => setActionDetails(e.target.value)} />
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
+              Details
+            </label>
+            <textarea
+              className="input-field"
+              style={{ minHeight: 70 }}
+              placeholder="Describe the action taken…"
+              value={actionDetails}
+              onChange={(e) => setActionDetails(e.target.value)}
+            />
           </div>
         </div>
       </Modal>
@@ -399,7 +527,12 @@ export default function FacilityManagerIncidentsPage() {
         <form id="log-incident-form" onSubmit={handleCreateIncident}>
           <div style={{ marginBottom: "1rem" }}>
             <label
-              style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
             >
               Description *
             </label>
@@ -416,7 +549,12 @@ export default function FacilityManagerIncidentsPage() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
             <div>
               <label
-                style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  marginBottom: "0.35rem",
+                }}
               >
                 Type
               </label>
@@ -435,7 +573,12 @@ export default function FacilityManagerIncidentsPage() {
 
             <div>
               <label
-                style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  marginBottom: "0.35rem",
+                }}
               >
                 Severity
               </label>
@@ -455,7 +598,12 @@ export default function FacilityManagerIncidentsPage() {
 
           <div style={{ marginTop: "1rem" }}>
             <label
-              style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
             >
               Specific Location
             </label>

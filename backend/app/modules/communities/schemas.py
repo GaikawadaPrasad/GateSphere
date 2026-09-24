@@ -12,7 +12,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.core.constants import PHONE_10_DIGIT_PATTERN
+from app.core.constants import PASSWORD_MIN_LENGTH, PHONE_10_DIGIT_PATTERN
 from app.modules.communities.models import GATE_TYPES, STRUCTURE_TYPES, UNIT_TYPES
 
 _Code = Annotated[
@@ -45,7 +45,7 @@ class CommunityCreate(_Write):
     timezone: str = Field(default="Asia/Kolkata", max_length=64)
     admin_name: str | None = Field(default=None, max_length=255)
     admin_email: str | None = Field(default=None, max_length=255)
-    admin_password: str | None = Field(default=None, min_length=8, max_length=128)
+    admin_password: str | None = Field(default=None, min_length=PASSWORD_MIN_LENGTH, max_length=128)
     admin_phone: str | None = Field(default=None, pattern=PHONE_10_DIGIT_PATTERN)
 
 
@@ -78,7 +78,7 @@ class CommunityRead(_Read):
 
 class CommunityAdminProvision(_Write):
     email: str = Field(min_length=3, max_length=255)
-    password: str = Field(min_length=8, max_length=128)
+    password: str = Field(min_length=PASSWORD_MIN_LENGTH, max_length=128)
     full_name: str | None = Field(default=None, max_length=255)
     phone: str | None = Field(default=None, pattern=PHONE_10_DIGIT_PATTERN)
 
@@ -128,7 +128,9 @@ class TowerCreate(_Write):
 
 
 class TowerUpdate(_Write):
-    name: str | None = Field(default=None, min_length=2, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9 \-_.,&()'/]*$")
+    name: str | None = Field(
+        default=None, min_length=2, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9 \-_.,&()'/]*$"
+    )
     structure_type: str | None = None
     total_floors: int | None = Field(default=None, ge=1, le=300)
     is_active: bool | None = None

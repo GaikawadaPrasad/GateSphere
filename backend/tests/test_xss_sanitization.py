@@ -1,6 +1,5 @@
 """Unit tests for SEC-02 Server-Side HTML & Rich Text Sanitization."""
 
-import pytest
 from app.core.sanitization import sanitize_html
 
 
@@ -37,7 +36,7 @@ def test_sanitize_svg_payloads():
 
 
 def test_sanitize_nested_html():
-    raw = '<div><script><iframe>nested</iframe></script><p>Valid <b>text</b></p></div>'
+    raw = "<div><script><iframe>nested</iframe></script><p>Valid <b>text</b></p></div>"
     clean = sanitize_html(raw)
     assert "<script>" not in clean
     assert "<iframe>" not in clean

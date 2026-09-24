@@ -32,9 +32,7 @@ def upgrade() -> None:
 
     # Find amenities whose only slot(s) span the full 06:00-22:00 window
     # (i.e. they have no proper 2-hour slots yet).
-    bad_amenities = conn.execute(
-        sa.text(
-            """
+    bad_amenities = conn.execute(sa.text("""
             SELECT DISTINCT amenity_id
             FROM amenity_slots
             WHERE start_time = '06:00' AND end_time = '22:00'
@@ -43,9 +41,7 @@ def upgrade() -> None:
                   FROM amenity_slots
                   WHERE end_time - start_time = interval '2 hours'
               )
-            """
-        )
-    ).fetchall()
+            """)).fetchall()
 
     if not bad_amenities:
         return
@@ -63,9 +59,7 @@ def upgrade() -> None:
 
     # Fetch amenity metadata needed to insert slots
     amenities = conn.execute(
-        sa.text(
-            "SELECT id, community_id, capacity FROM amenities WHERE id = ANY(:ids)"
-        ),
+        sa.text("SELECT id, community_id, capacity FROM amenities WHERE id = ANY(:ids)"),
         {"ids": amenity_ids},
     ).fetchall()
 
@@ -86,8 +80,7 @@ def upgrade() -> None:
                 )
 
     conn.execute(
-        sa.text(
-            """
+        sa.text("""
             INSERT INTO amenity_slots
                 (id, community_id, amenity_id, day_of_week, start_time, end_time,
                  capacity, fee, is_active)
@@ -95,8 +88,7 @@ def upgrade() -> None:
                 (gen_random_uuid(), CAST(:community_id AS uuid), CAST(:amenity_id AS uuid),
                  :dow, CAST(:st AS time), CAST(:et AS time), :cap, 0, true)
             ON CONFLICT DO NOTHING
-            """
-        ),
+            """),
         rows,
     )
 

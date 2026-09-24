@@ -58,7 +58,12 @@ describe("Domestic Staff 9 Modules Operational Verification", () => {
   it("accurately correlates open and closed attendance for guard console", () => {
     const attendanceRecords = [
       { id: "att-1", staff_id: "s1", check_in_at: "2026-09-12T08:00:00Z", check_out_at: null },
-      { id: "att-2", staff_id: "s2", check_in_at: "2026-09-12T07:00:00Z", check_out_at: "2026-09-12T11:00:00Z" },
+      {
+        id: "att-2",
+        staff_id: "s2",
+        check_in_at: "2026-09-12T07:00:00Z",
+        check_out_at: "2026-09-12T11:00:00Z",
+      },
     ];
 
     const openAttendanceMap: Record<string, any> = {};

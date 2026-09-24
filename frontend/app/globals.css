@@ -100,7 +100,15 @@ body {
   overflow-x: clip;
   max-width: 100vw;
   min-height: 100%;
-  font-family: var(--font-inter), 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family:
+    var(--font-inter),
+    "Inter",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -208,7 +216,6 @@ body {
 }
 
 @keyframes floatCard1 {
-
   0%,
   100% {
     transform: translateY(0px);
@@ -220,7 +227,6 @@ body {
 }
 
 @keyframes floatCard2 {
-
   0%,
   100% {
     transform: translateY(0px);
@@ -232,7 +238,6 @@ body {
 }
 
 @keyframes pulseLive {
-
   0%,
   100% {
     opacity: 1;
@@ -584,11 +589,13 @@ body {
 
 .marquee-gradient-mask {
   mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to right,
-      transparent 0%,
-      black 8%,
-      black 92%,
-      transparent 100%);
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    black 8%,
+    black 92%,
+    transparent 100%
+  );
 }
 
 /* ========================================================================= */
@@ -1011,7 +1018,9 @@ body {
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .data-table-mobile-card.is-clickable {
@@ -1176,7 +1185,6 @@ body {
 
 /* --- Tablette & below (768px) --- */
 @media (max-width: 768px) {
-
   /* Sidebar: fixed overlay drawer, zero layout footprint */
   .app-sidebar {
     position: fixed !important;
@@ -1304,7 +1312,7 @@ body {
     align-items: flex-start !important;
   }
 
-  .card-header-responsive>* {
+  .card-header-responsive > * {
     width: 100% !important;
   }
 
@@ -1517,7 +1525,6 @@ svg text[font-family*="Syne"] {
 }
 
 @keyframes floatCard1 {
-
   0%,
   100% {
     transform: translateY(0px);
@@ -1529,7 +1536,6 @@ svg text[font-family*="Syne"] {
 }
 
 @keyframes floatCard2 {
-
   0%,
   100% {
     transform: translateY(0px);
@@ -1541,7 +1547,6 @@ svg text[font-family*="Syne"] {
 }
 
 @keyframes pulseLive {
-
   0%,
   100% {
     opacity: 1;
@@ -1681,7 +1686,8 @@ svg text[font-family*="Syne"] {
 }
 
 @keyframes skeletonPulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {
@@ -1692,14 +1698,11 @@ svg text[font-family*="Syne"] {
 .skeleton,
 [data-skeleton] {
   background-color: #e2e8f0 !important;
-  background-image: linear-gradient(
-    90deg,
-    #e2e8f0 0%,
-    #cbd5e1 50%,
-    #e2e8f0 100%
-  ) !important;
+  background-image: linear-gradient(90deg, #e2e8f0 0%, #cbd5e1 50%, #e2e8f0 100%) !important;
   background-size: 200% 100% !important;
-  animation: skeletonShimmer 1.5s ease-in-out infinite, skeletonPulse 2s ease-in-out infinite !important;
+  animation:
+    skeletonShimmer 1.5s ease-in-out infinite,
+    skeletonPulse 2s ease-in-out infinite !important;
   border-radius: var(--radius-sm, 6px);
   display: block;
   min-height: 12px;

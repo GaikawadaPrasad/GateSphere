@@ -13,12 +13,7 @@ import type { FinancialStats } from "@/types/dashboards";
 describe("Community Admin Dashboard Components", () => {
   describe("FinancialHealthCard", () => {
     it("renders skeleton placeholders when isLoading is true", () => {
-      const { container } = render(
-        <FinancialHealthCard
-          data={null}
-          isLoading={true}
-        />
-      );
+      const { container } = render(<FinancialHealthCard data={null} isLoading={true} />);
       const skeletons = container.querySelectorAll(".skeleton");
       expect(skeletons.length).toBeGreaterThan(0);
     });
@@ -36,12 +31,7 @@ describe("Community Admin Dashboard Components", () => {
         },
       };
 
-      render(
-        <FinancialHealthCard
-          data={mockFinancialData}
-          isLoading={false}
-        />
-      );
+      render(<FinancialHealthCard data={mockFinancialData} isLoading={false} />);
       expect(screen.getByText("💳 Financial Health & Billing")).toBeInTheDocument();
       expect(screen.getByText("Total Billed")).toBeInTheDocument();
       expect(screen.getByText("Collected")).toBeInTheDocument();
@@ -158,7 +148,7 @@ describe("Community Admin Dashboard Components", () => {
           data={dummyData as (DummyItem & Record<string, unknown>)[]}
           enableClientPagination={true}
           pageSize={10}
-        />
+        />,
       );
 
       // Page 1 should display Resident 1 to Resident 10

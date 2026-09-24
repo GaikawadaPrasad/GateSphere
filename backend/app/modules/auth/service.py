@@ -42,7 +42,7 @@ async def resolve_login_role(
 
     - Super Admin always resolves to `super_admin` (global), regardless of `requested`.
     - `requested` given: must be a role the user actually holds -> that grant.
-    - `requested` omitted: defaults to the user's first role grant to ensure a 
+    - `requested` omitted: defaults to the user's first role grant to ensure a
       smooth login UX for users who hold multiple roles (BUG-006).
     """
     if user.is_superadmin:

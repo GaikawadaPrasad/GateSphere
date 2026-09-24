@@ -267,7 +267,15 @@ export function DataTable<T extends object = Record<string, unknown>>({
 
       return 0;
     });
-  }, [data, sortKey, sortDir, activeSortPreset, enableClientSort, detectedDateKey, detectedTextKey]);
+  }, [
+    data,
+    sortKey,
+    sortDir,
+    activeSortPreset,
+    enableClientSort,
+    detectedDateKey,
+    detectedTextKey,
+  ]);
 
   // Client-side pagination if needed
   const isClientPaging = enableClientPagination && !onPageChange;
@@ -378,7 +386,8 @@ export function DataTable<T extends object = Record<string, unknown>>({
                     cursor: "pointer",
                     background: effectiveViewMode === "cards" ? "#ffffff" : "transparent",
                     color: effectiveViewMode === "cards" ? "var(--primary)" : "var(--muted)",
-                    boxShadow: effectiveViewMode === "cards" ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
+                    boxShadow:
+                      effectiveViewMode === "cards" ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
                   }}
                   title="Card View"
                 >
@@ -397,7 +406,8 @@ export function DataTable<T extends object = Record<string, unknown>>({
                     cursor: "pointer",
                     background: effectiveViewMode === "table" ? "#ffffff" : "transparent",
                     color: effectiveViewMode === "table" ? "var(--primary)" : "var(--muted)",
-                    boxShadow: effectiveViewMode === "table" ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
+                    boxShadow:
+                      effectiveViewMode === "table" ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
                   }}
                   title="Table View"
                 >
@@ -407,11 +417,7 @@ export function DataTable<T extends object = Record<string, unknown>>({
             )}
 
             {showSortDropdown && (
-              <SortDropdown
-                value={activeSortPreset}
-                onChange={handleSortPresetChange}
-                size="sm"
-              />
+              <SortDropdown value={activeSortPreset} onChange={handleSortPresetChange} size="sm" />
             )}
           </div>
         </div>
@@ -452,10 +458,7 @@ export function DataTable<T extends object = Record<string, unknown>>({
                       : String(itemRecord[primaryCol?.key || ""] ?? "–")}
                   </div>
                   {statusCol && (
-                    <div
-                      className="data-table-card-badge"
-                      onClick={(e) => e.stopPropagation()}
-                    >
+                    <div className="data-table-card-badge" onClick={(e) => e.stopPropagation()}>
                       {statusCol.render
                         ? statusCol.render(item, index)
                         : String(itemRecord[statusCol.key] ?? "")}

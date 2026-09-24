@@ -579,4 +579,3 @@ export function getDashboardNavForRole(roleSlug: string): DashboardNavConfig {
   if (roleSlug === "facility_manager") return FACILITY_MANAGER_NAV;
   return OWNER_TENANT_NAV;
 }
-

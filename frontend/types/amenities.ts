@@ -50,12 +50,7 @@ export interface AmenitySlot {
   updated_at?: string;
 }
 
-export type BookingStatus =
-  | "pending"
-  | "confirmed"
-  | "cancelled"
-  | "rejected"
-  | "completed";
+export type BookingStatus = "pending" | "confirmed" | "cancelled" | "rejected" | "completed";
 
 export interface AmenityBooking {
   id: string;

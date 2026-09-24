@@ -14,12 +14,7 @@ describe("Resident Dashboard Components & Architecture", () => {
   describe("Skeleton Loading States", () => {
     it("renders KpiCardSkeleton when KPI data is loading", () => {
       const { container } = render(
-        <KpiCard
-          title="Pending Gate Approvals"
-          value="2"
-          icon="🔔"
-          isLoading={true}
-        />
+        <KpiCard title="Pending Gate Approvals" value="2" icon="🔔" isLoading={true} />,
       );
       const skeletons = container.querySelectorAll(".skeleton");
       expect(skeletons.length).toBeGreaterThan(0);
@@ -46,7 +41,7 @@ describe("Resident Dashboard Components & Architecture", () => {
           title="Failed to Load Invoices"
           message="Network timeout connecting to billing ledger."
           onRetry={onRetry}
-        />
+        />,
       );
 
       expect(screen.getByText("Failed to Load Invoices")).toBeInTheDocument();
@@ -159,11 +154,15 @@ describe("Resident Dashboard Components & Architecture", () => {
           columns={[
             { key: "invoice_number", header: "Invoice #" },
             { key: "title", header: "Billing Item" },
-            { key: "balance_due", header: "Balance Due", render: (i) => formatCurrency(i.balance_due) },
+            {
+              key: "balance_due",
+              header: "Balance Due",
+              render: (i) => formatCurrency(i.balance_due),
+            },
             { key: "status", header: "Status", render: (i) => <StatusBadge status={i.status} /> },
           ]}
           data={mockInvoices}
-        />
+        />,
       );
 
       expect(screen.getByText("INV-2026-001")).toBeInTheDocument();
@@ -208,16 +207,10 @@ describe("Resident Dashboard Components & Architecture", () => {
             if (i.status === "pending") {
               return (
                 <div style={{ display: "flex", gap: "0.4rem" }}>
-                  <button
-                    type="button"
-                    onClick={() => handleDecision(i.id, true)}
-                  >
+                  <button type="button" onClick={() => handleDecision(i.id, true)}>
                     ✓ Accept
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDecision(i.id, false)}
-                  >
+                  <button type="button" onClick={() => handleDecision(i.id, false)}>
                     ✕ Reject
                   </button>
                 </div>

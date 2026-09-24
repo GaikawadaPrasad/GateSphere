@@ -31,7 +31,9 @@ async def require_attachment_permission_async(
         return scope
     from app.core.errors import ForbiddenError
 
-    raise ForbiddenError("Missing permission: incidents:create or incidents:update", code="PERMISSION_DENIED")
+    raise ForbiddenError(
+        "Missing permission: incidents:create or incidents:update", code="PERMISSION_DENIED"
+    )
 
 
 ATTACH = Depends(require_attachment_permission_async)

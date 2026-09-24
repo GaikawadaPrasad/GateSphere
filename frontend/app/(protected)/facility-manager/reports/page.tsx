@@ -42,7 +42,9 @@ export default function FacilityManagerReportsPage() {
         const incidents = incidentsRes.status === "fulfilled" ? (incidentsRes.value as any[]) : [];
 
         if (ticketsRes.status === "rejected") {
-          setLoadError((ticketsRes as PromiseRejectedResult).reason?.message || "Failed to load tickets.");
+          setLoadError(
+            (ticketsRes as PromiseRejectedResult).reason?.message || "Failed to load tickets.",
+          );
         }
 
         const categoryMap = new Map<string, string>();
@@ -81,7 +83,9 @@ export default function FacilityManagerReportsPage() {
         const TERMINAL = ["resolved", "closed", "false_alarm"];
         setIncidentTotal((incidents || []).length);
         setIncidentOpen((incidents || []).filter((i: any) => !TERMINAL.includes(i.status)).length);
-        setIncidentResolved((incidents || []).filter((i: any) => TERMINAL.includes(i.status)).length);
+        setIncidentResolved(
+          (incidents || []).filter((i: any) => TERMINAL.includes(i.status)).length,
+        );
       } catch (err: any) {
         setLoadError(err?.message || "Failed to load report data.");
       } finally {
@@ -103,13 +107,24 @@ export default function FacilityManagerReportsPage() {
             onClick={async () => {
               setIsExporting(true);
               try {
-                const csv = await complaintsApi.exportCsv?.() ?? await fetch("/api/v1/complaints/tickets.csv", { credentials: "include", headers: { Accept: "text/csv" } }).then(r => r.text());
+                const csv =
+                  (await complaintsApi.exportCsv?.()) ??
+                  (await fetch("/api/v1/complaints/tickets.csv", {
+                    credentials: "include",
+                    headers: { Accept: "text/csv" },
+                  }).then((r) => r.text()));
                 const blob = new Blob([csv as string], { type: "text/csv" });
                 const url = URL.createObjectURL(blob);
-                const a = document.createElement("a"); a.href = url; a.download = "facility_tickets.csv"; a.click();
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "facility_tickets.csv";
+                a.click();
                 URL.revokeObjectURL(url);
-              } catch (err: any) { alert(err?.message || "Export failed."); }
-              finally { setIsExporting(false); }
+              } catch (err: any) {
+                alert(err?.message || "Export failed.");
+              } finally {
+                setIsExporting(false);
+              }
             }}
           >
             {isExporting ? "Exporting…" : "↓ Export Tickets CSV"}
@@ -190,18 +205,29 @@ export default function FacilityManagerReportsPage() {
         {isLoading ? (
           <p style={{ padding: "1rem", color: "var(--muted)" }}>Loading…</p>
         ) : (
-          <div style={{ padding: "0.5rem 1rem 1rem", display: "flex", gap: "2rem", fontSize: "0.875rem" }}>
+          <div
+            style={{
+              padding: "0.5rem 1rem 1rem",
+              display: "flex",
+              gap: "2rem",
+              fontSize: "0.875rem",
+            }}
+          >
             <div>
               <div style={{ color: "var(--muted)", fontSize: "0.75rem" }}>Total Incidents</div>
               <div style={{ fontWeight: 700, fontSize: "1.25rem" }}>{incidentTotal}</div>
             </div>
             <div>
               <div style={{ color: "var(--muted)", fontSize: "0.75rem" }}>Open / Active</div>
-              <div style={{ fontWeight: 700, fontSize: "1.25rem", color: "var(--danger)" }}>{incidentOpen}</div>
+              <div style={{ fontWeight: 700, fontSize: "1.25rem", color: "var(--danger)" }}>
+                {incidentOpen}
+              </div>
             </div>
             <div>
               <div style={{ color: "var(--muted)", fontSize: "0.75rem" }}>Resolved / Closed</div>
-              <div style={{ fontWeight: 700, fontSize: "1.25rem", color: "var(--success)" }}>{incidentResolved}</div>
+              <div style={{ fontWeight: 700, fontSize: "1.25rem", color: "var(--success)" }}>
+                {incidentResolved}
+              </div>
             </div>
           </div>
         )}
@@ -228,15 +254,21 @@ export default function FacilityManagerReportsPage() {
             </div>
             <div>
               <div style={{ color: "var(--muted)", fontSize: "0.75rem" }}>Confirmed</div>
-              <div style={{ fontWeight: 700, fontSize: "1.25rem", color: "var(--success)" }}>{amenityBookingsConfirmed}</div>
+              <div style={{ fontWeight: 700, fontSize: "1.25rem", color: "var(--success)" }}>
+                {amenityBookingsConfirmed}
+              </div>
             </div>
             <div>
               <div style={{ color: "var(--muted)", fontSize: "0.75rem" }}>Pending</div>
-              <div style={{ fontWeight: 700, fontSize: "1.25rem", color: "var(--warning)" }}>{amenityBookingsPending}</div>
+              <div style={{ fontWeight: 700, fontSize: "1.25rem", color: "var(--warning)" }}>
+                {amenityBookingsPending}
+              </div>
             </div>
             <div>
               <div style={{ color: "var(--muted)", fontSize: "0.75rem" }}>Cancelled</div>
-              <div style={{ fontWeight: 700, fontSize: "1.25rem", color: "var(--danger)" }}>{amenityBookingsCancelled}</div>
+              <div style={{ fontWeight: 700, fontSize: "1.25rem", color: "var(--danger)" }}>
+                {amenityBookingsCancelled}
+              </div>
             </div>
           </div>
         )}

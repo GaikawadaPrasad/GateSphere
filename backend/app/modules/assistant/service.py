@@ -388,10 +388,8 @@ class AssistantService:
         sensibly instead of the assistant being unusable for that role.
         """
         if community_id is not None:
-            try:
-                return [self.scope.require(community_id)]
-            except Exception:
-                pass
+            # Out-of-scope target -> NotFoundError (404), same shape as a missing community.
+            return [self.scope.require(community_id)]
         if not self.scope.is_global and self.scope.community_ids:
             return list(self.scope.community_ids)
         rows = await self.db.scalars(select(Community.id))
@@ -399,7 +397,9 @@ class AssistantService:
 
     async def _count(self, model, *where) -> int:
         try:
-            return int(await self.db.scalar(select(func.count()).select_from(model).where(*where)) or 0)
+            return int(
+                await self.db.scalar(select(func.count()).select_from(model).where(*where)) or 0
+            )
         except Exception:
             return 0
 

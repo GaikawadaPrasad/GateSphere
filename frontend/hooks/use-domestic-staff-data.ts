@@ -172,7 +172,10 @@ export function useStaffAttendance() {
           date: att.check_in_at ? att.check_in_at.split("T")[0] : "",
           raw_check_in_at: att.check_in_at,
           check_in_at: att.check_in_at
-            ? new Date(att.check_in_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+            ? new Date(att.check_in_at).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })
             : "",
           check_out_at: att.check_out_at
             ? new Date(att.check_out_at).toLocaleTimeString([], {

@@ -64,12 +64,16 @@ def ensure_bucket() -> None:
 
 def put_object(key: str, body: bytes, content_type: str) -> str:
     from botocore.exceptions import BotoCoreError, ClientError
-    from app.core.errors import BusinessRuleError
+
+    from app.core.errors import ServiceUnavailableError
+
     try:
         _s3.put_object(Bucket=settings.S3_BUCKET, Key=key, Body=body, ContentType=content_type)
         return public_url(key)
     except (BotoCoreError, ClientError) as e:
-        raise BusinessRuleError("Storage service temporarily unavailable", code="SERVICE_UNAVAILABLE") from e
+        raise ServiceUnavailableError(
+            "Storage service temporarily unavailable", code="STORAGE_UNAVAILABLE"
+        ) from e
 
 
 def presigned_get(key: str, expires: int = 3600) -> str:

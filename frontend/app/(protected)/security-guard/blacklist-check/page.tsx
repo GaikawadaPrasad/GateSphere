@@ -62,7 +62,10 @@ export default function SecurityGuardBlacklistCheckPage() {
           🔍 Instant Identity / Vehicle Check
         </h3>
 
-        <form onSubmit={handleSearch} style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+        <form
+          onSubmit={handleSearch}
+          style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}
+        >
           <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <input

@@ -87,7 +87,17 @@ export interface ComplaintTicket {
   category_name: string;
   description: string;
   priority: "low" | "medium" | "high" | "emergency";
-  status: "open" | "created" | "assigned" | "acknowledged" | "in_progress" | "resolved" | "resident_confirmation" | "closed" | "reopened" | "cancelled";
+  status:
+    | "open"
+    | "created"
+    | "assigned"
+    | "acknowledged"
+    | "in_progress"
+    | "resolved"
+    | "resident_confirmation"
+    | "closed"
+    | "reopened"
+    | "cancelled";
   escalation_state: "on_track" | "at_risk" | "breached" | "escalated";
   created_at: string;
   assigned_to?: string;
@@ -132,11 +142,17 @@ export function useResidentOverview(communityId?: string | null) {
         `/dashboards/resident${communityId ? `?community_id=${communityId}` : ""}`,
       );
       return {
-        pending_dues_amount: Number(stats?.pending_dues_amount ?? stats?.my_outstanding_balance ?? 0),
-        pending_visitor_count: Number(stats?.pending_visitor_count ?? stats?.my_pending_visitor_requests ?? 0),
+        pending_dues_amount: Number(
+          stats?.pending_dues_amount ?? stats?.my_outstanding_balance ?? 0,
+        ),
+        pending_visitor_count: Number(
+          stats?.pending_visitor_count ?? stats?.my_pending_visitor_requests ?? 0,
+        ),
         open_service_tickets: Number(stats?.open_tickets_count ?? stats?.my_open_tickets ?? 0),
         staff_on_duty_count: Number(stats?.staff_on_duty_count ?? 0),
-        upcoming_amenity_bookings: Number(stats?.upcoming_amenity_bookings ?? stats?.my_upcoming_bookings ?? 0),
+        upcoming_amenity_bookings: Number(
+          stats?.upcoming_amenity_bookings ?? stats?.my_upcoming_bookings ?? 0,
+        ),
         active_deliveries_count: Number(stats?.active_deliveries_count ?? 0),
       } as ResidentDashboardStats;
     },
@@ -211,7 +227,9 @@ export function useResidentVisitors() {
       group_label?: string;
     }) => {
       const isUuid = (s?: string) =>
-        Boolean(s && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s));
+        Boolean(
+          s && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s),
+        );
 
       let unitId = payload.unit_id;
       if (!isUuid(unitId)) {
@@ -256,10 +274,18 @@ export function useResidentVisitors() {
         const c = (cat || "").toLowerCase().trim();
         if (c.includes("deliver") || c.includes("courier")) return "delivery_exec";
         if (c.includes("cab") || c.includes("taxi")) return "cab_taxi";
-        if (c.includes("service") || c.includes("tech") || c.includes("maint")) return "service_tech";
+        if (c.includes("service") || c.includes("tech") || c.includes("maint"))
+          return "service_tech";
         if (c.includes("contract") || c.includes("vendor") || c.includes("work")) return "vendor";
         if (c.includes("interview")) return "interviewee";
-        if (c.includes("staff") || c.includes("domestic") || c.includes("help") || c.includes("maid") || c.includes("recurr")) return "recurring";
+        if (
+          c.includes("staff") ||
+          c.includes("domestic") ||
+          c.includes("help") ||
+          c.includes("maid") ||
+          c.includes("recurr")
+        )
+          return "recurring";
         if (c.includes("event") || c.includes("party")) return "event_guest";
         if (c.includes("relat") || c.includes("family")) return "relative";
         return "personal_guest";
@@ -269,11 +295,14 @@ export function useResidentVisitors() {
       const visitorType = mapCategoryToVisitorType(cleanCategory);
       const cleanReason = (payload.reason || "").trim() || `${cleanCategory} Entry`;
       const now = new Date();
-      const validUntil = new Date(
-        now.getTime() + (payload.valid_for_hours || 24) * 60 * 60 * 1000,
-      );
+      const validUntil = new Date(now.getTime() + (payload.valid_for_hours || 24) * 60 * 60 * 1000);
 
-      const cleanIdNum = payload.id_number ? payload.id_number.trim().toUpperCase().replace(/[\s\-]/g, "") : undefined;
+      const cleanIdNum = payload.id_number
+        ? payload.id_number
+            .trim()
+            .toUpperCase()
+            .replace(/[\s\-]/g, "")
+        : undefined;
 
       const req = await api.post<any>("/visitors/requests", {
         unit_id: unitId,
@@ -314,8 +343,14 @@ export function useResidentVisitors() {
       };
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["resident", "visitors"], refetchType: "all" });
-      await queryClient.invalidateQueries({ queryKey: ["resident", "overview"], refetchType: "all" });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "visitors"],
+        refetchType: "all",
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "overview"],
+        refetchType: "all",
+      });
     },
   });
 
@@ -384,8 +419,14 @@ export function useResidentDeliveries() {
       return await api.put("/deliveries/protocols", body);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["resident", "deliveries"], refetchType: "all" });
-      await queryClient.invalidateQueries({ queryKey: ["resident", "delivery-protocols"], refetchType: "all" });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "deliveries"],
+        refetchType: "all",
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "delivery-protocols"],
+        refetchType: "all",
+      });
     },
   });
 
@@ -461,8 +502,7 @@ export function useResidentAmenities() {
         id: a.id,
         name: a.name,
         category: a.amenity_type ? a.amenity_type.toUpperCase() : "Facility",
-        description:
-          a.description || `Community ${a.name} — open for booking.`,
+        description: a.description || `Community ${a.name} — open for booking.`,
         capacity: a.capacity || 20,
         pricing_type: a.pricing_type || "free",
         price_per_hour: Number(a.price_per_hour ?? 0),
@@ -520,10 +560,22 @@ export function useResidentAmenities() {
       });
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["resident", "my-bookings"], refetchType: "all" });
-      await queryClient.invalidateQueries({ queryKey: ["resident", "overview"], refetchType: "all" });
-      await queryClient.invalidateQueries({ queryKey: ["resident", "amenity-slots"], refetchType: "all" });
-      await queryClient.invalidateQueries({ queryKey: ["resident", "amenities-list"], refetchType: "all" });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "my-bookings"],
+        refetchType: "all",
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "overview"],
+        refetchType: "all",
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "amenity-slots"],
+        refetchType: "all",
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "amenities-list"],
+        refetchType: "all",
+      });
     },
   });
 
@@ -534,10 +586,22 @@ export function useResidentAmenities() {
       });
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["resident", "my-bookings"], refetchType: "all" });
-      await queryClient.invalidateQueries({ queryKey: ["resident", "overview"], refetchType: "all" });
-      await queryClient.invalidateQueries({ queryKey: ["resident", "amenities-list"], refetchType: "all" });
-      await queryClient.invalidateQueries({ queryKey: ["resident", "amenity-slots"], refetchType: "all" });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "my-bookings"],
+        refetchType: "all",
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "overview"],
+        refetchType: "all",
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "amenities-list"],
+        refetchType: "all",
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "amenity-slots"],
+        refetchType: "all",
+      });
     },
   });
 
@@ -591,7 +655,9 @@ export function useResidentComplaints() {
       priority?: string;
     }) => {
       const isUuid = (s?: string) =>
-        Boolean(s && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s));
+        Boolean(
+          s && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s),
+        );
 
       const profile = await api.get<any>("/residents/me");
       const unitId = profile?.occupancies?.[0]?.unit_id;
@@ -608,7 +674,7 @@ export function useResidentComplaints() {
               c.name?.toLowerCase().includes(catLower) ||
               c.code?.toLowerCase() === catLower ||
               catLower.includes(c.name?.toLowerCase()) ||
-              catLower.includes(c.code?.toLowerCase())
+              catLower.includes(c.code?.toLowerCase()),
           );
           if (match?.id) categoryId = match.id;
         }
@@ -623,8 +689,14 @@ export function useResidentComplaints() {
       });
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["resident", "complaints"], refetchType: "all" });
-      await queryClient.invalidateQueries({ queryKey: ["resident", "overview"], refetchType: "all" });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "complaints"],
+        refetchType: "all",
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "overview"],
+        refetchType: "all",
+      });
     },
   });
 
@@ -644,8 +716,14 @@ export function useResidentComplaints() {
       });
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["resident", "complaints"], refetchType: "all" });
-      await queryClient.invalidateQueries({ queryKey: ["resident", "overview"], refetchType: "all" });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "complaints"],
+        refetchType: "all",
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "overview"],
+        refetchType: "all",
+      });
     },
   });
 
@@ -665,7 +743,10 @@ export function useResidentComplaints() {
       });
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["resident", "complaints"], refetchType: "all" });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "complaints"],
+        refetchType: "all",
+      });
     },
   });
 
@@ -743,25 +824,26 @@ export function useResidentPayments() {
         late_fee: Number(inv.late_fee ?? 0),
         tax: Number(inv.tax ?? 0),
         receipt_number: inv.receipt_number,
-        line_items: Array.isArray(inv.items) && inv.items.length > 0
-          ? inv.items.map((i: any) => ({
-            head: i.description || "Maintenance Charge",
-            description: i.description || "General maintenance and community services",
-            quantity: Number(i.quantity ?? 1),
-            unit_rate: Number(i.unit_rate ?? i.amount ?? 0),
-            amount: Number(i.amount ?? 0),
-            taxable: Boolean(i.taxable),
-          }))
-          : [
-              {
-                head: "Monthly Society Maintenance & Operations",
-                description: "Standard community upkeep, security, and common utilities",
-                quantity: 1,
-                unit_rate: Number(inv.subtotal ?? inv.total_amount ?? 0),
-                amount: Number(inv.subtotal ?? inv.total_amount ?? 0),
-                taxable: Number(inv.tax ?? 0) > 0,
-              },
-            ],
+        line_items:
+          Array.isArray(inv.items) && inv.items.length > 0
+            ? inv.items.map((i: any) => ({
+                head: i.description || "Maintenance Charge",
+                description: i.description || "General maintenance and community services",
+                quantity: Number(i.quantity ?? 1),
+                unit_rate: Number(i.unit_rate ?? i.amount ?? 0),
+                amount: Number(i.amount ?? 0),
+                taxable: Boolean(i.taxable),
+              }))
+            : [
+                {
+                  head: "Monthly Society Maintenance & Operations",
+                  description: "Standard community upkeep, security, and common utilities",
+                  quantity: 1,
+                  unit_rate: Number(inv.subtotal ?? inv.total_amount ?? 0),
+                  amount: Number(inv.subtotal ?? inv.total_amount ?? 0),
+                  taxable: Number(inv.tax ?? 0) > 0,
+                },
+              ],
       }));
     },
   });
@@ -785,8 +867,14 @@ export function useResidentPayments() {
       return res;
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["resident", "invoices"], refetchType: "all" });
-      await queryClient.invalidateQueries({ queryKey: ["resident", "overview"], refetchType: "all" });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "invoices"],
+        refetchType: "all",
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "overview"],
+        refetchType: "all",
+      });
       await queryClient.invalidateQueries({ queryKey: ["resident", "ledger"], refetchType: "all" });
     },
   });
@@ -888,8 +976,14 @@ export function useResidentFamilyMembers() {
       });
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["resident", "family-members"], refetchType: "all" });
-      await queryClient.invalidateQueries({ queryKey: ["resident", "me-profile"], refetchType: "all" });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "family-members"],
+        refetchType: "all",
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "me-profile"],
+        refetchType: "all",
+      });
     },
   });
 
@@ -911,8 +1005,14 @@ export function useResidentFamilyMembers() {
       });
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["resident", "family-members"], refetchType: "all" });
-      await queryClient.invalidateQueries({ queryKey: ["resident", "me-profile"], refetchType: "all" });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "family-members"],
+        refetchType: "all",
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "me-profile"],
+        refetchType: "all",
+      });
     },
   });
 
@@ -921,8 +1021,14 @@ export function useResidentFamilyMembers() {
       return await api.delete(`/residents/family-members/${id}`);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["resident", "family-members"], refetchType: "all" });
-      await queryClient.invalidateQueries({ queryKey: ["resident", "me-profile"], refetchType: "all" });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "family-members"],
+        refetchType: "all",
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "me-profile"],
+        refetchType: "all",
+      });
     },
   });
 
@@ -957,7 +1063,10 @@ export function useResidentProfile() {
       return await api.patch("/residents/me", data);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["resident", "me-profile"], refetchType: "all" });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "me-profile"],
+        refetchType: "all",
+      });
       await queryClient.invalidateQueries({ queryKey: ["auth", "me"], refetchType: "all" });
     },
   });
@@ -973,8 +1082,14 @@ export function useResidentProfile() {
       return await api.post("/residents/family-members", data);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["resident", "family-members"], refetchType: "all" });
-      await queryClient.invalidateQueries({ queryKey: ["resident", "me-profile"], refetchType: "all" });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "family-members"],
+        refetchType: "all",
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "me-profile"],
+        refetchType: "all",
+      });
     },
   });
 
@@ -1210,7 +1325,10 @@ export function useSubmitStaffRating() {
       });
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["resident", "domestic-staff"], refetchType: "all" });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "domestic-staff"],
+        refetchType: "all",
+      });
     },
   });
 }
@@ -1226,7 +1344,9 @@ export function useSendResidentPanic() {
       location?: string;
     }) => {
       const locStr = payload.location
-        ? (payload.location.startsWith("Location:") ? payload.location : `Location: ${payload.location}`)
+        ? payload.location.startsWith("Location:")
+          ? payload.location
+          : `Location: ${payload.location}`
         : "";
       const fullMessage = [locStr, payload.note || "Resident emergency panic triggered from portal"]
         .filter(Boolean)
@@ -1243,7 +1363,10 @@ export function useSendResidentPanic() {
       });
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["resident", "overview"], refetchType: "all" });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "overview"],
+        refetchType: "all",
+      });
       await queryClient.invalidateQueries({ queryKey: ["gate", "alerts"], refetchType: "all" });
     },
   });
@@ -1276,8 +1399,14 @@ export function useAssignDomesticStaff() {
       return await api.post("/domestic-staff/assignments", payload);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["resident", "domestic-staff"], refetchType: "all" });
-      await queryClient.invalidateQueries({ queryKey: ["resident", "overview"], refetchType: "all" });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "domestic-staff"],
+        refetchType: "all",
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "overview"],
+        refetchType: "all",
+      });
     },
   });
 }
@@ -1289,8 +1418,14 @@ export function useEndDomesticStaffAssignment() {
       return await api.post(`/domestic-staff/assignments/${assignmentId}/end`, {});
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["resident", "domestic-staff"], refetchType: "all" });
-      await queryClient.invalidateQueries({ queryKey: ["resident", "overview"], refetchType: "all" });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "domestic-staff"],
+        refetchType: "all",
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "overview"],
+        refetchType: "all",
+      });
     },
   });
 }
@@ -1309,7 +1444,10 @@ export function useRegisterVehicle() {
       return await api.post("/vehicles", payload);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["resident", "vehicles"], refetchType: "all" });
+      await queryClient.invalidateQueries({
+        queryKey: ["resident", "vehicles"],
+        refetchType: "all",
+      });
     },
   });
 }
