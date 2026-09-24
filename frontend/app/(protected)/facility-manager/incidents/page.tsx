@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SearchInput } from "@/components/forms/SearchInput";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
+import { Pagination } from "@/components/tables/Pagination";
 import { incidentsApi } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
 import type { Incident, IncidentType, IncidentSeverity, IncidentStatus } from "@/types/incidents";
@@ -49,6 +50,8 @@ export default function FacilityManagerIncidentsPage() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [severityFilter, setSeverityFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -92,6 +95,10 @@ export default function FacilityManagerIncidentsPage() {
   useEffect(() => {
     loadIncidents();
   }, []);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, typeFilter, severityFilter]);
 
   const handleCreateIncident = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -168,16 +175,23 @@ export default function FacilityManagerIncidentsPage() {
     }
   };
 
-  const filtered = incidents.filter((inc) => {
-    const q = search.toLowerCase();
-    const matchSearch =
-      inc.incident_number?.toLowerCase().includes(q) ||
-      (inc.description || "").toLowerCase().includes(q) ||
-      (inc.location_text || "").toLowerCase().includes(q);
-    const matchType = typeFilter === "all" || inc.incident_type === typeFilter;
-    const matchSeverity = severityFilter === "all" || inc.severity === severityFilter;
-    return matchSearch && matchType && matchSeverity;
-  });
+  const filtered = useMemo(() => {
+    return incidents.filter((inc) => {
+      const q = search.toLowerCase();
+      const matchSearch =
+        inc.incident_number?.toLowerCase().includes(q) ||
+        (inc.description || "").toLowerCase().includes(q) ||
+        (inc.location_text || "").toLowerCase().includes(q);
+      const matchType = typeFilter === "all" || inc.incident_type === typeFilter;
+      const matchSeverity = severityFilter === "all" || inc.severity === severityFilter;
+      return matchSearch && matchType && matchSeverity;
+    });
+  }, [incidents, search, typeFilter, severityFilter]);
+
+  const paginatedIncidents = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, page, pageSize]);
 
   return (
     <div>
@@ -300,7 +314,7 @@ export default function FacilityManagerIncidentsPage() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((inc) => (
+                paginatedIncidents.map((inc) => (
                   <React.Fragment key={inc.id}>
                     <tr>
                       <td style={{ fontWeight: 600 }}>{inc.incident_number}</td>
@@ -436,6 +450,18 @@ export default function FacilityManagerIncidentsPage() {
             </tbody>
           </table>
         </div>
+        {filtered.length > 0 && (
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            total={filtered.length}
+            onPageChange={setPage}
+            onPageSizeChange={(sz) => {
+              setPageSize(sz);
+              setPage(1);
+            }}
+          />
+        )}
       </div>
 
       {/* Log Action Modal */}

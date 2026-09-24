@@ -46,7 +46,7 @@ async def require_household_view(
 async def require_household_write(
     scope: TenantScope = Depends(get_tenant_scope_async),
     user: User = Depends(require_auth_async),
-    db: AsyncSession = Depends(get_async_db, scope="function"),
+    db: AsyncSession = Depends(get_async_db),
 ) -> TenantScope:
     if (
         scope.can("residents:create")

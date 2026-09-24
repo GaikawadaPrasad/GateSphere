@@ -15,40 +15,30 @@ P = "/api/v1/amenities"
 
 def _amenity_and_slot(community_id: str):
     with SessionLocal() as db:
-        am = db.scalar(
-            select(Amenity).where(Amenity.community_id == community_id).order_by(Amenity.code)
-        )
-        if not am:
-            am = Amenity(
-                community_id=community_id,
-                code=f"AM-{uuid.uuid4().hex[:4]}",
-                name="Test Amenity",
-                amenity_type="court",
-                capacity=10,
-                is_active=True,
-            )
-            db.add(am)
-            db.flush()
-        target = date.today() + timedelta(days=2)
-        slot = db.scalar(
-            select(AmenitySlot).where(
-                AmenitySlot.amenity_id == am.id, AmenitySlot.day_of_week == target.weekday()
-            )
-        )
-        if not slot:
-            from datetime import time
+        from datetime import time
 
-            slot = AmenitySlot(
-                community_id=am.community_id,
-                amenity_id=am.id,
-                day_of_week=target.weekday(),
-                start_time=time(10, 0),
-                end_time=time(11, 0),
-                capacity=10,
-            )
-            db.add(slot)
-            db.commit()
-            db.refresh(slot)
+        am = Amenity(
+            community_id=community_id,
+            code=f"AM-{uuid.uuid4().hex[:6]}",
+            name="Test Amenity",
+            amenity_type="court",
+            capacity=100,
+            is_active=True,
+        )
+        db.add(am)
+        db.flush()
+        target = date.today() + timedelta(days=2)
+        slot = AmenitySlot(
+            community_id=am.community_id,
+            amenity_id=am.id,
+            day_of_week=target.weekday(),
+            start_time=time(10, 0),
+            end_time=time(11, 0),
+            capacity=100,
+        )
+        db.add(slot)
+        db.commit()
+        db.refresh(slot)
         return str(am.id), str(slot.id), target.isoformat()
 
 
@@ -160,3 +150,31 @@ def test_facility_manager_block_lifecycle(as_role, seed_ids):
 
     del_res = fm.delete(f"{P}/blocks/{block_id}")
     assert del_res.status_code == 204, del_res.text
+
+
+def test_facility_manager_notified_on_resident_booking(as_role, seed_ids):
+    resident = as_role("resident")
+    am_id, slot_id, bdate = _amenity_and_slot(seed_ids["community_id"])
+    r = resident.post(
+        f"{P}/bookings",
+        json={"amenity_id": am_id, "slot_id": slot_id, "booking_date": bdate},
+    )
+    assert r.status_code == 201, r.text
+    booking_id = r.json()["data"]["id"]
+
+    fm = as_role("facility_manager")
+    notifs_res = fm.get("/api/v1/notifications")
+    assert notifs_res.status_code == 200, notifs_res.text
+    notifs = notifs_res.json()["data"]
+
+    matching = [
+        n
+        for n in notifs
+        if n.get("reference_type") == "amenity_booking" and n.get("reference_id") == booking_id
+    ]
+    assert len(matching) >= 1, f"Expected notification for booking {booking_id}, found: {notifs}"
+    fm_notif = matching[0]
+    assert fm_notif["notification_type"] == "amenity.booking_created"
+    assert "New Amenity Booking" in fm_notif["title"]
+    assert "Unit" in fm_notif["message"]
+    assert "booked" in fm_notif["message"]

@@ -103,3 +103,17 @@ class BookingRepository(AsyncTenantRepository[AmenityBooking]):
                 )
             ).all()
         )
+
+    async def get_unit_and_tower(self, unit_id: uuid.UUID) -> tuple[str | None, str | None]:
+        from app.modules.communities.models import Tower, Unit
+
+        row = (
+            await self.db.execute(
+                select(Unit.unit_number, Tower.name)
+                .outerjoin(Tower, Tower.id == Unit.tower_id)
+                .where(Unit.id == unit_id)
+            )
+        ).first()
+        if row:
+            return row[0], row[1]
+        return None, None

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
+import { Pagination } from "@/components/tables/Pagination";
 import { amenitiesApi, facilitiesApi, type Amenity, type AmenityBooking } from "@/lib/api";
 
 export default function FacilityManagerAmenitiesPage() {
@@ -11,6 +12,14 @@ export default function FacilityManagerAmenitiesPage() {
   const [bookings, setBookings] = useState<AmenityBooking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Pagination for Amenities
+  const [amenityPage, setAmenityPage] = useState(1);
+  const [amenityPageSize, setAmenityPageSize] = useState(10);
+
+  // Pagination for Bookings
+  const [bookingPage, setBookingPage] = useState(1);
+  const [bookingPageSize, setBookingPageSize] = useState(10);
 
   // Add Amenity Modal
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -71,6 +80,16 @@ export default function FacilityManagerAmenitiesPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  const paginatedAmenities = useMemo(() => {
+    const start = (amenityPage - 1) * amenityPageSize;
+    return amenities.slice(start, start + amenityPageSize);
+  }, [amenities, amenityPage, amenityPageSize]);
+
+  const paginatedBookings = useMemo(() => {
+    const start = (bookingPage - 1) * bookingPageSize;
+    return bookings.slice(start, start + bookingPageSize);
+  }, [bookings, bookingPage, bookingPageSize]);
 
   const handleAddAmenity = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -211,8 +230,11 @@ export default function FacilityManagerAmenitiesPage() {
       >
         {/* Left Side: Amenities List & Block Controls */}
         <div className="card">
-          <div className="card-header">
+          <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <h3 className="card-title">Community Amenities</h3>
+            <span style={{ fontSize: "0.775rem", color: "var(--muted)" }}>
+              {amenities.length} total
+            </span>
           </div>
           <div className="table-container">
             <table className="data-table">
@@ -255,7 +277,7 @@ export default function FacilityManagerAmenitiesPage() {
                     </td>
                   </tr>
                 ) : (
-                  amenities.map((a: any) => (
+                  paginatedAmenities.map((a: any) => (
                     <tr key={a.id}>
                       <td style={{ fontWeight: 600, color: "var(--fg)" }}>{a.name}</td>
                       <td style={{ textTransform: "capitalize" }}>
@@ -290,12 +312,27 @@ export default function FacilityManagerAmenitiesPage() {
               </tbody>
             </table>
           </div>
+          {amenities.length > 0 && (
+            <Pagination
+              page={amenityPage}
+              pageSize={amenityPageSize}
+              total={amenities.length}
+              onPageChange={setAmenityPage}
+              onPageSizeChange={(sz) => {
+                setAmenityPageSize(sz);
+                setAmenityPage(1);
+              }}
+            />
+          )}
         </div>
 
         {/* Right Side: Active Resident Bookings */}
         <div className="card">
-          <div className="card-header">
+          <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <h3 className="card-title">Upcoming Resident Bookings</h3>
+            <span style={{ fontSize: "0.775rem", color: "var(--muted)" }}>
+              {bookings.length} total
+            </span>
           </div>
           <div className="table-container">
             <table className="data-table">
@@ -327,7 +364,7 @@ export default function FacilityManagerAmenitiesPage() {
                     </td>
                   </tr>
                 ) : (
-                  bookings.map((b: any) => {
+                  paginatedBookings.map((b: any) => {
                     const residentName =
                       b.resident_name ||
                       b.resident_user?.full_name ||
@@ -407,6 +444,18 @@ export default function FacilityManagerAmenitiesPage() {
               </tbody>
             </table>
           </div>
+          {bookings.length > 0 && (
+            <Pagination
+              page={bookingPage}
+              pageSize={bookingPageSize}
+              total={bookings.length}
+              onPageChange={setBookingPage}
+              onPageSizeChange={(sz) => {
+                setBookingPageSize(sz);
+                setBookingPage(1);
+              }}
+            />
+          )}
         </div>
       </div>
 

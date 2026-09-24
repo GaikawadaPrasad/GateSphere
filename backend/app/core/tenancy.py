@@ -75,7 +75,7 @@ async def bind_rls_scope_async(db: AsyncSession, scope: TenantScope) -> None:
 
 async def get_tenant_scope_async(
     request: Request,
-    db: AsyncSession = Depends(get_async_db, scope="function"),
+    db: AsyncSession = Depends(get_async_db),
     user: User = Depends(require_auth_async),
     x_community_id: str | None = Header(default=None, alias="X-Community-Id"),
 ) -> TenantScope:
@@ -145,7 +145,7 @@ class AsyncTenantContext:
 
 
 async def async_tenant_context(
-    db: AsyncSession = Depends(get_async_db, scope="function"),
+    db: AsyncSession = Depends(get_async_db),
     scope: TenantScope = Depends(get_tenant_scope_async),
 ) -> AsyncTenantContext:
     await bind_rls_scope_async(db, scope)

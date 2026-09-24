@@ -384,7 +384,7 @@ async def _touch_last_activity(db: AsyncSession, session_id: str) -> None:
 
 async def require_auth_async(
     request: Request,
-    db: AsyncSession = Depends(get_async_db, scope="function"),
+    db: AsyncSession = Depends(get_async_db),
     _: None = Depends(verify_csrf),
 ) -> User:
     session = await _load_session_async(db, request)
