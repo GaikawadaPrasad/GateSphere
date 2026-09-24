@@ -111,18 +111,19 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Column 3: Company Links (1 col on mobile, 2 cols on lg) */}
+          {/* Column 3: Company & Legal Links (1 col on mobile, 2 cols on lg) */}
           <div className="col-span-1 lg:col-span-2 space-y-2.5 sm:space-y-3">
             <h4
               className="text-[11.5px] sm:text-[12px] font-bold uppercase tracking-wider text-white"
               style={{ fontFamily: "'Outfit', sans-serif" }}
             >
-              COMPANY
+              COMPANY & LEGAL
             </h4>
             <ul className="space-y-1.5 sm:space-y-2 text-[12px] sm:text-[13px]">
               {[
                 { label: "About GateSphere", href: "/about" },
-                { label: "Platform Architecture", href: "/platform" },
+                { label: "Terms & Conditions", href: "/terms" },
+                { label: "Cookie Policy", href: "/cookies" },
                 { label: "Security & Privacy", href: "/security" },
                 { label: "Contact Us", href: "/demo" },
               ].map((item) => (
@@ -204,13 +205,13 @@ export default function Footer() {
         </div>
 
         {/* ── BOTTOM BAR: Copyright + Active Navigation Links ── */}
-        <div className="pt-5 sm:pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 text-[11.5px] sm:text-[12px] text-slate-500 text-center sm:text-left">
+        <div className="pt-5 sm:pt-6 flex flex-col md:flex-row items-center justify-between gap-3 sm:gap-4 text-[11.5px] sm:text-[12px] text-slate-500 text-center sm:text-left">
           <div>
             © 2026 GateSphere Enterprise. All rights reserved.
           </div>
 
           {/* Direct Quick Links Bar */}
-          <div className="flex flex-wrap sm:flex-nowrap items-center justify-center gap-2 sm:gap-3 text-[11px] sm:text-xs font-medium">
+          <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 text-[11px] sm:text-xs font-medium">
             <Link href="/" className="text-slate-400 hover:text-white transition-colors cursor-pointer">Home</Link>
             <span className="text-slate-700">·</span>
             <Link href="/platform" className="text-slate-400 hover:text-white transition-colors cursor-pointer">Platform</Link>
@@ -221,7 +222,9 @@ export default function Footer() {
             <span className="text-slate-700">·</span>
             <Link href="/security" className="text-slate-400 hover:text-white transition-colors cursor-pointer">Security</Link>
             <span className="text-slate-700">·</span>
-            <Link href="/about" className="text-slate-400 hover:text-white transition-colors cursor-pointer">About</Link>
+            <Link href="/terms" className="text-slate-400 hover:text-cyan-400 transition-colors cursor-pointer">Terms & Conditions</Link>
+            <span className="text-slate-700">·</span>
+            <Link href="/cookies" className="text-slate-400 hover:text-cyan-400 transition-colors cursor-pointer">Cookies</Link>
             <span className="text-slate-700">·</span>
             <Link href="/demo" className="text-slate-400 hover:text-white transition-colors cursor-pointer">Contact Us</Link>
           </div>
