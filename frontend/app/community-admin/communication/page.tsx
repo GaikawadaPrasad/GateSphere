@@ -302,15 +302,17 @@ export default function CommunityAdminCommunicationPage() {
       key: "title",
       header: "Title & Preview",
       render: (a) => (
-        <div style={{ maxWidth: 320 }}>
+        <div style={{ maxWidth: "100%", minWidth: 0 }}>
           <strong>{a.title}</strong>
           <div
             style={{
               fontSize: "0.75rem",
               color: "var(--muted)",
-              whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
             }}
           >
             {a.body}

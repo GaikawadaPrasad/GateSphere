@@ -166,20 +166,23 @@ export default function SecuritySupervisorNotificationsPage() {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
+                    gap: "0.75rem",
                     padding: "1rem",
                     borderRadius: "var(--radius-sm)",
                     background: isRead ? "white" : "var(--primary-light)",
                     border: isRead ? "1px solid var(--border)" : "1px solid #bfdbfe",
+                    minWidth: 0,
+                    overflow: "hidden",
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "1rem", minWidth: 0, flex: 1, overflow: "hidden" }}>
                     <StatusBadge status={n.category || n.notification_type || n.type || "Info"} />
-                    <div>
-                      <div style={{ fontWeight: 600, color: "var(--fg)", fontSize: "0.9rem" }}>
+                    <div style={{ minWidth: 0, flex: 1, overflow: "hidden" }}>
+                      <div style={{ fontWeight: 600, color: "var(--fg)", fontSize: "0.9rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {title} {!isRead && <span style={{ color: "var(--primary)" }}>●</span>}
                       </div>
                       <div
-                        style={{ fontSize: "0.8rem", color: "var(--muted)", marginTop: "0.2rem" }}
+                        style={{ fontSize: "0.8rem", color: "var(--muted)", marginTop: "0.2rem", wordBreak: "break-word" }}
                       >
                         {message}{" "}
                         {timestamp && (

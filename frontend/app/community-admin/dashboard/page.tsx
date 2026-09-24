@@ -562,6 +562,8 @@ export default function CommunityAdminDashboardPage() {
                           justifyContent: "space-between",
                           alignItems: "center",
                           gap: "0.5rem",
+                          minWidth: 0,
+                          overflow: "hidden",
                         }}
                       >
                         <strong

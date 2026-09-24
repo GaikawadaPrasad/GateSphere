@@ -160,10 +160,12 @@ export default function CommunityAdminNotificationsPage() {
               style={{
                 fontSize: "0.75rem",
                 color: "var(--muted)",
-                whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
-                maxWidth: 380,
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                maxWidth: "100%",
               }}
             >
               {n.body || n.message || "Notification alert"}
