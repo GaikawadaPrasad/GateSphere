@@ -110,7 +110,7 @@ export function EditRolePermissionsModal({
       await rbacApi.setRolePermissions(role.slug, Array.from(selectedPermissions));
       toast.success(
         `Updated permissions for role "${role.name}" (${selectedPermissions.size} assigned).`,
-        "Role Permissions Saved"
+        "Role Permissions Saved",
       );
       await Promise.allSettled([
         queryClient.invalidateQueries({ queryKey: ["roles"], refetchType: "all" }),
@@ -154,7 +154,10 @@ export function EditRolePermissionsModal({
         </>
       }
     >
-      <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+      <form
+        onSubmit={handleSave}
+        style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}
+      >
         {/* Meta Header */}
         <div
           style={{
@@ -198,7 +201,9 @@ export function EditRolePermissionsModal({
               fontSize: "0.85rem",
             }}
           >
-            <strong>Note:</strong> The Super Admin role has wildcard access (<code>*</code>) and automatically possesses all permissions across every module. Its permission set cannot be restricted.
+            <strong>Note:</strong> The Super Admin role has wildcard access (<code>*</code>) and
+            automatically possesses all permissions across every module. Its permission set cannot
+            be restricted.
           </div>
         )}
 
@@ -220,7 +225,9 @@ export function EditRolePermissionsModal({
         {!isWildcard && (
           <>
             {/* Filters Bar */}
-            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
+            <div
+              style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}
+            >
               <div style={{ flex: 1, minWidth: "200px" }}>
                 <input
                   type="text"
@@ -281,7 +288,14 @@ export function EditRolePermissionsModal({
               }}
             >
               {filteredPermissions.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "2rem", color: "var(--muted)", fontSize: "0.85rem" }}>
+                <div
+                  style={{
+                    textAlign: "center",
+                    padding: "2rem",
+                    color: "var(--muted)",
+                    fontSize: "0.85rem",
+                  }}
+                >
                   No permissions match the active filter.
                 </div>
               ) : (
@@ -300,7 +314,9 @@ export function EditRolePermissionsModal({
                         padding: "0.5rem 0.75rem",
                         borderRadius: "0.375rem",
                         background: isChecked ? "rgba(37, 99, 235, 0.04)" : "transparent",
-                        border: isChecked ? "1px solid rgba(37, 99, 235, 0.2)" : "1px solid transparent",
+                        border: isChecked
+                          ? "1px solid rgba(37, 99, 235, 0.2)"
+                          : "1px solid transparent",
                         cursor: "pointer",
                         transition: "all 0.15s ease",
                       }}
@@ -313,10 +329,15 @@ export function EditRolePermissionsModal({
                       />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                          <span style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--fg)" }}>
+                          <span
+                            style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--fg)" }}
+                          >
                             {p.code}
                           </span>
-                          <span className="badge badge-primary" style={{ fontSize: "0.7rem", padding: "0.15rem 0.4rem" }}>
+                          <span
+                            className="badge badge-primary"
+                            style={{ fontSize: "0.7rem", padding: "0.15rem 0.4rem" }}
+                          >
                             {mod}
                           </span>
                           {act && (
@@ -335,7 +356,13 @@ export function EditRolePermissionsModal({
                           )}
                         </div>
                         {p.description && (
-                          <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.15rem" }}>
+                          <div
+                            style={{
+                              fontSize: "0.75rem",
+                              color: "var(--muted)",
+                              marginTop: "0.15rem",
+                            }}
+                          >
                             {p.description}
                           </div>
                         )}

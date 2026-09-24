@@ -34,11 +34,7 @@ const GOVT_ID_TYPES = [
   { value: "other", label: "Other Government ID" },
 ];
 
-export function WalkInVisitorModal({
-  isOpen,
-  onClose,
-  onEntryAdmitted,
-}: WalkInVisitorModalProps) {
+export function WalkInVisitorModal({ isOpen, onClose, onEntryAdmitted }: WalkInVisitorModalProps) {
   // Form inputs
   const [visitorName, setVisitorName] = useState("");
   const [visitorPhone, setVisitorPhone] = useState("");
@@ -117,14 +113,15 @@ export function WalkInVisitorModal({
   const validateField = (
     name: string,
     value: any,
-    context?: { idType?: string }
+    context?: { idType?: string },
   ): string | undefined => {
     switch (name) {
       case "visitorName": {
         const trimmed = (value || "").trim();
         if (!trimmed) return "Visitor full name is required.";
         if (trimmed.length < 2) return "Visitor name is too short (must be at least 2 characters).";
-        if (trimmed.length > 35) return "Visitor name exceeds maximum length (cannot exceed 35 characters).";
+        if (trimmed.length > 35)
+          return "Visitor name exceeds maximum length (cannot exceed 35 characters).";
         if (!isValidPersonName(trimmed)) {
           return "Visitor name must contain only alphabetic letters and spaces (no numbers or symbols).";
         }
@@ -268,7 +265,7 @@ export function WalkInVisitorModal({
             (a.unit_number || "").localeCompare(b.unit_number || "", undefined, {
               numeric: true,
               sensitivity: "base",
-            })
+            }),
           );
           setUnits(sorted);
           setUnitId((prev) => (prev && sorted.some((u: any) => u.id === prev) ? prev : ""));
@@ -391,7 +388,10 @@ export function WalkInVisitorModal({
     setErrorMessage(null);
 
     try {
-      const cleanId = idNumber.trim().toUpperCase().replace(/[\s\-]/g, "");
+      const cleanId = idNumber
+        .trim()
+        .toUpperCase()
+        .replace(/[\s\-]/g, "");
       const payload = {
         unit_id: unitId,
         visitor: {
@@ -418,9 +418,9 @@ export function WalkInVisitorModal({
       ) {
         setBlacklistHit({
           reason:
-          err?.fields?.reason ||
-          err?.message ||
-          "This visitor is flagged on the security blacklist.",
+            err?.fields?.reason ||
+            err?.message ||
+            "This visitor is flagged on the security blacklist.",
           risk_level: err?.fields?.risk_level || "high",
         });
         setErrorMessage("⛔ ENTRY DENIED: Visitor is blacklisted by community security!");
@@ -428,9 +428,13 @@ export function WalkInVisitorModal({
         err?.code === "VISITOR_ALREADY_INSIDE" ||
         (err?.message && err.message.toLowerCase().includes("inside the premises"))
       ) {
-        setErrorMessage("⚠️ VISITOR ALREADY INSIDE: This visitor is currently checked in at the community. They must check out before a new entry pass or walk-in request can be created.");
+        setErrorMessage(
+          "⚠️ VISITOR ALREADY INSIDE: This visitor is currently checked in at the community. They must check out before a new entry pass or walk-in request can be created.",
+        );
       } else {
-        let detailMsg = err?.message || "Failed to initiate visitor approval request. Please check blacklist / unit status.";
+        let detailMsg =
+          err?.message ||
+          "Failed to initiate visitor approval request. Please check blacklist / unit status.";
         if (err?.fields && typeof err.fields === "object" && Object.keys(err.fields).length > 0) {
           const fieldDetails = Object.entries(err.fields)
             .map(([k, v]) => `${k}: ${v}`)
@@ -448,7 +452,7 @@ export function WalkInVisitorModal({
     if (!activeRequest?.id) return;
     if (!visitorPhotoUrl) {
       setErrorMessage(
-        "📸 VISITOR PHOTO REQUIRED: Security policy mandates capturing a visitor photograph before gate admittance. Please attach the photo below."
+        "📸 VISITOR PHOTO REQUIRED: Security policy mandates capturing a visitor photograph before gate admittance. Please attach the photo below.",
       );
       return;
     }
@@ -479,7 +483,9 @@ export function WalkInVisitorModal({
 
   const selectedUnit = units.find((u) => u.id === unitId);
   const filteredUnits = unitFilter.trim()
-    ? units.filter((u) => (u.unit_number || "").toLowerCase().includes(unitFilter.toLowerCase().trim()))
+    ? units.filter((u) =>
+        (u.unit_number || "").toLowerCase().includes(unitFilter.toLowerCase().trim()),
+      )
     : units;
 
   const handleUnitFilterChange = (val: string) => {
@@ -488,12 +494,8 @@ export function WalkInVisitorModal({
     if (!trimmed) {
       return;
     }
-    const matches = units.filter((u) =>
-      (u.unit_number || "").toLowerCase().includes(trimmed)
-    );
-    const exactMatch = matches.find(
-      (u) => (u.unit_number || "").toLowerCase() === trimmed
-    );
+    const matches = units.filter((u) => (u.unit_number || "").toLowerCase().includes(trimmed));
+    const exactMatch = matches.find((u) => (u.unit_number || "").toLowerCase() === trimmed);
     if (exactMatch) {
       setUnitId(exactMatch.id);
       handleFieldChange("unitId", exactMatch.id);
@@ -509,551 +511,551 @@ export function WalkInVisitorModal({
   return (
     <>
       <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={
-        step === "form"
-          ? "👤 Walk-In Visitor Gate Check-In"
-          : step === "waiting_approval"
-          ? "📲 Real-Time Resident Approval Prompt"
-          : "✅ Visitor Admitted to Premises"
-      }
-      size="lg"
-    >
-      {errorMessage && (
-        <div
-          style={{
-            marginBottom: "1rem",
-            padding: "0.75rem 1rem",
-            borderRadius: "var(--radius-sm)",
-            background: errorMessage.includes("ALREADY INSIDE") ? "#FEF3C7" : "var(--danger-light)",
-            border: errorMessage.includes("ALREADY INSIDE") ? "1px solid #F59E0B" : "1px solid var(--danger-border)",
-            color: errorMessage.includes("ALREADY INSIDE") ? "#92400E" : "#991b1b",
-            fontSize: "0.9rem",
-            fontWeight: 600,
-          }}
-        >
-          {errorMessage.startsWith("⚠️") || errorMessage.startsWith("⛔") ? errorMessage : `⚠️ ${errorMessage}`}
-        </div>
-      )}
-
-      {step === "form" && (
-        <form onSubmit={handleSendPrompt} noValidate>
-          <p style={{ fontSize: "0.875rem", color: "var(--muted)", marginBottom: "1.25rem" }}>
-            Visitor arrived at gate without a pre-approved pass. Enter mobile and details to trigger an instant approval prompt to the resident.
-          </p>
-
+        isOpen={isOpen}
+        onClose={onClose}
+        title={
+          step === "form"
+            ? "👤 Walk-In Visitor Gate Check-In"
+            : step === "waiting_approval"
+              ? "📲 Real-Time Resident Approval Prompt"
+              : "✅ Visitor Admitted to Premises"
+        }
+        size="lg"
+      >
+        {errorMessage && (
           <div
             style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-              gap: "1rem",
               marginBottom: "1rem",
+              padding: "0.75rem 1rem",
+              borderRadius: "var(--radius-sm)",
+              background: errorMessage.includes("ALREADY INSIDE")
+                ? "#FEF3C7"
+                : "var(--danger-light)",
+              border: errorMessage.includes("ALREADY INSIDE")
+                ? "1px solid #F59E0B"
+                : "1px solid var(--danger-border)",
+              color: errorMessage.includes("ALREADY INSIDE") ? "#92400E" : "#991b1b",
+              fontSize: "0.9rem",
+              fontWeight: 600,
             }}
           >
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
-                <label style={{ fontSize: "0.85rem", fontWeight: 700 }}>
-                  Visitor Full Name <span style={{ color: "red" }}>*</span>
-                </label>
-                <span
-                  style={{
-                    fontSize: "0.75rem",
-                    color: visitorName.length > 35 ? "#DC2626" : visitorName.length > 0 && visitorName.trim().length < 2 ? "#D97706" : "var(--muted)",
-                    fontWeight: visitorName.length > 35 ? 700 : 400,
-                  }}
-                >
-                  {visitorName.length}/35
-                </span>
-              </div>
-              <input
-                type="text"
-                className="input-field"
-                placeholder="e.g. Ramesh Kumar (2-35 chars)"
-                value={visitorName}
-                onChange={(e) => {
-                  setVisitorName(e.target.value);
-                  handleFieldChange("visitorName", e.target.value);
-                }}
-                onBlur={() => handleFieldBlur("visitorName", visitorName)}
-                style={fieldErrors.visitorName ? { borderColor: "#EF4444", background: "#FEF2F2" } : undefined}
-                required
-              />
-              {fieldErrors.visitorName && (
-                <div style={{ color: "#DC2626", fontSize: "0.75rem", marginTop: "0.25rem", fontWeight: 600 }}>
-                  {fieldErrors.visitorName}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, marginBottom: "0.35rem" }}>
-                Mobile Number <span style={{ color: "red" }}>*</span>
-              </label>
-              <input
-                type="tel"
-                className="input-field"
-                placeholder="e.g. 98765 43210"
-                value={visitorPhone}
-                onChange={(e) => {
-                  setVisitorPhone(e.target.value);
-                  handleFieldChange("visitorPhone", e.target.value);
-                }}
-                onBlur={() => {
-                  handleFieldBlur("visitorPhone", visitorPhone);
-                  checkBlacklist(visitorPhone, undefined);
-                }}
-                style={fieldErrors.visitorPhone ? { borderColor: "#EF4444", background: "#FEF2F2" } : undefined}
-                required
-              />
-              {fieldErrors.visitorPhone && (
-                <div style={{ color: "#DC2626", fontSize: "0.75rem", marginTop: "0.25rem", fontWeight: 600 }}>
-                  {fieldErrors.visitorPhone}
-                </div>
-              )}
-            </div>
+            {errorMessage.startsWith("⚠️") || errorMessage.startsWith("⛔")
+              ? errorMessage
+              : `⚠️ ${errorMessage}`}
           </div>
+        )}
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-              gap: "1rem",
-              marginBottom: "1rem",
-            }}
-          >
-            <div>
-              <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, marginBottom: "0.35rem" }}>
-                Govt ID Type (Optional)
-              </label>
-              <select
-                className="input-field"
-                value={idType}
-                onChange={(e) => {
-                  const newType = e.target.value;
-                  setIdType(newType);
-                  if (idNumber.trim()) {
-                    const idErr = validateField("idNumber", idNumber, { idType: newType });
-                    setFieldErrors((prev) => ({ ...prev, idNumber: idErr }));
-                  }
-                }}
-              >
-                {GOVT_ID_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+        {step === "form" && (
+          <form onSubmit={handleSendPrompt} noValidate>
+            <p style={{ fontSize: "0.875rem", color: "var(--muted)", marginBottom: "1.25rem" }}>
+              Visitor arrived at gate without a pre-approved pass. Enter mobile and details to
+              trigger an instant approval prompt to the resident.
+            </p>
 
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
-                <label style={{ fontSize: "0.85rem", fontWeight: 700 }}>
-                  Govt ID Number (Aadhaar / PAN / DL)
-                </label>
-                {isCheckingBlacklist && (
-                  <span style={{ fontSize: "0.75rem", color: "var(--primary)" }}>
-                    🔍 Checking…
-                  </span>
-                )}
-              </div>
-              <input
-                type="text"
-                className="input-field"
-                placeholder={
-                  idType === "aadhaar"
-                    ? "e.g. 1234 5678 9012 (12 digits)"
-                    : idType === "pan"
-                    ? "e.g. ABCDE1234F (10 chars)"
-                    : "Enter Govt ID number"
-                }
-                value={idNumber}
-                onChange={(e) => {
-                  const val = e.target.value.toUpperCase();
-                  setIdNumber(val);
-                  handleFieldChange("idNumber", val, { idType });
-                }}
-                onBlur={() => {
-                  handleFieldBlur("idNumber", idNumber, { idType });
-                  checkBlacklist(undefined, idNumber);
-                }}
-                style={{
-                  fontFamily: "monospace",
-                  ...(fieldErrors.idNumber ? { borderColor: "#EF4444", background: "#FEF2F2" } : {}),
-                }}
-              />
-              {fieldErrors.idNumber && (
-                <div style={{ color: "#DC2626", fontSize: "0.75rem", marginTop: "0.25rem", fontWeight: 600 }}>
-                  {fieldErrors.idNumber}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-              gap: "1rem",
-              marginBottom: "1rem",
-            }}
-          >
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
-                <label style={{ fontSize: "0.85rem", fontWeight: 700 }}>
-                  Destination Unit / Flat <span style={{ color: "red" }}>*</span>
-                  {units.length > 0 && (
-                    <span style={{ fontWeight: 400, color: "var(--muted)", marginLeft: "0.5rem", fontSize: "0.8rem" }}>
-                      ({units.length} flats available)
-                    </span>
-                  )}
-                </label>
-                {unitsError && (
-                  <button
-                    type="button"
-                    onClick={() => loadUnits(true)}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "var(--primary)",
-                      fontSize: "0.75rem",
-                      cursor: "pointer",
-                      textDecoration: "underline",
-                      fontWeight: 600,
-                    }}
-                  >
-                    🔄 Retry loading
-                  </button>
-                )}
-              </div>
-
-              {units.length > 6 && (
-                <input
-                  type="text"
-                  placeholder="🔍 Filter flat e.g. A-101, B-2..."
-                  value={unitFilter}
-                  onChange={(e) => handleUnitFilterChange(e.target.value)}
-                  style={{
-                    fontSize: "0.8rem",
-                    padding: "0.35rem 0.6rem",
-                    marginBottom: "0.4rem",
-                    width: "100%",
-                    borderRadius: "4px",
-                    border: "1px solid #cbd5e1",
-                  }}
-                />
-              )}
-
-              <select
-                className="input-field"
-                value={unitId}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setUnitId(val);
-                  handleFieldChange("unitId", val);
-                }}
-                onBlur={() => handleFieldBlur("unitId", unitId)}
-                style={fieldErrors.unitId ? { borderColor: "#EF4444", background: "#FEF2F2" } : undefined}
-                disabled={isLoadingUnits}
-                required
-              >
-                {isLoadingUnits ? (
-                  <option value="">⏳ Loading flats in community...</option>
-                ) : unitsError ? (
-                  <option value="">⚠️ Error loading flats — click Retry above</option>
-                ) : filteredUnits.length === 0 ? (
-                  <option value="">
-                    {units.length === 0 ? "No units registered in community" : `No units match "${unitFilter}"`}
-                  </option>
-                ) : (
-                  <>
-                    <option value="">
-                      {unitFilter.trim()
-                        ? `-- Select Destination Flat (${filteredUnits.length} matching) --`
-                        : "-- Select Destination Unit / Flat --"}
-                    </option>
-                    {filteredUnits.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        Unit {u.unit_number} {u.unit_type ? `(${u.unit_type})` : ""}
-                      </option>
-                    ))}
-                  </>
-                )}
-              </select>
-              {selectedUnit && (
-                <div
-                  style={{
-                    marginTop: "0.35rem",
-                    padding: "0.3rem 0.5rem",
-                    borderRadius: "4px",
-                    background: "#F0FDF4",
-                    border: "1px solid #BBF7D0",
-                    color: "#166534",
-                    fontSize: "0.75rem",
-                    fontWeight: 600,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <span>📍 Target Flat: <strong>Unit {selectedUnit.unit_number}</strong> {selectedUnit.unit_type ? `(${selectedUnit.unit_type})` : ""}</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUnitId("");
-                      setUnitFilter("");
-                      handleFieldChange("unitId", "");
-                    }}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "#991B1B",
-                      cursor: "pointer",
-                      fontSize: "0.75rem",
-                      fontWeight: 600,
-                    }}
-                    title="Clear selection"
-                  >
-                    ✕ Clear
-                  </button>
-                </div>
-              )}
-              {fieldErrors.unitId && (
-                <div style={{ color: "#DC2626", fontSize: "0.75rem", marginTop: "0.25rem", fontWeight: 600 }}>
-                  {fieldErrors.unitId}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, marginBottom: "0.35rem" }}>
-                Visitor Type / Category
-              </label>
-              <select
-                className="input-field"
-                value={visitorType}
-                onChange={(e) => setVisitorType(e.target.value)}
-              >
-                {VISITOR_CATEGORIES.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-              gap: "1rem",
-              marginBottom: "1.25rem",
-            }}
-          >
-            <div>
-              <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, marginBottom: "0.35rem" }}>
-                Vehicle Number (Optional)
-              </label>
-              <input
-                type="text"
-                className="input-field"
-                placeholder="e.g. TS 09 EA 1234"
-                value={vehicleNumber}
-                onChange={(e) => {
-                  const val = e.target.value.toUpperCase();
-                  setVehicleNumber(val);
-                  handleFieldChange("vehicleNumber", val);
-                }}
-                onBlur={() => handleFieldBlur("vehicleNumber", vehicleNumber)}
-                style={{
-                  fontFamily: "monospace",
-                  ...(fieldErrors.vehicleNumber ? { borderColor: "#EF4444", background: "#FEF2F2" } : {}),
-                }}
-              />
-              {fieldErrors.vehicleNumber && (
-                <div style={{ color: "#DC2626", fontSize: "0.75rem", marginTop: "0.25rem", fontWeight: 600 }}>
-                  {fieldErrors.vehicleNumber}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, marginBottom: "0.35rem" }}>
-                Purpose / Remarks
-              </label>
-              <input
-                type="text"
-                className="input-field"
-                placeholder="e.g. Meeting resident, Package drop"
-                value={purpose}
-                onChange={(e) => {
-                  setPurpose(e.target.value);
-                  handleFieldChange("purpose", e.target.value);
-                }}
-                onBlur={() => handleFieldBlur("purpose", purpose)}
-                style={fieldErrors.purpose ? { borderColor: "#EF4444", background: "#FEF2F2" } : undefined}
-              />
-              {fieldErrors.purpose && (
-                <div style={{ color: "#DC2626", fontSize: "0.75rem", marginTop: "0.25rem", fontWeight: 600 }}>
-                  {fieldErrors.purpose}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div
-            style={{
-              padding: "1rem",
-              borderRadius: "8px",
-              background: "#F8FAFC",
-              border: visitorPhotoUrl
-                ? "1px solid #86EFAC"
-                : fieldErrors.visitorPhotoUrl
-                ? "1.5px solid #EF4444"
-                : "1px solid #CBD5E1",
-              marginBottom: "1.25rem",
-            }}
-          >
             <div
               style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "0.5rem",
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                gap: "1rem",
+                marginBottom: "1rem",
               }}
             >
-              <label style={{ fontSize: "0.85rem", fontWeight: 700, color: "#1E293B" }}>
-                📷 Visitor Photograph <span style={{ color: "#DC2626", fontWeight: 900 }}>* (Mandatory)</span>
-              </label>
-              {visitorPhotoUrl ? (
-                <span style={{ fontSize: "0.75rem", color: "#16A34A", fontWeight: 700 }}>
-                  ✓ Photograph Attached
-                </span>
-              ) : (
-                <span style={{ fontSize: "0.75rem", color: "#DC2626", fontWeight: 700 }}>
-                  Required Before Entry
-                </span>
-              )}
-            </div>
-            <FileUpload
-              kind="visitor_photo"
-              label="Upload or snap visitor face photograph"
-              currentUrl={visitorPhotoUrl || undefined}
-              onUploadComplete={(url) => {
-                setVisitorPhotoUrl(url);
-                setErrorMessage(null);
-                setFieldErrors((prev) => ({ ...prev, visitorPhotoUrl: undefined }));
-              }}
-            />
-            {fieldErrors.visitorPhotoUrl && (
-              <div style={{ color: "#DC2626", fontSize: "0.75rem", marginTop: "0.4rem", fontWeight: 600 }}>
-                {fieldErrors.visitorPhotoUrl}
+              <div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: "0.35rem",
+                  }}
+                >
+                  <label style={{ fontSize: "0.85rem", fontWeight: 700 }}>
+                    Visitor Full Name <span style={{ color: "red" }}>*</span>
+                  </label>
+                  <span
+                    style={{
+                      fontSize: "0.75rem",
+                      color:
+                        visitorName.length > 35
+                          ? "#DC2626"
+                          : visitorName.length > 0 && visitorName.trim().length < 2
+                            ? "#D97706"
+                            : "var(--muted)",
+                      fontWeight: visitorName.length > 35 ? 700 : 400,
+                    }}
+                  >
+                    {visitorName.length}/35
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="e.g. Ramesh Kumar (2-35 chars)"
+                  value={visitorName}
+                  onChange={(e) => {
+                    setVisitorName(e.target.value);
+                    handleFieldChange("visitorName", e.target.value);
+                  }}
+                  onBlur={() => handleFieldBlur("visitorName", visitorName)}
+                  style={
+                    fieldErrors.visitorName
+                      ? { borderColor: "#EF4444", background: "#FEF2F2" }
+                      : undefined
+                  }
+                  required
+                />
+                {fieldErrors.visitorName && (
+                  <div
+                    style={{
+                      color: "#DC2626",
+                      fontSize: "0.75rem",
+                      marginTop: "0.25rem",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {fieldErrors.visitorName}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-
-
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "1.5rem" }}>
-            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={isSubmitting}>
-              Cancel
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-              {isSubmitting ? "Sending Request…" : "📲 SEND APPROVAL PROMPT TO RESIDENT"}
-            </button>
-          </div>
-        </form>
-      )}
-
-      {step === "waiting_approval" && activeRequest && (
-        <div>
-          <div
-            style={{
-              padding: "1.25rem",
-              borderRadius: "8px",
-              background: activeRequest.status === "approved" ? "var(--success-light)" : activeRequest.status === "rejected" ? "var(--danger-light)" : "#EFF6FF",
-              border: `1px solid ${activeRequest.status === "approved" ? "var(--success-border)" : activeRequest.status === "rejected" ? "var(--danger-border)" : "#BFDBFE"}`,
-              marginBottom: "1.25rem",
-              textAlign: "center",
-            }}
-          >
-            {activeRequest.status === "pending" && (
-              <>
-                <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>⏳</div>
-                <h4 style={{ margin: "0 0 0.5rem 0", color: "#1E40AF" }}>
-                  Awaiting Resident Decision
-                </h4>
-                <p style={{ margin: 0, fontSize: "0.9rem", color: "#3B82F6" }}>
-                  Real-time prompt sent to the primary occupant of{" "}
-                  <strong>Unit {selectedUnit?.unit_number || "Selected"}</strong>.
-                  Polling for resident response...
-                </p>
-              </>
-            )}
-
-            {activeRequest.status === "approved" && (
-              <>
-                <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>🎉</div>
-                <h4 style={{ margin: "0 0 0.5rem 0", color: "#065F46" }}>
-                  Resident Approved Entry!
-                </h4>
-                <p style={{ margin: 0, fontSize: "0.9rem", color: "#047857" }}>
-                  The resident has permitted this visitor to enter the community.
-                </p>
-              </>
-            )}
-
-            {activeRequest.status === "rejected" && (
-              <>
-                <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>❌</div>
-                <h4 style={{ margin: "0 0 0.5rem 0", color: "#991B1B" }}>
-                  Resident Denied Entry
-                </h4>
-                <p style={{ margin: 0, fontSize: "0.9rem", color: "#DC2626" }}>
-                  The resident has rejected this entry request. Do not allow visitor through the gate.
-                </p>
-              </>
-            )}
-          </div>
-
-          <div
-            style={{
-              background: "#F8FAFC",
-              borderRadius: "8px",
-              padding: "1rem 1.25rem",
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-              gap: "1rem",
-              fontSize: "0.9rem",
-              marginBottom: "1.5rem",
-            }}
-          >
-            <div>
-              <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>Visitor</span>
-              <strong>{visitorName}</strong>
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.85rem",
+                    fontWeight: 700,
+                    marginBottom: "0.35rem",
+                  }}
+                >
+                  Mobile Number <span style={{ color: "red" }}>*</span>
+                </label>
+                <input
+                  type="tel"
+                  className="input-field"
+                  placeholder="e.g. 98765 43210"
+                  value={visitorPhone}
+                  onChange={(e) => {
+                    setVisitorPhone(e.target.value);
+                    handleFieldChange("visitorPhone", e.target.value);
+                  }}
+                  onBlur={() => {
+                    handleFieldBlur("visitorPhone", visitorPhone);
+                    checkBlacklist(visitorPhone, undefined);
+                  }}
+                  style={
+                    fieldErrors.visitorPhone
+                      ? { borderColor: "#EF4444", background: "#FEF2F2" }
+                      : undefined
+                  }
+                  required
+                />
+                {fieldErrors.visitorPhone && (
+                  <div
+                    style={{
+                      color: "#DC2626",
+                      fontSize: "0.75rem",
+                      marginTop: "0.25rem",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {fieldErrors.visitorPhone}
+                  </div>
+                )}
+              </div>
             </div>
-            <div>
-              <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>Phone</span>
-              <strong style={{ fontFamily: "monospace" }}>{visitorPhone}</strong>
-            </div>
-            <div>
-              <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>Destination</span>
-              <strong>Unit {selectedUnit?.unit_number || "—"}</strong>
-            </div>
-            <div>
-              <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>Live Status</span>
-              <StatusBadge status={activeRequest.status} />
-            </div>
-          </div>
 
-          {activeRequest.status === "approved" && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                gap: "1rem",
+                marginBottom: "1rem",
+              }}
+            >
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.85rem",
+                    fontWeight: 700,
+                    marginBottom: "0.35rem",
+                  }}
+                >
+                  Govt ID Type (Optional)
+                </label>
+                <select
+                  className="input-field"
+                  value={idType}
+                  onChange={(e) => {
+                    const newType = e.target.value;
+                    setIdType(newType);
+                    if (idNumber.trim()) {
+                      const idErr = validateField("idNumber", idNumber, { idType: newType });
+                      setFieldErrors((prev) => ({ ...prev, idNumber: idErr }));
+                    }
+                  }}
+                >
+                  {GOVT_ID_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: "0.35rem",
+                  }}
+                >
+                  <label style={{ fontSize: "0.85rem", fontWeight: 700 }}>
+                    Govt ID Number (Aadhaar / PAN / DL)
+                  </label>
+                  {isCheckingBlacklist && (
+                    <span style={{ fontSize: "0.75rem", color: "var(--primary)" }}>
+                      🔍 Checking…
+                    </span>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder={
+                    idType === "aadhaar"
+                      ? "e.g. 1234 5678 9012 (12 digits)"
+                      : idType === "pan"
+                        ? "e.g. ABCDE1234F (10 chars)"
+                        : "Enter Govt ID number"
+                  }
+                  value={idNumber}
+                  onChange={(e) => {
+                    const val = e.target.value.toUpperCase();
+                    setIdNumber(val);
+                    handleFieldChange("idNumber", val, { idType });
+                  }}
+                  onBlur={() => {
+                    handleFieldBlur("idNumber", idNumber, { idType });
+                    checkBlacklist(undefined, idNumber);
+                  }}
+                  style={{
+                    fontFamily: "monospace",
+                    ...(fieldErrors.idNumber
+                      ? { borderColor: "#EF4444", background: "#FEF2F2" }
+                      : {}),
+                  }}
+                />
+                {fieldErrors.idNumber && (
+                  <div
+                    style={{
+                      color: "#DC2626",
+                      fontSize: "0.75rem",
+                      marginTop: "0.25rem",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {fieldErrors.idNumber}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                gap: "1rem",
+                marginBottom: "1rem",
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: "0.35rem",
+                  }}
+                >
+                  <label style={{ fontSize: "0.85rem", fontWeight: 700 }}>
+                    Destination Unit / Flat <span style={{ color: "red" }}>*</span>
+                    {units.length > 0 && (
+                      <span
+                        style={{
+                          fontWeight: 400,
+                          color: "var(--muted)",
+                          marginLeft: "0.5rem",
+                          fontSize: "0.8rem",
+                        }}
+                      >
+                        ({units.length} flats available)
+                      </span>
+                    )}
+                  </label>
+                  {unitsError && (
+                    <button
+                      type="button"
+                      onClick={() => loadUnits(true)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "var(--primary)",
+                        fontSize: "0.75rem",
+                        cursor: "pointer",
+                        textDecoration: "underline",
+                        fontWeight: 600,
+                      }}
+                    >
+                      🔄 Retry loading
+                    </button>
+                  )}
+                </div>
+
+                {units.length > 6 && (
+                  <input
+                    type="text"
+                    placeholder="🔍 Filter flat e.g. A-101, B-2..."
+                    value={unitFilter}
+                    onChange={(e) => handleUnitFilterChange(e.target.value)}
+                    style={{
+                      fontSize: "0.8rem",
+                      padding: "0.35rem 0.6rem",
+                      marginBottom: "0.4rem",
+                      width: "100%",
+                      borderRadius: "4px",
+                      border: "1px solid #cbd5e1",
+                    }}
+                  />
+                )}
+
+                <select
+                  className="input-field"
+                  value={unitId}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setUnitId(val);
+                    handleFieldChange("unitId", val);
+                  }}
+                  onBlur={() => handleFieldBlur("unitId", unitId)}
+                  style={
+                    fieldErrors.unitId
+                      ? { borderColor: "#EF4444", background: "#FEF2F2" }
+                      : undefined
+                  }
+                  disabled={isLoadingUnits}
+                  required
+                >
+                  {isLoadingUnits ? (
+                    <option value="">⏳ Loading flats in community...</option>
+                  ) : unitsError ? (
+                    <option value="">⚠️ Error loading flats — click Retry above</option>
+                  ) : filteredUnits.length === 0 ? (
+                    <option value="">
+                      {units.length === 0
+                        ? "No units registered in community"
+                        : `No units match "${unitFilter}"`}
+                    </option>
+                  ) : (
+                    <>
+                      <option value="">
+                        {unitFilter.trim()
+                          ? `-- Select Destination Flat (${filteredUnits.length} matching) --`
+                          : "-- Select Destination Unit / Flat --"}
+                      </option>
+                      {filteredUnits.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          Unit {u.unit_number} {u.unit_type ? `(${u.unit_type})` : ""}
+                        </option>
+                      ))}
+                    </>
+                  )}
+                </select>
+                {selectedUnit && (
+                  <div
+                    style={{
+                      marginTop: "0.35rem",
+                      padding: "0.3rem 0.5rem",
+                      borderRadius: "4px",
+                      background: "#F0FDF4",
+                      border: "1px solid #BBF7D0",
+                      color: "#166534",
+                      fontSize: "0.75rem",
+                      fontWeight: 600,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <span>
+                      📍 Target Flat: <strong>Unit {selectedUnit.unit_number}</strong>{" "}
+                      {selectedUnit.unit_type ? `(${selectedUnit.unit_type})` : ""}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUnitId("");
+                        setUnitFilter("");
+                        handleFieldChange("unitId", "");
+                      }}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "#991B1B",
+                        cursor: "pointer",
+                        fontSize: "0.75rem",
+                        fontWeight: 600,
+                      }}
+                      title="Clear selection"
+                    >
+                      ✕ Clear
+                    </button>
+                  </div>
+                )}
+                {fieldErrors.unitId && (
+                  <div
+                    style={{
+                      color: "#DC2626",
+                      fontSize: "0.75rem",
+                      marginTop: "0.25rem",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {fieldErrors.unitId}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.85rem",
+                    fontWeight: 700,
+                    marginBottom: "0.35rem",
+                  }}
+                >
+                  Visitor Type / Category
+                </label>
+                <select
+                  className="input-field"
+                  value={visitorType}
+                  onChange={(e) => setVisitorType(e.target.value)}
+                >
+                  {VISITOR_CATEGORIES.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                gap: "1rem",
+                marginBottom: "1.25rem",
+              }}
+            >
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.85rem",
+                    fontWeight: 700,
+                    marginBottom: "0.35rem",
+                  }}
+                >
+                  Vehicle Number (Optional)
+                </label>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="e.g. TS 09 EA 1234"
+                  value={vehicleNumber}
+                  onChange={(e) => {
+                    const val = e.target.value.toUpperCase();
+                    setVehicleNumber(val);
+                    handleFieldChange("vehicleNumber", val);
+                  }}
+                  onBlur={() => handleFieldBlur("vehicleNumber", vehicleNumber)}
+                  style={{
+                    fontFamily: "monospace",
+                    ...(fieldErrors.vehicleNumber
+                      ? { borderColor: "#EF4444", background: "#FEF2F2" }
+                      : {}),
+                  }}
+                />
+                {fieldErrors.vehicleNumber && (
+                  <div
+                    style={{
+                      color: "#DC2626",
+                      fontSize: "0.75rem",
+                      marginTop: "0.25rem",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {fieldErrors.vehicleNumber}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.85rem",
+                    fontWeight: 700,
+                    marginBottom: "0.35rem",
+                  }}
+                >
+                  Purpose / Remarks
+                </label>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="e.g. Meeting resident, Package drop"
+                  value={purpose}
+                  onChange={(e) => {
+                    setPurpose(e.target.value);
+                    handleFieldChange("purpose", e.target.value);
+                  }}
+                  onBlur={() => handleFieldBlur("purpose", purpose)}
+                  style={
+                    fieldErrors.purpose
+                      ? { borderColor: "#EF4444", background: "#FEF2F2" }
+                      : undefined
+                  }
+                />
+                {fieldErrors.purpose && (
+                  <div
+                    style={{
+                      color: "#DC2626",
+                      fontSize: "0.75rem",
+                      marginTop: "0.25rem",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {fieldErrors.purpose}
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div
               style={{
                 padding: "1rem",
                 borderRadius: "8px",
-                background: visitorPhotoUrl ? "#F0FDF4" : "#FEF2F2",
-                border: visitorPhotoUrl ? "1px solid #86EFAC" : "2px solid #F87171",
+                background: "#F8FAFC",
+                border: visitorPhotoUrl
+                  ? "1px solid #86EFAC"
+                  : fieldErrors.visitorPhotoUrl
+                    ? "1.5px solid #EF4444"
+                    : "1px solid #CBD5E1",
                 marginBottom: "1.25rem",
               }}
             >
@@ -1066,75 +1068,254 @@ export function WalkInVisitorModal({
                 }}
               >
                 <label style={{ fontSize: "0.85rem", fontWeight: 700, color: "#1E293B" }}>
-                  📷 Visitor Entry Photograph <span style={{ color: "#DC2626", fontWeight: 900 }}>* (Mandatory)</span>
+                  📷 Visitor Photograph{" "}
+                  <span style={{ color: "#DC2626", fontWeight: 900 }}>* (Mandatory)</span>
                 </label>
                 {visitorPhotoUrl ? (
                   <span style={{ fontSize: "0.75rem", color: "#16A34A", fontWeight: 700 }}>
-                    ✓ Photograph Ready for Admittance
+                    ✓ Photograph Attached
                   </span>
                 ) : (
                   <span style={{ fontSize: "0.75rem", color: "#DC2626", fontWeight: 700 }}>
-                    ⚠️ Photograph Required to Admit Visitor
+                    Required Before Entry
                   </span>
                 )}
               </div>
               <FileUpload
                 kind="visitor_photo"
-                label="Attach visitor face photograph before allowing entry"
+                label="Upload or snap visitor face photograph"
                 currentUrl={visitorPhotoUrl || undefined}
                 onUploadComplete={(url) => {
                   setVisitorPhotoUrl(url);
                   setErrorMessage(null);
+                  setFieldErrors((prev) => ({ ...prev, visitorPhotoUrl: undefined }));
                 }}
               />
+              {fieldErrors.visitorPhotoUrl && (
+                <div
+                  style={{
+                    color: "#DC2626",
+                    fontSize: "0.75rem",
+                    marginTop: "0.4rem",
+                    fontWeight: 600,
+                  }}
+                >
+                  {fieldErrors.visitorPhotoUrl}
+                </div>
+              )}
             </div>
-          )}
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={onClose}
-              disabled={isAdmitting}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "0.75rem",
+                marginTop: "1.5rem",
+              }}
             >
-              {activeRequest.status === "rejected" ? "Dismiss" : "Cancel"}
-            </button>
-
-            {activeRequest.status === "approved" && (
               <button
                 type="button"
-                className="btn btn-primary"
-                onClick={handleAdmitVisitor}
-                disabled={isAdmitting}
-                style={{ fontWeight: 800, padding: "0.6rem 1.5rem", background: "#059669", borderColor: "#059669" }}
+                className="btn btn-secondary"
+                onClick={onClose}
+                disabled={isSubmitting}
               >
-                {isAdmitting ? "Recording…" : "🚪 ALLOW GATE ENTRY & RECORD TIMESTAMP"}
+                Cancel
               </button>
-            )}
-          </div>
-        </div>
-      )}
+              <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+                {isSubmitting ? "Sending Request…" : "📲 SEND APPROVAL PROMPT TO RESIDENT"}
+              </button>
+            </div>
+          </form>
+        )}
 
-      {step === "admitted" && (
-        <div style={{ textAlign: "center", padding: "1.5rem 0" }}>
-          <div style={{ fontSize: "3rem", marginBottom: "0.75rem" }}>✅</div>
-          <h3 style={{ margin: "0 0 0.5rem 0", color: "#065F46" }}>
-            Gate Entry Recorded!
-          </h3>
-          <p style={{ color: "var(--muted)", fontSize: "0.95rem", marginBottom: "1.5rem" }}>
-            {visitorName} has been admitted. Entry timestamp and guard ID recorded in the permanent audit trail.
-          </p>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={onClose}
-            style={{ padding: "0.6rem 2rem", fontWeight: 700 }}
-          >
-            ✓ Done / Next Visitor
-          </button>
-        </div>
-      )}
-    </Modal>
+        {step === "waiting_approval" && activeRequest && (
+          <div>
+            <div
+              style={{
+                padding: "1.25rem",
+                borderRadius: "8px",
+                background:
+                  activeRequest.status === "approved"
+                    ? "var(--success-light)"
+                    : activeRequest.status === "rejected"
+                      ? "var(--danger-light)"
+                      : "#EFF6FF",
+                border: `1px solid ${activeRequest.status === "approved" ? "var(--success-border)" : activeRequest.status === "rejected" ? "var(--danger-border)" : "#BFDBFE"}`,
+                marginBottom: "1.25rem",
+                textAlign: "center",
+              }}
+            >
+              {activeRequest.status === "pending" && (
+                <>
+                  <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>⏳</div>
+                  <h4 style={{ margin: "0 0 0.5rem 0", color: "#1E40AF" }}>
+                    Awaiting Resident Decision
+                  </h4>
+                  <p style={{ margin: 0, fontSize: "0.9rem", color: "#3B82F6" }}>
+                    Real-time prompt sent to the primary occupant of{" "}
+                    <strong>Unit {selectedUnit?.unit_number || "Selected"}</strong>. Polling for
+                    resident response...
+                  </p>
+                </>
+              )}
+
+              {activeRequest.status === "approved" && (
+                <>
+                  <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>🎉</div>
+                  <h4 style={{ margin: "0 0 0.5rem 0", color: "#065F46" }}>
+                    Resident Approved Entry!
+                  </h4>
+                  <p style={{ margin: 0, fontSize: "0.9rem", color: "#047857" }}>
+                    The resident has permitted this visitor to enter the community.
+                  </p>
+                </>
+              )}
+
+              {activeRequest.status === "rejected" && (
+                <>
+                  <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>❌</div>
+                  <h4 style={{ margin: "0 0 0.5rem 0", color: "#991B1B" }}>
+                    Resident Denied Entry
+                  </h4>
+                  <p style={{ margin: 0, fontSize: "0.9rem", color: "#DC2626" }}>
+                    The resident has rejected this entry request. Do not allow visitor through the
+                    gate.
+                  </p>
+                </>
+              )}
+            </div>
+
+            <div
+              style={{
+                background: "#F8FAFC",
+                borderRadius: "8px",
+                padding: "1rem 1.25rem",
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                gap: "1rem",
+                fontSize: "0.9rem",
+                marginBottom: "1.5rem",
+              }}
+            >
+              <div>
+                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>
+                  Visitor
+                </span>
+                <strong>{visitorName}</strong>
+              </div>
+              <div>
+                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>
+                  Phone
+                </span>
+                <strong style={{ fontFamily: "monospace" }}>{visitorPhone}</strong>
+              </div>
+              <div>
+                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>
+                  Destination
+                </span>
+                <strong>Unit {selectedUnit?.unit_number || "—"}</strong>
+              </div>
+              <div>
+                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>
+                  Live Status
+                </span>
+                <StatusBadge status={activeRequest.status} />
+              </div>
+            </div>
+
+            {activeRequest.status === "approved" && (
+              <div
+                style={{
+                  padding: "1rem",
+                  borderRadius: "8px",
+                  background: visitorPhotoUrl ? "#F0FDF4" : "#FEF2F2",
+                  border: visitorPhotoUrl ? "1px solid #86EFAC" : "2px solid #F87171",
+                  marginBottom: "1.25rem",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: "0.5rem",
+                  }}
+                >
+                  <label style={{ fontSize: "0.85rem", fontWeight: 700, color: "#1E293B" }}>
+                    📷 Visitor Entry Photograph{" "}
+                    <span style={{ color: "#DC2626", fontWeight: 900 }}>* (Mandatory)</span>
+                  </label>
+                  {visitorPhotoUrl ? (
+                    <span style={{ fontSize: "0.75rem", color: "#16A34A", fontWeight: 700 }}>
+                      ✓ Photograph Ready for Admittance
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: "0.75rem", color: "#DC2626", fontWeight: 700 }}>
+                      ⚠️ Photograph Required to Admit Visitor
+                    </span>
+                  )}
+                </div>
+                <FileUpload
+                  kind="visitor_photo"
+                  label="Attach visitor face photograph before allowing entry"
+                  currentUrl={visitorPhotoUrl || undefined}
+                  onUploadComplete={(url) => {
+                    setVisitorPhotoUrl(url);
+                    setErrorMessage(null);
+                  }}
+                />
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={onClose}
+                disabled={isAdmitting}
+              >
+                {activeRequest.status === "rejected" ? "Dismiss" : "Cancel"}
+              </button>
+
+              {activeRequest.status === "approved" && (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleAdmitVisitor}
+                  disabled={isAdmitting}
+                  style={{
+                    fontWeight: 800,
+                    padding: "0.6rem 1.5rem",
+                    background: "#059669",
+                    borderColor: "#059669",
+                  }}
+                >
+                  {isAdmitting ? "Recording…" : "🚪 ALLOW GATE ENTRY & RECORD TIMESTAMP"}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {step === "admitted" && (
+          <div style={{ textAlign: "center", padding: "1.5rem 0" }}>
+            <div style={{ fontSize: "3rem", marginBottom: "0.75rem" }}>✅</div>
+            <h3 style={{ margin: "0 0 0.5rem 0", color: "#065F46" }}>Gate Entry Recorded!</h3>
+            <p style={{ color: "var(--muted)", fontSize: "0.95rem", marginBottom: "1.5rem" }}>
+              {visitorName} has been admitted. Entry timestamp and guard ID recorded in the
+              permanent audit trail.
+            </p>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={onClose}
+              style={{ padding: "0.6rem 2rem", fontWeight: 700 }}
+            >
+              ✓ Done / Next Visitor
+            </button>
+          </div>
+        )}
+      </Modal>
 
       {/* Prominent Red Alert Blacklist Pop-Up Modal */}
       {blacklistHit && (
@@ -1204,9 +1385,7 @@ export function WalkInVisitorModal({
                   >
                     Phone Number
                   </span>
-                  <div style={{ fontFamily: "monospace", fontWeight: 600 }}>
-                    {visitorPhone}
-                  </div>
+                  <div style={{ fontFamily: "monospace", fontWeight: 600 }}>{visitorPhone}</div>
                 </div>
               )}
               {idNumber && (
@@ -1291,7 +1470,8 @@ export function WalkInVisitorModal({
                 marginBottom: "1.5rem",
               }}
             >
-              This visitor is explicitly barred from entry under community security policy. Immediately notify the Security Supervisor.
+              This visitor is explicitly barred from entry under community security policy.
+              Immediately notify the Security Supervisor.
             </p>
 
             <button

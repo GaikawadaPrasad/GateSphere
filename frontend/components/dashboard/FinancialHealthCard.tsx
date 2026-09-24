@@ -13,9 +13,20 @@ interface FinancialHealthCardProps {
 export function FinancialHealthCard({ data, isLoading }: FinancialHealthCardProps) {
   if (isLoading) {
     return (
-      <div className="card" style={{ height: "100%", minHeight: 280, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+      <div
+        className="card"
+        style={{
+          height: "100%",
+          minHeight: 280,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+        }}
+      >
         <div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1.25rem" }}>
+          <div
+            style={{ display: "flex", justifyContent: "space-between", marginBottom: "1.25rem" }}
+          >
             <Skeleton width={180} height={20} borderRadius={4} />
             <Skeleton width={80} height={20} borderRadius={4} />
           </div>

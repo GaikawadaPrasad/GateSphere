@@ -17,15 +17,13 @@ export default function VendorServiceHistoryPage() {
       const data = await vendorTicketsApi.list({ page_size: 50 });
       const completed = (Array.isArray(data) ? data : []).filter(
         (t: any) =>
-          t.status === "resolved" ||
-          t.status === "resident_confirmation" ||
-          t.status === "closed",
+          t.status === "resolved" || t.status === "resident_confirmation" || t.status === "closed",
       );
       setTickets(completed);
       // fetch feedback ratings for closed tickets
       const closed = completed.filter((t: any) => t.status === "closed");
       const results = await Promise.allSettled(
-        closed.map((t: any) => complaintsApi.getFeedback(t.id))
+        closed.map((t: any) => complaintsApi.getFeedback(t.id)),
       );
       const map: Record<string, number | null> = {};
       closed.forEach((t: any, i: number) => {
@@ -125,10 +123,12 @@ export default function VendorServiceHistoryPage() {
         header: "Resident Rating",
         render: (h) => {
           const r = feedbackMap[h.id];
-          if (r == null) return <span style={{ color: "var(--muted)", fontSize: "0.8rem" }}>—</span>;
+          if (r == null)
+            return <span style={{ color: "var(--muted)", fontSize: "0.8rem" }}>—</span>;
           return (
             <span style={{ color: "#f59e0b", fontSize: "0.9rem", letterSpacing: 1 }}>
-              {"★".repeat(r)}{"☆".repeat(5 - r)}
+              {"★".repeat(r)}
+              {"☆".repeat(5 - r)}
             </span>
           );
         },
@@ -180,4 +180,3 @@ export default function VendorServiceHistoryPage() {
     </div>
   );
 }
-

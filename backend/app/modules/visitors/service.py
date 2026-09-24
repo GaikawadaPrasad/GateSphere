@@ -253,9 +253,7 @@ class VisitorService(UnitScopedAccess):
             created_by_user_id=self.actor.id,
         )
         await self.blacklist.add(obj)
-        await self._audit(
-            "blacklist.add", cid, "visitor_blacklist", obj.id, new={"reason": reason}
-        )
+        await self._audit("blacklist.add", cid, "visitor_blacklist", obj.id, new={"reason": reason})
         return obj
 
     async def remove_blacklist(self, blacklist_id: uuid.UUID) -> None:
@@ -343,12 +341,9 @@ class VisitorService(UnitScopedAccess):
         from sqlalchemy.orm import selectinload
 
         _enum("status", status)
-        stmt = (
-            select(VisitorRequest)
-            .options(
-                selectinload(VisitorRequest.visitor),
-                selectinload(VisitorRequest.passes),
-            )
+        stmt = select(VisitorRequest).options(
+            selectinload(VisitorRequest.visitor),
+            selectinload(VisitorRequest.passes),
         )
         if community_id is not None:
             self.scope.require(community_id)
@@ -435,7 +430,9 @@ class VisitorService(UnitScopedAccess):
             raise ConflictError(
                 f"Visitor {visitor.full_name} is currently inside the premises and has not checked out.",
                 code="VISITOR_ALREADY_INSIDE",
-                fields={"phone": f"Visitor {visitor.full_name} is already checked in at the premises."},
+                fields={
+                    "phone": f"Visitor {visitor.full_name} is already checked in at the premises."
+                },
             )
 
         approval_required = policy.approval_required and visitor_type != "recurring"
@@ -477,7 +474,9 @@ class VisitorService(UnitScopedAccess):
                 raise ConflictError(
                     f"Additional visitor {mv.full_name} is currently inside the premises and has not checked out.",
                     code="VISITOR_ALREADY_INSIDE",
-                    fields={"phone": f"Visitor {mv.full_name} is already checked in at the premises."},
+                    fields={
+                        "phone": f"Visitor {mv.full_name} is already checked in at the premises."
+                    },
                 )
             await self._add_member(obj, mv.id, is_primary=False)
         await self._audit(
@@ -492,16 +491,12 @@ class VisitorService(UnitScopedAccess):
                 cab_provider = obj.purpose or "Cab"
                 plate_str = f" ({obj.vehicle_number})" if obj.vehicle_number else ""
                 notif_title = f"🚖 Cab Arrival Approval: {cab_provider}{plate_str}"
-                notif_message = (
-                    f"Cab Driver {visitor.full_name} ({cab_provider}{plate_str}) has arrived at the gate for Unit {unit.unit_number}. Please confirm entry."
-                )
+                notif_message = f"Cab Driver {visitor.full_name} ({cab_provider}{plate_str}) has arrived at the gate for Unit {unit.unit_number}. Please confirm entry."
                 notif_type = "cab.approval_needed"
                 ref_type = "cab_request"
             else:
                 notif_title = f"Visitor Approval Request: {visitor.full_name}"
-                notif_message = (
-                    f"Visitor {visitor.full_name} (Purpose: {obj.purpose or 'General Visit'}) has arrived at the gate for Unit {unit.unit_number}. Please confirm entry."
-                )
+                notif_message = f"Visitor {visitor.full_name} (Purpose: {obj.purpose or 'General Visit'}) has arrived at the gate for Unit {unit.unit_number}. Please confirm entry."
                 notif_type = "visitor.approval_needed"
                 ref_type = "visitor_request"
 
@@ -614,9 +609,7 @@ class VisitorService(UnitScopedAccess):
                 cab_provider = req.purpose or "Cab"
                 plate_str = f" ({req.vehicle_number})" if req.vehicle_number else ""
                 notif_title = f"🚖 Cab Arrival Approval: {cab_provider}{plate_str}"
-                notif_message = (
-                    f"Cab Driver {visitor_name} ({cab_provider}{plate_str}) has arrived at the gate for Unit {unit_label}. Please confirm entry."
-                )
+                notif_message = f"Cab Driver {visitor_name} ({cab_provider}{plate_str}) has arrived at the gate for Unit {unit_label}. Please confirm entry."
                 notif_type = "cab.approval_needed"
                 ref_type = "cab_request"
             else:

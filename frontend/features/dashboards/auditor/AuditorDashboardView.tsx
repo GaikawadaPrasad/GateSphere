@@ -54,9 +54,7 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
   const { activeCommunityId, setActiveCommunity } = useUiStore();
 
   const assignedCommunityId =
-    user?.community_ids?.[0] ||
-    user?.roles?.find((r: any) => r.community_id)?.community_id ||
-    null;
+    user?.community_ids?.[0] || user?.roles?.find((r: any) => r.community_id)?.community_id || null;
   const effectiveCommunityId = activeCommunityId || assignedCommunityId;
 
   React.useEffect(() => {
@@ -363,11 +361,13 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
             <span style={{ fontSize: "1.35rem" }}>🏢</span>
             <div>
               <div style={{ fontWeight: 700, fontSize: "0.95rem", color: "#1E293B" }}>
-                Auditing Community: <span style={{ color: "#2563EB" }}>{community?.name || "Assigned Community"}</span>
+                Auditing Community:{" "}
+                <span style={{ color: "#2563EB" }}>{community?.name || "Assigned Community"}</span>
                 {community?.code ? ` (${community.code})` : ""}
               </div>
               <div style={{ fontSize: "0.8rem", color: "#64748B" }}>
-                Strict multi-tenant boundary active. Audit logs, financial transactions, and operational registers are scoped strictly to this community.
+                Strict multi-tenant boundary active. Audit logs, financial transactions, and
+                operational registers are scoped strictly to this community.
               </div>
             </div>
           </div>
@@ -609,10 +609,7 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
               <option value="complaints">Complaints</option>
               <option value="incidents">Incidents</option>
             </select>
-            <SortDropdown
-              value={logControls.sortPreset}
-              onChange={logControls.setSortPreset}
-            />
+            <SortDropdown value={logControls.sortPreset} onChange={logControls.setSortPreset} />
           </FilterPanel>
 
           <DataTable<AuditLogItem>
@@ -681,10 +678,7 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
               <option value="Domestic Staff">Domestic Staff</option>
               <option value="Delivery Agent">Delivery Agent</option>
             </select>
-            <SortDropdown
-              value={gateControls.sortPreset}
-              onChange={gateControls.setSortPreset}
-            />
+            <SortDropdown value={gateControls.sortPreset} onChange={gateControls.setSortPreset} />
           </FilterPanel>
 
           <DataTable
@@ -695,10 +689,18 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
                 sortable: true,
                 render: (i) => (
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
-                    <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--brand-heading)" }}>
+                    <span
+                      style={{ fontSize: "13px", fontWeight: 600, color: "var(--brand-heading)" }}
+                    >
                       {formatDateTime(i.occurred_at)}
                     </span>
-                    <span style={{ fontSize: "11px", color: "var(--brand-body)", fontFamily: "monospace" }}>
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        color: "var(--brand-body)",
+                        fontFamily: "monospace",
+                      }}
+                    >
                       {formatRelativeTime(i.occurred_at)}
                     </span>
                   </div>
@@ -786,7 +788,9 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
                     {i.exit_time ? (
                       formatDateTime(i.exit_time)
                     ) : (
-                      <span style={{ color: "#D97706", fontWeight: 600 }}>Still Inside (No Exit)</span>
+                      <span style={{ color: "#D97706", fontWeight: 600 }}>
+                        Still Inside (No Exit)
+                      </span>
                     )}
                   </span>
                 ),
@@ -860,8 +864,16 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
                 sortable: true,
                 render: (i) => (
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
-                    <span style={{ fontSize: "12px", fontWeight: 600 }}>{formatDateTime(i.created_at)}</span>
-                    <span style={{ fontSize: "11px", color: "var(--brand-body)", fontFamily: "monospace" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 600 }}>
+                      {formatDateTime(i.created_at)}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        color: "var(--brand-body)",
+                        fontFamily: "monospace",
+                      }}
+                    >
                       {formatRelativeTime(i.created_at)}
                     </span>
                   </div>
@@ -937,8 +949,16 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
                 sortable: true,
                 render: (i) => (
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
-                    <span style={{ fontSize: "12px", fontWeight: 600 }}>{formatDateTime(i.created_at)}</span>
-                    <span style={{ fontSize: "11px", color: "var(--brand-body)", fontFamily: "monospace" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 600 }}>
+                      {formatDateTime(i.created_at)}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        color: "var(--brand-body)",
+                        fontFamily: "monospace",
+                      }}
+                    >
                       {formatRelativeTime(i.created_at)}
                     </span>
                   </div>
@@ -1017,8 +1037,16 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
                 sortable: true,
                 render: (i) => (
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
-                    <span style={{ fontSize: "12px", fontWeight: 600 }}>{formatDateTime(i.created_at)}</span>
-                    <span style={{ fontSize: "11px", color: "var(--brand-body)", fontFamily: "monospace" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 600 }}>
+                      {formatDateTime(i.created_at)}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        color: "var(--brand-body)",
+                        fontFamily: "monospace",
+                      }}
+                    >
                       {formatRelativeTime(i.created_at)}
                     </span>
                   </div>
@@ -1247,65 +1275,155 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
               }}
             >
               <div>
-                <span style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>
+                <span
+                  style={{
+                    fontSize: "11px",
+                    color: "var(--brand-body)",
+                    textTransform: "uppercase",
+                    fontWeight: 700,
+                  }}
+                >
                   Date & Local Time
                 </span>
-                <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--brand-heading)", marginTop: "0.15rem" }}>
+                <div
+                  style={{
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    color: "var(--brand-heading)",
+                    marginTop: "0.15rem",
+                  }}
+                >
                   {formatDateTime(selectedAuditLog.occurred_at)}
                 </div>
               </div>
               <div>
-                <span style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>
+                <span
+                  style={{
+                    fontSize: "11px",
+                    color: "var(--brand-body)",
+                    textTransform: "uppercase",
+                    fontWeight: 700,
+                  }}
+                >
                   UTC ISO 8601 Timestamp
                 </span>
-                <div style={{ fontSize: "12px", fontFamily: "monospace", color: "var(--brand-heading)", marginTop: "0.15rem" }}>
+                <div
+                  style={{
+                    fontSize: "12px",
+                    fontFamily: "monospace",
+                    color: "var(--brand-heading)",
+                    marginTop: "0.15rem",
+                  }}
+                >
                   {new Date(selectedAuditLog.occurred_at).toISOString()}
                 </div>
               </div>
               <div>
-                <span style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>
+                <span
+                  style={{
+                    fontSize: "11px",
+                    color: "var(--brand-body)",
+                    textTransform: "uppercase",
+                    fontWeight: 700,
+                  }}
+                >
                   Elapsed Duration
                 </span>
-                <div style={{ fontSize: "12px", color: "var(--brand-body)", fontFamily: "monospace", marginTop: "0.15rem" }}>
+                <div
+                  style={{
+                    fontSize: "12px",
+                    color: "var(--brand-body)",
+                    fontFamily: "monospace",
+                    marginTop: "0.15rem",
+                  }}
+                >
                   {formatRelativeTime(selectedAuditLog.occurred_at)}
                 </div>
               </div>
               <div>
-                <span style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>
+                <span
+                  style={{
+                    fontSize: "11px",
+                    color: "var(--brand-body)",
+                    textTransform: "uppercase",
+                    fontWeight: 700,
+                  }}
+                >
                   Client IP Address
                 </span>
-                <div style={{ fontSize: "12px", fontFamily: "monospace", color: "var(--brand-heading)", marginTop: "0.15rem" }}>
+                <div
+                  style={{
+                    fontSize: "12px",
+                    fontFamily: "monospace",
+                    color: "var(--brand-heading)",
+                    marginTop: "0.15rem",
+                  }}
+                >
                   {selectedAuditLog.ip_address || "127.0.0.1"}
                 </div>
               </div>
               <div>
-                <span style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>
+                <span
+                  style={{
+                    fontSize: "11px",
+                    color: "var(--brand-body)",
+                    textTransform: "uppercase",
+                    fontWeight: 700,
+                  }}
+                >
                   Actor Identity & Role
                 </span>
                 <div style={{ fontSize: "13px", fontWeight: 600, marginTop: "0.15rem" }}>
                   {selectedAuditLog.actor_email} ({selectedAuditLog.actor_role})
                 </div>
                 {selectedAuditLog.actor_user_id && (
-                  <div style={{ fontSize: "11px", fontFamily: "monospace", color: "var(--brand-body)" }}>
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      fontFamily: "monospace",
+                      color: "var(--brand-body)",
+                    }}
+                  >
                     UUID: {selectedAuditLog.actor_user_id}
                   </div>
                 )}
               </div>
               <div>
-                <span style={{ fontSize: "11px", color: "var(--brand-body)", textTransform: "uppercase", fontWeight: 700 }}>
+                <span
+                  style={{
+                    fontSize: "11px",
+                    color: "var(--brand-body)",
+                    textTransform: "uppercase",
+                    fontWeight: 700,
+                  }}
+                >
                   Target Entity Record
                 </span>
                 <div style={{ fontSize: "13px", fontWeight: 600, marginTop: "0.15rem" }}>
                   {selectedAuditLog.entity_type}
                 </div>
-                <div style={{ fontSize: "11px", fontFamily: "monospace", color: "var(--brand-primary)" }}>
+                <div
+                  style={{
+                    fontSize: "11px",
+                    fontFamily: "monospace",
+                    color: "var(--brand-primary)",
+                  }}
+                >
                   {selectedAuditLog.entity_id}
                 </div>
               </div>
             </div>
 
             <div>
-              <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--brand-heading)", display: "block", marginBottom: "0.4rem" }}>
+              <span
+                style={{
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  color: "var(--brand-heading)",
+                  display: "block",
+                  marginBottom: "0.4rem",
+                }}
+              >
                 Immutable Mutation Payload / State Diff (JSON)
               </span>
               <pre

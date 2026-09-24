@@ -91,11 +91,7 @@ export default function SecurityGuardGateHistoryPage() {
           { label: "Gate History" },
         ]}
         actions={
-          <button
-            className="btn btn-secondary"
-            onClick={loadData}
-            disabled={isLoading}
-          >
+          <button className="btn btn-secondary" onClick={loadData} disabled={isLoading}>
             🔄 {isLoading ? "Refreshing…" : "Refresh"}
           </button>
         }

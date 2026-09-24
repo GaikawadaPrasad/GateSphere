@@ -62,11 +62,7 @@ describe("WalkInVisitorModal - Anti-Passback Validation", () => {
     });
 
     render(
-      <WalkInVisitorModal
-        isOpen={true}
-        onClose={onClose}
-        onEntryAdmitted={onEntryAdmitted}
-      />
+      <WalkInVisitorModal isOpen={true} onClose={onClose} onEntryAdmitted={onEntryAdmitted} />,
     );
 
     // Wait for units to load
@@ -96,7 +92,9 @@ describe("WalkInVisitorModal - Anti-Passback Validation", () => {
     // Assert anti-passback banner appears
     await waitFor(() => {
       expect(
-        screen.getByText(/VISITOR ALREADY INSIDE: This visitor is currently checked in at the community/i)
+        screen.getByText(
+          /VISITOR ALREADY INSIDE: This visitor is currently checked in at the community/i,
+        ),
       ).toBeInTheDocument();
     });
   });

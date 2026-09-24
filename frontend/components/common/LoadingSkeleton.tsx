@@ -154,7 +154,9 @@ export function ActivityFeedSkeleton({ rows = 4 }: { rows?: number }) {
           >
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", width: "70%" }}>
               <Skeleton width={32} height={32} borderRadius="50%" />
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem", width: "80%" }}>
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: "0.35rem", width: "80%" }}
+              >
                 <Skeleton width="75%" height="0.85rem" borderRadius={4} />
                 <Skeleton width="45%" height="0.65rem" borderRadius={4} />
               </div>

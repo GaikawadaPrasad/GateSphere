@@ -548,7 +548,9 @@ async def create_assessment(
     except (ValueError, TypeError):
         per_unit = "0.00"
 
-    proposer_id = str(svc.actor.id) if (svc and svc.actor) else payload_dict.get("proposed_by_user_id")
+    proposer_id = (
+        str(svc.actor.id) if (svc and svc.actor) else payload_dict.get("proposed_by_user_id")
+    )
     proposer_name = (
         svc.actor.full_name
         if (svc and svc.actor and svc.actor.full_name)
@@ -564,7 +566,9 @@ async def create_assessment(
         "target_amount": target_amt,
         "amount_collected": "0.00",
         "per_unit_amount": per_unit,
-        "effective_date": payload_dict.get("effective_date", datetime.now(UTC).strftime("%Y-%m-%d")),
+        "effective_date": payload_dict.get(
+            "effective_date", datetime.now(UTC).strftime("%Y-%m-%d")
+        ),
         "due_date": payload_dict.get("due_date", ""),
         "affected_units_count": units_count,
         "status": "under_review",
@@ -594,14 +598,12 @@ async def approve_assessment(
         svc.actor.full_name.strip() if (svc and svc.actor and svc.actor.full_name) else None
     )
     proposer_id = str(sa.get("proposed_by_user_id")) if sa.get("proposed_by_user_id") else None
-    proposer_name = (
-        str(sa.get("proposed_by_name")).strip() if sa.get("proposed_by_name") else None
-    )
+    proposer_name = str(sa.get("proposed_by_name")).strip() if sa.get("proposed_by_name") else None
 
     is_self_approval = False
-    if actor_id and proposer_id and actor_id == proposer_id:
-        is_self_approval = True
-    elif actor_name and proposer_name and actor_name.lower() == proposer_name.lower():
+    if (actor_id and proposer_id and actor_id == proposer_id) or (
+        actor_name and proposer_name and actor_name.lower() == proposer_name.lower()
+    ):
         is_self_approval = True
 
     if is_self_approval:

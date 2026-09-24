@@ -205,8 +205,28 @@ def _tests(method: str, name: str, status_code) -> list[str]:
     return lines
 
 
+def _api_routes(routes):
+    """Every API route with its FULL path. FastAPI >= 0.13x keeps `include_router()` targets
+    nested (`_IncludedRouter` -> `effective_candidates()`); older versions flattened them into
+    `APIRoute`s. Duck-typed so both shapes work."""
+    for r in routes:
+        if hasattr(r, "effective_candidates"):
+            yield from _api_routes(r.effective_candidates())
+        elif isinstance(r, APIRoute) or (
+            hasattr(r, "dependant") and hasattr(r, "methods") and hasattr(r, "endpoint")
+        ):
+            yield r
+
+
+def _status_code(r):
+    code = getattr(r, "status_code", None)
+    if code is None:  # nested route context (newer FastAPI) wraps the declared route
+        code = getattr(getattr(r, "original_route", None), "status_code", None)
+    return code
+
+
 def build():
-    routes = [r for r in m.app.routes if isinstance(r, APIRoute)]
+    routes = list(_api_routes(m.app.routes))
     folders: dict[str, dict] = {}
     for r in sorted(routes, key=lambda r: (r.path, sorted(r.methods))):
         mod = r.endpoint.__module__
@@ -259,7 +279,7 @@ def build():
                         "listen": "test",
                         "script": {
                             "type": "text/javascript",
-                            "exec": _tests(method, item_name := f"{method} {r.path}", r.status_code),
+                            "exec": _tests(method, item_name := f"{method} {r.path}", _status_code(r)),
                         },
                     },
                 ],

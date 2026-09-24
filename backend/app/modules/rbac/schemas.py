@@ -23,7 +23,6 @@ class PermissionUpdate(_Write):
     description: str | None = Field(default=None, max_length=512)
 
 
-
 class RolePermsRead(BaseModel):
     slug: str
     name: str

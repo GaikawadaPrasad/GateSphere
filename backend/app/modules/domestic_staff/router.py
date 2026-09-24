@@ -6,9 +6,9 @@ Contract: docs/backend/api/domestic-staff.md.
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime
 from typing import Any
-import uuid
 
 from fastapi import APIRouter, Depends, Response, status
 
@@ -193,9 +193,7 @@ async def list_attendance(
         offset=params.offset,
         limit=params.page_size,
     )
-    return paginated(
-        [_to_attendance_read(r) for r in rows], total=total, params=params
-    )
+    return paginated([_to_attendance_read(r) for r in rows], total=total, params=params)
 
 
 @router.post(
@@ -207,9 +205,7 @@ async def list_attendance(
 async def check_in(
     payload: schemas.CheckInCreate, svc: Svc = Depends(domestic_staff_service)
 ) -> dict:
-    return ok(
-        _to_attendance_read(await svc.check_in(payload)), message="Checked in"
-    )
+    return ok(_to_attendance_read(await svc.check_in(payload)), message="Checked in")
 
 
 @router.patch(
@@ -322,8 +318,6 @@ async def update_staff(
     response_class=Response,
     dependencies=[DELETE],
 )
-async def delete_staff(
-    staff_id: uuid.UUID, svc: Svc = Depends(domestic_staff_service)
-) -> Response:
+async def delete_staff(staff_id: uuid.UUID, svc: Svc = Depends(domestic_staff_service)) -> Response:
     await svc.delete_staff(staff_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

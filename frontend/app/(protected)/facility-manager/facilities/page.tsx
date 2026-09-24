@@ -73,7 +73,7 @@ export default function FacilityManagerFacilitiesPage() {
     setEditingFacility(f);
     setEditName(f.name);
     setEditType(f.type || "Community Hall");
-    setEditLocation(f.location === "Community Grounds" ? "" : (f.location || ""));
+    setEditLocation(f.location === "Community Grounds" ? "" : f.location || "");
     setEditCapacity(String(f.capacity || 50));
     setIsEditModalOpen(true);
   };
@@ -95,7 +95,8 @@ export default function FacilityManagerFacilitiesPage() {
       const rawType = editType.toLowerCase();
       let amenityType = "other";
       if (rawType.includes("pool")) amenityType = "pool";
-      else if (rawType.includes("sport") || rawType.includes("tennis") || rawType.includes("court")) amenityType = "tennis";
+      else if (rawType.includes("sport") || rawType.includes("tennis") || rawType.includes("court"))
+        amenityType = "tennis";
       else if (rawType.includes("gym") || rawType.includes("fitness")) amenityType = "gym";
       else if (rawType.includes("club")) amenityType = "clubhouse";
       else if (rawType.includes("guest") || rawType.includes("room")) amenityType = "guest_room";
@@ -193,12 +194,16 @@ export default function FacilityManagerFacilitiesPage() {
 
   const handleStatusChange = async (id: string, newStatus: string) => {
     const prevStatus = facilities.find((f) => f.id === id)?.status;
-    setFacilities((prev) => prev.map((f) => (f.id === id ? { ...f, status: newStatus as any } : f)));
+    setFacilities((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, status: newStatus as any } : f)),
+    );
     try {
       const isActive = newStatus === "Available" || newStatus === "Occupied/Booked";
       await facilitiesApi.updateStatus(id, isActive);
     } catch (err: any) {
-      setFacilities((prev) => prev.map((f) => (f.id === id ? { ...f, status: prevStatus as any } : f)));
+      setFacilities((prev) =>
+        prev.map((f) => (f.id === id ? { ...f, status: prevStatus as any } : f)),
+      );
       alert(err?.message || "Failed to update facility status.");
     }
   };
@@ -285,7 +290,9 @@ export default function FacilityManagerFacilitiesPage() {
               key: "name",
               header: "Facility Name",
               sortable: true,
-              render: (f: Facility) => <span style={{ fontWeight: 600, color: "var(--fg)" }}>{f.name}</span>,
+              render: (f: Facility) => (
+                <span style={{ fontWeight: 600, color: "var(--fg)" }}>{f.name}</span>
+              ),
             },
             { key: "type", header: "Type", sortable: true },
             { key: "location", header: "Location", sortable: true },
@@ -332,7 +339,12 @@ export default function FacilityManagerFacilitiesPage() {
                   </button>
                   <button
                     className="btn btn-secondary"
-                    style={{ height: 28, fontSize: "0.75rem", padding: "0 0.5rem", color: "var(--danger, #dc2626)" }}
+                    style={{
+                      height: 28,
+                      fontSize: "0.75rem",
+                      padding: "0 0.5rem",
+                      color: "var(--danger, #dc2626)",
+                    }}
                     onClick={() => handleDeleteFacility(f)}
                   >
                     🗑️ Delete
@@ -468,14 +480,28 @@ export default function FacilityManagerFacilitiesPage() {
       {/* Edit Facility Modal */}
       <Modal
         isOpen={isEditModalOpen}
-        onClose={() => { setIsEditModalOpen(false); setEditingFacility(null); }}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingFacility(null);
+        }}
         title="Edit Facility"
         footer={
           <>
-            <button className="btn btn-secondary" onClick={() => { setIsEditModalOpen(false); setEditingFacility(null); }}>
+            <button
+              className="btn btn-secondary"
+              onClick={() => {
+                setIsEditModalOpen(false);
+                setEditingFacility(null);
+              }}
+            >
               Cancel
             </button>
-            <button className="btn btn-primary" type="submit" form="edit-facility-form" disabled={isSubmittingEdit}>
+            <button
+              className="btn btn-primary"
+              type="submit"
+              form="edit-facility-form"
+              disabled={isSubmittingEdit}
+            >
               {isSubmittingEdit ? "Saving…" : "Save Changes"}
             </button>
           </>
@@ -483,7 +509,14 @@ export default function FacilityManagerFacilitiesPage() {
       >
         <form id="edit-facility-form" onSubmit={handleEditFacility}>
           <div style={{ marginBottom: "1rem" }}>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
               Facility Name *
             </label>
             <input
@@ -494,12 +527,30 @@ export default function FacilityManagerFacilitiesPage() {
               required
             />
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "1rem",
+              marginBottom: "1rem",
+            }}
+          >
             <div>
-              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Type
               </label>
-              <select className="select-field" value={editType} onChange={(e) => setEditType(e.target.value)}>
+              <select
+                className="select-field"
+                value={editType}
+                onChange={(e) => setEditType(e.target.value)}
+              >
                 <option value="Sports">Sports / Court</option>
                 <option value="Community Hall">Community Hall</option>
                 <option value="Swimming Pool">Swimming Pool</option>
@@ -511,7 +562,14 @@ export default function FacilityManagerFacilitiesPage() {
               </select>
             </div>
             <div>
-              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Max Capacity
               </label>
               <input
@@ -523,7 +581,14 @@ export default function FacilityManagerFacilitiesPage() {
             </div>
           </div>
           <div>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
               Location / Block
             </label>
             <input

@@ -22,19 +22,17 @@ import type { Community } from "@/types/communities";
 const CreateCommunityModal = dynamic(
   () =>
     import("@/components/super-admin/CreateCommunityModal").then((mod) => mod.CreateCommunityModal),
-  { ssr: false }
+  { ssr: false },
 );
 
 const EditCommunityModal = dynamic(
-  () =>
-    import("@/components/super-admin/EditCommunityModal").then((mod) => mod.EditCommunityModal),
-  { ssr: false }
+  () => import("@/components/super-admin/EditCommunityModal").then((mod) => mod.EditCommunityModal),
+  { ssr: false },
 );
 
 const ViewCommunityModal = dynamic(
-  () =>
-    import("@/components/super-admin/ViewCommunityModal").then((mod) => mod.ViewCommunityModal),
-  { ssr: false }
+  () => import("@/components/super-admin/ViewCommunityModal").then((mod) => mod.ViewCommunityModal),
+  { ssr: false },
 );
 
 export default function SuperAdminDashboardPage() {
@@ -70,7 +68,7 @@ export default function SuperAdminDashboardPage() {
 
   const activeCommunity = useMemo(
     () => communities?.find((c: Community) => c.id === activeCommunityId) || null,
-    [communities, activeCommunityId]
+    [communities, activeCommunityId],
   );
 
   const { data: gateEvents, isLoading: isEventsLoading } = useGateEvents({
@@ -142,10 +140,11 @@ export default function SuperAdminDashboardPage() {
   };
 
   const handleOnboardFromLead = (lead: DemoRequestLead) => {
-    const generatedCode = (lead.community || "COM")
-      .replace(/[^a-zA-Z0-9]/g, "")
-      .substring(0, 4)
-      .toUpperCase() + "-01";
+    const generatedCode =
+      (lead.community || "COM")
+        .replace(/[^a-zA-Z0-9]/g, "")
+        .substring(0, 4)
+        .toUpperCase() + "-01";
 
     setLeadInitialValues({
       name: lead.community || "",
@@ -179,11 +178,7 @@ export default function SuperAdminDashboardPage() {
   return (
     <div style={{ maxWidth: 1600, margin: "0 auto" }}>
       <PageHeader
-        title={
-          activeCommunity
-            ? `${activeCommunity.name} Dashboard`
-            : "Super Admin Dashboard"
-        }
+        title={activeCommunity ? `${activeCommunity.name} Dashboard` : "Super Admin Dashboard"}
         subtitle={
           activeCommunity
             ? `Operations and analytics scoped to ${activeCommunity.name} (${activeCommunity.code})`
@@ -237,11 +232,20 @@ export default function SuperAdminDashboardPage() {
             gap: "0.6rem",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.85rem", color: "#1e40af" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              fontSize: "0.85rem",
+              color: "#1e40af",
+            }}
+          >
             <span>🏢</span>
             <span>
-              Scope Active: Viewing metrics for <strong>{activeCommunity.name}</strong> ({activeCommunity.code})
-              {activeCommunity.city ? ` — ${activeCommunity.city}` : ""}{activeCommunity.state ? `, ${activeCommunity.state}` : ""}.
+              Scope Active: Viewing metrics for <strong>{activeCommunity.name}</strong> (
+              {activeCommunity.code}){activeCommunity.city ? ` — ${activeCommunity.city}` : ""}
+              {activeCommunity.state ? `, ${activeCommunity.state}` : ""}.
             </span>
           </div>
           <button
@@ -300,7 +304,9 @@ export default function SuperAdminDashboardPage() {
               <div>
                 <h3 className="card-title">Managed Communities</h3>
                 <p style={{ fontSize: "0.775rem", color: "var(--muted)", margin: "0.15rem 0 0 0" }}>
-                  {isCommunitiesLoading ? "Loading communities…" : `${filteredCommunities.length} of ${communities?.length || 0} communities`}
+                  {isCommunitiesLoading
+                    ? "Loading communities…"
+                    : `${filteredCommunities.length} of ${communities?.length || 0} communities`}
                 </p>
               </div>
 

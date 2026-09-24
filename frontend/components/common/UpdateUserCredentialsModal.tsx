@@ -6,6 +6,7 @@ import { PasswordField } from "@/components/forms/PasswordField";
 import { usersApi } from "@/lib/api";
 import { toast } from "@/store/toast";
 import { isValidPersonName } from "@/lib/utils";
+import { PASSWORD_MIN_LENGTH } from "@/constants/password";
 
 export interface CredentialUser {
   id: string;
@@ -60,8 +61,8 @@ export function UpdateUserCredentialsModal({
     if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       errs.email = "Please enter a valid email address.";
     }
-    if (password && password.length < 8) {
-      errs.password = "Password must be at least 8 characters.";
+    if (password && password.length < PASSWORD_MIN_LENGTH) {
+      errs.password = `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`;
     }
     setFieldErrors(errs);
     return Object.keys(errs).length === 0;
@@ -101,10 +102,20 @@ export function UpdateUserCredentialsModal({
       maxWidth={520}
       footer={
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", width: "100%" }}>
-          <button type="button" className="btn btn-secondary" onClick={onClose} disabled={isSubmitting}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={onClose}
+            disabled={isSubmitting}
+          >
             Cancel
           </button>
-          <button type="submit" form="update-credentials-form" className="btn btn-primary" disabled={isSubmitting}>
+          <button
+            type="submit"
+            form="update-credentials-form"
+            className="btn btn-primary"
+            disabled={isSubmitting}
+          >
             {isSubmitting ? "Updating..." : "Save Credentials"}
           </button>
         </div>
@@ -141,17 +152,29 @@ export function UpdateUserCredentialsModal({
             }}
           >
             <div>
-              <span style={{ fontWeight: 600, color: "#1e293b" }}>Target Account:</span> {user.full_name}
+              <span style={{ fontWeight: 600, color: "#1e293b" }}>Target Account:</span>{" "}
+              {user.full_name}
             </div>
             {user.roleName && (
-              <span className="badge badge-primary" style={{ fontSize: "0.7rem", textTransform: "capitalize" }}>
+              <span
+                className="badge badge-primary"
+                style={{ fontSize: "0.7rem", textTransform: "capitalize" }}
+              >
                 {user.roleName.replace(/_/g, " ")}
               </span>
             )}
           </div>
 
           <div>
-            <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, color: "#334155", marginBottom: "0.3rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "0.82rem",
+                fontWeight: 600,
+                color: "#334155",
+                marginBottom: "0.3rem",
+              }}
+            >
               Full Name <span style={{ color: "var(--danger)" }}>*</span>
             </label>
             <input
@@ -163,7 +186,14 @@ export function UpdateUserCredentialsModal({
               required
             />
             {fieldErrors.fullName && (
-              <span style={{ color: "var(--danger)", fontSize: "0.75rem", marginTop: "0.2rem", display: "block" }}>
+              <span
+                style={{
+                  color: "var(--danger)",
+                  fontSize: "0.75rem",
+                  marginTop: "0.2rem",
+                  display: "block",
+                }}
+              >
                 {fieldErrors.fullName}
               </span>
             )}
@@ -171,7 +201,15 @@ export function UpdateUserCredentialsModal({
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
             <div>
-              <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, color: "#334155", marginBottom: "0.3rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.82rem",
+                  fontWeight: 600,
+                  color: "#334155",
+                  marginBottom: "0.3rem",
+                }}
+              >
                 Login Email
               </label>
               <input
@@ -182,14 +220,29 @@ export function UpdateUserCredentialsModal({
                 placeholder="user@example.com"
               />
               {fieldErrors.email && (
-                <span style={{ color: "var(--danger)", fontSize: "0.75rem", marginTop: "0.2rem", display: "block" }}>
+                <span
+                  style={{
+                    color: "var(--danger)",
+                    fontSize: "0.75rem",
+                    marginTop: "0.2rem",
+                    display: "block",
+                  }}
+                >
                   {fieldErrors.email}
                 </span>
               )}
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, color: "#334155", marginBottom: "0.3rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.82rem",
+                  fontWeight: 600,
+                  color: "#334155",
+                  marginBottom: "0.3rem",
+                }}
+              >
                 Phone Number
               </label>
               <input
@@ -208,11 +261,18 @@ export function UpdateUserCredentialsModal({
               subLabel="(Leave blank to keep existing password)"
               value={password}
               onChange={(val) => setPassword(val)}
-              placeholder="Enter new password (min 8 chars)"
+              placeholder={`Enter new password (min ${PASSWORD_MIN_LENGTH} chars)`}
               helperText="💡 Changing password will revoke active sessions and require the user to sign in with their new credentials."
             />
             {fieldErrors.password && (
-              <span style={{ color: "var(--danger)", fontSize: "0.75rem", marginTop: "0.2rem", display: "block" }}>
+              <span
+                style={{
+                  color: "var(--danger)",
+                  fontSize: "0.75rem",
+                  marginTop: "0.2rem",
+                  display: "block",
+                }}
+              >
                 {fieldErrors.password}
               </span>
             )}

@@ -37,13 +37,15 @@ export default function SpecialAssessmentsPage() {
   const [newDescription, setNewDescription] = useState("");
   const [newTargetAmount, setNewTargetAmount] = useState("25000");
   const [newUnitsCount, setNewUnitsCount] = useState(120);
-  const [newProposerDepartment, setNewProposerDepartment] = useState("Facility Operations & Maintenance");
+  const [newProposerDepartment, setNewProposerDepartment] = useState(
+    "Facility Operations & Maintenance",
+  );
   const [newProposerName, setNewProposerName] = useState("");
   const [newEffectiveDate, setNewEffectiveDate] = useState(
-    new Date(Date.now() + 15 * 86400000).toISOString().slice(0, 10)
+    new Date(Date.now() + 15 * 86400000).toISOString().slice(0, 10),
   );
   const [newDueDate, setNewDueDate] = useState(
-    new Date(Date.now() + 45 * 86400000).toISOString().slice(0, 10)
+    new Date(Date.now() + 45 * 86400000).toISOString().slice(0, 10),
   );
 
   const { data: assessments, isLoading } = useSpecialAssessments({
@@ -57,7 +59,7 @@ export default function SpecialAssessmentsPage() {
 
   const computedPerUnit = Math.max(
     parseFloat(newTargetAmount || "0") / Math.max(newUnitsCount || 1, 1),
-    0
+    0,
   ).toFixed(2);
 
   const [assessmentFieldErrors, setAssessmentFieldErrors] = useState<Record<string, string>>({});
@@ -103,7 +105,8 @@ export default function SpecialAssessmentsPage() {
           effective_date: newEffectiveDate,
           due_date: newDueDate,
           proposed_by_user_id: currentUser?.id,
-          proposed_by_name: newProposerName.trim() || currentUser?.full_name || "Facility Operations",
+          proposed_by_name:
+            newProposerName.trim() || currentUser?.full_name || "Facility Operations",
           proposer_department: newProposerDepartment,
           proposer_role: currentUser?.active_role || "facility_manager",
         },
@@ -140,7 +143,9 @@ export default function SpecialAssessmentsPage() {
   const handleApprove = async () => {
     if (!selectedAssessment) return;
     if (isSelfProposal(selectedAssessment)) {
-      alert("Maker-Checker Violation: You cannot approve your own proposal. Another committee member must review and approve.");
+      alert(
+        "Maker-Checker Violation: You cannot approve your own proposal. Another committee member must review and approve.",
+      );
       return;
     }
 
@@ -302,7 +307,14 @@ export default function SpecialAssessmentsPage() {
       render: (item) => {
         const isSelf = isSelfProposal(item);
         return (
-          <div style={{ display: "flex", gap: "0.4rem", justifyContent: "flex-end", alignItems: "center" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: "0.4rem",
+              justifyContent: "flex-end",
+              alignItems: "center",
+            }}
+          >
             <Link
               href={`/association-committee/assessments/${item.id}`}
               className="btn btn-secondary"
@@ -310,8 +322,8 @@ export default function SpecialAssessmentsPage() {
             >
               View
             </Link>
-            {item.status === "under_review" && (
-              isSelf ? (
+            {item.status === "under_review" &&
+              (isSelf ? (
                 <button
                   type="button"
                   onClick={() => {
@@ -343,8 +355,7 @@ export default function SpecialAssessmentsPage() {
                 >
                   ⚖️ Review & Vote
                 </button>
-              )
-            )}
+              ))}
           </div>
         );
       },
@@ -393,11 +404,30 @@ export default function SpecialAssessmentsPage() {
         }}
       >
         <div>
-          <div style={{ fontWeight: 700, fontSize: "0.875rem", color: "var(--fg)", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+          <div
+            style={{
+              fontWeight: 700,
+              fontSize: "0.875rem",
+              color: "var(--fg)",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.4rem",
+            }}
+          >
             <span>⚖️</span> Maker-Checker Governance & Committee Approval Authority (PRD FR-09)
           </div>
-          <p style={{ fontSize: "0.775rem", color: "var(--muted)", marginTop: "0.2rem", maxWidth: 750 }}>
-            CapEx projects and special infrastructure levies are initiated by Facility Management or Operations, and require formal sign-off by the Association Committee. <strong>Segregation of Duties:</strong> A proposer cannot approve their own assessment proposal.
+          <p
+            style={{
+              fontSize: "0.775rem",
+              color: "var(--muted)",
+              marginTop: "0.2rem",
+              maxWidth: 750,
+            }}
+          >
+            CapEx projects and special infrastructure levies are initiated by Facility Management or
+            Operations, and require formal sign-off by the Association Committee.{" "}
+            <strong>Segregation of Duties:</strong> A proposer cannot approve their own assessment
+            proposal.
           </p>
         </div>
 
@@ -439,7 +469,11 @@ export default function SpecialAssessmentsPage() {
             setSelectedAssessment(null);
             setIsRejectMode(false);
           }}
-          title={isRejectMode ? "Reject / Return Special Assessment" : "Association Committee Governance Review"}
+          title={
+            isRejectMode
+              ? "Reject / Return Special Assessment"
+              : "Association Committee Governance Review"
+          }
           maxWidth={600}
           footer={
             <div
@@ -464,7 +498,15 @@ export default function SpecialAssessmentsPage() {
 
               <div style={{ display: "flex", gap: "0.5rem" }}>
                 {isSelectedSelf ? (
-                  <div style={{ fontSize: "0.775rem", color: "#92400e", fontWeight: 600, display: "flex", alignItems: "center" }}>
+                  <div
+                    style={{
+                      fontSize: "0.775rem",
+                      color: "#92400e",
+                      fontWeight: 600,
+                      display: "flex",
+                      alignItems: "center",
+                    }}
+                  >
                     🔒 Self-approval restricted per Maker-Checker policy
                   </div>
                 ) : !isRejectMode ? (
@@ -525,7 +567,9 @@ export default function SpecialAssessmentsPage() {
                 <div style={{ fontWeight: 700, marginBottom: "0.2rem" }}>
                   ⚠️ Segregation of Duties (Maker-Checker Policy)
                 </div>
-                You submitted this special assessment proposal. Enterprise statutory standards prohibit a single person from both proposing and accepting a financial levy. Another Association Committee member or the President must review and approve this proposal.
+                You submitted this special assessment proposal. Enterprise statutory standards
+                prohibit a single person from both proposing and accepting a financial levy. Another
+                Association Committee member or the President must review and approve this proposal.
               </div>
             )}
 
@@ -625,8 +669,8 @@ export default function SpecialAssessmentsPage() {
               </div>
             )}
 
-            {!isSelectedSelf && (
-              !isRejectMode ? (
+            {!isSelectedSelf &&
+              (!isRejectMode ? (
                 <div>
                   <label
                     style={{ fontSize: "0.775rem", fontWeight: 600, color: "var(--fg-secondary)" }}
@@ -659,8 +703,7 @@ export default function SpecialAssessmentsPage() {
                     }}
                   />
                 </div>
-              )
-            )}
+              ))}
           </div>
         </Modal>
       )}
@@ -685,12 +728,22 @@ export default function SpecialAssessmentsPage() {
                   color: "#166534",
                 }}
               >
-                <strong>Proposal Workflow:</strong> Submitting will enter the assessment into <em>Under Review</em> status. Per Maker-Checker governance, approval must be granted by another committee executive.
+                <strong>Proposal Workflow:</strong> Submitting will enter the assessment into{" "}
+                <em>Under Review</em> status. Per Maker-Checker governance, approval must be granted
+                by another committee executive.
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
                 <div>
-                  <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--fg-secondary)", display: "block", marginBottom: "0.35rem" }}>
+                  <label
+                    style={{
+                      fontSize: "0.8rem",
+                      fontWeight: 600,
+                      color: "var(--fg-secondary)",
+                      display: "block",
+                      marginBottom: "0.35rem",
+                    }}
+                  >
                     Initiating Department / Entity *
                   </label>
                   <select
@@ -699,15 +752,27 @@ export default function SpecialAssessmentsPage() {
                     className="select-field"
                   >
                     <option value="Facility Operations & Maintenance">Facility Operations</option>
-                    <option value="Engineering & Infrastructure Committee">Engineering Committee</option>
+                    <option value="Engineering & Infrastructure Committee">
+                      Engineering Committee
+                    </option>
                     <option value="Managing Committee Executive">Managing Committee Board</option>
                     <option value="Security & Surveillance Committee">Security Committee</option>
-                    <option value="Amenities & Landscaping Sub-committee">Amenities Committee</option>
+                    <option value="Amenities & Landscaping Sub-committee">
+                      Amenities Committee
+                    </option>
                   </select>
                 </div>
 
                 <div>
-                  <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--fg-secondary)", display: "block", marginBottom: "0.35rem" }}>
+                  <label
+                    style={{
+                      fontSize: "0.8rem",
+                      fontWeight: 600,
+                      color: "var(--fg-secondary)",
+                      display: "block",
+                      marginBottom: "0.35rem",
+                    }}
+                  >
                     Proposer Name *
                   </label>
                   <input
@@ -722,7 +787,15 @@ export default function SpecialAssessmentsPage() {
               </div>
 
               <div>
-                <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--fg-secondary)", display: "block", marginBottom: "0.35rem" }}>
+                <label
+                  style={{
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
+                    color: "var(--fg-secondary)",
+                    display: "block",
+                    marginBottom: "0.35rem",
+                  }}
+                >
                   Assessment Project Title *
                 </label>
                 <input
@@ -737,7 +810,15 @@ export default function SpecialAssessmentsPage() {
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
                 <div>
-                  <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--fg-secondary)", display: "block", marginBottom: "0.35rem" }}>
+                  <label
+                    style={{
+                      fontSize: "0.8rem",
+                      fontWeight: 600,
+                      color: "var(--fg-secondary)",
+                      display: "block",
+                      marginBottom: "0.35rem",
+                    }}
+                  >
                     Category / Purpose *
                   </label>
                   <select
@@ -755,7 +836,15 @@ export default function SpecialAssessmentsPage() {
                 </div>
 
                 <div>
-                  <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--fg-secondary)", display: "block", marginBottom: "0.35rem" }}>
+                  <label
+                    style={{
+                      fontSize: "0.8rem",
+                      fontWeight: 600,
+                      color: "var(--fg-secondary)",
+                      display: "block",
+                      marginBottom: "0.35rem",
+                    }}
+                  >
                     Target Budget (₹) *
                   </label>
                   <input
@@ -773,7 +862,15 @@ export default function SpecialAssessmentsPage() {
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
                 <div>
-                  <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--fg-secondary)", display: "block", marginBottom: "0.35rem" }}>
+                  <label
+                    style={{
+                      fontSize: "0.8rem",
+                      fontWeight: 600,
+                      color: "var(--fg-secondary)",
+                      display: "block",
+                      marginBottom: "0.35rem",
+                    }}
+                  >
                     Participating Units Count *
                   </label>
                   <input
@@ -787,7 +884,15 @@ export default function SpecialAssessmentsPage() {
                 </div>
 
                 <div>
-                  <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--fg-secondary)", display: "block", marginBottom: "0.35rem" }}>
+                  <label
+                    style={{
+                      fontSize: "0.8rem",
+                      fontWeight: 600,
+                      color: "var(--fg-secondary)",
+                      display: "block",
+                      marginBottom: "0.35rem",
+                    }}
+                  >
                     Per Unit Assessment
                   </label>
                   <div
@@ -810,7 +915,15 @@ export default function SpecialAssessmentsPage() {
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
                 <div>
-                  <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--fg-secondary)", display: "block", marginBottom: "0.35rem" }}>
+                  <label
+                    style={{
+                      fontSize: "0.8rem",
+                      fontWeight: 600,
+                      color: "var(--fg-secondary)",
+                      display: "block",
+                      marginBottom: "0.35rem",
+                    }}
+                  >
                     Effective Start Date *
                   </label>
                   <input
@@ -824,7 +937,15 @@ export default function SpecialAssessmentsPage() {
                 </div>
 
                 <div>
-                  <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--fg-secondary)", display: "block", marginBottom: "0.35rem" }}>
+                  <label
+                    style={{
+                      fontSize: "0.8rem",
+                      fontWeight: 600,
+                      color: "var(--fg-secondary)",
+                      display: "block",
+                      marginBottom: "0.35rem",
+                    }}
+                  >
                     Payment Due Date
                   </label>
                   <input
@@ -838,7 +959,15 @@ export default function SpecialAssessmentsPage() {
               </div>
 
               <div>
-                <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--fg-secondary)", display: "block", marginBottom: "0.35rem" }}>
+                <label
+                  style={{
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
+                    color: "var(--fg-secondary)",
+                    display: "block",
+                    marginBottom: "0.35rem",
+                  }}
+                >
                   Project Scope & Scope Justification
                 </label>
                 <textarea
@@ -851,7 +980,14 @@ export default function SpecialAssessmentsPage() {
                 />
               </div>
 
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "0.5rem" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: "0.5rem",
+                  marginTop: "0.5rem",
+                }}
+              >
                 <button
                   type="button"
                   onClick={() => setIsCreateModalOpen(false)}
@@ -864,7 +1000,9 @@ export default function SpecialAssessmentsPage() {
                   disabled={createMutation.isPending}
                   className="btn btn-primary"
                 >
-                  {createMutation.isPending ? "Submitting..." : "Submit Proposal for Committee Review"}
+                  {createMutation.isPending
+                    ? "Submitting..."
+                    : "Submit Proposal for Committee Review"}
                 </button>
               </div>
             </div>

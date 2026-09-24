@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SearchInput } from "@/components/forms/SearchInput";
 import { StatusBadge } from "@/components/common/StatusBadge";
@@ -10,6 +10,9 @@ import { deliveriesApi, communitiesApi, authApi } from "@/lib/api";
 import type { Unit } from "@/types/communities";
 import { isValidPersonName } from "@/lib/utils";
 import { toast } from "@/store/toast";
+
+/** Protocols whose parcel is handed over at the gate desk (backend `GATE_DESK_PROTOCOLS`). */
+const GATE_DESK_PROTOCOLS = new Set(["leave_at_gate_desk", "leave_at_gate", "collect_at_gate"]);
 
 interface DeliveryRow {
   id: string;
@@ -30,7 +33,10 @@ export default function SecurityGuardDeliveriesPage() {
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [actionMessage, setActionMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   // Log Delivery Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -49,13 +55,9 @@ export default function SecurityGuardDeliveriesPage() {
     if (showLoading) setIsLoading(true);
     setLoadError(null);
     try {
-      const [data, protocols] = await Promise.all([
-        deliveriesApi.list(),
-        deliveriesApi.protocols(),
-      ]);
-      const protocolMap = new Map<string, string>();
-      for (const p of protocols || [])
-        if ((p as any)?.id) protocolMap.set((p as any).id, (p as any).protocol_type);
+      // Each delivery carries the protocol it was routed by (community- or unit-level),
+      // resolved server-side — no client-side join against the protocol list.
+      const data = await deliveriesApi.list();
       const unitMap = new Map<string, string>();
       for (const u of units) {
         if (u.id && u.unit_number) unitMap.set(u.id, u.unit_number);
@@ -63,7 +65,11 @@ export default function SecurityGuardDeliveriesPage() {
       setDeliveries(
         (data || []).map((d: any) => {
           const rawNum = d.unit_number || (d.unit ? d.unit.unit_number : unitMap.get(d.unit_id));
-          const unitStr = rawNum ? (String(rawNum).startsWith("Unit ") ? String(rawNum) : `Unit ${rawNum}`) : "—";
+          const unitStr = rawNum
+            ? String(rawNum).startsWith("Unit ")
+              ? String(rawNum)
+              : `Unit ${rawNum}`
+            : "—";
           return {
             id: d.id,
             unit_number: unitStr,
@@ -74,7 +80,7 @@ export default function SecurityGuardDeliveriesPage() {
             tracking_reference: d.tracking_reference || d.id.slice(0, 8),
             status: d.status || "expected",
             approval_status: d.approval_status || "pending",
-            protocol_type: protocolMap.get(d.protocol_id) || "—",
+            protocol_type: d.protocol_type || "—",
             arrived_at: d.arrived_at,
           };
         }),
@@ -155,13 +161,15 @@ export default function SecurityGuardDeliveriesPage() {
     }
     if (trimmedExecName) {
       if (trimmedExecName.length < 2 || !isValidPersonName(trimmedExecName)) {
-        errors.executiveName = "Delivery executive name must contain only alphabetic letters and spaces (min 2 characters).";
+        errors.executiveName =
+          "Delivery executive name must contain only alphabetic letters and spaces (min 2 characters).";
       }
     }
     if (trimmedExecPhone) {
       const phoneDigits = trimmedExecPhone.replace(/\D/g, "");
       if (!/^\+?[0-9\s\-()]{7,20}$/.test(trimmedExecPhone) || phoneDigits.length < 10) {
-        errors.executivePhone = "Please enter a valid mobile number for the delivery executive (at least 10 digits).";
+        errors.executivePhone =
+          "Please enter a valid mobile number for the delivery executive (at least 10 digits).";
       }
     }
 
@@ -242,6 +250,31 @@ export default function SecurityGuardDeliveriesPage() {
     }
   };
 
+  // Ref guard (AGENTS.md §5.4): a double-click must not record two hand-overs.
+  const collectInFlight = useRef<Set<string>>(new Set());
+  const [collectingId, setCollectingId] = useState<string | null>(null);
+
+  const handleCollected = async (id: string, unitLabel?: string) => {
+    if (collectInFlight.current.has(id)) return;
+    collectInFlight.current.add(id);
+    setCollectingId(id);
+    setActionMessage(null);
+    try {
+      await deliveriesApi.collect(id, "Handed over at gate desk");
+      const msg = `Parcel handed over at the gate desk${unitLabel ? ` for ${unitLabel}` : ""}.`;
+      setActionMessage({ type: "success", text: msg });
+      toast.success(msg);
+      loadData(false);
+    } catch (err: any) {
+      const errMsg = err?.message || "Failed to record gate-desk collection.";
+      setActionMessage({ type: "error", text: errMsg });
+      toast.error(errMsg);
+    } finally {
+      collectInFlight.current.delete(id);
+      setCollectingId(null);
+    }
+  };
+
   const handleCancel = async (id: string) => {
     setActionMessage(null);
     try {
@@ -292,7 +325,9 @@ export default function SecurityGuardDeliveriesPage() {
       key: "provider_name",
       header: "Provider",
       sortable: true,
-      render: (d) => <span style={{ fontWeight: 600, color: "var(--fg)" }}>📦 {d.provider_name}</span>,
+      render: (d) => (
+        <span style={{ fontWeight: 600, color: "var(--fg)" }}>📦 {d.provider_name}</span>
+      ),
     },
     {
       key: "delivery_type",
@@ -310,7 +345,11 @@ export default function SecurityGuardDeliveriesPage() {
       key: "executive_name",
       header: "Executive",
       sortable: true,
-      render: (d) => <span>{d.executive_name} {d.executive_phone ? `(${d.executive_phone})` : ""}</span>,
+      render: (d) => (
+        <span>
+          {d.executive_name} {d.executive_phone ? `(${d.executive_phone})` : ""}
+        </span>
+      ),
     },
     {
       key: "tracking_reference",
@@ -335,7 +374,9 @@ export default function SecurityGuardDeliveriesPage() {
       header: "Gate Action",
       align: "right",
       render: (d) => (
-        <div style={{ display: "flex", gap: "0.35rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
+        <div
+          style={{ display: "flex", gap: "0.35rem", justifyContent: "flex-end", flexWrap: "wrap" }}
+        >
           {!["delivered", "collected", "cancelled", "returned"].includes(d.status) && (
             <button
               className="btn btn-primary"
@@ -366,15 +407,28 @@ export default function SecurityGuardDeliveriesPage() {
               Arrival
             </button>
           )}
-          {(d.status === "at_gate" || d.status === "in_transit") && (
+          {d.status === "at_gate" && GATE_DESK_PROTOCOLS.has(d.protocol_type) && (
             <button
-              className="btn btn-secondary"
+              className="btn btn-primary"
               style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
-              onClick={() => handleMarkDelivered(d.id)}
+              onClick={() => handleCollected(d.id, d.unit_number)}
+              disabled={collectingId === d.id}
+              aria-busy={collectingId === d.id}
+              title="Resident collected this parcel from the gate desk"
             >
-              Delivered
+              {collectingId === d.id ? "Saving…" : "Collected at desk"}
             </button>
           )}
+          {(d.status === "at_gate" || d.status === "in_transit") &&
+            !GATE_DESK_PROTOCOLS.has(d.protocol_type) && (
+              <button
+                className="btn btn-secondary"
+                style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
+                onClick={() => handleMarkDelivered(d.id)}
+              >
+                Delivered
+              </button>
+            )}
           {!["delivered", "collected", "cancelled", "returned"].includes(d.status) && (
             <button
               className="btn btn-danger"
@@ -421,7 +475,8 @@ export default function SecurityGuardDeliveriesPage() {
             padding: "0.75rem 1rem",
             marginBottom: "1.25rem",
             borderRadius: "var(--radius)",
-            background: actionMessage.type === "success" ? "var(--success-light)" : "var(--danger-light)",
+            background:
+              actionMessage.type === "success" ? "var(--success-light)" : "var(--danger-light)",
             border: `1px solid ${actionMessage.type === "success" ? "var(--success-border)" : "var(--danger-border)"}`,
             color: actionMessage.type === "success" ? "#065f46" : "#991b1b",
             display: "flex",
@@ -524,7 +579,10 @@ export default function SecurityGuardDeliveriesPage() {
           </div>
         }
       >
-        <form onSubmit={handleCreateDelivery} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+        <form
+          onSubmit={handleCreateDelivery}
+          style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
+        >
           <div
             style={{
               padding: "0.6rem 0.85rem",
@@ -536,7 +594,8 @@ export default function SecurityGuardDeliveriesPage() {
               fontWeight: 500,
             }}
           >
-            📲 <strong>Real-Time Notification:</strong> Logging this delivery will immediately dispatch an approval and arrival prompt to the resident&apos;s mobile app.
+            📲 <strong>Real-Time Notification:</strong> Logging this delivery will immediately
+            dispatch an approval and arrival prompt to the resident&apos;s mobile app.
           </div>
 
           {modalError && (
@@ -556,7 +615,10 @@ export default function SecurityGuardDeliveriesPage() {
           )}
 
           <div>
-            <label className="form-label" style={{ fontWeight: 600, marginBottom: "0.35rem", display: "block" }}>
+            <label
+              className="form-label"
+              style={{ fontWeight: 600, marginBottom: "0.35rem", display: "block" }}
+            >
               Destination Resident Unit *
             </label>
             <select
@@ -581,7 +643,14 @@ export default function SecurityGuardDeliveriesPage() {
               )}
             </select>
             {deliveryFieldErrors.unitId && (
-              <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+              <span
+                style={{
+                  color: "var(--danger, #ef4444)",
+                  fontSize: "0.75rem",
+                  display: "block",
+                  marginTop: "0.25rem",
+                }}
+              >
                 {deliveryFieldErrors.unitId}
               </span>
             )}
@@ -589,7 +658,10 @@ export default function SecurityGuardDeliveriesPage() {
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
             <div>
-              <label className="form-label" style={{ fontWeight: 600, marginBottom: "0.35rem", display: "block" }}>
+              <label
+                className="form-label"
+                style={{ fontWeight: 600, marginBottom: "0.35rem", display: "block" }}
+              >
                 Delivery Category *
               </label>
               <select
@@ -606,7 +678,10 @@ export default function SecurityGuardDeliveriesPage() {
             </div>
 
             <div>
-              <label className="form-label" style={{ fontWeight: 600, marginBottom: "0.35rem", display: "block" }}>
+              <label
+                className="form-label"
+                style={{ fontWeight: 600, marginBottom: "0.35rem", display: "block" }}
+              >
                 Provider / Brand Name *
               </label>
               <input
@@ -623,7 +698,14 @@ export default function SecurityGuardDeliveriesPage() {
                 required
               />
               {deliveryFieldErrors.providerName && (
-                <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                <span
+                  style={{
+                    color: "var(--danger, #ef4444)",
+                    fontSize: "0.75rem",
+                    display: "block",
+                    marginTop: "0.25rem",
+                  }}
+                >
                   {deliveryFieldErrors.providerName}
                 </span>
               )}
@@ -632,7 +714,10 @@ export default function SecurityGuardDeliveriesPage() {
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
             <div>
-              <label className="form-label" style={{ fontWeight: 600, marginBottom: "0.35rem", display: "block" }}>
+              <label
+                className="form-label"
+                style={{ fontWeight: 600, marginBottom: "0.35rem", display: "block" }}
+              >
                 Executive / Driver Name
               </label>
               <input
@@ -648,14 +733,24 @@ export default function SecurityGuardDeliveriesPage() {
                 }}
               />
               {deliveryFieldErrors.executiveName && (
-                <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                <span
+                  style={{
+                    color: "var(--danger, #ef4444)",
+                    fontSize: "0.75rem",
+                    display: "block",
+                    marginTop: "0.25rem",
+                  }}
+                >
                   {deliveryFieldErrors.executiveName}
                 </span>
               )}
             </div>
 
             <div>
-              <label className="form-label" style={{ fontWeight: 600, marginBottom: "0.35rem", display: "block" }}>
+              <label
+                className="form-label"
+                style={{ fontWeight: 600, marginBottom: "0.35rem", display: "block" }}
+              >
                 Executive Mobile Number
               </label>
               <input
@@ -671,7 +766,14 @@ export default function SecurityGuardDeliveriesPage() {
                 }}
               />
               {deliveryFieldErrors.executivePhone && (
-                <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                <span
+                  style={{
+                    color: "var(--danger, #ef4444)",
+                    fontSize: "0.75rem",
+                    display: "block",
+                    marginTop: "0.25rem",
+                  }}
+                >
                   {deliveryFieldErrors.executivePhone}
                 </span>
               )}
@@ -679,7 +781,10 @@ export default function SecurityGuardDeliveriesPage() {
           </div>
 
           <div>
-            <label className="form-label" style={{ fontWeight: 600, marginBottom: "0.35rem", display: "block" }}>
+            <label
+              className="form-label"
+              style={{ fontWeight: 600, marginBottom: "0.35rem", display: "block" }}
+            >
               Tracking Reference / Order Number
             </label>
             <input

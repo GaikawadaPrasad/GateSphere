@@ -29,14 +29,11 @@ export function useCreateInvoice() {
     mutationFn: (data: Parameters<typeof billingApi.createInvoice>[0]) =>
       billingApi.createInvoice(data),
     onSuccess: async (newInvoice) => {
-      qc.setQueriesData<MaintenanceInvoice[]>(
-        { queryKey: billingKeys.all },
-        (old) => {
-          if (!old || !Array.isArray(old)) return old;
-          if (old.some((i) => i.id === newInvoice.id)) return old;
-          return [newInvoice, ...old];
-        },
-      );
+      qc.setQueriesData<MaintenanceInvoice[]>({ queryKey: billingKeys.all }, (old) => {
+        if (!old || !Array.isArray(old)) return old;
+        if (old.some((i) => i.id === newInvoice.id)) return old;
+        return [newInvoice, ...old];
+      });
       await qc.invalidateQueries({ queryKey: billingKeys.all, refetchType: "all" });
       await qc.invalidateQueries({ queryKey: ["dashboards"], refetchType: "all" });
     },
@@ -48,13 +45,10 @@ export function usePostInvoice() {
   return useMutation({
     mutationFn: (invoiceId: string) => billingApi.postInvoice(invoiceId),
     onSuccess: async (updated) => {
-      qc.setQueriesData<MaintenanceInvoice[]>(
-        { queryKey: billingKeys.all },
-        (old) => {
-          if (!old || !Array.isArray(old)) return old;
-          return old.map((i) => (i.id === updated.id ? { ...i, ...updated } : i));
-        },
-      );
+      qc.setQueriesData<MaintenanceInvoice[]>({ queryKey: billingKeys.all }, (old) => {
+        if (!old || !Array.isArray(old)) return old;
+        return old.map((i) => (i.id === updated.id ? { ...i, ...updated } : i));
+      });
       await qc.invalidateQueries({ queryKey: billingKeys.all, refetchType: "all" });
       await qc.invalidateQueries({ queryKey: ["dashboards"], refetchType: "all" });
     },
@@ -66,13 +60,10 @@ export function useCancelInvoice() {
   return useMutation({
     mutationFn: (invoiceId: string) => billingApi.cancelInvoice(invoiceId),
     onSuccess: async (updated) => {
-      qc.setQueriesData<MaintenanceInvoice[]>(
-        { queryKey: billingKeys.all },
-        (old) => {
-          if (!old || !Array.isArray(old)) return old;
-          return old.map((i) => (i.id === updated.id ? { ...i, ...updated } : i));
-        },
-      );
+      qc.setQueriesData<MaintenanceInvoice[]>({ queryKey: billingKeys.all }, (old) => {
+        if (!old || !Array.isArray(old)) return old;
+        return old.map((i) => (i.id === updated.id ? { ...i, ...updated } : i));
+      });
       await qc.invalidateQueries({ queryKey: billingKeys.all, refetchType: "all" });
       await qc.invalidateQueries({ queryKey: ["dashboards"], refetchType: "all" });
     },

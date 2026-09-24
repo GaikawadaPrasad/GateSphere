@@ -18,6 +18,82 @@ Format per entry:
 
 ---
 
+## 2026-09-24 — Merge `dev` (PR #92, `c72319f`) into `feature-superadmin`
+
+**By:** Claude Code (with johnalexanderkondepoguVPD)
+**Branch / commit:** `feature-superadmin` (`d0173af`) ← `dev` (`cc480a6`), merge in progress
+**Conflicts resolved:** `frontend/eslint.config.mjs` (kept ours, a superset with Playwright
+ignores); `frontend/__tests__/unit/auth-lifecycle.test.tsx` (kept ours, same lint fix);
+`frontend/e2e/smoke.spec.ts` (kept deleted: replaced by the real-backend specs; `dev`'s fake
+`gs_session` cookie still ran against a mocked backend).
+**Auto-merged `dev` changes corrected:**
+- `core/config.py`: bare `postgresql://` was rewritten to `+asyncpg`, which is not installed;
+  restored `+psycopg`. The `asyncpg` passthrough is kept.
+- `communities/repository.py`: `except Exception: pass` (ruff S110, swallowed DB error) narrowed
+  to `SQLAlchemyError` + warning log.
+- `billing/tests/test_billing_unit.py::test_sweep_overdue_invoices_task` removed. It could
+  never pass (savepoint `db` fixture vs the task's own `job_session` connection) and it ran a
+  real global sweep; coverage already exists in `test_billing_tasks.py`.
+- `frontend/.prettierignore` += `tsconfig.json` (`next build` rewrites it: re-audit #4 N-6);
+  `DeliveriesTab.tsx` formatted. Note: `DeliveriesTab.tsx` (from `dev`) is not imported anywhere.
+**Verified:** fresh DB migrate 48 revisions + round-trip, seed reset ×2, pytest 416 passed /
+1 skipped / 0 failed; ruff, black 26.3.1, prettier, eslint (0 errors), tsc, vitest 149/149,
+`DOCKER_BUILD=1 next build`. mypy ratchet now 654 (was 651: +3 from `dev`); layering 232.
+
+## 2026-09-24 — Re-audit #3 remediation (N-1…N-5, S-01/05/06/08/11/12, F1/F5, 10-B)
+
+**By:** Claude Code (with johnalexanderkondepoguVPD)
+**Branch / commit:** `feature-superadmin` @ `fb80e8b` + uncommitted working tree
+**What changed:**
+- **N-1** `billing/tasks.py` imported `record_audit_async` (sweep crashed on the first overdue
+  invoice → nothing ever went overdue / got a late fee). Monthly invoice generation now audits
+  `invoice.generated`. Regression test `billing/tests/test_billing_tasks.py`.
+- **S-01 RLS** migration `0045_rls_fail_closed`: every policy fail-closed (unset/empty GUC ⇒ 0
+  rows, `*` = global, bound by `bind_rls_scope_async` and by `jobs.job_session` on every
+  transaction); 20 more tables covered (children inherit via `EXISTS` on the parent;
+  `user_notification_preferences`); `audit_logs` hides platform rows from tenant readers;
+  `gatesphere_app` password cleared (or set from `GATESPHERE_APP_DB_PASSWORD`, bind param —
+  fixes R-4 on DBs migrated before 0040 was edited; 0040 itself left as is so no credential
+  literal returns to the tree) and audit grants narrowed to INSERT/SELECT. Onboarding's public
+  token lookup binds `*` then narrows to the invitation's community.
+- **S-06** `seed.reset_data`: disable-trigger / TRUNCATE / enable in ONE transaction, errors
+  propagate; environment allow-list `{"local"}`.
+- **S-05 residual** `users.update_user`: a scoped admin can change `email`/`password`/
+  `is_active` only if every grant of the target is inside their scope (`403 ACCOUNT_SHARED`).
+- **S-12** `core/constants.PASSWORD_MIN_LENGTH = 10` for every password a user sets (7 schemas
+  were 6/8/10); frontend `constants/password.ts` mirrors it.
+- **S-08** migration `0046_notif_simulated`: mocked channels recorded as `simulated`, not
+  `delivered`. **S-11** `/` and `/healthz` no longer return `environment`.
+- **10-B** `ServiceUnavailableError` (503 + Retry-After); central handlers map `OperationalError`
+  → `DATABASE_UNAVAILABLE`, `BotoCoreError` → `STORAGE_UNAVAILABLE`. Root `app/error.tsx` +
+  `app/global-error.tsx`.
+- **F5 deliveries**: gate-desk decided by `protocol_type` (default protocol no longer
+  `leave_at_gate=True`, so approval deliveries end `delivered`); `/collect` only for gate-desk
+  protocols at `at_gate` (`422 NOT_GATE_DESK_DELIVERY`); `DeliveryRead.protocol_type` (found by
+  E2E: staff protocol list omits unit-level rows). UI: resident `DeliveryProtocolSettings`,
+  guard "Collected at desk".
+- **Swallowed exceptions** (ruff S110 etc.) fixed for real: gate invalid cursor → `400
+  INVALID_CURSOR`; assistant out-of-scope community → `404`; complaint default-category race →
+  savepoint + `IntegrityError`; perms cache catches `RedisError` only and logs.
+- **CI**: ruff clean, Black 26.3.1 applied, Prettier applied (160 files), `next lint` → ESLint 9
+  flat config, dependency split (`requirements.lock.txt` runtime-only for the image + pip-audit;
+  `requirements-dev.lock.txt` = + pytest 9.0.3 / black 26.3.1 etc.; compose builds with the dev
+  lock via `REQUIREMENTS` build arg), Playwright rewritten against a real backend (new CI job
+  `frontend-e2e`), `npm start` honours `$PORT`.
+**Why:** `3_reaudit_qa_findings.md` (2026-09-24).
+**Verified:** see the re-audit report for this session — fresh-DB migrate/seed×2/round-trip,
+full pytest, vitest, tsc, eslint, prettier, ruff, black, pip-audit (both locks), npm audit,
+Playwright 8/8 against the live stack.
+**Open / next:**
+- App still connects as the owner role; switching `DATABASE_URL` to `gatesphere_app` needs
+  user-keyed policies for pre-scope reads (`user_roles`, `community_role_permissions` in
+  `get_tenant_scope_async`/login) — do NOT flip it before that, deny overrides would be lost.
+- CI `backend-types` (mypy 651 vs baseline 630) and `backend-layering` (232 vs 218) were
+  already red at `fb80e8b` (654 / 232); this change reduces mypy by 3. Needs a dedicated pass.
+- `deliveries (protocol_id, community_id) → delivery_protocols ON DELETE SET NULL` would null the
+  NOT NULL `community_id` if a protocol were ever deleted (no endpoint does today).
+- E2E still lacks amenity-conflict, complaint-lifecycle and gate-entry journeys.
+
 ## 2026-09-23 — Console 401 burst on sign-out / session loss (login page)
 
 **By:** Claude Code (with johnalexanderkondepoguVPD)

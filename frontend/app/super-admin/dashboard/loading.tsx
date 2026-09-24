@@ -1,10 +1,22 @@
-import { KpiCardSkeleton, TableSkeleton, CardSkeleton, Skeleton } from "@/components/common/LoadingSkeleton";
+import {
+  KpiCardSkeleton,
+  TableSkeleton,
+  CardSkeleton,
+  Skeleton,
+} from "@/components/common/LoadingSkeleton";
 
 export default function SuperAdminDashboardLoading() {
   return (
     <div>
       {/* Header Skeleton */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.75rem" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "1.75rem",
+        }}
+      >
         <div>
           <Skeleton width={260} height={32} style={{ marginBottom: "0.5rem" }} />
           <Skeleton width={420} height={16} />

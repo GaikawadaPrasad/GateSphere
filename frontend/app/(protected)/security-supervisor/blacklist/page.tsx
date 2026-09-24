@@ -50,8 +50,10 @@ export default function SecuritySupervisorBlacklistPage() {
       }
     }
     if (!cleanPhone && !cleanId && !cleanVehicle) {
-      errors.phone = "Provide either a mobile number, Government ID, or Vehicle Plate to blacklist.";
-      errors.idNumber = "Provide either a mobile number, Government ID, or Vehicle Plate to blacklist.";
+      errors.phone =
+        "Provide either a mobile number, Government ID, or Vehicle Plate to blacklist.";
+      errors.idNumber =
+        "Provide either a mobile number, Government ID, or Vehicle Plate to blacklist.";
     }
     if (cleanPhone) {
       const phoneDigits = cleanPhone.replace(/\D/g, "");
@@ -79,7 +81,11 @@ export default function SecuritySupervisorBlacklistPage() {
       let formattedPhone: string | undefined = undefined;
       if (cleanPhone) {
         const stripped = cleanPhone.replace(/[\s\-()]/g, "");
-        formattedPhone = stripped.startsWith("+") ? stripped : (stripped.length === 10 ? `+91${stripped}` : `+${stripped}`);
+        formattedPhone = stripped.startsWith("+")
+          ? stripped
+          : stripped.length === 10
+            ? `+91${stripped}`
+            : `+${stripped}`;
       }
 
       await blacklistApi.add({
@@ -109,7 +115,9 @@ export default function SecuritySupervisorBlacklistPage() {
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
   const handleRemove = async (id: string, nameLabel: string) => {
-    if (!window.confirm(`Are you sure you want to remove "${nameLabel}" from the security blacklist?`)) {
+    if (
+      !window.confirm(`Are you sure you want to remove "${nameLabel}" from the security blacklist?`)
+    ) {
       return;
     }
     setIsDeleting(id);
@@ -153,11 +161,7 @@ export default function SecuritySupervisorBlacklistPage() {
         ]}
         actions={
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-            <button
-              className="btn btn-secondary"
-              onClick={loadData}
-              disabled={isLoading}
-            >
+            <button className="btn btn-secondary" onClick={loadData} disabled={isLoading}>
               🔄 {isLoading ? "Refreshing…" : "Refresh"}
             </button>
             <button className="btn btn-danger" onClick={() => setIsAddModalOpen(true)}>
@@ -221,8 +225,11 @@ export default function SecuritySupervisorBlacklistPage() {
                     b.name ||
                     (b.reason && b.reason.includes(":") ? b.reason.split(":")[0] : null) ||
                     "Restricted Visitor";
-                  const displayPhone = b.phone || (b.phone_hash ? `Hash: ${String(b.phone_hash).slice(0, 8)}…` : "—");
-                  const displayDate = b.date_added || (b.created_at ? new Date(b.created_at).toLocaleDateString() : "Active");
+                  const displayPhone =
+                    b.phone || (b.phone_hash ? `Hash: ${String(b.phone_hash).slice(0, 8)}…` : "—");
+                  const displayDate =
+                    b.date_added ||
+                    (b.created_at ? new Date(b.created_at).toLocaleDateString() : "Active");
                   const statusStr = b.status || (b.is_active !== false ? "Active" : "Inactive");
                   const riskLevel = b.risk_level || "high";
 
@@ -243,10 +250,17 @@ export default function SecuritySupervisorBlacklistPage() {
                               borderRadius: "4px",
                             }}
                           >
-                            {b.id_type ? `${b.id_type.toUpperCase()}: ` : ""}{b.id_number}
+                            {b.id_type ? `${b.id_type.toUpperCase()}: ` : ""}
+                            {b.id_number}
                           </span>
                         ) : b.id_number_hash ? (
-                          <span style={{ fontSize: "0.75rem", color: "var(--muted)", fontFamily: "monospace" }}>
+                          <span
+                            style={{
+                              fontSize: "0.75rem",
+                              color: "var(--muted)",
+                              fontFamily: "monospace",
+                            }}
+                          >
                             ID Hash: {b.id_number_hash.slice(0, 8)}…
                           </span>
                         ) : (
@@ -264,7 +278,11 @@ export default function SecuritySupervisorBlacklistPage() {
                       <td>
                         <button
                           className="btn btn-secondary"
-                          style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem", color: "var(--danger)" }}
+                          style={{
+                            fontSize: "0.75rem",
+                            padding: "0.2rem 0.5rem",
+                            color: "var(--danger)",
+                          }}
                           onClick={() => handleRemove(b.id, displayName)}
                           disabled={isDeleting === b.id}
                         >
@@ -321,7 +339,14 @@ export default function SecuritySupervisorBlacklistPage() {
               }}
             />
             {blacklistFieldErrors.name && (
-              <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+              <span
+                style={{
+                  color: "var(--danger, #ef4444)",
+                  fontSize: "0.75rem",
+                  display: "block",
+                  marginTop: "0.25rem",
+                }}
+              >
                 {blacklistFieldErrors.name}
               </span>
             )}
@@ -359,7 +384,14 @@ export default function SecuritySupervisorBlacklistPage() {
                 }}
               />
               {blacklistFieldErrors.phone && (
-                <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                <span
+                  style={{
+                    color: "var(--danger, #ef4444)",
+                    fontSize: "0.75rem",
+                    display: "block",
+                    marginTop: "0.25rem",
+                  }}
+                >
                   {blacklistFieldErrors.phone}
                 </span>
               )}
@@ -389,7 +421,14 @@ export default function SecuritySupervisorBlacklistPage() {
                 }}
               />
               {blacklistFieldErrors.vehicleNumber && (
-                <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                <span
+                  style={{
+                    color: "var(--danger, #ef4444)",
+                    fontSize: "0.75rem",
+                    display: "block",
+                    marginTop: "0.25rem",
+                  }}
+                >
                   {blacklistFieldErrors.vehicleNumber}
                 </span>
               )}
@@ -453,7 +492,14 @@ export default function SecuritySupervisorBlacklistPage() {
                 }}
               />
               {blacklistFieldErrors.idNumber && (
-                <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                <span
+                  style={{
+                    color: "var(--danger, #ef4444)",
+                    fontSize: "0.75rem",
+                    display: "block",
+                    marginTop: "0.25rem",
+                  }}
+                >
                   {blacklistFieldErrors.idNumber}
                 </span>
               )}
@@ -461,7 +507,8 @@ export default function SecuritySupervisorBlacklistPage() {
           </div>
 
           <p style={{ fontSize: "0.78rem", color: "var(--muted)", marginBottom: "1rem" }}>
-            💡 Provide at least Mobile Number or Government ID (Aadhaar / PAN / Voter ID / DL / Passport) to restrict gate entry.
+            💡 Provide at least Mobile Number or Government ID (Aadhaar / PAN / Voter ID / DL /
+            Passport) to restrict gate entry.
           </p>
 
           <div>
@@ -489,7 +536,14 @@ export default function SecuritySupervisorBlacklistPage() {
               required
             />
             {blacklistFieldErrors.reason && (
-              <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+              <span
+                style={{
+                  color: "var(--danger, #ef4444)",
+                  fontSize: "0.75rem",
+                  display: "block",
+                  marginTop: "0.25rem",
+                }}
+              >
                 {blacklistFieldErrors.reason}
               </span>
             )}

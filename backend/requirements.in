@@ -1,4 +1,6 @@
-# GateSphere backend — pinned top-level dependencies
+# GateSphere backend — pinned top-level RUNTIME dependencies.
+# Dev / test tools live in requirements-dev.in so they never ship in the runtime image.
+# Lock:  pip-compile --generate-hashes --output-file=requirements.lock.txt requirements.in
 fastapi==0.141.1
 uvicorn[standard]==0.34.0
 gunicorn==23.0.0
@@ -19,11 +21,3 @@ httpx==0.28.1
 boto3==1.35.90
 sib-api-v3-sdk==7.6.0
 structlog==24.4.0
-
-# dev / test
-pytest==8.3.4
-pytest-asyncio==0.25.0
-pytest-cov==6.0.0
-ruff==0.8.6
-black==24.10.0
-mypy==1.14.1

@@ -3,3 +3,9 @@ node_modules/
 package-lock.json
 next-env.d.ts
 public/
+test-results/
+playwright-report/
+e2e/.auth/
+coverage/
+# Rewritten by `next build` in its own formatting on every build (re-audit #4, N-6).
+tsconfig.json

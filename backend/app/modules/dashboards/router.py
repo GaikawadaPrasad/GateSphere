@@ -73,7 +73,6 @@ FINANCIAL_DASHBOARD = Depends(require_financial_dashboard_async)
 Svc = DashboardService
 
 
-
 @router.get("/health", summary="Dashboards module liveness")
 async def module_health() -> dict:
     return ok({"module": "dashboards", "status": "ok"})
@@ -115,7 +114,9 @@ async def overview(
     return ok(data)
 
 
-@router.get("/security", response_model=Envelope[schemas.SecurityStats], dependencies=[SECURITY_DASHBOARD])
+@router.get(
+    "/security", response_model=Envelope[schemas.SecurityStats], dependencies=[SECURITY_DASHBOARD]
+)
 async def security(
     community_id: uuid.UUID | None = None,
     refresh: bool = False,
@@ -131,7 +132,11 @@ async def security(
     return ok(data)
 
 
-@router.get("/financial", response_model=Envelope[schemas.FinancialStats], dependencies=[FINANCIAL_DASHBOARD])
+@router.get(
+    "/financial",
+    response_model=Envelope[schemas.FinancialStats],
+    dependencies=[FINANCIAL_DASHBOARD],
+)
 async def financial(
     community_id: uuid.UUID | None = None,
     refresh: bool = False,

@@ -91,7 +91,9 @@ async def test_over_allocation_rejected(db, scope_for, community, unit, superadm
 
 async def test_allocation_sum_must_match(db, scope_for, community, unit, superadmin):
     svc = _svc(db, scope_for(community.id), superadmin)
-    await svc.update_rule(schemas.RuleUpdate(allow_advance_payment=False), community_id=community.id)
+    await svc.update_rule(
+        schemas.RuleUpdate(allow_advance_payment=False), community_id=community.id
+    )
     inv = await _invoice(svc, unit)
     await svc.post_invoice(inv.id)
     with pytest.raises(BusinessRuleError) as exc:
@@ -141,18 +143,7 @@ async def test_cannot_cancel_invoice_with_payments(db, scope_for, community, uni
     assert exc.value.code == "INVOICE_HAS_PAYMENTS"
 
 
-async def test_sweep_overdue_invoices_task(db, scope_for, community, unit, superadmin):
-    from datetime import date, timedelta
-    from app.modules.billing.tasks import _sweep_overdue_invoices
-
-    svc = _svc(db, scope_for(community.id), superadmin)
-    inv = await _invoice(svc, unit)
-    await svc.post_invoice(inv.id)
-    inv.due_date = date.today() - timedelta(days=1)
-    await db.commit()
-
-    res = await _sweep_overdue_invoices()
-    assert res["invoices_marked"] >= 1
-    await db.refresh(inv)
-    assert inv.status == "overdue"
-
+# The overdue sweep is covered by `test_billing_tasks.py`. It cannot be tested with the
+# savepoint-backed `db` fixture used here: the Celery task opens its own connection
+# (`app.core.jobs.job_session`) and never sees rows that were only written inside the
+# fixture's uncommitted outer transaction.

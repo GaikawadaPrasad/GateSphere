@@ -28,7 +28,10 @@ const ROLE_DISPLAY_NAMES: Record<string, string> = {
   auditor: "Auditor",
 };
 
-function getIncompatibleRoleError(activeRoleSlugs: string[], targetRoleSlug: string): string | null {
+function getIncompatibleRoleError(
+  activeRoleSlugs: string[],
+  targetRoleSlug: string,
+): string | null {
   for (const [r1, r2] of INCOMPATIBLE_ROLE_PAIRS) {
     if (targetRoleSlug === r1 && activeRoleSlugs.includes(r2)) {
       return `First revoke the ${ROLE_DISPLAY_NAMES[r2] || r2} role, then ${ROLE_DISPLAY_NAMES[r1] || r1} can be granted.`;
@@ -203,10 +206,7 @@ export function EditUserModal({
         role_slug: selectedRoleSlug,
         community_id: targetCommunityId,
       });
-      toast.success(
-        `Role "${selectedRoleSlug}" granted to ${user.full_name}.`,
-        "Role Assigned"
-      );
+      toast.success(`Role "${selectedRoleSlug}" granted to ${user.full_name}.`, "Role Assigned");
 
       const grantedRole = availableRoles.find((r) => r.slug === selectedRoleSlug);
       const newGrant: UserRoleGrant = {
@@ -215,7 +215,10 @@ export function EditUserModal({
         role_name: grantedRole?.name || selectedRoleSlug,
         community_id: targetCommunityId || null,
       };
-      setAssignedRoles((prev) => [...prev.filter((r) => r.role_slug !== selectedRoleSlug), newGrant]);
+      setAssignedRoles((prev) => [
+        ...prev.filter((r) => r.role_slug !== selectedRoleSlug),
+        newGrant,
+      ]);
 
       setSelectedRoleSlug("");
       setCommunityIdInput("");
@@ -277,7 +280,14 @@ export function EditUserModal({
       title={`Edit User Access — ${user.full_name}`}
       size="lg"
       footer={
-        <div style={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "center" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            width: "100%",
+            alignItems: "center",
+          }}
+        >
           <button
             type="button"
             className="btn btn-danger"
@@ -288,8 +298,8 @@ export function EditUserModal({
             {isDeletingUser
               ? "Deleting..."
               : confirmDelete
-              ? "⚠️ Confirm Delete Person"
-              : "Delete Person"}
+                ? "⚠️ Confirm Delete Person"
+                : "Delete Person"}
           </button>
 
           <div style={{ display: "flex", gap: "0.75rem" }}>
@@ -330,14 +340,33 @@ export function EditUserModal({
         )}
 
         {/* User Profile Details */}
-        <form onSubmit={handleUpdateProfile} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-          <h4 style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--brand-heading)", marginBottom: "-0.25rem" }}>
+        <form
+          onSubmit={handleUpdateProfile}
+          style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
+        >
+          <h4
+            style={{
+              fontSize: "0.95rem",
+              fontWeight: 700,
+              color: "var(--brand-heading)",
+              marginBottom: "-0.25rem",
+            }}
+          >
             1. User Profile Details
           </h4>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
             <div>
-              <label htmlFor="edit-user-fullname" style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.25rem" }}>
+              <label
+                htmlFor="edit-user-fullname"
+                style={{
+                  fontSize: "0.8rem",
+                  fontWeight: 600,
+                  color: "var(--brand-heading)",
+                  display: "block",
+                  marginBottom: "0.25rem",
+                }}
+              >
                 Full Name
               </label>
               <input
@@ -355,14 +384,30 @@ export function EditUserModal({
                 }}
               />
               {fieldErrors.fullName && (
-                <span style={{ fontSize: "0.75rem", color: "#ef4444", marginTop: "0.25rem", display: "block" }}>
+                <span
+                  style={{
+                    fontSize: "0.75rem",
+                    color: "#ef4444",
+                    marginTop: "0.25rem",
+                    display: "block",
+                  }}
+                >
                   {fieldErrors.fullName}
                 </span>
               )}
             </div>
 
             <div>
-              <label htmlFor="edit-user-email" style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.25rem" }}>
+              <label
+                htmlFor="edit-user-email"
+                style={{
+                  fontSize: "0.8rem",
+                  fontWeight: 600,
+                  color: "var(--brand-heading)",
+                  display: "block",
+                  marginBottom: "0.25rem",
+                }}
+              >
                 Email Address
               </label>
               <input
@@ -380,14 +425,30 @@ export function EditUserModal({
                 }}
               />
               {fieldErrors.email && (
-                <span style={{ fontSize: "0.75rem", color: "#ef4444", marginTop: "0.25rem", display: "block" }}>
+                <span
+                  style={{
+                    fontSize: "0.75rem",
+                    color: "#ef4444",
+                    marginTop: "0.25rem",
+                    display: "block",
+                  }}
+                >
                   {fieldErrors.email}
                 </span>
               )}
             </div>
 
             <div>
-              <label htmlFor="edit-user-phone" style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.25rem" }}>
+              <label
+                htmlFor="edit-user-phone"
+                style={{
+                  fontSize: "0.8rem",
+                  fontWeight: 600,
+                  color: "var(--brand-heading)",
+                  display: "block",
+                  marginBottom: "0.25rem",
+                }}
+              >
                 Phone Number
               </label>
               <input
@@ -405,14 +466,30 @@ export function EditUserModal({
                 }}
               />
               {fieldErrors.phone && (
-                <span style={{ fontSize: "0.75rem", color: "#ef4444", marginTop: "0.25rem", display: "block" }}>
+                <span
+                  style={{
+                    fontSize: "0.75rem",
+                    color: "#ef4444",
+                    marginTop: "0.25rem",
+                    display: "block",
+                  }}
+                >
                   {fieldErrors.phone}
                 </span>
               )}
             </div>
 
             <div>
-              <label htmlFor="edit-user-status" style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.25rem" }}>
+              <label
+                htmlFor="edit-user-status"
+                style={{
+                  fontSize: "0.8rem",
+                  fontWeight: 600,
+                  color: "var(--brand-heading)",
+                  display: "block",
+                  marginBottom: "0.25rem",
+                }}
+              >
                 Account Status
               </label>
               <select
@@ -420,7 +497,12 @@ export function EditUserModal({
                 className="form-control"
                 value={isActive ? "active" : "inactive"}
                 onChange={(e) => setIsActive(e.target.value === "active")}
-                style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: "var(--radius-input)", border: "1px solid var(--border-standard)" }}
+                style={{
+                  width: "100%",
+                  padding: "0.5rem 0.75rem",
+                  borderRadius: "var(--radius-input)",
+                  border: "1px solid var(--border-standard)",
+                }}
               >
                 <option value="active">Active Access</option>
                 <option value="inactive">Disabled / Deactivated</option>
@@ -457,7 +539,8 @@ export function EditUserModal({
                       {grant.role_name || grant.role_slug}
                     </span>
                     <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-                      Scope: {grant.community_id ? `Community: ${grant.community_id}` : "Platform-Global"}
+                      Scope:{" "}
+                      {grant.community_id ? `Community: ${grant.community_id}` : "Platform-Global"}
                     </span>
                   </div>
 
@@ -492,7 +575,16 @@ export function EditUserModal({
             }}
           >
             <div style={{ flex: 1 }}>
-              <label htmlFor="select-role-to-grant" style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--brand-heading)", display: "block", marginBottom: "0.2rem" }}>
+              <label
+                htmlFor="select-role-to-grant"
+                style={{
+                  fontSize: "0.75rem",
+                  fontWeight: 600,
+                  color: "var(--brand-heading)",
+                  display: "block",
+                  marginBottom: "0.2rem",
+                }}
+              >
                 Select Role to Grant
               </label>
               <select
@@ -500,7 +592,13 @@ export function EditUserModal({
                 className="form-control"
                 value={selectedRoleSlug}
                 onChange={(e) => setSelectedRoleSlug(e.target.value)}
-                style={{ width: "100%", padding: "0.45rem 0.65rem", fontSize: "0.85rem", borderRadius: "var(--radius-input)", border: "1px solid var(--border-standard)" }}
+                style={{
+                  width: "100%",
+                  padding: "0.45rem 0.65rem",
+                  fontSize: "0.85rem",
+                  borderRadius: "var(--radius-input)",
+                  border: "1px solid var(--border-standard)",
+                }}
               >
                 <option value="">-- Choose Role --</option>
                 {availableRoles.map((r) => (

@@ -68,7 +68,8 @@ export default function SecuritySupervisorDeliveryManagementPage() {
       (d.courier && d.courier.toLowerCase().includes(q)) ||
       (d.unit && d.unit.toLowerCase().includes(q));
     const matchCategory =
-      categoryFilter === "all" || (d.category && d.category.toLowerCase().includes(categoryFilter.toLowerCase()));
+      categoryFilter === "all" ||
+      (d.category && d.category.toLowerCase().includes(categoryFilter.toLowerCase()));
     return matchSearch && matchCategory;
   });
 
@@ -132,11 +133,7 @@ export default function SecuritySupervisorDeliveryManagementPage() {
           { label: "Delivery Management" },
         ]}
         actions={
-          <button
-            className="btn btn-secondary"
-            onClick={loadData}
-            disabled={isLoading}
-          >
+          <button className="btn btn-secondary" onClick={loadData} disabled={isLoading}>
             🔄 {isLoading ? "Refreshing…" : "Refresh"}
           </button>
         }

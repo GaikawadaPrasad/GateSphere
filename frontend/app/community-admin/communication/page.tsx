@@ -117,16 +117,19 @@ export default function CommunityAdminCommunicationPage() {
     } else if (trimmedTitle.length > 200) {
       errors.title = "Announcement title cannot exceed 200 characters.";
     } else if (!/[a-zA-Z]{2,}/.test(trimmedTitle)) {
-      errors.title = "Announcement title must contain meaningful readable text (at least 2 alphabetic letters).";
+      errors.title =
+        "Announcement title must contain meaningful readable text (at least 2 alphabetic letters).";
     }
 
     const trimmedBody = form.body.trim();
     if (!trimmedBody || trimmedBody.length < 10) {
-      errors.body = "Announcement message content is required and must be at least 10 characters long.";
+      errors.body =
+        "Announcement message content is required and must be at least 10 characters long.";
     } else if (trimmedBody.length > 20000) {
       errors.body = "Announcement message content cannot exceed 20,000 characters.";
     } else if (!/[a-zA-Z]{3,}/.test(trimmedBody)) {
-      errors.body = "Announcement message content must contain meaningful text (at least 3 alphabetic letters).";
+      errors.body =
+        "Announcement message content must contain meaningful text (at least 3 alphabetic letters).";
     }
 
     if (form.target_type !== "all" && !form.target_id) {
@@ -235,7 +238,10 @@ export default function CommunityAdminCommunicationPage() {
         },
         communityId: activeCommunityId,
       });
-      toast.success(`Resident group "${groupForm.name.trim()}" created successfully.`, "Group Created");
+      toast.success(
+        `Resident group "${groupForm.name.trim()}" created successfully.`,
+        "Group Created",
+      );
       setIsGroupModalOpen(false);
       setCommFieldErrors({});
       setGroupForm({ name: "", description: "" });
@@ -1167,13 +1173,12 @@ export default function CommunityAdminCommunicationPage() {
                   <option value="">-- Select Resident to Add --</option>
                   {residentsList
                     ?.filter(
-                      (r) =>
-                        r.user_id &&
-                        !groupMembers?.some((m: any) => m.user_id === r.user_id),
+                      (r) => r.user_id && !groupMembers?.some((m: any) => m.user_id === r.user_id),
                     )
                     .map((r) => (
                       <option key={r.id} value={r.user_id}>
-                        {r.full_name} {r.unit_number ? `(${r.unit_number})` : ""} {r.email ? `• ${r.email}` : ""}
+                        {r.full_name} {r.unit_number ? `(${r.unit_number})` : ""}{" "}
+                        {r.email ? `• ${r.email}` : ""}
                       </option>
                     ))}
                 </select>
@@ -1236,7 +1241,8 @@ export default function CommunityAdminCommunicationPage() {
                     fontSize: "0.85rem",
                   }}
                 >
-                  No residents have been added to this group yet. Select a resident above and click &quot;+ Add to Group&quot;.
+                  No residents have been added to this group yet. Select a resident above and click
+                  &quot;+ Add to Group&quot;.
                 </div>
               ) : (
                 <div
@@ -1249,7 +1255,12 @@ export default function CommunityAdminCommunicationPage() {
                 >
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
                     <thead>
-                      <tr style={{ background: "var(--bg-secondary)", borderBottom: "1px solid var(--border)" }}>
+                      <tr
+                        style={{
+                          background: "var(--bg-secondary)",
+                          borderBottom: "1px solid var(--border)",
+                        }}
+                      >
                         <th style={{ textAlign: "left", padding: "0.5rem 0.75rem" }}>Resident</th>
                         <th style={{ textAlign: "left", padding: "0.5rem 0.75rem" }}>Added</th>
                         <th style={{ textAlign: "right", padding: "0.5rem 0.75rem" }}>Action</th>
@@ -1266,14 +1277,27 @@ export default function CommunityAdminCommunicationPage() {
                           );
                         })
                         .map((m: any) => (
-                          <tr key={m.id || m.user_id} style={{ borderBottom: "1px solid var(--border)" }}>
+                          <tr
+                            key={m.id || m.user_id}
+                            style={{ borderBottom: "1px solid var(--border)" }}
+                          >
                             <td style={{ padding: "0.5rem 0.75rem" }}>
-                              <div style={{ fontWeight: 600 }}>{m.user_name || "Resident Member"}</div>
+                              <div style={{ fontWeight: 600 }}>
+                                {m.user_name || "Resident Member"}
+                              </div>
                               {m.user_email && (
-                                <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>{m.user_email}</div>
+                                <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                                  {m.user_email}
+                                </div>
                               )}
                             </td>
-                            <td style={{ padding: "0.5rem 0.75rem", color: "var(--muted)", fontSize: "0.75rem" }}>
+                            <td
+                              style={{
+                                padding: "0.5rem 0.75rem",
+                                color: "var(--muted)",
+                                fontSize: "0.75rem",
+                              }}
+                            >
                               {m.added_at ? formatDateTime(m.added_at).split(",")[0] : "Joined"}
                             </td>
                             <td style={{ padding: "0.5rem 0.75rem", textAlign: "right" }}>

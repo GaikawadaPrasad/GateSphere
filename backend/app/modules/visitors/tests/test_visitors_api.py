@@ -311,5 +311,3 @@ def test_supervisor_blacklist_vehicle_recognized_by_guard(as_role, seed_ids):
         assert check_plate.json()["data"]["blacklisted"] is True
     finally:
         sup.delete(f"/api/v1/visitors/blacklist/{bl_id}")
-
-

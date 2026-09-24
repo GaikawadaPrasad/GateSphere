@@ -15,11 +15,7 @@ interface ViewCommunityModalProps {
   community: CommunityWithMetrics | null;
 }
 
-export function ViewCommunityModal({
-  isOpen,
-  onClose,
-  community,
-}: ViewCommunityModalProps) {
+export function ViewCommunityModal({ isOpen, onClose, community }: ViewCommunityModalProps) {
   const [communityTowers, setCommunityTowers] = useState<Tower[]>([]);
   const [communityGates, setCommunityGates] = useState<Gate[]>([]);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
@@ -30,10 +26,7 @@ export function ViewCommunityModal({
       setCommunityTowers([]);
       setCommunityGates([]);
 
-      Promise.allSettled([
-        communitiesApi.towers(community.id),
-        communitiesApi.gates(community.id),
-      ])
+      Promise.allSettled([communitiesApi.towers(community.id), communitiesApi.gates(community.id)])
         .then(([towersRes, gatesRes]) => {
           if (towersRes.status === "fulfilled") setCommunityTowers(towersRes.value || []);
           if (gatesRes.status === "fulfilled") setCommunityGates(gatesRes.value || []);
@@ -56,11 +49,7 @@ export function ViewCommunityModal({
       title={`Community Details: ${community.name}`}
       maxWidth={620}
       footer={
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={onClose}
-        >
+        <button type="button" className="btn btn-secondary" onClick={onClose}>
           Close
         </button>
       }
@@ -80,23 +69,61 @@ export function ViewCommunityModal({
           }}
         >
           <div>
-            <span style={{ fontSize: "0.725rem", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>Code</span>
-            <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--fg)" }}>{community.code}</div>
+            <span
+              style={{
+                fontSize: "0.725rem",
+                color: "var(--muted)",
+                textTransform: "uppercase",
+                fontWeight: 600,
+              }}
+            >
+              Code
+            </span>
+            <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--fg)" }}>
+              {community.code}
+            </div>
           </div>
           <div>
-            <span style={{ fontSize: "0.725rem", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>Location</span>
+            <span
+              style={{
+                fontSize: "0.725rem",
+                color: "var(--muted)",
+                textTransform: "uppercase",
+                fontWeight: 600,
+              }}
+            >
+              Location
+            </span>
             <div style={{ fontWeight: 600, fontSize: "0.9rem", color: "var(--fg)" }}>
               {[community.city, community.state].filter(Boolean).join(", ") || "–"}
             </div>
           </div>
           <div>
-            <span style={{ fontSize: "0.725rem", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>Status</span>
+            <span
+              style={{
+                fontSize: "0.725rem",
+                color: "var(--muted)",
+                textTransform: "uppercase",
+                fontWeight: 600,
+              }}
+            >
+              Status
+            </span>
             <div style={{ marginTop: "0.15rem" }}>
               <StatusBadge status={community.is_active} />
             </div>
           </div>
           <div>
-            <span style={{ fontSize: "0.725rem", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>Created</span>
+            <span
+              style={{
+                fontSize: "0.725rem",
+                color: "var(--muted)",
+                textTransform: "uppercase",
+                fontWeight: 600,
+              }}
+            >
+              Created
+            </span>
             <div style={{ fontSize: "0.85rem", fontWeight: 500, color: "var(--fg)" }}>
               {formatDate(community.created_at)}
             </div>
@@ -105,16 +132,44 @@ export function ViewCommunityModal({
 
         {/* Structure Breakdown: Towers & Gates with Skeleton fallback */}
         {isLoadingDetails ? (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: "1rem" }}>
-            <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "0.85rem" }}>
-              <Skeleton width="45%" height="1.1rem" borderRadius={4} style={{ marginBottom: "0.75rem" }} />
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))",
+              gap: "1rem",
+            }}
+          >
+            <div
+              style={{
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                padding: "0.85rem",
+              }}
+            >
+              <Skeleton
+                width="45%"
+                height="1.1rem"
+                borderRadius={4}
+                style={{ marginBottom: "0.75rem" }}
+              />
               <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                 <Skeleton height="1.8rem" borderRadius={4} />
                 <Skeleton height="1.8rem" borderRadius={4} />
               </div>
             </div>
-            <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "0.85rem" }}>
-              <Skeleton width="45%" height="1.1rem" borderRadius={4} style={{ marginBottom: "0.75rem" }} />
+            <div
+              style={{
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                padding: "0.85rem",
+              }}
+            >
+              <Skeleton
+                width="45%"
+                height="1.1rem"
+                borderRadius={4}
+                style={{ marginBottom: "0.75rem" }}
+              />
               <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                 <Skeleton height="1.8rem" borderRadius={4} />
                 <Skeleton height="1.8rem" borderRadius={4} />
@@ -122,7 +177,13 @@ export function ViewCommunityModal({
             </div>
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: "1rem" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))",
+              gap: "1rem",
+            }}
+          >
             {/* Towers List */}
             <div
               style={{
@@ -146,7 +207,15 @@ export function ViewCommunityModal({
                 <span>🏢 Towers ({communityTowers.length})</span>
               </h4>
               {communityTowers.length > 0 ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", maxHeight: 220, overflowY: "auto" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.4rem",
+                    maxHeight: 220,
+                    overflowY: "auto",
+                  }}
+                >
                   {communityTowers.map((t) => (
                     <div
                       key={t.id}
@@ -194,7 +263,15 @@ export function ViewCommunityModal({
                 <span>🛡️ Gates ({communityGates.length})</span>
               </h4>
               {communityGates.length > 0 ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", maxHeight: 220, overflowY: "auto" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.4rem",
+                    maxHeight: 220,
+                    overflowY: "auto",
+                  }}
+                >
                   {communityGates.map((g) => (
                     <div
                       key={g.id}

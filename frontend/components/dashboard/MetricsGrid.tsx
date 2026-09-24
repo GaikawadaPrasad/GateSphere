@@ -17,11 +17,15 @@ interface MetricsGridProps {
   } | null;
 }
 
-export function MetricsGrid({ metrics, isLoading, onCardClick, activeCommunity }: MetricsGridProps) {
+export function MetricsGrid({
+  metrics,
+  isLoading,
+  onCardClick,
+  activeCommunity,
+}: MetricsGridProps) {
   if (isLoading || !metrics) {
     return <MetricsSkeleton count={6} />;
   }
-
 
   return (
     <div
@@ -35,7 +39,9 @@ export function MetricsGrid({ metrics, isLoading, onCardClick, activeCommunity }
       {/* 1. Total Communities / Scoped Community */}
       <KpiCard
         title={activeCommunity ? "Scoped Community" : "Total Communities"}
-        value={activeCommunity ? activeCommunity.name : formatCompactNumber(metrics.totalCommunities)}
+        value={
+          activeCommunity ? activeCommunity.name : formatCompactNumber(metrics.totalCommunities)
+        }
         subtitle={
           activeCommunity
             ? `Code: ${activeCommunity.code} · ${activeCommunity.city || activeCommunity.state || "Active"}`

@@ -46,24 +46,24 @@ export function useAuditorOverview(communityId?: string | null) {
         fetchOverview,
         fetchFinancial,
         api
-          .get<any[]>(
-            `/audit/logs?page_size=100${communityId ? `&community_id=${communityId}` : ""}`,
-          )
+          .get<
+            any[]
+          >(`/audit/logs?page_size=100${communityId ? `&community_id=${communityId}` : ""}`)
           .catch(() => []),
         api
-          .get<any[]>(
-            `/incidents?page_size=100${communityId ? `&community_id=${communityId}` : ""}`,
-          )
+          .get<
+            any[]
+          >(`/incidents?page_size=100${communityId ? `&community_id=${communityId}` : ""}`)
           .catch(() => []),
         api
-          .get<any[]>(
-            `/gate/events?page_size=100${communityId ? `&community_id=${communityId}` : ""}`,
-          )
+          .get<
+            any[]
+          >(`/gate/events?page_size=100${communityId ? `&community_id=${communityId}` : ""}`)
           .catch(() => []),
         api
-          .get<any[]>(
-            `/billing/invoices?page_size=100${communityId ? `&community_id=${communityId}` : ""}`,
-          )
+          .get<
+            any[]
+          >(`/billing/invoices?page_size=100${communityId ? `&community_id=${communityId}` : ""}`)
           .catch(() => []),
       ]);
 

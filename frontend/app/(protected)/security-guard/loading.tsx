@@ -18,9 +18,14 @@ export default function SecurityGuardLoading() {
       >
         {[1, 2, 3, 4, 5].map((i) => (
           <div key={i} className="card" style={{ padding: "1.25rem", minHeight: 120 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.75rem" }}>
+            <div
+              style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.75rem" }}
+            >
               <div className="skeleton" style={{ width: 100, height: 14 }} />
-              <div className="skeleton" style={{ width: 28, height: 28, borderRadius: "var(--radius-sm)" }} />
+              <div
+                className="skeleton"
+                style={{ width: 28, height: 28, borderRadius: "var(--radius-sm)" }}
+              />
             </div>
             <div className="skeleton" style={{ width: 50, height: 28, marginBottom: "0.5rem" }} />
             <div className="skeleton" style={{ width: 120, height: 12 }} />
@@ -31,9 +36,19 @@ export default function SecurityGuardLoading() {
       {/* Actions Bar Skeleton */}
       <div className="card" style={{ marginBottom: "1.75rem", padding: "1.25rem" }}>
         <div className="skeleton" style={{ width: 180, height: 16, marginBottom: "1rem" }} />
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "1rem" }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+            gap: "1rem",
+          }}
+        >
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="skeleton" style={{ height: 44, borderRadius: "var(--radius)" }} />
+            <div
+              key={i}
+              className="skeleton"
+              style={{ height: 44, borderRadius: "var(--radius)" }}
+            />
           ))}
         </div>
       </div>
@@ -42,7 +57,11 @@ export default function SecurityGuardLoading() {
       <div className="card" style={{ padding: "1.25rem" }}>
         <div className="skeleton" style={{ width: 220, height: 20, marginBottom: "1rem" }} />
         {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="skeleton" style={{ height: 40, width: "100%", marginBottom: "0.75rem" }} />
+          <div
+            key={i}
+            className="skeleton"
+            style={{ height: 40, width: "100%", marginBottom: "0.75rem" }}
+          />
         ))}
       </div>
     </div>

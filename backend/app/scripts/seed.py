@@ -483,19 +483,23 @@ def seed_amenities(db: Session, communities: list[Community]) -> None:
 
     def _provision_slots(db, amenity, cap):
         """Add standard 2-hour slots for all 7 days if none exist yet."""
-        existing = db.scalar(select(AmenitySlot).where(AmenitySlot.amenity_id == amenity.id).limit(1))
+        existing = db.scalar(
+            select(AmenitySlot).where(AmenitySlot.amenity_id == amenity.id).limit(1)
+        )
         if existing:
             return
         for dow in range(7):
             for st, et in standard_slot_times:
-                db.add(AmenitySlot(
-                    community_id=amenity.community_id,
-                    amenity_id=amenity.id,
-                    day_of_week=dow,
-                    start_time=st,
-                    end_time=et,
-                    capacity=cap,
-                ))
+                db.add(
+                    AmenitySlot(
+                        community_id=amenity.community_id,
+                        amenity_id=amenity.id,
+                        day_of_week=dow,
+                        start_time=st,
+                        end_time=et,
+                        capacity=cap,
+                    )
+                )
 
     presets = [("CLUB", "Clubhouse", "clubhouse", 60), ("GYM", "Gym", "gym", 20)]
     for c in communities:
@@ -1080,43 +1084,54 @@ def seed_audit_trail(db: Session, communities: list[Community]) -> None:
     log.info("seed.audit_trail", rows=len(rows))
 
 
+# Environments where a destructive reset is permitted. An allow-list (not a deny-list)
+# so any environment not named here is refused.
+_RESET_ALLOWED_ENVIRONMENTS = frozenset({"local"})
+
+
 def reset_data(db: Session) -> None:
     """TRUNCATE every data table (schema + `alembic_version` kept) so `main()` re-seeds
     from a guaranteed-clean state. `CASCADE` handles FK order; `RESTART IDENTITY` resets
-    the few `Identity` sequences (e.g. `ledger_entries.entry_seq`)."""
+    the few `Identity` sequences (e.g. `ledger_entries.entry_seq`).
+
+    `audit_logs` carries a BEFORE TRUNCATE guard trigger (migration 0040). It is disabled,
+    the TRUNCATE runs and it is re-enabled **in one transaction** (PostgreSQL DDL is
+    transactional): if any step fails the whole block rolls back, so the guard can never
+    be left silently switched off. Errors propagate — nothing is swallowed.
+    """
     from app.core.config import settings
 
-    if getattr(settings, "ENVIRONMENT", "").lower() in ("production", "staging", "prod"):
-        raise RuntimeError(
-            f"Database reset is strictly prohibited in {settings.ENVIRONMENT} environment."
-        )
+    environment = (getattr(settings, "ENVIRONMENT", "") or "").lower()
+    if environment not in _RESET_ALLOWED_ENVIRONMENTS:
+        raise RuntimeError(f"Database reset is not permitted in the {environment!r} environment.")
 
     import app.db.base  # noqa: F401 — register every model on Base.metadata
     from app.db.base_class import Base
 
     names = [t.name for t in Base.metadata.sorted_tables if t.name != "alembic_version"]
     if names:
+        # Table names come from our own ORM metadata, never from input.
         cols = ", ".join(f'"{n}"' for n in names)
-        has_audit_trigger = False
+        has_guard = bool(
+            db.scalar(
+                text(
+                    "SELECT 1 FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid "
+                    "WHERE c.relname = 'audit_logs' "
+                    "AND t.tgname = 'tr_prevent_audit_truncate'"
+                )
+            )
+        )
         try:
-            db.execute(text("ALTER TABLE audit_logs DISABLE TRIGGER tr_prevent_audit_truncate;"))
+            if has_guard:
+                db.execute(text("ALTER TABLE audit_logs DISABLE TRIGGER tr_prevent_audit_truncate"))
+            db.execute(text(f"TRUNCATE {cols} RESTART IDENTITY CASCADE"))
+            if has_guard:
+                db.execute(text("ALTER TABLE audit_logs ENABLE TRIGGER tr_prevent_audit_truncate"))
             db.commit()
-            has_audit_trigger = True
         except Exception:
             db.rollback()
-
-        try:
-            db.execute(text(f"TRUNCATE {cols} RESTART IDENTITY CASCADE"))
-            db.commit()
-        finally:
-            if has_audit_trigger:
-                try:
-                    db.execute(
-                        text("ALTER TABLE audit_logs ENABLE TRIGGER tr_prevent_audit_truncate;")
-                    )
-                    db.commit()
-                except Exception:
-                    db.rollback()
+            log.error("seed.reset_failed", tables=len(names))
+            raise
 
     log.info("seed.reset", tables=len(names))
 

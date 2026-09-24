@@ -7,6 +7,8 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
+from app.core.constants import PASSWORD_MIN_LENGTH
+
 _OCCUPANCY_ROLES = ("primary_owner", "secondary_owner", "tenant", "family", "occupant")
 
 
@@ -88,7 +90,7 @@ class EmergencyContactIn(_Write):
 
 class InvitationAccept(_Write):
     # required only when the invited email has no account yet
-    password: str | None = Field(default=None, min_length=10, max_length=200)
+    password: str | None = Field(default=None, min_length=PASSWORD_MIN_LENGTH, max_length=200)
     full_name: str | None = Field(default=None, max_length=255)
     phone: str | None = _Phone
     date_of_birth: date | None = None
@@ -103,7 +105,7 @@ class TenantAdd(_Write):
     email: EmailStr
     full_name: str = Field(min_length=1, max_length=255)
     phone: str | None = _Phone
-    password: str | None = Field(default=None, min_length=10, max_length=200)
+    password: str | None = Field(default=None, min_length=PASSWORD_MIN_LENGTH, max_length=200)
     unit_id: uuid.UUID
     occupancy_role: str = "tenant"
     is_primary: bool = False

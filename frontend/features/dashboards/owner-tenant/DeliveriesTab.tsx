@@ -6,32 +6,72 @@ import type { DeliveryItem, DeliveryProtocol } from "@/types/deliveries";
 
 function PackageIcon({ className = "w-4 h-4" }: { className?: string }) {
   return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+      />
     </svg>
   );
 }
 
 function RefreshIcon({ className = "w-3.5 h-3.5" }: { className?: string }) {
   return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+      />
     </svg>
   );
 }
 
 function SearchIcon({ className = "w-4 h-4" }: { className?: string }) {
   return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+      />
     </svg>
   );
 }
 
 function AlertIcon({ className = "w-4 h-4" }: { className?: string }) {
   return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+      />
     </svg>
   );
 }
@@ -77,9 +117,7 @@ export function DeliveriesTab() {
         protocol_type: newProtocol,
       });
       setProtocols((prev) =>
-        prev.map((p) =>
-          p.delivery_type === type ? { ...p, protocol_type: newProtocol } : p
-        )
+        prev.map((p) => (p.delivery_type === type ? { ...p, protocol_type: newProtocol } : p)),
       );
     } catch (err: any) {
       alert("Failed to update delivery protocol: " + (err?.message || "Unknown error"));
@@ -124,8 +162,7 @@ export function DeliveriesTab() {
             { key: "courier", label: "Courier & Parcels", defaultProto: "leave_at_gate_desk" },
           ].map((cat) => {
             const currentProto =
-              protocols.find((p) => p.delivery_type === cat.key)?.protocol_type ||
-              cat.defaultProto;
+              protocols.find((p) => p.delivery_type === cat.key)?.protocol_type || cat.defaultProto;
 
             return (
               <div
@@ -147,9 +184,7 @@ export function DeliveriesTab() {
                   className="w-full text-xs bg-white border border-slate-300 rounded-md p-2 font-medium text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                 >
                   <option value="allow_at_gate">allow at gate</option>
-                  <option value="resident_approval_required">
-                    resident approval required
-                  </option>
+                  <option value="resident_approval_required">resident approval required</option>
                   <option value="leave_at_gate_desk">leave at gate desk</option>
                   <option value="direct_rejection">direct rejection</option>
                 </select>
@@ -202,7 +237,8 @@ export function DeliveriesTab() {
             <PackageIcon className="w-10 h-10 text-slate-300 mx-auto mb-2" />
             <p className="text-sm font-semibold text-slate-700">No deliveries found</p>
             <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1">
-              There are no active or incoming parcels matching your current filter. New deliveries registered at the gate will appear here in real-time.
+              There are no active or incoming parcels matching your current filter. New deliveries
+              registered at the gate will appear here in real-time.
             </p>
           </div>
         ) : (
@@ -235,8 +271,8 @@ export function DeliveriesTab() {
                           d.status === "delivered" || d.status === "collected_at_gate"
                             ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                             : d.status === "arrived"
-                            ? "bg-amber-50 text-amber-700 border border-amber-200"
-                            : "bg-blue-50 text-blue-700 border border-blue-200"
+                              ? "bg-amber-50 text-amber-700 border border-amber-200"
+                              : "bg-blue-50 text-blue-700 border border-blue-200"
                         }`}
                       >
                         {d.status}

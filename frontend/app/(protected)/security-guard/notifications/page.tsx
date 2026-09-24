@@ -41,11 +41,7 @@ export default function SecurityGuardNotificationsPage() {
           { label: "Notifications" },
         ]}
         actions={
-          <button
-            className="btn btn-secondary"
-            onClick={loadData}
-            disabled={isLoading}
-          >
+          <button className="btn btn-secondary" onClick={loadData} disabled={isLoading}>
             🔄 {isLoading ? "Refreshing…" : "Refresh"}
           </button>
         }
@@ -58,7 +54,14 @@ export default function SecurityGuardNotificationsPage() {
 
         <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
           {isLoading ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", padding: "0.5rem" }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.75rem",
+                padding: "0.5rem",
+              }}
+            >
               {[1, 2, 3, 4].map((i) => (
                 <div
                   key={i}
@@ -71,13 +74,22 @@ export default function SecurityGuardNotificationsPage() {
                   }}
                 >
                   <div style={{ display: "flex", gap: "1rem", alignItems: "center", width: "80%" }}>
-                    <div className="skeleton" style={{ width: 60, height: 24, borderRadius: "var(--radius-sm)" }} />
+                    <div
+                      className="skeleton"
+                      style={{ width: 60, height: 24, borderRadius: "var(--radius-sm)" }}
+                    />
                     <div style={{ flex: 1 }}>
-                      <div className="skeleton" style={{ width: "40%", height: 16, marginBottom: "0.4rem" }} />
+                      <div
+                        className="skeleton"
+                        style={{ width: "40%", height: 16, marginBottom: "0.4rem" }}
+                      />
                       <div className="skeleton" style={{ width: "70%", height: 12 }} />
                     </div>
                   </div>
-                  <div className="skeleton" style={{ width: 80, height: 28, borderRadius: "var(--radius-sm)" }} />
+                  <div
+                    className="skeleton"
+                    style={{ width: 80, height: 28, borderRadius: "var(--radius-sm)" }}
+                  />
                 </div>
               ))}
             </div>

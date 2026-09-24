@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
+from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from app.db.session import SessionLocal
@@ -107,9 +110,7 @@ def test_resident_cannot_touch_other_units_delivery(as_role, seed_ids, resident_
     assert as_role("community_admin").get(f"{P}/{d['id']}").status_code == 200
 
 
-def test_duplicate_handover_is_rejected_without_double_effect(
-    as_role, seed_ids, resident_unit_id
-):
+def test_duplicate_handover_is_rejected_without_double_effect(as_role, seed_ids, resident_unit_id):
     """Retried handover/completion must fail safe (422), never record twice."""
     from app.modules.deliveries.models import Delivery, DeliveryEvent
 
@@ -325,3 +326,139 @@ def test_protocol_direct_rejection_workflow(as_role, resident_unit_id):
     assert d["approval_status"] == "rejected"
     assert d["status"] == "cancelled"
 
+
+def _community_protocol(admin: TestClient, delivery_type: str) -> str | None:
+    rows = admin.get(f"{P}/protocols").json()["data"]
+    for row in rows:
+        if row["delivery_type"] == delivery_type and row.get("unit_id") is None:
+            return row["protocol_type"]
+    return None
+
+
+def _set_protocol(admin: TestClient, delivery_type: str, protocol_type: str) -> None:
+    r = admin.put(
+        f"{P}/protocols", json={"delivery_type": delivery_type, "protocol_type": protocol_type}
+    )
+    assert r.status_code == 200, r.text
+
+
+def test_resident_approval_delivery_completes_as_delivered_not_collected(
+    as_role: Callable[[str], TestClient], resident_unit_id: str
+) -> None:
+    """Re-audit #3 F5: the default protocol carried `leave_at_gate=True`, so a
+    resident-approval delivery finished as `collected` instead of `delivered`."""
+    admin, guard = as_role("community_admin"), as_role("security_guard")
+    previous = _community_protocol(admin, "courier")
+    _set_protocol(admin, "courier", "resident_approval_required")
+    # Reproduce the data state that triggered the bug: rows created from the old default
+    # (and pre-0044 rows) carry leave_at_gate=True alongside resident_approval_required.
+    from sqlalchemy import update
+
+    from app.db.session import SessionLocal
+    from app.modules.deliveries.models import DeliveryProtocol
+
+    with SessionLocal() as db:
+        db.execute(
+            update(DeliveryProtocol)
+            .where(
+                DeliveryProtocol.delivery_type == "courier",
+                DeliveryProtocol.protocol_type == "resident_approval_required",
+            )
+            .values(leave_at_gate=True)
+        )
+        db.commit()
+    try:
+        resident = as_role("resident")
+        d = guard.post(P, json={"unit_id": resident_unit_id, "delivery_type": "courier"}).json()[
+            "data"
+        ]
+        assert d["approval_status"] == "pending"
+        dec = resident.post(f"{P}/{d['id']}/decision", json={"decision": "approved"})
+        assert dec.status_code == 200, dec.text
+        assert guard.post(f"{P}/{d['id']}/arrival", json={}).json()["data"]["status"] == "at_gate"
+        done = guard.post(f"{P}/{d['id']}/delivered")
+        assert done.status_code == 200, done.text
+        assert done.json()["data"]["status"] == "delivered"
+    finally:
+        _set_protocol(admin, "courier", previous or "resident_approval_required")
+
+
+def test_collect_is_only_for_gate_desk_deliveries_at_the_desk(
+    as_role: Callable[[str], TestClient], resident_unit_id: str
+) -> None:
+    admin, guard = as_role("community_admin"), as_role("security_guard")
+    previous = _community_protocol(admin, "grocery")
+    try:
+        # allow_at_gate -> the parcel goes to the door; the desk cannot "collect" it.
+        _set_protocol(admin, "grocery", "allow_at_gate")
+        d = guard.post(P, json={"unit_id": resident_unit_id, "delivery_type": "grocery"}).json()[
+            "data"
+        ]
+        guard.post(f"{P}/{d['id']}/arrival", json={})
+        r = guard.post(f"{P}/{d['id']}/collect", json={})
+        assert r.status_code == 422, r.text
+        assert r.json()["error"]["code"] == "NOT_GATE_DESK_DELIVERY"
+
+        # leave_at_gate_desk, but not yet at the desk -> invalid transition.
+        _set_protocol(admin, "grocery", "leave_at_gate_desk")
+        d2 = guard.post(P, json={"unit_id": resident_unit_id, "delivery_type": "grocery"}).json()[
+            "data"
+        ]
+        r2 = guard.post(f"{P}/{d2['id']}/collect", json={})
+        assert r2.status_code == 422, r2.text
+        assert r2.json()["error"]["code"] == "INVALID_TRANSITION"
+        guard.post(f"{P}/{d2['id']}/arrival", json={})
+        ok = guard.post(f"{P}/{d2['id']}/collect", json={})
+        assert ok.status_code == 200 and ok.json()["data"]["status"] == "collected"
+    finally:
+        _set_protocol(admin, "grocery", previous or "resident_approval_required")
+
+
+def test_delivery_read_exposes_resolved_unit_level_protocol(
+    as_role: Callable[[str], TestClient], resident_unit_id: str
+) -> None:
+    """Re-audit #3 (found by E2E): staff `GET /protocols` lists only community-level rows,
+    so the guard console could not see a unit's own protocol. Each delivery now carries
+    the `protocol_type` it was routed by."""
+    guard, resident = as_role("security_guard"), as_role("resident")
+    r = resident.put(
+        f"{P}/protocols",
+        json={"delivery_type": "laundry", "protocol_type": "leave_at_gate_desk"},
+    )
+    assert r.status_code == 200, r.text
+    try:
+        d = guard.post(P, json={"unit_id": resident_unit_id, "delivery_type": "laundry"})
+        assert d.status_code == 201, d.text
+        body = d.json()["data"]
+        assert body["protocol_type"] == "leave_at_gate_desk"
+        listed = guard.get(P, params={"page_size": 100}).json()["data"]
+        assert {x["id"]: x["protocol_type"] for x in listed}.get(body["id"]) in (
+            "leave_at_gate_desk",
+            None,  # not on the first page — covered by the detail read below
+        )
+        assert guard.get(f"{P}/{body['id']}").json()["data"]["protocol_type"] == (
+            "leave_at_gate_desk"
+        )
+    finally:
+        # Delete (not re-PUT) the unit-level row: any unit override would change routing
+        # for later tests that configure the community-level protocol.
+        from sqlalchemy import delete, select, update
+
+        from app.db.session import SessionLocal
+        from app.modules.deliveries.models import Delivery, DeliveryProtocol
+
+        with SessionLocal() as db:
+            proto_ids = db.scalars(
+                select(DeliveryProtocol.id).where(
+                    DeliveryProtocol.delivery_type == "laundry",
+                    DeliveryProtocol.unit_id == resident_unit_id,
+                )
+            ).all()
+            if proto_ids:
+                db.execute(
+                    update(Delivery)
+                    .where(Delivery.protocol_id.in_(proto_ids))
+                    .values(protocol_id=None)
+                )
+                db.execute(delete(DeliveryProtocol).where(DeliveryProtocol.id.in_(proto_ids)))
+            db.commit()

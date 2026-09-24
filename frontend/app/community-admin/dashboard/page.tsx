@@ -22,13 +22,31 @@ const FinancialHealthCard = dynamic(
   () => import("@/components/dashboard/FinancialHealthCard").then((mod) => mod.FinancialHealthCard),
   {
     loading: () => (
-      <div className="card" style={{ height: "100%", minHeight: 280, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+      <div
+        className="card"
+        style={{
+          height: "100%",
+          minHeight: 280,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+        }}
+      >
         <div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1.25rem" }}>
+          <div
+            style={{ display: "flex", justifyContent: "space-between", marginBottom: "1.25rem" }}
+          >
             <Skeleton width={180} height={20} borderRadius={4} />
             <Skeleton width={80} height={20} borderRadius={4} />
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 110px), 1fr))", gap: "0.75rem", marginBottom: "1rem" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 110px), 1fr))",
+              gap: "0.75rem",
+              marginBottom: "1rem",
+            }}
+          >
             <Skeleton height={68} borderRadius={6} />
             <Skeleton height={68} borderRadius={6} />
             <Skeleton height={68} borderRadius={6} />
@@ -52,9 +70,20 @@ const AttendanceWidget = dynamic(
   () => import("@/components/dashboard/AttendanceWidget").then((mod) => mod.AttendanceWidget),
   {
     loading: () => (
-      <div className="card" style={{ height: "100%", minHeight: 280, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+      <div
+        className="card"
+        style={{
+          height: "100%",
+          minHeight: 280,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+        }}
+      >
         <div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1.25rem" }}>
+          <div
+            style={{ display: "flex", justifyContent: "space-between", marginBottom: "1.25rem" }}
+          >
             <Skeleton width={190} height={20} borderRadius={4} />
             <Skeleton width={90} height={20} borderRadius={4} />
           </div>
@@ -74,9 +103,20 @@ const IncidentListWidget = dynamic(
   () => import("@/components/dashboard/IncidentListWidget").then((mod) => mod.IncidentListWidget),
   {
     loading: () => (
-      <div className="card" style={{ height: "100%", minHeight: 280, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+      <div
+        className="card"
+        style={{
+          height: "100%",
+          minHeight: 280,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+        }}
+      >
         <div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1.25rem" }}>
+          <div
+            style={{ display: "flex", justifyContent: "space-between", marginBottom: "1.25rem" }}
+          >
             <Skeleton width={190} height={20} borderRadius={4} />
             <Skeleton width={90} height={20} borderRadius={4} />
           </div>
@@ -223,7 +263,15 @@ export default function CommunityAdminDashboardPage() {
       : "100%";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1.75rem", maxWidth: 1600, margin: "0 auto" }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "1.75rem",
+        maxWidth: 1600,
+        margin: "0 auto",
+      }}
+    >
       <PageHeader
         title="Community Overview"
         description={`Live operations, property health, and resident management for ${community?.name || "your community"}.`}
@@ -429,7 +477,13 @@ export default function CommunityAdminDashboardPage() {
                 }}
               >
                 <div
-                  style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    gap: "0.5rem",
+                  }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                     <span>📦</span>
@@ -503,7 +557,14 @@ export default function CommunityAdminDashboardPage() {
                           gap: "0.5rem",
                         }}
                       >
-                        <strong style={{ color: "var(--fg)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        <strong
+                          style={{
+                            color: "var(--fg)",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
                           {a.title}
                         </strong>
                         <span style={{ fontSize: "0.7rem", color: "var(--muted)", flexShrink: 0 }}>

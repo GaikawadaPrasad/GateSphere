@@ -105,9 +105,7 @@ export default function VendorDashboardPage() {
         key: "status",
         header: "Status",
         render: (t) => (
-          <StatusBadge
-            status={(t.status || "created").replace(/_/g, " ").toUpperCase()}
-          />
+          <StatusBadge status={(t.status || "created").replace(/_/g, " ").toUpperCase()} />
         ),
       },
     ],

@@ -43,98 +43,234 @@ export const INDIAN_STATES_AND_UTS = [
 
 export const CITIES_BY_STATE: Record<string, string[]> = {
   "Andhra Pradesh": [
-    "Visakhapatnam", "Vijayawada", "Guntur", "Nellore", "Kurnool", "Rajahmundry",
-    "Tirupati", "Kadapa", "Kakinada", "Anantapur", "Vizianagaram", "Eluru", "Ongole", "Nandyal", "Machilipatnam"
+    "Visakhapatnam",
+    "Vijayawada",
+    "Guntur",
+    "Nellore",
+    "Kurnool",
+    "Rajahmundry",
+    "Tirupati",
+    "Kadapa",
+    "Kakinada",
+    "Anantapur",
+    "Vizianagaram",
+    "Eluru",
+    "Ongole",
+    "Nandyal",
+    "Machilipatnam",
   ],
-  "Arunachal Pradesh": [
-    "Itanagar", "Naharlagun", "Pasighat", "Tawang", "Ziro"
+  "Arunachal Pradesh": ["Itanagar", "Naharlagun", "Pasighat", "Tawang", "Ziro"],
+  Assam: ["Guwahati", "Silchar", "Dibrugarh", "Jorhat", "Nagaon", "Tinsukia", "Tezpur"],
+  Bihar: [
+    "Patna",
+    "Gaya",
+    "Bhagalpur",
+    "Muzaffarpur",
+    "Purnia",
+    "Darbhanga",
+    "Bihar Sharif",
+    "Arrah",
+    "Begusarai",
+    "Katihar",
   ],
-  "Assam": [
-    "Guwahati", "Silchar", "Dibrugarh", "Jorhat", "Nagaon", "Tinsukia", "Tezpur"
+  Chhattisgarh: ["Raipur", "Bhilai", "Bilaspur", "Korba", "Rajnandgaon", "Durg", "Jagdalpur"],
+  Goa: ["Panaji", "Margao", "Vasco da Gama", "Mapusa", "Ponda", "Bicholim", "Curchorem"],
+  Gujarat: [
+    "Ahmedabad",
+    "Surat",
+    "Vadodara",
+    "Rajkot",
+    "Bhavnagar",
+    "Jamnagar",
+    "Gandhinagar",
+    "Junagadh",
+    "Anand",
+    "Navsari",
+    "Morbi",
   ],
-  "Bihar": [
-    "Patna", "Gaya", "Bhagalpur", "Muzaffarpur", "Purnia", "Darbhanga", "Bihar Sharif", "Arrah", "Begusarai", "Katihar"
-  ],
-  "Chhattisgarh": [
-    "Raipur", "Bhilai", "Bilaspur", "Korba", "Rajnandgaon", "Durg", "Jagdalpur"
-  ],
-  "Goa": [
-    "Panaji", "Margao", "Vasco da Gama", "Mapusa", "Ponda", "Bicholim", "Curchorem"
-  ],
-  "Gujarat": [
-    "Ahmedabad", "Surat", "Vadodara", "Rajkot", "Bhavnagar", "Jamnagar", "Gandhinagar", "Junagadh", "Anand", "Navsari", "Morbi"
-  ],
-  "Haryana": [
-    "Gurugram", "Faridabad", "Panipat", "Ambala", "Yamunanagar", "Rohtak", "Hisar", "Karnal", "Sonipat", "Panchkula"
+  Haryana: [
+    "Gurugram",
+    "Faridabad",
+    "Panipat",
+    "Ambala",
+    "Yamunanagar",
+    "Rohtak",
+    "Hisar",
+    "Karnal",
+    "Sonipat",
+    "Panchkula",
   ],
   "Himachal Pradesh": [
-    "Shimla", "Dharamshala", "Solan", "Mandi", "Kullu", "Manali", "Baddi", "Palampur"
+    "Shimla",
+    "Dharamshala",
+    "Solan",
+    "Mandi",
+    "Kullu",
+    "Manali",
+    "Baddi",
+    "Palampur",
   ],
-  "Jharkhand": [
-    "Ranchi", "Jamshedpur", "Dhanbad", "Bokaro Steel City", "Deoghar", "Hazaribagh"
+  Jharkhand: ["Ranchi", "Jamshedpur", "Dhanbad", "Bokaro Steel City", "Deoghar", "Hazaribagh"],
+  Karnataka: [
+    "Bengaluru",
+    "Mysuru",
+    "Mangaluru",
+    "Hubballi",
+    "Belagavi",
+    "Shivamogga",
+    "Ballari",
+    "Tumakuru",
+    "Davanagere",
+    "Kalaburagi",
+    "Udupi",
   ],
-  "Karnataka": [
-    "Bengaluru", "Mysuru", "Mangaluru", "Hubballi", "Belagavi", "Shivamogga", "Ballari", "Tumakuru", "Davanagere", "Kalaburagi", "Udupi"
-  ],
-  "Kerala": [
-    "Thiruvananthapuram", "Kochi", "Kozhikode", "Kollam", "Thrissur", "Kannur", "Alappuzha", "Palakkad", "Kottayam"
+  Kerala: [
+    "Thiruvananthapuram",
+    "Kochi",
+    "Kozhikode",
+    "Kollam",
+    "Thrissur",
+    "Kannur",
+    "Alappuzha",
+    "Palakkad",
+    "Kottayam",
   ],
   "Madhya Pradesh": [
-    "Indore", "Bhopal", "Jabalpur", "Gwalior", "Ujjain", "Sagar", "Dewas", "Satna", "Ratlam"
+    "Indore",
+    "Bhopal",
+    "Jabalpur",
+    "Gwalior",
+    "Ujjain",
+    "Sagar",
+    "Dewas",
+    "Satna",
+    "Ratlam",
   ],
-  "Maharashtra": [
-    "Mumbai", "Pune", "Nagpur", "Thane", "Nashik", "Chhatrapati Sambhajinagar", "Solapur", "Navi Mumbai", "Kolhapur", "Amravati", "Nanded"
+  Maharashtra: [
+    "Mumbai",
+    "Pune",
+    "Nagpur",
+    "Thane",
+    "Nashik",
+    "Chhatrapati Sambhajinagar",
+    "Solapur",
+    "Navi Mumbai",
+    "Kolhapur",
+    "Amravati",
+    "Nanded",
   ],
-  "Manipur": [
-    "Imphal", "Thoubal", "Bishnupur", "Churachandpur"
+  Manipur: ["Imphal", "Thoubal", "Bishnupur", "Churachandpur"],
+  Meghalaya: ["Shillong", "Tura", "Jowai", "Nongpoh"],
+  Mizoram: ["Aizawl", "Lunglei", "Champhai", "Serchhip"],
+  Nagaland: ["Kohima", "Dimapur", "Mokokchung", "Tuensang"],
+  Odisha: [
+    "Bhubaneswar",
+    "Cuttack",
+    "Rourkela",
+    "Berhampur",
+    "Sambalpur",
+    "Puri",
+    "Balasore",
+    "Bhadrak",
   ],
-  "Meghalaya": [
-    "Shillong", "Tura", "Jowai", "Nongpoh"
+  Punjab: [
+    "Ludhiana",
+    "Amritsar",
+    "Jalandhar",
+    "Patiala",
+    "Bathinda",
+    "Mohali",
+    "Hoshiarpur",
+    "Pathankot",
   ],
-  "Mizoram": [
-    "Aizawl", "Lunglei", "Champhai", "Serchhip"
+  Rajasthan: [
+    "Jaipur",
+    "Jodhpur",
+    "Kota",
+    "Bikaner",
+    "Ajmer",
+    "Udaipur",
+    "Bhilwara",
+    "Alwar",
+    "Bharatpur",
+    "Sikar",
   ],
-  "Nagaland": [
-    "Kohima", "Dimapur", "Mokokchung", "Tuensang"
-  ],
-  "Odisha": [
-    "Bhubaneswar", "Cuttack", "Rourkela", "Berhampur", "Sambalpur", "Puri", "Balasore", "Bhadrak"
-  ],
-  "Punjab": [
-    "Ludhiana", "Amritsar", "Jalandhar", "Patiala", "Bathinda", "Mohali", "Hoshiarpur", "Pathankot"
-  ],
-  "Rajasthan": [
-    "Jaipur", "Jodhpur", "Kota", "Bikaner", "Ajmer", "Udaipur", "Bhilwara", "Alwar", "Bharatpur", "Sikar"
-  ],
-  "Sikkim": [
-    "Gangtok", "Namchi", "Gyalshing", "Mangan"
-  ],
+  Sikkim: ["Gangtok", "Namchi", "Gyalshing", "Mangan"],
   "Tamil Nadu": [
-    "Chennai", "Coimbatore", "Madurai", "Tiruchirappalli", "Salem", "Tirunelveli", "Tiruppur", "Vellore", "Erode", "Thoothukudi", "Dindigul"
+    "Chennai",
+    "Coimbatore",
+    "Madurai",
+    "Tiruchirappalli",
+    "Salem",
+    "Tirunelveli",
+    "Tiruppur",
+    "Vellore",
+    "Erode",
+    "Thoothukudi",
+    "Dindigul",
   ],
-  "Telangana": [
-    "Hyderabad", "Warangal", "Nizamabad", "Karimnagar", "Khammam", "Ramagundam", "Mahbubnagar", "Nalgonda"
+  Telangana: [
+    "Hyderabad",
+    "Warangal",
+    "Nizamabad",
+    "Karimnagar",
+    "Khammam",
+    "Ramagundam",
+    "Mahbubnagar",
+    "Nalgonda",
   ],
-  "Tripura": [
-    "Agartala", "Udaipur", "Dharmanagar", "Kailashahar"
-  ],
+  Tripura: ["Agartala", "Udaipur", "Dharmanagar", "Kailashahar"],
   "Uttar Pradesh": [
-    "Lucknow", "Kanpur", "Ghaziabad", "Agra", "Varanasi", "Meerut", "Prayagraj", "Noida", "Greater Noida", "Bareilly", "Aligarh", "Moradabad", "Gorakhpur"
+    "Lucknow",
+    "Kanpur",
+    "Ghaziabad",
+    "Agra",
+    "Varanasi",
+    "Meerut",
+    "Prayagraj",
+    "Noida",
+    "Greater Noida",
+    "Bareilly",
+    "Aligarh",
+    "Moradabad",
+    "Gorakhpur",
   ],
-  "Uttarakhand": [
-    "Dehradun", "Haridwar", "Roorkee", "Haldwani", "Rudrapur", "Kashipur", "Rishikesh", "Nainital"
+  Uttarakhand: [
+    "Dehradun",
+    "Haridwar",
+    "Roorkee",
+    "Haldwani",
+    "Rudrapur",
+    "Kashipur",
+    "Rishikesh",
+    "Nainital",
   ],
   "West Bengal": [
-    "Kolkata", "Howrah", "Durgapur", "Asansol", "Siliguri", "Kharagpur", "Bardhaman", "New Town"
+    "Kolkata",
+    "Howrah",
+    "Durgapur",
+    "Asansol",
+    "Siliguri",
+    "Kharagpur",
+    "Bardhaman",
+    "New Town",
   ],
   "Andaman and Nicobar Islands": ["Port Blair"],
-  "Chandigarh": ["Chandigarh"],
+  Chandigarh: ["Chandigarh"],
   "Dadra and Nagar Haveli and Daman and Diu": ["Daman", "Diu", "Silvassa"],
-  "Delhi": ["New Delhi", "North Delhi", "South Delhi", "West Delhi", "East Delhi", "Dwarka", "Rohini"],
+  Delhi: [
+    "New Delhi",
+    "North Delhi",
+    "South Delhi",
+    "West Delhi",
+    "East Delhi",
+    "Dwarka",
+    "Rohini",
+  ],
   "Jammu and Kashmir": ["Srinagar", "Jammu", "Anantnag", "Baramulla", "Udhampur"],
-  "Ladakh": ["Leh", "Kargil"],
-  "Lakshadweep": ["Kavaratti"],
-  "Puducherry": ["Puducherry", "Karaikal", "Ozhukarai", "Yanam", "Mahe"],
+  Ladakh: ["Leh", "Kargil"],
+  Lakshadweep: ["Kavaratti"],
+  Puducherry: ["Puducherry", "Karaikal", "Ozhukarai", "Yanam", "Mahe"],
 };
 
 export const POPULAR_CITIES_BY_STATE = CITIES_BY_STATE;

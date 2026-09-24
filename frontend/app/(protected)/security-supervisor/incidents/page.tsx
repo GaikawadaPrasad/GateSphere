@@ -85,12 +85,13 @@ export default function SecuritySupervisorIncidentsPage() {
           assigned_guard: inc.responder_user_id
             ? `Responder (${inc.responder_user_id.slice(0, 6)})`
             : "Duty Security Team",
-          reported_time: inc.reported_at || inc.created_at
-            ? new Date(inc.reported_at || inc.created_at).toLocaleString([], {
-                dateStyle: "short",
-                timeStyle: "short",
-              })
-            : "Recent",
+          reported_time:
+            inc.reported_at || inc.created_at
+              ? new Date(inc.reported_at || inc.created_at).toLocaleString([], {
+                  dateStyle: "short",
+                  timeStyle: "short",
+                })
+              : "Recent",
           status: inc.status || "reported",
           location: inc.location_text || "Perimeter",
         })),
@@ -173,7 +174,9 @@ export default function SecuritySupervisorIncidentsPage() {
   const handleConfirmResolve = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!resolvingIncident || !resolutionSummary.trim() || resolutionSummary.trim().length < 5) {
-      setIncidentFieldErrors({ resolution: "Resolution summary must be at least 5 characters long." });
+      setIncidentFieldErrors({
+        resolution: "Resolution summary must be at least 5 characters long.",
+      });
       toast.error("Please provide a detailed resolution summary (min 5 characters).");
       return;
     }
@@ -231,11 +234,7 @@ export default function SecuritySupervisorIncidentsPage() {
         ]}
         actions={
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-            <button
-              className="btn btn-secondary"
-              onClick={loadData}
-              disabled={isLoading}
-            >
+            <button className="btn btn-secondary" onClick={loadData} disabled={isLoading}>
               🔄 {isLoading ? "Refreshing…" : "Refresh"}
             </button>
             <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
@@ -312,8 +311,12 @@ export default function SecuritySupervisorIncidentsPage() {
               ) : (
                 filteredIncidents.map((inc) => (
                   <tr key={inc.id}>
-                    <td style={{ fontWeight: 600, fontFamily: "monospace" }}>{inc.incident_number}</td>
-                    <td style={{ fontWeight: 500, color: "var(--fg)", maxWidth: 220 }}>{inc.title}</td>
+                    <td style={{ fontWeight: 600, fontFamily: "monospace" }}>
+                      {inc.incident_number}
+                    </td>
+                    <td style={{ fontWeight: 500, color: "var(--fg)", maxWidth: 220 }}>
+                      {inc.title}
+                    </td>
                     <td>
                       <span style={{ fontSize: "0.8rem", textTransform: "capitalize" }}>
                         {inc.incident_type.replace(/_/g, " ")}
@@ -323,7 +326,9 @@ export default function SecuritySupervisorIncidentsPage() {
                       <StatusBadge status={inc.severity} />
                     </td>
                     <td style={{ fontSize: "0.8rem" }}>{inc.location}</td>
-                    <td style={{ fontSize: "0.8rem", whiteSpace: "nowrap" }}>{inc.reported_time}</td>
+                    <td style={{ fontSize: "0.8rem", whiteSpace: "nowrap" }}>
+                      {inc.reported_time}
+                    </td>
                     <td>
                       <StatusBadge status={inc.status} />
                     </td>
@@ -400,7 +405,14 @@ export default function SecuritySupervisorIncidentsPage() {
               required
             />
             {incidentFieldErrors.title && (
-              <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+              <span
+                style={{
+                  color: "var(--danger, #ef4444)",
+                  fontSize: "0.75rem",
+                  display: "block",
+                  marginTop: "0.25rem",
+                }}
+              >
                 {incidentFieldErrors.title}
               </span>
             )}
@@ -533,7 +545,8 @@ export default function SecuritySupervisorIncidentsPage() {
               marginBottom: "1rem",
             }}
           >
-            ℹ️ Resolving an incident requires a documented resolution summary and findings for compliance audit.
+            ℹ️ Resolving an incident requires a documented resolution summary and findings for
+            compliance audit.
           </div>
 
           <div style={{ marginBottom: "1rem" }}>
@@ -570,7 +583,14 @@ export default function SecuritySupervisorIncidentsPage() {
               required
             />
             {incidentFieldErrors.resolution && (
-              <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+              <span
+                style={{
+                  color: "var(--danger, #ef4444)",
+                  fontSize: "0.75rem",
+                  display: "block",
+                  marginTop: "0.25rem",
+                }}
+              >
                 {incidentFieldErrors.resolution}
               </span>
             )}

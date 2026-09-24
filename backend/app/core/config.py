@@ -148,7 +148,8 @@ class Settings(BaseSettings):
         if url.startswith("postgresql+psycopg://"):
             return url
         if url.startswith("postgresql://"):
-            return "postgresql+asyncpg://" + url[len("postgresql://") :]
+            # psycopg 3 (in the lock) serves async too; asyncpg is NOT installed.
+            return "postgresql+psycopg://" + url[len("postgresql://") :]
         return url
 
 

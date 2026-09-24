@@ -15,6 +15,6 @@ declare module "jsqr" {
     data: Uint8ClampedArray,
     width: number,
     height: number,
-    options?: any
+    options?: any,
   ): QRCode | null;
 }

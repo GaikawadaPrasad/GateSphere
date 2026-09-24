@@ -58,12 +58,14 @@ vi.mock("@/hooks/use-residents", () => ({
 
 vi.mock("@/lib/api", () => ({
   communitiesApi: {
-    towers: vi.fn().mockResolvedValue([
-      { id: "twr-1", name: "Tower A", code: "TWR-A", total_floors: 5, total_units: 10 },
-    ]),
-    floors: vi.fn().mockResolvedValue([
-      { id: "flr-1", tower_id: "twr-1", floor_number: 1, label: "Floor 1" },
-    ]),
+    towers: vi
+      .fn()
+      .mockResolvedValue([
+        { id: "twr-1", name: "Tower A", code: "TWR-A", total_floors: 5, total_units: 10 },
+      ]),
+    floors: vi
+      .fn()
+      .mockResolvedValue([{ id: "flr-1", tower_id: "twr-1", floor_number: 1, label: "Floor 1" }]),
     communityUnits: vi.fn().mockResolvedValue([]),
     gates: vi.fn().mockResolvedValue([]),
     provisionAdmin: vi.fn().mockResolvedValue({ id: "adm-1" }),
@@ -84,7 +86,7 @@ function renderPage() {
   return render(
     <QueryClientProvider client={queryClient}>
       <CommunitiesPage />
-    </QueryClientProvider>
+    </QueryClientProvider>,
   );
 }
 
@@ -125,31 +127,17 @@ describe("Super Admin Communities - Add Unit Flow", () => {
     const selectElements = screen.getAllByRole("combobox");
     // selectElements should include Tower, Floor, Unit Type
     const typeSelect = selectElements.find((sel) =>
-      Array.from(sel.querySelectorAll("option")).some((opt) => opt.value === "apartment")
+      Array.from(sel.querySelectorAll("option")).some((opt) => opt.value === "apartment"),
     ) as HTMLSelectElement;
 
     expect(typeSelect).toBeDefined();
     expect(typeSelect.value).toBe("apartment");
 
     const optionValues = Array.from(typeSelect.querySelectorAll("option")).map((o) => o.value);
-    expect(optionValues).toEqual([
-      "apartment",
-      "office",
-      "penthouse",
-      "shop",
-      "studio",
-      "villa",
-    ]);
+    expect(optionValues).toEqual(["apartment", "office", "penthouse", "shop", "studio", "villa"]);
 
     const optionTexts = Array.from(typeSelect.querySelectorAll("option")).map((o) => o.textContent);
-    expect(optionTexts).toEqual([
-      "Apartment",
-      "Office",
-      "Penthouse",
-      "Shop",
-      "Studio",
-      "Villa",
-    ]);
+    expect(optionTexts).toEqual(["Apartment", "Office", "Penthouse", "Shop", "Studio", "Villa"]);
   });
 
   it("successfully creates a unit with default unit_type 'apartment' and numeric values", async () => {
@@ -203,7 +191,7 @@ describe("Super Admin Communities - Add Unit Flow", () => {
 
     const selectElements = screen.getAllByRole("combobox");
     const typeSelect = selectElements.find((sel) =>
-      Array.from(sel.querySelectorAll("option")).some((opt) => opt.value === "villa")
+      Array.from(sel.querySelectorAll("option")).some((opt) => opt.value === "villa"),
     ) as HTMLSelectElement;
 
     fireEvent.change(typeSelect, { target: { value: "villa" } });
@@ -227,7 +215,9 @@ describe("Super Admin Communities - Add Unit Flow", () => {
   });
 
   it("displays error inside modal if mutation fails", async () => {
-    mockMutateUnitAsync.mockRejectedValueOnce(new Error("Unit number already exists in this tower"));
+    mockMutateUnitAsync.mockRejectedValueOnce(
+      new Error("Unit number already exists in this tower"),
+    );
 
     renderPage();
 

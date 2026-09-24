@@ -46,7 +46,14 @@ flowchart TD
     subgraph DELIVERED["POST /deliveries/{id}/delivered → mark_delivered  [deliveries:update]"]
         direction TB
         M1{"status ∈ at_gate|in_transit?"} -->|no| M_E["422 INVALID_TRANSITION"]
-        M1 -->|yes| M2["protocol.leave_at_gate ? status=collected : status=delivered<br/>INSERT delivery_events (delivered); audit"]
+        M1 -->|yes| M2["_is_gate_desk(protocol) ? status=collected : status=delivered<br/>(protocol_type decides; legacy types fall back to leave_at_gate flag)<br/>INSERT delivery_events (delivered); audit"]
+    end
+
+    subgraph COLLECT["POST /deliveries/{id}/collect → mark_collected  [deliveries:update]"]
+        direction TB
+        K1{"_is_gate_desk(protocol)?"} -->|no| K_E1["422 NOT_GATE_DESK_DELIVERY"]
+        K1 -->|yes| K2{"status = at_gate?"} -->|no| K_E2["422 INVALID_TRANSITION"]
+        K2 -->|yes| K3["status=collected; INSERT delivery_events (delivered, remarks)<br/>audit delivery.collected; notify resident (delivery.collected)"]
     end
 
     CANCEL["POST /deliveries/{id}/cancel → cancel_delivery  [deliveries:update]<br/>not terminal → status=cancelled; INSERT delivery_events; audit"]
@@ -54,7 +61,7 @@ flowchart TD
     EVT["GET /deliveries/{id}/events → list_events (via get_delivery scope gate)"]
     G --> EVT
 
-    PROTO & LIST & CREATE & DETAIL & DECIDE & ARRIVE & DELIVERED & CANCEL --> REPO["ProtocolRepository / DeliveryRepository (AsyncTenantRepository) + delivery_events()"]
+    PROTO & LIST & CREATE & DETAIL & DECIDE & ARRIVE & DELIVERED & COLLECT & CANCEL --> REPO["ProtocolRepository / DeliveryRepository (AsyncTenantRepository) + delivery_events()"]
     CR1 --> UP["uploads.guard? (no file field on delivery — n/a)"]
     REPO --> DB[("PostgreSQL: delivery_protocols, deliveries, delivery_events, audit_logs")]
 

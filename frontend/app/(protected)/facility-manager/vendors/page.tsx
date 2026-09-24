@@ -150,7 +150,11 @@ export default function FacilityManagerVendorsPage() {
             </p>
           </div>
           <div style={{ width: "100%", maxWidth: 240 }}>
-            <SearchInput value={search} onChange={setSearch} placeholder="Search name, email, phone…" />
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Search name, email, phone…"
+            />
           </div>
         </div>
 
@@ -160,7 +164,9 @@ export default function FacilityManagerVendorsPage() {
               key: "full_name",
               header: "Full Name",
               sortable: true,
-              render: (v: VendorUser) => <span style={{ fontWeight: 600, color: "var(--fg)" }}>{v.full_name}</span>,
+              render: (v: VendorUser) => (
+                <span style={{ fontWeight: 600, color: "var(--fg)" }}>{v.full_name}</span>
+              ),
             },
             {
               key: "email",
@@ -172,7 +178,9 @@ export default function FacilityManagerVendorsPage() {
               key: "phone",
               header: "Phone",
               sortable: true,
-              render: (v: VendorUser) => <span style={{ fontSize: "0.85rem" }}>{v.phone || "—"}</span>,
+              render: (v: VendorUser) => (
+                <span style={{ fontSize: "0.85rem" }}>{v.phone || "—"}</span>
+              ),
             },
             {
               key: "role_slug",
@@ -188,7 +196,9 @@ export default function FacilityManagerVendorsPage() {
               key: "status",
               header: "Status",
               sortable: true,
-              render: (v: VendorUser) => <StatusBadge status={v.is_active ? "active" : "inactive"} />,
+              render: (v: VendorUser) => (
+                <StatusBadge status={v.is_active ? "active" : "inactive"} />
+              ),
             },
             {
               key: "actions",
@@ -208,7 +218,11 @@ export default function FacilityManagerVendorsPage() {
           data={filteredVendors as (VendorUser & Record<string, unknown>)[]}
           isLoading={isLoading}
           emptyTitle="No vendors match your search"
-          emptyDescription={search ? "Try adjusting your search criteria." : "No vendor technicians registered yet. Click 'Add Vendor Technician' to create one."}
+          emptyDescription={
+            search
+              ? "Try adjusting your search criteria."
+              : "No vendor technicians registered yet. Click 'Add Vendor Technician' to create one."
+          }
           enableClientPagination={true}
           enableClientSort={true}
           pageSize={10}
@@ -222,17 +236,38 @@ export default function FacilityManagerVendorsPage() {
         title="Add Vendor Technician"
         footer={
           <>
-            <button className="btn btn-secondary" onClick={() => setIsCreateModalOpen(false)}>Cancel</button>
-            <button className="btn btn-primary" type="submit" form="create-vendor-form" disabled={isCreating}>
+            <button className="btn btn-secondary" onClick={() => setIsCreateModalOpen(false)}>
+              Cancel
+            </button>
+            <button
+              className="btn btn-primary"
+              type="submit"
+              form="create-vendor-form"
+              disabled={isCreating}
+            >
               {isCreating ? "Creating…" : "Create Vendor"}
             </button>
           </>
         }
       >
         <form id="create-vendor-form" onSubmit={handleCreateVendor}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "1rem",
+              marginBottom: "1rem",
+            }}
+          >
             <div>
-              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Full Name *
               </label>
               <input
@@ -249,7 +284,14 @@ export default function FacilityManagerVendorsPage() {
               />
             </div>
             <div>
-              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Email *
               </label>
               <input
@@ -263,9 +305,23 @@ export default function FacilityManagerVendorsPage() {
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "0.5rem" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "1rem",
+              marginBottom: "0.5rem",
+            }}
+          >
             <div>
-              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Phone
               </label>
               <input
@@ -288,12 +344,20 @@ export default function FacilityManagerVendorsPage() {
           </div>
 
           <p style={{ margin: "0 0 1rem 0", fontSize: "11.5px", color: "var(--muted)" }}>
-            💡 Providing an email and password allows this technician to sign in to the <strong>Vendor Technician Dashboard</strong> to view assigned service tickets.
+            💡 Providing an email and password allows this technician to sign in to the{" "}
+            <strong>Vendor Technician Dashboard</strong> to view assigned service tickets.
           </p>
 
           {communities.length > 0 && (
             <div>
-              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Assign to Community
               </label>
               <select
@@ -303,7 +367,9 @@ export default function FacilityManagerVendorsPage() {
               >
                 <option value="">— All communities —</option>
                 {communities.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
                 ))}
               </select>
             </div>

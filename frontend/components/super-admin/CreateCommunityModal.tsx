@@ -89,7 +89,7 @@ export function generateUnitNumber(
   floorNumber: number,
   unitIndex: number,
   towerCode = "",
-  style: "numeric" | "tower_prefix" | "alpha" = "numeric"
+  style: "numeric" | "tower_prefix" | "alpha" = "numeric",
 ): string {
   const paddedUnit = unitIndex < 10 ? `0${unitIndex}` : `${unitIndex}`;
   if (style === "tower_prefix") {
@@ -151,7 +151,9 @@ export function CreateCommunityModal({
   const [isAddingFloorUnits, setIsAddingFloorUnits] = useState(false);
 
   // Step 4: Units
-  const [unitFormatStyle, setUnitFormatStyle] = useState<"numeric" | "tower_prefix" | "alpha">("numeric");
+  const [unitFormatStyle, setUnitFormatStyle] = useState<"numeric" | "tower_prefix" | "alpha">(
+    "numeric",
+  );
   const [defaultUnitType, setDefaultUnitType] = useState("apartment");
   const [defaultBedrooms, setDefaultBedrooms] = useState(2);
   const [defaultSqft, setDefaultSqft] = useState(1200);
@@ -225,12 +227,16 @@ export function CreateCommunityModal({
     if (!trimmedName) errs.name = "Community name is required";
     else if (trimmedName.length < 2) errs.name = "Community name must be at least 2 characters";
     else if (trimmedName.length > 255) errs.name = "Community name cannot exceed 255 characters";
-    else if (!isValidCommunityName(trimmedName)) errs.name = "Community name contains invalid characters";
+    else if (!isValidCommunityName(trimmedName))
+      errs.name = "Community name contains invalid characters";
 
     const trimmedCode = code.trim().toUpperCase();
     if (!trimmedCode) errs.code = "Community code is required";
-    else if (trimmedCode.length < 2 || trimmedCode.length > 32) errs.code = "Code must be between 2 and 32 characters";
-    else if (!/^[A-Z0-9][A-Z0-9_\-\/]*$/.test(trimmedCode)) errs.code = "Code must start with alphanumeric and only contain letters, numbers, hyphens or underscores";
+    else if (trimmedCode.length < 2 || trimmedCode.length > 32)
+      errs.code = "Code must be between 2 and 32 characters";
+    else if (!/^[A-Z0-9][A-Z0-9_\-\/]*$/.test(trimmedCode))
+      errs.code =
+        "Code must start with alphanumeric and only contain letters, numbers, hyphens or underscores";
 
     const trimmedState = state.trim();
     if (!trimmedState) {
@@ -325,7 +331,9 @@ export function CreateCommunityModal({
       ]);
       setStep("towers");
     } catch (err: unknown) {
-      setFormError(err instanceof Error ? err.message : "Failed to create community. Ensure code is unique.");
+      setFormError(
+        err instanceof Error ? err.message : "Failed to create community. Ensure code is unique.",
+      );
     }
   };
 
@@ -335,11 +343,13 @@ export function CreateCommunityModal({
     tCode: string,
     totalFloorsCount: number,
     unitsEachFloor: number,
-    uType: string
+    uType: string,
   ): Promise<{ floors: FloorEntry[]; units: UnitEntry[] }> => {
     const createdFloors: FloorEntry[] = [];
     const createdUnits: UnitEntry[] = [];
-    const validUnitType = ["apartment", "villa", "penthouse", "studio", "shop", "office"].includes(uType)
+    const validUnitType = ["apartment", "villa", "penthouse", "studio", "shop", "office"].includes(
+      uType,
+    )
       ? uType
       : "apartment";
 
@@ -349,7 +359,8 @@ export function CreateCommunityModal({
         const floorRes = await createFloorMutation.mutateAsync({
           tower_id: towerId,
           floor_number: f,
-          label: f === 1 ? "1st Floor" : f === 2 ? "2nd Floor" : f === 3 ? "3rd Floor" : `Floor ${f}`,
+          label:
+            f === 1 ? "1st Floor" : f === 2 ? "2nd Floor" : f === 3 ? "3rd Floor" : `Floor ${f}`,
         });
 
         const floorEntry: FloorEntry = {
@@ -400,11 +411,13 @@ export function CreateCommunityModal({
     const errs: Record<string, string> = {};
     const tName = towerName.trim();
     if (!tName) errs.name = "Tower name is required";
-    else if (tName.length < 1 || tName.length > 100) errs.name = "Tower name must be between 1 and 100 characters";
+    else if (tName.length < 1 || tName.length > 100)
+      errs.name = "Tower name must be between 1 and 100 characters";
 
     const tCode = towerCode.trim().toUpperCase();
     if (!tCode) errs.code = "Tower code is required";
-    else if (tCode.length < 1 || tCode.length > 20) errs.code = "Tower code must be between 1 and 20 characters";
+    else if (tCode.length < 1 || tCode.length > 20)
+      errs.code = "Tower code must be between 1 and 20 characters";
 
     if (!towerFloors || towerFloors < 1 || towerFloors > 150) {
       errs.floors = "Total floors must be between 1 and 150";
@@ -462,7 +475,7 @@ export function CreateCommunityModal({
           tCode,
           floorsCount,
           unitsCount,
-          unitTypeInput
+          unitTypeInput,
         );
         setAddedFloors((prev) => [...prev, ...genFloors]);
         setAddedUnits((prev) => [...prev, ...genUnits]);
@@ -530,7 +543,14 @@ export function CreateCommunityModal({
       // Auto generate units for this newly added floor!
       const count = Math.max(0, Number(floorUnitsCount) || 0);
       if (count > 0) {
-        const validUnitType = ["apartment", "villa", "penthouse", "studio", "shop", "office"].includes(defaultUnitType)
+        const validUnitType = [
+          "apartment",
+          "villa",
+          "penthouse",
+          "studio",
+          "shop",
+          "office",
+        ].includes(defaultUnitType)
           ? defaultUnitType
           : "apartment";
 
@@ -587,7 +607,14 @@ export function CreateCommunityModal({
     }
     setUnitError("");
     try {
-      const validUnitType = ["apartment", "villa", "penthouse", "studio", "shop", "office"].includes(manualUnitType)
+      const validUnitType = [
+        "apartment",
+        "villa",
+        "penthouse",
+        "studio",
+        "shop",
+        "office",
+      ].includes(manualUnitType)
         ? manualUnitType
         : "apartment";
 
@@ -600,7 +627,12 @@ export function CreateCommunityModal({
       });
       setAddedUnits((prev) => [
         ...prev,
-        { id: result.id, unit_number: manualUnitNumber.trim(), floor_id: floorIdToUse, unit_type: validUnitType },
+        {
+          id: result.id,
+          unit_number: manualUnitNumber.trim(),
+          floor_id: floorIdToUse,
+          unit_type: validUnitType,
+        },
       ]);
       setManualUnitNumber("");
     } catch (err: unknown) {
@@ -648,8 +680,22 @@ export function CreateCommunityModal({
         const isCurrent = s === step;
         const isDone = stepIndex > i;
         return (
-          <div key={s} style={{ display: "flex", alignItems: "center", flex: i < STEP_LIST.length - 1 ? 1 : 0 }}>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.2rem" }}>
+          <div
+            key={s}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              flex: i < STEP_LIST.length - 1 ? 1 : 0,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "0.2rem",
+              }}
+            >
               <div
                 style={{
                   width: 28,
@@ -660,7 +706,11 @@ export function CreateCommunityModal({
                   justifyContent: "center",
                   fontSize: "0.72rem",
                   fontWeight: 700,
-                  background: isDone ? "#16a34a" : isCurrent ? "var(--primary, #0ea5e9)" : "#e2e8f0",
+                  background: isDone
+                    ? "#16a34a"
+                    : isCurrent
+                      ? "var(--primary, #0ea5e9)"
+                      : "#e2e8f0",
                   color: isDone || isCurrent ? "#fff" : "#64748b",
                   flexShrink: 0,
                 }}
@@ -711,7 +761,8 @@ export function CreateCommunityModal({
           marginBottom: "0.5rem",
         }}
       >
-        ✓ {count} {label}{count > 1 ? "s" : ""} added
+        ✓ {count} {label}
+        {count > 1 ? "s" : ""} added
       </span>
     ) : null;
 
@@ -755,11 +806,7 @@ export function CreateCommunityModal({
           >
             {addedTowers.length === 0 && !towerName.trim() ? "Skip Towers →" : "Next: Floors →"}
           </button>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={handleCloseModal}
-          >
+          <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
             Finish & Close
           </button>
           {(addedTowers.length > 0 || (towerName.trim() && towerCode.trim())) && (
@@ -772,8 +819,8 @@ export function CreateCommunityModal({
               {isProcessingTower
                 ? creationProgressText || "Generating Floors & Units…"
                 : addedTowers.length > 0 && !towerName.trim()
-                ? `Continue to Floors (${addedFloors.length} Floors · ${addedUnits.length} Units) →`
-                : `Save & Auto-Generate ${towerFloors} Floors (${towerFloors * unitsPerFloorInput} Units) →`}
+                  ? `Continue to Floors (${addedFloors.length} Floors · ${addedUnits.length} Units) →`
+                  : `Save & Auto-Generate ${towerFloors} Floors (${towerFloors * unitsPerFloorInput} Units) →`}
             </button>
           )}
         </>
@@ -784,11 +831,7 @@ export function CreateCommunityModal({
           <button type="button" className="btn btn-secondary" onClick={() => setStep("towers")}>
             ← Back to Towers
           </button>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={handleCloseModal}
-          >
+          <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
             Finish & Close
           </button>
           <button
@@ -836,7 +879,13 @@ export function CreateCommunityModal({
   );
 
   return (
-    <Modal isOpen={isOpen} onClose={handleCloseModal} title={titles[step]} footer={renderFooter()} maxWidth={680}>
+    <Modal
+      isOpen={isOpen}
+      onClose={handleCloseModal}
+      title={titles[step]}
+      footer={renderFooter()}
+      maxWidth={680}
+    >
       <StepIndicator />
 
       {/* STEP 1: Community & Admin */}
@@ -856,11 +905,21 @@ export function CreateCommunityModal({
             </div>
           )}
           <div style={{ marginBottom: "1rem" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem" }}>
-              <label htmlFor="modal-comm-name" style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--fg)" }}>
+            <div
+              style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem" }}
+            >
+              <label
+                htmlFor="modal-comm-name"
+                style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--fg)" }}
+              >
                 Community Name <span style={{ color: "var(--danger, #ef4444)" }}>*</span>
               </label>
-              <span style={{ fontSize: "0.75rem", color: name.length > 255 ? "var(--danger, #ef4444)" : "var(--muted)" }}>
+              <span
+                style={{
+                  fontSize: "0.75rem",
+                  color: name.length > 255 ? "var(--danger, #ef4444)" : "var(--muted)",
+                }}
+              >
                 {name.length}/255
               </span>
             </div>
@@ -875,22 +934,43 @@ export function CreateCommunityModal({
                 if (!touched.name) setTouched((t) => ({ ...t, name: true }));
               }}
               onBlur={() => setTouched((t) => ({ ...t, name: true }))}
-              style={{ borderColor: touched.name && createErrors.name ? "var(--danger, #ef4444)" : undefined }}
+              style={{
+                borderColor:
+                  touched.name && createErrors.name ? "var(--danger, #ef4444)" : undefined,
+              }}
               required
             />
             {touched.name && createErrors.name && (
-              <p style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", marginTop: "0.3rem", fontWeight: 500 }}>
+              <p
+                style={{
+                  color: "var(--danger, #ef4444)",
+                  fontSize: "0.75rem",
+                  marginTop: "0.3rem",
+                  fontWeight: 500,
+                }}
+              >
                 ✕ {createErrors.name}
               </p>
             )}
           </div>
 
           <div style={{ marginBottom: "1rem" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem" }}>
-              <label htmlFor="modal-comm-code" style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--fg)" }}>
-                Community Code (Unique Slug) <span style={{ color: "var(--danger, #ef4444)" }}>*</span>
+            <div
+              style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem" }}
+            >
+              <label
+                htmlFor="modal-comm-code"
+                style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--fg)" }}
+              >
+                Community Code (Unique Slug){" "}
+                <span style={{ color: "var(--danger, #ef4444)" }}>*</span>
               </label>
-              <span style={{ fontSize: "0.75rem", color: code.length > 32 ? "var(--danger, #ef4444)" : "var(--muted)" }}>
+              <span
+                style={{
+                  fontSize: "0.75rem",
+                  color: code.length > 32 ? "var(--danger, #ef4444)" : "var(--muted)",
+                }}
+              >
                 {code.length}/32
               </span>
             </div>
@@ -907,7 +987,8 @@ export function CreateCommunityModal({
               }}
               onBlur={() => setTouched((t) => ({ ...t, code: true }))}
               style={{
-                borderColor: touched.code && createErrors.code ? "var(--danger, #ef4444)" : undefined,
+                borderColor:
+                  touched.code && createErrors.code ? "var(--danger, #ef4444)" : undefined,
                 textTransform: "uppercase",
                 letterSpacing: "0.05em",
                 fontWeight: 600,
@@ -915,7 +996,14 @@ export function CreateCommunityModal({
               required
             />
             {touched.code && createErrors.code ? (
-              <p style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", marginTop: "0.3rem", fontWeight: 500 }}>
+              <p
+                style={{
+                  color: "var(--danger, #ef4444)",
+                  fontSize: "0.75rem",
+                  marginTop: "0.3rem",
+                  fontWeight: 500,
+                }}
+              >
                 ✕ {createErrors.code}
               </p>
             ) : (
@@ -925,9 +1013,25 @@ export function CreateCommunityModal({
             )}
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "1.25rem" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "0.75rem",
+              marginBottom: "1.25rem",
+            }}
+          >
             <div>
-              <label htmlFor="modal-comm-state" style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--fg)", display: "block", marginBottom: "0.35rem" }}>
+              <label
+                htmlFor="modal-comm-state"
+                style={{
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  color: "var(--fg)",
+                  display: "block",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 State / UT <span style={{ color: "var(--danger, #ef4444)" }}>*</span>
               </label>
               <select
@@ -940,14 +1044,20 @@ export function CreateCommunityModal({
                   if (!touched.state) setTouched((t) => ({ ...t, state: true }));
                   // Clear city if not in new state
                   const newCities = getCitiesForState(newState);
-                  if (city && !newCities.some((c) => c.toLowerCase() === city.trim().toLowerCase())) {
+                  if (
+                    city &&
+                    !newCities.some((c) => c.toLowerCase() === city.trim().toLowerCase())
+                  ) {
                     setCity("");
                     setCustomCity("");
                     setIsCustomCity(false);
                   }
                 }}
                 onBlur={() => setTouched((t) => ({ ...t, state: true }))}
-                style={{ borderColor: touched.state && createErrors.state ? "var(--danger, #ef4444)" : undefined }}
+                style={{
+                  borderColor:
+                    touched.state && createErrors.state ? "var(--danger, #ef4444)" : undefined,
+                }}
                 required
               >
                 <option value="">Select State / UT…</option>
@@ -958,13 +1068,29 @@ export function CreateCommunityModal({
                 ))}
               </select>
               {touched.state && createErrors.state && (
-                <p style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", marginTop: "0.3rem", fontWeight: 500 }}>
+                <p
+                  style={{
+                    color: "var(--danger, #ef4444)",
+                    fontSize: "0.75rem",
+                    marginTop: "0.3rem",
+                    fontWeight: 500,
+                  }}
+                >
                   ✕ {createErrors.state}
                 </p>
               )}
             </div>
             <div>
-              <label htmlFor="modal-comm-city" style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--fg)", display: "block", marginBottom: "0.35rem" }}>
+              <label
+                htmlFor="modal-comm-city"
+                style={{
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  color: "var(--fg)",
+                  display: "block",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 City <span style={{ color: "var(--danger, #ef4444)" }}>*</span>
               </label>
               <select
@@ -983,11 +1109,16 @@ export function CreateCommunityModal({
                   if (!touched.city) setTouched((t) => ({ ...t, city: true }));
                 }}
                 onBlur={() => setTouched((t) => ({ ...t, city: true }))}
-                style={{ borderColor: touched.city && createErrors.city ? "var(--danger, #ef4444)" : undefined }}
+                style={{
+                  borderColor:
+                    touched.city && createErrors.city ? "var(--danger, #ef4444)" : undefined,
+                }}
                 disabled={!state}
                 required
               >
-                <option value="">{state ? `Select city in ${state}…` : "Select State / UT first…"}</option>
+                <option value="">
+                  {state ? `Select city in ${state}…` : "Select State / UT first…"}
+                </option>
                 {getCitiesForState(state).map((c) => (
                   <option key={c} value={c}>
                     {c}
@@ -1007,12 +1138,23 @@ export function CreateCommunityModal({
                     if (!touched.city) setTouched((t) => ({ ...t, city: true }));
                   }}
                   onBlur={() => setTouched((t) => ({ ...t, city: true }))}
-                  style={{ marginTop: "0.4rem", borderColor: touched.city && createErrors.city ? "var(--danger, #ef4444)" : undefined }}
+                  style={{
+                    marginTop: "0.4rem",
+                    borderColor:
+                      touched.city && createErrors.city ? "var(--danger, #ef4444)" : undefined,
+                  }}
                   required
                 />
               )}
               {touched.city && createErrors.city && (
-                <p style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", marginTop: "0.3rem", fontWeight: 500 }}>
+                <p
+                  style={{
+                    color: "var(--danger, #ef4444)",
+                    fontSize: "0.75rem",
+                    marginTop: "0.3rem",
+                    fontWeight: 500,
+                  }}
+                >
                   ✕ {createErrors.city}
                 </p>
               )}
@@ -1021,9 +1163,18 @@ export function CreateCommunityModal({
 
           {/* Admin Setup - REQUIRED */}
           <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "1rem", marginTop: "0.5rem" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "0.75rem",
+              }}
+            >
               <div>
-                <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "var(--fg)" }}>👤 Community Admin Account</span>
+                <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "var(--fg)" }}>
+                  👤 Community Admin Account
+                </span>
                 <span style={{ fontSize: "0.72rem", color: "var(--muted)", display: "block" }}>
                   Required: Primary administrator credentials for this community
                 </span>
@@ -1032,12 +1183,21 @@ export function CreateCommunityModal({
                 type="button"
                 className="btn btn-secondary"
                 style={{ fontSize: "0.72rem", padding: "0.2rem 0.5rem" }}
-                onClick={() => setAdminPassword(generateInitialPassword(adminName || name || "Admin"))}
+                onClick={() =>
+                  setAdminPassword(generateInitialPassword(adminName || name || "Admin"))
+                }
               >
                 ⚡ Generate Password
               </button>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "0.75rem" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "0.75rem",
+                marginBottom: "0.75rem",
+              }}
+            >
               <div>
                 {inputLabel("Admin Full Name", true)}
                 <input
@@ -1049,11 +1209,23 @@ export function CreateCommunityModal({
                     if (!touched.adminName) setTouched((t) => ({ ...t, adminName: true }));
                   }}
                   onBlur={() => setTouched((t) => ({ ...t, adminName: true }))}
-                  style={{ borderColor: touched.adminName && createErrors.adminName ? "var(--danger, #ef4444)" : undefined }}
+                  style={{
+                    borderColor:
+                      touched.adminName && createErrors.adminName
+                        ? "var(--danger, #ef4444)"
+                        : undefined,
+                  }}
                   required
                 />
                 {touched.adminName && createErrors.adminName && (
-                  <p style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", marginTop: "0.3rem", fontWeight: 500 }}>
+                  <p
+                    style={{
+                      color: "var(--danger, #ef4444)",
+                      fontSize: "0.75rem",
+                      marginTop: "0.3rem",
+                      fontWeight: 500,
+                    }}
+                  >
                     ✕ {createErrors.adminName}
                   </p>
                 )}
@@ -1070,11 +1242,23 @@ export function CreateCommunityModal({
                     if (!touched.adminEmail) setTouched((t) => ({ ...t, adminEmail: true }));
                   }}
                   onBlur={() => setTouched((t) => ({ ...t, adminEmail: true }))}
-                  style={{ borderColor: touched.adminEmail && createErrors.adminEmail ? "var(--danger, #ef4444)" : undefined }}
+                  style={{
+                    borderColor:
+                      touched.adminEmail && createErrors.adminEmail
+                        ? "var(--danger, #ef4444)"
+                        : undefined,
+                  }}
                   required
                 />
                 {touched.adminEmail && createErrors.adminEmail && (
-                  <p style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", marginTop: "0.3rem", fontWeight: 500 }}>
+                  <p
+                    style={{
+                      color: "var(--danger, #ef4444)",
+                      fontSize: "0.75rem",
+                      marginTop: "0.3rem",
+                      fontWeight: 500,
+                    }}
+                  >
                     ✕ {createErrors.adminEmail}
                   </p>
                 )}
@@ -1110,10 +1294,22 @@ export function CreateCommunityModal({
                     if (!touched.adminPhone) setTouched((t) => ({ ...t, adminPhone: true }));
                   }}
                   onBlur={() => setTouched((t) => ({ ...t, adminPhone: true }))}
-                  style={{ borderColor: touched.adminPhone && createErrors.adminPhone ? "var(--danger, #ef4444)" : undefined }}
+                  style={{
+                    borderColor:
+                      touched.adminPhone && createErrors.adminPhone
+                        ? "var(--danger, #ef4444)"
+                        : undefined,
+                  }}
                 />
                 {touched.adminPhone && createErrors.adminPhone && (
-                  <p style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", marginTop: "0.3rem", fontWeight: 500 }}>
+                  <p
+                    style={{
+                      color: "var(--danger, #ef4444)",
+                      fontSize: "0.75rem",
+                      marginTop: "0.3rem",
+                      fontWeight: 500,
+                    }}
+                  >
                     ✕ {createErrors.adminPhone}
                   </p>
                 )}
@@ -1127,23 +1323,49 @@ export function CreateCommunityModal({
       {step === "towers" && (
         <div>
           <div style={{ marginBottom: "1rem" }}>
-            <p style={{ fontSize: "0.85rem", color: "var(--fg)", fontWeight: 600, margin: "0 0 0.25rem 0" }}>
+            <p
+              style={{
+                fontSize: "0.85rem",
+                color: "var(--fg)",
+                fontWeight: 600,
+                margin: "0 0 0.25rem 0",
+              }}
+            >
               🏢 Towers & Blocks for {name}
             </p>
             <p style={{ fontSize: "0.78rem", color: "var(--muted)", margin: 0 }}>
-              Specify the total floors & units per floor. All floors & unit numbers (e.g. 101–104, 201–204) will be automatically generated!
+              Specify the total floors & units per floor. All floors & unit numbers (e.g. 101–104,
+              201–204) will be automatically generated!
             </p>
           </div>
 
           {towerError && (
-            <div className="badge badge-danger" style={{ display: "block", marginBottom: "1rem", padding: "0.5rem 0.75rem" }}>
+            <div
+              className="badge badge-danger"
+              style={{ display: "block", marginBottom: "1rem", padding: "0.5rem 0.75rem" }}
+            >
               ⚠️ {towerError}
             </div>
           )}
 
           {addedTowers.length > 0 && (
-            <div style={{ marginBottom: "1.25rem", padding: "0.75rem", background: "#f0fdf4", borderRadius: 8, border: "1px solid #bbf7d0" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem" }}>
+            <div
+              style={{
+                marginBottom: "1.25rem",
+                padding: "0.75rem",
+                background: "#f0fdf4",
+                borderRadius: 8,
+                border: "1px solid #bbf7d0",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "0.4rem",
+                }}
+              >
                 <CountBadge count={addedTowers.length} label="Tower" />
                 <span style={{ fontSize: "0.72rem", color: "#16a34a", fontWeight: 700 }}>
                   ✓ {addedFloors.length} Floors · {addedUnits.length} Units Generated
@@ -1152,7 +1374,9 @@ export function CreateCommunityModal({
               <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
                 {addedTowers.map((t) => {
                   const tFloors = addedFloors.filter((f) => f.tower_id === t.id).length;
-                  const tUnits = addedUnits.filter((u) => addedFloors.some((f) => f.tower_id === t.id && f.id === u.floor_id)).length;
+                  const tUnits = addedUnits.filter((u) =>
+                    addedFloors.some((f) => f.tower_id === t.id && f.id === u.floor_id),
+                  ).length;
                   return (
                     <span
                       key={t.id}
@@ -1168,8 +1392,17 @@ export function CreateCommunityModal({
                         gap: "0.3rem",
                       }}
                     >
-                      🏢 {t.name} <span style={{ opacity: 0.7, fontSize: "0.72rem" }}>({t.code})</span>
-                      <span style={{ background: "#dcfce7", color: "#166534", borderRadius: 4, padding: "0 4px", fontSize: "0.68rem" }}>
+                      🏢 {t.name}{" "}
+                      <span style={{ opacity: 0.7, fontSize: "0.72rem" }}>({t.code})</span>
+                      <span
+                        style={{
+                          background: "#dcfce7",
+                          color: "#166534",
+                          borderRadius: 4,
+                          padding: "0 4px",
+                          fontSize: "0.68rem",
+                        }}
+                      >
                         {tFloors} Floors · {tUnits} Units
                       </span>
                     </span>
@@ -1179,7 +1412,10 @@ export function CreateCommunityModal({
             </div>
           )}
 
-          <form onSubmit={handleAddTower} style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+          <form
+            onSubmit={handleAddTower}
+            style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}
+          >
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
               <div>
                 {inputLabel("Tower Name", true)}
@@ -1192,11 +1428,23 @@ export function CreateCommunityModal({
                     if (!towerTouched.name) setTowerTouched((t) => ({ ...t, name: true }));
                   }}
                   onBlur={() => setTowerTouched((t) => ({ ...t, name: true }))}
-                  style={{ borderColor: towerTouched.name && towerValidationErrors.name ? "var(--danger, #ef4444)" : undefined }}
+                  style={{
+                    borderColor:
+                      towerTouched.name && towerValidationErrors.name
+                        ? "var(--danger, #ef4444)"
+                        : undefined,
+                  }}
                   required
                 />
                 {towerTouched.name && towerValidationErrors.name && (
-                  <p style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", marginTop: "0.3rem", fontWeight: 500 }}>
+                  <p
+                    style={{
+                      color: "var(--danger, #ef4444)",
+                      fontSize: "0.75rem",
+                      marginTop: "0.3rem",
+                      fontWeight: 500,
+                    }}
+                  >
                     ✕ {towerValidationErrors.name}
                   </p>
                 )}
@@ -1213,14 +1461,24 @@ export function CreateCommunityModal({
                   }}
                   onBlur={() => setTowerTouched((t) => ({ ...t, code: true }))}
                   style={{
-                    borderColor: towerTouched.code && towerValidationErrors.code ? "var(--danger, #ef4444)" : undefined,
+                    borderColor:
+                      towerTouched.code && towerValidationErrors.code
+                        ? "var(--danger, #ef4444)"
+                        : undefined,
                     textTransform: "uppercase",
                     fontWeight: 600,
                   }}
                   required
                 />
                 {towerTouched.code && towerValidationErrors.code && (
-                  <p style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", marginTop: "0.3rem", fontWeight: 500 }}>
+                  <p
+                    style={{
+                      color: "var(--danger, #ef4444)",
+                      fontSize: "0.75rem",
+                      marginTop: "0.3rem",
+                      fontWeight: 500,
+                    }}
+                  >
                     ✕ {towerValidationErrors.code}
                   </p>
                 )}
@@ -1230,7 +1488,11 @@ export function CreateCommunityModal({
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
               <div>
                 {inputLabel("Structure Type")}
-                <select className="select-field" value={towerType} onChange={(e) => setTowerType(e.target.value)}>
+                <select
+                  className="select-field"
+                  value={towerType}
+                  onChange={(e) => setTowerType(e.target.value)}
+                >
                   {STRUCTURE_TYPES.map((t) => (
                     <option key={t.value} value={t.value}>
                       {t.label}
@@ -1251,11 +1513,23 @@ export function CreateCommunityModal({
                     if (!towerTouched.floors) setTowerTouched((t) => ({ ...t, floors: true }));
                   }}
                   onBlur={() => setTowerTouched((t) => ({ ...t, floors: true }))}
-                  style={{ borderColor: towerTouched.floors && towerValidationErrors.floors ? "var(--danger, #ef4444)" : undefined }}
+                  style={{
+                    borderColor:
+                      towerTouched.floors && towerValidationErrors.floors
+                        ? "var(--danger, #ef4444)"
+                        : undefined,
+                  }}
                   required
                 />
                 {towerTouched.floors && towerValidationErrors.floors && (
-                  <p style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", marginTop: "0.3rem", fontWeight: 500 }}>
+                  <p
+                    style={{
+                      color: "var(--danger, #ef4444)",
+                      fontSize: "0.75rem",
+                      marginTop: "0.3rem",
+                      fontWeight: 500,
+                    }}
+                  >
                     ✕ {towerValidationErrors.floors}
                   </p>
                 )}
@@ -1277,18 +1551,34 @@ export function CreateCommunityModal({
                     if (!towerTouched.units) setTowerTouched((t) => ({ ...t, units: true }));
                   }}
                   onBlur={() => setTowerTouched((t) => ({ ...t, units: true }))}
-                  style={{ borderColor: towerTouched.units && towerValidationErrors.units ? "var(--danger, #ef4444)" : undefined }}
+                  style={{
+                    borderColor:
+                      towerTouched.units && towerValidationErrors.units
+                        ? "var(--danger, #ef4444)"
+                        : undefined,
+                  }}
                   required
                 />
                 {towerTouched.units && towerValidationErrors.units && (
-                  <p style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", marginTop: "0.3rem", fontWeight: 500 }}>
+                  <p
+                    style={{
+                      color: "var(--danger, #ef4444)",
+                      fontSize: "0.75rem",
+                      marginTop: "0.3rem",
+                      fontWeight: 500,
+                    }}
+                  >
                     ✕ {towerValidationErrors.units}
                   </p>
                 )}
               </div>
               <div>
                 {inputLabel("Unit Type")}
-                <select className="select-field" value={unitTypeInput} onChange={(e) => setUnitTypeInput(e.target.value)}>
+                <select
+                  className="select-field"
+                  value={unitTypeInput}
+                  onChange={(e) => setUnitTypeInput(e.target.value)}
+                >
                   {UNIT_TYPES.map((t) => (
                     <option key={t.value} value={t.value}>
                       {t.label}
@@ -1316,19 +1606,45 @@ export function CreateCommunityModal({
                   type="checkbox"
                   checked={autoGenerateAll}
                   onChange={(e) => setAutoGenerateAll(e.target.checked)}
-                  style={{ width: 16, height: 16, accentColor: "var(--primary, #0ea5e9)", cursor: "pointer" }}
+                  style={{
+                    width: 16,
+                    height: 16,
+                    accentColor: "var(--primary, #0ea5e9)",
+                    cursor: "pointer",
+                  }}
                 />
-                <label htmlFor="auto-gen-all-chk" style={{ fontSize: "0.82rem", color: "#0369a1", cursor: "pointer", fontWeight: 700 }}>
-                  ⚡ Auto-generate {towerFloors || 11} Floors & {(towerFloors || 11) * (unitsPerFloorInput || 4)} Unit Numbers
+                <label
+                  htmlFor="auto-gen-all-chk"
+                  style={{
+                    fontSize: "0.82rem",
+                    color: "#0369a1",
+                    cursor: "pointer",
+                    fontWeight: 700,
+                  }}
+                >
+                  ⚡ Auto-generate {towerFloors || 11} Floors &{" "}
+                  {(towerFloors || 11) * (unitsPerFloorInput || 4)} Unit Numbers
                 </label>
               </div>
               <span style={{ fontSize: "0.75rem", color: "#0284c7", paddingLeft: "1.5rem" }}>
-                Generates Floor 1 ({generateUnitNumber(1, 1)}–{generateUnitNumber(1, unitsPerFloorInput)}) through Floor {towerFloors} ({generateUnitNumber(towerFloors, 1)}–{generateUnitNumber(towerFloors, unitsPerFloorInput)}).
+                Generates Floor 1 ({generateUnitNumber(1, 1)}–
+                {generateUnitNumber(1, unitsPerFloorInput)}) through Floor {towerFloors} (
+                {generateUnitNumber(towerFloors, 1)}–
+                {generateUnitNumber(towerFloors, unitsPerFloorInput)}).
               </span>
             </div>
 
             {isProcessingTower && (
-              <div style={{ padding: "0.5rem 0.75rem", background: "#fef3c7", color: "#92400e", borderRadius: 6, fontSize: "0.78rem", fontWeight: 600 }}>
+              <div
+                style={{
+                  padding: "0.5rem 0.75rem",
+                  background: "#fef3c7",
+                  color: "#92400e",
+                  borderRadius: 6,
+                  fontSize: "0.78rem",
+                  fontWeight: 600,
+                }}
+              >
                 ⏳ {creationProgressText || "Processing…"}
               </div>
             )}
@@ -1351,22 +1667,42 @@ export function CreateCommunityModal({
       {step === "floors" && (
         <div>
           <div style={{ marginBottom: "1rem" }}>
-            <p style={{ fontSize: "0.85rem", color: "var(--fg)", fontWeight: 600, margin: "0 0 0.25rem 0" }}>
+            <p
+              style={{
+                fontSize: "0.85rem",
+                color: "var(--fg)",
+                fontWeight: 600,
+                margin: "0 0 0.25rem 0",
+              }}
+            >
               🏗 Floor Levels & Unit Numbers
             </p>
             <p style={{ fontSize: "0.78rem", color: "var(--muted)", margin: 0 }}>
-              Unit numbers are automatically mapped to each floor level based on the number of units.
+              Unit numbers are automatically mapped to each floor level based on the number of
+              units.
             </p>
           </div>
 
           {floorError && (
-            <div className="badge badge-danger" style={{ display: "block", marginBottom: "1rem", padding: "0.5rem 0.75rem" }}>
+            <div
+              className="badge badge-danger"
+              style={{ display: "block", marginBottom: "1rem", padding: "0.5rem 0.75rem" }}
+            >
               ⚠️ {floorError}
             </div>
           )}
 
           {/* Tower Floor Cards with unit pills */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem", maxHeight: 280, overflowY: "auto", paddingRight: "0.25rem" }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.85rem",
+              maxHeight: 280,
+              overflowY: "auto",
+              paddingRight: "0.25rem",
+            }}
+          >
             {addedTowers.map((tower) => {
               const towerFloorsList = addedFloors.filter((f) => f.tower_id === tower.id);
               return (
@@ -1379,12 +1715,33 @@ export function CreateCommunityModal({
                     border: "1px solid #e2e8f0",
                   }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.6rem" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: "0.6rem",
+                    }}
+                  >
                     <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "var(--fg)" }}>
                       🏢 {tower.name} ({tower.code})
                     </span>
-                    <span style={{ fontSize: "0.72rem", background: "#dcfce7", color: "#166534", padding: "0.15rem 0.5rem", borderRadius: 999, fontWeight: 700 }}>
-                      {towerFloorsList.length} Floors · {addedUnits.filter((u) => towerFloorsList.some((f) => f.id === u.floor_id)).length} Units
+                    <span
+                      style={{
+                        fontSize: "0.72rem",
+                        background: "#dcfce7",
+                        color: "#166534",
+                        padding: "0.15rem 0.5rem",
+                        borderRadius: 999,
+                        fontWeight: 700,
+                      }}
+                    >
+                      {towerFloorsList.length} Floors ·{" "}
+                      {
+                        addedUnits.filter((u) => towerFloorsList.some((f) => f.id === u.floor_id))
+                          .length
+                      }{" "}
+                      Units
                     </span>
                   </div>
 
@@ -1406,10 +1763,19 @@ export function CreateCommunityModal({
                               gap: "0.5rem",
                             }}
                           >
-                            <span style={{ fontWeight: 600, fontSize: "0.78rem", color: "var(--fg)", minWidth: 70 }}>
+                            <span
+                              style={{
+                                fontWeight: 600,
+                                fontSize: "0.78rem",
+                                color: "var(--fg)",
+                                minWidth: 70,
+                              }}
+                            >
                               Floor {f.floor_number}:
                             </span>
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem", flex: 1 }}>
+                            <div
+                              style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem", flex: 1 }}
+                            >
                               {floorUnits.length > 0 ? (
                                 floorUnits.map((u) => (
                                   <span
@@ -1428,7 +1794,13 @@ export function CreateCommunityModal({
                                   </span>
                                 ))
                               ) : (
-                                <span style={{ fontSize: "0.72rem", color: "var(--muted)", fontStyle: "italic" }}>
+                                <span
+                                  style={{
+                                    fontSize: "0.72rem",
+                                    color: "var(--muted)",
+                                    fontStyle: "italic",
+                                  }}
+                                >
                                   No units yet
                                 </span>
                               )}
@@ -1451,11 +1823,29 @@ export function CreateCommunityModal({
           </div>
 
           {/* Add custom floor with auto unit generation */}
-          <details style={{ marginTop: "1rem", background: "#f8fafc", borderRadius: 8, padding: "0.5rem 0.75rem", border: "1px solid #e2e8f0" }}>
-            <summary style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--fg)", cursor: "pointer" }}>
+          <details
+            style={{
+              marginTop: "1rem",
+              background: "#f8fafc",
+              borderRadius: 8,
+              padding: "0.5rem 0.75rem",
+              border: "1px solid #e2e8f0",
+            }}
+          >
+            <summary
+              style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--fg)", cursor: "pointer" }}
+            >
               ➕ Add Additional Custom Floor (with Auto Units)
             </summary>
-            <form onSubmit={handleAddCustomFloorWithUnits} style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginTop: "0.75rem" }}>
+            <form
+              onSubmit={handleAddCustomFloorWithUnits}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.75rem",
+                marginTop: "0.75rem",
+              }}
+            >
               <div>
                 {inputLabel("Select Tower", true)}
                 <select
@@ -1524,7 +1914,14 @@ export function CreateCommunityModal({
       {step === "units" && (
         <div>
           <div style={{ marginBottom: "1rem" }}>
-            <p style={{ fontSize: "0.85rem", color: "var(--fg)", fontWeight: 600, margin: "0 0 0.25rem 0" }}>
+            <p
+              style={{
+                fontSize: "0.85rem",
+                color: "var(--fg)",
+                fontWeight: 600,
+                margin: "0 0 0.25rem 0",
+              }}
+            >
               🚪 Generated Units & Flats Summary
             </p>
             <p style={{ fontSize: "0.78rem", color: "var(--muted)", margin: 0 }}>
@@ -1533,7 +1930,10 @@ export function CreateCommunityModal({
           </div>
 
           {unitError && (
-            <div className="badge badge-danger" style={{ display: "block", marginBottom: "1rem", padding: "0.5rem 0.75rem" }}>
+            <div
+              className="badge badge-danger"
+              style={{ display: "block", marginBottom: "1rem", padding: "0.5rem 0.75rem" }}
+            >
               ⚠️ {unitError}
             </div>
           )}
@@ -1552,23 +1952,50 @@ export function CreateCommunityModal({
             }}
           >
             <div>
-              <span style={{ fontSize: "0.72rem", color: "#0369a1", display: "block" }}>Total Towers</span>
-              <span style={{ fontSize: "1.1rem", fontWeight: 700, color: "#0284c7" }}>{addedTowers.length}</span>
+              <span style={{ fontSize: "0.72rem", color: "#0369a1", display: "block" }}>
+                Total Towers
+              </span>
+              <span style={{ fontSize: "1.1rem", fontWeight: 700, color: "#0284c7" }}>
+                {addedTowers.length}
+              </span>
             </div>
             <div>
-              <span style={{ fontSize: "0.72rem", color: "#0369a1", display: "block" }}>Total Floors</span>
-              <span style={{ fontSize: "1.1rem", fontWeight: 700, color: "#0284c7" }}>{addedFloors.length}</span>
+              <span style={{ fontSize: "0.72rem", color: "#0369a1", display: "block" }}>
+                Total Floors
+              </span>
+              <span style={{ fontSize: "1.1rem", fontWeight: 700, color: "#0284c7" }}>
+                {addedFloors.length}
+              </span>
             </div>
             <div>
-              <span style={{ fontSize: "0.72rem", color: "#0369a1", display: "block" }}>Total Units</span>
-              <span style={{ fontSize: "1.1rem", fontWeight: 700, color: "#16a34a" }}>{addedUnits.length}</span>
+              <span style={{ fontSize: "0.72rem", color: "#0369a1", display: "block" }}>
+                Total Units
+              </span>
+              <span style={{ fontSize: "1.1rem", fontWeight: 700, color: "#16a34a" }}>
+                {addedUnits.length}
+              </span>
             </div>
           </div>
 
           {/* Units Pill Grid */}
           {addedUnits.length > 0 ? (
-            <div style={{ marginBottom: "1.25rem", padding: "0.75rem", background: "var(--surface-alt, #f8fafc)", borderRadius: 8, border: "1px solid #e2e8f0" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+            <div
+              style={{
+                marginBottom: "1.25rem",
+                padding: "0.75rem",
+                background: "var(--surface-alt, #f8fafc)",
+                borderRadius: 8,
+                border: "1px solid #e2e8f0",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "0.5rem",
+                }}
+              >
                 <span style={{ fontWeight: 600, fontSize: "0.8rem", color: "var(--fg)" }}>
                   All Generated Units ({addedUnits.length})
                 </span>
@@ -1576,7 +2003,15 @@ export function CreateCommunityModal({
                   ✓ Ready to Save
                 </span>
               </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", maxHeight: 150, overflowY: "auto" }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "0.35rem",
+                  maxHeight: 150,
+                  overflowY: "auto",
+                }}
+              >
                 {addedUnits.map((u) => {
                   const floor = addedFloors.find((f) => f.id === u.floor_id);
                   return (
@@ -1604,17 +2039,44 @@ export function CreateCommunityModal({
               </div>
             </div>
           ) : (
-            <div style={{ padding: "1.5rem", textAlign: "center", background: "#fef3c7", borderRadius: 8, color: "#92400e", fontSize: "0.85rem", marginBottom: "1rem" }}>
+            <div
+              style={{
+                padding: "1.5rem",
+                textAlign: "center",
+                background: "#fef3c7",
+                borderRadius: 8,
+                color: "#92400e",
+                fontSize: "0.85rem",
+                marginBottom: "1rem",
+              }}
+            >
               ⚠️ No units generated. Go back to Step 2 or 3 to add floors and units.
             </div>
           )}
 
           {/* Add Single Custom Unit */}
-          <details style={{ background: "#f8fafc", borderRadius: 8, padding: "0.5rem 0.75rem", border: "1px solid #e2e8f0" }}>
-            <summary style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--fg)", cursor: "pointer" }}>
+          <details
+            style={{
+              background: "#f8fafc",
+              borderRadius: 8,
+              padding: "0.5rem 0.75rem",
+              border: "1px solid #e2e8f0",
+            }}
+          >
+            <summary
+              style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--fg)", cursor: "pointer" }}
+            >
               ➕ Add Single Custom Unit
             </summary>
-            <form onSubmit={handleAddManualUnit} style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginTop: "0.75rem" }}>
+            <form
+              onSubmit={handleAddManualUnit}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.75rem",
+                marginTop: "0.75rem",
+              }}
+            >
               {addedFloors.length > 0 && (
                 <div>
                   {inputLabel("Select Floor", true)}
@@ -1649,7 +2111,11 @@ export function CreateCommunityModal({
                 </div>
                 <div>
                   {inputLabel("Unit Type")}
-                  <select className="select-field" value={manualUnitType} onChange={(e) => setManualUnitType(e.target.value)}>
+                  <select
+                    className="select-field"
+                    value={manualUnitType}
+                    onChange={(e) => setManualUnitType(e.target.value)}
+                  >
                     {UNIT_TYPES.map((t) => (
                       <option key={t.value} value={t.value}>
                         {t.label}
@@ -1661,7 +2127,9 @@ export function CreateCommunityModal({
               <button
                 type="submit"
                 className="btn btn-secondary"
-                disabled={createUnitMutation.isPending || (!selectedFloorId && addedFloors.length === 0)}
+                disabled={
+                  createUnitMutation.isPending || (!selectedFloorId && addedFloors.length === 0)
+                }
                 style={{ alignSelf: "flex-start" }}
               >
                 {createUnitMutation.isPending ? "Adding…" : "➕ Add Custom Unit"}

@@ -72,7 +72,9 @@ export function useTransitionIncident() {
       queryClient.setQueriesData({ queryKey: ["incidents"] }, (old: any) => {
         if (Array.isArray(old)) {
           return old.map((inc: any) =>
-            inc.id === variables.id ? { ...inc, ...(updatedIncident || {}), status: variables.payload.status } : inc,
+            inc.id === variables.id
+              ? { ...inc, ...(updatedIncident || {}), status: variables.payload.status }
+              : inc,
           );
         }
         return old;

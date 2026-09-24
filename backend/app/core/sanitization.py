@@ -5,13 +5,34 @@ event attributes (onerror, onload, onclick, etc.), and `javascript:` / `data:` U
 Preserves legitimate rich-text formatting tags (<p>, <b>, <i>, <ul>, <li>, <a>, <h1>-<h6>, etc.).
 """
 
-import re
 import html
+import re
 
 # Allowed HTML tags for rich text fields
 ALLOWED_TAGS = {
-    "a", "b", "blockquote", "br", "code", "div", "em", "h1", "h2", "h3", "h4", "h5", "h6",
-    "hr", "i", "li", "ol", "p", "pre", "span", "strong", "u", "ul"
+    "a",
+    "b",
+    "blockquote",
+    "br",
+    "code",
+    "div",
+    "em",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "hr",
+    "i",
+    "li",
+    "ol",
+    "p",
+    "pre",
+    "span",
+    "strong",
+    "u",
+    "ul",
 }
 
 # Allowed attributes per tag
@@ -46,7 +67,7 @@ JAVASCRIPT_URL_PATTERN = re.compile(
 
 def sanitize_html(content: str | None) -> str:
     """Sanitize a rich-text HTML string, stripping dangerous tags, scripts, and event handlers.
-    
+
     If content is None or empty, returns empty string.
     """
     if not content:
@@ -79,17 +100,21 @@ def sanitize_html(content: str | None) -> str:
             return f"</{tag_name}>"
 
         # Check attributes for allowed tags
-        attrs_str = match.group(0)[len(tag_match.group(0)):]
+        attrs_str = match.group(0)[len(tag_match.group(0)) :]
         allowed_attrs = ALLOWED_ATTRIBUTES.get(tag_name, set())
-        
+
         cleaned_attrs = []
-        attr_matches = re.findall(r'([a-zA-Z0-9_-]+)\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s>]+))', attrs_str)
+        attr_matches = re.findall(
+            r'([a-zA-Z0-9_-]+)\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s>]+))', attrs_str
+        )
         for attr_name, val1, val2, val3 in attr_matches:
             attr_name_lower = attr_name.lower()
             if attr_name_lower in allowed_attrs:
                 val = val1 or val2 or val3 or ""
                 # Ensure no javascript: or data: in href
-                if attr_name_lower == "href" and ("javascript:" in val.lower() or "data:" in val.lower()):
+                if attr_name_lower == "href" and (
+                    "javascript:" in val.lower() or "data:" in val.lower()
+                ):
                     continue
                 cleaned_attrs.append(f'{attr_name_lower}="{html.escape(val)}"')
 

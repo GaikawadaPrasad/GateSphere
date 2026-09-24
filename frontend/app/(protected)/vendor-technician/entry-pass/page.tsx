@@ -52,9 +52,7 @@ export default function VendorEntryPassPage() {
           const tickets = ticketsRes.value as any[];
           const inProgress = tickets.find((t) => t.status === "in_progress");
           const acknowledged = tickets.find((t) => t.status === "acknowledged");
-          const assigned = tickets.find(
-            (t) => t.status === "assigned" || t.status === "created",
-          );
+          const assigned = tickets.find((t) => t.status === "assigned" || t.status === "created");
           const matched = inProgress || acknowledged || assigned || null;
           if (matched) {
             try {
@@ -79,14 +77,14 @@ export default function VendorEntryPassPage() {
   const passCode = activeTicket?.pass_code
     ? activeTicket.pass_code
     : activeTicket
-    ? `PASS-VEN-${activeTicket.ticket_number.replace(/\D/g, "").slice(-4) || "8812"}`
-    : "NO-ACTIVE-PASS";
+      ? `PASS-VEN-${activeTicket.ticket_number.replace(/\D/g, "").slice(-4) || "8812"}`
+      : "NO-ACTIVE-PASS";
 
   const qrData = activeTicket?.qr_payload
     ? activeTicket.qr_payload
     : activeTicket
-    ? `GS-PASS-${activeTicket.ticket_number}-${activeTicket.id.slice(0, 8).toUpperCase()}`
-    : "NO-ACTIVE-WORK-ORDER";
+      ? `GS-PASS-${activeTicket.ticket_number}-${activeTicket.id.slice(0, 8).toUpperCase()}`
+      : "NO-ACTIVE-WORK-ORDER";
 
   return (
     <div>

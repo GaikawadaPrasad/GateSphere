@@ -25,16 +25,14 @@ NEW_ROLE_PERMS = [
 def upgrade() -> None:
     conn = op.get_bind()
     conn.execute(
-        sa.text(
-            """
+        sa.text("""
             INSERT INTO role_permissions (id, role_id, permission_id)
             SELECT gen_random_uuid(), r.id, p.id
             FROM roles r
             CROSS JOIN permissions p
             WHERE r.slug = :role_slug AND p.code = :perm_code
             ON CONFLICT (role_id, permission_id) DO NOTHING;
-            """
-        ),
+            """),
         NEW_ROLE_PERMS,
     )
     conn.execute(sa.text("UPDATE users SET permission_version = permission_version + 1;"))

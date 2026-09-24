@@ -15,6 +15,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.context import RequestContext
@@ -144,17 +145,20 @@ class ComplaintService(UnitScopedAccess):
                 ("LIFT", "Common Area & Lift", "critical"),
                 ("GEN", "General Maintenance", "medium"),
             ]
-            for code, name, prio in default_cats:
-                cat = ServiceCategory(
-                    community_id=cid,
-                    code=code,
-                    name=name,
-                    default_priority=prio,
-                )
-                self.db.add(cat)
             try:
-                await self.db.flush()
-            except Exception:
+                async with self.db.begin_nested():
+                    for code, name, prio in default_cats:
+                        self.db.add(
+                            ServiceCategory(
+                                community_id=cid,
+                                code=code,
+                                name=name,
+                                default_priority=prio,
+                            )
+                        )
+            except IntegrityError:
+                # A concurrent request provisioned the defaults first; the savepoint is
+                # rolled back and we simply read what it created.
                 pass
             cats = list((await self.db.scalars(stmt)).all())
         return cats
@@ -323,6 +327,7 @@ class ComplaintService(UnitScopedAccess):
             )
         # vendor_technician only sees tickets assigned to them via TicketAssignment
         from app.modules.users.models import Role, UserRole
+
         is_vendor = await self.db.scalar(
             select(UserRole.id)
             .join(Role, Role.id == UserRole.role_id)
@@ -344,9 +349,7 @@ class ComplaintService(UnitScopedAccess):
                 ServiceTicket.unit_id,
                 or_owned=ServiceTicket.raised_by_user_id == self.actor.id,
             )
-        rows = await self.tickets.list(
-            offset=offset, limit=limit, extra=stmt
-        )
+        rows = await self.tickets.list(offset=offset, limit=limit, extra=stmt)
         await self.tickets.enrich_tickets(rows)
         return rows, await self.tickets.count(extra=stmt)
 
@@ -471,7 +474,8 @@ class ComplaintService(UnitScopedAccess):
                 .where(
                     UserRole.user_id == self.actor.id,
                     Role.slug.in_(CROSS_UNIT_ROLES),
-                    (UserRole.community_id == ticket.community_id) | (UserRole.community_id.is_(None)),
+                    (UserRole.community_id == ticket.community_id)
+                    | (UserRole.community_id.is_(None)),
                 )
                 .limit(1)
             )

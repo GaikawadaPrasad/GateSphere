@@ -7,12 +7,16 @@ from __future__ import annotations
 
 import uuid
 
+import structlog
 from sqlalchemy import Select, func, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.tenancy import TenantScope
 from app.db.repository import AsyncTenantRepository
 from app.modules.communities.models import Community, Floor, Gate, Tower, Unit
+
+log = structlog.get_logger(__name__)
 
 
 class CommunityRepository:
@@ -36,6 +40,7 @@ class CommunityRepository:
             if not hasattr(c, "admin_name"):
                 c.admin_name = None
         from app.modules.users.models import Role, User, UserRole
+
         comm_map = {c.id: c for c in comms}
         stmt = (
             select(UserRole.community_id, User.email, User.full_name)
@@ -52,8 +57,9 @@ class CommunityRepository:
                 if community_id in comm_map:
                     comm_map[community_id].admin_email = email
                     comm_map[community_id].admin_name = full_name
-        except Exception:
-            pass
+        except SQLAlchemyError as exc:
+            # Admin name/email are display-only enrichment; the list itself must still load.
+            log.warning("communities.admin_info_failed", error=type(exc).__name__)
         return comms
 
     async def get(self, community_id: uuid.UUID) -> Community | None:

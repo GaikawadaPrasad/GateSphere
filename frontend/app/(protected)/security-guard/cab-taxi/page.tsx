@@ -31,10 +31,15 @@ export interface CabMovement {
 export default function SecurityGuardCabTaxiPage() {
   const [cabs, setCabs] = useState<CabMovement[]>([]);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved" | "entered" | "completed">("all");
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "pending" | "approved" | "entered" | "completed"
+  >("all");
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [actionMessage, setActionMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   // Verification Modal State (Fast Lookup by Plate, Unit, Driver)
   const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
@@ -71,7 +76,9 @@ export default function SecurityGuardCabTaxiPage() {
       ]);
 
       const requests = Array.isArray(requestsRes) ? requestsRes : (requestsRes as any)?.data || [];
-      const directory = Array.isArray(directoryRes) ? directoryRes : (directoryRes as any)?.data || [];
+      const directory = Array.isArray(directoryRes)
+        ? directoryRes
+        : (directoryRes as any)?.data || [];
       const entries = Array.isArray(entriesRes) ? entriesRes : (entriesRes as any)?.data || [];
 
       let cid = me?.community_ids?.[0] || (me as any)?.community_id;
@@ -137,9 +144,11 @@ export default function SecurityGuardCabTaxiPage() {
               id: r.id,
               unit_id: r.unit_id,
               unit_number: displayUnit,
-              visitorName: r.visitor_name || r.visitor?.full_name || visitor?.full_name || "Cab Driver",
+              visitorName:
+                r.visitor_name || r.visitor?.full_name || visitor?.full_name || "Cab Driver",
               visitorPhone: r.visitor_phone || r.visitor?.phone || visitor?.phone || undefined,
-              vehicleNumber: r.vehicle_number || r.visitor?.vehicle_number || visitor?.vehicle_number || "—",
+              vehicleNumber:
+                r.vehicle_number || r.visitor?.vehicle_number || visitor?.vehicle_number || "—",
               purpose: r.purpose || "Cab / Taxi",
               status: r.status || "pending",
               entryId,
@@ -230,18 +239,21 @@ export default function SecurityGuardCabTaxiPage() {
     } else {
       const cleanPlateNoSpaces = cleanPlate.replace(/[\s\-]/g, "");
       if (!/^[A-Z0-9]{4,15}$/.test(cleanPlateNoSpaces)) {
-        errors.vehicleNumber = "Vehicle plate number must be 4-15 alphanumeric characters (e.g. KA01AB1234).";
+        errors.vehicleNumber =
+          "Vehicle plate number must be 4-15 alphanumeric characters (e.g. KA01AB1234).";
       }
     }
     if (trimmedDriverName) {
       if (trimmedDriverName.length < 2 || !isValidPersonName(trimmedDriverName)) {
-        errors.driverName = "Driver name must contain only alphabetic letters and spaces (min 2 characters).";
+        errors.driverName =
+          "Driver name must contain only alphabetic letters and spaces (min 2 characters).";
       }
     }
     if (trimmedDriverPhone) {
       const phoneDigits = trimmedDriverPhone.replace(/\D/g, "");
       if (!/^\+?[0-9\s\-()]{7,20}$/.test(trimmedDriverPhone) || phoneDigits.length < 10) {
-        errors.driverPhone = "Please enter a valid mobile number for the driver (at least 10 digits).";
+        errors.driverPhone =
+          "Please enter a valid mobile number for the driver (at least 10 digits).";
       }
     }
 
@@ -355,7 +367,12 @@ export default function SecurityGuardCabTaxiPage() {
       if (statusFilter === "pending" && c.status !== "pending") return false;
       if (statusFilter === "approved" && c.status !== "approved") return false;
       if (statusFilter === "entered" && c.status !== "entered") return false;
-      if (statusFilter === "completed" && c.status !== "completed" && c.status !== "rejected" && c.status !== "cancelled")
+      if (
+        statusFilter === "completed" &&
+        c.status !== "completed" &&
+        c.status !== "rejected" &&
+        c.status !== "cancelled"
+      )
         return false;
 
       // 2. Search Text
@@ -537,7 +554,11 @@ export default function SecurityGuardCabTaxiPage() {
             </div>
           );
         }
-        return <span style={{ fontSize: "0.775rem", color: "var(--muted)" }}>{c.createdAt ? formatDateTime(c.createdAt) : "—"}</span>;
+        return (
+          <span style={{ fontSize: "0.775rem", color: "var(--muted)" }}>
+            {c.createdAt ? formatDateTime(c.createdAt) : "—"}
+          </span>
+        );
       },
     },
     {
@@ -545,7 +566,14 @@ export default function SecurityGuardCabTaxiPage() {
       header: "Gate Action",
       align: "right",
       render: (c) => (
-        <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", alignItems: "center" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: "0.5rem",
+            justifyContent: "flex-end",
+            alignItems: "center",
+          }}
+        >
           {c.status === "approved" && (
             <button
               className="btn btn-primary"
@@ -668,7 +696,8 @@ export default function SecurityGuardCabTaxiPage() {
             padding: "0.75rem 1rem",
             marginBottom: "1.25rem",
             borderRadius: "var(--radius)",
-            background: actionMessage.type === "success" ? "var(--success-light)" : "var(--danger-light)",
+            background:
+              actionMessage.type === "success" ? "var(--success-light)" : "var(--danger-light)",
             border: `1px solid ${actionMessage.type === "success" ? "var(--success-border)" : "var(--danger-border)"}`,
             color: actionMessage.type === "success" ? "#065f46" : "#991b1b",
             display: "flex",
@@ -747,7 +776,8 @@ export default function SecurityGuardCabTaxiPage() {
               Live Gate Cab & Commercial Taxi Verification
             </h4>
             <p style={{ margin: 0, fontSize: "0.825rem", opacity: 0.9 }}>
-              Verify arriving cabs against resident approvals and log instant gate entry and exit timestamps.
+              Verify arriving cabs against resident approvals and log instant gate entry and exit
+              timestamps.
             </p>
           </div>
         </div>
@@ -861,12 +891,16 @@ export default function SecurityGuardCabTaxiPage() {
               color: "#1e40af",
             }}
           >
-            💡 <strong>Quick Gate Verification:</strong> Search by Vehicle Plate number, Destination Unit, or Driver name to confirm resident approval and admit vehicle.
+            💡 <strong>Quick Gate Verification:</strong> Search by Vehicle Plate number, Destination
+            Unit, or Driver name to confirm resident approval and admit vehicle.
           </div>
 
           {/* Search by Plate / Unit */}
           <div>
-            <label className="form-label" style={{ fontWeight: 700, marginBottom: "0.35rem", display: "block" }}>
+            <label
+              className="form-label"
+              style={{ fontWeight: 700, marginBottom: "0.35rem", display: "block" }}
+            >
               Search Active Cab Bookings (Vehicle Plate / Unit # / Driver)
             </label>
             <input
@@ -899,7 +933,13 @@ export default function SecurityGuardCabTaxiPage() {
                   <p style={{ margin: 0, fontWeight: 600, color: "var(--fg)" }}>
                     No pre-approved cab bookings match &quot;{verifySearchQuery}&quot;.
                   </p>
-                  <p style={{ margin: "0.25rem 0 0.75rem", fontSize: "0.8rem", color: "var(--muted)" }}>
+                  <p
+                    style={{
+                      margin: "0.25rem 0 0.75rem",
+                      fontSize: "0.8rem",
+                      color: "var(--muted)",
+                    }}
+                  >
                     You can log this arrival immediately for the destination unit.
                   </p>
                   <button
@@ -932,8 +972,21 @@ export default function SecurityGuardCabTaxiPage() {
                       }}
                     >
                       <div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.25rem" }}>
-                          <span style={{ fontFamily: "monospace", fontWeight: 800, fontSize: "0.95rem" }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.5rem",
+                            marginBottom: "0.25rem",
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontFamily: "monospace",
+                              fontWeight: 800,
+                              fontSize: "0.95rem",
+                            }}
+                          >
                             🚖 {cab.vehicleNumber}
                           </span>
                           <span
@@ -950,8 +1003,10 @@ export default function SecurityGuardCabTaxiPage() {
                           <StatusBadge status={cab.status} />
                         </div>
                         <div style={{ fontSize: "0.825rem", color: "var(--muted)" }}>
-                          Destination: <strong style={{ color: "var(--fg)" }}>{cab.unit_number}</strong> · Driver:{" "}
-                          <strong>{cab.visitorName}</strong> {cab.visitorPhone ? `(${cab.visitorPhone})` : ""}
+                          Destination:{" "}
+                          <strong style={{ color: "var(--fg)" }}>{cab.unit_number}</strong> ·
+                          Driver: <strong>{cab.visitorName}</strong>{" "}
+                          {cab.visitorPhone ? `(${cab.visitorPhone})` : ""}
                         </div>
                       </div>
 
@@ -960,7 +1015,12 @@ export default function SecurityGuardCabTaxiPage() {
                           <button
                             type="button"
                             className="btn btn-primary"
-                            style={{ fontSize: "0.8rem", padding: "0.35rem 0.75rem", background: "#059669", borderColor: "#059669" }}
+                            style={{
+                              fontSize: "0.8rem",
+                              padding: "0.35rem 0.75rem",
+                              background: "#059669",
+                              borderColor: "#059669",
+                            }}
                             onClick={() => {
                               handleAllowEntry(cab);
                             }}
@@ -973,7 +1033,12 @@ export default function SecurityGuardCabTaxiPage() {
                           <button
                             type="button"
                             className="btn btn-secondary"
-                            style={{ fontSize: "0.8rem", padding: "0.35rem 0.75rem", color: "#d97706", borderColor: "#fde68a" }}
+                            style={{
+                              fontSize: "0.8rem",
+                              padding: "0.35rem 0.75rem",
+                              color: "#d97706",
+                              borderColor: "#fde68a",
+                            }}
                             onClick={() => {
                               handleSendApprovalRequest(cab);
                             }}
@@ -1026,46 +1091,75 @@ export default function SecurityGuardCabTaxiPage() {
               }}
             >
               <div>
-                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>Vehicle Plate #</span>
+                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>
+                  Vehicle Plate #
+                </span>
                 <strong style={{ fontFamily: "monospace", fontSize: "1rem", color: "var(--fg)" }}>
                   {selectedCabDetails.vehicleNumber}
                 </strong>
               </div>
               <div>
-                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>Gate Status</span>
+                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>
+                  Gate Status
+                </span>
                 <StatusBadge status={selectedCabDetails.status} />
               </div>
               <div>
-                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>Destination Unit</span>
+                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>
+                  Destination Unit
+                </span>
                 <strong style={{ color: "var(--fg)" }}>{selectedCabDetails.unit_number}</strong>
               </div>
               <div>
-                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>Service Provider</span>
+                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>
+                  Service Provider
+                </span>
                 <strong>{selectedCabDetails.purpose}</strong>
               </div>
               <div>
-                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>Driver Name</span>
+                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>
+                  Driver Name
+                </span>
                 <span>{selectedCabDetails.visitorName}</span>
               </div>
               <div>
-                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>Driver Phone</span>
-                <span style={{ fontFamily: "monospace" }}>{selectedCabDetails.visitorPhone || "—"}</span>
+                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>
+                  Driver Phone
+                </span>
+                <span style={{ fontFamily: "monospace" }}>
+                  {selectedCabDetails.visitorPhone || "—"}
+                </span>
               </div>
               {selectedCabDetails.enteredAt && (
                 <div>
-                  <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>Entered Timestamp</span>
-                  <span style={{ fontWeight: 600, color: "#059669" }}>{formatDateTime(selectedCabDetails.enteredAt)}</span>
+                  <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>
+                    Entered Timestamp
+                  </span>
+                  <span style={{ fontWeight: 600, color: "#059669" }}>
+                    {formatDateTime(selectedCabDetails.enteredAt)}
+                  </span>
                 </div>
               )}
               {selectedCabDetails.exitedAt && (
                 <div>
-                  <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>Exited Timestamp</span>
-                  <span style={{ fontWeight: 600, color: "#64748b" }}>{formatDateTime(selectedCabDetails.exitedAt)}</span>
+                  <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>
+                    Exited Timestamp
+                  </span>
+                  <span style={{ fontWeight: 600, color: "#64748b" }}>
+                    {formatDateTime(selectedCabDetails.exitedAt)}
+                  </span>
                 </div>
               )}
             </div>
 
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "0.75rem" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "0.5rem",
+                marginTop: "0.75rem",
+              }}
+            >
               {selectedCabDetails.status === "approved" && (
                 <button
                   type="button"
@@ -1089,7 +1183,10 @@ export default function SecurityGuardCabTaxiPage() {
                   }}
                   disabled={sendingApprovalId === selectedCabDetails.id}
                 >
-                  📲 {sendingApprovalId === selectedCabDetails.id ? "Sending…" : "Send Approval Request"}
+                  📲{" "}
+                  {sendingApprovalId === selectedCabDetails.id
+                    ? "Sending…"
+                    : "Send Approval Request"}
                 </button>
               )}
               {selectedCabDetails.status === "entered" && (
@@ -1143,7 +1240,10 @@ export default function SecurityGuardCabTaxiPage() {
           </div>
         }
       >
-        <form onSubmit={handleCreateCabArrival} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+        <form
+          onSubmit={handleCreateCabArrival}
+          style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
+        >
           {modalError && (
             <div
               style={{
@@ -1161,7 +1261,10 @@ export default function SecurityGuardCabTaxiPage() {
           )}
 
           <div>
-            <label className="form-label" style={{ fontWeight: 600, marginBottom: "0.35rem", display: "block" }}>
+            <label
+              className="form-label"
+              style={{ fontWeight: 600, marginBottom: "0.35rem", display: "block" }}
+            >
               Destination Resident Unit *
             </label>
             <select
@@ -1186,7 +1289,14 @@ export default function SecurityGuardCabTaxiPage() {
               )}
             </select>
             {cabFieldErrors.unitId && (
-              <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+              <span
+                style={{
+                  color: "var(--danger, #ef4444)",
+                  fontSize: "0.75rem",
+                  display: "block",
+                  marginTop: "0.25rem",
+                }}
+              >
                 {cabFieldErrors.unitId}
               </span>
             )}
@@ -1194,7 +1304,10 @@ export default function SecurityGuardCabTaxiPage() {
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
             <div>
-              <label className="form-label" style={{ fontWeight: 600, marginBottom: "0.35rem", display: "block" }}>
+              <label
+                className="form-label"
+                style={{ fontWeight: 600, marginBottom: "0.35rem", display: "block" }}
+              >
                 Vehicle Plate Number *
               </label>
               <input
@@ -1211,14 +1324,24 @@ export default function SecurityGuardCabTaxiPage() {
                 required
               />
               {cabFieldErrors.vehicleNumber && (
-                <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                <span
+                  style={{
+                    color: "var(--danger, #ef4444)",
+                    fontSize: "0.75rem",
+                    display: "block",
+                    marginTop: "0.25rem",
+                  }}
+                >
                   {cabFieldErrors.vehicleNumber}
                 </span>
               )}
             </div>
 
             <div>
-              <label className="form-label" style={{ fontWeight: 600, marginBottom: "0.35rem", display: "block" }}>
+              <label
+                className="form-label"
+                style={{ fontWeight: 600, marginBottom: "0.35rem", display: "block" }}
+              >
                 Cab Provider / Service *
               </label>
               <select
@@ -1238,7 +1361,10 @@ export default function SecurityGuardCabTaxiPage() {
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
             <div>
-              <label className="form-label" style={{ fontWeight: 600, marginBottom: "0.35rem", display: "block" }}>
+              <label
+                className="form-label"
+                style={{ fontWeight: 600, marginBottom: "0.35rem", display: "block" }}
+              >
                 Driver Name (Optional)
               </label>
               <input
@@ -1254,14 +1380,24 @@ export default function SecurityGuardCabTaxiPage() {
                 }}
               />
               {cabFieldErrors.driverName && (
-                <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                <span
+                  style={{
+                    color: "var(--danger, #ef4444)",
+                    fontSize: "0.75rem",
+                    display: "block",
+                    marginTop: "0.25rem",
+                  }}
+                >
                   {cabFieldErrors.driverName}
                 </span>
               )}
             </div>
 
             <div>
-              <label className="form-label" style={{ fontWeight: 600, marginBottom: "0.35rem", display: "block" }}>
+              <label
+                className="form-label"
+                style={{ fontWeight: 600, marginBottom: "0.35rem", display: "block" }}
+              >
                 Driver Phone (Optional)
               </label>
               <input
@@ -1277,7 +1413,14 @@ export default function SecurityGuardCabTaxiPage() {
                 }}
               />
               {cabFieldErrors.driverPhone && (
-                <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+                <span
+                  style={{
+                    color: "var(--danger, #ef4444)",
+                    fontSize: "0.75rem",
+                    display: "block",
+                    marginTop: "0.25rem",
+                  }}
+                >
                   {cabFieldErrors.driverPhone}
                 </span>
               )}

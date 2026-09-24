@@ -35,7 +35,10 @@ export function Pagination({
         boxSizing: "border-box",
       }}
     >
-      <div className="pagination-info" style={{ color: "var(--muted)", fontSize: "0.8rem", minWidth: 0 }}>
+      <div
+        className="pagination-info"
+        style={{ color: "var(--muted)", fontSize: "0.8rem", minWidth: 0 }}
+      >
         Showing <strong style={{ color: "var(--fg)" }}>{startItem}</strong>–
         <strong style={{ color: "var(--fg)" }}>{endItem}</strong> of{" "}
         <strong style={{ color: "var(--fg)" }}>{total}</strong>

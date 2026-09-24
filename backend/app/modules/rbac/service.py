@@ -122,7 +122,6 @@ class RbacService:
             code=perm.code, module=mod, action=act, description=perm.description
         )
 
-
     async def list_roles(self) -> list[schemas.RolePermsRead]:
         roles = (await self.db.scalars(select(Role).order_by(Role.slug))).all()
         out = []

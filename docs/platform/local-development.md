@@ -39,6 +39,7 @@ The app **fails to start** if `SECRET_KEY` (<32 chars) or a datastore URL is mis
 
 ## Bare-metal (no Docker) — optional
 
-Backend: Python 3.12, local Postgres+Redis, `pip install -r backend/requirements.txt`,
+Backend: Python 3.12, local Postgres+Redis, `pip install --require-hashes -r backend/requirements-dev.lock.txt`
+(runtime deps + pytest/black/ruff/mypy; the production image installs only `requirements.lock.txt`),
 `cp backend/.env.example backend/.env`, `cd backend && alembic upgrade head && python -m app.scripts.seed && uvicorn app.main:app --reload`.
 Frontend: Node 20, `cd frontend && npm install && cp .env.example .env.local && npm run dev`.

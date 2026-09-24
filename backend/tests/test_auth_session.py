@@ -212,4 +212,3 @@ def test_change_password_and_session_revocation(client):
         json={"current_password": NEW_PW, "new_password": DEMO_PASSWORD},
     )
     assert r3.status_code == 200
-

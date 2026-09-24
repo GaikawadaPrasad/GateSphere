@@ -45,7 +45,7 @@ export function OperationalStaffDetailsModal({
 
       toast.success(
         `${staff.full_name} is now ${newStatus ? "Active" : "Deactivated"}.`,
-        "Status Updated"
+        "Status Updated",
       );
 
       if (onUpdated) onUpdated();
@@ -64,7 +64,14 @@ export function OperationalStaffDetailsModal({
       title="Staff Personnel Profile"
       size="md"
       footer={
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            width: "100%",
+          }}
+        >
           <button
             type="button"
             className={staff.is_active ? "btn btn-danger" : "btn btn-secondary"}
@@ -75,8 +82,8 @@ export function OperationalStaffDetailsModal({
             {isToggling
               ? "Updating..."
               : staff.is_active
-              ? "Deactivate Account"
-              : "Activate Account"}
+                ? "Deactivate Account"
+                : "Activate Account"}
           </button>
 
           <button type="button" className="btn btn-secondary" onClick={onClose}>
@@ -147,16 +154,38 @@ export function OperationalStaffDetailsModal({
           }}
         >
           <div>
-            <span style={{ color: "var(--muted)", display: "block", fontSize: "0.75rem", marginBottom: "0.15rem" }}>
+            <span
+              style={{
+                color: "var(--muted)",
+                display: "block",
+                fontSize: "0.75rem",
+                marginBottom: "0.15rem",
+              }}
+            >
               Assigned Role
             </span>
-            <span style={{ fontWeight: 600, color: "var(--fg)", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+            <span
+              style={{
+                fontWeight: 600,
+                color: "var(--fg)",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.35rem",
+              }}
+            >
               <span>{roleMeta.icon}</span> {roleMeta.name}
             </span>
           </div>
 
           <div>
-            <span style={{ color: "var(--muted)", display: "block", fontSize: "0.75rem", marginBottom: "0.15rem" }}>
+            <span
+              style={{
+                color: "var(--muted)",
+                display: "block",
+                fontSize: "0.75rem",
+                marginBottom: "0.15rem",
+              }}
+            >
               Contact Phone
             </span>
             <span style={{ fontWeight: 600, color: "var(--fg)" }}>
@@ -165,7 +194,14 @@ export function OperationalStaffDetailsModal({
           </div>
 
           <div>
-            <span style={{ color: "var(--muted)", display: "block", fontSize: "0.75rem", marginBottom: "0.15rem" }}>
+            <span
+              style={{
+                color: "var(--muted)",
+                display: "block",
+                fontSize: "0.75rem",
+                marginBottom: "0.15rem",
+              }}
+            >
               User ID
             </span>
             <span style={{ fontFamily: "monospace", fontSize: "0.75rem", color: "var(--muted)" }}>
@@ -174,7 +210,14 @@ export function OperationalStaffDetailsModal({
           </div>
 
           <div>
-            <span style={{ color: "var(--muted)", display: "block", fontSize: "0.75rem", marginBottom: "0.15rem" }}>
+            <span
+              style={{
+                color: "var(--muted)",
+                display: "block",
+                fontSize: "0.75rem",
+                marginBottom: "0.15rem",
+              }}
+            >
               Registered On
             </span>
             <span style={{ fontWeight: 500, color: "var(--fg)" }}>
@@ -185,13 +228,28 @@ export function OperationalStaffDetailsModal({
 
         {/* Role Responsibilities */}
         <div>
-          <h4 style={{ margin: "0 0 0.5rem", fontSize: "0.85rem", fontWeight: 700, color: "var(--fg)" }}>
+          <h4
+            style={{
+              margin: "0 0 0.5rem",
+              fontSize: "0.85rem",
+              fontWeight: 700,
+              color: "var(--fg)",
+            }}
+          >
             Operational Scope &amp; Responsibilities
           </h4>
           <p style={{ fontSize: "0.8rem", color: "var(--muted)", margin: "0 0 0.5rem" }}>
             {roleMeta.description}
           </p>
-          <ul style={{ margin: 0, paddingLeft: "1.2rem", fontSize: "0.8rem", color: "var(--muted)", lineHeight: 1.5 }}>
+          <ul
+            style={{
+              margin: 0,
+              paddingLeft: "1.2rem",
+              fontSize: "0.8rem",
+              color: "var(--muted)",
+              lineHeight: 1.5,
+            }}
+          >
             {roleMeta.responsibilities.map((resp, idx) => (
               <li key={idx}>{resp}</li>
             ))}

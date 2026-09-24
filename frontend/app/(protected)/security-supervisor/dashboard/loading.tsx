@@ -18,7 +18,14 @@
       >
         {[1, 2, 3, 4, 5, 6].map((i) => (
           <div key={i} className="card" style={{ padding: "1.25rem" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "0.75rem",
+              }}
+            >
               <div className="skeleton" style={{ width: 120, height: 16 }} />
               <div className="skeleton" style={{ width: 28, height: 28, borderRadius: "50%" }} />
             </div>
@@ -33,7 +40,11 @@
         <div className="skeleton" style={{ width: 200, height: 18, marginBottom: "0.75rem" }} />
         <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="skeleton" style={{ width: 150, height: 36, borderRadius: "var(--radius-sm)" }} />
+            <div
+              key={i}
+              className="skeleton"
+              style={{ width: 150, height: 36, borderRadius: "var(--radius-sm)" }}
+            />
           ))}
         </div>
       </div>
@@ -49,7 +60,11 @@
         <div className="card" style={{ minHeight: 320, padding: "1.25rem" }}>
           <div className="skeleton" style={{ width: 220, height: 20, marginBottom: "1.25rem" }} />
           {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="skeleton" style={{ height: 40, width: "100%", marginBottom: "0.75rem" }} />
+            <div
+              key={i}
+              className="skeleton"
+              style={{ height: 40, width: "100%", marginBottom: "0.75rem" }}
+            />
           ))}
         </div>
 
@@ -57,7 +72,11 @@
           <div className="card" style={{ padding: "1.25rem", marginBottom: "1.5rem" }}>
             <div className="skeleton" style={{ width: 160, height: 20, marginBottom: "1rem" }} />
             {[1, 2, 3].map((i) => (
-              <div key={i} className="skeleton" style={{ height: 48, width: "100%", marginBottom: "0.75rem" }} />
+              <div
+                key={i}
+                className="skeleton"
+                style={{ height: 48, width: "100%", marginBottom: "0.75rem" }}
+              />
             ))}
           </div>
 

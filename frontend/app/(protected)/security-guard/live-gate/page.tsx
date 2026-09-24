@@ -4,11 +4,7 @@ import { useState, useRef, useCallback } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { QrScannerModal } from "@/components/common/QrScannerModal";
-import {
-  decodeQrFromFile,
-  parseQrPayload,
-  type ParsedQrData,
-} from "@/lib/qr-decoder";
+import { decodeQrFromFile, parseQrPayload, type ParsedQrData } from "@/lib/qr-decoder";
 import { visitorsApi, domesticStaffApi, gateApi, residentsApi } from "@/lib/api";
 import { WalkInVisitorModal } from "@/components/common/WalkInVisitorModal";
 import { FileUpload } from "@/components/common/FileUpload";
@@ -107,7 +103,9 @@ export default function SecurityGuardLiveGatePage() {
             enteredAt: String(att?.check_in_at || new Date().toISOString()),
             isStaff: true,
           });
-          setSuccessMessage(`✅ Staff Entry Permitted & Attendance Logged for ${staff?.full_name || "Staff"}. Assigned residents notified.`);
+          setSuccessMessage(
+            `✅ Staff Entry Permitted & Attendance Logged for ${staff?.full_name || "Staff"}. Assigned residents notified.`,
+          );
           setPassInput("");
           setScannedBadge(null);
         } catch (err: any) {
@@ -115,7 +113,9 @@ export default function SecurityGuardLiveGatePage() {
           const msg = err?.message || "Invalid staff pass";
           if (code === "ALREADY_INSIDE" || msg.includes("already checked in")) {
             setPendingStaffPassForExit(raw);
-            setErrorMessage(`⚠️ Staff member is already checked in. Click "Check Out Staff Member Now" below to record exit.`);
+            setErrorMessage(
+              `⚠️ Staff member is already checked in. Click "Check Out Staff Member Now" below to record exit.`,
+            );
           } else if (code === "STAFF_BLACKLISTED" || msg.includes("blacklist")) {
             setErrorMessage(`🚨 STAFF ENTRY BLOCKED: Staff member is on the security blacklist.`);
           } else if (code === "STAFF_INACTIVE") {
@@ -180,7 +180,9 @@ export default function SecurityGuardLiveGatePage() {
             isVendor: true,
             ticketNumber,
           });
-          setSuccessMessage(`✅ Vendor Technician Entry Approved for ${ticketNumber}. Entry logged to Gate Operations.`);
+          setSuccessMessage(
+            `✅ Vendor Technician Entry Approved for ${ticketNumber}. Entry logged to Gate Operations.`,
+          );
           setPassInput("");
           setScannedBadge(null);
         } catch (err: any) {
@@ -265,11 +267,15 @@ export default function SecurityGuardLiveGatePage() {
             enteredAt: new Date().toISOString(),
             isFamily: true,
           });
-          setSuccessMessage(`✅ Family Entry Permitted: ${res.full_name} (${res.relationship}) from Unit ${res.unit_number}. Gate pass recorded.`);
+          setSuccessMessage(
+            `✅ Family Entry Permitted: ${res.full_name} (${res.relationship}) from Unit ${res.unit_number}. Gate pass recorded.`,
+          );
           setPassInput("");
           setScannedBadge(null);
         } catch (err: any) {
-          setErrorMessage(`❌ FAMILY ENTRY DENIED: ${err?.message || "Invalid family pass or access disabled"}`);
+          setErrorMessage(
+            `❌ FAMILY ENTRY DENIED: ${err?.message || "Invalid family pass or access disabled"}`,
+          );
         }
         setIsVerifying(false);
         return;
@@ -297,7 +303,9 @@ export default function SecurityGuardLiveGatePage() {
       setPendingStaffPassForExit(null);
 
       try {
-        const payload: Record<string, unknown> = isPin ? { pin: pinToUse } : { pass_token: tokenToUse || raw };
+        const payload: Record<string, unknown> = isPin
+          ? { pin: pinToUse }
+          : { pass_token: tokenToUse || raw };
         if (entryPhotoUrl) {
           payload.entry_photo_url = entryPhotoUrl;
         }
@@ -324,13 +332,17 @@ export default function SecurityGuardLiveGatePage() {
               visitorName: famRes.full_name,
               category: "Family Member (Household)",
               reason: `Permanent Resident Access · Relationship: ${famRes.relationship} · Pre-Approved`,
-              unitLabel: famRes.unit_number ? `Unit ${famRes.unit_number}` : "Resident Household Unit",
+              unitLabel: famRes.unit_number
+                ? `Unit ${famRes.unit_number}`
+                : "Resident Household Unit",
               vehicleNumber: null,
               status: "admitted",
               enteredAt: new Date().toISOString(),
               isFamily: true,
             });
-            setSuccessMessage(`✅ Family Entry Permitted: ${famRes.full_name} (${famRes.relationship}) from Unit ${famRes.unit_number}. Gate pass recorded.`);
+            setSuccessMessage(
+              `✅ Family Entry Permitted: ${famRes.full_name} (${famRes.relationship}) from Unit ${famRes.unit_number}. Gate pass recorded.`,
+            );
             setPassInput("");
             setScannedBadge(null);
             setIsVerifying(false);
@@ -342,7 +354,10 @@ export default function SecurityGuardLiveGatePage() {
           // Fallback: If 10-digit mobile number was entered, try domestic staff lookup by phone
           if (cleanDigits.length === 10 || cleanDigits.length === 12) {
             try {
-              const res = await domesticStaffApi.verifyPass({ pass_code: cleanDigits, action: "check_in" });
+              const res = await domesticStaffApi.verifyPass({
+                pass_code: cleanDigits,
+                action: "check_in",
+              });
               const staff = res?.staff;
               const att = res?.attendance;
               setVerifiedEntry({
@@ -356,7 +371,9 @@ export default function SecurityGuardLiveGatePage() {
                 enteredAt: String(att?.check_in_at || new Date().toISOString()),
                 isStaff: true,
               });
-              setSuccessMessage(`✅ Staff Entry Permitted & Attendance Logged for ${staff?.full_name || "Staff"}.`);
+              setSuccessMessage(
+                `✅ Staff Entry Permitted & Attendance Logged for ${staff?.full_name || "Staff"}.`,
+              );
               setPassInput("");
               setScannedBadge(null);
               setIsVerifying(false);
@@ -403,7 +420,9 @@ export default function SecurityGuardLiveGatePage() {
           status: String(entry?.status || "admitted"),
           enteredAt: String(entry?.entry_at || new Date().toISOString()),
         });
-        setSuccessMessage(`✅ Entry Approved & Recorded for ${visitorName} — QR/OTP is now EXPIRED.`);
+        setSuccessMessage(
+          `✅ Entry Approved & Recorded for ${visitorName} — QR/OTP is now EXPIRED.`,
+        );
         setPassInput("");
         setScannedBadge(null);
         setEntryPhotoUrl(null);
@@ -414,7 +433,7 @@ export default function SecurityGuardLiveGatePage() {
       }
       setIsVerifying(false);
     },
-    [passInput, entryPhotoUrl]
+    [passInput, entryPhotoUrl],
   );
 
   const handleVerifyPass = (e: React.FormEvent) => {
@@ -425,14 +444,20 @@ export default function SecurityGuardLiveGatePage() {
   // Called when QR code is decoded from Modal (Camera or Upload)
   const handleQrDecoded = (raw: string, parsed: ParsedQrData) => {
     setPassInput(raw);
-    const displayLabel = parsed.token ? `Token: ${parsed.token}` : parsed.pin ? `PIN: ${parsed.pin}` : raw;
+    const displayLabel = parsed.token
+      ? `Token: ${parsed.token}`
+      : parsed.pin
+        ? `PIN: ${parsed.pin}`
+        : raw;
     setScannedBadge(displayLabel);
     setErrorMessage("");
 
     if (autoVerifyOnScan) {
       executeVerification(raw, parsed);
     } else {
-      setSuccessMessage(`✓ QR code successfully read: ${displayLabel}. Click "Verify & Allow Entry" to admit.`);
+      setSuccessMessage(
+        `✓ QR code successfully read: ${displayLabel}. Click "Verify & Allow Entry" to admit.`,
+      );
     }
   };
 
@@ -455,21 +480,21 @@ export default function SecurityGuardLiveGatePage() {
         const displayLabel = parsed.token
           ? `Token: ${parsed.token}`
           : parsed.pin
-          ? `PIN: ${parsed.pin}`
-          : result.data;
+            ? `PIN: ${parsed.pin}`
+            : result.data;
         setScannedBadge(displayLabel);
 
         if (autoVerifyOnScan) {
           await executeVerification(result.data, parsed);
         } else {
           setSuccessMessage(
-            `✓ QR Code scanned from image: ${displayLabel}. Click "Verify & Allow Entry" to admit.`
+            `✓ QR Code scanned from image: ${displayLabel}. Click "Verify & Allow Entry" to admit.`,
           );
         }
       } else {
         setErrorMessage(
           result.error ||
-            "No QR code found in the uploaded image. Please ensure the QR code is clearly visible, well-lit, and in focus."
+            "No QR code found in the uploaded image. Please ensure the QR code is clearly visible, well-lit, and in focus.",
         );
       }
     } catch (err: any) {
@@ -570,16 +595,44 @@ export default function SecurityGuardLiveGatePage() {
           background: isDraggingFile
             ? "var(--primary-light)"
             : "linear-gradient(135deg, #ffffff, #f8fafc)",
-          border: isDraggingFile ? "2px dashed var(--brand-primary)" : "1px solid var(--border-standard)",
+          border: isDraggingFile
+            ? "2px dashed var(--brand-primary)"
+            : "1px solid var(--border-standard)",
           transition: "all 0.2s ease",
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "1rem",
+            flexWrap: "wrap",
+            gap: "0.5rem",
+          }}
+        >
           <h3 className="card-title" style={{ margin: 0 }}>
             🔍 Verify & Record Entry (QR Token or PIN)
           </h3>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", fontSize: "0.85rem", color: "var(--brand-body)", flexWrap: "wrap" }}>
-            <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", cursor: "pointer", userSelect: "none" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.75rem",
+              fontSize: "0.85rem",
+              color: "var(--brand-body)",
+              flexWrap: "wrap",
+            }}
+          >
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem",
+                cursor: "pointer",
+                userSelect: "none",
+              }}
+            >
               <input
                 type="checkbox"
                 checked={autoVerifyOnScan}
@@ -592,7 +645,12 @@ export default function SecurityGuardLiveGatePage() {
               type="button"
               className="btn btn-primary"
               onClick={() => setIsWalkInModalOpen(true)}
-              style={{ padding: "0.45rem 1rem", fontSize: "0.85rem", fontWeight: 700, background: "linear-gradient(135deg, #2563EB, #1D4ED8)" }}
+              style={{
+                padding: "0.45rem 1rem",
+                fontSize: "0.85rem",
+                fontWeight: 700,
+                background: "linear-gradient(135deg, #2563EB, #1D4ED8)",
+              }}
             >
               👤 Walk-In Check-In (Notify Resident)
             </button>
@@ -642,7 +700,15 @@ export default function SecurityGuardLiveGatePage() {
             borderTop: "1px solid #f1f5f9",
           }}
         >
-          <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          <span
+            style={{
+              fontSize: "0.85rem",
+              fontWeight: 700,
+              color: "var(--muted)",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+            }}
+          >
             QR Code Scan:
           </span>
 
@@ -795,7 +861,8 @@ export default function SecurityGuardLiveGatePage() {
                 gap: "0.4rem",
               }}
             >
-              📷 Visitor Entry Photograph <span style={{ color: "#dc2626", fontWeight: 900 }}>* (Mandatory)</span>{" "}
+              📷 Visitor Entry Photograph{" "}
+              <span style={{ color: "#dc2626", fontWeight: 900 }}>* (Mandatory)</span>{" "}
               {showPhotoPrompt && (
                 <span
                   style={{
@@ -863,7 +930,9 @@ export default function SecurityGuardLiveGatePage() {
                         pass_code: pendingStaffPassForExit,
                         action: "check_out",
                       });
-                      setSuccessMessage(`✓ Staff Exit Recorded successfully for ${res.staff?.full_name || "Staff"}.`);
+                      setSuccessMessage(
+                        `✓ Staff Exit Recorded successfully for ${res.staff?.full_name || "Staff"}.`,
+                      );
                       setPendingStaffPassForExit(null);
                       setErrorMessage("");
                       setPassInput("");
@@ -904,23 +973,38 @@ export default function SecurityGuardLiveGatePage() {
       {verifiedEntry && (
         <div
           className="card"
-          style={{ marginBottom: "1.75rem", border: "2px solid var(--success-border)", background: "#ffffff" }}
+          style={{
+            marginBottom: "1.75rem",
+            border: "2px solid var(--success-border)",
+            background: "#ffffff",
+          }}
         >
-          <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div
+            className="card-header"
+            style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
+          >
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
               <span style={{ fontSize: "1.25rem" }}>
-                {verifiedEntry.isFamily ? "👨‍👩‍👧‍👦" : verifiedEntry.isStaff ? "👷" : verifiedEntry.isVendor ? "🔧" : verifiedEntry.isDelivery ? "📦" : "🎟️"}
+                {verifiedEntry.isFamily
+                  ? "👨‍👩‍👧‍👦"
+                  : verifiedEntry.isStaff
+                    ? "👷"
+                    : verifiedEntry.isVendor
+                      ? "🔧"
+                      : verifiedEntry.isDelivery
+                        ? "📦"
+                        : "🎟️"}
               </span>
               <h3 className="card-title" style={{ margin: 0 }}>
                 {verifiedEntry.isFamily
                   ? "Pre-Approved Family Member Gate Entry"
                   : verifiedEntry.isStaff
-                  ? "Domestic Staff Gate Entry Admitted"
-                  : verifiedEntry.isVendor
-                  ? "Vendor Technician Gate Entry Admitted"
-                  : verifiedEntry.isDelivery
-                  ? "Delivery Agent Gate Entry Admitted"
-                  : "Gate Entry Admitted & Pass Expired"}
+                    ? "Domestic Staff Gate Entry Admitted"
+                    : verifiedEntry.isVendor
+                      ? "Vendor Technician Gate Entry Admitted"
+                      : verifiedEntry.isDelivery
+                        ? "Delivery Agent Gate Entry Admitted"
+                        : "Gate Entry Admitted & Pass Expired"}
               </h3>
             </div>
             <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
@@ -931,43 +1015,43 @@ export default function SecurityGuardLiveGatePage() {
                   background: verifiedEntry.isFamily
                     ? "#ECFDF5"
                     : verifiedEntry.isStaff
-                    ? "#EFF6FF"
-                    : verifiedEntry.isVendor
-                    ? "#FDF4FF"
-                    : verifiedEntry.isDelivery
-                    ? "#FFFBEB"
-                    : "#FEF2F2",
+                      ? "#EFF6FF"
+                      : verifiedEntry.isVendor
+                        ? "#FDF4FF"
+                        : verifiedEntry.isDelivery
+                          ? "#FFFBEB"
+                          : "#FEF2F2",
                   color: verifiedEntry.isFamily
                     ? "#065F46"
                     : verifiedEntry.isStaff
-                    ? "#1D4ED8"
-                    : verifiedEntry.isVendor
-                    ? "#86198F"
-                    : verifiedEntry.isDelivery
-                    ? "#B45309"
-                    : "#991B1B",
+                      ? "#1D4ED8"
+                      : verifiedEntry.isVendor
+                        ? "#86198F"
+                        : verifiedEntry.isDelivery
+                          ? "#B45309"
+                          : "#991B1B",
                   fontWeight: 700,
                   fontSize: "11.5px",
                   border: verifiedEntry.isFamily
                     ? "1px solid #A7F3D0"
                     : verifiedEntry.isStaff
-                    ? "1px solid #DBEAFE"
-                    : verifiedEntry.isVendor
-                    ? "1px solid #F5D0FE"
-                    : verifiedEntry.isDelivery
-                    ? "1px solid #FDE68A"
-                    : "1px solid #FECACA",
+                      ? "1px solid #DBEAFE"
+                      : verifiedEntry.isVendor
+                        ? "1px solid #F5D0FE"
+                        : verifiedEntry.isDelivery
+                          ? "1px solid #FDE68A"
+                          : "1px solid #FECACA",
                 }}
               >
                 {verifiedEntry.isFamily
                   ? "♾️ PERMANENT FAMILY PASS"
                   : verifiedEntry.isStaff
-                  ? "🛡️ DIGITAL STAFF PASS"
-                  : verifiedEntry.isVendor
-                  ? "🔧 VENDOR WORK ORDER"
-                  : verifiedEntry.isDelivery
-                  ? "📦 COURIER ENTRY"
-                  : "🔒 SINGLE-USE EXPIRED"}
+                    ? "🛡️ DIGITAL STAFF PASS"
+                    : verifiedEntry.isVendor
+                      ? "🔧 VENDOR WORK ORDER"
+                      : verifiedEntry.isDelivery
+                        ? "📦 COURIER ENTRY"
+                        : "🔒 SINGLE-USE EXPIRED"}
               </span>
               <StatusBadge status={verifiedEntry.status} />
             </div>
@@ -986,54 +1070,153 @@ export default function SecurityGuardLiveGatePage() {
             }}
           >
             <div>
-              <div style={{ fontSize: "0.75rem", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>
+              <div
+                style={{
+                  fontSize: "0.75rem",
+                  color: "var(--muted)",
+                  textTransform: "uppercase",
+                  fontWeight: 600,
+                }}
+              >
                 {verifiedEntry.isFamily
                   ? "Family Member"
                   : verifiedEntry.isStaff
-                  ? "Staff Member"
-                  : verifiedEntry.isVendor
-                  ? "Technician / Vendor"
-                  : verifiedEntry.isDelivery
-                  ? "Delivery Agent"
-                  : "Visitor Name"}
+                    ? "Staff Member"
+                    : verifiedEntry.isVendor
+                      ? "Technician / Vendor"
+                      : verifiedEntry.isDelivery
+                        ? "Delivery Agent"
+                        : "Visitor Name"}
               </div>
-              <div style={{ fontWeight: 700, fontSize: "1.1rem", color: "var(--brand-heading)", marginTop: "0.2rem" }}>
+              <div
+                style={{
+                  fontWeight: 700,
+                  fontSize: "1.1rem",
+                  color: "var(--brand-heading)",
+                  marginTop: "0.2rem",
+                }}
+              >
                 {verifiedEntry.visitorName}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: "0.75rem", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>Category</div>
-              <div style={{ fontWeight: 700, fontSize: "1.05rem", color: "var(--brand-primary)", marginTop: "0.2rem", textTransform: "capitalize" }}>
+              <div
+                style={{
+                  fontSize: "0.75rem",
+                  color: "var(--muted)",
+                  textTransform: "uppercase",
+                  fontWeight: 600,
+                }}
+              >
+                Category
+              </div>
+              <div
+                style={{
+                  fontWeight: 700,
+                  fontSize: "1.05rem",
+                  color: "var(--brand-primary)",
+                  marginTop: "0.2rem",
+                  textTransform: "capitalize",
+                }}
+              >
                 {verifiedEntry.category || "Guest"}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: "0.75rem", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>Reason / Purpose</div>
-              <div style={{ fontWeight: 600, fontSize: "0.95rem", color: "var(--brand-heading)", marginTop: "0.2rem" }}>
+              <div
+                style={{
+                  fontSize: "0.75rem",
+                  color: "var(--muted)",
+                  textTransform: "uppercase",
+                  fontWeight: 600,
+                }}
+              >
+                Reason / Purpose
+              </div>
+              <div
+                style={{
+                  fontWeight: 600,
+                  fontSize: "0.95rem",
+                  color: "var(--brand-heading)",
+                  marginTop: "0.2rem",
+                }}
+              >
                 {verifiedEntry.reason || "Visitor Entry"}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: "0.75rem", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>Destination / Unit</div>
-              <div style={{ fontWeight: 700, fontSize: "1rem", color: "var(--brand-heading)", marginTop: "0.2rem" }}>
+              <div
+                style={{
+                  fontSize: "0.75rem",
+                  color: "var(--muted)",
+                  textTransform: "uppercase",
+                  fontWeight: 600,
+                }}
+              >
+                Destination / Unit
+              </div>
+              <div
+                style={{
+                  fontWeight: 700,
+                  fontSize: "1rem",
+                  color: "var(--brand-heading)",
+                  marginTop: "0.2rem",
+                }}
+              >
                 {verifiedEntry.unitLabel}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: "0.75rem", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>Vehicle Number</div>
-              <div style={{ fontWeight: 600, fontFamily: "monospace", fontSize: "0.95rem", marginTop: "0.2rem" }}>
+              <div
+                style={{
+                  fontSize: "0.75rem",
+                  color: "var(--muted)",
+                  textTransform: "uppercase",
+                  fontWeight: 600,
+                }}
+              >
+                Vehicle Number
+              </div>
+              <div
+                style={{
+                  fontWeight: 600,
+                  fontFamily: "monospace",
+                  fontSize: "0.95rem",
+                  marginTop: "0.2rem",
+                }}
+              >
                 {verifiedEntry.vehicleNumber || "N/A (Pedestrian)"}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: "0.75rem", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>Entry Time</div>
-              <div style={{ fontWeight: 600, fontSize: "0.95rem", color: "#065F46", marginTop: "0.2rem" }}>
-                {verifiedEntry.enteredAt ? new Date(verifiedEntry.enteredAt).toLocaleTimeString() : "Just now"}
+              <div
+                style={{
+                  fontSize: "0.75rem",
+                  color: "var(--muted)",
+                  textTransform: "uppercase",
+                  fontWeight: 600,
+                }}
+              >
+                Entry Time
+              </div>
+              <div
+                style={{
+                  fontWeight: 600,
+                  fontSize: "0.95rem",
+                  color: "#065F46",
+                  marginTop: "0.2rem",
+                }}
+              >
+                {verifiedEntry.enteredAt
+                  ? new Date(verifiedEntry.enteredAt).toLocaleTimeString()
+                  : "Just now"}
               </div>
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <div
+            style={{ display: "flex", gap: "1rem", flexWrap: "wrap", justifyContent: "flex-end" }}
+          >
             <button
               className="btn btn-secondary"
               style={{ padding: "0.6rem 1.25rem", fontSize: "0.95rem", fontWeight: 600 }}
@@ -1048,11 +1231,22 @@ export default function SecurityGuardLiveGatePage() {
             </button>
             <button
               className="btn btn-secondary"
-              style={{ padding: "0.6rem 1.5rem", fontSize: "0.95rem", fontWeight: 700, color: "#991B1B", borderColor: "#FECACA" }}
+              style={{
+                padding: "0.6rem 1.5rem",
+                fontSize: "0.95rem",
+                fontWeight: 700,
+                color: "#991B1B",
+                borderColor: "#FECACA",
+              }}
               onClick={handleRecordExit}
               disabled={isExiting}
             >
-              🚪 {isExiting ? "Recording…" : verifiedEntry.isStaff ? "CHECK OUT STAFF NOW" : "RECORD EXIT NOW"}
+              🚪{" "}
+              {isExiting
+                ? "Recording…"
+                : verifiedEntry.isStaff
+                  ? "CHECK OUT STAFF NOW"
+                  : "RECORD EXIT NOW"}
             </button>
           </div>
         </div>

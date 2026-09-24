@@ -1,17 +1,22 @@
+// ESLint 9 flat config. `next lint` was removed in Next 16, so `npm run lint` calls the
+// ESLint CLI directly. eslint-config-next 15 still ships legacy (eslintrc) presets, so they
+// are loaded through FlatCompat — same rule set as the former .eslintrc.json.
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { FlatCompat } from "@eslint/eslintrc";
-import path from "path";
-import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const compat = new FlatCompat({ baseDirectory: dirname(fileURLToPath(import.meta.url)) });
 
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-});
-
-const eslintConfig = [
+const config = [
   {
-    ignores: ["next-env.d.ts", ".next/**"],
+    ignores: [
+      ".next/**",
+      "node_modules/**",
+      "coverage/**",
+      "playwright-report/**",
+      "test-results/**",
+      "next-env.d.ts",
+    ],
   },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
@@ -23,4 +28,4 @@ const eslintConfig = [
   },
 ];
 
-export default eslintConfig;
+export default config;

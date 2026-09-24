@@ -44,7 +44,7 @@ async def test_dispatch_from_template_renders_and_delivers(
     )
     assert note.title == "Hi Sam" and "GateSphere" in note.message
     statuses = {d.channel: d.status for d in note.deliveries}
-    assert statuses == {"in_app": "delivered", "email": "delivered"}
+    assert statuses == {"in_app": "delivered", "email": "simulated"}
 
 
 async def test_dispatch_without_content_or_template_fails(

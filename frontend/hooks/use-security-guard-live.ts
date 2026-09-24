@@ -18,7 +18,7 @@ export interface SecurityGuardLiveData {
 
 /**
  * Production-Grade Adaptive Real-Time Sync Hook for Security Guard Live Gate.
- * 
+ *
  * Features:
  * - Tiered polling intervals (Emergency SOS: 4s, Visitor/Deliveries: 10s, Overview: 30s)
  * - Battery & bandwidth protection: stops polling when tab is hidden or tablet is locked (refetchIntervalInBackground: false)
@@ -87,8 +87,7 @@ export function useSecurityGuardLive(communityId?: string): SecurityGuardLiveDat
   const activeSos =
     alertsQuery.data?.find((a) => a.status === "active" || a.status === "acknowledged") || null;
 
-  const activeRoster =
-    rostersQuery.data?.find((r) => r.status === "active") || null;
+  const activeRoster = rostersQuery.data?.find((r) => r.status === "active") || null;
 
   const refetchAll = async () => {
     await Promise.allSettled([

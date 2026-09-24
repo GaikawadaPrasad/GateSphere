@@ -296,7 +296,11 @@ async def confirm_ticket(
     dependencies=[VIEW],
 )
 async def get_feedback(ticket_id: uuid.UUID, svc: Svc = Depends(complaint_service)) -> dict:
-    return ok(schemas.FeedbackRead.model_validate(fb) if (fb := await svc.get_feedback(ticket_id)) else None)
+    return ok(
+        schemas.FeedbackRead.model_validate(fb)
+        if (fb := await svc.get_feedback(ticket_id))
+        else None
+    )
 
 
 @router.post(
@@ -342,4 +346,3 @@ async def add_attachment(
         schemas.AttachmentRead.model_validate(await svc.add_attachment(ticket_id, payload)),
         message="Attached",
     )
-

@@ -16,11 +16,12 @@ Handlers never leak a stack trace, SQL, secret, or filesystem path.
 from __future__ import annotations
 
 import structlog
+from botocore.exceptions import BotoCoreError
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 HTTP_422 = getattr(status, "HTTP_422_UNPROCESSABLE_CONTENT", status.HTTP_422_UNPROCESSABLE_ENTITY)
@@ -94,6 +95,18 @@ class RateLimitedError(AppError):
         retry_after: int | None = None,
     ) -> None:
         super().__init__(message, code=code, status_code=status.HTTP_429_TOO_MANY_REQUESTS)
+        self.retry_after = retry_after
+
+
+class ServiceUnavailableError(AppError):
+    """503 + `Retry-After`: a backing service (object storage, email provider, database)
+    is unreachable. Transient — the client may retry; never a 4xx/500."""
+
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    code = "SERVICE_UNAVAILABLE"
+
+    def __init__(self, message: str, *, code: str | None = None, retry_after: int = 5) -> None:
+        super().__init__(message, code=code, status_code=status.HTTP_503_SERVICE_UNAVAILABLE)
         self.retry_after = retry_after
 
 
@@ -180,10 +193,15 @@ def register_exception_handlers(app: FastAPI) -> None:
             "amenity_booking_capacity_exceeded" in err_str
             or "gs_amenity_booking_capacity_guard" in err_str
         ):
-            log.warning("db.integrity.amenity_capacity", sqlstate=sqlstate, request_id=_request_id(request))
+            log.warning(
+                "db.integrity.amenity_capacity", sqlstate=sqlstate, request_id=_request_id(request)
+            )
             return JSONResponse(
                 status_code=status.HTTP_409_CONFLICT,
-                content=_envelope("BOOKING_CONFLICT", "No capacity left for that slot; overlapping booking confirmed."),
+                content=_envelope(
+                    "BOOKING_CONFLICT",
+                    "No capacity left for that slot; overlapping booking confirmed.",
+                ),
             )
 
         mapping = {
@@ -198,6 +216,28 @@ def register_exception_handlers(app: FastAPI) -> None:
         )
         log.warning("db.integrity", sqlstate=sqlstate, request_id=_request_id(request))
         return JSONResponse(status_code=code_status, content=_envelope(code, msg))
+
+    @app.exception_handler(OperationalError)
+    async def _db_unavailable(request: Request, exc: OperationalError) -> JSONResponse:
+        """Connection lost / refused / timed out — transient, so 503 not 500."""
+        log.error("db.unavailable", error=exc.__class__.__name__, request_id=_request_id(request))
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content=_envelope("DATABASE_UNAVAILABLE", "Service temporarily unavailable."),
+            headers={"Retry-After": "5", "X-Request-ID": _request_id(request) or ""},
+        )
+
+    @app.exception_handler(BotoCoreError)
+    async def _storage_unavailable(request: Request, exc: BotoCoreError) -> JSONResponse:
+        """Object storage unreachable (endpoint down, connect/read timeout)."""
+        log.error(
+            "storage.unavailable", error=exc.__class__.__name__, request_id=_request_id(request)
+        )
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content=_envelope("STORAGE_UNAVAILABLE", "File storage is temporarily unavailable."),
+            headers={"Retry-After": "5", "X-Request-ID": _request_id(request) or ""},
+        )
 
     @app.exception_handler(SQLAlchemyError)
     async def _sqlalchemy(request: Request, exc: SQLAlchemyError) -> JSONResponse:

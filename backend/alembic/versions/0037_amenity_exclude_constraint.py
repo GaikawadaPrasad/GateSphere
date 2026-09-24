@@ -15,6 +15,7 @@ down_revision = "0036_rbac_communities_view"
 branch_labels = None
 depends_on = None
 
+
 def upgrade() -> None:
     # Pairwise EXCLUDE constraint rejected by CR-04 audit because amenities support
     # shared capacity > 1 (e.g. swimming pool, clubhouse). Overbooking is guarded
@@ -24,6 +25,7 @@ def upgrade() -> None:
         ALTER TABLE amenity_bookings
         DROP CONSTRAINT IF EXISTS excl_amenity_booking_overlap;
     """)
+
 
 def downgrade() -> None:
     op.execute("""

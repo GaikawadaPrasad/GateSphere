@@ -2,8 +2,9 @@
 
 - `dispatch` renders a notification for a recipient (from a template `code` or an explicit
   title/message), then fans out one `notification_delivery` per resolved channel. `in_app`
-  is always delivered; other channels are **simulated** (marked delivered unless the user
-  disabled the channel or is in quiet hours -> `skipped`).
+  is delivered; other channels are **simulated** — recorded with status `simulated` (never
+  `delivered`, no `delivered_at`) unless the user disabled the channel or is in quiet
+  hours -> `skipped`.
 - `notification_deliveries` is append-only.
 """
 
@@ -257,15 +258,16 @@ class NotificationService:
         for ch in channels:
             decision = await self._channel_allowed(payload.recipient_user_id, cid, ch)
             if decision == "deliver":
+                in_app = ch == "in_app"
                 self.db.add(
                     NotificationDelivery(
                         notification_id=note.id,
                         channel=ch,
-                        provider="in_app" if ch == "in_app" else "simulated",
-                        status="delivered",
+                        provider="in_app" if in_app else "simulated",
+                        status="delivered" if in_app else "simulated",
                         provider_message_id=f"sim-{secrets.token_hex(6)}",
                         sent_at=now,
-                        delivered_at=now,
+                        delivered_at=now if in_app else None,
                     )
                 )
             else:
@@ -294,10 +296,8 @@ class NotificationService:
         base_stmt = select(Notification).where(Notification.recipient_user_id == self.actor.id)
         if unread_only:
             base_stmt = base_stmt.where(Notification.is_read.is_(False))
-        stmt = (
-            base_stmt
-            .options(selectinload(Notification.deliveries))
-            .order_by(Notification.created_at.desc())
+        stmt = base_stmt.options(selectinload(Notification.deliveries)).order_by(
+            Notification.created_at.desc()
         )
         return (
             await self.notifications.list(offset=offset, limit=limit, extra=stmt),

@@ -128,7 +128,14 @@ export function PasswordField({
       </div>
 
       {error ? (
-        <p style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", marginTop: "0.3rem", fontWeight: 500 }}>
+        <p
+          style={{
+            color: "var(--danger, #ef4444)",
+            fontSize: "0.75rem",
+            marginTop: "0.3rem",
+            fontWeight: 500,
+          }}
+        >
           ✕ {error}
         </p>
       ) : helperText ? (

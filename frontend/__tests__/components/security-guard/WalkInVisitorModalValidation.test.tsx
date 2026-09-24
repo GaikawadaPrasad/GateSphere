@@ -42,11 +42,7 @@ describe("WalkInVisitorModal - Visitor Name Length Validation", () => {
 
   it("renders visitor name input with 0/35 character counter", async () => {
     render(
-      <WalkInVisitorModal
-        isOpen={true}
-        onClose={onClose}
-        onEntryAdmitted={onEntryAdmitted}
-      />
+      <WalkInVisitorModal isOpen={true} onClose={onClose} onEntryAdmitted={onEntryAdmitted} />,
     );
 
     expect(screen.getByPlaceholderText(/e.g. Ramesh Kumar/i)).toBeInTheDocument();
@@ -58,11 +54,7 @@ describe("WalkInVisitorModal - Visitor Name Length Validation", () => {
 
   it("shows validation error when visitor name is too short (1 character)", async () => {
     render(
-      <WalkInVisitorModal
-        isOpen={true}
-        onClose={onClose}
-        onEntryAdmitted={onEntryAdmitted}
-      />
+      <WalkInVisitorModal isOpen={true} onClose={onClose} onEntryAdmitted={onEntryAdmitted} />,
     );
 
     const input = screen.getByPlaceholderText(/e.g. Ramesh Kumar/i);
@@ -70,18 +62,14 @@ describe("WalkInVisitorModal - Visitor Name Length Validation", () => {
     fireEvent.blur(input);
 
     expect(
-      await screen.findByText("Visitor name is too short (must be at least 2 characters).")
+      await screen.findByText("Visitor name is too short (must be at least 2 characters)."),
     ).toBeInTheDocument();
     expect(screen.getByText("1/35")).toBeInTheDocument();
   });
 
   it("shows validation error when visitor name exceeds 35 characters", async () => {
     render(
-      <WalkInVisitorModal
-        isOpen={true}
-        onClose={onClose}
-        onEntryAdmitted={onEntryAdmitted}
-      />
+      <WalkInVisitorModal isOpen={true} onClose={onClose} onEntryAdmitted={onEntryAdmitted} />,
     );
 
     const input = screen.getByPlaceholderText(/e.g. Ramesh Kumar/i);
@@ -90,18 +78,14 @@ describe("WalkInVisitorModal - Visitor Name Length Validation", () => {
     fireEvent.blur(input);
 
     expect(
-      await screen.findByText("Visitor name exceeds maximum length (cannot exceed 35 characters).")
+      await screen.findByText("Visitor name exceeds maximum length (cannot exceed 35 characters)."),
     ).toBeInTheDocument();
     expect(screen.getByText("36/35")).toBeInTheDocument();
   });
 
   it("accepts a valid visitor name within the character limit (e.g. 2 to 35 chars)", async () => {
     render(
-      <WalkInVisitorModal
-        isOpen={true}
-        onClose={onClose}
-        onEntryAdmitted={onEntryAdmitted}
-      />
+      <WalkInVisitorModal isOpen={true} onClose={onClose} onEntryAdmitted={onEntryAdmitted} />,
     );
 
     await waitFor(() => {
@@ -113,28 +97,22 @@ describe("WalkInVisitorModal - Visitor Name Length Validation", () => {
     fireEvent.blur(input);
 
     expect(
-      screen.queryByText("Visitor name is too short (must be at least 2 characters).")
+      screen.queryByText("Visitor name is too short (must be at least 2 characters)."),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByText("Visitor name exceeds maximum length (cannot exceed 35 characters).")
+      screen.queryByText("Visitor name exceeds maximum length (cannot exceed 35 characters)."),
     ).not.toBeInTheDocument();
     expect(screen.getByText("12/35")).toBeInTheDocument();
   });
 
   it("displays validation error when submitting an empty visitor name", async () => {
     render(
-      <WalkInVisitorModal
-        isOpen={true}
-        onClose={onClose}
-        onEntryAdmitted={onEntryAdmitted}
-      />
+      <WalkInVisitorModal isOpen={true} onClose={onClose} onEntryAdmitted={onEntryAdmitted} />,
     );
 
     const submitBtn = screen.getByRole("button", { name: /Send Approval Prompt/i });
     fireEvent.click(submitBtn);
 
-    expect(
-      await screen.findByText("Visitor full name is required.")
-    ).toBeInTheDocument();
+    expect(await screen.findByText("Visitor full name is required.")).toBeInTheDocument();
   });
 });

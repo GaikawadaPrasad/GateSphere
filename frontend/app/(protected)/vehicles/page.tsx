@@ -90,7 +90,9 @@ export default function VehiclesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Vehicle Registry</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Manage registered resident and staff vehicles</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Manage registered resident and staff vehicles
+          </p>
         </div>
         <button
           onClick={() => setShowModal(true)}
@@ -111,16 +113,23 @@ export default function VehiclesPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {vehicles.map((v) => (
-            <div key={v.id} className="p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-2">
+            <div
+              key={v.id}
+              className="p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-2"
+            >
               <div className="flex items-center justify-between">
                 <span className="font-mono font-bold text-lg px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded text-slate-900 dark:text-white">
                   {v.plate_number}
                 </span>
-                <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${v.is_active ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-600"}`}>
+                <span
+                  className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${v.is_active ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-600"}`}
+                >
                   {v.is_active ? "Active" : "Inactive"}
                 </span>
               </div>
-              <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{v.make_model || "Vehicle"}</p>
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                {v.make_model || "Vehicle"}
+              </p>
               <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-700">
                 <span>Type: {v.vehicle_type?.replace("_", " ")}</span>
                 {v.sticker_number && <span>Sticker: #{v.sticker_number}</span>}
@@ -134,7 +143,9 @@ export default function VehiclesPage() {
         <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Register New Vehicle">
           <form onSubmit={handleRegister} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Plate Number *</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Plate Number *
+              </label>
               <input
                 type="text"
                 required
@@ -143,12 +154,12 @@ export default function VehiclesPage() {
                 placeholder="e.g. KA01AB1234"
                 className={`w-full mt-1 p-2 border rounded-md uppercase font-mono ${plateError ? "border-red-500" : ""}`}
               />
-              {plateError && (
-                <span className="text-xs text-red-600 mt-1 block">{plateError}</span>
-              )}
+              {plateError && <span className="text-xs text-red-600 mt-1 block">{plateError}</span>}
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Make & Model</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Make & Model
+              </label>
               <input
                 type="text"
                 value={makeModel}
@@ -158,7 +169,9 @@ export default function VehiclesPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Vehicle Type</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Vehicle Type
+              </label>
               <select
                 value={vehicleType}
                 onChange={(e) => setVehicleType(e.target.value)}
@@ -175,7 +188,9 @@ export default function VehiclesPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Sticker / Pass Number</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Sticker / Pass Number
+              </label>
               <input
                 type="text"
                 value={stickerNumber}

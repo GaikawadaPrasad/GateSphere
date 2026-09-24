@@ -20,7 +20,13 @@ from app.core.tenancy import TenantScope
 from app.modules.audit.service import record_audit_async
 from app.modules.communities.models import Gate, Unit
 from app.modules.deliveries import schemas
-from app.modules.deliveries.models import Delivery, DeliveryEvent, DeliveryProtocol
+from app.modules.deliveries.models import (
+    CANONICAL_PROTOCOLS,
+    GATE_DESK_PROTOCOLS,
+    Delivery,
+    DeliveryEvent,
+    DeliveryProtocol,
+)
 from app.modules.deliveries.repository import (
     DeliveryRepository,
     ProtocolRepository,
@@ -36,9 +42,20 @@ _DEFAULT_PROTOCOL = {
     "protocol_type": "resident_approval_required",
     "requires_otp": False,
     "allow_direct_entry": False,
-    "leave_at_gate": True,
+    # Consistent with `upsert_protocol`'s flag sync for resident_approval_required.
+    "leave_at_gate": False,
     "is_active": True,
 }
+
+
+def _is_gate_desk(protocol: DeliveryProtocol | None) -> bool:
+    if protocol is None:
+        return False
+    if protocol.protocol_type in GATE_DESK_PROTOCOLS:
+        return True
+    if protocol.protocol_type in CANONICAL_PROTOCOLS:
+        return False
+    return bool(protocol.leave_at_gate)  # legacy protocol types only
 
 
 def _enum(field: str, value: str | None) -> None:
@@ -173,7 +190,11 @@ class DeliveryService(UnitScopedAccess):
         elif payload.protocol_type == "direct_rejection":
             payload.allow_direct_entry = False
             payload.leave_at_gate = False
-        elif payload.allow_direct_entry and payload.protocol_type in (None, "collect_at_gate", "resident_approval_required"):
+        elif payload.allow_direct_entry and payload.protocol_type in (
+            None,
+            "collect_at_gate",
+            "resident_approval_required",
+        ):
             payload.protocol_type = "allow_at_gate"
 
         if await self.is_unit_restricted():
@@ -256,6 +277,9 @@ class DeliveryService(UnitScopedAccess):
         await self.deliveries.add(obj)
         await self.db.flush()
         obj.unit = unit
+        # Load the (view-only) protocol relationship now: a lazy load at serialisation time
+        # is not possible on the async session.
+        await self.db.refresh(obj, attribute_names=["protocol"])
         await self._event(obj, "logged")
         await self._audit(
             "delivery.create",
@@ -284,9 +308,7 @@ class DeliveryService(UnitScopedAccess):
         from sqlalchemy.orm import selectinload
 
         stmt = (
-            select(Delivery)
-            .where(Delivery.id == delivery_id)
-            .options(selectinload(Delivery.unit))
+            select(Delivery).where(Delivery.id == delivery_id).options(selectinload(Delivery.unit))
         )
         if not self.scope.is_global:
             stmt = stmt.where(Delivery.community_id.in_(self.scope.community_ids))
@@ -415,21 +437,22 @@ class DeliveryService(UnitScopedAccess):
                 f"Delivery is '{obj.status}', cannot complete", code="INVALID_TRANSITION"
             )
         protocol = await self.db.get(DeliveryProtocol, obj.protocol_id) if obj.protocol_id else None
-        is_gate_desk = (
-            protocol is not None
-            and (protocol.protocol_type in ("leave_at_gate_desk", "leave_at_gate") or protocol.leave_at_gate)
-        )
-        obj.status = "collected" if is_gate_desk else "delivered"
+        obj.status = "collected" if _is_gate_desk(protocol) else "delivered"
         await self._event(obj, "delivered")
         await self.db.flush()
         await self._audit("delivery.delivered", obj.community_id, "delivery", obj.id)
         return obj
 
-    async def mark_collected(
-        self, delivery_id: uuid.UUID, remarks: str | None = None
-    ) -> Delivery:
+    async def mark_collected(self, delivery_id: uuid.UUID, remarks: str | None = None) -> Delivery:
         obj = await self.get_delivery(delivery_id)
-        if obj.status not in ("at_gate", "in_transit"):
+        protocol = await self.db.get(DeliveryProtocol, obj.protocol_id) if obj.protocol_id else None
+        if not _is_gate_desk(protocol):
+            raise BusinessRuleError(
+                "Only a gate-desk delivery can be collected from the gate desk",
+                code="NOT_GATE_DESK_DELIVERY",
+            )
+        # A gate-desk parcel is handed over at the desk, so it must be sitting there.
+        if obj.status != "at_gate":
             raise BusinessRuleError(
                 f"Delivery is '{obj.status}', cannot mark as collected", code="INVALID_TRANSITION"
             )
@@ -515,4 +538,3 @@ class DeliveryService(UnitScopedAccess):
     async def list_events(self, delivery_id: uuid.UUID) -> list[DeliveryEvent]:
         await self.get_delivery(delivery_id)  # scope check
         return await delivery_events(self.db, delivery_id)
-

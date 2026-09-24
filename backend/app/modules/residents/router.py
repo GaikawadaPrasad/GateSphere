@@ -12,7 +12,6 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, Response, status
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -79,7 +78,6 @@ async def require_household_write(
 
 HOUSEHOLD_VIEW = Depends(require_household_view)
 HOUSEHOLD_WRITE = Depends(require_household_write)
-
 
 
 @router.get("/health", summary="Residents module liveness")
@@ -435,4 +433,3 @@ async def create_contact(
         schemas.EmergencyContactRead.model_validate(await svc.create_contact(profile_id, payload)),
         message="Contact added",
     )
-

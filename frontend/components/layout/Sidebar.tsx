@@ -31,13 +31,33 @@ const SUPER_ADMIN_NAV_ITEMS: NavItem[] = [
 const COMMUNITY_ADMIN_NAV_ITEMS: NavItem[] = [
   { id: "dashboard", label: "Dashboard", href: "/community-admin/dashboard", icon: "🏢" },
   { id: "property", label: "Property & Structure", href: "/community-admin/property", icon: "🏗️" },
-  { id: "residents", label: "Residents & Occupancy", href: "/community-admin/residents", icon: "👥" },
+  {
+    id: "residents",
+    label: "Residents & Occupancy",
+    href: "/community-admin/residents",
+    icon: "👥",
+  },
   { id: "staff", label: "Operational Staff", href: "/community-admin/staff", icon: "👔" },
-  { id: "security-staff", label: "Security & Operations", href: "/community-admin/security-staff", icon: "🛡️" },
+  {
+    id: "security-staff",
+    label: "Security & Operations",
+    href: "/community-admin/security-staff",
+    icon: "🛡️",
+  },
   { id: "billing", label: "Billing & Finance", href: "/community-admin/billing", icon: "💳" },
-  { id: "communication", label: "Communications", href: "/community-admin/communication", icon: "📢" },
+  {
+    id: "communication",
+    label: "Communications",
+    href: "/community-admin/communication",
+    icon: "📢",
+  },
   { id: "incidents", label: "Incidents & Safety", href: "/community-admin/incidents", icon: "🚨" },
-  { id: "notifications", label: "Notifications", href: "/community-admin/notifications", icon: "🔔" },
+  {
+    id: "notifications",
+    label: "Notifications",
+    href: "/community-admin/notifications",
+    icon: "🔔",
+  },
 ];
 
 export function Sidebar() {
@@ -118,21 +138,61 @@ export function Sidebar() {
       accentColor: "#EA580C",
       items: [
         { id: "dashboard", label: "Dashboard", href: "/security-supervisor/dashboard", icon: "📊" },
-        { id: "gate-operations", label: "Gate Operations", href: "/security-supervisor/gate-operations", icon: "🛡️" },
-        { id: "guard-management", label: "Guard Management", href: "/security-supervisor/guard-management", icon: "👮" },
-        { id: "visitor-management", label: "Visitor Management", href: "/security-supervisor/visitor-management", icon: "👥" },
-        { id: "delivery-management", label: "Delivery Management", href: "/security-supervisor/delivery-management", icon: "📦" },
-        { id: "domestic-staff", label: "Domestic Staff", href: "/security-supervisor/domestic-staff", icon: "👔" },
+        {
+          id: "gate-operations",
+          label: "Gate Operations",
+          href: "/security-supervisor/gate-operations",
+          icon: "🛡️",
+        },
+        {
+          id: "guard-management",
+          label: "Guard Management",
+          href: "/security-supervisor/guard-management",
+          icon: "👮",
+        },
+        {
+          id: "visitor-management",
+          label: "Visitor Management",
+          href: "/security-supervisor/visitor-management",
+          icon: "👥",
+        },
+        {
+          id: "delivery-management",
+          label: "Delivery Management",
+          href: "/security-supervisor/delivery-management",
+          icon: "📦",
+        },
+        {
+          id: "domestic-staff",
+          label: "Domestic Staff",
+          href: "/security-supervisor/domestic-staff",
+          icon: "👔",
+        },
         { id: "blacklist", label: "Blacklist", href: "/security-supervisor/blacklist", icon: "🚫" },
         { id: "incidents", label: "Incidents", href: "/security-supervisor/incidents", icon: "⚠️" },
-        { id: "emergency-alerts", label: "Emergency Alerts", href: "/security-supervisor/emergency-alerts", icon: "🚨" },
-        { id: "checkpoints", label: "Checkpoints", href: "/security-supervisor/checkpoints", icon: "📍" },
+        {
+          id: "emergency-alerts",
+          label: "Emergency Alerts",
+          href: "/security-supervisor/emergency-alerts",
+          icon: "🚨",
+        },
+        {
+          id: "checkpoints",
+          label: "Checkpoints",
+          href: "/security-supervisor/checkpoints",
+          icon: "📍",
+        },
         { id: "reports", label: "Reports", href: "/security-supervisor/reports", icon: "📈" },
-        { id: "audit-logs", label: "Audit Logs", href: "/security-supervisor/audit-logs", icon: "📋" },
+        {
+          id: "audit-logs",
+          label: "Audit Logs",
+          href: "/security-supervisor/audit-logs",
+          icon: "📋",
+        },
       ],
     };
   } else if (
-    pathname.startsWith("/facility-manager") || 
+    pathname.startsWith("/facility-manager") ||
     pathname.startsWith("/dashboard/facility-manager")
   ) {
     navConfig = {
@@ -299,9 +359,9 @@ export function Sidebar() {
               const isSubActive =
                 item.href !== navConfig.items[0]?.href && pathname.startsWith(item.href);
               const isActive = isExactActive || isSubActive;
-              const isNotifItem = item.id === "notifications" || item.href.includes("notifications");
-              const effectiveBadge =
-                isNotifItem && unreadCount > 0 ? unreadCount : item.badge;
+              const isNotifItem =
+                item.id === "notifications" || item.href.includes("notifications");
+              const effectiveBadge = isNotifItem && unreadCount > 0 ? unreadCount : item.badge;
 
               return (
                 <Link
@@ -367,7 +427,9 @@ export function Sidebar() {
                               : item.accentColor
                                 ? `${item.accentColor}30`
                                 : `${navConfig.accentColor}30`,
-                            color: isNotifItem ? "#FFFFFF" : item.accentColor || navConfig.accentColor,
+                            color: isNotifItem
+                              ? "#FFFFFF"
+                              : item.accentColor || navConfig.accentColor,
                             boxShadow: isNotifItem ? "0 2px 6px rgba(239, 68, 68, 0.4)" : "none",
                           }}
                         >

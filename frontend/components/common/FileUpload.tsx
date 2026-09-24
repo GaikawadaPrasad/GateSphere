@@ -63,7 +63,7 @@ async function compressImageIfPossible(file: File, maxDim = 1600, quality = 0.82
           resolve(compressedFile);
         },
         "image/jpeg",
-        quality
+        quality,
       );
     };
     img.onerror = () => {
@@ -124,12 +124,12 @@ export const FileUpload: React.FC<FileUploadProps> = ({
         const directRes: any = await uploadsApi.directUpload(formData);
         const directPayload = directRes?.data || directRes || {};
         resolvedUrl =
-          directPayload.file_url ||
-          directPayload.url ||
-          directPayload.public_url ||
-          null;
+          directPayload.file_url || directPayload.url || directPayload.public_url || null;
       } catch (directErr: any) {
-        console.warn("Direct upload fallback to presigned pipeline:", directErr?.message || directErr);
+        console.warn(
+          "Direct upload fallback to presigned pipeline:",
+          directErr?.message || directErr,
+        );
         // Step 3: Fallback to Presigned S3 pipeline if direct upload is unavailable
         const presignRes = await uploadsApi.presign({
           kind,
@@ -162,18 +162,25 @@ export const FileUpload: React.FC<FileUploadProps> = ({
           });
           if (!uploadRes.ok) {
             const errText = await uploadRes.text().catch(() => "");
-            throw new Error(`Storage upload failed (${uploadRes.status}): ${errText || "Check storage settings"}`);
+            throw new Error(
+              `Storage upload failed (${uploadRes.status}): ${errText || "Check storage settings"}`,
+            );
           }
         }
 
         const confirmRes = await uploadsApi.confirm(file_id);
         const confirmData: any = confirmRes;
         const confirmPayload = confirmData?.data || confirmData || {};
-        resolvedUrl = confirmPayload.file_url || confirmPayload.url || file_url || public_url || null;
+        resolvedUrl =
+          confirmPayload.file_url || confirmPayload.url || file_url || public_url || null;
       }
 
       if (resolvedUrl) {
-        const cleanUrl = resolvedUrl.trim().replace(/^["']+|["']+$/g, "").replace(/[\r\n]/g, "").trim();
+        const cleanUrl = resolvedUrl
+          .trim()
+          .replace(/^["']+|["']+$/g, "")
+          .replace(/[\r\n]/g, "")
+          .trim();
         setPreviewUrl(cleanUrl);
         onUploadComplete(cleanUrl);
       } else {
@@ -204,7 +211,11 @@ export const FileUpload: React.FC<FileUploadProps> = ({
 
   return (
     <div className="file-upload-container flex flex-col gap-2">
-      {label && <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">{label}</label>}
+      {label && (
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+          {label}
+        </label>
+      )}
 
       {/* Hidden inputs for File and Live Camera */}
       <input
@@ -290,9 +301,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
             </a>
           )}
           <div className="flex flex-col">
-            <span className="text-xs text-emerald-600 font-semibold">
-              ✓ Uploaded successfully
-            </span>
+            <span className="text-xs text-emerald-600 font-semibold">✓ Uploaded successfully</span>
             {isImage && (
               <span
                 onClick={() => setLightboxOpen(true)}
