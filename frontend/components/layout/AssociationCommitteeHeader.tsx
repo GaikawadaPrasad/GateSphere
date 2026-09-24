@@ -313,6 +313,7 @@ export function AssociationCommitteeHeader() {
           {/* Notification Popover Menu */}
           {isOpen && (
             <div
+              className="notif-popover"
               style={{
                 position: "absolute",
                 top: "calc(100% + 8px)",
