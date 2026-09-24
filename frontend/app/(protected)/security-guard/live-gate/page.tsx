@@ -372,6 +372,7 @@ export default function SecurityGuardLiveGatePage() {
         let unitLabel = hintUnitLabel || "Resident Unit";
         let category = extractedCategory || "Guest";
         let reason = extractedReason || "Visitor Entry";
+        let vehicleNumber = (entry?.vehicle_number as string | null) || null;
 
         try {
           if (entry?.request_id) {
@@ -379,13 +380,20 @@ export default function SecurityGuardLiveGatePage() {
             if (request) {
               if (request.purpose) reason = String(request.purpose);
               if (request.visitor_type) category = String(request.visitor_type).replace(/_/g, " ");
+              if (request.vehicle_number) vehicleNumber = String(request.vehicle_number);
+              else if (request.visitor?.vehicle_number) vehicleNumber = String(request.visitor.vehicle_number);
               unitLabel =
                 (request.group_label as string) ||
                 (request.unit_id ? `Unit ${String(request.unit_id).slice(0, 6)}` : unitLabel);
               if (request.visitor_id) {
                 const directory = await visitorsApi.directory({ q: undefined });
                 const match = (directory || []).find((v: any) => v.id === request.visitor_id);
-                if (match) visitorName = (match as any).full_name || visitorName;
+                if (match) {
+                  visitorName = (match as any).full_name || visitorName;
+                  if (!vehicleNumber && (match as any).vehicle_number) {
+                    vehicleNumber = String((match as any).vehicle_number);
+                  }
+                }
               }
             }
           }
@@ -399,7 +407,7 @@ export default function SecurityGuardLiveGatePage() {
           category,
           reason,
           unitLabel,
-          vehicleNumber: (entry?.vehicle_number as string | null) || null,
+          vehicleNumber: vehicleNumber || null,
           status: String(entry?.status || "admitted"),
           enteredAt: String(entry?.entry_at || new Date().toISOString()),
         });

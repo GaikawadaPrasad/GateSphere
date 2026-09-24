@@ -284,9 +284,10 @@ export function OwnerTenantDashboardView({
   const payments = useResidentPayments();
   const family = useResidentFamilyMembers();
   const profile = useResidentProfile();
+  const myOccupancy = profile.data?.occupancies?.[0];
   const deliveryProtocols = useResidentDeliveryProtocols();
   const vehicles = useResidentVehicles();
-  const domesticStaff = useResidentDomesticStaff();
+  const domesticStaff = useResidentDomesticStaff(myOccupancy?.unit_id);
   const announcements = useAnnouncements();
   const myNotifications = useMyNotifications({ page_size: 20 });
   const queryClient = useQueryClient();
@@ -302,7 +303,6 @@ export function OwnerTenantDashboardView({
   const deliveryList = deliveries.data || [];
   const complaintList = complaints.data || [];
   const invoiceList = payments.data || [];
-  const myOccupancy = profile.data?.occupancies?.[0];
 
   const { data: myAlerts = [], refetch: refetchAlerts } = useQuery({
     queryKey: ["resident", "alerts"],

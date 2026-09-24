@@ -797,56 +797,6 @@ class ResidentService(UnitScopedAccess):
         if profile is not None:
             return profile
 
-        # Auto-heal / link: If the user has a community in scope, find the profile in that community
-        # and attach it to this user so that future queries match directly.
-        if not self.scope.is_global and self.scope.community_ids:
-            cid = next(iter(self.scope.community_ids))
-            existing = await self.db.scalar(
-                select(ResidentProfile)
-                .where(ResidentProfile.community_id == cid, ResidentProfile.user_id.is_(None))
-                .order_by(ResidentProfile.created_at)
-            )
-            if existing is not None:
-                existing.user_id = self.actor.id
-                await self.db.flush()
-                return existing
-
-            # If no profile exists in this community at all, provision one
-            from app.modules.communities.models import Unit
-
-            new_profile = ResidentProfile(
-                community_id=cid,
-                user_id=self.actor.id,
-                profile_status="active",
-                kyc_status="verified",
-            )
-            self.db.add(new_profile)
-            await self.db.flush()
-
-            unit = await self.db.scalar(
-                select(Unit).where(Unit.community_id == cid).order_by(Unit.unit_number)
-            )
-            if unit is not None:
-                occ = UnitOccupancy(
-                    community_id=cid,
-                    unit_id=unit.id,
-                    resident_profile_id=new_profile.id,
-                    occupancy_role="primary_owner",
-                    is_primary=True,
-                    is_active=True,
-                )
-                self.db.add(occ)
-                await self.db.flush()
-            return new_profile
-
-        fallback = await self.db.scalar(
-            select(ResidentProfile).order_by(ResidentProfile.created_at)
-        )
-        if fallback is not None:
-            fallback.user_id = self.actor.id
-            await self.db.flush()
-            return fallback
-
         raise NotFoundError("Resident profile not found")
 
     async def get_my_profile(self) -> schemas.ResidentMeRead:

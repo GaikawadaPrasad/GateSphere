@@ -190,3 +190,121 @@ def test_community_admin_deletes_staff(as_role):
 
     # Confirm it's gone -> 404
     assert admin.get(f"{P}/{staff_id}").status_code == 404
+
+
+def test_cross_resident_staff_assignment_isolation(as_role, seed_ids, resident_unit_id):
+    """GS-BUG-029: Staff assigned to Resident A must never leak to Resident B."""
+    admin = as_role("community_admin")
+    cid = seed_ids["community_id"]
+    staff = admin.post(
+        P,
+        json={"full_name": "Cook Yeswanth", "staff_type": "cook", "phone": _phone()},
+    ).json()["data"]
+
+    resident_a = as_role("resident")
+    # Resident A hires/assigns cook to unit A
+    assign_res = resident_a.post(
+        f"{P}/assignments",
+        json={
+            "staff_id": staff["id"],
+            "unit_id": resident_unit_id,
+            "work_type": "full_time",
+        },
+    )
+    assert assign_res.status_code == 201, assign_res.text
+    assignment_id = assign_res.json()["data"]["id"]
+
+    # Verify Resident A sees assignment
+    r_a_list = resident_a.get(f"{P}/assignments")
+    assert r_a_list.status_code == 200
+    assert any(a["id"] == assignment_id for a in r_a_list.json()["data"])
+
+    # Create Resident B in a distinct unit in the same community
+    from app.core.security import hash_password
+    from app.modules.users.models import User, Role, UserRole
+    from app.modules.residents.models import ResidentProfile, UnitOccupancy
+
+    with SessionLocal() as db:
+        from app.modules.communities.models import Floor, Tower
+
+        u1 = db.scalar(select(Unit).where(Unit.id == uuid.UUID(resident_unit_id)))
+        u2 = Unit(
+            community_id=cid,
+            tower_id=u1.tower_id if u1 else None,
+            floor_id=u1.floor_id if u1 else None,
+            unit_number=f"U-ISOL-{uuid.uuid4().hex[:4]}",
+        )
+        db.add(u2)
+        db.flush()
+        u2_id = str(u2.id)
+
+        user_b = User(
+            email=f"mubeena-{uuid.uuid4().hex[:6]}@example.com",
+            full_name="Mubeena Test",
+            password_hash=hash_password("Pass123!"),
+            is_active=True,
+        )
+        db.add(user_b)
+        db.flush()
+
+        role = db.scalar(select(Role).where(Role.slug == "resident"))
+        db.add(UserRole(user_id=user_b.id, role_id=role.id, community_id=uuid.UUID(cid)))
+
+        prof_b = ResidentProfile(
+            community_id=uuid.UUID(cid),
+            user_id=user_b.id,
+            profile_status="active",
+            kyc_status="verified",
+        )
+        db.add(prof_b)
+        db.flush()
+
+        db.add(
+            UnitOccupancy(
+                community_id=uuid.UUID(cid),
+                unit_id=uuid.UUID(u2_id),
+                resident_profile_id=prof_b.id,
+                occupancy_role="primary_owner",
+                is_primary=True,
+                is_active=True,
+            )
+        )
+        prof_b_id = prof_b.id
+        user_b_id = user_b.id
+        user_b_email = user_b.email
+        db.commit()
+
+    try:
+        from starlette.testclient import TestClient
+        from app.main import app
+        client_b = TestClient(app)
+        login_res = client_b.post(
+            "/api/v1/auth/login",
+            json={"email": user_b_email, "password": "Pass123!"},
+        )
+        assert login_res.status_code == 200, login_res.text
+
+        # 1. Resident B listing assignments must NOT leak Resident A's cook
+        r_b_list = client_b.get(f"{P}/assignments")
+        assert r_b_list.status_code == 200
+        assert not any(a["id"] == assignment_id for a in r_b_list.json()["data"])
+
+        # 2. Resident B querying Resident A's unit explicitly must return 404 (NotFoundError)
+        r_b_cross = client_b.get(f"{P}/assignments?unit_id={resident_unit_id}")
+        assert r_b_cross.status_code == 404
+    finally:
+        with SessionLocal() as db:
+            occs = db.scalars(select(UnitOccupancy).where(UnitOccupancy.unit_id == uuid.UUID(u2_id))).all()
+            for o in occs:
+                db.delete(o)
+            p = db.get(ResidentProfile, prof_b_id)
+            if p:
+                db.delete(p)
+            u = db.get(User, user_b_id)
+            if u:
+                db.delete(u)
+            unit_obj = db.get(Unit, uuid.UUID(u2_id))
+            if unit_obj:
+                db.delete(unit_obj)
+            db.commit()
+

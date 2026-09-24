@@ -156,7 +156,7 @@ export function useResidentVisitors() {
         visitor_name: r.visitor?.full_name || r.visitor_name || r.full_name || "Visitor",
         phone: r.visitor?.phone || r.phone || r.visitor_phone || "",
         purpose: r.purpose || "Guest visit",
-        vehicle_number: r.vehicle_number,
+        vehicle_number: r.vehicle_number || r.visitor?.vehicle_number || undefined,
         photo_url: r.photo_url || r.visitor?.photo_url || r.entries?.[0]?.entry_photo_url || null,
         visitor_type: r.visitor_type || "guest",
         status: r.status,
@@ -1141,15 +1141,18 @@ export interface AssignedDomesticStaff {
   last_check_in?: string;
 }
 
-export function useResidentDomesticStaff() {
+export function useResidentDomesticStaff(unitId?: string) {
   return useQuery<AssignedDomesticStaff[]>({
-    queryKey: ["resident", "domestic-staff"],
+    queryKey: ["resident", "domestic-staff", unitId],
     queryFn: async () => {
-      const me = await api.get<any>("/residents/me");
-      const unitId = me?.occupancies?.[0]?.unit_id;
-      if (!unitId) return [];
+      let targetUnitId = unitId;
+      if (!targetUnitId) {
+        const me = await api.get<any>("/residents/me").catch(() => null);
+        targetUnitId = me?.occupancies?.[0]?.unit_id;
+      }
+      if (!targetUnitId) return [];
       const [assignments, openAttendance] = await Promise.all([
-        api.get<any[]>("/domestic-staff/assignments", { unit_id: unitId, page_size: 100 }),
+        api.get<any[]>("/domestic-staff/assignments", { unit_id: targetUnitId, page_size: 100 }),
         api.get<any[]>("/domestic-staff/attendance?open_only=true&page_size=100").catch(() => []),
       ]);
       if (!Array.isArray(assignments) || assignments.length === 0) return [];

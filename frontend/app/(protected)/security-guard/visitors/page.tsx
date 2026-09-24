@@ -128,7 +128,12 @@ export default function SecurityGuardVisitorsPage() {
             status: r.status,
             entryId: openEntry?.id,
             unitNumber: unit,
-            vehicleNumber: r.vehicle_number || r.visitor?.vehicle_number || "—",
+            vehicleNumber:
+              r.vehicle_number ||
+              r.visitor?.vehicle_number ||
+              directoryVisitor?.vehicle_number ||
+              openEntry?.vehicle_number ||
+              "—",
             purpose: r.purpose || "—",
             expectedAt: r.expected_at ? formatDateTime(r.expected_at) : "—",
             validUntil: r.valid_until ? formatDateTime(r.valid_until) : "—",

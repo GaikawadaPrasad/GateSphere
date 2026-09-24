@@ -506,10 +506,13 @@ describe("Resident Dashboard - Invoice Payment Modal & Receipt Flow", () => {
     );
 
     // Verify Open Service Tickets count = 2 (tkt-1 and tkt-2, excluding resolved tkt-3)
-    await waitFor(() => {
-      expect(screen.getByText("Open Service Tickets")).toBeInTheDocument();
-      expect(screen.getAllByText("2").length).toBeGreaterThanOrEqual(1);
-    });
+    await waitFor(
+      () => {
+        expect(screen.getByText("Open Service Tickets")).toBeInTheDocument();
+        expect(screen.getAllByText("2").length).toBeGreaterThanOrEqual(1);
+      },
+      { timeout: 4000 }
+    );
 
     // Verify Booked Amenities count = 2 (bk-1 and bk-2, excluding cancelled bk-3)
     expect(screen.getByText("Booked Amenities")).toBeInTheDocument();

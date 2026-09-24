@@ -344,6 +344,7 @@ class DomesticStaffService(UnitScopedAccess):
         if staff_id:
             stmt = stmt.where(StaffUnitAssignment.staff_id == staff_id)
         if unit_id:
+            await self._assert_unit_visible(unit_id)
             stmt = stmt.where(StaffUnitAssignment.unit_id == unit_id)
         if active_only:
             stmt = stmt.where(StaffUnitAssignment.is_active.is_(True))
