@@ -326,7 +326,7 @@ export default function CommunityAdminDashboardPage() {
           <span>🏗️</span> Property & Towers
         </Link>
         <Link
-          href="/community-admin/staff"
+          href="/community-admin/staff?tab=security"
           className="btn btn-secondary btn-sm"
           style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
         >
@@ -338,6 +338,13 @@ export default function CommunityAdminDashboardPage() {
           style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
         >
           <span>🛡️</span> Security & Guards
+        </Link>
+        <Link
+          href="/community-admin/staff?tab=security"
+          className="btn btn-secondary btn-sm"
+          style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
+        >
+          <span>🛠️</span> Vendors &amp; Visits
         </Link>
         <Link
           href="/community-admin/billing"

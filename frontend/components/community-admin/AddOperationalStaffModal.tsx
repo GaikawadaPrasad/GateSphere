@@ -48,7 +48,9 @@ export function AddOperationalStaffModal({
               ? "Supervisor"
               : slug === "auditor"
                 ? "Auditor"
-                : "Guard";
+                : slug === "vendor_technician"
+                  ? "Vendor"
+                  : "Guard";
       setPassword(`${prefix}@Gate2026!`);
     }
   };
