@@ -126,7 +126,9 @@ export function EditUserModal({
     if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       errors.email = "Please enter a valid email address.";
     }
-    if (phone.trim() && !/^[+0-9][0-9 \-]{4,19}$/.test(phone.trim())) {
+    if (!phone.trim()) {
+      errors.phone = "Phone number is required.";
+    } else if (!/^[+0-9][0-9 \-]{4,19}$/.test(phone.trim())) {
       errors.phone = "Phone must be 5-20 digits (e.g. +91 9876543210).";
     }
     setFieldErrors(errors);
@@ -458,6 +460,7 @@ export function EditUserModal({
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="+91 98765 43210"
+                required
                 style={{
                   width: "100%",
                   padding: "0.5rem 0.75rem",

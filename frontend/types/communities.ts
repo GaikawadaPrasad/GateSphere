@@ -62,6 +62,7 @@ export interface Unit {
   community_id?: string;
   floor_id: string;
   tower_id?: string;
+  tower_name?: string;
   unit_number: string;
   unit_type?: string;
   bedrooms?: number;

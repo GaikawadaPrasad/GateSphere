@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import uuid
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.context import RequestContext
@@ -389,7 +390,17 @@ class CommunityService:
         self, *, floor_id: uuid.UUID, offset: int, limit: int
     ) -> tuple[list[Unit], int]:
         floor = await self.get_floor(floor_id)
-        return await self.units.list_for_floor(floor.id, offset=offset, limit=limit)
+        rows, total = await self.units.list_for_floor(floor.id, offset=offset, limit=limit)
+        if rows:
+            tower_ids = {u.tower_id for u in rows if u.tower_id}
+            if tower_ids:
+                stmt = select(Tower).where(Tower.id.in_(tower_ids))
+                res = await self.db.execute(stmt)
+                towers_map = {t.id: t.name for t in res.scalars().all()}
+                for u in rows:
+                    if u.tower_id in towers_map:
+                        u.tower_name = towers_map[u.tower_id]
+        return rows, total
 
     async def list_community_units(
         self,
@@ -405,7 +416,7 @@ class CommunityService:
         cid = self.scope.require(community_id)
         if unit_type is not None:
             _check_enum("unit_type", unit_type)
-        return await self.units.list_for_community(
+        rows, total = await self.units.list_for_community(
             cid,
             offset=offset,
             limit=limit,
@@ -414,6 +425,16 @@ class CommunityService:
             unit_type=unit_type,
             active=active,
         )
+        if rows:
+            tower_ids = {u.tower_id for u in rows if u.tower_id}
+            if tower_ids:
+                stmt = select(Tower).where(Tower.id.in_(tower_ids))
+                res = await self.db.execute(stmt)
+                towers_map = {t.id: t.name for t in res.scalars().all()}
+                for u in rows:
+                    if u.tower_id in towers_map:
+                        u.tower_name = towers_map[u.tower_id]
+        return rows, total
 
     async def get_unit(self, unit_id: uuid.UUID) -> Unit:
         obj = await self.units.get(unit_id)
