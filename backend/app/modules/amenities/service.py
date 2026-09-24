@@ -514,6 +514,44 @@ class AmenityService(UnitScopedAccess):
                 reference_type="amenity_booking",
                 reference_id=obj.id,
             )
+
+        # Notify Facility Manager and Community Admin
+        resident_name = self.actor.full_name or "A resident"
+        unit_num, tower_name = await self.bookings.get_unit_and_tower(unit_id)
+        if tower_name and unit_num:
+            tower_prefix = (
+                tower_name if tower_name.lower().startswith("tower") else f"Tower {tower_name}"
+            )
+            unit_text = f"{tower_prefix}, Unit {unit_num}"
+        elif unit_num:
+            unit_text = f"Unit {unit_num}"
+        elif tower_name:
+            unit_text = (
+                tower_name if tower_name.lower().startswith("tower") else f"Tower {tower_name}"
+            )
+        else:
+            unit_text = "Unit N/A"
+
+        time_range = f"{slot.start_time.strftime('%I:%M %p')} – {slot.end_time.strftime('%I:%M %p')}"
+        duration_minutes = int((end_at - start_at).total_seconds() // 60)
+        hours = duration_minutes // 60
+        mins = duration_minutes % 60
+        duration_span = f"{hours}h {mins}m" if mins else f"{hours}h"
+        duration_text = f"{time_range} ({duration_span}) on {payload.booking_date.strftime('%d %b %Y')}"
+
+        await notif_events.emit_to_roles(
+            self.db,
+            self.scope,
+            self.actor,
+            self.ctx,
+            community_id=amenity.community_id,
+            role_slugs=["facility_manager", "community_admin"],
+            notification_type="amenity.booking_created",
+            title=f"New Amenity Booking — {amenity.name}",
+            message=f"{resident_name} from {unit_text} has booked {amenity.name} for {duration_text}.",
+            reference_type="amenity_booking",
+            reference_id=obj.id,
+        )
         return obj
 
     async def cancel_booking(self, booking_id: uuid.UUID, payload: schemas.BookingCancel):
