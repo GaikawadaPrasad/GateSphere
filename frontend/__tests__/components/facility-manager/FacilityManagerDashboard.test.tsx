@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import React from "react";
@@ -91,6 +91,66 @@ describe("Facility Manager Dashboard Components", () => {
       expect(screen.getByText("TICK-2026-010")).toBeInTheDocument();
       expect(screen.queryByText("TICK-2026-001")).not.toBeInTheDocument();
       expect(screen.getByText(/Page 2 of 3/)).toBeInTheDocument();
+    });
+
+    it("renders resident identification details (name, unit number, contact phone) in table", () => {
+      const ticketsWithResident: MockTicket[] = [
+        {
+          id: "tkt-res-01",
+          ticket_number: "TKT-2026-00101",
+          subject: "AC Not Cooling in Master Bedroom",
+          category_name: "HVAC",
+          priority: "high",
+          status: "created",
+          escalation_state: "on_track",
+          created_at: "2026-09-24T10:00:00Z",
+          raised_by_name: "Aarav Patel",
+          unit_number: "101",
+          raised_by_phone: "+91 9876543210",
+          raised_by_email: "aarav@example.com",
+        },
+      ];
+
+      const columnsWithResident: Column<MockTicket>[] = [
+        { key: "ticket_number", header: "Ticket #" },
+        { key: "subject", header: "Subject" },
+        {
+          key: "raised_by_name",
+          header: "Resident / Unit",
+          render: (t) => (
+            <div>
+              <span>👤 {t.raised_by_name || "Resident"}</span>
+              <span>🏢 Unit {t.unit_number}</span>
+            </div>
+          ),
+        },
+        {
+          key: "raised_by_phone",
+          header: "Contact Info",
+          render: (t) => (
+            <div>
+              <a href={`tel:${t.raised_by_phone}`}>📞 {t.raised_by_phone}</a>
+              <a href={`mailto:${t.raised_by_email}`}>✉️ {t.raised_by_email}</a>
+            </div>
+          ),
+        },
+        { key: "priority", header: "Priority" },
+      ];
+
+      render(
+        <DataTable
+          columns={columnsWithResident}
+          data={ticketsWithResident as (MockTicket & Record<string, unknown>)[]}
+          isLoading={false}
+        />,
+      );
+
+      expect(screen.getByText("TKT-2026-00101")).toBeInTheDocument();
+      expect(screen.getByText("AC Not Cooling in Master Bedroom")).toBeInTheDocument();
+      expect(screen.getByText(/Aarav Patel/)).toBeInTheDocument();
+      expect(screen.getByText(/Unit 101/)).toBeInTheDocument();
+      expect(screen.getByText(/\+91 9876543210/)).toBeInTheDocument();
+      expect(screen.getByText(/aarav@example\.com/)).toBeInTheDocument();
     });
 
     it("renders EmptyState when there are no tickets", () => {

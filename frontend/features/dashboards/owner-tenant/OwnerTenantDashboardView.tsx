@@ -273,6 +273,7 @@ export function OwnerTenantDashboardView({
   const [vehMake, setVehMake] = useState("");
   const [vehModel, setVehModel] = useState("");
   const [vehColor, setVehColor] = useState("");
+  const [vehErrors, setVehErrors] = useState<Record<string, string>>({});
   const registerVehicleMutation = useRegisterVehicle();
 
   // Payments view mode ("invoices" vs "ledger")
@@ -319,7 +320,31 @@ export function OwnerTenantDashboardView({
   const markAllNotificationsRead = useMarkAllNotificationsRead();
   const [actionedNotifications, setActionedNotifications] = useState<
     Record<string, "approved" | "rejected">
-  >({});
+  >(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("gs_actioned_notifs");
+        if (saved) return JSON.parse(saved);
+      } catch {
+        // ignore
+      }
+    }
+    return {};
+  });
+
+  const updateActionedNotification = (id: string, action: "approved" | "rejected") => {
+    setActionedNotifications((prev) => {
+      const next = { ...prev, [id]: action };
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("gs_actioned_notifs", JSON.stringify(next));
+        } catch {
+          // ignore
+        }
+      }
+      return next;
+    });
+  };
   const [notifFilter, setNotifFilter] = useState<"all" | "unread">("all");
   const panicMutation = useSendResidentPanic();
   const submitStaffRating = useSubmitStaffRating();
@@ -480,6 +505,17 @@ export function OwnerTenantDashboardView({
       await deliveries.refetch();
       refetchStats?.();
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
+
+      // Synchronize action in notification inbox
+      const notifsList = Array.isArray(myNotifications.data)
+        ? (myNotifications.data as any[])
+        : [];
+      for (const n of notifsList) {
+        if (n.reference_id === deliveryId) {
+          updateActionedNotification(n.id, approved ? "approved" : "rejected");
+        }
+      }
+
       toast.success(
         approved
           ? "Delivery approved! Security guard notified to permit entry."
@@ -607,6 +643,27 @@ export function OwnerTenantDashboardView({
         queryClient.invalidateQueries({ queryKey: ["notifications"] });
       }
       if (pendingVisitor) setDismissedVisitorId(pendingVisitor.id);
+
+      // Synchronize action in notification inbox
+      const notifsList = Array.isArray(myNotifications.data)
+        ? (myNotifications.data as any[])
+        : [];
+      for (const n of notifsList) {
+        if (
+          n.reference_id === requestId ||
+          (pendingVisitor &&
+            n.title &&
+            n.title.toLowerCase().includes(pendingVisitor.visitor_name.toLowerCase())) ||
+          (pendingVisitor &&
+            (n.body || (n as any).message) &&
+            (n.body || (n as any).message)
+              .toLowerCase()
+              .includes(pendingVisitor.visitor_name.toLowerCase()))
+        ) {
+          updateActionedNotification(n.id, approved ? "approved" : "rejected");
+        }
+      }
+
       toast.success(
         approved ? "Visitor entry approved for Main Gate 1." : "Visitor entry request rejected.",
         approved ? "Gate Entry Approved" : "Gate Entry Rejected",
@@ -4670,21 +4727,43 @@ export function OwnerTenantDashboardView({
                     const isLocalRead = Boolean(actionedNotifications[n.id]);
                     const isRead = n.is_read || isLocalRead;
 
-                    // Find status in real-time collections
-                    const matchedVisitor = visitorList.find((v) => v.id === refId);
-                    const matchedDelivery = deliveryList.find((d) => d.id === refId);
+                    // Find status in real-time collections (by refId or by name match in title/body)
+                    const matchedVisitor = visitorList.find(
+                      (v) =>
+                        (refId && (v.id === refId || (v as any).request_id === refId)) ||
+                        (v.visitor_name &&
+                          n.title &&
+                          n.title.toLowerCase().includes(v.visitor_name.toLowerCase())) ||
+                        (v.visitor_name &&
+                          (n.body || (n as any).message) &&
+                          (n.body || (n as any).message)
+                            .toLowerCase()
+                            .includes(v.visitor_name.toLowerCase())),
+                    );
+                    const matchedDelivery = deliveryList.find(
+                      (d) =>
+                        (refId && d.id === refId) ||
+                        (d.tracking_id &&
+                          (n.body || (n as any).message) &&
+                          (n.body || (n as any).message).includes(d.tracking_id)) ||
+                        (d.courier_company &&
+                          n.title &&
+                          n.title.toLowerCase().includes(d.courier_company.toLowerCase())),
+                    );
 
                     const localAction = actionedNotifications[n.id];
                     const isVisitorApproved =
                       matchedVisitor &&
-                      (matchedVisitor.status === "approved" ||
-                        matchedVisitor.status === "checked_in");
+                      matchedVisitor.status !== "pending" &&
+                      matchedVisitor.status !== "rejected";
                     const isVisitorRejected =
                       matchedVisitor && matchedVisitor.status === "rejected";
                     const isDeliveryApproved =
                       matchedDelivery &&
                       (matchedDelivery.approval_status === "approved" ||
-                        matchedDelivery.status === "delivered");
+                        matchedDelivery.approval_status === "allowed" ||
+                        matchedDelivery.status === "delivered" ||
+                        matchedDelivery.status === "collected");
                     const isDeliveryRejected =
                       matchedDelivery &&
                       (matchedDelivery.approval_status === "rejected" ||
@@ -4912,10 +4991,7 @@ export function OwnerTenantDashboardView({
                                   }}
                                   onClick={async (e) => {
                                     e.stopPropagation();
-                                    setActionedNotifications((prev) => ({
-                                      ...prev,
-                                      [n.id]: "approved",
-                                    }));
+                                    updateActionedNotification(n.id, "approved");
                                     try {
                                       if (isDeliveryNotif) {
                                         await handleDecideDelivery(refId, true);
@@ -4948,10 +5024,7 @@ export function OwnerTenantDashboardView({
                                   }}
                                   onClick={async (e) => {
                                     e.stopPropagation();
-                                    setActionedNotifications((prev) => ({
-                                      ...prev,
-                                      [n.id]: "rejected",
-                                    }));
+                                    updateActionedNotification(n.id, "rejected");
                                     try {
                                       if (isDeliveryNotif) {
                                         await handleDecideDelivery(refId, false);
@@ -9423,21 +9496,49 @@ export function OwnerTenantDashboardView({
       {/* Register Vehicle Modal */}
       <Modal
         isOpen={registerVehicleModalOpen}
-        onClose={() => setRegisterVehicleModalOpen(false)}
+        onClose={() => {
+          setRegisterVehicleModalOpen(false);
+          setVehErrors({});
+        }}
         title="🚗 Register Vehicle"
         size="md"
       >
         <form
           onSubmit={async (e) => {
             e.preventDefault();
-            const plate = vehRegNumber.trim().toUpperCase();
-            if (!plate) {
-              toast.error("Please enter a vehicle registration/plate number.");
+            const errors: Record<string, string> = {};
+            const cleanPlate = vehRegNumber.trim().toUpperCase().replace(/[\s\-]/g, "");
+
+            if (!cleanPlate) {
+              errors.registration_number = "License plate / registration number is required.";
+            } else if (cleanPlate.length < 3) {
+              errors.registration_number = "Registration number must be at least 3 characters.";
+            } else if (cleanPlate.length > 20) {
+              errors.registration_number = "Registration number cannot exceed 20 characters.";
+            } else if (!/^[A-Z0-9]+$/.test(cleanPlate)) {
+              errors.registration_number =
+                "License plate must contain only letters and numbers (e.g. KA01AB1234).";
+            }
+
+            if (vehMake.trim().length > 60) {
+              errors.make = "Make/Brand cannot exceed 60 characters.";
+            }
+            if (vehModel.trim().length > 60) {
+              errors.model = "Model cannot exceed 60 characters.";
+            }
+            if (vehColor.trim().length > 30) {
+              errors.color = "Color cannot exceed 30 characters.";
+            }
+
+            if (Object.keys(errors).length > 0) {
+              setVehErrors(errors);
               return;
             }
+            setVehErrors({});
+
             try {
               await registerVehicleMutation.mutateAsync({
-                registration_number: plate,
+                registration_number: cleanPlate,
                 vehicle_type: vehType,
                 make: vehMake.trim() || undefined,
                 model: vehModel.trim() || undefined,
@@ -9445,7 +9546,12 @@ export function OwnerTenantDashboardView({
               });
               await vehicles.refetch();
               setRegisterVehicleModalOpen(false);
-              toast.success(`Vehicle ${plate} registered successfully!`, "Vehicle Registered");
+              setVehRegNumber("");
+              setVehMake("");
+              setVehModel("");
+              setVehColor("");
+              setVehErrors({});
+              toast.success(`Vehicle ${cleanPlate} registered successfully!`, "Vehicle Registered");
             } catch (err: any) {
               toast.error(err?.message || "Failed to register vehicle.");
             }
@@ -9469,9 +9575,35 @@ export function OwnerTenantDashboardView({
               className="input-field"
               placeholder="e.g. KA01AB1234"
               value={vehRegNumber}
-              onChange={(e) => setVehRegNumber(e.target.value)}
+              onChange={(e) => {
+                setVehRegNumber(e.target.value.toUpperCase());
+                if (vehErrors.registration_number) {
+                  setVehErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.registration_number;
+                    return next;
+                  });
+                }
+              }}
+              style={{
+                borderColor: vehErrors.registration_number ? "#EF4444" : undefined,
+                textTransform: "uppercase",
+              }}
               required
             />
+            {vehErrors.registration_number && (
+              <span
+                style={{
+                  color: "#EF4444",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  marginTop: "0.3rem",
+                  display: "block",
+                }}
+              >
+                {vehErrors.registration_number}
+              </span>
+            )}
           </div>
 
           <div>
@@ -9521,8 +9653,32 @@ export function OwnerTenantDashboardView({
                 className="input-field"
                 placeholder="e.g. Honda, Hyundai"
                 value={vehMake}
-                onChange={(e) => setVehMake(e.target.value)}
+                maxLength={60}
+                onChange={(e) => {
+                  setVehMake(e.target.value);
+                  if (vehErrors.make) {
+                    setVehErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.make;
+                      return next;
+                    });
+                  }
+                }}
+                style={{ borderColor: vehErrors.make ? "#EF4444" : undefined }}
               />
+              {vehErrors.make && (
+                <span
+                  style={{
+                    color: "#EF4444",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    marginTop: "0.3rem",
+                    display: "block",
+                  }}
+                >
+                  {vehErrors.make}
+                </span>
+              )}
             </div>
             <div>
               <label
@@ -9541,8 +9697,32 @@ export function OwnerTenantDashboardView({
                 className="input-field"
                 placeholder="e.g. City, Creta"
                 value={vehModel}
-                onChange={(e) => setVehModel(e.target.value)}
+                maxLength={60}
+                onChange={(e) => {
+                  setVehModel(e.target.value);
+                  if (vehErrors.model) {
+                    setVehErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.model;
+                      return next;
+                    });
+                  }
+                }}
+                style={{ borderColor: vehErrors.model ? "#EF4444" : undefined }}
               />
+              {vehErrors.model && (
+                <span
+                  style={{
+                    color: "#EF4444",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    marginTop: "0.3rem",
+                    display: "block",
+                  }}
+                >
+                  {vehErrors.model}
+                </span>
+              )}
             </div>
           </div>
 
@@ -9563,8 +9743,32 @@ export function OwnerTenantDashboardView({
               className="input-field"
               placeholder="e.g. White, Silver, Black"
               value={vehColor}
-              onChange={(e) => setVehColor(e.target.value)}
+              maxLength={30}
+              onChange={(e) => {
+                setVehColor(e.target.value);
+                if (vehErrors.color) {
+                  setVehErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.color;
+                    return next;
+                  });
+                }
+              }}
+              style={{ borderColor: vehErrors.color ? "#EF4444" : undefined }}
             />
+            {vehErrors.color && (
+              <span
+                style={{
+                  color: "#EF4444",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  marginTop: "0.3rem",
+                  display: "block",
+                }}
+              >
+                {vehErrors.color}
+              </span>
+            )}
           </div>
 
           <div
@@ -9578,7 +9782,10 @@ export function OwnerTenantDashboardView({
             <BrandButton
               type="button"
               variant="outline"
-              onClick={() => setRegisterVehicleModalOpen(false)}
+              onClick={() => {
+                setRegisterVehicleModalOpen(false);
+                setVehErrors({});
+              }}
             >
               Cancel
             </BrandButton>

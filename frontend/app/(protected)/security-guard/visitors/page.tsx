@@ -13,6 +13,8 @@ import { FileUpload } from "@/components/common/FileUpload";
 import { formatDateTime } from "@/lib/utils";
 import { communitiesApi, authApi } from "@/lib/api";
 import { toast } from "@/store/toast";
+import { QrScannerModal } from "@/components/common/QrScannerModal";
+import { parseQrPayload, type ParsedQrData } from "@/lib/qr-decoder";
 
 interface VisitorRow {
   id: string;
@@ -36,6 +38,7 @@ interface VisitorRow {
 export default function SecurityGuardVisitorsPage() {
   const [visitors, setVisitors] = useState<VisitorRow[]>([]);
   const [search, setSearch] = useState("");
+  const [viewTab, setViewTab] = useState<"entered" | "expected" | "all">("entered");
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{
@@ -46,8 +49,21 @@ export default function SecurityGuardVisitorsPage() {
   const [selectedVisitor, setSelectedVisitor] = useState<VisitorRow | null>(null);
   const [admitVisitor, setAdmitVisitor] = useState<VisitorRow | null>(null);
   const [admitPhotoUrl, setAdmitPhotoUrl] = useState<string | null>(null);
+  const [admitOtp, setAdmitOtp] = useState("");
   const [isAdmitting, setIsAdmitting] = useState(false);
   const [admitError, setAdmitError] = useState<string | null>(null);
+
+  // Standalone Pass Verification State (QR / Entry OTP)
+  const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
+  const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
+  const [verifyOtp, setVerifyOtp] = useState("");
+  const [verifyToken, setVerifyToken] = useState("");
+  const [verifyPhotoUrl, setVerifyPhotoUrl] = useState<string | null>(null);
+  const [verifyVehicleNumber, setVerifyVehicleNumber] = useState("");
+  const [isVerifyingPass, setIsVerifyingPass] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [scannedPassSummary, setScannedPassSummary] = useState<string | null>(null);
+
   const [previewPhoto, setPreviewPhoto] = useState<{
     url: string;
     title: string;
@@ -158,11 +174,22 @@ export default function SecurityGuardVisitorsPage() {
     setActionMessage(null);
     setAdmitError(null);
     setAdmitPhotoUrl(null);
+    setAdmitOtp("");
     setAdmitVisitor(v);
   };
 
   const handleConfirmAdmit = async () => {
     if (!admitVisitor) return;
+    setAdmitError(null);
+
+    const cleanOtp = admitOtp.trim();
+    if (!cleanOtp) {
+      const msg = "Please enter the 6-digit Entry OTP provided by the resident.";
+      setAdmitError(msg);
+      toast.error(msg);
+      return;
+    }
+
     if (!admitPhotoUrl) {
       const msg =
         "📸 VISITOR PHOTO REQUIRED: Security policy mandates capturing a visitor photograph before gate entry. Please attach photo.";
@@ -170,26 +197,102 @@ export default function SecurityGuardVisitorsPage() {
       toast.error(msg);
       return;
     }
+
     setIsAdmitting(true);
-    setAdmitError(null);
     try {
       await visitorsApi.recordEntry({
         request_id: admitVisitor.id,
+        pin: cleanOtp,
         entry_photo_url: admitPhotoUrl,
         vehicle_number: admitVisitor.vehicleNumber !== "—" ? admitVisitor.vehicleNumber : undefined,
       });
-      const msg = `Gate entry recorded for ${admitVisitor.name}`;
+      const msg = `✅ Gate entry verified & recorded for ${admitVisitor.name}`;
       setActionMessage({ type: "success", text: msg });
       toast.success(msg);
       setAdmitVisitor(null);
       setAdmitPhotoUrl(null);
+      setAdmitOtp("");
+      setViewTab("entered");
       await loadData();
     } catch (err: any) {
-      const errMsg = err?.message || "Failed to record gate entry.";
+      const errMsg = err?.message || "Failed to verify entry OTP for this visitor.";
       setAdmitError(errMsg);
       toast.error(errMsg);
     } finally {
       setIsAdmitting(false);
+    }
+  };
+
+  const handleQrScanSuccess = (raw: string, parsed: ParsedQrData) => {
+    setIsScannerModalOpen(false);
+    const token = parsed?.token || (raw.startsWith("QR-") ? raw.replace(/^QR-/, "") : raw);
+    const pin = parsed?.pin || "";
+    if (pin) {
+      setVerifyOtp(pin);
+    } else {
+      setVerifyToken(token);
+    }
+    const summary = parsed?.visitorName
+      ? `Pass detected for: ${parsed.visitorName} (${parsed.unitLabel || "Visitor"})`
+      : `QR Pass Token Scanned: ${raw.slice(0, 16)}…`;
+    setScannedPassSummary(summary);
+    setIsVerifyModalOpen(true);
+  };
+
+  const handleVerifyPassEntry = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setVerifyError(null);
+
+    const cleanOtp = verifyOtp.trim();
+    const cleanToken = verifyToken.trim();
+
+    if (!cleanOtp && !cleanToken) {
+      const msg = "Please enter the 6-digit Entry OTP or scan the visitor's QR pass.";
+      setVerifyError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    if (!verifyPhotoUrl) {
+      const msg =
+        "📸 VISITOR PHOTO REQUIRED: Security policy mandates capturing a visitor photograph before gate entry. Please attach photo.";
+      setVerifyError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    setIsVerifyingPass(true);
+    try {
+      const payload: Record<string, unknown> = {
+        entry_photo_url: verifyPhotoUrl,
+      };
+      if (cleanOtp) {
+        payload.pin = cleanOtp;
+      } else if (cleanToken) {
+        payload.pass_token = cleanToken;
+      }
+      if (verifyVehicleNumber.trim()) {
+        payload.vehicle_number = verifyVehicleNumber.trim();
+      }
+
+      await visitorsApi.recordEntry(payload);
+      const msg = "✅ Gate Entry Verified! Visitor admitted to premises.";
+      setActionMessage({ type: "success", text: msg });
+      toast.success(msg);
+      setIsVerifyModalOpen(false);
+      setVerifyOtp("");
+      setVerifyToken("");
+      setVerifyPhotoUrl(null);
+      setVerifyVehicleNumber("");
+      setScannedPassSummary(null);
+      setViewTab("entered");
+      await loadData();
+    } catch (err: any) {
+      const errMsg = err?.message || "Failed to verify visitor pass. Please check the OTP / QR code.";
+      setVerifyError(errMsg);
+      toast.error(errMsg);
+    } finally {
+      setIsVerifyingPass(false);
     }
   };
 
@@ -209,7 +312,22 @@ export default function SecurityGuardVisitorsPage() {
     }
   };
 
-  const filteredVisitors = visitors.filter((v) => {
+  const enteredCount = visitors.filter(
+    (v) => v.status === "entered" || v.status === "completed" || Boolean(v.entryId),
+  ).length;
+
+  const expectedCount = visitors.filter(
+    (v) => (v.status === "approved" || v.status === "pending") && !v.entryId,
+  ).length;
+
+  const tabFilteredVisitors = visitors.filter((v) => {
+    const isEntered = v.status === "entered" || v.status === "completed" || Boolean(v.entryId);
+    if (viewTab === "entered") return isEntered;
+    if (viewTab === "expected") return !isEntered && (v.status === "approved" || v.status === "pending");
+    return true; // "all"
+  });
+
+  const filteredVisitors = tabFilteredVisitors.filter((v) => {
     const q = search.toLowerCase();
     return (
       v.name.toLowerCase().includes(q) ||
@@ -357,16 +475,16 @@ export default function SecurityGuardVisitorsPage() {
           >
             👁️ View
           </button>
-          {v.status === "approved" ? (
+          {v.status === "approved" || v.status === "pending" ? (
             <button
               type="button"
               className="btn btn-primary"
-              style={{ fontSize: "0.8rem", padding: "0.3rem 0.65rem" }}
+              style={{ fontSize: "0.8rem", padding: "0.3rem 0.65rem", display: "inline-flex", alignItems: "center", gap: "0.25rem" }}
               onClick={() => handleMarkEntry(v)}
             >
-              Mark Entry
+              🔑 Verify OTP / QR
             </button>
-          ) : v.status === "entered" && v.entryId ? (
+          ) : (v.status === "entered" || v.entryId) && v.entryId ? (
             <button
               type="button"
               className="btn btn-secondary"
@@ -388,9 +506,40 @@ export default function SecurityGuardVisitorsPage() {
         subtitle="Review resident-approved visitor requests, and log visitor gate entry / exit"
         breadcrumbs={[{ label: "GateSphere" }, { label: "Security Guard" }, { label: "Visitors" }]}
         actions={
-          <button className="btn btn-secondary" onClick={loadData} disabled={isLoading}>
-            🔄 {isLoading ? "Refreshing…" : "Refresh"}
-          </button>
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
+              onClick={() => {
+                setVerifyOtp("");
+                setVerifyToken("");
+                setVerifyError(null);
+                setVerifyPhotoUrl(null);
+                setIsScannerModalOpen(true);
+              }}
+            >
+              📷 Scan QR Pass
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
+              onClick={() => {
+                setVerifyOtp("");
+                setVerifyToken("");
+                setVerifyError(null);
+                setVerifyPhotoUrl(null);
+                setScannedPassSummary(null);
+                setIsVerifyModalOpen(true);
+              }}
+            >
+              🔑 Enter Pass OTP
+            </button>
+            <button className="btn btn-secondary" onClick={loadData} disabled={isLoading}>
+              🔄 {isLoading ? "Refreshing…" : "Refresh"}
+            </button>
+          </div>
         }
       />
 
@@ -449,16 +598,93 @@ export default function SecurityGuardVisitorsPage() {
       )}
 
       <div className="card">
+        {/* Navigation Tabs */}
+        <div
+          style={{
+            display: "flex",
+            gap: "0.5rem",
+            padding: "0.75rem 1rem 0",
+            borderBottom: "1px solid var(--border)",
+            background: "#f8fafc",
+            flexWrap: "wrap",
+          }}
+        >
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => setViewTab("entered")}
+            style={{
+              padding: "0.45rem 0.9rem",
+              fontSize: "0.82rem",
+              fontWeight: 600,
+              background: viewTab === "entered" ? "#ffffff" : "transparent",
+              border: viewTab === "entered" ? "1px solid var(--border)" : "1px solid transparent",
+              borderBottom: viewTab === "entered" ? "2px solid var(--primary, #2563eb)" : "none",
+              color: viewTab === "entered" ? "var(--primary, #2563eb)" : "var(--muted)",
+              borderRadius: "6px 6px 0 0",
+              cursor: "pointer",
+            }}
+          >
+            🟢 Checked-In Visitors ({enteredCount})
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => setViewTab("expected")}
+            style={{
+              padding: "0.45rem 0.9rem",
+              fontSize: "0.82rem",
+              fontWeight: 600,
+              background: viewTab === "expected" ? "#ffffff" : "transparent",
+              border: viewTab === "expected" ? "1px solid var(--border)" : "1px solid transparent",
+              borderBottom: viewTab === "expected" ? "2px solid var(--primary, #2563eb)" : "none",
+              color: viewTab === "expected" ? "var(--primary, #2563eb)" : "var(--muted)",
+              borderRadius: "6px 6px 0 0",
+              cursor: "pointer",
+            }}
+          >
+            ⏳ Expected Pre-Approvals ({expectedCount})
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => setViewTab("all")}
+            style={{
+              padding: "0.45rem 0.9rem",
+              fontSize: "0.82rem",
+              fontWeight: 600,
+              background: viewTab === "all" ? "#ffffff" : "transparent",
+              border: viewTab === "all" ? "1px solid var(--border)" : "1px solid transparent",
+              borderBottom: viewTab === "all" ? "2px solid var(--primary, #2563eb)" : "none",
+              color: viewTab === "all" ? "var(--primary, #2563eb)" : "var(--muted)",
+              borderRadius: "6px 6px 0 0",
+              cursor: "pointer",
+            }}
+          >
+            📋 All Records ({visitors.length})
+          </button>
+        </div>
+
         <div className="card-header" style={{ flexWrap: "wrap", gap: "0.75rem" }}>
           <div>
-            <h3 className="card-title">Today&apos;s Visitors</h3>
+            <h3 className="card-title">
+              {viewTab === "entered"
+                ? "Checked-In Visitors (Gate Verified)"
+                : viewTab === "expected"
+                  ? "Expected Resident Pre-Approvals"
+                  : "Today's Visitors"}
+            </h3>
             <p style={{ fontSize: "0.775rem", color: "var(--muted)" }}>
-              {filteredVisitors.length} visitors registered
+              {viewTab === "entered"
+                ? `${filteredVisitors.length} visitor(s) currently admitted / inside premises`
+                : viewTab === "expected"
+                  ? `${filteredVisitors.length} resident pre-approval(s) awaiting QR scan / OTP entry`
+                  : `${filteredVisitors.length} visitors registered`}
             </p>
           </div>
 
-          <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", flexWrap: "wrap" }}>
-            <div style={{ width: "100%", maxWidth: 240 }}>
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ width: "100%", maxWidth: 220 }}>
               <SearchInput
                 value={search}
                 onChange={setSearch}
@@ -467,11 +693,40 @@ export default function SecurityGuardVisitorsPage() {
             </div>
             <button
               type="button"
+              className="btn btn-secondary"
+              style={{ fontSize: "0.82rem", padding: "0.45rem 0.8rem", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "0.3rem" }}
+              onClick={() => {
+                setVerifyOtp("");
+                setVerifyToken("");
+                setVerifyError(null);
+                setVerifyPhotoUrl(null);
+                setIsScannerModalOpen(true);
+              }}
+            >
+              📷 Scan QR
+            </button>
+            <button
+              type="button"
               className="btn btn-primary"
-              style={{ fontSize: "0.85rem", padding: "0.45rem 1rem", fontWeight: 700 }}
+              style={{ fontSize: "0.82rem", padding: "0.45rem 0.85rem", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "0.3rem" }}
+              onClick={() => {
+                setVerifyOtp("");
+                setVerifyToken("");
+                setVerifyError(null);
+                setVerifyPhotoUrl(null);
+                setScannedPassSummary(null);
+                setIsVerifyModalOpen(true);
+              }}
+            >
+              🔑 Enter Pass OTP
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline"
+              style={{ fontSize: "0.82rem", padding: "0.45rem 0.8rem", fontWeight: 700 }}
               onClick={() => setIsWalkInModalOpen(true)}
             >
-              + Walk-In Check-In
+              + Walk-In
             </button>
           </div>
         </div>
@@ -960,6 +1215,39 @@ export default function SecurityGuardVisitorsPage() {
               </div>
             </div>
 
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+                <label style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--fg)" }}>
+                  Entry OTP / PIN (6 digits) <span style={{ color: "#dc2626" }}>*</span>
+                </label>
+                <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                  Provided by host resident
+                </span>
+              </div>
+              <input
+                type="text"
+                maxLength={8}
+                className="input-field"
+                placeholder="e.g. 849201"
+                value={admitOtp}
+                onChange={(e) => {
+                  setAdmitOtp(e.target.value.replace(/\D/g, ""));
+                  setAdmitError(null);
+                }}
+                style={{
+                  fontSize: "1.1rem",
+                  fontFamily: "monospace",
+                  letterSpacing: "0.15em",
+                  fontWeight: 700,
+                  textAlign: "center",
+                }}
+                required
+              />
+              <p style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.25rem" }}>
+                Ask visitor for the 6-digit entry code generated by their resident host.
+              </p>
+            </div>
+
             <div
               style={{
                 padding: "1rem",
@@ -1025,16 +1313,188 @@ export default function SecurityGuardVisitorsPage() {
                 style={{
                   padding: "0.5rem 1.25rem",
                   fontWeight: 700,
-                  background: admitPhotoUrl ? "#059669" : undefined,
-                  borderColor: admitPhotoUrl ? "#059669" : undefined,
+                  background: admitPhotoUrl && admitOtp ? "#059669" : undefined,
+                  borderColor: admitPhotoUrl && admitOtp ? "#059669" : undefined,
                 }}
               >
-                {isAdmitting ? "Recording Entry…" : "🚪 ALLOW GATE ENTRY"}
+                {isAdmitting ? "Verifying OTP & Entry…" : "🚪 VERIFY OTP & ALLOW ENTRY"}
               </button>
             </div>
           </div>
         </Modal>
       )}
+
+      {/* Standalone Visitor Pass Verification Modal (QR / OTP) */}
+      {isVerifyModalOpen && (
+        <Modal
+          isOpen={true}
+          onClose={() => {
+            if (!isVerifyingPass) {
+              setIsVerifyModalOpen(false);
+              setVerifyError(null);
+            }
+          }}
+          title="🔑 Verify Visitor Pass (QR / Entry OTP)"
+          size="md"
+        >
+          <form onSubmit={handleVerifyPassEntry} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            {verifyError && (
+              <div
+                style={{
+                  padding: "0.75rem 1rem",
+                  borderRadius: "6px",
+                  background: "#fee2e2",
+                  border: "1px solid #fca5a5",
+                  color: "#991b1b",
+                  fontSize: "0.875rem",
+                  fontWeight: 600,
+                }}
+              >
+                ⚠️ {verifyError}
+              </div>
+            )}
+
+            {scannedPassSummary && (
+              <div
+                style={{
+                  padding: "0.6rem 0.85rem",
+                  borderRadius: "6px",
+                  background: "#f0fdf4",
+                  border: "1px solid #86efac",
+                  color: "#166534",
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                }}
+              >
+                ✓ {scannedPassSummary}
+              </div>
+            )}
+
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+                <label style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--fg)" }}>
+                  Entry OTP / PIN (6 digits) or QR Token <span style={{ color: "#dc2626" }}>*</span>
+                </label>
+                <button
+                  type="button"
+                  className="btn btn-xs btn-secondary"
+                  style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}
+                  onClick={() => setIsScannerModalOpen(true)}
+                >
+                  📷 Scan QR Code
+                </button>
+              </div>
+              <input
+                type="text"
+                className="input-field"
+                placeholder="e.g. 849201"
+                value={verifyOtp || verifyToken}
+                onChange={(e) => {
+                  const val = e.target.value.trim();
+                  if (/^\d+$/.test(val)) {
+                    setVerifyOtp(val);
+                    setVerifyToken("");
+                  } else {
+                    setVerifyToken(val);
+                    setVerifyOtp("");
+                  }
+                  setVerifyError(null);
+                }}
+                style={{
+                  fontSize: "1.1rem",
+                  fontFamily: "monospace",
+                  letterSpacing: "0.15em",
+                  fontWeight: 700,
+                  textAlign: "center",
+                }}
+                required
+              />
+              <p style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.25rem" }}>
+                Ask visitor for the 6-digit entry code or scan the QR pass shared by the resident.
+              </p>
+            </div>
+
+            {/* Mandatory Visitor Face Photo */}
+            <div
+              style={{
+                padding: "0.85rem 1rem",
+                borderRadius: "8px",
+                background: verifyPhotoUrl ? "#f0fdf4" : "#fffbeb",
+                border: verifyPhotoUrl ? "1px solid #86efac" : "2px solid #f59e0b",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem" }}>
+                <span style={{ fontWeight: 700, fontSize: "0.875rem", color: "#1e293b" }}>
+                  📷 Visitor Face Photograph <span style={{ color: "#dc2626", fontWeight: 900 }}>* (Mandatory)</span>
+                </span>
+                {verifyPhotoUrl ? (
+                  <span style={{ fontSize: "0.75rem", color: "#16a34a", fontWeight: 700 }}>
+                    ✓ Photograph Attached
+                  </span>
+                ) : (
+                  <span style={{ fontSize: "0.75rem", color: "#b45309", fontWeight: 700 }}>
+                    Required Before Entry
+                  </span>
+                )}
+              </div>
+              <FileUpload
+                kind="visitor_photo"
+                label="Snap or upload visitor photograph before gate entry"
+                currentUrl={verifyPhotoUrl || undefined}
+                onUploadComplete={(url) => {
+                  setVerifyPhotoUrl(url);
+                  setVerifyError(null);
+                }}
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--fg)", display: "block", marginBottom: "0.35rem" }}>
+                Vehicle Number (Optional)
+              </label>
+              <input
+                type="text"
+                className="input-field"
+                placeholder="e.g. KA-01-AB-1234"
+                value={verifyVehicleNumber}
+                onChange={(e) => setVerifyVehicleNumber(e.target.value.toUpperCase())}
+                style={{ textTransform: "uppercase" }}
+              />
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setIsVerifyModalOpen(false)}
+                disabled={isVerifyingPass}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={isVerifyingPass}
+                style={{
+                  padding: "0.5rem 1.25rem",
+                  fontWeight: 700,
+                  background: verifyPhotoUrl ? "#059669" : undefined,
+                  borderColor: verifyPhotoUrl ? "#059669" : undefined,
+                }}
+              >
+                {isVerifyingPass ? "Verifying Pass…" : "🚪 VERIFY & ALLOW ENTRY"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* QR Scanner Camera & File Upload Modal */}
+      <QrScannerModal
+        isOpen={isScannerModalOpen}
+        onClose={() => setIsScannerModalOpen(false)}
+        onScan={handleQrScanSuccess}
+      />
 
       {/* Photo Lightbox Modal */}
       {previewPhoto && (

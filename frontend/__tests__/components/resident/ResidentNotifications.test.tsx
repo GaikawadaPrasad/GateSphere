@@ -140,6 +140,7 @@ function renderDashboard(initialTab: any = "notifications") {
 describe("GS-033: Resident Notifications State & Action Updates", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
     mockNotifications = [
       {
         id: "notif-cab-01",

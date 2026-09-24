@@ -63,7 +63,7 @@ _ROLE_ROUTES: dict[str, dict[str, str]] = {
     },
     "complaints": {
         "resident": "/owner-tenant/complaints",
-        "facility_manager": "/facility-manager/service-requests",
+        "facility_manager": "/facility-manager/complaints",
         "vendor_technician": "/vendor-technician/assigned-tickets",
         "community_admin": "/community-admin/incidents",
         "super_admin": "/super-admin/complaints",

@@ -72,7 +72,7 @@ export default function FacilityManagerComplaintsPage() {
       const priority = priorityFilter === "all" ? undefined : priorityFilter;
 
       const promises: any[] = [
-        complaintsApi.list({
+        complaintsApi.listPaginated({
           page: targetPage,
           page_size: pageSize,
           q,
@@ -108,11 +108,18 @@ export default function FacilityManagerComplaintsPage() {
 
       if (ticketsRes.status === "fulfilled") {
         const res = ticketsRes.value as any;
-        const items = (res.data || []).sort(
-          (a: any, b: any) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+        const rawList: any[] = Array.isArray(res)
+          ? res
+          : Array.isArray(res?.data)
+            ? res.data
+            : [];
+        const items = [...rawList].sort(
+          (a: any, b: any) =>
+            new Date(b.updated_at || b.created_at).getTime() -
+            new Date(a.updated_at || a.created_at).getTime(),
         );
         setComplaints(items);
-        setTotal(res.meta?.total || items.length);
+        setTotal(res?.meta?.total ?? rawList.length);
         setPage(targetPage);
       } else {
         setLoadError(ticketsRes.reason?.message || "Failed to load complaints.");
@@ -288,10 +295,12 @@ export default function FacilityManagerComplaintsPage() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Complaint #</th>
+                <th>Ticket #</th>
                 <th>Subject</th>
                 <th>Category</th>
+                <th>Resident</th>
                 <th>Unit</th>
+                <th>Contact Info</th>
                 <th>Priority</th>
                 <th>SLA</th>
                 <th>Status</th>
@@ -301,14 +310,14 @@ export default function FacilityManagerComplaintsPage() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: "center", padding: "2rem" }}>
+                  <td colSpan={10} style={{ textAlign: "center", padding: "2rem" }}>
                     Loading complaints…
                   </td>
                 </tr>
               ) : loadError ? (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={10}
                     style={{
                       textAlign: "center",
                       padding: "2rem",
@@ -321,7 +330,7 @@ export default function FacilityManagerComplaintsPage() {
               ) : filteredComplaints.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={10}
                     style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}
                   >
                     No complaints found.
@@ -345,9 +354,100 @@ export default function FacilityManagerComplaintsPage() {
                           </button>
                         </td>
                         <td style={{ fontWeight: 500, color: "var(--fg)" }}>{c.subject}</td>
-                        <td>{categoryMap[c.category_id] || "—"}</td>
+                        <td>{c.category_name || categoryMap[c.category_id] || "—"}</td>
+                        <td>
+                          <div
+                            style={{
+                              fontWeight: 600,
+                              fontSize: "0.85rem",
+                              color: "var(--fg)",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.3rem",
+                            }}
+                          >
+                            <span>👤</span>
+                            <span>{c.raised_by_name || "Resident"}</span>
+                          </div>
+                        </td>
                         <td style={{ fontSize: "0.8rem", color: "var(--muted)" }}>
-                          {c.unit_id ? String(c.unit_id).slice(0, 8) + "…" : "Common Area"}
+                          <span
+                            style={{
+                              display: "inline-block",
+                              fontWeight: 600,
+                              fontSize: "0.75rem",
+                              color: "var(--primary-dark, #1e40af)",
+                              background: "var(--primary-subtle, #eff6ff)",
+                              padding: "0.15rem 0.45rem",
+                              borderRadius: "4px",
+                              border: "1px solid #bfdbfe",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            🏢{" "}
+                            {c.unit_number
+                              ? `Unit ${c.unit_number}`
+                              : c.unit_id
+                                ? `Unit ${String(c.unit_id).slice(0, 6)}`
+                                : "Common Area"}
+                          </span>
+                        </td>
+                        <td>
+                          <div
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: "0.15rem",
+                              fontSize: "0.78rem",
+                            }}
+                          >
+                            {c.raised_by_phone && (
+                              <a
+                                href={`tel:${c.raised_by_phone}`}
+                                style={{
+                                  color: "var(--fg)",
+                                  textDecoration: "none",
+                                  fontWeight: 500,
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "0.25rem",
+                                }}
+                                title={`Call ${c.raised_by_name || "Resident"}`}
+                              >
+                                <span>📞</span>
+                                <span>{c.raised_by_phone}</span>
+                              </a>
+                            )}
+                            {c.raised_by_email && (
+                              <a
+                                href={`mailto:${c.raised_by_email}`}
+                                style={{
+                                  color: "var(--muted)",
+                                  textDecoration: "none",
+                                  fontSize: "0.72rem",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "0.25rem",
+                                }}
+                                title={`Email ${c.raised_by_email}`}
+                              >
+                                <span>✉️</span>
+                                <span
+                                  style={{
+                                    maxWidth: 120,
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {c.raised_by_email}
+                                </span>
+                              </a>
+                            )}
+                            {!c.raised_by_phone && !c.raised_by_email && (
+                              <span style={{ color: "var(--muted)" }}>—</span>
+                            )}
+                          </div>
                         </td>
                         <td>
                           <StatusBadge status={c.priority} />
@@ -554,8 +654,56 @@ export default function FacilityManagerComplaintsPage() {
             >
               <strong>{historyTicket.subject}</strong>
               <span style={{ marginLeft: "0.75rem", color: "var(--muted)" }}>
-                {categoryMap[historyTicket.category_id] || "—"}
+                {historyTicket.category_name || categoryMap[historyTicket.category_id] || "—"}
               </span>
+
+              {/* Resident Details Banner */}
+              <div
+                style={{
+                  marginTop: "0.6rem",
+                  paddingTop: "0.6rem",
+                  borderTop: "1px solid var(--border)",
+                  display: "flex",
+                  gap: "1.25rem",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  fontSize: "0.82rem",
+                }}
+              >
+                <div>
+                  👤 <strong>Resident:</strong> {historyTicket.raised_by_name || "Resident"}
+                </div>
+                <div>
+                  🏢 <strong>Unit:</strong>{" "}
+                  {historyTicket.unit_number
+                    ? `Unit ${historyTicket.unit_number}`
+                    : historyTicket.unit_id
+                      ? `Unit ${String(historyTicket.unit_id).slice(0, 6)}`
+                      : "Common Area"}
+                </div>
+                {historyTicket.raised_by_phone && (
+                  <div>
+                    📞 <strong>Phone:</strong>{" "}
+                    <a
+                      href={`tel:${historyTicket.raised_by_phone}`}
+                      style={{ color: "var(--primary)" }}
+                    >
+                      {historyTicket.raised_by_phone}
+                    </a>
+                  </div>
+                )}
+                {historyTicket.raised_by_email && (
+                  <div>
+                    ✉️ <strong>Email:</strong>{" "}
+                    <a
+                      href={`mailto:${historyTicket.raised_by_email}`}
+                      style={{ color: "var(--primary)" }}
+                    >
+                      {historyTicket.raised_by_email}
+                    </a>
+                  </div>
+                )}
+              </div>
               {ticketFeedback && (
                 <div
                   style={{
