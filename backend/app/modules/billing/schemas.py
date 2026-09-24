@@ -135,6 +135,8 @@ class InvoiceItemRead(BaseModel):
 class InvoiceRead(_Read):
     community_id: uuid.UUID
     unit_id: uuid.UUID
+    unit_number: str | None = None
+    tower_name: str | None = None
     billed_to_user_id: uuid.UUID | None
     invoice_number: str
     billing_period_start: date | None
@@ -213,6 +215,8 @@ class ReceiptRead(BaseModel):
     payment_reference: str
     community_name: str | None
     payer_name: str | None
+    unit_number: str | None = None
+    tower_name: str | None = None
     amount: Decimal
     payment_method: str
     payment_status: str

@@ -189,6 +189,7 @@ class UnitRead(_Read):
     tower_id: uuid.UUID
     floor_id: uuid.UUID
     unit_number: str
+    tower_name: str | None = None
     unit_type: str
     bedrooms: int | None
     area_sqft: float | None

@@ -36,7 +36,7 @@ export function InvoiceDetailModal({
             <div>
               <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Unit</div>
               <div style={{ fontWeight: 600, fontSize: "0.9rem" }}>
-                Unit {invoice.unit_number || invoice.unit_id?.slice(0, 8)}
+                {invoice.tower_name ? `${invoice.tower_name}, ` : ""}Unit {invoice.unit_number || invoice.unit_id?.slice(0, 8)}
               </div>
             </div>
             <div>

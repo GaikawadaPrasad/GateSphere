@@ -20,6 +20,7 @@ export interface MaintenanceInvoice {
   community_name?: string;
   unit_id: string;
   unit_number?: string;
+  tower_name?: string;
   invoice_number: string;
   status: InvoiceStatus;
   subtotal: string;

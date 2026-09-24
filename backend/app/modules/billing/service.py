@@ -267,11 +267,32 @@ class BillingService(UnitScopedAccess):
         )
         return await self.get_invoice(inv.id)
 
+    async def _enrich_invoices(self, invoices: list[MaintenanceInvoice]) -> list[MaintenanceInvoice]:
+        if not invoices:
+            return invoices
+        unit_ids = {inv.unit_id for inv in invoices if inv.unit_id}
+        if not unit_ids:
+            return invoices
+        stmt = (
+            select(Unit, Tower)
+            .outerjoin(Tower, Unit.tower_id == Tower.id)
+            .where(Unit.id.in_(unit_ids))
+        )
+        res = await self.db.execute(stmt)
+        units_map = {}
+        for u_obj, t_obj in res.all():
+            units_map[u_obj.id] = (u_obj.unit_number, t_obj.name if t_obj else None)
+        for inv in invoices:
+            if inv.unit_id in units_map:
+                inv.unit_number, inv.tower_name = units_map[inv.unit_id]
+        return invoices
+
     async def get_invoice(self, invoice_id: uuid.UUID) -> MaintenanceInvoice:
         obj = await self.invoices.get(invoice_id)
         if obj is None:
             raise NotFoundError("Invoice not found")
         await self._assert_unit_visible(obj.unit_id)
+        await self._enrich_invoices([obj])
         return obj
 
     async def list_invoices(
@@ -294,9 +315,10 @@ class BillingService(UnitScopedAccess):
             stmt = stmt.where(MaintenanceInvoice.status == invoice_status)
         stmt = stmt.order_by(MaintenanceInvoice.created_at.desc())
         stmt = await self._scope_unit_column(stmt, MaintenanceInvoice.unit_id)
-        return await self.invoices.list(
-            offset=offset, limit=limit, extra=stmt
-        ), await self.invoices.count(extra=stmt)
+        items = await self.invoices.list(offset=offset, limit=limit, extra=stmt)
+        total = await self.invoices.count(extra=stmt)
+        await self._enrich_invoices(items)
+        return items, total
 
     async def post_invoice(self, invoice_id: uuid.UUID) -> MaintenanceInvoice:
         inv = await self.get_invoice(invoice_id)
@@ -695,6 +717,8 @@ class BillingService(UnitScopedAccess):
             "payment_reference": pay.payment_reference,
             "community_name": community.name if community else None,
             "payer_name": payer.full_name if payer else None,
+            "unit_number": getattr(pay, "unit_number", None),
+            "tower_name": getattr(pay, "tower_name", None),
             "amount": pay.amount,
             "payment_method": pay.payment_method,
             "payment_status": pay.payment_status,
