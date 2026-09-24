@@ -2779,7 +2779,7 @@ export default function CommunitiesPage() {
                       </div>
                     ) : (
                       <div
-                        className="table-responsive"
+                        className="table-responsive-wrapper"
                         style={{ maxHeight: "420px", overflowY: "auto" }}
                       >
                         <table className="table" style={{ width: "100%", fontSize: "0.85rem" }}>

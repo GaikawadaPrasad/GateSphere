@@ -207,71 +207,73 @@ export default function SecuritySupervisorAuditLogsPage() {
               </p>
             </div>
           ) : (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Timestamp</th>
-                  <th>Security Operator</th>
-                  <th>Action / Event</th>
-                  <th>Gate / Checkpoint</th>
-                  <th>Reference</th>
-                  <th>Reason / Details</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredLogs.map((log) => (
-                  <tr key={log.id}>
-                    <td style={{ fontSize: "0.8rem", whiteSpace: "nowrap" }}>{log.timestamp}</td>
-                    <td style={{ fontWeight: 600, color: "var(--fg)" }}>{log.user}</td>
-                    <td>
-                      <span
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "4px",
-                          fontFamily: "monospace",
-                          fontSize: "0.75rem",
-                          padding: "2px 8px",
-                          borderRadius: "4px",
-                          backgroundColor: log.isOverride
-                            ? "rgba(239, 68, 68, 0.12)"
-                            : "rgba(59, 130, 246, 0.12)",
-                          color: log.isOverride
-                            ? "var(--danger, #ef4444)"
-                            : "var(--primary, #3b82f6)",
-                          fontWeight: 600,
-                        }}
-                      >
-                        {log.isOverride && (
-                          <svg
-                            width="12"
-                            height="12"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
-                            <line x1="12" y1="9" x2="12" y2="13"></line>
-                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                          </svg>
-                        )}
-                        {log.action}
-                      </span>
-                    </td>
-                    <td style={{ fontSize: "0.85rem", fontWeight: 500 }}>{log.gate}</td>
-                    <td
-                      style={{ color: "var(--muted)", fontSize: "0.8rem", fontFamily: "monospace" }}
-                    >
-                      {log.reference}
-                    </td>
-                    <td style={{ fontSize: "0.85rem", maxWidth: "260px" }}>{log.details}</td>
+            <div className="table-responsive-wrapper">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Security Operator</th>
+                    <th>Action / Event</th>
+                    <th>Gate / Checkpoint</th>
+                    <th>Reference</th>
+                    <th>Reason / Details</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {filteredLogs.map((log) => (
+                    <tr key={log.id}>
+                      <td style={{ fontSize: "0.8rem", whiteSpace: "nowrap" }}>{log.timestamp}</td>
+                      <td style={{ fontWeight: 600, color: "var(--fg)" }}>{log.user}</td>
+                      <td>
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            fontFamily: "monospace",
+                            fontSize: "0.75rem",
+                            padding: "2px 8px",
+                            borderRadius: "4px",
+                            backgroundColor: log.isOverride
+                              ? "rgba(239, 68, 68, 0.12)"
+                              : "rgba(59, 130, 246, 0.12)",
+                            color: log.isOverride
+                              ? "var(--danger, #ef4444)"
+                              : "var(--primary, #3b82f6)",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {log.isOverride && (
+                            <svg
+                              width="12"
+                              height="12"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+                              <line x1="12" y1="9" x2="12" y2="13"></line>
+                              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                            </svg>
+                          )}
+                          {log.action}
+                        </span>
+                      </td>
+                      <td style={{ fontSize: "0.85rem", fontWeight: 500 }}>{log.gate}</td>
+                      <td
+                        style={{ color: "var(--muted)", fontSize: "0.8rem", fontFamily: "monospace" }}
+                      >
+                        {log.reference}
+                      </td>
+                      <td style={{ fontSize: "0.85rem", maxWidth: "260px" }}>{log.details}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </div>
