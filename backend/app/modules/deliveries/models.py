@@ -36,6 +36,7 @@ DELIVERY_TYPES = (
     "ecommerce",
     "courier",
     "medicine",
+    "pharmacy",
     "laundry",
     "other",
 )

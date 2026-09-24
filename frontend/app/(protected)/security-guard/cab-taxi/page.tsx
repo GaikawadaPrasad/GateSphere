@@ -140,6 +140,14 @@ export default function SecurityGuardCabTaxiPage() {
               (r.unit ? `Unit ${r.unit.unit_number}` : "") ||
               (r.unit_id ? `Unit #${r.unit_id.slice(0, 5)}` : "—");
 
+            const vPlate =
+              r.vehicle_number ||
+              r.visitor?.vehicle_number ||
+              visitor?.vehicle_number ||
+              openEntry?.vehicle_number ||
+              anyEntry?.vehicle_number ||
+              "—";
+
             return {
               id: r.id,
               unit_id: r.unit_id,
@@ -211,7 +219,7 @@ export default function SecurityGuardCabTaxiPage() {
     setSelectedUnitId(prefillUnitId);
     setDriverName("");
     setDriverPhone("");
-    setVehicleNumber(prefillPlate);
+    setVehicleNumber((prefillPlate || "").trim().toUpperCase());
     setCabCompany("Uber");
     setModalError(null);
     setCabFieldErrors({});
@@ -378,10 +386,15 @@ export default function SecurityGuardCabTaxiPage() {
       // 2. Search Text
       const q = search.toLowerCase().trim();
       if (!q) return true;
+      const qClean = q.replace(/[\s\-.]/g, "");
+      const vClean = (c.vehicleNumber || "").toLowerCase().replace(/[\s\-.]/g, "");
+      const uClean = (c.unit_number || "").toLowerCase().replace(/[\s\-.]/g, "");
       return (
-        c.vehicleNumber.toLowerCase().includes(q) ||
+        (vClean && vClean !== "—" && (vClean.includes(qClean) || qClean.includes(vClean))) ||
+        (c.vehicleNumber && c.vehicleNumber !== "—" && c.vehicleNumber.toLowerCase().includes(q)) ||
         c.visitorName.toLowerCase().includes(q) ||
         (c.visitorPhone && c.visitorPhone.includes(q)) ||
+        (uClean && uClean.includes(qClean)) ||
         (c.unit_number && c.unit_number.toLowerCase().includes(q)) ||
         c.purpose.toLowerCase().includes(q)
       );
@@ -392,13 +405,22 @@ export default function SecurityGuardCabTaxiPage() {
   const verifiedMatches = useMemo(() => {
     const q = verifySearchQuery.toLowerCase().trim();
     if (!q) return [];
-    return cabs.filter(
-      (c) =>
-        c.vehicleNumber.toLowerCase().includes(q) ||
+    const qClean = q.replace(/[\s\-.]/g, "");
+    return cabs.filter((c) => {
+      const vClean = (c.vehicleNumber || "").toLowerCase().replace(/[\s\-.]/g, "");
+      const uClean = (c.unit_number || "").toLowerCase().replace(/[\s\-.]/g, "");
+      const nameClean = (c.visitorName || "").toLowerCase();
+      const phoneClean = (c.visitorPhone || "").replace(/[\s\-()]/g, "");
+
+      return (
+        (vClean && vClean !== "—" && (vClean.includes(qClean) || qClean.includes(vClean))) ||
+        (c.vehicleNumber && c.vehicleNumber !== "—" && c.vehicleNumber.toLowerCase().includes(q)) ||
+        (uClean && uClean.includes(qClean)) ||
         (c.unit_number && c.unit_number.toLowerCase().includes(q)) ||
-        c.visitorName.toLowerCase().includes(q) ||
-        (c.visitorPhone && c.visitorPhone.includes(q)),
-    );
+        nameClean.includes(q) ||
+        (phoneClean && phoneClean.includes(qClean))
+      );
+    });
   }, [cabs, verifySearchQuery]);
 
   const counts = useMemo(() => {

@@ -436,6 +436,14 @@ class VisitorService(UnitScopedAccess):
             )
 
         approval_required = policy.approval_required and visitor_type != "recurring"
+        req_vehicle = (
+            payload.vehicle_number
+            or (payload.visitor.vehicle_number if payload.visitor else None)
+            or visitor.vehicle_number
+        )
+        if req_vehicle and not visitor.vehicle_number:
+            visitor.vehicle_number = req_vehicle
+
         obj = VisitorRequest(
             community_id=unit.community_id,
             visitor_id=visitor.id,
@@ -446,7 +454,7 @@ class VisitorService(UnitScopedAccess):
             purpose=payload.purpose,
             expected_at=payload.expected_at,
             valid_until=payload.valid_until,
-            vehicle_number=payload.vehicle_number,
+            vehicle_number=req_vehicle,
             group_label=payload.group_label,
             party_size=payload.party_size,
             approval_required=approval_required,
@@ -893,7 +901,7 @@ class VisitorService(UnitScopedAccess):
             gate_id=await self._gate_in_scope(payload.gate_id),
             entry_guard_user_id=self.actor.id,
             entry_at=datetime.now(UTC),
-            vehicle_number=payload.vehicle_number or req.vehicle_number,
+            vehicle_number=payload.vehicle_number or req.vehicle_number or (visitor.vehicle_number if visitor else None),
             entry_photo_url=payload.entry_photo_url,
             status="inside",
         )

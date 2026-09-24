@@ -205,10 +205,14 @@ class RequestRead(_Read):
                 data.setdefault("visitor_name", v.get("full_name"))
                 data.setdefault("phone", v.get("phone"))
                 data.setdefault("photo_url", v.get("photo_url"))
+                if not data.get("vehicle_number"):
+                    data["vehicle_number"] = v.get("vehicle_number")
             elif v is not None:
                 data.setdefault("visitor_name", getattr(v, "full_name", None))
                 data.setdefault("phone", getattr(v, "phone", None))
                 data.setdefault("photo_url", getattr(v, "photo_url", None))
+                if not data.get("vehicle_number"):
+                    data["vehicle_number"] = getattr(v, "vehicle_number", None)
             return data
 
         # If data is an ORM instance or other object, extract attributes into dict safely
@@ -217,6 +221,9 @@ class RequestRead(_Read):
             v_name = getattr(v, "full_name", None) if v else None
             v_phone = getattr(v, "phone", None) if v else None
             v_photo = getattr(v, "photo_url", None) if v else None
+            v_vehicle = getattr(data, "vehicle_number", None) or (
+                getattr(v, "vehicle_number", None) if v else None
+            )
             passes = []
             try:
                 raw_passes = getattr(data, "passes", [])
@@ -237,7 +244,7 @@ class RequestRead(_Read):
                 "valid_until": getattr(data, "valid_until", None),
                 "status": getattr(data, "status", None),
                 "approval_required": getattr(data, "approval_required", None),
-                "vehicle_number": getattr(data, "vehicle_number", None),
+                "vehicle_number": v_vehicle,
                 "group_label": getattr(data, "group_label", None),
                 "party_size": getattr(data, "party_size", 1),
                 "visitor": v,

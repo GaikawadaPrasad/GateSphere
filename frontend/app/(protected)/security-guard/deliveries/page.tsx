@@ -669,11 +669,12 @@ export default function SecurityGuardDeliveriesPage() {
                 value={deliveryType}
                 onChange={(e) => setDeliveryType(e.target.value)}
               >
-                <option value="courier">Courier / Parcel</option>
                 <option value="food">Food Delivery (Zomato/Swiggy)</option>
-                <option value="grocery">Grocery / Instant Mart</option>
-                <option value="laundry">Laundry / Dry Clean</option>
+                <option value="grocery">Grocery / Instant Mart (Blinkit/Instamart)</option>
+                <option value="ecommerce">E-commerce (Amazon/Flipkart)</option>
+                <option value="courier">Courier / Parcel</option>
                 <option value="medicine">Pharmacy / Medicine</option>
+                <option value="laundry">Laundry / Dry Clean</option>
               </select>
             </div>
 

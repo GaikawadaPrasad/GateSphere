@@ -355,9 +355,11 @@ def seed_deliveries(db: Session, communities: list[Community]) -> None:
     from app.modules.deliveries.models import DeliveryProtocol
 
     presets = {
-        "food": {"protocol_type": "collect_at_gate", "leave_at_gate": False},
-        "ecommerce": {"protocol_type": "leave_at_gate", "leave_at_gate": True},
-        "courier": {"protocol_type": "call_resident", "requires_otp": True},
+        "food": {"protocol_type": "allow_at_gate", "leave_at_gate": False},
+        "grocery": {"protocol_type": "resident_approval_required", "leave_at_gate": False},
+        "ecommerce": {"protocol_type": "leave_at_gate_desk", "leave_at_gate": True},
+        "courier": {"protocol_type": "resident_approval_required", "requires_otp": True},
+        "medicine": {"protocol_type": "allow_at_gate", "requires_otp": False},
     }
     for c in communities:
         for dtype, cfg in presets.items():

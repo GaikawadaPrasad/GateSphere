@@ -32,6 +32,7 @@ vi.mock("@/hooks/use-communities", () => ({
   useDeleteCommunity: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useCreateTower: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useCreateFloor: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDeleteFloor: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useCreateUnit: () => ({
     mutateAsync: mockMutateUnitAsync,
     isPending: false,

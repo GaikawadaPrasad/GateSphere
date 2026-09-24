@@ -14,6 +14,7 @@ import {
   useDeleteCommunity,
   useCreateTower,
   useCreateFloor,
+  useDeleteFloor,
   useCreateUnit,
   useCreateGate,
   useCommunityUnits,
@@ -186,7 +187,8 @@ export default function CommunitiesPage() {
   const [isAddTowerOpen, setIsAddTowerOpen] = useState(false);
   const [towerName, setTowerName] = useState("");
   const [towerCode, setTowerCode] = useState("");
-  const [towerFloors, setTowerFloors] = useState(10);
+  const [towerFloors, setTowerFloors] = useState<number | string>(5);
+  const [autoGenFloorsOnTowerCreate, setAutoGenFloorsOnTowerCreate] = useState(true);
   const [towerType, setTowerType] = useState("tower");
 
   const [isAddFloorOpen, setIsAddFloorOpen] = useState(false);
@@ -203,6 +205,9 @@ export default function CommunitiesPage() {
   const [unitBedrooms, setUnitBedrooms] = useState<number | string>(2);
   const [unitSqFt, setUnitSqFt] = useState<number | string>(1200);
   const [unitError, setUnitError] = useState("");
+  const [towerFloorsMap, setTowerFloorsMap] = useState<Record<string, Floor[]>>({});
+  const [expandedTowers, setExpandedTowers] = useState<Record<string, boolean>>({});
+  const [isGeneratingFloors, setIsGeneratingFloors] = useState<Record<string, boolean>>({});
 
   const [isAddResidentOpen, setIsAddResidentOpen] = useState(false);
   const [residentTowerId, setResidentTowerId] = useState("");
@@ -237,6 +242,7 @@ export default function CommunitiesPage() {
   const deleteMutation = useDeleteCommunity();
   const createTowerMutation = useCreateTower();
   const createFloorMutation = useCreateFloor();
+  const deleteFloorMutation = useDeleteFloor();
   const createUnitMutation = useCreateUnit();
   const createGateMutation = useCreateGate();
   const addResidentMutation = useAddResident();
@@ -333,7 +339,25 @@ export default function CommunitiesPage() {
         residentsApi.list({ community_id: commId, page: 1, page_size: 100 }),
         usersApi.list({ community_id: commId, page_size: 100 }),
       ]);
-      if (towersRes.status === "fulfilled") setCommunityTowers(towersRes.value || []);
+      if (towersRes.status === "fulfilled") {
+        const twrs = towersRes.value || [];
+        setCommunityTowers(twrs);
+        // Load floors for each tower
+        const floorReqs = twrs.map(async (t) => {
+          try {
+            const fls = await communitiesApi.floors(t.id);
+            return { id: t.id, floors: fls || [] };
+          } catch {
+            return { id: t.id, floors: [] };
+          }
+        });
+        const floorResults = await Promise.all(floorReqs);
+        const map: Record<string, Floor[]> = {};
+        floorResults.forEach((r) => {
+          map[r.id] = r.floors;
+        });
+        setTowerFloorsMap(map);
+      }
       if (gatesRes.status === "fulfilled") setCommunityGates(gatesRes.value || []);
       if (residentsRes.status === "fulfilled") {
         const val: unknown = residentsRes.value;
@@ -349,6 +373,46 @@ export default function CommunitiesPage() {
       refetchUnits();
     } catch (err) {
       console.error("Failed to refresh details", err);
+    }
+  };
+
+  const handleGenerateFloorsForTower = async (towerId: string, countToGen?: number) => {
+    const targetTower = communityTowers.find((t) => t.id === towerId);
+    if (!targetTower) return;
+    const num = countToGen || targetTower.total_floors || 10;
+    setIsGeneratingFloors((prev) => ({ ...prev, [towerId]: true }));
+    try {
+      const existing = await communitiesApi.floors(towerId).catch(() => []);
+      const existingNums = new Set(existing.map((f: any) => f.floor_number));
+      const reqs: Promise<any>[] = [];
+      for (let i = 1; i <= num; i++) {
+        if (!existingNums.has(i)) {
+          reqs.push(
+            createFloorMutation.mutateAsync({
+              tower_id: towerId,
+              floor_number: i,
+              label: `Floor ${i}`,
+            }).catch((err) => console.error(`Failed to create floor ${i}:`, err))
+          );
+        }
+      }
+      await Promise.all(reqs);
+
+      const updated = await communitiesApi.floors(towerId);
+      setTowerFloorsMap((prev) => ({ ...prev, [towerId]: updated || [] }));
+
+      if (unitTowerId === towerId) {
+        setTowerFloorsList(updated || []);
+        if (updated && updated.length > 0) {
+          setUnitFloorId(updated[0].id);
+        }
+      }
+      toast.success(`Generated ${reqs.length} floor(s) for "${targetTower.name}".`);
+      if (viewingCommunity) await refreshCommunityDetails(viewingCommunity.id);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to generate floors.");
+    } finally {
+      setIsGeneratingFloors((prev) => ({ ...prev, [towerId]: false }));
     }
   };
 
@@ -413,7 +477,8 @@ export default function CommunitiesPage() {
   const handleOpenAddTower = () => {
     setTowerName("");
     setTowerCode("");
-    setTowerFloors(10);
+    setTowerFloors(5);
+    setAutoGenFloorsOnTowerCreate(true);
     setTowerType("tower");
     setDetailsFeedback(null);
     setIsAddTowerOpen(true);
@@ -474,7 +539,7 @@ export default function CommunitiesPage() {
     }
 
     try {
-      await createTowerMutation.mutateAsync({
+      const towerRes = await createTowerMutation.mutateAsync({
         communityId: viewingCommunity.id,
         data: {
           name: trimmedName,
@@ -483,6 +548,19 @@ export default function CommunitiesPage() {
           structure_type: towerType,
         },
       });
+
+      // Auto-generate floor records 1 to floorsNum if enabled
+      if (autoGenFloorsOnTowerCreate && floorsNum > 0) {
+        const floorPromises = Array.from({ length: floorsNum }, (_, i) =>
+          createFloorMutation.mutateAsync({
+            tower_id: towerRes.id,
+            floor_number: i + 1,
+            label: `Floor ${i + 1}`,
+          }).catch((err) => console.error(`Failed to auto-create floor ${i + 1}:`, err))
+        );
+        await Promise.all(floorPromises);
+      }
+
       setIsAddTowerOpen(false);
       setDetailsFeedback({
         type: "success",
@@ -502,8 +580,11 @@ export default function CommunitiesPage() {
   const handleOpenAddFloor = (towerId?: string) => {
     const tId = towerId || communityTowers[0]?.id || "";
     setSelectedTowerForFloor(tId);
-    setFloorNumber(1);
-    setFloorLabel("");
+    const existing = towerFloorsMap[tId] || [];
+    const highestNum = existing.reduce((max, f) => Math.max(max, f.floor_number), 0);
+    const nextNum = highestNum + 1;
+    setFloorNumber(nextNum);
+    setFloorLabel(`Floor ${nextNum}`);
     setDetailsFeedback(null);
     setIsAddFloorOpen(true);
   };
@@ -528,6 +609,25 @@ export default function CommunitiesPage() {
         type: "error",
         message: err instanceof Error ? err.message : "Failed to create floor.",
       });
+    }
+  };
+
+  const handleDeleteFloor = async (floorId: string, towerId: string, floorNum: number) => {
+    const unitsOnFloor = communityUnitsList?.filter((u) => u.floor_id === floorId) || [];
+    if (unitsOnFloor.length > 0) {
+      toast.error(`Cannot delete Floor ${floorNum}: It has ${unitsOnFloor.length} active unit(s). Delete units first.`);
+      return;
+    }
+    if (!confirm(`Are you sure you want to delete Floor ${floorNum}?`)) return;
+
+    try {
+      await deleteFloorMutation.mutateAsync({ id: floorId, tower_id: towerId });
+      toast.success(`Floor ${floorNum} deleted successfully.`);
+      const updated = await communitiesApi.floors(towerId).catch(() => []);
+      setTowerFloorsMap((prev) => ({ ...prev, [towerId]: updated || [] }));
+      if (viewingCommunity) await refreshCommunityDetails(viewingCommunity.id);
+    } catch (err: any) {
+      toast.error(err?.message || `Failed to delete floor ${floorNum}.`);
     }
   };
 
@@ -1676,44 +1776,242 @@ export default function CommunitiesPage() {
                     </div>
 
                     {communityTowers.length > 0 ? (
-                      <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-                        {communityTowers.map((t) => (
-                          <div
-                            key={t.id}
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                              padding: "0.75rem 1rem",
-                              background: "#f8fafc",
-                              border: "1px solid var(--border)",
-                              borderRadius: "var(--radius-sm)",
-                            }}
-                          >
-                            <div>
-                              <div style={{ fontWeight: 600, fontSize: "0.9rem" }}>{t.name}</div>
-                              <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-                                Code: <strong>{t.code || "–"}</strong> • {t.total_floors} Floors
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+                        {communityTowers.map((t) => {
+                          const floors = towerFloorsMap[t.id] || [];
+                          const isExpanded = expandedTowers[t.id] !== false; // Default expanded so floors are immediately visible
+                          return (
+                            <div
+                              key={t.id}
+                              style={{
+                                background: "#ffffff",
+                                border: "1px solid var(--border)",
+                                borderRadius: "var(--radius-sm)",
+                                overflow: "hidden",
+                                boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+                              }}
+                            >
+                              {/* Tower Header Bar */}
+                              <div
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                  padding: "0.85rem 1rem",
+                                  background: "#f8fafc",
+                                  borderBottom: isExpanded ? "1px solid var(--border)" : "none",
+                                  flexWrap: "wrap",
+                                  gap: "0.5rem",
+                                }}
+                              >
+                                <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => setExpandedTowers((prev) => ({ ...prev, [t.id]: !isExpanded }))}
+                                    style={{
+                                      background: "none",
+                                      border: "none",
+                                      cursor: "pointer",
+                                      fontSize: "0.8rem",
+                                      color: "var(--muted)",
+                                      padding: "0.2rem",
+                                      lineHeight: 1,
+                                    }}
+                                    title={isExpanded ? "Collapse Floors" : "Expand Floors"}
+                                  >
+                                    {isExpanded ? "▼" : "▶"}
+                                  </button>
+                                  <div>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexWrap: "wrap" }}>
+                                      <span style={{ fontWeight: 700, fontSize: "0.95rem", color: "var(--fg)" }}>
+                                        🏢 {t.name}
+                                      </span>
+                                      <span className="badge badge-secondary" style={{ fontSize: "0.7rem", textTransform: "uppercase" }}>
+                                        {t.code || "–"}
+                                      </span>
+                                      <span className="badge badge-outline" style={{ fontSize: "0.7rem", textTransform: "capitalize" }}>
+                                        {t.structure_type || "tower"}
+                                      </span>
+                                    </div>
+                                    <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.2rem", display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                                      <span>Planned: <strong>{t.total_floors} Floors</strong></span>
+                                      <span>•</span>
+                                      {floors.length === 0 ? (
+                                        <span style={{ color: "#dc2626", fontWeight: 600 }}>
+                                          ⚠️ 0 Floors in Database
+                                        </span>
+                                      ) : (
+                                        <span style={{ color: "#16a34a", fontWeight: 600 }}>
+                                          ✓ {floors.length} Floor(s) in Database
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexWrap: "wrap" }}>
+                                  {floors.length === 0 && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-xs btn-primary"
+                                      disabled={isGeneratingFloors[t.id]}
+                                      onClick={() => handleGenerateFloorsForTower(t.id, t.total_floors)}
+                                      style={{ padding: "0.25rem 0.65rem", fontSize: "0.75rem" }}
+                                    >
+                                      {isGeneratingFloors[t.id] ? "Generating…" : `⚡ Generate ${t.total_floors || 5} Floors`}
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    className="btn btn-xs btn-secondary"
+                                    onClick={() => handleOpenAddFloor(t.id)}
+                                    style={{ padding: "0.25rem 0.6rem", fontSize: "0.75rem" }}
+                                  >
+                                    ➕ Floor
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn btn-xs btn-primary"
+                                    onClick={() => handleOpenAddUnit(t.id)}
+                                    style={{ padding: "0.25rem 0.6rem", fontSize: "0.75rem" }}
+                                  >
+                                    ➕ Unit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn btn-xs btn-outline"
+                                    onClick={() => setExpandedTowers((prev) => ({ ...prev, [t.id]: !isExpanded }))}
+                                    style={{ padding: "0.25rem 0.5rem", fontSize: "0.75rem" }}
+                                  >
+                                    {isExpanded ? "Hide Floors" : `Show Floors (${floors.length})`}
+                                  </button>
+                                </div>
                               </div>
+
+                              {/* Floors List (Visible when expanded) */}
+                              {isExpanded && (
+                                <div style={{ padding: "0.85rem 1rem", background: "#ffffff" }}>
+                                  {floors.length === 0 ? (
+                                    <div
+                                      style={{
+                                        padding: "1rem",
+                                        background: "#fffbeb",
+                                        border: "1px dashed #fcd34d",
+                                        borderRadius: "var(--radius-sm)",
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                        flexWrap: "wrap",
+                                        gap: "0.75rem",
+                                      }}
+                                    >
+                                      <div>
+                                        <div style={{ fontWeight: 600, fontSize: "0.85rem", color: "#92400e" }}>
+                                          ⚠️ No floor records exist in database for this tower
+                                        </div>
+                                        <div style={{ fontSize: "0.75rem", color: "#b45309", marginTop: "0.2rem" }}>
+                                          Units cannot be added until at least one floor exists. Click generate or add a floor manually.
+                                        </div>
+                                      </div>
+                                      <div style={{ display: "flex", gap: "0.5rem" }}>
+                                        <button
+                                          type="button"
+                                          className="btn btn-xs btn-primary"
+                                          disabled={isGeneratingFloors[t.id]}
+                                          onClick={() => handleGenerateFloorsForTower(t.id, t.total_floors)}
+                                          style={{ padding: "0.3rem 0.75rem", fontSize: "0.78rem" }}
+                                        >
+                                          {isGeneratingFloors[t.id] ? "Generating…" : `⚡ Generate ${t.total_floors || 5} Floors Now`}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="btn btn-xs btn-secondary"
+                                          onClick={() => handleOpenAddFloor(t.id)}
+                                          style={{ padding: "0.3rem 0.75rem", fontSize: "0.78rem" }}
+                                        >
+                                          ➕ Add Floor Manually
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div>
+                                      <div
+                                        style={{
+                                          display: "grid",
+                                          gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))",
+                                          gap: "0.55rem",
+                                        }}
+                                      >
+                                        {floors
+                                          .slice()
+                                          .sort((a, b) => a.floor_number - b.floor_number)
+                                          .map((f) => {
+                                            const unitsOnFloor =
+                                              communityUnitsList?.filter((u) => u.floor_id === f.id) || [];
+                                            return (
+                                              <div
+                                                key={f.id}
+                                                style={{
+                                                  padding: "0.6rem 0.75rem",
+                                                  background: "#f8fafc",
+                                                  border: "1px solid #e2e8f0",
+                                                  borderRadius: "6px",
+                                                  display: "flex",
+                                                  justifyContent: "space-between",
+                                                  alignItems: "center",
+                                                }}
+                                              >
+                                                <div>
+                                                  <div style={{ fontWeight: 600, fontSize: "0.82rem", color: "var(--fg)" }}>
+                                                    {f.label || `Floor ${f.floor_number}`}
+                                                  </div>
+                                                  <div style={{ fontSize: "0.72rem", color: "var(--muted)" }}>
+                                                    Floor #{f.floor_number} • {unitsOnFloor.length} {unitsOnFloor.length === 1 ? "unit" : "units"}
+                                                  </div>
+                                                </div>
+                                                <div style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                                                  <button
+                                                    type="button"
+                                                    title={`Add Unit to ${f.label || `Floor ${f.floor_number}`}`}
+                                                    onClick={() => handleOpenAddUnit(t.id, f.id)}
+                                                    className="btn btn-xs btn-secondary"
+                                                    style={{ padding: "0.2rem 0.45rem", fontSize: "0.72rem" }}
+                                                  >
+                                                    ➕ Unit
+                                                  </button>
+                                                  {unitsOnFloor.length === 0 && (
+                                                    <button
+                                                      type="button"
+                                                      title={`Delete Floor ${f.floor_number}`}
+                                                      onClick={() => handleDeleteFloor(f.id, t.id, f.floor_number)}
+                                                      className="btn btn-xs btn-outline"
+                                                      style={{ padding: "0.2rem 0.45rem", fontSize: "0.72rem", color: "#dc2626" }}
+                                                    >
+                                                      ✕
+                                                    </button>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                      </div>
+                                      <div style={{ marginTop: "0.6rem", display: "flex", justifyContent: "flex-end" }}>
+                                        <button
+                                          type="button"
+                                          className="btn btn-xs btn-secondary"
+                                          onClick={() => handleOpenAddFloor(t.id)}
+                                          style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem" }}
+                                        >
+                                          ➕ Add Another Floor
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
-                            <div style={{ display: "flex", gap: "0.5rem" }}>
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-secondary"
-                                onClick={() => handleOpenAddFloor(t.id)}
-                              >
-                                ➕ Floor
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-primary"
-                                onClick={() => handleOpenAddUnit(t.id)}
-                              >
-                                ➕ Unit
-                              </button>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     ) : (
                       <div
@@ -2618,7 +2916,7 @@ export default function CommunitiesPage() {
                 max="100"
                 className="input-field"
                 value={towerFloors}
-                onChange={(e) => setTowerFloors(Number(e.target.value))}
+                onChange={(e) => setTowerFloors(e.target.value === "" ? "" : Number(e.target.value))}
                 required
               />
             </div>
@@ -2644,6 +2942,19 @@ export default function CommunitiesPage() {
                 <option value="wing">Wing</option>
               </select>
             </div>
+          </div>
+          <div style={{ marginBottom: "1rem", padding: "0.65rem 0.85rem", background: "#f8fafc", borderRadius: "6px", border: "1px solid var(--border)" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={autoGenFloorsOnTowerCreate}
+                onChange={(e) => setAutoGenFloorsOnTowerCreate(e.target.checked)}
+              />
+              Auto-generate {Number(towerFloors) || 1} floor records (Floor 1 to {Number(towerFloors) || 1})
+            </label>
+            <p style={{ margin: "0.25rem 0 0 1.45rem", fontSize: "0.75rem", color: "var(--muted)" }}>
+              Recommended: Automatically provisions individual floor records in database so units can be added immediately.
+            </p>
           </div>
         </form>
       </Modal>
@@ -2852,6 +3163,22 @@ export default function CommunitiesPage() {
                   ))
                 )}
               </select>
+              {towerFloorsList.length === 0 && unitTowerId && (
+                <div style={{ marginTop: "0.35rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <span style={{ fontSize: "0.75rem", color: "#dc2626" }}>
+                    No floors exist yet.
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-xs btn-primary"
+                    disabled={isGeneratingFloors[unitTowerId]}
+                    onClick={() => handleGenerateFloorsForTower(unitTowerId)}
+                    style={{ padding: "0.2rem 0.5rem", fontSize: "0.75rem" }}
+                  >
+                    {isGeneratingFloors[unitTowerId] ? "Generating…" : "⚡ Generate Floors Now"}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 

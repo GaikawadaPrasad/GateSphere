@@ -19,7 +19,7 @@ export function makeQueryClient(): QueryClient {
           return failureCount < 2;
         },
         refetchOnWindowFocus: true,
-        refetchOnMount: true,
+        refetchOnMount: false,
         refetchOnReconnect: true,
         staleTime: 30_000,
         gcTime: 5 * 60_000,
