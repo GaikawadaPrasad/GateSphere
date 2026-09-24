@@ -74,16 +74,6 @@ jobs:
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 5s --health-timeout 5s --health-retries 10
-      minio:
-        image: bitnami/minio:2024
-        env:
-          MINIO_ROOT_USER: gatesphere
-          MINIO_ROOT_PASSWORD: gatesphere-secret
-          MINIO_DEFAULT_BUCKETS: gatesphere-local
-        ports: ["9000:9000"]
-        options: >-
-          --health-cmd "curl -f http://localhost:9000/minio/health/live"
-          --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       ENVIRONMENT: local
       DEBUG: "true"
@@ -107,11 +97,25 @@ jobs:
       RATE_LIMIT_ENABLED: "true"
     steps:
       - uses: actions/checkout@v4
+      # Object storage. `bitnami/minio` was withdrawn from Docker Hub (re-audit #4 N-12), and a
+      # service container cannot pass MinIO's `server /data` argument, so run the official
+      # image as a step and create the bucket with `mc` — the same as docker-compose.yml.
+      - name: Start MinIO + bucket
+        run: |
+          docker run -d --name minio -p 9000:9000             -e MINIO_ROOT_USER=gatesphere -e MINIO_ROOT_PASSWORD=gatesphere-secret             quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:9000/minio/health/live && break; sleep 2; done
+          docker run --rm --network host --entrypoint sh quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z -c             "mc alias set local http://127.0.0.1:9000 gatesphere gatesphere-secret && mc mb -p local/gatesphere-local"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: pip install --require-hashes -r requirements-dev.lock.txt
       - run: alembic upgrade head
+      # AGENTS.md §8.4: every migration ships a working downgrade. Round-trip the newest
+      # revisions on the real schema so a broken downgrade() fails CI, not a rollback.
+      - name: Migration downgrade / re-upgrade round-trip
+        run: |
+          alembic downgrade -3
+          alembic upgrade head
       - run: python -m app.scripts.seed --reset
       - run: pytest -q
 
@@ -185,16 +189,6 @@ jobs:
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 5s --health-timeout 5s --health-retries 10
-      minio:
-        image: bitnami/minio:2024
-        env:
-          MINIO_ROOT_USER: gatesphere
-          MINIO_ROOT_PASSWORD: gatesphere-secret
-          MINIO_DEFAULT_BUCKETS: gatesphere-local
-        ports: ["9000:9000"]
-        options: >-
-          --health-cmd "curl -f http://localhost:9000/minio/health/live"
-          --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       ENVIRONMENT: local
       SECRET_KEY: ci-test-secret-key-not-for-production-0000
@@ -216,12 +210,24 @@ jobs:
       S3_REGION: us-east-1
       EMAIL_BACKEND: console
       SEED_ON_START: "false"
-      # The suite signs several roles in from one IP; keep the limiter on, but roomy.
+      # The suite signs several roles in from one IP; keep the limiter on, but roomy. The
+      # limiter keys by user id and the resident portal is chatty (dozens of requests per page
+      # + 10 s polling); journeys reuse the same demo users, so the default bucket is raised
+      # too — back-to-back runs otherwise hit genuine 429s (re-audit #5).
       RATE_LIMIT_LOGIN: 100/60
+      RATE_LIMIT_DEFAULT: 3000/60
       BACKEND_INTERNAL_URL: http://127.0.0.1:8000
       NEXT_TELEMETRY_DISABLED: "1"
     steps:
       - uses: actions/checkout@v4
+      # Object storage. `bitnami/minio` was withdrawn from Docker Hub (re-audit #4 N-12), and a
+      # service container cannot pass MinIO's `server /data` argument, so run the official
+      # image as a step and create the bucket with `mc` — the same as docker-compose.yml.
+      - name: Start MinIO + bucket
+        run: |
+          docker run -d --name minio -p 9000:9000             -e MINIO_ROOT_USER=gatesphere -e MINIO_ROOT_PASSWORD=gatesphere-secret             quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:9000/minio/health/live && break; sleep 2; done
+          docker run --rm --network host --entrypoint sh quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z -c             "mc alias set local http://127.0.0.1:9000 gatesphere gatesphere-secret && mc mb -p local/gatesphere-local"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"

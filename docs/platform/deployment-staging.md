@@ -50,6 +50,7 @@ EMAIL_BACKEND=brevo
 BREVO_API_KEY=<brevo key>
 EMAIL_FROM=no-reply@<domain>
 RATE_LIMIT_LOGIN=5/minute
+TRUSTED_PROXY_HOPS=1   # Render load balancer; rate-limit by the real client IP
 ```
 
 ### Vercel (frontend)

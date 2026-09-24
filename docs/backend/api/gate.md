@@ -9,7 +9,7 @@ global caller on the collection routes.
 | Method & path | Permission | Body | Success | Notes |
 |---|---|---|---|---|
 | `GET /gate/health` | – (session) | – | `200` | liveness |
-| `GET /gate/events` | `gate:view` | – | `200` list | `?gate_id=`, `?event_type=`, `?community_id=` |
+| `GET /gate/events` | `gate:view` | – | `200` list | `?gate_id=`, `?event_type=`, `?community_id=`. Offset pages by default (`meta.page/page_size/total`). **Keyset**: `?keyset=true` for the first page, then `?cursor=<meta.next_cursor>` → `meta: {page_size, next_cursor}` (no `total`, stable under concurrent inserts; `next_cursor` null on the last page). Malformed cursor → `400 INVALID_CURSOR` |
 | `POST /gate/events` | `gate:create` | `EventCreate` | `201` single | append-only; `422 INVALID_ENUM`; `404` if gate outside scope |
 | `POST /gate/checkpoint-override` | `gate:approve` | `CheckpointOverride` | `201` `EventRead` | Security Supervisor / Community Admin only — logs an append-only `checkpoint_override` gate event + notifies supervisors + admin; `reason` mandatory (`422` if too short) |
 | `GET /gate/rosters` | `gate:view` | – | `200` list | `?guard_user_id=`, `?roster_status=` |

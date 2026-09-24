@@ -18,7 +18,8 @@ from app.core.context import RequestContext
 from app.core.errors import BusinessRuleError, NotFoundError
 from app.core.tenancy import TenantScope
 from app.modules.audit.service import record_audit_async
-from app.modules.communities.models import Gate, Unit
+from app.modules.communities.models import Unit
+from app.modules.communities.repository import gate_in_scope
 from app.modules.deliveries import schemas
 from app.modules.deliveries.models import (
     CANONICAL_PROTOCOLS,
@@ -112,10 +113,7 @@ class DeliveryService(UnitScopedAccess):
     async def _gate_in_scope(self, gate_id: uuid.UUID | None) -> uuid.UUID | None:
         if gate_id is None:
             return None
-        stmt = select(Gate).where(Gate.id == gate_id)
-        if not self.scope.is_global:
-            stmt = stmt.where(Gate.community_id.in_(self.scope.community_ids))
-        gate = await self.db.scalar(stmt)
+        gate = await gate_in_scope(self.db, self.scope, gate_id)
         if gate is None:
             raise NotFoundError("Gate not found")
         return gate.id

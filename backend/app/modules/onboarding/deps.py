@@ -35,14 +35,14 @@ def onboarding_service(
 
 def public_onboarding_service(
     request: Request,
-    db: AsyncSession = Depends(get_async_db),
+    db: AsyncSession = Depends(get_async_db, scope="function"),
 ) -> OnboardingService:
     return OnboardingService(db, None, None, request)
 
 
 async def optional_user(
     request: Request,
-    db: AsyncSession = Depends(get_async_db),
+    db: AsyncSession = Depends(get_async_db, scope="function"),
 ) -> User | None:
     """The signed-in user, or ``None`` — never raises. Used by ``POST .../accept``."""
     if not request.cookies.get(settings.SESSION_COOKIE_NAME):

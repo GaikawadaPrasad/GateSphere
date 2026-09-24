@@ -41,6 +41,7 @@ async def _close_past_bookings() -> dict:
                 module="amenities",
                 action="booking.completed",
                 actor=actor,
+                role_slug="system",
                 community_id=b.community_id,
                 entity_type="amenity_booking",
                 entity_id=b.id,

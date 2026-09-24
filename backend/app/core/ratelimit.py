@@ -122,8 +122,25 @@ def _identity(request: Request) -> str:
                     return "user:" + json.loads(raw)["user_id"]
                 except (ValueError, KeyError):
                     pass
+    return f"ip:{client_ip(request)}"
+
+
+def client_ip(request: Request) -> str:
+    """The real client address. With `TRUSTED_PROXY_HOPS = N`, each trusted proxy appended
+    one entry to X-Forwarded-For, so the client is the N-th entry from the RIGHT; anything
+    further left was supplied by the client and is ignored (spoof-proof). With N = 0, or a
+    header shorter than N, fall back to the socket peer."""
+    hops = settings.TRUSTED_PROXY_HOPS
+    if hops > 0:
+        forwarded = [
+            part.strip()
+            for part in request.headers.get("x-forwarded-for", "").split(",")
+            if part.strip()
+        ]
+        if len(forwarded) >= hops:
+            return forwarded[-hops]
     client = request.client
-    return f"ip:{client.host}" if client else "ip:unknown"
+    return client.host if client else "unknown"
 
 
 def _hash(token: str) -> str:
@@ -186,7 +203,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         try:
             used = await asyncio.to_thread(_check_rate_limit)
-        except (RedisError, Exception):
+        except (RedisError, OSError):
+            # Redis unreachable: sensitive classes fail closed, the rest fail open (§9.2).
+            # Any other exception is a bug and propagates to the central handler.
             if cls in ("auth", "payment"):
                 return _unavailable(getattr(request.state, "request_id", None))
             return await call_next(request)

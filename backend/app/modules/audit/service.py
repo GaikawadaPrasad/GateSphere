@@ -12,11 +12,14 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
+import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.context import RequestContext
 from app.modules.audit.models import AuditLog
 from app.modules.users.models import User
+
+log = structlog.get_logger(__name__)
 
 
 def _jsonable(value: Any) -> Any:
@@ -81,6 +84,11 @@ async def record_audit_async(
     `role_slug` overrides `ctx.role_slug` — used by login/logout and system jobs where
     `request.state` is not populated.
     """
+    if ctx is None and role_slug is None:
+        # Every call site must pass a request context or an explicit actor marker (system
+        # jobs: role_slug="system"); tests/test_audit_context.py enforces it statically.
+        # Logged, not raised: an audit write must never break the business operation.
+        log.warning("audit.missing_context", module=module, action=action)
     row = _build_audit_row(
         module=module,
         action=action,

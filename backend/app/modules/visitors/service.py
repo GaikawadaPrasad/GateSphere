@@ -901,7 +901,9 @@ class VisitorService(UnitScopedAccess):
             gate_id=await self._gate_in_scope(payload.gate_id),
             entry_guard_user_id=self.actor.id,
             entry_at=datetime.now(UTC),
-            vehicle_number=payload.vehicle_number or req.vehicle_number or (visitor.vehicle_number if visitor else None),
+            vehicle_number=payload.vehicle_number
+            or req.vehicle_number
+            or (visitor.vehicle_number if visitor else None),
             entry_photo_url=payload.entry_photo_url,
             status="inside",
         )

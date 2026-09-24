@@ -18,6 +18,52 @@ Format per entry:
 
 ---
 
+## 2026-09-24 — Re-audit #4 remediation (lint/types/layering CI, N-9…N-12, 10-A, E2E)
+
+**By:** Claude Code (with johnalexanderkondepoguVPD)
+**Branch / commit:** `feature-superadmin` @ `e50ca3e` + uncommitted working tree
+**What changed:**
+- **Local `black --check` failures:** the project `.venv` had Black 24.10 while CI/code use
+  26.3.1. Root cause: the locks (compiled on Linux) listed `uvloop` without its platform marker,
+  so `pip install -r requirements-dev.lock.txt` failed on Windows and the venv never updated.
+  `uvloop==0.22.1 ; sys_platform != "win32"` pinned in `requirements.in`, locks regenerated
+  (pins unchanged). `[tool.black] required-version = "26.3.1"` makes a mismatch explicit.
+  Teammate commits had 4 ruff errors + 2 unformatted files: fixed.
+- **CI `backend-types`:** mypy 654 → 622 (baseline lowered to 622): `residents/access.py`
+  scope helpers typed for mapped columns (9 call sites), vehicles/gate services annotated.
+- **CI `backend-layering`:** 229 → 218: gate-module query builders moved into
+  `gate/repository.py`; the duplicated gate-in-scope lookup (gate/vehicles/deliveries) is one
+  `communities.repository.gate_in_scope()`; guard contacts fetched by `guard_contacts()`.
+- **N-9:** migration `0047_delivery_protocol_fk` → `ON DELETE SET NULL (protocol_id)`
+  (NOT VALID + separate VALIDATE, lock_timeout). Test deletes a referenced protocol.
+- **N-10:** `GET /gate/events?keyset=true|cursor=` exposes keyset pagination (`CursorMeta`, no
+  total). Cursor now ISO-8601 (float epoch lost microseconds → rows could repeat/skip).
+- **N-11 / FR-17:** seeded `resident<N>.<code>` accounts had no role grant (could not sign in);
+  demo `resident@` now owns the paid / partially-paid / payable invoices of its community.
+- **N-12:** `bitnami/minio:2024` is gone from Docker Hub (CI `backend-tests` and `frontend-e2e`
+  would fail at service start). Replaced by the official `quay.io/minio/minio` (pinned release)
+  started as a step + `mc mb` (same as docker-compose).
+- **10-A:** `TRUSTED_PROXY_HOPS` (default 0; Render = 1) — client IP = N-th X-Forwarded-For entry
+  from the right (spoof-proof); limiter `except` narrowed to `(RedisError, OSError)`.
+- **Finding 3:** the 3 task audit calls pass `role_slug="system"`; `tests/test_audit_context.py`
+  statically fails CI if a new `record_audit*` call passes neither `ctx` nor `role_slug`;
+  runtime logs `audit.missing_context` (never raises).
+- **E2E:** + amenity booking conflict, complaint lifecycle, gate entry (11 journeys).
+- **CI:** migration downgrade/re-upgrade round-trip step added to `backend-tests`.
+- **Found during the re-audit — commit AFTER response (data integrity):** since FastAPI 0.121 a
+  `yield` dependency's teardown runs after the response is sent unless `scope="function"`.
+  `get_async_db` commits in its teardown, so clients got `201` before the commit (next request
+  → `404`; Newman + E2E flaked) and a commit failure was never reported to the client. All 10
+  `Depends(get_async_db)` now `scope="function"`; `tests/test_db_commit_before_response.py`
+  walks every route's dependency graph (negative control verified).
+- **E2E environment:** back-to-back runs hit genuine 429s (limiter keys by user id; the resident
+  portal is chatty) — `RATE_LIMIT_DEFAULT=3000/60` in the E2E job, limiter still on.
+**Verified:** see `5_reaudit_qa_findings.md`.
+**Open / next:** S-01 (app still connects as the owner role); `units` unique-constraint drift
+(model `(community_id, tower_id, unit_number)` vs DB `(…, floor_id, …)` since `37aeead`, no
+migration) — needs a data decision, then an `alembic check` CI gate; dual-role ticket
+confirmation (PRD question).
+
 ## 2026-09-24 — Staging deploy failed: 0045 deadlocked with live traffic
 
 **By:** Claude Code (with johnalexanderkondepoguVPD)

@@ -103,7 +103,7 @@ must update this page in the same PR.
 | Table | Key columns | Notes |
 |-------|-------------|-------|
 | `delivery_protocols` | `community_id`, `delivery_type`, `protocol_type`, `requires_otp`, `allow_direct_entry`, `leave_at_gate`, `allowed_start_time`, `allowed_end_time`, `is_active` | **DB source of truth** for protocol rules — never hardcode. |
-| `deliveries` | `community_id`, `unit_id`, `resident_user_id`, `delivery_type`, `provider_name`, `executive_name`, `executive_phone`, `tracking_reference`, `protocol_id`, `approval_status`, `approved_by_user_id`, `expected_at`, `arrived_at`, `status`, `parcel_count`, `notes` | Protocol/unit/resident all belong to `deliveries.community_id`. |
+| `deliveries` | `community_id`, `unit_id`, `resident_user_id`, `delivery_type`, `provider_name`, `executive_name`, `executive_phone`, `tracking_reference`, `protocol_id`, `approval_status`, `approved_by_user_id`, `expected_at`, `arrived_at`, `status`, `parcel_count`, `notes` | Protocol/unit/resident all belong to `deliveries.community_id`. FK `(protocol_id, community_id) → delivery_protocols` is `ON DELETE SET NULL (protocol_id)` (0047): deleting a protocol nulls only `protocol_id`. |
 | `delivery_events` | `delivery_id`, `gate_id`, `actor_user_id`, `event_type`, `occurred_at`, `remarks`, `metadata` JSONB | **Append-only.** |
 
 ## 07 · Vehicle & Parking

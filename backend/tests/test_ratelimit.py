@@ -143,3 +143,50 @@ def test_invite_token_is_redacted_in_logs():
         == "/api/v1/invitations/<redacted>/accept"
     )
     assert redact_path("/api/v1/visitors/requests/xyz") == "/api/v1/visitors/requests/xyz"
+
+
+# --- trusted-proxy client IP (re-audit #4, 10-A) -------------------------------------- #
+
+
+def _req_from(peer: str, xff: str | None) -> Request:
+    headers = [(b"x-forwarded-for", xff.encode())] if xff is not None else []
+    return Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/",
+            "headers": headers,
+            "query_string": b"",
+            "client": (peer, 1234),
+        }
+    )
+
+
+@pytest.fixture()
+def _hops():
+    prev = ratelimit.settings.TRUSTED_PROXY_HOPS
+    yield lambda n: setattr(ratelimit.settings, "TRUSTED_PROXY_HOPS", n)
+    ratelimit.settings.TRUSTED_PROXY_HOPS = prev
+
+
+def test_no_trusted_proxy_ignores_forwarded_header(_hops) -> None:
+    _hops(0)
+    assert ratelimit.client_ip(_req_from("10.0.0.9", "1.2.3.4")) == "10.0.0.9"
+
+
+def test_one_trusted_proxy_uses_rightmost_entry(_hops) -> None:
+    _hops(1)
+    assert ratelimit.client_ip(_req_from("10.0.0.9", "203.0.113.7")) == "203.0.113.7"
+
+
+def test_spoofed_leading_entries_are_ignored(_hops) -> None:
+    """A client can prepend anything; only the entry our proxy appended is trusted."""
+    _hops(1)
+    req = _req_from("10.0.0.9", "6.6.6.6, 203.0.113.7")
+    assert ratelimit.client_ip(req) == "203.0.113.7"
+
+
+def test_short_forwarded_header_falls_back_to_peer(_hops) -> None:
+    _hops(2)
+    assert ratelimit.client_ip(_req_from("10.0.0.9", "203.0.113.7")) == "10.0.0.9"
+    assert ratelimit.client_ip(_req_from("10.0.0.9", None)) == "10.0.0.9"

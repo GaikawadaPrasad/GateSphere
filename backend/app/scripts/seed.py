@@ -168,6 +168,7 @@ def seed_residents(db: Session, communities: list[Community]) -> None:
         UnitOccupancy,
     )
 
+    resident_role = db.scalar(select(Role).where(Role.slug == "resident"))
     for c in communities:
         units = db.scalars(
             select(Unit).where(Unit.community_id == c.id).order_by(Unit.unit_number).limit(6)
@@ -182,6 +183,11 @@ def seed_residents(db: Session, communities: list[Community]) -> None:
                     "full_name": f"Resident {i} ({c.code})",
                     "password_hash": hash_password("Resident#2026"),
                 },
+            )
+            # Without a community-scoped `resident` grant the account cannot sign in
+            # (`NO_ROLE`) — every seeded resident must be usable for demos and QA (FR-17).
+            _get_or_create(
+                db, UserRole, user_id=user.id, role_id=resident_role.id, community_id=c.id
             )
             profile, created = _get_or_create(
                 db,
@@ -685,6 +691,12 @@ def seed_operations(db: Session, communities: list[Community]) -> None:
             prof = _profiles.get(occ.resident_profile_id)
             return prof.user_id if prof else None
 
+        # The demo `resident@` account (demos, Sivion QA, E2E) must never open onto empty
+        # billing / complaint screens (FR-17): put its occupancy first so the per-community
+        # invoice and ticket plans below always include it. Stable sort keeps the rest.
+        demo_resident_id = db.scalar(select(User.id).where(User.email == f"resident@{DEMO_DOMAIN}"))
+        occupancies = sorted(occupancies, key=lambda o: _resident_user(o) != demo_resident_id)
+
         # -- Billing: 3 invoices (paid / partially paid / posted-unpaid) + payments --------
         maint = db.scalar(
             select(ChargeHead).where(ChargeHead.community_id == c.id, ChargeHead.code == "MAINT")
@@ -697,8 +709,11 @@ def seed_operations(db: Session, communities: list[Community]) -> None:
             ("partially_paid", Decimal("0.4")),
             ("posted", Decimal("0")),
         ]
+        demo_here = _resident_user(occupancies[0]) == demo_resident_id
         for idx, (target_status, paid_ratio) in enumerate(plans):
-            occ = occupancies[idx % len(occupancies)]
+            # The demo resident gets all three states (paid / partially paid / payable), so
+            # the payment flow is demonstrable from that account; elsewhere, spread them out.
+            occ = occupancies[0] if demo_here else occupancies[idx % len(occupancies)]
             base = Decimal("2875.00")
             water_amt = Decimal("300.00")
             tax = ((base + water_amt) * Decimal("0.18")).quantize(Decimal("0.01"))

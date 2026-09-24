@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,7 +20,7 @@ from app.core.context import RequestContext
 from app.core.errors import BusinessRuleError, ConflictError, NotFoundError
 from app.core.tenancy import TenantScope
 from app.modules.audit.service import record_audit_async
-from app.modules.communities.models import Gate
+from app.modules.communities.repository import gate_in_scope
 from app.modules.residents.access import UnitScopedAccess
 from app.modules.residents.models import ResidentProfile
 from app.modules.uploads.guard import ensure_confirmed_async
@@ -81,7 +82,14 @@ class VehicleService(UnitScopedAccess):
         self.rules = RuleRepository(db, scope)
         self.violations = ViolationRepository(db, scope)
 
-    async def _audit(self, action, community_id, entity_type, entity_id, **kw):
+    async def _audit(
+        self,
+        action: str,
+        community_id: uuid.UUID | None,
+        entity_type: str,
+        entity_id: uuid.UUID | str,
+        **kw: Any,
+    ) -> None:
         await record_audit_async(
             self.db,
             module="vehicles",
@@ -106,10 +114,7 @@ class VehicleService(UnitScopedAccess):
     async def _gate_in_scope(self, gate_id: uuid.UUID | None) -> uuid.UUID | None:
         if gate_id is None:
             return None
-        stmt = select(Gate).where(Gate.id == gate_id)
-        if not self.scope.is_global:
-            stmt = stmt.where(Gate.community_id.in_(self.scope.community_ids))
-        gate = await self.db.scalar(stmt)
+        gate = await gate_in_scope(self.db, self.scope, gate_id)
         if gate is None:
             raise NotFoundError("Gate not found")
         return gate.id
@@ -125,7 +130,9 @@ class VehicleService(UnitScopedAccess):
     async def get_rule(self, *, community_id: uuid.UUID | None) -> ParkingRule:
         return await self._rule(self._one_community(community_id))
 
-    async def update_rule(self, payload: schemas.RuleUpdate, *, community_id: uuid.UUID | None):
+    async def update_rule(
+        self, payload: schemas.RuleUpdate, *, community_id: uuid.UUID | None
+    ) -> ParkingRule:
         obj = await self._rule(self._one_community(community_id))
         patch = payload.model_dump(exclude_unset=True)
         for k, v in patch.items():
@@ -137,7 +144,7 @@ class VehicleService(UnitScopedAccess):
     # -- vehicles --------------------------------------------- #
     async def register_vehicle(
         self, payload: schemas.VehicleCreate, *, community_id: uuid.UUID | None
-    ):
+    ) -> Vehicle:
         cid = self._one_community(community_id)
         _enum("vehicle_type", payload.vehicle_type)
         plate = payload.registration_number.upper()
@@ -206,7 +213,7 @@ class VehicleService(UnitScopedAccess):
 
     async def list_vehicles(
         self, *, community_id: uuid.UUID | None, q: str | None, offset: int, limit: int
-    ):
+    ) -> tuple[list[Vehicle], int]:
         cid = self._one_community(community_id)
         stmt = select(Vehicle).where(Vehicle.community_id == cid)
         if q:
@@ -218,7 +225,9 @@ class VehicleService(UnitScopedAccess):
         ), await self.vehicles.count(extra=stmt)
 
     # -- slots ----------------------------------------------- #
-    async def create_slot(self, payload: schemas.SlotCreate, *, community_id: uuid.UUID | None):
+    async def create_slot(
+        self, payload: schemas.SlotCreate, *, community_id: uuid.UUID | None
+    ) -> ParkingSlot:
         cid = self._one_community(community_id)
         _enum("slot_type", payload.slot_type)
         if await self.slots.by_code(cid, payload.slot_code):
@@ -243,7 +252,7 @@ class VehicleService(UnitScopedAccess):
         slot_status: str | None,
         offset: int,
         limit: int,
-    ):
+    ) -> tuple[list[ParkingSlot], int]:
         _enum("slot_status", slot_status)
         cid = self._one_community(community_id)
         stmt = select(ParkingSlot).where(ParkingSlot.community_id == cid)
@@ -310,7 +319,7 @@ class VehicleService(UnitScopedAccess):
         active_only: bool,
         offset: int,
         limit: int,
-    ):
+    ) -> tuple[list[ParkingAllocation], int]:
         stmt = select(ParkingAllocation)
         if community_id is not None:
             self.scope.require(community_id)
@@ -324,7 +333,9 @@ class VehicleService(UnitScopedAccess):
         ), await self.allocations.count(extra=stmt)
 
     # -- gate entries ---------------------------------- #
-    async def record_entry(self, payload: schemas.EntryCreate, *, community_id: uuid.UUID | None):
+    async def record_entry(
+        self, payload: schemas.EntryCreate, *, community_id: uuid.UUID | None
+    ) -> VehicleEntry:
         cid = self._one_community(community_id)
         _enum("source_type", payload.source_type)
         plate = payload.registration_number.upper()
@@ -369,7 +380,7 @@ class VehicleService(UnitScopedAccess):
         open_only: bool,
         offset: int,
         limit: int,
-    ):
+    ) -> tuple[list[VehicleEntry], int]:
         stmt = select(VehicleEntry)
         if community_id is not None:
             self.scope.require(community_id)
@@ -386,7 +397,7 @@ class VehicleService(UnitScopedAccess):
     # -- violations ---------------------------------- #
     async def report_violation(
         self, payload: schemas.ViolationCreate, *, community_id: uuid.UUID | None
-    ):
+    ) -> ParkingViolation:
         cid = self._one_community(community_id)
         _enum("violation_type", payload.violation_type)
         await ensure_confirmed_async(self.db, payload.evidence_url)
@@ -430,7 +441,7 @@ class VehicleService(UnitScopedAccess):
         violation_status: str | None,
         offset: int,
         limit: int,
-    ):
+    ) -> tuple[list[ParkingViolation], int]:
         _enum("violation_status", violation_status)
         stmt = select(ParkingViolation)
         if community_id is not None:

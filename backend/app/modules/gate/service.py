@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,13 +26,15 @@ from app.core.errors import (
 from app.core.state_machine import ensure_transition
 from app.core.tenancy import TenantScope
 from app.modules.audit.service import record_audit_async
-from app.modules.communities.models import Gate
+from app.modules.communities.repository import gate_in_scope
+from app.modules.gate import schemas
 from app.modules.gate.models import GateAssignment, GateEvent, GuardRoster, PanicAlert
 from app.modules.gate.repository import (
     GateAssignmentRepository,
     GateEventRepository,
     GuardRosterRepository,
     PanicAlertRepository,
+    guard_contacts,
 )
 from app.modules.gate.schemas import ALLOWED
 from app.modules.notifications import events as notif_events
@@ -68,7 +71,14 @@ class GateService:
         self.alerts = PanicAlertRepository(db, scope)
 
     # -- helpers ---------------------------------------------------- #
-    async def _audit(self, action, community_id, entity_type, entity_id, **kw):
+    async def _audit(
+        self,
+        action: str,
+        community_id: uuid.UUID | None,
+        entity_type: str,
+        entity_id: uuid.UUID | str,
+        **kw: Any,
+    ) -> None:
         await record_audit_async(
             self.db,
             module="gate",
@@ -93,25 +103,19 @@ class GateService:
     async def _gate_in_scope(self, gate_id: uuid.UUID | None) -> uuid.UUID | None:
         if gate_id is None:
             return None
-        stmt = select(Gate).where(Gate.id == gate_id)
-        if not self.scope.is_global:
-            stmt = stmt.where(Gate.community_id.in_(self.scope.community_ids))
-        gate = await self.db.scalar(stmt)
+        gate = await gate_in_scope(self.db, self.scope, gate_id)
         if gate is None:
             raise NotFoundError("Gate not found")
         return gate.id
 
     async def _gate_community(self, gate_id: uuid.UUID) -> uuid.UUID:
-        stmt = select(Gate).where(Gate.id == gate_id)
-        if not self.scope.is_global:
-            stmt = stmt.where(Gate.community_id.in_(self.scope.community_ids))
-        gate = await self.db.scalar(stmt)
+        gate = await gate_in_scope(self.db, self.scope, gate_id)
         if gate is None:
             raise NotFoundError("Gate not found")
         return gate.community_id
 
     # -- gate events (append-only) -------------------------------- #
-    async def log_event(self, payload) -> GateEvent:
+    async def log_event(self, payload: schemas.EventCreate) -> GateEvent:
         _enum("event_type", payload.event_type)
         if payload.gate_id is not None:
             community_id = await self._gate_community(payload.gate_id)
@@ -133,7 +137,7 @@ class GateService:
         )
         return obj
 
-    async def override_checkpoint(self, payload) -> GateEvent:
+    async def override_checkpoint(self, payload: schemas.CheckpointOverride) -> GateEvent:
         """Supervisor manually overrides a gate checkpoint (FR-05) — append-only event
         + audit + notification to supervisors and the community admin."""
         if payload.gate_id is not None:
@@ -181,46 +185,38 @@ class GateService:
         gate_id: uuid.UUID | None = None,
         event_type: str | None = None,
         cursor: str | None = None,
+        keyset: bool = False,
         offset: int = 0,
         limit: int = 20,
-    ):
+    ) -> tuple[list[GateEvent], str | int | None]:
+        """Offset mode returns `(rows, total)`. Keyset mode (`keyset=True` for the first page,
+        or any `cursor`) returns `(rows, next_cursor)` and never counts (AGENTS.md §4.3)."""
         import base64
 
         _enum("event_type", event_type)
-        stmt = select(GateEvent)
-        if community_id is not None:
-            if not self.scope.is_global and self.scope.community_ids:
-                self.scope.require(community_id)
-            stmt = stmt.where(GateEvent.community_id == community_id)
-        if gate_id:
-            stmt = stmt.where(GateEvent.gate_id == gate_id)
-        if event_type:
-            stmt = stmt.where(GateEvent.event_type == event_type)
+        if community_id is not None and not self.scope.is_global and self.scope.community_ids:
+            self.scope.require(community_id)
+        stmt = self.events.filtered(
+            community_id=community_id, gate_id=gate_id, event_type=event_type
+        )
 
-        if cursor:
-            try:
-                decoded = base64.b64decode(cursor).decode("utf-8")
-                ts, last_id = decoded.split("|")
-                dt = datetime.fromtimestamp(float(ts), UTC)
-                # Keyset pagination condition: (occurred_at, id) < (dt, last_id)
-                from sqlalchemy import literal, tuple_
-
-                stmt = stmt.where(
-                    tuple_(GateEvent.occurred_at, GateEvent.id)
-                    < tuple_(literal(dt), literal(uuid.UUID(last_id)))
-                )
-            except (ValueError, TypeError, UnicodeDecodeError) as exc:
-                raise AppError("Invalid cursor", code="INVALID_CURSOR") from exc
-
-            stmt = stmt.order_by(GateEvent.occurred_at.desc(), GateEvent.id.desc())
-            rows = list((await self.db.scalars(self.events._scoped(stmt).limit(limit + 1))).all())
+        if cursor or keyset:
+            after: tuple[datetime, uuid.UUID] | None = None
+            if cursor:
+                try:
+                    # Opaque to clients: base64("<ISO-8601 occurred_at>|<uuid>"). ISO keeps the
+                    # full microsecond precision a float epoch would round away.
+                    ts, last_id = base64.urlsafe_b64decode(cursor).decode("utf-8").split("|")
+                    after = (datetime.fromisoformat(ts), uuid.UUID(last_id))
+                except (ValueError, TypeError, UnicodeDecodeError) as exc:
+                    raise AppError("Invalid cursor", code="INVALID_CURSOR") from exc
+            rows = await self.events.keyset_page(stmt, after=after, limit=limit)
             next_cursor = None
             if len(rows) > limit:
                 rows.pop()
                 last = rows[-1]
-                ts = last.occurred_at.timestamp()
-                next_cursor = base64.b64encode(f"{ts}|{last.id}".encode()).decode("utf-8")
-
+                token = f"{last.occurred_at.isoformat()}|{last.id}".encode()
+                next_cursor = base64.urlsafe_b64encode(token).decode("ascii")
             return rows, next_cursor
 
         stmt = stmt.order_by(GateEvent.occurred_at.desc(), GateEvent.id.desc())
@@ -229,19 +225,19 @@ class GateService:
         return rows, total
 
     # -- guard rosters ------------------------------------------ #
-    async def create_roster(self, payload, *, community_id: uuid.UUID | None) -> GuardRoster:
+    async def create_roster(
+        self, payload: schemas.RosterCreate, *, community_id: uuid.UUID | None
+    ) -> GuardRoster:
         cid = self._one_community(community_id)
         if payload.shift_end <= payload.shift_start:
             raise BusinessRuleError(
                 "shift_end must be after shift_start", code="INVALID_TIME_RANGE"
             )
-        clash = await self.db.scalar(
-            select(GuardRoster).where(
-                GuardRoster.community_id == cid,
-                GuardRoster.guard_user_id == payload.guard_user_id,
-                GuardRoster.shift_date == payload.shift_date,
-                GuardRoster.shift_start == payload.shift_start,
-            )
+        clash = await self.rosters.find_clash(
+            community_id=cid,
+            guard_user_id=payload.guard_user_id,
+            shift_date=payload.shift_date,
+            shift_start=payload.shift_start,
         )
         if clash is not None:
             raise ConflictError("That guard already has a shift at this time", code="ROSTER_EXISTS")
@@ -266,36 +262,28 @@ class GateService:
         roster_status: str | None,
         offset: int,
         limit: int,
-    ):
+    ) -> tuple[list[GuardRoster], int]:
         _enum("roster_status", roster_status)
-        stmt = select(GuardRoster)
         if community_id is not None:
             self.scope.require(community_id)
-            stmt = stmt.where(GuardRoster.community_id == community_id)
-        if guard_user_id:
-            stmt = stmt.where(GuardRoster.guard_user_id == guard_user_id)
-        if roster_status:
-            stmt = stmt.where(GuardRoster.status == roster_status)
-        stmt = stmt.order_by(GuardRoster.shift_date.desc(), GuardRoster.shift_start)
+        stmt = self.rosters.filtered(
+            community_id=community_id, guard_user_id=guard_user_id, status=roster_status
+        )
         rosters = await self.rosters.list(offset=offset, limit=limit, extra=stmt)
         total = await self.rosters.count(extra=stmt)
-        guard_ids = {r.guard_user_id for r in rosters if r.guard_user_id}
-        if guard_ids:
-            u_stmt = select(User.id, User.full_name, User.phone).where(User.id.in_(guard_ids))
-            users_res = (await self.db.execute(u_stmt)).all()
-            user_map = {u[0]: (u[1], u[2]) for u in users_res}
-            for r in rosters:
-                if r.guard_user_id in user_map:
-                    r.guard_name, r.guard_phone = user_map[r.guard_user_id]
+        user_map = await guard_contacts(
+            self.db, {r.guard_user_id for r in rosters if r.guard_user_id}
+        )
+        for r in rosters:
+            if r.guard_user_id in user_map:
+                r.guard_name, r.guard_phone = user_map[r.guard_user_id]
         return rosters, total
 
     async def _populate_guard_info(self, obj: GuardRoster) -> GuardRoster:
         if obj and obj.guard_user_id:
-            u_stmt = select(User.id, User.full_name, User.phone).where(User.id == obj.guard_user_id)
-            user_res = (await self.db.execute(u_stmt)).first()
-            if user_res:
-                obj.guard_name = user_res[1]
-                obj.guard_phone = user_res[2]
+            contact = (await guard_contacts(self.db, {obj.guard_user_id})).get(obj.guard_user_id)
+            if contact:
+                obj.guard_name, obj.guard_phone = contact
         return obj
 
     async def _get_roster(self, roster_id: uuid.UUID) -> GuardRoster:
@@ -304,7 +292,9 @@ class GateService:
             raise NotFoundError("Roster not found")
         return obj
 
-    async def update_roster(self, roster_id: uuid.UUID, payload) -> GuardRoster:
+    async def update_roster(
+        self, roster_id: uuid.UUID, payload: schemas.RosterUpdate
+    ) -> GuardRoster:
         """Edit roster **details** only. Status is a guarded transition — see
         `transition_roster` / `POST /gate/rosters/{id}/status`."""
         obj = await self._get_roster(roster_id)
@@ -316,7 +306,7 @@ class GateService:
         return await self._populate_guard_info(obj)
 
     async def transition_roster(
-        self, roster_id: uuid.UUID, new_status: str, reason=None
+        self, roster_id: uuid.UUID, new_status: str, reason: str | None = None
     ) -> GuardRoster:
         obj = await self._get_roster(roster_id)
         _enum("roster_status", new_status)
@@ -335,7 +325,9 @@ class GateService:
         return await self._populate_guard_info(obj)
 
     # -- gate assignments ----------------------------------- #
-    async def create_assignment(self, payload, *, community_id: uuid.UUID | None) -> GateAssignment:
+    async def create_assignment(
+        self, payload: schemas.AssignmentCreate, *, community_id: uuid.UUID | None
+    ) -> GateAssignment:
         gate_cid = await self._gate_community(payload.gate_id)
         if community_id is not None and community_id != gate_cid:
             raise NotFoundError("Gate not found")
@@ -365,16 +357,12 @@ class GateService:
         active_only: bool,
         offset: int,
         limit: int,
-    ):
-        stmt = select(GateAssignment)
+    ) -> tuple[list[GateAssignment], int]:
         if community_id is not None:
             self.scope.require(community_id)
-            stmt = stmt.where(GateAssignment.community_id == community_id)
-        if gate_id:
-            stmt = stmt.where(GateAssignment.gate_id == gate_id)
-        if active_only:
-            stmt = stmt.where(GateAssignment.status == "active")
-        stmt = stmt.order_by(GateAssignment.assigned_from.desc())
+        stmt = self.assignments.filtered(
+            community_id=community_id, gate_id=gate_id, active_only=active_only
+        )
         return await self.assignments.list(
             offset=offset, limit=limit, extra=stmt
         ), await self.assignments.count(extra=stmt)
@@ -392,7 +380,7 @@ class GateService:
         return obj
 
     # -- panic alerts -------------------------------------- #
-    async def raise_alert(self, payload) -> PanicAlert:
+    async def raise_alert(self, payload: schemas.AlertCreate) -> PanicAlert:
         _enum("alert_type", payload.alert_type)
         _enum("severity", payload.severity)
         if payload.gate_id is not None:
@@ -480,15 +468,11 @@ class GateService:
         alert_status: str | None,
         offset: int,
         limit: int,
-    ):
+    ) -> tuple[list[PanicAlert], int]:
         _enum("alert_status", alert_status)
-        stmt = select(PanicAlert)
         if community_id is not None:
             self.scope.require(community_id)
-            stmt = stmt.where(PanicAlert.community_id == community_id)
-        if alert_status:
-            stmt = stmt.where(PanicAlert.status == alert_status)
-        stmt = stmt.order_by(PanicAlert.triggered_at.desc())
+        stmt = self.alerts.filtered(community_id=community_id, status=alert_status)
         return await self.alerts.list(
             offset=offset, limit=limit, extra=stmt
         ), await self.alerts.count(extra=stmt)
@@ -510,7 +494,7 @@ class GateService:
         await self._audit("alert.acknowledge", obj.community_id, "panic_alert", obj.id)
         return obj
 
-    async def resolve_alert(self, alert_id: uuid.UUID, payload) -> PanicAlert:
+    async def resolve_alert(self, alert_id: uuid.UUID, payload: schemas.AlertResolve) -> PanicAlert:
         obj = await self._get_alert(alert_id)
         if obj.status not in ("active", "acknowledged"):
             raise BusinessRuleError(f"Alert is already '{obj.status}'", code="INVALID_TRANSITION")

@@ -398,7 +398,8 @@ export default function SecurityGuardLiveGatePage() {
               if (request.purpose) reason = String(request.purpose);
               if (request.visitor_type) category = String(request.visitor_type).replace(/_/g, " ");
               if (request.vehicle_number) vehicleNumber = String(request.vehicle_number);
-              else if (request.visitor?.vehicle_number) vehicleNumber = String(request.visitor.vehicle_number);
+              else if (request.visitor?.vehicle_number)
+                vehicleNumber = String(request.visitor.vehicle_number);
               unitLabel =
                 (request.group_label as string) ||
                 (request.unit_id ? `Unit ${String(request.unit_id).slice(0, 6)}` : unitLabel);
