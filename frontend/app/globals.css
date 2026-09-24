@@ -1844,6 +1844,30 @@ svg text[font-family*="Syne"] {
   div[style*="repeat(auto-fit, minmax(2"] {
     grid-template-columns: 1fr !important;
   }
+
+  /* Collapse fixed 2/3-column inline grids to a single column on phones. Forms and
+     detail/summary panels across the app are authored with raw inline
+     `style={{ gridTemplateColumns: "1fr 1fr" }}` (etc.) rather than a shared class, so this
+     targets the rendered `style` attribute directly instead of requiring every call site to
+     be touched — additive CSS only, no markup or behavior change. Every fixed pattern used
+     in the app is enumerated (verified against the codebase); auto-fit/auto-fill grids are
+     untouched since they already reflow safely. */
+  div[style*="grid-template-columns: 1fr 1fr"],
+  div[style*="gridTemplateColumns: 1fr 1fr"],
+  div[style*="grid-template-columns:1fr 1fr"],
+  div[style*="gridTemplateColumns:1fr 1fr"],
+  div[style*="grid-template-columns: repeat(2, 1fr)"],
+  div[style*="gridTemplateColumns: repeat(2, 1fr)"],
+  div[style*="grid-template-columns: repeat(2,1fr)"],
+  div[style*="gridTemplateColumns: repeat(2,1fr)"],
+  div[style*="grid-template-columns: repeat(3, 1fr)"],
+  div[style*="gridTemplateColumns: repeat(3, 1fr)"],
+  div[style*="grid-template-columns: repeat(3,1fr)"],
+  div[style*="gridTemplateColumns: repeat(3,1fr)"],
+  div[style*="grid-template-columns: 160px 1fr"],
+  div[style*="gridTemplateColumns: 160px 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 @media (max-width: 480px) {
