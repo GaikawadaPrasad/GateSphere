@@ -18,6 +18,26 @@ Format per entry:
 
 ---
 
+## 2026-09-24 — Staging deploy failed: 0045 deadlocked with live traffic
+
+**By:** Claude Code (with johnalexanderkondepoguVPD)
+**Symptom:** Render build `alembic upgrade head` → `DeadlockDetected` on
+`DROP POLICY tenant_isolation ON user_roles`. Render runs migrations while the previous
+release is serving. 0045 rewrote ~80 policies in ONE transaction, holding ACCESS EXCLUSIVE on
+every table until commit, and a live request holding a read lock closed the cycle. The failed
+run rolled back entirely (transactional DDL), so staging stayed at its prior revision.
+**Fix:** 0045 now converts one table per short autocommitted `DO` block (atomic per table,
+at most one table lock held), `lock_timeout = 5s` + retry on 55P03/40P01, all steps
+idempotent (re-runnable after an interruption). Role/grant changes stay in the migration
+transaction. New pre-flight guard: aborts if the migrating role is neither SUPERUSER nor
+BYPASSRLS (fail-closed + FORCE would otherwise hide pre-scope rows from the app).
+**Verified:** reproduced with a concurrent transaction (reads `visitors`, sleeps, reads
+`announcements`): old 0045 → `deadlock detected`; new 0045 → both complete, 78 fail-closed
+policies. Downgrade/upgrade round-trip, re-run after `stamp 0044`, full pytest 416 passed /
+1 skipped / 0 failed, ruff + black clean.
+**Open / next:** prefer a Render `preDeployCommand` (or a one-off job) for migrations instead
+of the build step (AGENTS.md §8.4: migrations are a separate one-shot job).
+
 ## 2026-09-24 — Merge `dev` (PR #92, `c72319f`) into `feature-superadmin`
 
 **By:** Claude Code (with johnalexanderkondepoguVPD)

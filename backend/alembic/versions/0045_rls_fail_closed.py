@@ -31,6 +31,7 @@ Create Date: 2026-09-24
 from __future__ import annotations
 
 import os
+import time
 
 import sqlalchemy as sa
 from alembic import op
@@ -118,25 +119,62 @@ def _role_exists(bind) -> bool:
     )
 
 
+# --- online-safe DDL -------------------------------------------------------------------- #
+# Render (and any rolling deploy) runs `alembic upgrade head` while the previous release is
+# still serving traffic. Rewriting ~80 policies in ONE transaction accumulated an ACCESS
+# EXCLUSIVE lock on every table until commit, and a live request holding a read lock on a
+# later table deadlocked with it (staging deploy 2026-09-24: DeadlockDetected on
+# `DROP POLICY tenant_isolation ON user_roles`). Each table is therefore converted in its
+# own short transaction (one atomic DO block), so the migration never holds more than one
+# table's lock, waits at most `_LOCK_TIMEOUT` for it, and retries. Every step is idempotent,
+# so a run interrupted half-way is simply re-run.
+_LOCK_TIMEOUT = "5s"
+_RETRIES = 8
+_RETRY_SQLSTATES = {"55P03", "40P01"}  # lock_not_available, deadlock_detected
+
+
+def _atomic(bind, statements: list[str]) -> None:
+    """Run `statements` as ONE autocommitted DO block, retrying on lock contention."""
+    body = " ".join(f"EXECUTE {_quote(stmt)};" for stmt in statements)
+    sql = f"DO $gs$ BEGIN {body} END $gs$"
+    for attempt in range(1, _RETRIES + 1):
+        try:
+            bind.exec_driver_sql(sql)
+            return
+        except sa.exc.OperationalError as exc:
+            sqlstate = getattr(getattr(exc, "orig", None), "sqlstate", None)
+            if sqlstate not in _RETRY_SQLSTATES or attempt == _RETRIES:
+                raise
+            time.sleep(min(2**attempt, 30) * 0.25)
+
+
+def _quote(stmt: str) -> str:
+    # Statements are built from our own constants (table/column names), never from input.
+    return "'" + stmt.replace("'", "''") + "'"
+
+
+def _assert_role_bypasses_rls(bind) -> None:
+    """Fail-closed policies + FORCE RLS apply to the table owner. The app currently connects
+    as the owning role and reads `user_roles` etc. before any tenant scope is bound, so that
+    role must be a superuser or BYPASSRLS (true for local/CI `gatesphere` and Supabase
+    `postgres`). Abort loudly rather than deploy an app that cannot resolve logins."""
+    ok = bind.execute(
+        sa.text("SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname = current_user")
+    ).scalar()
+    if not ok:
+        raise RuntimeError(
+            "0045_rls_fail_closed: the migration/app role is neither SUPERUSER nor BYPASSRLS, "
+            "so fail-closed RLS would hide rows from the app's pre-scope reads. Grant "
+            "BYPASSRLS to the owner role (or migrate the app to gatesphere_app first)."
+        )
+
+
 def upgrade() -> None:
     bind = op.get_bind()
+    _assert_role_bypasses_rls(bind)
 
-    # 1. rewrite every existing community policy fail-closed
-    for table in _existing_community_policy_tables(bind):
-        op.execute(f"DROP POLICY tenant_isolation ON {table}")
-        op.execute(_community_policy(table))
-
-    # 2. new coverage
-    for table in _NEW_COMMUNITY_TABLES:
-        op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
-        op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
-        op.execute(_community_policy(table))
-    for table, (fk, parent) in _CHILD_TABLES.items():
-        op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
-        op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
-        op.execute(_child_policy(table, fk, parent))
-
-    # 3. app role: rotate away the legacy hard-coded password, narrow audit grants
+    # 1. app role (inside the normal migration transaction: light locks; the password is
+    #    passed through a transaction-local setting so it needs one transaction).
     if _role_exists(bind):
         password = os.getenv("GATESPHERE_APP_DB_PASSWORD") or os.getenv("APP_DB_PASSWORD")
         if password:
@@ -151,6 +189,41 @@ def upgrade() -> None:
             op.execute("ALTER ROLE gatesphere_app PASSWORD NULL")
         op.execute("REVOKE UPDATE, DELETE, TRUNCATE, TRIGGER ON audit_logs FROM gatesphere_app")
 
+    # 2. policies: one table per short transaction (see `_atomic`).
+    with op.get_context().autocommit_block():
+        bind.exec_driver_sql(f"SET lock_timeout = '{_LOCK_TIMEOUT}'")
+        try:
+            for table in _existing_community_policy_tables(bind):
+                _atomic(
+                    bind,
+                    [
+                        f"DROP POLICY IF EXISTS tenant_isolation ON {table}",
+                        _community_policy(table),
+                    ],
+                )
+            for table in _NEW_COMMUNITY_TABLES:
+                _atomic(
+                    bind,
+                    [
+                        f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY",
+                        f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY",
+                        f"DROP POLICY IF EXISTS tenant_isolation ON {table}",
+                        _community_policy(table),
+                    ],
+                )
+            for table, (fk, parent) in _CHILD_TABLES.items():
+                _atomic(
+                    bind,
+                    [
+                        f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY",
+                        f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY",
+                        f"DROP POLICY IF EXISTS tenant_isolation ON {table}",
+                        _child_policy(table, fk, parent),
+                    ],
+                )
+        finally:
+            bind.exec_driver_sql("RESET lock_timeout")
+
 
 def downgrade() -> None:
     bind = op.get_bind()
@@ -159,15 +232,25 @@ def downgrade() -> None:
         # The old password is deliberately NOT restored.
         op.execute("GRANT UPDATE, DELETE, TRUNCATE, TRIGGER ON audit_logs TO gatesphere_app")
 
-    for table in _CHILD_TABLES:
-        op.execute(f"DROP POLICY IF EXISTS tenant_isolation ON {table}")
-        op.execute(f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY")
-        op.execute(f"ALTER TABLE {table} DISABLE ROW LEVEL SECURITY")
-    for table in _NEW_COMMUNITY_TABLES:
-        op.execute(f"DROP POLICY IF EXISTS tenant_isolation ON {table}")
-        op.execute(f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY")
-        op.execute(f"ALTER TABLE {table} DISABLE ROW LEVEL SECURITY")
-
-    for table in _existing_community_policy_tables(bind):
-        op.execute(f"DROP POLICY tenant_isolation ON {table}")
-        op.execute(_OLD_POLICY.format(t=table))
+    with op.get_context().autocommit_block():
+        bind.exec_driver_sql(f"SET lock_timeout = '{_LOCK_TIMEOUT}'")
+        try:
+            for table in [*_CHILD_TABLES, *_NEW_COMMUNITY_TABLES]:
+                _atomic(
+                    bind,
+                    [
+                        f"DROP POLICY IF EXISTS tenant_isolation ON {table}",
+                        f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY",
+                        f"ALTER TABLE {table} DISABLE ROW LEVEL SECURITY",
+                    ],
+                )
+            for table in _existing_community_policy_tables(bind):
+                _atomic(
+                    bind,
+                    [
+                        f"DROP POLICY IF EXISTS tenant_isolation ON {table}",
+                        _OLD_POLICY.format(t=table),
+                    ],
+                )
+        finally:
+            bind.exec_driver_sql("RESET lock_timeout")
