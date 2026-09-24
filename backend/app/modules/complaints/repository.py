@@ -73,6 +73,32 @@ class TicketRepository(AsyncTenantRepository[ServiceTicket]):
             for uid, name, email, phone in res:
                 user_map[uid] = (name, email, phone)
 
+        # Fallback: if raised_by_user_id is missing or has no info, look up active unit occupant
+        unresolved_unit_ids = {
+            t.unit_id
+            for t in tickets
+            if (not t.raised_by_user_id or t.raised_by_user_id not in user_map) and t.unit_id
+        }
+        unit_occupant_map: dict[uuid.UUID, tuple[str, str | None, str | None]] = {}
+        if unresolved_unit_ids:
+            from app.modules.residents.models import ResidentProfile, UnitOccupancy
+            from app.modules.users.models import User
+
+            stmt = (
+                select(UnitOccupancy.unit_id, User.full_name, User.email, User.phone)
+                .join(ResidentProfile, ResidentProfile.id == UnitOccupancy.resident_profile_id)
+                .join(User, User.id == ResidentProfile.user_id)
+                .where(
+                    UnitOccupancy.unit_id.in_(unresolved_unit_ids),
+                    UnitOccupancy.is_active.is_(True),
+                )
+                .order_by(UnitOccupancy.is_primary.desc())
+            )
+            res = (await self.db.execute(stmt)).all()
+            for uid, name, email, phone in res:
+                if uid not in unit_occupant_map:
+                    unit_occupant_map[uid] = (name, email, phone)
+
         comm_map: dict[uuid.UUID, str] = {}
         if comm_ids:
             from app.modules.communities.models import Community
@@ -102,6 +128,8 @@ class TicketRepository(AsyncTenantRepository[ServiceTicket]):
 
         for t in tickets:
             u_info = user_map.get(t.raised_by_user_id) if t.raised_by_user_id else None
+            if not u_info and t.unit_id:
+                u_info = unit_occupant_map.get(t.unit_id)
             t.raised_by_name = u_info[0] if u_info else None
             t.raised_by_email = u_info[1] if u_info else None
             t.raised_by_phone = u_info[2] if u_info else None

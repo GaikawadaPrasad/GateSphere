@@ -1721,3 +1721,149 @@ svg text[font-family*="Syne"] {
   justify-content: space-between;
   min-height: 140px;
 }
+
+/* ========================================================================= */
+/* UNIVERSAL RESPONSIVE SYSTEM (MOBILE, TABLET & DESKTOP)                     */
+/* ========================================================================= */
+
+.app-container {
+  display: flex;
+  width: 100%;
+  min-height: 100vh;
+  max-width: 100vw;
+  overflow-x: clip;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  overflow-x: clip;
+}
+
+.page-body {
+  flex: 1;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: 1.5rem;
+  box-sizing: border-box;
+}
+
+/* Responsive Tabs container */
+.tabs-nav,
+.tabs-header,
+[role="tablist"],
+.nav-tabs {
+  display: flex;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+  scrollbar-width: none;
+}
+
+.tabs-nav::-webkit-scrollbar,
+.tabs-header::-webkit-scrollbar,
+[role="tablist"]::-webkit-scrollbar,
+.nav-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+/* Universal Page Header responsiveness */
+.page-header-container,
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .page-body {
+    padding: 1rem !important;
+  }
+
+  .page-header-container,
+  .page-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.75rem !important;
+  }
+
+  .page-header > div:last-child,
+  .page-header-actions {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    width: 100% !important;
+    gap: 0.5rem !important;
+  }
+
+  .page-header-actions .btn,
+  .page-header > div:last-child .btn,
+  .page-header > div:last-child a.btn {
+    flex: 1 1 auto !important;
+    justify-content: center !important;
+    text-align: center !important;
+  }
+
+  /* Force multi-column grids to gracefully collapse */
+  div[style*="gridTemplateColumns"],
+  div[style*="grid-template-columns"] {
+    max-width: 100% !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .page-body {
+    padding: 0.75rem !important;
+  }
+
+  /* Auto-wrap form rows and filter bars */
+  .filter-bar,
+  .form-row,
+  .search-bar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.5rem !important;
+  }
+
+  .filter-bar > *,
+  .form-row > *,
+  .search-bar > * {
+    width: 100% !important;
+  }
+
+  /* Ensure card grids collapse to 1 column on small screens if min-width exceeds viewport */
+  .grid-responsive-auto,
+  div[style*="repeat(auto-fit, minmax(2"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-body {
+    padding: 0.5rem !important;
+  }
+
+  /* Prevent text and badge clipping */
+  .badge {
+    font-size: 0.7rem !important;
+    padding: 0.15rem 0.45rem !important;
+  }
+
+  /* Modal mobile viewport */
+  .modal-dialog,
+  .modal-box,
+  div[role="dialog"] > div {
+    max-width: 95vw !important;
+    margin: 0.5rem auto !important;
+    padding: 1rem !important;
+  }
+}
+

@@ -21,6 +21,11 @@ interface DashboardTicket {
   status: string;
   escalation_state: string;
   created_at: string;
+  unit_id?: string | null;
+  raised_by_name?: string | null;
+  unit_number?: string | null;
+  raised_by_phone?: string | null;
+  raised_by_email?: string | null;
 }
 
 export default function FacilityManagerDashboardPage() {
@@ -49,7 +54,7 @@ export default function FacilityManagerDashboardPage() {
     try {
       const [ticketsRes, categoriesRes, amenitiesRes, bookingsRes, meRes] =
         await Promise.allSettled([
-          complaintsApi.list(),
+          complaintsApi.list({ page_size: 100 }),
           complaintsApi.categories(),
           amenitiesApi.list(),
           amenitiesApi.bookings(),
@@ -65,10 +70,15 @@ export default function FacilityManagerDashboardPage() {
           ? meRes.value.community_ids[0]
           : null;
 
+      const unitMap = new Map<string, string>();
       if (commId) {
         try {
           const uList = await communitiesApi.communityUnits(commId);
-          setUnits((uList || []).map((u: any) => ({ id: u.id, unit_number: u.unit_number })));
+          const mappedUnits = (uList || []).map((u: any) => ({ id: u.id, unit_number: u.unit_number }));
+          setUnits(mappedUnits);
+          for (const u of mappedUnits) {
+            if (u.id) unitMap.set(u.id, u.unit_number);
+          }
         } catch {
           // graceful fallback
         }
@@ -79,17 +89,53 @@ export default function FacilityManagerDashboardPage() {
         if (categoriesRes.status === "fulfilled") {
           for (const c of categoriesRes.value || []) if (c?.id) categoryMap.set(c.id, c.name);
         }
+        const rawTickets: any[] = Array.isArray(ticketsRes.value)
+          ? ticketsRes.value
+          : Array.isArray((ticketsRes.value as any)?.data)
+            ? (ticketsRes.value as any).data
+            : [];
         setTickets(
-          (ticketsRes.value || []).map((t: any) => ({
-            id: t.id,
-            ticket_number: t.ticket_number,
-            subject: t.subject,
-            category_name: categoryMap.get(t.category_id) || "Uncategorized",
-            priority: t.priority,
-            status: t.status,
-            escalation_state: deriveTicketEscalationState(t),
-            created_at: t.created_at,
-          })),
+          rawTickets.map((t: any) => {
+            const unitNum =
+              t.unit_number ||
+              (t.unit_id ? unitMap.get(t.unit_id) : null) ||
+              t.unit?.unit_number ||
+              null;
+            const resName =
+              t.raised_by_name ||
+              t.resident_name ||
+              t.user?.full_name ||
+              t.creator_name ||
+              null;
+            const resPhone =
+              t.raised_by_phone ||
+              t.phone ||
+              t.contact_phone ||
+              t.user?.phone ||
+              null;
+            const resEmail =
+              t.raised_by_email ||
+              t.email ||
+              t.contact_email ||
+              t.user?.email ||
+              null;
+
+            return {
+              id: t.id,
+              ticket_number: t.ticket_number,
+              subject: t.subject,
+              category_name: t.category_name || categoryMap.get(t.category_id) || "Uncategorized",
+              priority: t.priority,
+              status: t.status,
+              escalation_state: deriveTicketEscalationState(t),
+              created_at: t.created_at,
+              unit_id: t.unit_id || null,
+              raised_by_name: resName,
+              unit_number: unitNum,
+              raised_by_phone: resPhone,
+              raised_by_email: resEmail,
+            };
+          }),
         );
       } else {
         setLoadError((ticketsRes as any).reason?.message || "Failed to load tickets.");
@@ -178,7 +224,24 @@ export default function FacilityManagerDashboardPage() {
       header: "Ticket #",
       sortable: true,
       render: (t) => (
-        <span style={{ fontWeight: 600, color: "var(--primary, #2563eb)" }}>{t.ticket_number}</span>
+        <button
+          type="button"
+          className="btn btn-link"
+          style={{
+            fontWeight: 700,
+            color: "var(--primary, #2563eb)",
+            padding: 0,
+            border: "none",
+            background: "none",
+            cursor: "pointer",
+            textAlign: "left",
+            fontSize: "0.85rem",
+          }}
+          onClick={() => router.push("/facility-manager/complaints")}
+          title="Open in Complaints Queue"
+        >
+          {t.ticket_number}
+        </button>
       ),
     },
     {
@@ -188,18 +251,131 @@ export default function FacilityManagerDashboardPage() {
       render: (t) => (
         <span
           style={{
-            maxWidth: 220,
+            maxWidth: 180,
             display: "inline-block",
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
             verticalAlign: "middle",
+            fontWeight: 500,
           }}
           title={t.subject}
         >
           {t.subject}
         </span>
       ),
+    },
+    {
+      key: "raised_by_name",
+      header: "Resident / Unit",
+      sortable: true,
+      render: (t) => {
+        const residentName = t.raised_by_name || "Resident";
+        const unitDisplay = t.unit_number
+          ? `Unit ${t.unit_number}`
+          : t.unit_id
+            ? `Unit #${String(t.unit_id).slice(0, 6)}`
+            : "Common Area";
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+            <div
+              style={{
+                fontWeight: 600,
+                color: "var(--fg)",
+                fontSize: "0.82rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.3rem",
+              }}
+            >
+              <span>👤</span>
+              <span>{residentName}</span>
+            </div>
+            <div>
+              <span
+                style={{
+                  display: "inline-block",
+                  fontWeight: 600,
+                  fontSize: "0.72rem",
+                  color: "var(--primary-dark, #1e40af)",
+                  background: "var(--primary-subtle, #eff6ff)",
+                  padding: "0.1rem 0.4rem",
+                  borderRadius: "4px",
+                  border: "1px solid #bfdbfe",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                🏢 {unitDisplay}
+              </span>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      key: "raised_by_phone",
+      header: "Contact Info",
+      render: (t) => {
+        const phone = t.raised_by_phone;
+        const email = t.raised_by_email;
+        if (!phone && !email) {
+          return <span style={{ color: "var(--muted)", fontSize: "0.8rem" }}>—</span>;
+        }
+        return (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.15rem",
+              fontSize: "0.78rem",
+            }}
+          >
+            {phone && (
+              <a
+                href={`tel:${phone}`}
+                style={{
+                  color: "var(--fg)",
+                  fontWeight: 500,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.25rem",
+                  textDecoration: "none",
+                }}
+                title={`Call ${t.raised_by_name || "Resident"}`}
+              >
+                <span>📞</span>
+                <span>{phone}</span>
+              </a>
+            )}
+            {email && (
+              <a
+                href={`mailto:${email}`}
+                style={{
+                  color: "var(--muted)",
+                  fontSize: "0.72rem",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.25rem",
+                  textDecoration: "none",
+                }}
+                title={`Email ${email}`}
+              >
+                <span>✉️</span>
+                <span
+                  style={{
+                    maxWidth: 130,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {email}
+                </span>
+              </a>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: "category_name",

@@ -349,6 +349,7 @@ class ComplaintService(UnitScopedAccess):
                 ServiceTicket.unit_id,
                 or_owned=ServiceTicket.raised_by_user_id == self.actor.id,
             )
+        stmt = stmt.order_by(ServiceTicket.created_at.desc())
         rows = await self.tickets.list(offset=offset, limit=limit, extra=stmt)
         await self.tickets.enrich_tickets(rows)
         return rows, await self.tickets.count(extra=stmt)
