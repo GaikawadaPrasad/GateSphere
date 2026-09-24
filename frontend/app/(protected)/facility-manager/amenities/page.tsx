@@ -44,15 +44,15 @@ export default function FacilityManagerAmenitiesPage() {
               const blockList = await fetch(`/api/v1/amenities/${a.id}/blocks`, {
                 credentials: "include",
                 headers: { Accept: "application/json", "X-Session-Role": "facility_manager" },
-              }).then((r) => r.json()).then((r) => r.data || []);
-              const activeBlock = blockList.find(
-                (b: any) => new Date(b.blocked_to) > new Date()
-              );
+              })
+                .then((r) => r.json())
+                .then((r) => r.data || []);
+              const activeBlock = blockList.find((b: any) => new Date(b.blocked_to) > new Date());
               return { ...a, block_id: activeBlock?.id || null };
             } catch {
               return { ...a, block_id: null };
             }
-          })
+          }),
         );
         setAmenities(withBlocks);
       } else {
@@ -234,13 +234,23 @@ export default function FacilityManagerAmenitiesPage() {
                   </tr>
                 ) : loadError ? (
                   <tr>
-                    <td colSpan={5} style={{ textAlign: "center", padding: "1.5rem", color: "var(--danger, #dc2626)" }}>
+                    <td
+                      colSpan={5}
+                      style={{
+                        textAlign: "center",
+                        padding: "1.5rem",
+                        color: "var(--danger, #dc2626)",
+                      }}
+                    >
                       {loadError}
                     </td>
                   </tr>
                 ) : amenities.length === 0 ? (
                   <tr>
-                    <td colSpan={5} style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}>
+                    <td
+                      colSpan={5}
+                      style={{ textAlign: "center", padding: "1.5rem", color: "var(--muted)" }}
+                    >
                       No amenities found.
                     </td>
                   </tr>
@@ -318,21 +328,39 @@ export default function FacilityManagerAmenitiesPage() {
                   </tr>
                 ) : (
                   bookings.map((b: any) => {
-                    const residentName = b.resident_name || b.resident_user?.full_name || (b.resident_user_id ? "Resident" : "—");
-                    const unitDisplay = b.unit_label || (b.unit_number ? `Unit ${b.unit_number}${b.tower_name ? `, ${b.tower_name}` : ""}` : "—");
+                    const residentName =
+                      b.resident_name ||
+                      b.resident_user?.full_name ||
+                      (b.resident_user_id ? "Resident" : "—");
+                    const unitDisplay =
+                      b.unit_label ||
+                      (b.unit_number
+                        ? `Unit ${b.unit_number}${b.tower_name ? `, ${b.tower_name}` : ""}`
+                        : "—");
                     const phoneDisplay = b.resident_phone || b.resident_user?.phone || "";
 
                     return (
                       <tr key={b.id}>
                         <td style={{ fontWeight: 600, color: "var(--fg)" }}>
-                          {b.amenity_name || amenities.find((a: any) => a.id === b.amenity_id)?.name || "Amenity"}
+                          {b.amenity_name ||
+                            amenities.find((a: any) => a.id === b.amenity_id)?.name ||
+                            "Amenity"}
                         </td>
                         <td>
-                          <div style={{ fontWeight: 600, fontSize: "0.875rem", color: "var(--fg)" }}>
+                          <div
+                            style={{ fontWeight: 600, fontSize: "0.875rem", color: "var(--fg)" }}
+                          >
                             👤 {residentName}
                           </div>
                           {phoneDisplay && (
-                            <div style={{ fontSize: "0.75rem", color: "var(--muted)", fontFamily: "monospace", marginTop: "0.1rem" }}>
+                            <div
+                              style={{
+                                fontSize: "0.75rem",
+                                color: "var(--muted)",
+                                fontFamily: "monospace",
+                                marginTop: "0.1rem",
+                              }}
+                            >
                               {phoneDisplay}
                             </div>
                           )}
@@ -358,7 +386,9 @@ export default function FacilityManagerAmenitiesPage() {
                         <td style={{ fontSize: "0.8rem", color: "var(--muted)" }}>
                           {formatSlot(b)}
                         </td>
-                        <td><StatusBadge status={b.status} /></td>
+                        <td>
+                          <StatusBadge status={b.status} />
+                        </td>
                         <td>
                           {b.status !== "cancelled" && (
                             <button
@@ -406,9 +436,23 @@ export default function FacilityManagerAmenitiesPage() {
             <strong>{selectedAmenity?.name}</strong>:
           </p>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "1rem",
+              marginBottom: "1rem",
+            }}
+          >
             <div>
-              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Block From *
               </label>
               <input
@@ -420,7 +464,14 @@ export default function FacilityManagerAmenitiesPage() {
               />
             </div>
             <div>
-              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Block To *
               </label>
               <input
@@ -434,7 +485,14 @@ export default function FacilityManagerAmenitiesPage() {
           </div>
 
           <div>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
               Reason for Maintenance Block
             </label>
             <input
@@ -475,7 +533,14 @@ export default function FacilityManagerAmenitiesPage() {
       >
         <form id="add-amenity-form" onSubmit={handleAddAmenity}>
           <div style={{ marginBottom: "1rem" }}>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
               Amenity Name *
             </label>
             <input
@@ -488,9 +553,23 @@ export default function FacilityManagerAmenitiesPage() {
             />
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "1rem",
+              marginBottom: "1rem",
+            }}
+          >
             <div>
-              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Type *
               </label>
               <select
@@ -509,7 +588,14 @@ export default function FacilityManagerAmenitiesPage() {
               </select>
             </div>
             <div>
-              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Capacity (People) *
               </label>
               <input
@@ -524,7 +610,14 @@ export default function FacilityManagerAmenitiesPage() {
           </div>
 
           <div style={{ marginBottom: "0.5rem" }}>
-            <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                marginBottom: "0.35rem",
+              }}
+            >
               Location / Instructions
             </label>
             <input

@@ -16,9 +16,7 @@ const createTestQueryClient = () =>
 
 function renderWithClient(ui: React.ReactElement) {
   const testQueryClient = createTestQueryClient();
-  return render(
-    <QueryClientProvider client={testQueryClient}>{ui}</QueryClientProvider>
-  );
+  return render(<QueryClientProvider client={testQueryClient}>{ui}</QueryClientProvider>);
 }
 
 // Mock APIs
@@ -56,13 +54,7 @@ describe("Super Admin Personnel Management: CreateUserModal", () => {
   });
 
   it("renders all key community personnel roles in dropdown", async () => {
-    renderWithClient(
-      <CreateUserModal
-        isOpen={true}
-        onClose={vi.fn()}
-        onSuccess={vi.fn()}
-      />
-    );
+    renderWithClient(<CreateUserModal isOpen={true} onClose={vi.fn()} onSuccess={vi.fn()} />);
 
     const roleSelect = screen.getByLabelText(/Assign Role/i) as HTMLSelectElement;
     expect(roleSelect).toBeInTheDocument();
@@ -86,7 +78,7 @@ describe("Super Admin Personnel Management: CreateUserModal", () => {
         onClose={vi.fn()}
         onSuccess={vi.fn()}
         defaultRoleSlug="auditor"
-      />
+      />,
     );
 
     fireEvent.change(screen.getByLabelText(/Full Name/i), {
@@ -103,7 +95,9 @@ describe("Super Admin Personnel Management: CreateUserModal", () => {
     fireEvent.click(submitBtn);
 
     await waitFor(() => {
-      expect(screen.getByText(/A community must be selected for community-assigned roles/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/A community must be selected for community-assigned roles/i),
+      ).toBeInTheDocument();
     });
     expect(usersApi.create).not.toHaveBeenCalled();
   });
@@ -120,7 +114,7 @@ describe("Super Admin Personnel Management: CreateUserModal", () => {
         preselectedCommunityId="comm-1"
         lockCommunity={true}
         defaultRoleSlug="association_committee"
-      />
+      />,
     );
 
     fireEvent.change(screen.getByLabelText(/Full Name/i), {
@@ -165,7 +159,7 @@ describe("Super Admin Personnel Management: CreateUserModal", () => {
         preselectedCommunityId="comm-2"
         lockCommunity={true}
         defaultRoleSlug="vendor_technician"
-      />
+      />,
     );
 
     const communitySelect = screen.getByLabelText(/Assigned Community/i) as HTMLSelectElement;
@@ -175,9 +169,7 @@ describe("Super Admin Personnel Management: CreateUserModal", () => {
 });
 
 describe("Super Admin Users Page: Sorting & Search", () => {
-  const mockCommunities = [
-    { id: "comm-1", name: "Palm Meadows Heights", code: "PMH-01" },
-  ];
+  const mockCommunities = [{ id: "comm-1", name: "Palm Meadows Heights", code: "PMH-01" }];
 
   const mockUsers = [
     {
@@ -300,7 +292,7 @@ describe("Super Admin Personnel Management: EditUserModal Single-Role Validation
         onSuccess={vi.fn()}
         user={userWithSecurityGuard}
         availableRoles={mockRoles as any}
-      />
+      />,
     );
 
     // Select Vendor / Technician
@@ -310,8 +302,8 @@ describe("Super Admin Personnel Management: EditUserModal Single-Role Validation
     // Warning banner should appear immediately
     expect(
       screen.getByText(
-        "First revoke the Security Guard role, then Vendor/Technician can be granted."
-      )
+        "First revoke the Security Guard role, then Vendor/Technician can be granted.",
+      ),
     ).toBeInTheDocument();
 
     // Click + Grant Role button
@@ -329,7 +321,7 @@ describe("Super Admin Personnel Management: EditUserModal Single-Role Validation
         onSuccess={vi.fn()}
         user={userWithSecurityGuard}
         availableRoles={mockRoles as any}
-      />
+      />,
     );
 
     // Select Vendor / Technician
@@ -357,7 +349,7 @@ describe("Super Admin Personnel Management: EditUserModal Single-Role Validation
         onSuccess={handleSuccess}
         user={userWithSecurityGuard}
         availableRoles={mockRoles as any}
-      />
+      />,
     );
 
     // Select compatible role: Facility Manager
@@ -392,7 +384,7 @@ describe("Super Admin Personnel Management: EditUserModal Single-Role Validation
         onSuccess={vi.fn()}
         user={userWithSecurityGuard}
         availableRoles={mockRoles as any}
-      />
+      />,
     );
 
     // Revoke Security Guard grant
@@ -410,8 +402,8 @@ describe("Super Admin Personnel Management: EditUserModal Single-Role Validation
     // Warning banner should NOT be present now
     expect(
       screen.queryByText(
-        "First revoke the Security Guard role, then Vendor/Technician can be granted."
-      )
+        "First revoke the Security Guard role, then Vendor/Technician can be granted.",
+      ),
     ).not.toBeInTheDocument();
 
     // Click + Grant Role
@@ -426,4 +418,3 @@ describe("Super Admin Personnel Management: EditUserModal Single-Role Validation
     });
   });
 });
-

@@ -226,7 +226,16 @@ export default function FinancialSummaryPage() {
                 </span>
               )}
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap", fontSize: "0.75rem", color: "var(--muted)" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem",
+                flexWrap: "wrap",
+                fontSize: "0.75rem",
+                color: "var(--muted)",
+              }}
+            >
               <span style={{ fontWeight: 500, color: "var(--primary)" }}>{payer.unitDisplay}</span>
               {payer.email && <span>· {payer.email}</span>}
               {payer.phone && <span>· {payer.phone}</span>}

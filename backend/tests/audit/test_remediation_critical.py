@@ -10,11 +10,12 @@ Tests critical security, authorization, data integrity, and session management f
 """
 
 import pytest
+from conftest import _login
 from starlette.testclient import TestClient
+
 from app.main import app
 from app.modules.residents.access import actor_unit_scope
 from app.modules.users.models import User
-from conftest import _login
 
 
 @pytest.mark.asyncio
@@ -28,17 +29,21 @@ async def test_auditor_read_only_mutations_denied(as_role, seed_ids):
     assert r_view.status_code == 200
 
     # 2. Auditor attempting rating mutation -> 403
-    r_rate = auditor.post("/api/v1/domestic-staff/ratings", json={
-        "staff_id": "00000000-0000-0000-0000-000000000001",
-        "rating": 5,
-        "comment": "Auditor rating test"
-    })
+    r_rate = auditor.post(
+        "/api/v1/domestic-staff/ratings",
+        json={
+            "staff_id": "00000000-0000-0000-0000-000000000001",
+            "rating": 5,
+            "comment": "Auditor rating test",
+        },
+    )
     assert r_rate.status_code == 403
 
     # 3. Auditor attempting poll vote -> 403
-    r_vote = auditor.post("/api/v1/communication/polls/00000000-0000-0000-0000-000000000001/vote", json={
-        "selected_option": 0
-    })
+    r_vote = auditor.post(
+        "/api/v1/communication/polls/00000000-0000-0000-0000-000000000001/vote",
+        json={"selected_option": 0},
+    )
     assert r_vote.status_code == 403
 
 
@@ -68,7 +73,7 @@ async def test_resident_unit_scope_fallback_removed(db):
         email="test_no_occ@gatesphere.com",
         password_hash="hash",
         full_name="Test No Occupancy",
-        is_active=True
+        is_active=True,
     )
     db.add(fake_user)
     await db.flush()
@@ -83,33 +88,33 @@ async def test_password_change_flow(as_role):
     client = as_role("resident")
 
     # 1. Incorrect current password -> 401
-    r_fail = client.post("/api/v1/auth/password", json={
-        "current_password": "WrongPassword123!",
-        "new_password": "NewSecretPassword123!"
-    })
+    r_fail = client.post(
+        "/api/v1/auth/password",
+        json={"current_password": "WrongPassword123!", "new_password": "NewSecretPassword123!"},
+    )
     assert r_fail.status_code == 401
 
     # 2. Same password -> 400 or 422
-    r_same = client.post("/api/v1/auth/password", json={
-        "current_password": "resident@Gate2026!",
-        "new_password": "resident@Gate2026!"
-    })
+    r_same = client.post(
+        "/api/v1/auth/password",
+        json={"current_password": "resident@Gate2026!", "new_password": "resident@Gate2026!"},
+    )
     assert r_same.status_code in (400, 422)
 
     # 3. Successful change
-    r_ok = client.post("/api/v1/auth/password", json={
-        "current_password": "resident@Gate2026!",
-        "new_password": "NewValidPassword2026!"
-    })
+    r_ok = client.post(
+        "/api/v1/auth/password",
+        json={"current_password": "resident@Gate2026!", "new_password": "NewValidPassword2026!"},
+    )
     assert r_ok.status_code == 200
 
     # 4. Login with new password to get fresh session, then restore original password
     client_new = TestClient(app)
     _login(client_new, "resident@gatesphere.com", "NewValidPassword2026!")
-    r_restore = client_new.post("/api/v1/auth/password", json={
-        "current_password": "NewValidPassword2026!",
-        "new_password": "resident@Gate2026!"
-    })
+    r_restore = client_new.post(
+        "/api/v1/auth/password",
+        json={"current_password": "NewValidPassword2026!", "new_password": "resident@Gate2026!"},
+    )
     assert r_restore.status_code == 200
 
 

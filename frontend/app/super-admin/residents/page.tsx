@@ -64,7 +64,11 @@ export default function ResidentsPage() {
     return communityUnits.filter((u) => u.tower_id === targetTowerId);
   }, [communityUnits, targetTowerId]);
 
-  const { data: residents, isLoading, refetch } = useQuery({
+  const {
+    data: residents,
+    isLoading,
+    refetch,
+  } = useQuery({
     queryKey: ["residents", "list", { page, page_size: pageSize, community_id: communityId }],
     queryFn: () =>
       residentsApi.list({ page, page_size: pageSize, community_id: communityId || undefined }),
@@ -112,7 +116,11 @@ export default function ResidentsPage() {
     }
     if (phone.trim()) {
       const phoneDigits = phone.replace(/\D/g, "");
-      if (phoneDigits.length < 7 || phoneDigits.length > 15 || !/^\+?[0-9\s\-()]+$/.test(phone.trim())) {
+      if (
+        phoneDigits.length < 7 ||
+        phoneDigits.length > 15 ||
+        !/^\+?[0-9\s\-()]+$/.test(phone.trim())
+      ) {
         errs.phone = "Enter a valid phone number (7-15 digits, plus optional country code).";
       }
     }
@@ -126,7 +134,8 @@ export default function ResidentsPage() {
       if (trimmedAgreement.length < 3 || trimmedAgreement.length > 50) {
         errs.agreementRef = "Agreement reference must be between 3 and 50 characters.";
       } else if (!/^[A-Z0-9\-_/]+$/.test(trimmedAgreement)) {
-        errs.agreementRef = "Agreement reference must be uppercase letters, numbers, and allowed symbols (e.g. LEASE-2026-081).";
+        errs.agreementRef =
+          "Agreement reference must be uppercase letters, numbers, and allowed symbols (e.g. LEASE-2026-081).";
       }
     }
     setFieldErrors(errs);
@@ -187,7 +196,7 @@ export default function ResidentsPage() {
       await deleteResidentMutation.mutateAsync(residentToDelete.id);
       toast.success(
         `Deleted resident profile for ${residentToDelete.full_name}.`,
-        "Resident Deleted"
+        "Resident Deleted",
       );
       setResidentToDelete(null);
       await refetch();
@@ -307,7 +316,9 @@ export default function ResidentsPage() {
           <div>
             <h3 className="card-title">Resident Profiles</h3>
             <p style={{ fontSize: "0.775rem", color: "var(--muted)" }}>
-              {isLoading ? "Loading residents…" : `${filteredResidents?.length || 0} residents listed`}
+              {isLoading
+                ? "Loading residents…"
+                : `${filteredResidents?.length || 0} residents listed`}
             </p>
           </div>
 
@@ -361,7 +372,8 @@ export default function ResidentsPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
             {/* Header Subtitle */}
             <p style={{ margin: 0, fontSize: "0.825rem", color: "#64748b" }}>
-              Assign residential unit occupancy, resident contact credentials, and portal permissions.
+              Assign residential unit occupancy, resident contact credentials, and portal
+              permissions.
             </p>
 
             {formError && (
@@ -395,13 +407,30 @@ export default function ResidentsPage() {
                 gap: "0.85rem",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontWeight: 600, fontSize: "0.825rem", color: "#334155" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.4rem",
+                  fontWeight: 600,
+                  fontSize: "0.825rem",
+                  color: "#334155",
+                }}
+              >
                 <span>🏢</span> Property, Tower &amp; Unit Allocation
               </div>
 
               {/* Community Selection */}
               <div>
-                <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#475569", marginBottom: "0.35rem" }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.775rem",
+                    fontWeight: 600,
+                    color: "#475569",
+                    marginBottom: "0.35rem",
+                  }}
+                >
                   Community <span style={{ color: "#dc2626" }}>*</span>
                 </label>
                 <select
@@ -433,7 +462,14 @@ export default function ResidentsPage() {
                   ))}
                 </select>
                 {fieldErrors.targetCommunityId && (
-                  <span style={{ fontSize: "0.75rem", color: "#dc2626", marginTop: "0.25rem", display: "block" }}>
+                  <span
+                    style={{
+                      fontSize: "0.75rem",
+                      color: "#dc2626",
+                      marginTop: "0.25rem",
+                      display: "block",
+                    }}
+                  >
                     {fieldErrors.targetCommunityId}
                   </span>
                 )}
@@ -442,7 +478,15 @@ export default function ResidentsPage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.85rem" }}>
                 {/* Tower Selection */}
                 <div>
-                  <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#475569", marginBottom: "0.35rem" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.775rem",
+                      fontWeight: 600,
+                      color: "#475569",
+                      marginBottom: "0.35rem",
+                    }}
+                  >
                     Tower / Block
                   </label>
                   <select
@@ -473,7 +517,15 @@ export default function ResidentsPage() {
 
                 {/* Unit Selection */}
                 <div>
-                  <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#475569", marginBottom: "0.35rem" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.775rem",
+                      fontWeight: 600,
+                      color: "#475569",
+                      marginBottom: "0.35rem",
+                    }}
+                  >
                     Residential Unit <span style={{ color: "#dc2626" }}>*</span>
                   </label>
                   <select
@@ -500,17 +552,29 @@ export default function ResidentsPage() {
                     {filteredUnits && filteredUnits.length > 0 ? (
                       filteredUnits.map((u) => (
                         <option key={u.id} value={u.id}>
-                          Unit {u.unit_number} {u.unit_type ? `(${u.unit_type})` : ""} {u.sq_ft ? `• ${u.sq_ft} sqft` : ""}
+                          Unit {u.unit_number} {u.unit_type ? `(${u.unit_type})` : ""}{" "}
+                          {u.sq_ft ? `• ${u.sq_ft} sqft` : ""}
                         </option>
                       ))
                     ) : (
                       <option value="" disabled>
-                        {targetCommunityId ? (targetTowerId ? "No units in this tower" : "No units created yet") : "Select a community first"}
+                        {targetCommunityId
+                          ? targetTowerId
+                            ? "No units in this tower"
+                            : "No units created yet"
+                          : "Select a community first"}
                       </option>
                     )}
                   </select>
                   {fieldErrors.targetUnitId && (
-                    <span style={{ fontSize: "0.75rem", color: "#dc2626", marginTop: "0.25rem", display: "block" }}>
+                    <span
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "#dc2626",
+                        marginTop: "0.25rem",
+                        display: "block",
+                      }}
+                    >
                       {fieldErrors.targetUnitId}
                     </span>
                   )}
@@ -532,7 +596,10 @@ export default function ResidentsPage() {
                   }}
                 >
                   <span>⚠️</span>
-                  <span>No units created yet in this community. Please add towers/units in Community Management first.</span>
+                  <span>
+                    No units created yet in this community. Please add towers/units in Community
+                    Management first.
+                  </span>
                 </div>
               )}
             </div>
@@ -549,14 +616,31 @@ export default function ResidentsPage() {
                 gap: "0.85rem",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontWeight: 600, fontSize: "0.825rem", color: "#334155" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.4rem",
+                  fontWeight: 600,
+                  fontSize: "0.825rem",
+                  color: "#334155",
+                }}
+              >
                 <span>👤</span> Resident Identity &amp; Contact
               </div>
 
               {/* Name & Email */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.85rem" }}>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#475569", marginBottom: "0.35rem" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.775rem",
+                      fontWeight: 600,
+                      color: "#475569",
+                      marginBottom: "0.35rem",
+                    }}
+                  >
                     Full Name <span style={{ color: "#dc2626" }}>*</span>
                   </label>
                   <input
@@ -582,13 +666,28 @@ export default function ResidentsPage() {
                     }}
                   />
                   {fieldErrors.fullName && (
-                    <span style={{ fontSize: "0.75rem", color: "#dc2626", marginTop: "0.25rem", display: "block" }}>
+                    <span
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "#dc2626",
+                        marginTop: "0.25rem",
+                        display: "block",
+                      }}
+                    >
                       {fieldErrors.fullName}
                     </span>
                   )}
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#475569", marginBottom: "0.35rem" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.775rem",
+                      fontWeight: 600,
+                      color: "#475569",
+                      marginBottom: "0.35rem",
+                    }}
+                  >
                     Email Address <span style={{ color: "#dc2626" }}>*</span>
                   </label>
                   <input
@@ -612,7 +711,14 @@ export default function ResidentsPage() {
                     }}
                   />
                   {fieldErrors.email && (
-                    <span style={{ fontSize: "0.75rem", color: "#dc2626", marginTop: "0.25rem", display: "block" }}>
+                    <span
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "#dc2626",
+                        marginTop: "0.25rem",
+                        display: "block",
+                      }}
+                    >
                       {fieldErrors.email}
                     </span>
                   )}
@@ -622,7 +728,15 @@ export default function ResidentsPage() {
               {/* Phone & Password */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.85rem" }}>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#475569", marginBottom: "0.35rem" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.775rem",
+                      fontWeight: 600,
+                      color: "#475569",
+                      marginBottom: "0.35rem",
+                    }}
+                  >
                     Phone Number
                   </label>
                   <input
@@ -646,7 +760,14 @@ export default function ResidentsPage() {
                     }}
                   />
                   {fieldErrors.phone && (
-                    <span style={{ fontSize: "0.75rem", color: "#dc2626", marginTop: "0.25rem", display: "block" }}>
+                    <span
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "#dc2626",
+                        marginTop: "0.25rem",
+                        display: "block",
+                      }}
+                    >
                       {fieldErrors.phone}
                     </span>
                   )}
@@ -664,14 +785,23 @@ export default function ResidentsPage() {
                     placeholder="e.g. rahul@Gate2026!"
                   />
                   {fieldErrors.password && (
-                    <span style={{ fontSize: "0.75rem", color: "#dc2626", marginTop: "0.25rem", display: "block" }}>
+                    <span
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "#dc2626",
+                        marginTop: "0.25rem",
+                        display: "block",
+                      }}
+                    >
                       {fieldErrors.password}
                     </span>
                   )}
                 </div>
               </div>
               <p style={{ margin: 0, fontSize: "11.5px", color: "var(--muted)" }}>
-                💡 Providing credentials allows this resident to sign in to the <strong>Resident Portal</strong> to approve visitors, receive delivery alerts, and book amenities.
+                💡 Providing credentials allows this resident to sign in to the{" "}
+                <strong>Resident Portal</strong> to approve visitors, receive delivery alerts, and
+                book amenities.
               </p>
             </div>
 
@@ -687,13 +817,30 @@ export default function ResidentsPage() {
                 gap: "0.85rem",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontWeight: 600, fontSize: "0.825rem", color: "#334155" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.4rem",
+                  fontWeight: 600,
+                  fontSize: "0.825rem",
+                  color: "#334155",
+                }}
+              >
                 <span>📋</span> Occupancy Role &amp; Details
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.85rem" }}>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#475569", marginBottom: "0.35rem" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.775rem",
+                      fontWeight: 600,
+                      color: "#475569",
+                      marginBottom: "0.35rem",
+                    }}
+                  >
                     Occupancy Role <span style={{ color: "#dc2626" }}>*</span>
                   </label>
                   <select
@@ -725,8 +872,21 @@ export default function ResidentsPage() {
                 </div>
 
                 <div>
-                  <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#475569", marginBottom: "0.35rem" }}>
-                    Agreement Reference {occupancyRole === "tenant" ? <span style={{ color: "#dc2626" }}>*</span> : "(Optional)"}
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.775rem",
+                      fontWeight: 600,
+                      color: "#475569",
+                      marginBottom: "0.35rem",
+                    }}
+                  >
+                    Agreement Reference{" "}
+                    {occupancyRole === "tenant" ? (
+                      <span style={{ color: "#dc2626" }}>*</span>
+                    ) : (
+                      "(Optional)"
+                    )}
                   </label>
                   <input
                     type="text"
@@ -768,18 +928,38 @@ export default function ResidentsPage() {
                   onClick={(e) => e.stopPropagation()}
                 />
                 <div>
-                  <div style={{ fontSize: "0.825rem", fontWeight: 600, color: isPrimary ? "#166534" : "#334155" }}>
+                  <div
+                    style={{
+                      fontSize: "0.825rem",
+                      fontWeight: 600,
+                      color: isPrimary ? "#166534" : "#334155",
+                    }}
+                  >
                     Primary Unit Contact
                   </div>
-                  <div style={{ fontSize: "0.75rem", color: isPrimary ? "#15803d" : "#64748b", marginTop: "0.1rem" }}>
-                    Receives all visitor approvals, entry alerts, delivery checkpoints, and invoices for this unit.
+                  <div
+                    style={{
+                      fontSize: "0.75rem",
+                      color: isPrimary ? "#15803d" : "#64748b",
+                      marginTop: "0.1rem",
+                    }}
+                  >
+                    Receives all visitor approvals, entry alerts, delivery checkpoints, and invoices
+                    for this unit.
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Modal Actions */}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.6rem", marginTop: "0.25rem" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "0.6rem",
+                marginTop: "0.25rem",
+              }}
+            >
               <button
                 type="button"
                 className="btn btn-secondary"
@@ -846,7 +1026,8 @@ export default function ResidentsPage() {
                 {residentToDelete.unit_number || "–"}).
               </p>
               <p style={{ fontSize: "0.8rem", color: "#991b1b", margin: 0 }}>
-                This will remove their portal access, visitor pre-approvals, and all associated records.
+                This will remove their portal access, visitor pre-approvals, and all associated
+                records.
               </p>
             </div>
 

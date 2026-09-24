@@ -15,18 +15,15 @@ import { Modal } from "@/components/common/Modal";
 import { KpiCardSkeleton, CardSkeleton, TableSkeleton } from "@/components/common/LoadingSkeleton";
 import { ErrorState } from "@/components/common/ErrorState";
 
-const QrCodeSvg = dynamic(
-  () => import("@/components/common/QrCodeSvg").then((m) => m.QrCodeSvg),
-  {
-    ssr: false,
-    loading: () => (
-      <div
-        className="skeleton"
-        style={{ width: 150, height: 150, borderRadius: 12, margin: "0 auto" }}
-      />
-    ),
-  },
-);
+const QrCodeSvg = dynamic(() => import("@/components/common/QrCodeSvg").then((m) => m.QrCodeSvg), {
+  ssr: false,
+  loading: () => (
+    <div
+      className="skeleton"
+      style={{ width: 150, height: 150, borderRadius: 12, margin: "0 auto" }}
+    />
+  ),
+});
 import {
   useStaffProfile,
   useUpdateStaffProfile,
@@ -205,7 +202,8 @@ export function DomesticStaffDashboardView({
     } else if (trimmedEmergName.length < 2) {
       errors.emergency_name = "Emergency contact name must be at least 2 characters.";
     } else if (!isValidPersonName(trimmedEmergName)) {
-      errors.emergency_name = "Please enter a valid emergency contact name (at least 2 characters).";
+      errors.emergency_name =
+        "Please enter a valid emergency contact name (at least 2 characters).";
     }
 
     // Emergency Contact Phone validation
@@ -348,7 +346,9 @@ export function DomesticStaffDashboardView({
                     Overdue Checkout Warning (&gt;12 Hours)
                   </strong>
                   <span style={{ fontSize: "12.5px", color: "#B91C1C" }}>
-                    Your shift started at {openAttendance.check_in_at} ({openAttendance.gate_name}) and has remained active for over 12 hours. Please report to the security gate to record your checkout.
+                    Your shift started at {openAttendance.check_in_at} ({openAttendance.gate_name})
+                    and has remained active for over 12 hours. Please report to the security gate to
+                    record your checkout.
                   </span>
                 </div>
               </div>
@@ -450,11 +450,27 @@ export function DomesticStaffDashboardView({
                 border: "1px solid #CCFBF1",
               }}
             >
-              <div style={{ fontSize: "11.5px", fontWeight: 700, color: "#0D9488", textTransform: "uppercase" }}>
+              <div
+                style={{
+                  fontSize: "11.5px",
+                  fontWeight: 700,
+                  color: "#0D9488",
+                  textTransform: "uppercase",
+                }}
+              >
                 ⏱️ Hours Logged Today
               </div>
-              <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "#0F766E", marginTop: "0.25rem" }}>
-                {profile?.hours_worked_today ? `${profile.hours_worked_today.toFixed(1)} hrs` : "0.0 hrs"}
+              <div
+                style={{
+                  fontSize: "1.6rem",
+                  fontWeight: 800,
+                  color: "#0F766E",
+                  marginTop: "0.25rem",
+                }}
+              >
+                {profile?.hours_worked_today
+                  ? `${profile.hours_worked_today.toFixed(1)} hrs`
+                  : "0.0 hrs"}
               </div>
               <div style={{ fontSize: "12px", color: "var(--brand-body)", marginTop: "0.2rem" }}>
                 Active gate check-in duration
@@ -468,11 +484,27 @@ export function DomesticStaffDashboardView({
                 border: "1px solid #DCFCE7",
               }}
             >
-              <div style={{ fontSize: "11.5px", fontWeight: 700, color: "#16A34A", textTransform: "uppercase" }}>
+              <div
+                style={{
+                  fontSize: "11.5px",
+                  fontWeight: 700,
+                  color: "#16A34A",
+                  textTransform: "uppercase",
+                }}
+              >
                 📅 Hours This Week
               </div>
-              <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "#15803D", marginTop: "0.25rem" }}>
-                {profile?.hours_worked_this_week ? `${profile.hours_worked_this_week.toFixed(1)} hrs` : "0.0 hrs"}
+              <div
+                style={{
+                  fontSize: "1.6rem",
+                  fontWeight: 800,
+                  color: "#15803D",
+                  marginTop: "0.25rem",
+                }}
+              >
+                {profile?.hours_worked_this_week
+                  ? `${profile.hours_worked_this_week.toFixed(1)} hrs`
+                  : "0.0 hrs"}
               </div>
               <div style={{ fontSize: "12px", color: "var(--brand-body)", marginTop: "0.2rem" }}>
                 Monday to Sunday cumulative
@@ -486,11 +518,27 @@ export function DomesticStaffDashboardView({
                 border: "1px solid #DBEAFE",
               }}
             >
-              <div style={{ fontSize: "11.5px", fontWeight: 700, color: "#2563EB", textTransform: "uppercase" }}>
+              <div
+                style={{
+                  fontSize: "11.5px",
+                  fontWeight: 700,
+                  color: "#2563EB",
+                  textTransform: "uppercase",
+                }}
+              >
                 📊 Hours This Month
               </div>
-              <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "#1D4ED8", marginTop: "0.25rem" }}>
-                {profile?.hours_worked_this_month ? `${profile.hours_worked_this_month.toFixed(1)} hrs` : "0.0 hrs"}
+              <div
+                style={{
+                  fontSize: "1.6rem",
+                  fontWeight: 800,
+                  color: "#1D4ED8",
+                  marginTop: "0.25rem",
+                }}
+              >
+                {profile?.hours_worked_this_month
+                  ? `${profile.hours_worked_this_month.toFixed(1)} hrs`
+                  : "0.0 hrs"}
               </div>
               <div style={{ fontSize: "12px", color: "var(--brand-body)", marginTop: "0.2rem" }}>
                 Current calendar month total
@@ -616,8 +664,8 @@ export function DomesticStaffDashboardView({
       )}
 
       {/* TAB 2: MY PROFILE */}
-      {activeTab === "profile" && (
-        profileError ? (
+      {activeTab === "profile" &&
+        (profileError ? (
           <ErrorState
             title="Failed to Load Staff Profile"
             message="Could not load your staff profile and verification information."
@@ -762,17 +810,19 @@ export function DomesticStaffDashboardView({
                     color: "var(--brand-body)",
                   }}
                 >
-                  {profile?.verification_id || (profile?.police_verified ? "Verified on Record" : "Pending Verification Submission")}
+                  {profile?.verification_id ||
+                    (profile?.police_verified
+                      ? "Verified on Record"
+                      : "Pending Verification Submission")}
                 </div>
               </div>
             </div>
           </div>
-        )
-      )}
+        ))}
 
       {/* TAB 3: ASSIGNED HOMES */}
-      {activeTab === "assigned-homes" && (
-        homesError ? (
+      {activeTab === "assigned-homes" &&
+        (homesError ? (
           <ErrorState
             title="Failed to Load Assigned Homes"
             message="Could not load your assigned households from the community database."
@@ -815,10 +865,7 @@ export function DomesticStaffDashboardView({
                   icon="🔍"
                 />
               </div>
-              <SortDropdown
-                value={homeControls.sortPreset}
-                onChange={homeControls.setSortPreset}
-              />
+              <SortDropdown value={homeControls.sortPreset} onChange={homeControls.setSortPreset} />
             </div>
             <div
               style={{
@@ -869,7 +916,11 @@ export function DomesticStaffDashboardView({
 
                   {home.special_instructions && (
                     <p
-                      style={{ fontSize: "12px", color: "var(--brand-body)", marginBottom: "0.75rem" }}
+                      style={{
+                        fontSize: "12px",
+                        color: "var(--brand-body)",
+                        marginBottom: "0.75rem",
+                      }}
                     >
                       💡 <em>{home.special_instructions}</em>
                     </p>
@@ -889,7 +940,9 @@ export function DomesticStaffDashboardView({
                 }}
               >
                 <span style={{ fontSize: "13px", color: "var(--brand-body)" }}>
-                  Showing {homeControls.startIndex + 1}–{Math.min(homeControls.startIndex + homeControls.pageSize, homeControls.total)} of {homeControls.total} assigned homes
+                  Showing {homeControls.startIndex + 1}–
+                  {Math.min(homeControls.startIndex + homeControls.pageSize, homeControls.total)} of{" "}
+                  {homeControls.total} assigned homes
                 </span>
                 <div style={{ display: "flex", gap: "0.5rem" }}>
                   <BrandButton
@@ -912,8 +965,7 @@ export function DomesticStaffDashboardView({
               </div>
             )}
           </div>
-        )
-      )}
+        ))}
 
       {/* TAB 4: SCHEDULE */}
       {activeTab === "schedule" && (
@@ -992,8 +1044,8 @@ export function DomesticStaffDashboardView({
       )}
 
       {/* TAB 5: ATTENDANCE */}
-      {activeTab === "attendance" && (
-        attError ? (
+      {activeTab === "attendance" &&
+        (attError ? (
           <ErrorState
             title="Failed to Load Attendance History"
             message="Could not load your gate check-in and check-out logs."
@@ -1018,7 +1070,8 @@ export function DomesticStaffDashboardView({
               >
                 <span>⚠️</span>
                 <span>
-                  <strong>Notice:</strong> Your open shift exceeds 12 hours. Please checkout at the security gate.
+                  <strong>Notice:</strong> Your open shift exceeds 12 hours. Please checkout at the
+                  security gate.
                 </span>
               </div>
             )}
@@ -1033,8 +1086,8 @@ export function DomesticStaffDashboardView({
                 color: "#1E40AF",
               }}
             >
-              ℹ️ Attendance timestamps are auto-populated directly from Security Gate check-in events
-              and cannot be manually modified.
+              ℹ️ Attendance timestamps are auto-populated directly from Security Gate check-in
+              events and cannot be manually modified.
             </div>
             <div
               style={{
@@ -1054,10 +1107,7 @@ export function DomesticStaffDashboardView({
                   icon="🔍"
                 />
               </div>
-              <SortDropdown
-                value={attControls.sortPreset}
-                onChange={attControls.setSortPreset}
-              />
+              <SortDropdown value={attControls.sortPreset} onChange={attControls.setSortPreset} />
             </div>
             {attLoading ? (
               <div className="card">
@@ -1136,8 +1186,7 @@ export function DomesticStaffDashboardView({
               />
             )}
           </div>
-        )
-      )}
+        ))}
 
       {/* TAB 6: ENTRY / EXIT */}
       {activeTab === "entry-exit" && (
@@ -1183,7 +1232,10 @@ export function DomesticStaffDashboardView({
                 letterSpacing: "0.08em",
               }}
             >
-              {passData?.pass_code || profile?.verification_id || profile?.id?.slice(0, 8).toUpperCase() || "STAFF PASS"}
+              {passData?.pass_code ||
+                profile?.verification_id ||
+                profile?.id?.slice(0, 8).toUpperCase() ||
+                "STAFF PASS"}
             </span>
           </div>
 
@@ -1212,8 +1264,8 @@ export function DomesticStaffDashboardView({
       )}
 
       {/* TAB 7: VISITS & RATINGS */}
-      {activeTab === "visits" && (
-        visitsError ? (
+      {activeTab === "visits" &&
+        (visitsError ? (
           <ErrorState
             title="Failed to Load Visits & Ratings"
             message="Could not load your service visit history and resident feedback."
@@ -1285,145 +1337,165 @@ export function DomesticStaffDashboardView({
               />
             )}
           </div>
-        )
-      )}
+        ))}
 
       {/* TAB 8: NOTIFICATIONS */}
-      {activeTab === "notifications" && (() => {
-        const notifList = myNotifications.data || [];
-        const unreadCount = notifList.filter((n) => !n.is_read).length;
+      {activeTab === "notifications" &&
+        (() => {
+          const notifList = myNotifications.data || [];
+          const unreadCount = notifList.filter((n) => !n.is_read).length;
 
-        const handleMarkAllRead = async () => {
-          try {
-            await markAllNotificationsRead.mutateAsync();
-            toast.success("All notifications marked as read.", "Caught Up");
-            myNotifications.refetch();
-          } catch (err: any) {
-            toast.error(err?.message || "Failed to mark notifications as read.", "Error");
-          }
-        };
+          const handleMarkAllRead = async () => {
+            try {
+              await markAllNotificationsRead.mutateAsync();
+              toast.success("All notifications marked as read.", "Caught Up");
+              myNotifications.refetch();
+            } catch (err: any) {
+              toast.error(err?.message || "Failed to mark notifications as read.", "Error");
+            }
+          };
 
-        return (
-          <div className="gs-card">
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "1rem",
-                flexWrap: "wrap",
-                gap: "0.5rem",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <h3 className="card-h3" style={{ margin: 0 }}>
-                  Staff Notice Board &amp; Alerts
-                </h3>
-                {unreadCount > 0 && (
-                  <span
-                    className="badge badge-primary"
-                    style={{
-                      background: "var(--brand-primary, #1D4ED8)",
-                      color: "#FFFFFF",
-                      fontWeight: 700,
-                      fontSize: "0.75rem",
-                      padding: "0.15rem 0.5rem",
-                      borderRadius: "9999px",
-                    }}
+          return (
+            <div className="gs-card">
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "1rem",
+                  flexWrap: "wrap",
+                  gap: "0.5rem",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <h3 className="card-h3" style={{ margin: 0 }}>
+                    Staff Notice Board &amp; Alerts
+                  </h3>
+                  {unreadCount > 0 && (
+                    <span
+                      className="badge badge-primary"
+                      style={{
+                        background: "var(--brand-primary, #1D4ED8)",
+                        color: "#FFFFFF",
+                        fontWeight: 700,
+                        fontSize: "0.75rem",
+                        padding: "0.15rem 0.5rem",
+                        borderRadius: "9999px",
+                      }}
+                    >
+                      {unreadCount} Unread
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ fontSize: "0.75rem", padding: "0.25rem 0.65rem" }}
+                    onClick={handleMarkAllRead}
+                    disabled={markAllNotificationsRead.isPending || unreadCount === 0}
                   >
-                    {unreadCount} Unread
-                  </span>
-                )}
+                    ✓ Mark All as Read
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
+                    onClick={() => myNotifications.refetch()}
+                    title="Refresh notifications"
+                  >
+                    🔄
+                  </button>
+                </div>
               </div>
 
-              <div style={{ display: "flex", gap: "0.5rem" }}>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  style={{ fontSize: "0.75rem", padding: "0.25rem 0.65rem" }}
-                  onClick={handleMarkAllRead}
-                  disabled={markAllNotificationsRead.isPending || unreadCount === 0}
-                >
-                  ✓ Mark All as Read
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
-                  onClick={() => myNotifications.refetch()}
-                  title="Refresh notifications"
-                >
-                  🔄
-                </button>
-              </div>
-            </div>
-
-            {myNotifications.isLoading ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                <CardSkeleton height={68} />
-                <CardSkeleton height={68} />
-                <CardSkeleton height={68} />
-              </div>
-            ) : notifList.length === 0 ? (
-              <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>No notifications yet.</p>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                {notifList.map((n) => (
-                  <div
-                    key={n.id}
-                    style={{
-                      padding: "0.85rem",
-                      background: n.is_read ? "#F8FAFC" : "#EFF6FF",
-                      borderRadius: "8px",
-                      border: n.is_read ? "1px solid var(--border-light)" : "1px solid var(--brand-primary)",
-                      cursor: n.is_read ? "default" : "pointer",
-                      transition: "all 0.2s ease",
-                    }}
-                    onClick={async () => {
-                      if (!n.is_read) {
-                        try {
-                          await markNotificationRead.mutateAsync(n.id);
-                          myNotifications.refetch();
-                        } catch (e) {
-                          // ignore
+              {myNotifications.isLoading ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                  <CardSkeleton height={68} />
+                  <CardSkeleton height={68} />
+                  <CardSkeleton height={68} />
+                </div>
+              ) : notifList.length === 0 ? (
+                <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>
+                  No notifications yet.
+                </p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                  {notifList.map((n) => (
+                    <div
+                      key={n.id}
+                      style={{
+                        padding: "0.85rem",
+                        background: n.is_read ? "#F8FAFC" : "#EFF6FF",
+                        borderRadius: "8px",
+                        border: n.is_read
+                          ? "1px solid var(--border-light)"
+                          : "1px solid var(--brand-primary)",
+                        cursor: n.is_read ? "default" : "pointer",
+                        transition: "all 0.2s ease",
+                      }}
+                      onClick={async () => {
+                        if (!n.is_read) {
+                          try {
+                            await markNotificationRead.mutateAsync(n.id);
+                            myNotifications.refetch();
+                          } catch (e) {
+                            // ignore
+                          }
                         }
-                      }
-                    }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                        <strong style={{ fontSize: "14px", color: "var(--fg)" }}>{n.title}</strong>
-                        {!n.is_read && (
-                          <span
-                            style={{
-                              width: 8,
-                              height: 8,
-                              borderRadius: "50%",
-                              background: "#EF4444",
-                              display: "inline-block",
-                            }}
-                          />
-                        )}
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                          <strong style={{ fontSize: "14px", color: "var(--fg)" }}>
+                            {n.title}
+                          </strong>
+                          {!n.is_read && (
+                            <span
+                              style={{
+                                width: 8,
+                                height: 8,
+                                borderRadius: "50%",
+                                background: "#EF4444",
+                                display: "inline-block",
+                              }}
+                            />
+                          )}
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                          {n.is_read && (
+                            <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                              ✓ Seen
+                            </span>
+                          )}
+                          <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                            {formatDate(n.created_at)}
+                          </span>
+                        </div>
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                        {n.is_read && (
-                          <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>✓ Seen</span>
-                        )}
-                        <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-                          {formatDate(n.created_at)}
-                        </span>
-                      </div>
+                      <p
+                        style={{
+                          fontSize: "13px",
+                          color: "var(--brand-body)",
+                          marginTop: "0.25rem",
+                        }}
+                      >
+                        {n.body}
+                      </p>
                     </div>
-                    <p style={{ fontSize: "13px", color: "var(--brand-body)", marginTop: "0.25rem" }}>
-                      {n.body}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })()}
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
       {/* TAB 9: EMERGENCY SOS */}
       {activeTab === "emergency" && (
@@ -1538,7 +1610,14 @@ export function DomesticStaffDashboardView({
               required
             />
             {fieldErrors.full_name && (
-              <span style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", display: "block" }}>
+              <span
+                style={{
+                  color: "#DC2626",
+                  fontSize: "12px",
+                  marginTop: "0.25rem",
+                  display: "block",
+                }}
+              >
                 {fieldErrors.full_name}
               </span>
             )}
@@ -1574,7 +1653,14 @@ export function DomesticStaffDashboardView({
               required
             />
             {fieldErrors.phone && (
-              <span style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", display: "block" }}>
+              <span
+                style={{
+                  color: "#DC2626",
+                  fontSize: "12px",
+                  marginTop: "0.25rem",
+                  display: "block",
+                }}
+              >
                 {fieldErrors.phone}
               </span>
             )}
@@ -1609,7 +1695,14 @@ export function DomesticStaffDashboardView({
               required
             />
             {fieldErrors.emergency_name && (
-              <span style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", display: "block" }}>
+              <span
+                style={{
+                  color: "#DC2626",
+                  fontSize: "12px",
+                  marginTop: "0.25rem",
+                  display: "block",
+                }}
+              >
                 {fieldErrors.emergency_name}
               </span>
             )}
@@ -1645,7 +1738,14 @@ export function DomesticStaffDashboardView({
               required
             />
             {fieldErrors.emergency_phone && (
-              <span style={{ color: "#DC2626", fontSize: "12px", marginTop: "0.25rem", display: "block" }}>
+              <span
+                style={{
+                  color: "#DC2626",
+                  fontSize: "12px",
+                  marginTop: "0.25rem",
+                  display: "block",
+                }}
+              >
                 {fieldErrors.emergency_phone}
               </span>
             )}

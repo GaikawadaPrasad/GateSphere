@@ -27,7 +27,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base_class import Base, TenantMixin, TimestampMixin, pk
 
 CHANNELS = ("in_app", "email", "sms", "whatsapp", "push")
-DELIVERY_STATUS = ("queued", "sent", "delivered", "failed", "skipped")
+# `simulated`: a mocked channel (SMS / WhatsApp / push / email in this build) recorded the
+# message but no provider delivered it — never reported as `delivered` (re-audit #3, S-08).
+DELIVERY_STATUS = ("queued", "sent", "delivered", "simulated", "failed", "skipped")
 DEAD_LETTER_KINDS = ("single", "bulk", "broadcast_enqueue")
 
 

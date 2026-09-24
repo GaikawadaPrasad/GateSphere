@@ -59,10 +59,7 @@ export function Header() {
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (
-        notifDropdownRef.current &&
-        !notifDropdownRef.current.contains(event.target as Node)
-      ) {
+      if (notifDropdownRef.current && !notifDropdownRef.current.contains(event.target as Node)) {
         setIsNotifOpen(false);
       }
     }
@@ -75,9 +72,7 @@ export function Header() {
   }, [isNotifOpen]);
 
   const assignedCommunityId =
-    user?.community_ids?.[0] ||
-    user?.roles?.find((r) => r.community_id)?.community_id ||
-    null;
+    user?.community_ids?.[0] || user?.roles?.find((r) => r.community_id)?.community_id || null;
   const effectiveCommunityId = activeCommunityId || assignedCommunityId;
 
   useEffect(() => {
@@ -259,7 +254,13 @@ export function Header() {
       {/* Right section: User info & Actions */}
       <div
         className="mobile-header-right"
-        style={{ display: "flex", alignItems: "center", gap: "0.75rem", minWidth: 0, flexShrink: 0 }}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "0.75rem",
+          minWidth: 0,
+          flexShrink: 0,
+        }}
       >
         {/* Notification Bell with Dropdown Popover */}
         <div style={{ position: "relative" }} ref={notifDropdownRef}>
@@ -447,9 +448,7 @@ export function Header() {
                       fontSize: "0.85rem",
                     }}
                   >
-                    <span
-                      style={{ fontSize: "1.75rem", display: "block", marginBottom: "0.5rem" }}
-                    >
+                    <span style={{ fontSize: "1.75rem", display: "block", marginBottom: "0.5rem" }}>
                       🎉
                     </span>
                     <strong

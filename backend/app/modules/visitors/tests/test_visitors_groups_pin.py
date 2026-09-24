@@ -125,7 +125,9 @@ def test_visitor_entry_otp_required_policy(as_role, seed_ids, confirmed_upload):
             },
         ).json()["data"]
 
-        p = admin.post(f"{P}/requests/{req['id']}/passes", json={"pass_type": "pin", "max_entries": 1})
+        p = admin.post(
+            f"{P}/requests/{req['id']}/passes", json={"pass_type": "pin", "max_entries": 1}
+        )
         assert p.status_code == 201, p.text
         pin = p.json()["data"]["pin"]
 
@@ -149,4 +151,3 @@ def test_visitor_entry_otp_required_policy(as_role, seed_ids, confirmed_upload):
     finally:
         # Revert policy
         admin.patch(f"{P}/policy", json={"otp_required": False})
-

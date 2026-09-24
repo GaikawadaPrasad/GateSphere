@@ -19,7 +19,10 @@ import { DataTable, type Column } from "@/components/tables/DataTable";
 import { FilterPanel } from "@/components/common/FilterPanel";
 import { Modal } from "@/components/common/Modal";
 import { OperationalStaffView } from "@/components/community-admin/OperationalStaffView";
-import { UpdateUserCredentialsModal, type CredentialUser } from "@/components/common/UpdateUserCredentialsModal";
+import {
+  UpdateUserCredentialsModal,
+  type CredentialUser,
+} from "@/components/common/UpdateUserCredentialsModal";
 import type {
   Staff,
   StaffAttendance,
@@ -88,7 +91,14 @@ export default function CommunityAdminStaffPage() {
   const [isAssignUnitModalOpen, setIsAssignUnitModalOpen] = useState(false);
   const [assignUnitId, setAssignUnitId] = useState("");
   const [assignWorkType, setAssignWorkType] = useState<string>("part_time");
-  const [assignDays, setAssignDays] = useState<string[]>(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]);
+  const [assignDays, setAssignDays] = useState<string[]>([
+    "Mon",
+    "Tue",
+    "Wed",
+    "Thu",
+    "Fri",
+    "Sat",
+  ]);
   const [checkInForm, setCheckInForm] = useState<{ staff_id: string; gate_id: string }>({
     staff_id: "",
     gate_id: "",
@@ -182,7 +192,8 @@ export default function CommunityAdminStaffPage() {
       if (idTypeNorm === "aadhaar" || idTypeNorm.includes("aadhaar")) {
         const cleanAadhaar = trimmedId.replace(/[\s-]/g, "");
         if (!/^\d{12}$/.test(cleanAadhaar)) {
-          errors.id_number = "Aadhaar number must be exactly 12 numeric digits (e.g. 1234 5678 9012).";
+          errors.id_number =
+            "Aadhaar number must be exactly 12 numeric digits (e.g. 1234 5678 9012).";
         } else if (/^(\d)\1{11}$/.test(cleanAadhaar)) {
           errors.id_number = "Aadhaar number cannot contain all identical repeating digits.";
         }
@@ -201,7 +212,11 @@ export default function CommunityAdminStaffPage() {
         if (!/^[A-Z][0-9]{7,8}$/.test(cleanPass)) {
           errors.id_number = "Passport must be 1 letter followed by 7-8 digits (e.g. A1234567).";
         }
-      } else if (idTypeNorm === "driving license" || idTypeNorm === "driving_license" || idTypeNorm === "dl") {
+      } else if (
+        idTypeNorm === "driving license" ||
+        idTypeNorm === "driving_license" ||
+        idTypeNorm === "dl"
+      ) {
         const cleanDl = trimmedId.replace(/[\s-]/g, "").toUpperCase();
         if (!/^[A-Z]{2}[0-9A-Z]{8,18}$/.test(cleanDl)) {
           errors.id_number = "Driving License must be valid (e.g. DL-1420110012345).";
@@ -252,7 +267,7 @@ export default function CommunityAdminStaffPage() {
       });
       toast.success(
         `Staff member "${newStaffForm.full_name.trim()}" registered successfully.`,
-        "Staff Member Added"
+        "Staff Member Added",
       );
       setIsAddStaffModalOpen(false);
       setShowStaffPassword(true);
@@ -683,7 +698,14 @@ export default function CommunityAdminStaffPage() {
 
             {/* Assigned Units */}
             <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "0.5rem",
+                }}
+              >
                 <h4 style={{ fontSize: "0.85rem", fontWeight: 600 }}>
                   🚪 Assigned Residential Units
                 </h4>
@@ -715,19 +737,31 @@ export default function CommunityAdminStaffPage() {
                       <div>
                         <strong>Unit {asg.unit_number || asg.unit_id}</strong> (
                         {asg.tower_name || "Tower"})
-                        <span style={{ fontSize: "0.75rem", color: "var(--muted)", marginLeft: "0.5rem" }}>
+                        <span
+                          style={{
+                            fontSize: "0.75rem",
+                            color: "var(--muted)",
+                            marginLeft: "0.5rem",
+                          }}
+                        >
                           {asg.work_type}
                         </span>
                       </div>
                       <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
-                        <span className={`badge ${asg.is_active ? "badge-success" : "badge-neutral"}`}>
+                        <span
+                          className={`badge ${asg.is_active ? "badge-success" : "badge-neutral"}`}
+                        >
                           {asg.is_active ? "Active" : "Ended"}
                         </span>
                         {asg.is_active && (
                           <button
                             type="button"
                             className="btn btn-secondary"
-                            style={{ fontSize: "0.7rem", padding: "0.15rem 0.4rem", color: "#dc2626" }}
+                            style={{
+                              fontSize: "0.7rem",
+                              padding: "0.15rem 0.4rem",
+                              color: "#dc2626",
+                            }}
                             onClick={async () => {
                               if (confirm("End this staff assignment?")) {
                                 await endAssignment.mutateAsync(asg.id);
@@ -901,7 +935,14 @@ export default function CommunityAdminStaffPage() {
           )}
 
           <div>
-            <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+            <label
+              style={{
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                display: "block",
+                marginBottom: "0.25rem",
+              }}
+            >
               Select Residential Unit *
             </label>
             <select
@@ -920,7 +961,14 @@ export default function CommunityAdminStaffPage() {
           </div>
 
           <div>
-            <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+            <label
+              style={{
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                display: "block",
+                marginBottom: "0.25rem",
+              }}
+            >
               Service / Work Type
             </label>
             <select
@@ -935,7 +983,14 @@ export default function CommunityAdminStaffPage() {
           </div>
 
           <div>
-            <label style={{ fontSize: "0.85rem", fontWeight: 600, display: "block", marginBottom: "0.4rem" }}>
+            <label
+              style={{
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                display: "block",
+                marginBottom: "0.4rem",
+              }}
+            >
               Working Days
             </label>
             <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
@@ -971,7 +1026,14 @@ export default function CommunityAdminStaffPage() {
             </div>
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "0.5rem" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: "0.5rem",
+              marginTop: "0.5rem",
+            }}
+          >
             <button
               type="button"
               className="btn btn-secondary"
@@ -1099,7 +1161,14 @@ export default function CommunityAdminStaffPage() {
         <form
           noValidate
           onSubmit={handleAddStaff}
-          style={{ display: "flex", flexDirection: "column", gap: "1.25rem", maxHeight: "80vh", overflowY: "auto", paddingRight: "0.25rem" }}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "1.25rem",
+            maxHeight: "80vh",
+            overflowY: "auto",
+            paddingRight: "0.25rem",
+          }}
         >
           {errorMessage && (
             <div
@@ -1163,7 +1232,9 @@ export default function CommunityAdminStaffPage() {
                   className="input-field"
                   required
                   aria-invalid={Boolean(staffFieldErrors.full_name)}
-                  aria-describedby={staffFieldErrors.full_name ? "staff_full_name_error" : undefined}
+                  aria-describedby={
+                    staffFieldErrors.full_name ? "staff_full_name_error" : undefined
+                  }
                   placeholder="e.g. Ramesh Kumar"
                   value={newStaffForm.full_name}
                   onChange={(e) => {
@@ -1187,7 +1258,14 @@ export default function CommunityAdminStaffPage() {
                     id="staff_full_name_error"
                     role="alert"
                     title={staffFieldErrors.full_name}
-                    style={{ fontSize: "0.75rem", color: "#EF4444", marginTop: "0.25rem", display: "flex", alignItems: "center", gap: "0.25rem" }}
+                    style={{
+                      fontSize: "0.75rem",
+                      color: "#EF4444",
+                      marginTop: "0.25rem",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.25rem",
+                    }}
                   >
                     <span>⚠️</span> {staffFieldErrors.full_name}
                   </span>
@@ -1225,7 +1303,14 @@ export default function CommunityAdminStaffPage() {
                     id="staff_phone_error"
                     role="alert"
                     title={staffFieldErrors.phone}
-                    style={{ fontSize: "0.75rem", color: "#EF4444", marginTop: "0.25rem", display: "flex", alignItems: "center", gap: "0.25rem" }}
+                    style={{
+                      fontSize: "0.75rem",
+                      color: "#EF4444",
+                      marginTop: "0.25rem",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.25rem",
+                    }}
                   >
                     <span>⚠️</span> {staffFieldErrors.phone}
                   </span>
@@ -1244,7 +1329,10 @@ export default function CommunityAdminStaffPage() {
                     marginBottom: "0.3rem",
                   }}
                 >
-                  Email Address <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 400 }}>(For Dashboard Login)</span>
+                  Email Address{" "}
+                  <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 400 }}>
+                    (For Dashboard Login)
+                  </span>
                 </label>
                 <input
                   id="staff_email"
@@ -1264,7 +1352,14 @@ export default function CommunityAdminStaffPage() {
                     id="staff_email_error"
                     role="alert"
                     title={staffFieldErrors.email}
-                    style={{ fontSize: "0.75rem", color: "#EF4444", marginTop: "0.25rem", display: "flex", alignItems: "center", gap: "0.25rem" }}
+                    style={{
+                      fontSize: "0.75rem",
+                      color: "#EF4444",
+                      marginTop: "0.25rem",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.25rem",
+                    }}
                   >
                     <span>⚠️</span> {staffFieldErrors.email}
                   </span>
@@ -1590,7 +1685,15 @@ export default function CommunityAdminStaffPage() {
               }
               style={{ width: "16px", height: "16px", cursor: "pointer" }}
             />
-            <label htmlFor="police_verified" style={{ fontSize: "0.85rem", fontWeight: 600, cursor: "pointer", color: "var(--fg)" }}>
+            <label
+              htmlFor="police_verified"
+              style={{
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                cursor: "pointer",
+                color: "var(--fg)",
+              }}
+            >
               🛡️ Police background verification completed
             </label>
           </div>

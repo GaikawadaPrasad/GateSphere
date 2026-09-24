@@ -288,9 +288,11 @@ export default function CommunityAdminNotificationsPage() {
                 className="badge badge-neutral"
                 style={{ textTransform: "capitalize", fontSize: "0.7rem" }}
               >
-                {(selectedNotification.category ||
+                {(
+                  selectedNotification.category ||
                   (selectedNotification as any).notification_type ||
-                  "System")?.replace("_", " ")}
+                  "System"
+                )?.replace("_", " ")}
               </span>
             </div>
 

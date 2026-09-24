@@ -81,9 +81,22 @@ def test_resident_raises_fm_resolves_resident_confirms(as_role, seed_ids, reside
     assert fm.post(f"{P}/tickets/{tid}/transition", json={"status": "resolved"}).status_code == 200
 
     # Staff roles attempting confirm_ticket -> 403 NOT_AUTHORIZED
-    assert fm.post(f"{P}/tickets/{tid}/confirm", json={"confirmation_status": "confirmed"}).status_code == 403
-    assert as_role("community_admin").post(f"{P}/tickets/{tid}/confirm", json={"confirmation_status": "confirmed"}).status_code == 403
-    assert as_role("super_admin").post(f"{P}/tickets/{tid}/confirm", json={"confirmation_status": "confirmed"}).status_code == 403
+    assert (
+        fm.post(f"{P}/tickets/{tid}/confirm", json={"confirmation_status": "confirmed"}).status_code
+        == 403
+    )
+    assert (
+        as_role("community_admin")
+        .post(f"{P}/tickets/{tid}/confirm", json={"confirmation_status": "confirmed"})
+        .status_code
+        == 403
+    )
+    assert (
+        as_role("super_admin")
+        .post(f"{P}/tickets/{tid}/confirm", json={"confirmation_status": "confirmed"})
+        .status_code
+        == 403
+    )
 
     got = resident.post(f"{P}/tickets/{tid}/confirm", json={"confirmation_status": "confirmed"})
     assert got.status_code == 200 and got.json()["data"]["status"] == "closed"
@@ -106,7 +119,9 @@ def test_staff_raised_ticket_cannot_be_self_closed_by_staff(as_role, seed_ids, r
     tid = r.json()["data"]["id"]
 
     assert fm.post(f"{P}/tickets/{tid}/assign", json={"vendor_name": "Acme"}).status_code == 200
-    assert fm.post(f"{P}/tickets/{tid}/transition", json={"status": "in_progress"}).status_code == 200
+    assert (
+        fm.post(f"{P}/tickets/{tid}/transition", json={"status": "in_progress"}).status_code == 200
+    )
     assert fm.post(f"{P}/tickets/{tid}/transition", json={"status": "resolved"}).status_code == 200
 
     # FM who raised the ticket attempts self-closing -> 403 NOT_AUTHORIZED
@@ -116,7 +131,9 @@ def test_staff_raised_ticket_cannot_be_self_closed_by_staff(as_role, seed_ids, r
 
     # Active resident occupant of that unit confirms -> 200 closed
     resident = as_role("resident")
-    res_confirm = resident.post(f"{P}/tickets/{tid}/confirm", json={"confirmation_status": "confirmed"})
+    res_confirm = resident.post(
+        f"{P}/tickets/{tid}/confirm", json={"confirmation_status": "confirmed"}
+    )
     assert res_confirm.status_code == 200
     assert res_confirm.json()["data"]["status"] == "closed"
 
@@ -216,7 +233,8 @@ def test_ticket_entry_pass(as_role, seed_ids, resident_unit_id):
     cat = _category_in(cid)
     admin = as_role("community_admin")
     t = admin.post(
-        f"{P}/tickets", json={"unit_id": resident_unit_id, "category_id": cat, "subject": "Pass Test"}
+        f"{P}/tickets",
+        json={"unit_id": resident_unit_id, "category_id": cat, "subject": "Pass Test"},
     ).json()["data"]
     r = admin.get(f"{P}/tickets/{t['id']}/entry-pass")
     assert r.status_code == 200, r.text

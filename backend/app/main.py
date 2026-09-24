@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+
 import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -66,8 +67,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
                     headers=dict(response.headers),
                     media_type=response.media_type,
                 )
-            except Exception:
-                pass
+            except Exception as exc:  # docs page still served, just without SRI rewrite
+                log.warning("docs.sri_rewrite_failed", error=type(exc).__name__)
         else:
             response.headers.setdefault(
                 "Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'"
@@ -93,6 +94,7 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
 
     from fastapi.openapi.utils import get_openapi
+
     def custom_openapi() -> dict:
         if app.openapi_schema:
             return app.openapi_schema
@@ -148,7 +150,6 @@ def create_app() -> FastAPI:
                 "name": settings.PROJECT_NAME,
                 "service": "gatesphere-backend",
                 "version": app.version,
-                "environment": settings.ENVIRONMENT,
                 "api_prefix": settings.API_V1_PREFIX,
                 "docs": "/docs",
                 "openapi": f"{settings.API_V1_PREFIX}/openapi.json",
@@ -162,7 +163,6 @@ def create_app() -> FastAPI:
             {
                 "name": settings.PROJECT_NAME,
                 "version": app.version,
-                "environment": settings.ENVIRONMENT,
             },
             message="alive",
         )
@@ -203,5 +203,3 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-
-

@@ -441,7 +441,6 @@ class ResidentService(UnitScopedAccess):
     def _family_pass_credentials(self, member: FamilyMember) -> tuple[str, str, str]:
         """Generate deterministic permanent gate pass token, 6-digit PIN, and QR payload for a family member."""
         import hashlib
-        import json
 
         raw_key = f"gse:family:{member.id}:{member.community_id}"
         h = hashlib.sha256(raw_key.encode()).hexdigest()
@@ -482,7 +481,6 @@ class ResidentService(UnitScopedAccess):
         self, payload: schemas.FamilyPassVerifyIn
     ) -> schemas.FamilyPassVerifyOut:
         """Verify a permanent family member QR code or PIN at the gate and log gate event."""
-        import json
         from app.modules.gate.models import GateEvent
 
         code = payload.pass_code.strip()
@@ -521,8 +519,7 @@ class ResidentService(UnitScopedAccess):
                 p_tok, p_pin, p_qr = self._family_pass_credentials(cand)
                 if (
                     code.upper() == p_tok.upper()
-                    or code == p_pin
-                    or code == p_qr
+                    or code in (p_pin, p_qr)
                     or (cand.phone and code in (cand.phone, cand.phone.replace("+91", "")))
                 ):
                     matched_member = cand

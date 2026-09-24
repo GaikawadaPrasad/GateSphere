@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
+import pytest
+from fastapi.testclient import TestClient
+
 P = "/api/v1/uploads"
 
 
@@ -264,3 +269,27 @@ def test_direct_upload_rejects_oversize(as_role, seed_ids):
     assert r.status_code == 422, r.text
     assert r.json()["error"]["code"] == "FILE_TOO_LARGE"
 
+
+def test_confirm_when_storage_is_unreachable_is_503(
+    as_role: Callable[[str], TestClient],
+    seed_ids: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Re-audit #3 10-B: an object-storage outage is a transient 503 with Retry-After,
+    never an opaque 500."""
+    from botocore.exceptions import EndpointConnectionError
+
+    from app.services import storage
+
+    guard = as_role("security_guard")
+    d = _presign(guard, seed_ids)
+
+    def _down(*_a: object, **_kw: object) -> None:
+        raise EndpointConnectionError(endpoint_url="http://storage.invalid")
+
+    monkeypatch.setattr(storage._s3, "head_object", _down)
+    c = guard.post(f"{P}/{d['file_id']}/confirm")
+    assert c.status_code == 503, c.text
+    assert c.json()["error"]["code"] == "STORAGE_UNAVAILABLE"
+    assert c.headers.get("Retry-After")
+    assert "storage.invalid" not in c.text  # no internal endpoint leaked

@@ -22,7 +22,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install ruff==0.8.6 black==24.10.0
+      # Keep in step with requirements-dev.in.
+      - run: pip install ruff==0.8.6 black==26.3.1
       - run: ruff check .
       - run: black --check .
 
@@ -36,7 +37,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install --require-hashes -r requirements.lock.txt
+      - run: pip install --require-hashes -r requirements-dev.lock.txt
       # Ratchet: fails only if the mypy error count grew vs backend/.mypy-baseline (TYP-1).
       - run: bash scripts/mypy-ratchet.sh
 
@@ -109,7 +110,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install --require-hashes -r requirements.lock.txt
+      - run: pip install --require-hashes -r requirements-dev.lock.txt
       - run: alembic upgrade head
       - run: python -m app.scripts.seed --reset
       - run: pytest -q
@@ -125,8 +126,10 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install pip-audit==2.7.3
-      # Scans the fully-pinned transitive lockfile, not the loose top-level requirements.txt.
+      # Scans the fully-pinned, hashed lockfiles: the runtime lock (what the image ships)
+      # and the dev lock (what CI and local containers install).
       - run: pip-audit --require-hashes -r requirements.lock.txt
+      - run: pip-audit --require-hashes -r requirements-dev.lock.txt
 
   frontend-lint:
     runs-on: ubuntu-latest
@@ -159,12 +162,98 @@ jobs:
           node-version: "20"
       - run: npm ci
       - run: npm run test
-      - name: Build Frontend for E2E
-        run: npm run build
+
+  # Critical journeys against a REAL backend + deterministic seed (re-audit #3 F1/N-4):
+  # the Next.js middleware checks the session cookie server-side, so browser-side API
+  # mocking cannot exercise a signed-in page. Nothing is mocked here.
+  frontend-e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
         env:
-          DOCKER_BUILD: "1"
-      - run: npx playwright install --with-deps chromium
-      - run: npx playwright test
+          POSTGRES_USER: gatesphere
+          POSTGRES_PASSWORD: gatesphere
+          POSTGRES_DB: gatesphere
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U gatesphere"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      minio:
+        image: bitnami/minio:2024
+        env:
+          MINIO_ROOT_USER: gatesphere
+          MINIO_ROOT_PASSWORD: gatesphere-secret
+          MINIO_DEFAULT_BUCKETS: gatesphere-local
+        ports: ["9000:9000"]
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/live"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      ENVIRONMENT: local
+      SECRET_KEY: ci-test-secret-key-not-for-production-0000
+      FRONTEND_ORIGIN: http://127.0.0.1:3000
+      COOKIE_SECURE: "false"
+      DATABASE_URL: postgresql+psycopg://gatesphere:gatesphere@localhost:5432/gatesphere
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+      REDIS_URL: redis://localhost:6379/0
+      REDIS_HOST: localhost
+      REDIS_PORT: "6379"
+      CELERY_BROKER_URL: redis://localhost:6379/1
+      CELERY_RESULT_BACKEND: redis://localhost:6379/2
+      S3_ENDPOINT_URL: http://localhost:9000
+      S3_PUBLIC_URL: http://localhost:9000
+      S3_ACCESS_KEY: gatesphere
+      S3_SECRET_KEY: gatesphere-secret
+      S3_BUCKET: gatesphere-local
+      S3_REGION: us-east-1
+      EMAIL_BACKEND: console
+      SEED_ON_START: "false"
+      # The suite signs several roles in from one IP; keep the limiter on, but roomy.
+      RATE_LIMIT_LOGIN: 100/60
+      BACKEND_INTERNAL_URL: http://127.0.0.1:8000
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Backend — install, migrate, seed, serve
+        working-directory: backend
+        run: |
+          pip install --require-hashes -r requirements.lock.txt
+          alembic upgrade head
+          python -m app.scripts.seed --reset
+          nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > ../uvicorn.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:8000/readyz && break; sleep 2; done
+          curl -sf http://127.0.0.1:8000/readyz
+      - name: Frontend — build against the live backend (rewrites resolve at build time)
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+      - working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - working-directory: frontend
+        run: npx playwright test
+      - if: failure()
+        run: tail -n 200 uvicorn.log
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/test-results/
+          retention-days: 7
 
   docker-build:
     runs-on: ubuntu-latest

@@ -38,7 +38,10 @@ export default function SecurityGuardVisitorsPage() {
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [actionMessage, setActionMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
   const [isWalkInModalOpen, setIsWalkInModalOpen] = useState(false);
   const [selectedVisitor, setSelectedVisitor] = useState<VisitorRow | null>(null);
   const [admitVisitor, setAdmitVisitor] = useState<VisitorRow | null>(null);
@@ -63,7 +66,9 @@ export default function SecurityGuardVisitorsPage() {
       ]);
 
       const requests = Array.isArray(requestsRes) ? requestsRes : (requestsRes as any)?.data || [];
-      const directory = Array.isArray(directoryRes) ? directoryRes : (directoryRes as any)?.data || [];
+      const directory = Array.isArray(directoryRes)
+        ? directoryRes
+        : (directoryRes as any)?.data || [];
       const entries = Array.isArray(entriesRes) ? entriesRes : (entriesRes as any)?.data || [];
 
       let cid = me?.community_ids?.[0] || (me as any)?.community_id;
@@ -103,22 +108,16 @@ export default function SecurityGuardVisitorsPage() {
             directoryVisitor?.full_name ||
             "Visitor";
           const phone =
-            r.phone ||
-            r.visitor?.phone ||
-            r.visitor_phone ||
-            directoryVisitor?.phone ||
-            "—";
-          const unit = unitMap.get(r.unit_id) || (r.unit_id ? `Unit #${r.unit_id.slice(0, 6)}` : "—");
+            r.phone || r.visitor?.phone || r.visitor_phone || directoryVisitor?.phone || "—";
+          const unit =
+            unitMap.get(r.unit_id) || (r.unit_id ? `Unit #${r.unit_id.slice(0, 6)}` : "—");
           const photoUrl =
             r.photo_url ||
             r.visitor?.photo_url ||
             directoryVisitor?.photo_url ||
             openEntry?.entry_photo_url ||
             undefined;
-          const entryPhotoUrl =
-            openEntry?.entry_photo_url ||
-            r.entry_photo_url ||
-            undefined;
+          const entryPhotoUrl = openEntry?.entry_photo_url || r.entry_photo_url || undefined;
 
           return {
             id: r.id,
@@ -165,7 +164,8 @@ export default function SecurityGuardVisitorsPage() {
   const handleConfirmAdmit = async () => {
     if (!admitVisitor) return;
     if (!admitPhotoUrl) {
-      const msg = "📸 VISITOR PHOTO REQUIRED: Security policy mandates capturing a visitor photograph before gate entry. Please attach photo.";
+      const msg =
+        "📸 VISITOR PHOTO REQUIRED: Security policy mandates capturing a visitor photograph before gate entry. Please attach photo.";
       setAdmitError(msg);
       toast.error(msg);
       return;
@@ -315,11 +315,7 @@ export default function SecurityGuardVisitorsPage() {
       key: "unitNumber",
       header: "Destination Unit",
       sortable: true,
-      render: (v) => (
-        <span style={{ fontWeight: 600, color: "var(--fg)" }}>
-          🏢 {v.unitNumber}
-        </span>
-      ),
+      render: (v) => <span style={{ fontWeight: 600, color: "var(--fg)" }}>🏢 {v.unitNumber}</span>,
     },
     {
       key: "visitorType",
@@ -338,11 +334,24 @@ export default function SecurityGuardVisitorsPage() {
       header: "Actions",
       align: "right",
       render: (v) => (
-        <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", alignItems: "center" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: "0.5rem",
+            justifyContent: "flex-end",
+            alignItems: "center",
+          }}
+        >
           <button
             type="button"
             className="btn btn-secondary"
-            style={{ fontSize: "0.8rem", padding: "0.3rem 0.65rem", display: "inline-flex", alignItems: "center", gap: "0.25rem" }}
+            style={{
+              fontSize: "0.8rem",
+              padding: "0.3rem 0.65rem",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.25rem",
+            }}
             onClick={() => setSelectedVisitor(v)}
             title="View full visitor details"
           >
@@ -379,11 +388,7 @@ export default function SecurityGuardVisitorsPage() {
         subtitle="Review resident-approved visitor requests, and log visitor gate entry / exit"
         breadcrumbs={[{ label: "GateSphere" }, { label: "Security Guard" }, { label: "Visitors" }]}
         actions={
-          <button
-            className="btn btn-secondary"
-            onClick={loadData}
-            disabled={isLoading}
-          >
+          <button className="btn btn-secondary" onClick={loadData} disabled={isLoading}>
             🔄 {isLoading ? "Refreshing…" : "Refresh"}
           </button>
         }
@@ -395,7 +400,8 @@ export default function SecurityGuardVisitorsPage() {
             padding: "0.75rem 1rem",
             marginBottom: "1.25rem",
             borderRadius: "var(--radius)",
-            background: actionMessage.type === "success" ? "var(--success-light)" : "var(--danger-light)",
+            background:
+              actionMessage.type === "success" ? "var(--success-light)" : "var(--danger-light)",
             border: `1px solid ${actionMessage.type === "success" ? "var(--success-border)" : "var(--danger-border)"}`,
             color: actionMessage.type === "success" ? "#065f46" : "#991b1b",
             display: "flex",
@@ -453,7 +459,11 @@ export default function SecurityGuardVisitorsPage() {
 
           <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", flexWrap: "wrap" }}>
             <div style={{ width: "100%", maxWidth: 240 }}>
-              <SearchInput value={search} onChange={setSearch} placeholder="Search name/type/phone…" />
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Search name/type/phone…"
+              />
             </div>
             <button
               type="button"
@@ -499,7 +509,9 @@ export default function SecurityGuardVisitorsPage() {
           title="Visitor Pass & Entry Details"
           size="md"
           footer={
-            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", width: "100%" }}>
+            <div
+              style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", width: "100%" }}
+            >
               {selectedVisitor.status === "approved" && (
                 <button
                   type="button"
@@ -561,7 +573,12 @@ export default function SecurityGuardVisitorsPage() {
                       }
                     }}
                     title="Click to view full photograph"
-                    style={{ position: "relative", display: "inline-block", flexShrink: 0, cursor: "pointer" }}
+                    style={{
+                      position: "relative",
+                      display: "inline-block",
+                      flexShrink: 0,
+                      cursor: "pointer",
+                    }}
                   >
                     <img
                       src={selectedVisitor.photoUrl || selectedVisitor.entryPhotoUrl}
@@ -616,18 +633,43 @@ export default function SecurityGuardVisitorsPage() {
                   </div>
                 )}
                 <div>
-                  <h4 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700, color: "var(--fg)" }}>
+                  <h4
+                    style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700, color: "var(--fg)" }}
+                  >
                     {selectedVisitor.name}
                   </h4>
-                  <p style={{ margin: "0.2rem 0 0", fontSize: "0.85rem", color: "var(--muted)", fontFamily: "monospace" }}>
+                  <p
+                    style={{
+                      margin: "0.2rem 0 0",
+                      fontSize: "0.85rem",
+                      color: "var(--muted)",
+                      fontFamily: "monospace",
+                    }}
+                  >
                     {selectedVisitor.phone}
                   </p>
                   {selectedVisitor.photoUrl || selectedVisitor.entryPhotoUrl ? (
-                    <span style={{ fontSize: "0.75rem", color: "#16a34a", fontWeight: 600, display: "block", marginTop: "0.2rem" }}>
+                    <span
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "#16a34a",
+                        fontWeight: 600,
+                        display: "block",
+                        marginTop: "0.2rem",
+                      }}
+                    >
                       ✓ Verified Photo Attached
                     </span>
                   ) : (
-                    <span style={{ fontSize: "0.75rem", color: "#d97706", fontWeight: 600, display: "block", marginTop: "0.2rem" }}>
+                    <span
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "#d97706",
+                        fontWeight: 600,
+                        display: "block",
+                        marginTop: "0.2rem",
+                      }}
+                    >
                       ⚠️ No Photo Attached
                     </span>
                   )}
@@ -709,7 +751,9 @@ export default function SecurityGuardVisitorsPage() {
               }}
             >
               <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
-                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                <div
+                  style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}
+                >
                   Destination Unit
                 </div>
                 <div style={{ fontWeight: 600, color: "var(--fg)", marginTop: "0.15rem" }}>
@@ -718,25 +762,45 @@ export default function SecurityGuardVisitorsPage() {
               </div>
 
               <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
-                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                <div
+                  style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}
+                >
                   Visitor Type
                 </div>
-                <div style={{ fontWeight: 600, color: "var(--fg)", marginTop: "0.15rem", textTransform: "capitalize" }}>
+                <div
+                  style={{
+                    fontWeight: 600,
+                    color: "var(--fg)",
+                    marginTop: "0.15rem",
+                    textTransform: "capitalize",
+                  }}
+                >
                   {selectedVisitor.visitorType}
                 </div>
               </div>
 
               <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
-                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                <div
+                  style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}
+                >
                   Vehicle Number
                 </div>
-                <div style={{ fontWeight: 600, color: "var(--fg)", marginTop: "0.15rem", fontFamily: "monospace" }}>
+                <div
+                  style={{
+                    fontWeight: 600,
+                    color: "var(--fg)",
+                    marginTop: "0.15rem",
+                    fontFamily: "monospace",
+                  }}
+                >
                   🚗 {selectedVisitor.vehicleNumber}
                 </div>
               </div>
 
               <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
-                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                <div
+                  style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}
+                >
                   Party Size
                 </div>
                 <div style={{ fontWeight: 600, color: "var(--fg)", marginTop: "0.15rem" }}>
@@ -744,8 +808,17 @@ export default function SecurityGuardVisitorsPage() {
                 </div>
               </div>
 
-              <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px", gridColumn: "span 2" }}>
-                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+              <div
+                style={{
+                  background: "#f8fafc",
+                  padding: "0.6rem 0.8rem",
+                  borderRadius: "6px",
+                  gridColumn: "span 2",
+                }}
+              >
+                <div
+                  style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}
+                >
                   Purpose of Visit
                 </div>
                 <div style={{ fontWeight: 500, color: "var(--fg)", marginTop: "0.15rem" }}>
@@ -754,28 +827,62 @@ export default function SecurityGuardVisitorsPage() {
               </div>
 
               <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
-                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                <div
+                  style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}
+                >
                   Expected At
                 </div>
-                <div style={{ fontWeight: 500, color: "var(--fg)", marginTop: "0.15rem", fontSize: "0.8rem" }}>
+                <div
+                  style={{
+                    fontWeight: 500,
+                    color: "var(--fg)",
+                    marginTop: "0.15rem",
+                    fontSize: "0.8rem",
+                  }}
+                >
                   {selectedVisitor.expectedAt}
                 </div>
               </div>
 
               <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
-                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                <div
+                  style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}
+                >
                   Valid Until
                 </div>
-                <div style={{ fontWeight: 500, color: "var(--fg)", marginTop: "0.15rem", fontSize: "0.8rem" }}>
+                <div
+                  style={{
+                    fontWeight: 500,
+                    color: "var(--fg)",
+                    marginTop: "0.15rem",
+                    fontSize: "0.8rem",
+                  }}
+                >
                   {selectedVisitor.validUntil}
                 </div>
               </div>
 
-              <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px", gridColumn: "span 2" }}>
-                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+              <div
+                style={{
+                  background: "#f8fafc",
+                  padding: "0.6rem 0.8rem",
+                  borderRadius: "6px",
+                  gridColumn: "span 2",
+                }}
+              >
+                <div
+                  style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}
+                >
                   Pass Created
                 </div>
-                <div style={{ fontWeight: 500, color: "var(--fg)", marginTop: "0.15rem", fontSize: "0.8rem" }}>
+                <div
+                  style={{
+                    fontWeight: 500,
+                    color: "var(--fg)",
+                    marginTop: "0.15rem",
+                    fontSize: "0.8rem",
+                  }}
+                >
                   {selectedVisitor.createdAt}
                 </div>
               </div>
@@ -828,19 +935,27 @@ export default function SecurityGuardVisitorsPage() {
               }}
             >
               <div>
-                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>Visitor</span>
+                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>
+                  Visitor
+                </span>
                 <strong style={{ color: "var(--fg)" }}>👤 {admitVisitor.name}</strong>
               </div>
               <div>
-                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>Phone</span>
+                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>
+                  Phone
+                </span>
                 <strong style={{ fontFamily: "monospace" }}>{admitVisitor.phone}</strong>
               </div>
               <div>
-                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>Destination</span>
+                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>
+                  Destination
+                </span>
                 <strong>🏢 {admitVisitor.unitNumber}</strong>
               </div>
               <div>
-                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>Type</span>
+                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block" }}>
+                  Type
+                </span>
                 <span style={{ textTransform: "capitalize" }}>{admitVisitor.visitorType}</span>
               </div>
             </div>
@@ -862,7 +977,8 @@ export default function SecurityGuardVisitorsPage() {
                 }}
               >
                 <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "#1e293b" }}>
-                  📷 Visitor Face Photograph <span style={{ color: "#dc2626", fontWeight: 900 }}>* (Mandatory)</span>
+                  📷 Visitor Face Photograph{" "}
+                  <span style={{ color: "#dc2626", fontWeight: 900 }}>* (Mandatory)</span>
                 </span>
                 {admitPhotoUrl ? (
                   <span style={{ fontSize: "0.75rem", color: "#16a34a", fontWeight: 700 }}>
@@ -885,7 +1001,14 @@ export default function SecurityGuardVisitorsPage() {
               />
             </div>
 
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "0.75rem",
+                marginTop: "0.5rem",
+              }}
+            >
               <button
                 type="button"
                 className="btn btn-secondary"

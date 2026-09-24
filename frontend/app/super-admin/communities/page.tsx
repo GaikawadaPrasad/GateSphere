@@ -83,7 +83,9 @@ export default function CommunitiesPage() {
   // View / Structure Details Modal state
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [viewingCommunity, setViewingCommunity] = useState<CommunityWithMetrics | null>(null);
-  const [activeTab, setActiveTab] = useState<"towers" | "units" | "residents" | "gates" | "credentials" | "staff">("towers");
+  const [activeTab, setActiveTab] = useState<
+    "towers" | "units" | "residents" | "gates" | "credentials" | "staff"
+  >("towers");
   const [communityTowers, setCommunityTowers] = useState<Tower[]>([]);
   const [communityGates, setCommunityGates] = useState<Gate[]>([]);
   const [communityResidents, setCommunityResidents] = useState<ResidentProfile[]>([]);
@@ -94,7 +96,10 @@ export default function CommunitiesPage() {
   const [editingPersonnel, setEditingPersonnel] = useState<UserRecord | null>(null);
   const [deletingPersonnel, setDeletingPersonnel] = useState<UserRecord | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
-  const [detailsFeedback, setDetailsFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [detailsFeedback, setDetailsFeedback] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   const handleShowCredentials = (comm: CommunityWithMetrics) => {
     const codeSlug = comm.code.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -127,7 +132,9 @@ export default function CommunitiesPage() {
     if (!createdAdminInfo?.communityId) return;
     const trimmedName = updateAdminName.trim();
     if (trimmedName && (trimmedName.length < 2 || !isValidPersonName(trimmedName))) {
-      setUpdateAdminCredsError("Admin full name must contain only alphabets and spaces (min 2 chars).");
+      setUpdateAdminCredsError(
+        "Admin full name must contain only alphabets and spaces (min 2 chars).",
+      );
       return;
     }
     const trimmedEmail = updateAdminEmail.trim();
@@ -164,7 +171,7 @@ export default function CommunitiesPage() {
 
       toast.success(
         `Updated Community Admin credentials for ${createdAdminInfo.communityName}.`,
-        "Credentials Updated"
+        "Credentials Updated",
       );
       refetch();
       setIsEditingAdminCredentials(false);
@@ -221,7 +228,7 @@ export default function CommunitiesPage() {
   const { data: communities, isLoading, refetch } = useCommunities();
   const { data: metrics } = useSuperAdminDashboardMetrics(activeCommunityId);
   const { data: communityUnitsList, refetch: refetchUnits } = useCommunityUnits(
-    viewingCommunity?.id || undefined
+    viewingCommunity?.id || undefined,
   );
 
   const filteredResidentUnits = useMemo(() => {
@@ -356,7 +363,7 @@ export default function CommunitiesPage() {
         const val: unknown = residentsRes.value;
         const resList: ResidentProfile[] = Array.isArray(val)
           ? (val as ResidentProfile[])
-          : ((val as { items?: ResidentProfile[] })?.items || []);
+          : (val as { items?: ResidentProfile[] })?.items || [];
         setCommunityResidents(resList);
       }
       if (personnelRes.status === "fulfilled") {
@@ -487,15 +494,24 @@ export default function CommunitiesPage() {
       return;
     }
     if (trimmedName.length < 2 || trimmedName.length > 128) {
-      setDetailsFeedback({ type: "error", message: "Tower name must be between 2 and 128 characters." });
+      setDetailsFeedback({
+        type: "error",
+        message: "Tower name must be between 2 and 128 characters.",
+      });
       return;
     }
     if (!/[A-Za-z]/.test(trimmedName)) {
-      setDetailsFeedback({ type: "error", message: "Tower name must contain letters and cannot be purely numeric or symbols." });
+      setDetailsFeedback({
+        type: "error",
+        message: "Tower name must contain letters and cannot be purely numeric or symbols.",
+      });
       return;
     }
     if (!/^[A-Za-z0-9][A-Za-z0-9\s\-./]*$/.test(trimmedName)) {
-      setDetailsFeedback({ type: "error", message: "Tower name can only contain letters, numbers, spaces, hyphens, and periods." });
+      setDetailsFeedback({
+        type: "error",
+        message: "Tower name can only contain letters, numbers, spaces, hyphens, and periods.",
+      });
       return;
     }
 
@@ -505,13 +521,20 @@ export default function CommunitiesPage() {
       return;
     }
     if (trimmedCode.length > 32 || !/^[A-Za-z0-9][A-Za-z0-9 _\-\/]*$/.test(trimmedCode)) {
-      setDetailsFeedback({ type: "error", message: "Tower code must start with a letter or number and contain only letters, numbers, hyphens, or slashes (1–32 characters)." });
+      setDetailsFeedback({
+        type: "error",
+        message:
+          "Tower code must start with a letter or number and contain only letters, numbers, hyphens, or slashes (1–32 characters).",
+      });
       return;
     }
 
     const floorsNum = Number(towerFloors);
     if (isNaN(floorsNum) || !Number.isInteger(floorsNum) || floorsNum < 1 || floorsNum > 300) {
-      setDetailsFeedback({ type: "error", message: "Total floors must be a whole number between 1 and 300." });
+      setDetailsFeedback({
+        type: "error",
+        message: "Total floors must be a whole number between 1 and 300.",
+      });
       return;
     }
 
@@ -541,9 +564,7 @@ export default function CommunitiesPage() {
       setIsAddTowerOpen(false);
       setDetailsFeedback({
         type: "success",
-        message: autoGenFloorsOnTowerCreate
-          ? `Tower "${trimmedName}" created with ${floorsNum} floor(s) successfully.`
-          : `Tower "${trimmedName}" created successfully.`,
+        message: `Tower "${trimmedName}" created successfully.`,
       });
       await refreshCommunityDetails(viewingCommunity.id);
       refetch();
@@ -578,9 +599,10 @@ export default function CommunitiesPage() {
         label: floorLabel.trim() || undefined,
       });
       setIsAddFloorOpen(false);
-      setDetailsFeedback({ type: "success", message: `Floor ${floorNumber} created successfully.` });
-      const updated = await communitiesApi.floors(selectedTowerForFloor).catch(() => []);
-      setTowerFloorsMap((prev) => ({ ...prev, [selectedTowerForFloor]: updated || [] }));
+      setDetailsFeedback({
+        type: "success",
+        message: `Floor ${floorNumber} created successfully.`,
+      });
       if (viewingCommunity) await refreshCommunityDetails(viewingCommunity.id);
     } catch (err: unknown) {
       setDetailsFeedback({
@@ -646,16 +668,17 @@ export default function CommunitiesPage() {
         unit_number: unitNumber.trim(),
         unit_type: unitType,
         bedrooms:
-          unitBedrooms !== "" && !isNaN(Number(unitBedrooms))
-            ? Number(unitBedrooms)
-            : undefined,
+          unitBedrooms !== "" && !isNaN(Number(unitBedrooms)) ? Number(unitBedrooms) : undefined,
         area_sqft:
           unitSqFt !== "" && !isNaN(Number(unitSqFt)) && Number(unitSqFt) > 0
             ? Number(unitSqFt)
             : undefined,
       });
       setIsAddUnitOpen(false);
-      setDetailsFeedback({ type: "success", message: `Unit "${unitNumber}" created successfully.` });
+      setDetailsFeedback({
+        type: "success",
+        message: `Unit "${unitNumber}" created successfully.`,
+      });
       if (viewingCommunity) await refreshCommunityDetails(viewingCommunity.id);
       refetch();
     } catch (err: unknown) {
@@ -726,14 +749,18 @@ export default function CommunitiesPage() {
           full_name: residentFullName.trim(),
           email: residentEmail.trim().toLowerCase(),
           phone: residentPhone.trim(),
-          password: residentPassword.trim() || generateInitialPassword(residentFullName, "resident"),
+          password:
+            residentPassword.trim() || generateInitialPassword(residentFullName, "resident"),
           occupancy_role: residentRole,
           is_primary: residentIsPrimary,
         },
       });
       setIsAddResidentOpen(false);
       setResidentFormErrors({});
-      toast.success(`Resident "${residentFullName.trim()}" onboarded successfully!`, "Resident Registered");
+      toast.success(
+        `Resident "${residentFullName.trim()}" onboarded successfully!`,
+        "Resident Registered",
+      );
       setDetailsFeedback({
         type: "success",
         message: `Resident "${residentFullName}" onboarded successfully.`,
@@ -864,7 +891,9 @@ export default function CommunitiesPage() {
           <div>
             <h3 className="card-title">All Communities</h3>
             <p style={{ fontSize: "0.775rem", color: "var(--muted)" }}>
-              {isLoading ? "Loading registered communities…" : `Total ${communities?.length || 0} registered communities`}
+              {isLoading
+                ? "Loading registered communities…"
+                : `Total ${communities?.length || 0} registered communities`}
             </p>
           </div>
 
@@ -917,7 +946,14 @@ export default function CommunitiesPage() {
         title={`🔑 Community Admin Credentials — ${createdAdminInfo?.communityName || ""}`}
         maxWidth={620}
         footer={
-          <div style={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "center" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              width: "100%",
+              alignItems: "center",
+            }}
+          >
             <button
               type="button"
               className="btn btn-secondary"
@@ -934,7 +970,6 @@ export default function CommunitiesPage() {
               {copiedAll ? "✓ All Credentials Copied!" : "📋 Copy All Credentials"}
             </button>
             <div style={{ display: "flex", gap: "0.5rem" }}>
-              
               <button
                 type="button"
                 className="btn btn-primary"
@@ -957,10 +992,12 @@ export default function CommunitiesPage() {
             }}
           >
             <p style={{ margin: 0, fontWeight: 600, color: "#166534", fontSize: "0.9rem" }}>
-              ✅ Credentials ready for <strong>{createdAdminInfo?.communityName}</strong> ({createdAdminInfo?.communityCode})
+              ✅ Credentials ready for <strong>{createdAdminInfo?.communityName}</strong> (
+              {createdAdminInfo?.communityCode})
             </p>
             <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.775rem", color: "#15803d" }}>
-              Use these credentials to sign in as Community Administrator or share them with the designated admin.
+              Use these credentials to sign in as Community Administrator or share them with the
+              designated admin.
             </p>
           </div>
 
@@ -972,7 +1009,14 @@ export default function CommunitiesPage() {
               padding: "1rem",
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "0.75rem",
+              }}
+            >
               <h4
                 style={{
                   margin: 0,
@@ -996,15 +1040,40 @@ export default function CommunitiesPage() {
             </div>
 
             {updateAdminCredsError && (
-              <div style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", padding: "0.5rem 0.75rem", borderRadius: "6px", fontSize: "0.8rem", marginBottom: "0.75rem" }}>
+              <div
+                style={{
+                  background: "#fef2f2",
+                  border: "1px solid #fecaca",
+                  color: "#991b1b",
+                  padding: "0.5rem 0.75rem",
+                  borderRadius: "6px",
+                  fontSize: "0.8rem",
+                  marginBottom: "0.75rem",
+                }}
+              >
                 ⚠️ {updateAdminCredsError}
               </div>
             )}
 
             {isEditingAdminCredentials ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", fontSize: "0.85rem" }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.75rem",
+                  fontSize: "0.85rem",
+                }}
+              >
                 <div>
-                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "#475569", marginBottom: "0.2rem" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.75rem",
+                      fontWeight: 600,
+                      color: "#475569",
+                      marginBottom: "0.2rem",
+                    }}
+                  >
                     Admin Name
                   </label>
                   <input
@@ -1017,7 +1086,15 @@ export default function CommunitiesPage() {
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
                   <div>
-                    <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "#475569", marginBottom: "0.2rem" }}>
+                    <label
+                      style={{
+                        display: "block",
+                        fontSize: "0.75rem",
+                        fontWeight: 600,
+                        color: "#475569",
+                        marginBottom: "0.2rem",
+                      }}
+                    >
                       Login Email <span style={{ color: "var(--danger)" }}>*</span>
                     </label>
                     <input
@@ -1030,7 +1107,15 @@ export default function CommunitiesPage() {
                     />
                   </div>
                   <div>
-                    <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "#475569", marginBottom: "0.2rem" }}>
+                    <label
+                      style={{
+                        display: "block",
+                        fontSize: "0.75rem",
+                        fontWeight: 600,
+                        color: "#475569",
+                        marginBottom: "0.2rem",
+                      }}
+                    >
                       Phone
                     </label>
                     <input
@@ -1060,7 +1145,9 @@ export default function CommunitiesPage() {
                   onClick={handleSaveAdminCredentials}
                   disabled={isUpdatingAdminCreds}
                 >
-                  {isUpdatingAdminCreds ? "Updating Credentials…" : "💾 Save & Provision New Credentials"}
+                  {isUpdatingAdminCreds
+                    ? "Updating Credentials…"
+                    : "💾 Save & Provision New Credentials"}
                 </button>
               </div>
             ) : (
@@ -1074,9 +1161,16 @@ export default function CommunitiesPage() {
                     borderBottom: "1px dashed #e2e8f0",
                   }}
                 >
-                  <span style={{ color: "var(--muted)", fontWeight: 500 }}>Community Name & Code:</span>
+                  <span style={{ color: "var(--muted)", fontWeight: 500 }}>
+                    Community Name & Code:
+                  </span>
                   <span style={{ fontWeight: 600, color: "var(--fg)" }}>
-                    {createdAdminInfo?.communityName} <code style={{ background: "#e2e8f0", padding: "0.1rem 0.35rem", borderRadius: 4 }}>{createdAdminInfo?.communityCode}</code>
+                    {createdAdminInfo?.communityName}{" "}
+                    <code
+                      style={{ background: "#e2e8f0", padding: "0.1rem 0.35rem", borderRadius: 4 }}
+                    >
+                      {createdAdminInfo?.communityCode}
+                    </code>
                   </span>
                 </div>
 
@@ -1187,7 +1281,9 @@ export default function CommunitiesPage() {
               lineHeight: 1.4,
             }}
           >
-            💡 Community administrators sign in at <strong>/login</strong> using their registered email and password to access the Community Console, manage towers, gates, units, and residents.
+            💡 Community administrators sign in at <strong>/login</strong> using their registered
+            email and password to access the Community Console, manage towers, gates, units, and
+            residents.
           </p>
         </div>
       </Modal>
@@ -1541,7 +1637,8 @@ export default function CommunitiesPage() {
               <div>
                 <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Location</span>
                 <div style={{ fontWeight: 600, fontSize: "0.85rem" }}>
-                  {[viewingCommunity.city, viewingCommunity.state].filter(Boolean).join(", ") || "–"}
+                  {[viewingCommunity.city, viewingCommunity.state].filter(Boolean).join(", ") ||
+                    "–"}
                 </div>
               </div>
               <div>
@@ -1635,7 +1732,9 @@ export default function CommunitiesPage() {
             </div>
 
             {isLoadingDetails ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", padding: "1rem" }}>
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: "0.5rem", padding: "1rem" }}
+              >
                 <div className="skeleton" style={{ height: 32 }} />
                 <div className="skeleton" style={{ height: 32 }} />
                 <div className="skeleton" style={{ height: 32 }} />
@@ -1998,14 +2097,19 @@ export default function CommunitiesPage() {
                           WebkitOverflowScrolling: "touch",
                         }}
                       >
-                        <table className="data-table" style={{ width: "100%", fontSize: "0.825rem" }}>
+                        <table
+                          className="data-table"
+                          style={{ width: "100%", fontSize: "0.825rem" }}
+                        >
                           <thead>
                             <tr style={{ background: "#f1f5f9", textAlign: "left" }}>
                               <th style={{ padding: "0.5rem 0.75rem" }}>Unit #</th>
                               <th style={{ padding: "0.5rem 0.75rem" }}>Type</th>
                               <th style={{ padding: "0.5rem 0.75rem" }}>Area (Sq. Ft.)</th>
                               <th style={{ padding: "0.5rem 0.75rem" }}>Status</th>
-                              <th style={{ padding: "0.5rem 0.75rem", textAlign: "right" }}>Action</th>
+                              <th style={{ padding: "0.5rem 0.75rem", textAlign: "right" }}>
+                                Action
+                              </th>
                             </tr>
                           </thead>
                           <tbody>
@@ -2015,7 +2119,9 @@ export default function CommunitiesPage() {
                                   {u.unit_number}
                                 </td>
                                 <td style={{ padding: "0.5rem 0.75rem" }}>{u.unit_type || "–"}</td>
-                                <td style={{ padding: "0.5rem 0.75rem" }}>{u.sq_ft ? `${u.sq_ft} sq ft` : "–"}</td>
+                                <td style={{ padding: "0.5rem 0.75rem" }}>
+                                  {u.sq_ft ? `${u.sq_ft} sq ft` : "–"}
+                                </td>
                                 <td style={{ padding: "0.5rem 0.75rem" }}>
                                   <span
                                     className={`badge ${u.is_occupied ? "badge-success" : "badge-secondary"}`}
@@ -2113,7 +2219,10 @@ export default function CommunitiesPage() {
                           WebkitOverflowScrolling: "touch",
                         }}
                       >
-                        <table className="data-table" style={{ width: "100%", fontSize: "0.825rem" }}>
+                        <table
+                          className="data-table"
+                          style={{ width: "100%", fontSize: "0.825rem" }}
+                        >
                           <thead>
                             <tr style={{ background: "#f1f5f9", textAlign: "left" }}>
                               <th style={{ padding: "0.5rem 0.75rem" }}>Name</th>
@@ -2132,7 +2241,10 @@ export default function CommunitiesPage() {
                                   {r.unit_number || r.tower_name || "–"}
                                 </td>
                                 <td style={{ padding: "0.5rem 0.75rem" }}>
-                                  <span className="badge badge-primary" style={{ textTransform: "capitalize" }}>
+                                  <span
+                                    className="badge badge-primary"
+                                    style={{ textTransform: "capitalize" }}
+                                  >
                                     {(r.resident_type || "Resident").replace(/_/g, " ")}
                                   </span>
                                 </td>
@@ -2208,7 +2320,13 @@ export default function CommunitiesPage() {
                           >
                             <div>
                               <span style={{ fontWeight: 600, fontSize: "0.85rem" }}>{g.name}</span>
-                              <span style={{ fontSize: "0.75rem", color: "var(--muted)", marginLeft: "0.5rem" }}>
+                              <span
+                                style={{
+                                  fontSize: "0.75rem",
+                                  color: "var(--muted)",
+                                  marginLeft: "0.5rem",
+                                }}
+                              >
                                 ({g.code})
                               </span>
                             </div>
@@ -2264,11 +2382,25 @@ export default function CommunitiesPage() {
                         }}
                       >
                         <div>
-                          <h4 style={{ margin: 0, fontWeight: 700, fontSize: "0.95rem", color: "#1e293b" }}>
+                          <h4
+                            style={{
+                              margin: 0,
+                              fontWeight: 700,
+                              fontSize: "0.95rem",
+                              color: "#1e293b",
+                            }}
+                          >
                             🔑 Community Admin Account Credentials
                           </h4>
-                          <p style={{ margin: "0.2rem 0 0 0", fontSize: "0.775rem", color: "var(--muted)" }}>
-                            Portal access and login details for <strong>{viewingCommunity.name}</strong> ({viewingCommunity.code})
+                          <p
+                            style={{
+                              margin: "0.2rem 0 0 0",
+                              fontSize: "0.775rem",
+                              color: "var(--muted)",
+                            }}
+                          >
+                            Portal access and login details for{" "}
+                            <strong>{viewingCommunity.name}</strong> ({viewingCommunity.code})
                           </p>
                         </div>
                         <span className="badge badge-primary" style={{ fontSize: "0.75rem" }}>
@@ -2286,8 +2418,17 @@ export default function CommunitiesPage() {
                             borderBottom: "1px dashed #e2e8f0",
                           }}
                         >
-                          <span style={{ color: "var(--muted)", fontWeight: 500 }}>Community Code:</span>
-                          <code style={{ background: "#e2e8f0", padding: "0.15rem 0.4rem", borderRadius: 4, fontWeight: 700 }}>
+                          <span style={{ color: "var(--muted)", fontWeight: 500 }}>
+                            Community Code:
+                          </span>
+                          <code
+                            style={{
+                              background: "#e2e8f0",
+                              padding: "0.15rem 0.4rem",
+                              borderRadius: 4,
+                              fontWeight: 700,
+                            }}
+                          >
                             {viewingCommunity.code}
                           </code>
                         </div>
@@ -2301,7 +2442,9 @@ export default function CommunitiesPage() {
                             borderBottom: "1px dashed #e2e8f0",
                           }}
                         >
-                          <span style={{ color: "var(--muted)", fontWeight: 500 }}>Admin Name:</span>
+                          <span style={{ color: "var(--muted)", fontWeight: 500 }}>
+                            Admin Name:
+                          </span>
                           <span style={{ fontWeight: 600, color: "var(--fg)" }}>
                             {viewingCommunity.admin_name || `Admin (${viewingCommunity.name})`}
                           </span>
@@ -2316,17 +2459,24 @@ export default function CommunitiesPage() {
                             borderBottom: "1px dashed #e2e8f0",
                           }}
                         >
-                          <span style={{ color: "var(--muted)", fontWeight: 500 }}>Login Email:</span>
+                          <span style={{ color: "var(--muted)", fontWeight: 500 }}>
+                            Login Email:
+                          </span>
                           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                            <span style={{ fontWeight: 600, color: "#0f172a", fontFamily: "monospace" }}>
-                              {viewingCommunity.admin_email || `admin.${viewingCommunity.code.toLowerCase().replace(/[^a-z0-9]/g, "")}@gatesphere.com`}
+                            <span
+                              style={{ fontWeight: 600, color: "#0f172a", fontFamily: "monospace" }}
+                            >
+                              {viewingCommunity.admin_email ||
+                                `admin.${viewingCommunity.code.toLowerCase().replace(/[^a-z0-9]/g, "")}@gatesphere.com`}
                             </span>
                             <button
                               type="button"
                               className="btn btn-secondary"
                               style={{ fontSize: "0.7rem", padding: "0.15rem 0.45rem" }}
                               onClick={() => {
-                                const email = viewingCommunity.admin_email || `admin.${viewingCommunity.code.toLowerCase().replace(/[^a-z0-9]/g, "")}@gatesphere.com`;
+                                const email =
+                                  viewingCommunity.admin_email ||
+                                  `admin.${viewingCommunity.code.toLowerCase().replace(/[^a-z0-9]/g, "")}@gatesphere.com`;
                                 navigator.clipboard.writeText(email);
                                 setCopiedEmail(true);
                                 setTimeout(() => setCopiedEmail(false), 2000);
@@ -2344,7 +2494,9 @@ export default function CommunitiesPage() {
                             alignItems: "center",
                           }}
                         >
-                          <span style={{ color: "var(--muted)", fontWeight: 500 }}>Initial / Standard Password:</span>
+                          <span style={{ color: "var(--muted)", fontWeight: 500 }}>
+                            Initial / Standard Password:
+                          </span>
                           <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
                             <code
                               style={{
@@ -2358,7 +2510,9 @@ export default function CommunitiesPage() {
                                 letterSpacing: showPassword ? "normal" : "0.15em",
                               }}
                             >
-                              {showPassword ? `${viewingCommunity.code.toLowerCase().replace(/[^a-z0-9]/g, "")}@Gate2026!` : "••••••••••••"}
+                              {showPassword
+                                ? `${viewingCommunity.code.toLowerCase().replace(/[^a-z0-9]/g, "")}@Gate2026!`
+                                : "••••••••••••"}
                             </code>
                             <button
                               type="button"
@@ -2386,14 +2540,25 @@ export default function CommunitiesPage() {
                       </div>
                     </div>
 
-                    <div style={{ marginTop: "1rem", display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+                    <div
+                      style={{
+                        marginTop: "1rem",
+                        display: "flex",
+                        gap: "0.5rem",
+                        justifyContent: "flex-end",
+                      }}
+                    >
                       <button
                         type="button"
                         className="btn btn-secondary"
                         onClick={() => {
-                          const codeSlug = viewingCommunity.code.toLowerCase().replace(/[^a-z0-9]/g, "");
-                          const email = viewingCommunity.admin_email || `admin.${codeSlug}@gatesphere.com`;
-                          const name = viewingCommunity.admin_name || `Admin (${viewingCommunity.name})`;
+                          const codeSlug = viewingCommunity.code
+                            .toLowerCase()
+                            .replace(/[^a-z0-9]/g, "");
+                          const email =
+                            viewingCommunity.admin_email || `admin.${codeSlug}@gatesphere.com`;
+                          const name =
+                            viewingCommunity.admin_name || `Admin (${viewingCommunity.name})`;
                           const pwd = `${codeSlug}@Gate2026!`;
                           const text = `GateSphere Enterprise - Community Admin Credentials\nCommunity: ${viewingCommunity.name} (${viewingCommunity.code})\nAdmin Name: ${name}\nLogin Email: ${email}\nInitial Password: ${pwd}\nRole: Community Admin\nPortal Link: ${window.location.origin}/login`;
                           navigator.clipboard.writeText(text);
@@ -2404,7 +2569,6 @@ export default function CommunitiesPage() {
                       >
                         {copiedAll ? "✓ All Credentials Copied!" : "📋 Copy All Credentials"}
                       </button>
-                      
                     </div>
                   </div>
                 )}
@@ -2469,11 +2633,24 @@ export default function CommunitiesPage() {
                           border: "1px dashed var(--border)",
                         }}
                       >
-                        <p style={{ fontWeight: 600, color: "var(--brand-heading)", marginBottom: "0.25rem" }}>
+                        <p
+                          style={{
+                            fontWeight: 600,
+                            color: "var(--brand-heading)",
+                            marginBottom: "0.25rem",
+                          }}
+                        >
                           No personnel records found
                         </p>
-                        <p style={{ fontSize: "0.825rem", color: "var(--muted)", marginBottom: "1rem" }}>
-                          No administrators or staff match the current filters for {viewingCommunity.name}.
+                        <p
+                          style={{
+                            fontSize: "0.825rem",
+                            color: "var(--muted)",
+                            marginBottom: "1rem",
+                          }}
+                        >
+                          No administrators or staff match the current filters for{" "}
+                          {viewingCommunity.name}.
                         </p>
                         <button
                           type="button"
@@ -2484,7 +2661,10 @@ export default function CommunitiesPage() {
                         </button>
                       </div>
                     ) : (
-                      <div className="table-responsive" style={{ maxHeight: "420px", overflowY: "auto" }}>
+                      <div
+                        className="table-responsive"
+                        style={{ maxHeight: "420px", overflowY: "auto" }}
+                      >
                         <table className="table" style={{ width: "100%", fontSize: "0.85rem" }}>
                           <thead>
                             <tr>
@@ -2499,26 +2679,35 @@ export default function CommunitiesPage() {
                               <tr key={u.id}>
                                 <td>
                                   <div>
-                                    <div style={{ fontWeight: 600, color: "var(--fg)" }}>{u.full_name}</div>
+                                    <div style={{ fontWeight: 600, color: "var(--fg)" }}>
+                                      {u.full_name}
+                                    </div>
                                     <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
                                       {u.email} {u.phone ? `• ${u.phone}` : ""}
                                     </div>
                                   </div>
                                 </td>
                                 <td>
-                                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem" }}>
+                                  <div
+                                    style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem" }}
+                                  >
                                     {u.roles && u.roles.length > 0 ? (
                                       u.roles.map((r) => (
                                         <span
                                           key={r.id}
                                           className="badge badge-primary"
-                                          style={{ fontSize: "0.725rem", textTransform: "capitalize" }}
+                                          style={{
+                                            fontSize: "0.725rem",
+                                            textTransform: "capitalize",
+                                          }}
                                         >
                                           {r.role_name || r.role_slug.replace(/_/g, " ")}
                                         </span>
                                       ))
                                     ) : (
-                                      <span style={{ color: "var(--muted)", fontSize: "0.75rem" }}>Unassigned</span>
+                                      <span style={{ color: "var(--muted)", fontSize: "0.75rem" }}>
+                                        Unassigned
+                                      </span>
                                     )}
                                   </div>
                                 </td>
@@ -2531,7 +2720,13 @@ export default function CommunitiesPage() {
                                   </span>
                                 </td>
                                 <td style={{ textAlign: "right" }}>
-                                  <div style={{ display: "flex", gap: "0.4rem", justifyContent: "flex-end" }}>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      gap: "0.4rem",
+                                      justifyContent: "flex-end",
+                                    }}
+                                  >
                                     <button
                                       type="button"
                                       className="btn btn-secondary btn-sm"
@@ -2623,8 +2818,9 @@ export default function CommunitiesPage() {
           }
         >
           <p style={{ fontSize: "0.9rem" }}>
-            Are you sure you want to delete user <strong>{deletingPersonnel.full_name}</strong> ({deletingPersonnel.email})?
-            This will revoke all role grants and session tokens for this user.
+            Are you sure you want to delete user <strong>{deletingPersonnel.full_name}</strong> (
+            {deletingPersonnel.email})? This will revoke all role grants and session tokens for this
+            user.
           </p>
         </Modal>
       )}
@@ -2656,7 +2852,14 @@ export default function CommunitiesPage() {
       >
         <form id="add-tower-form" onSubmit={handleSaveTower}>
           <div style={{ marginBottom: "1rem" }}>
-            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                marginBottom: "0.35rem",
+              }}
+            >
               Tower / Block Name <span style={{ color: "var(--danger)" }}>*</span>
             </label>
             <input
@@ -2669,7 +2872,14 @@ export default function CommunitiesPage() {
             />
           </div>
           <div style={{ marginBottom: "1rem" }}>
-            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                marginBottom: "0.35rem",
+              }}
+            >
               Tower Code <span style={{ color: "var(--danger)" }}>*</span>
             </label>
             <input
@@ -2681,10 +2891,24 @@ export default function CommunitiesPage() {
               required
             />
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "1rem",
+              marginBottom: "1rem",
+            }}
+          >
             <div>
-              <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
-                Total Floors <span style={{ color: "var(--danger)" }}>*</span>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  marginBottom: "0.35rem",
+                }}
+              >
+                Total Floors
               </label>
               <input
                 type="number"
@@ -2697,7 +2921,14 @@ export default function CommunitiesPage() {
               />
             </div>
             <div>
-              <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Structure Type
               </label>
               <select
@@ -2755,7 +2986,14 @@ export default function CommunitiesPage() {
       >
         <form id="add-floor-form" onSubmit={handleSaveFloor}>
           <div style={{ marginBottom: "1rem" }}>
-            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                marginBottom: "0.35rem",
+              }}
+            >
               Select Tower <span style={{ color: "var(--danger)" }}>*</span>
             </label>
             <select
@@ -2771,9 +3009,23 @@ export default function CommunitiesPage() {
               ))}
             </select>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "1rem",
+              marginBottom: "1rem",
+            }}
+          >
             <div>
-              <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Floor Number <span style={{ color: "var(--danger)" }}>*</span>
               </label>
               <input
@@ -2787,7 +3039,14 @@ export default function CommunitiesPage() {
               />
             </div>
             <div>
-              <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Floor Label (Optional)
               </label>
               <input
@@ -2843,9 +3102,23 @@ export default function CommunitiesPage() {
               ⚠️ {unitError}
             </div>
           )}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "1rem",
+              marginBottom: "1rem",
+            }}
+          >
             <div>
-              <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Tower <span style={{ color: "var(--danger)" }}>*</span>
               </label>
               <select
@@ -2863,7 +3136,14 @@ export default function CommunitiesPage() {
               </select>
             </div>
             <div>
-              <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Floor <span style={{ color: "var(--danger)" }}>*</span>
               </label>
               <select
@@ -2903,7 +3183,14 @@ export default function CommunitiesPage() {
           </div>
 
           <div style={{ marginBottom: "1rem" }}>
-            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                marginBottom: "0.35rem",
+              }}
+            >
               Unit Number / Identifier <span style={{ color: "var(--danger)" }}>*</span>
             </label>
             <input
@@ -2916,9 +3203,23 @@ export default function CommunitiesPage() {
             />
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr 1fr",
+              gap: "1rem",
+              marginBottom: "1rem",
+            }}
+          >
             <div>
-              <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Unit Type <span style={{ color: "var(--danger)" }}>*</span>
               </label>
               <select
@@ -2936,7 +3237,14 @@ export default function CommunitiesPage() {
               </select>
             </div>
             <div>
-              <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Bedrooms
               </label>
               <input
@@ -2945,11 +3253,20 @@ export default function CommunitiesPage() {
                 max="10"
                 className="input-field"
                 value={unitBedrooms}
-                onChange={(e) => setUnitBedrooms(e.target.value === "" ? "" : Number(e.target.value))}
+                onChange={(e) =>
+                  setUnitBedrooms(e.target.value === "" ? "" : Number(e.target.value))
+                }
               />
             </div>
             <div>
-              <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Area (Sq. Ft.)
               </label>
               <input
@@ -3011,7 +3328,15 @@ export default function CommunitiesPage() {
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "#475569", marginBottom: "0.3rem" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.75rem",
+                      fontWeight: 600,
+                      color: "#475569",
+                      marginBottom: "0.3rem",
+                    }}
+                  >
                     Tower / Block
                   </label>
                   <select
@@ -3032,7 +3357,15 @@ export default function CommunitiesPage() {
                 </div>
 
                 <div>
-                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "#475569", marginBottom: "0.3rem" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.75rem",
+                      fontWeight: 600,
+                      color: "#475569",
+                      marginBottom: "0.3rem",
+                    }}
+                  >
                     Target Unit <span style={{ color: "var(--danger)" }}>*</span>
                   </label>
                   <select
@@ -3045,18 +3378,28 @@ export default function CommunitiesPage() {
                       }
                     }}
                     style={{
-                      border: residentFormErrors.residentUnitId ? "1px solid var(--danger, #dc2626)" : undefined,
+                      border: residentFormErrors.residentUnitId
+                        ? "1px solid var(--danger, #dc2626)"
+                        : undefined,
                     }}
                   >
                     <option value="">Select Unit…</option>
                     {filteredResidentUnits.map((u) => (
                       <option key={u.id} value={u.id}>
-                        Unit {u.unit_number} {u.unit_type ? `(${u.unit_type})` : ""} {u.sq_ft ? `• ${u.sq_ft} sqft` : ""}
+                        Unit {u.unit_number} {u.unit_type ? `(${u.unit_type})` : ""}{" "}
+                        {u.sq_ft ? `• ${u.sq_ft} sqft` : ""}
                       </option>
                     ))}
                   </select>
                   {residentFormErrors.residentUnitId && (
-                    <span style={{ fontSize: "0.75rem", color: "var(--danger, #dc2626)", marginTop: "0.25rem", display: "block" }}>
+                    <span
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "var(--danger, #dc2626)",
+                        marginTop: "0.25rem",
+                        display: "block",
+                      }}
+                    >
                       {residentFormErrors.residentUnitId}
                     </span>
                   )}
@@ -3082,7 +3425,15 @@ export default function CommunitiesPage() {
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "#475569", marginBottom: "0.3rem" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.75rem",
+                      fontWeight: 600,
+                      color: "#475569",
+                      marginBottom: "0.3rem",
+                    }}
+                  >
                     Full Name <span style={{ color: "var(--danger)" }}>*</span>
                   </label>
                   <input
@@ -3099,17 +3450,34 @@ export default function CommunitiesPage() {
                       }
                     }}
                     style={{
-                      border: residentFormErrors.residentFullName ? "1px solid var(--danger, #dc2626)" : undefined,
+                      border: residentFormErrors.residentFullName
+                        ? "1px solid var(--danger, #dc2626)"
+                        : undefined,
                     }}
                   />
                   {residentFormErrors.residentFullName && (
-                    <span style={{ fontSize: "0.75rem", color: "var(--danger, #dc2626)", marginTop: "0.25rem", display: "block" }}>
+                    <span
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "var(--danger, #dc2626)",
+                        marginTop: "0.25rem",
+                        display: "block",
+                      }}
+                    >
                       {residentFormErrors.residentFullName}
                     </span>
                   )}
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "#475569", marginBottom: "0.3rem" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.75rem",
+                      fontWeight: 600,
+                      color: "#475569",
+                      marginBottom: "0.3rem",
+                    }}
+                  >
                     Occupancy Role <span style={{ color: "var(--danger)" }}>*</span>
                   </label>
                   <select
@@ -3134,7 +3502,15 @@ export default function CommunitiesPage() {
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "#475569", marginBottom: "0.3rem" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.75rem",
+                      fontWeight: 600,
+                      color: "#475569",
+                      marginBottom: "0.3rem",
+                    }}
+                  >
                     Email <span style={{ color: "var(--danger)" }}>*</span>
                   </label>
                   <input
@@ -3149,17 +3525,34 @@ export default function CommunitiesPage() {
                       }
                     }}
                     style={{
-                      border: residentFormErrors.residentEmail ? "1px solid var(--danger, #dc2626)" : undefined,
+                      border: residentFormErrors.residentEmail
+                        ? "1px solid var(--danger, #dc2626)"
+                        : undefined,
                     }}
                   />
                   {residentFormErrors.residentEmail && (
-                    <span style={{ fontSize: "0.75rem", color: "var(--danger, #dc2626)", marginTop: "0.25rem", display: "block" }}>
+                    <span
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "var(--danger, #dc2626)",
+                        marginTop: "0.25rem",
+                        display: "block",
+                      }}
+                    >
                       {residentFormErrors.residentEmail}
                     </span>
                   )}
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "#475569", marginBottom: "0.3rem" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.75rem",
+                      fontWeight: 600,
+                      color: "#475569",
+                      marginBottom: "0.3rem",
+                    }}
+                  >
                     Phone <span style={{ color: "var(--danger)" }}>*</span>
                   </label>
                   <input
@@ -3174,11 +3567,20 @@ export default function CommunitiesPage() {
                       }
                     }}
                     style={{
-                      border: residentFormErrors.residentPhone ? "1px solid var(--danger, #dc2626)" : undefined,
+                      border: residentFormErrors.residentPhone
+                        ? "1px solid var(--danger, #dc2626)"
+                        : undefined,
                     }}
                   />
                   {residentFormErrors.residentPhone && (
-                    <span style={{ fontSize: "0.75rem", color: "var(--danger, #dc2626)", marginTop: "0.25rem", display: "block" }}>
+                    <span
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "var(--danger, #dc2626)",
+                        marginTop: "0.25rem",
+                        display: "block",
+                      }}
+                    >
                       {residentFormErrors.residentPhone}
                     </span>
                   )}
@@ -3198,7 +3600,14 @@ export default function CommunitiesPage() {
                   helperText="💡 Providing credentials allows this resident to sign in to the Resident Portal to approve visitors, receive delivery alerts, and book amenities."
                 />
                 {residentFormErrors.residentPassword && (
-                  <span style={{ fontSize: "0.75rem", color: "var(--danger, #dc2626)", marginTop: "0.25rem", display: "block" }}>
+                  <span
+                    style={{
+                      fontSize: "0.75rem",
+                      color: "var(--danger, #dc2626)",
+                      marginTop: "0.25rem",
+                      display: "block",
+                    }}
+                  >
                     {residentFormErrors.residentPassword}
                   </span>
                 )}
@@ -3224,7 +3633,13 @@ export default function CommunitiesPage() {
                   style={{ width: "auto", margin: 0, accentColor: "#16a34a" }}
                   onClick={(e) => e.stopPropagation()}
                 />
-                <span style={{ fontSize: "0.8rem", fontWeight: 500, color: residentIsPrimary ? "#166534" : "#334155" }}>
+                <span
+                  style={{
+                    fontSize: "0.8rem",
+                    fontWeight: 500,
+                    color: residentIsPrimary ? "#166534" : "#334155",
+                  }}
+                >
                   Primary point of contact for gate entries and invoices
                 </span>
               </div>
@@ -3260,7 +3675,14 @@ export default function CommunitiesPage() {
       >
         <form id="add-gate-form" onSubmit={handleSaveGate}>
           <div style={{ marginBottom: "1rem" }}>
-            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                marginBottom: "0.35rem",
+              }}
+            >
               Gate Name <span style={{ color: "var(--danger)" }}>*</span>
             </label>
             <input
@@ -3272,9 +3694,23 @@ export default function CommunitiesPage() {
               required
             />
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "1rem",
+              marginBottom: "1rem",
+            }}
+          >
             <div>
-              <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Gate Code <span style={{ color: "var(--danger)" }}>*</span>
               </label>
               <input
@@ -3287,13 +3723,22 @@ export default function CommunitiesPage() {
               />
             </div>
             <div>
-              <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Gate Type <span style={{ color: "var(--danger)" }}>*</span>
               </label>
               <select
                 className="select-field"
                 value={gateType}
-                onChange={(e) => setGateType(e.target.value as "entry" | "exit" | "both" | "pedestrian")}
+                onChange={(e) =>
+                  setGateType(e.target.value as "entry" | "exit" | "both" | "pedestrian")
+                }
               >
                 <option value="both">Entry & Exit (Both)</option>
                 <option value="entry">Entry Only</option>

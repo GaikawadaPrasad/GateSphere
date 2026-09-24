@@ -81,7 +81,10 @@ services:
       mc anonymous set download local/gatesphere-local || true"
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      args:
+        REQUIREMENTS: requirements-dev.lock.txt  # local stack runs pytest / lint in-container
     command: ["api"]
     environment: *backend-env
     volumes: ["./backend:/app"]
@@ -92,7 +95,10 @@ services:
       minio: { condition: service_healthy }
 
   worker:
-    build: ./backend
+    build:
+      context: ./backend
+      args:
+        REQUIREMENTS: requirements-dev.lock.txt  # local stack runs pytest / lint in-container
     command: ["worker"]
     environment: *backend-env
     volumes: ["./backend:/app"]
@@ -101,7 +107,10 @@ services:
       redis: { condition: service_healthy }
 
   beat:
-    build: ./backend
+    build:
+      context: ./backend
+      args:
+        REQUIREMENTS: requirements-dev.lock.txt  # local stack runs pytest / lint in-container
     command: ["beat"]
     environment: *backend-env
     volumes: ["./backend:/app"]

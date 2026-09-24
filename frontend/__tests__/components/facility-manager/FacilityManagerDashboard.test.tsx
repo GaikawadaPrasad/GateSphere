@@ -41,12 +41,7 @@ describe("Facility Manager Dashboard Components", () => {
   describe("KPI Cards & Skeleton Loading", () => {
     it("renders KpiCardSkeleton when isLoading is true", () => {
       const { container } = render(
-        <KpiCard
-          title="Total Facilities"
-          value="12"
-          icon="🏢"
-          isLoading={true}
-        />
+        <KpiCard title="Total Facilities" value="12" icon="🏢" isLoading={true} />,
       );
       const skeletons = container.querySelectorAll(".skeleton");
       expect(skeletons.length).toBeGreaterThan(0);
@@ -61,7 +56,7 @@ describe("Facility Manager Dashboard Components", () => {
           icon="🏢"
           accent="primary"
           isLoading={false}
-        />
+        />,
       );
       expect(screen.getByText("Total Facilities")).toBeInTheDocument();
       expect(screen.getByText("12")).toBeInTheDocument();
@@ -78,7 +73,7 @@ describe("Facility Manager Dashboard Components", () => {
           isLoading={false}
           enableClientPagination={true}
           pageSize={5}
-        />
+        />,
       );
 
       // Page 1 should display first 5 tickets
@@ -104,10 +99,12 @@ describe("Facility Manager Dashboard Components", () => {
           icon="🛡️"
           title="No open service tickets"
           description="All service and maintenance requests have been resolved."
-        />
+        />,
       );
       expect(screen.getByText("No open service tickets")).toBeInTheDocument();
-      expect(screen.getByText("All service and maintenance requests have been resolved.")).toBeInTheDocument();
+      expect(
+        screen.getByText("All service and maintenance requests have been resolved."),
+      ).toBeInTheDocument();
     });
   });
 });

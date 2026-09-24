@@ -174,6 +174,7 @@ is emitted by `docs/architecture/backend/gen_route_inventory.py`; keep in sync w
 | POST | `/deliveries/{id}/decision` | session | `deliveries:approve` | T+U | `deliveries.approval_status`, `delivery_events` (insert) | `422 INVALID_TRANSITION` if not `pending` |
 | POST | `/deliveries/{id}/arrival` | session | `deliveries:update` | T | `deliveries.status='at_gate'`, `delivery_events` (`arrived`) | `422 NOT_APPROVED`/`INVALID_TRANSITION` |
 | POST | `/deliveries/{id}/delivered` | session | `deliveries:update` | T | `deliveries.status` (`delivered`/`collected` per protocol), `delivery_events` | `422 INVALID_TRANSITION` |
+| POST | `/deliveries/{id}/collect` | session | `deliveries:update` | T+U | `deliveries.status='collected'`, `delivery_events`, notification | gate-desk protocol + `at_gate` only; `422 NOT_GATE_DESK_DELIVERY`/`INVALID_TRANSITION` |
 | POST | `/deliveries/{id}/cancel` | session | `deliveries:update` | T | `deliveries.status='cancelled'`, `delivery_events` | |
 | GET | `/deliveries/{id}/events` | session | `deliveries:view` | T+U (via get_delivery) | – | append-only log |
 

@@ -59,7 +59,11 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
     return filteredLeads.slice(start, start + pageSize);
   }, [filteredLeads, page, pageSize]);
 
-  const handleStatusChange = (id: string, newStatus: DemoRequestLead["status"], e: React.MouseEvent) => {
+  const handleStatusChange = (
+    id: string,
+    newStatus: DemoRequestLead["status"],
+    e: React.MouseEvent,
+  ) => {
     e.stopPropagation();
     updateDemoRequestStatus(id, newStatus);
     loadLeads();
@@ -132,7 +136,16 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
         </div>
 
         {/* Filters */}
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center", width: "100%", minWidth: 0 }}>
+        <div
+          style={{
+            display: "flex",
+            gap: "0.5rem",
+            flexWrap: "wrap",
+            alignItems: "center",
+            width: "100%",
+            minWidth: 0,
+          }}
+        >
           <input
             type="text"
             placeholder="Search leads, email, society…"
@@ -172,29 +185,99 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
       {/* Table Container with touch scrolling */}
       <div className="table-responsive-wrapper" style={{ borderTop: "1px solid var(--border)" }}>
         {filteredLeads.length === 0 ? (
-          <div style={{ padding: "2.5rem 1rem", textAlign: "center", color: "var(--muted)", fontSize: "0.875rem" }}>
+          <div
+            style={{
+              padding: "2.5rem 1rem",
+              textAlign: "center",
+              color: "var(--muted)",
+              fontSize: "0.875rem",
+            }}
+          >
             No demo requests found matching your filters.
           </div>
         ) : (
-          <table className="data-table" style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem", minWidth: 600 }}>
+          <table
+            className="data-table"
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              fontSize: "0.85rem",
+              minWidth: 600,
+            }}
+          >
             <thead>
-              <tr style={{ background: "var(--surface-subtle, #f8fafc)", borderBottom: "1px solid var(--border)", textAlign: "left" }}>
-                <th style={{ padding: "0.75rem 1rem", fontWeight: 600, color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+              <tr
+                style={{
+                  background: "var(--surface-subtle, #f8fafc)",
+                  borderBottom: "1px solid var(--border)",
+                  textAlign: "left",
+                }}
+              >
+                <th
+                  style={{
+                    padding: "0.75rem 1rem",
+                    fontWeight: 600,
+                    color: "var(--muted)",
+                    fontSize: "0.75rem",
+                    textTransform: "uppercase",
+                  }}
+                >
                   Ticket &amp; Prospect
                 </th>
-                <th style={{ padding: "0.75rem 1rem", fontWeight: 600, color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                <th
+                  style={{
+                    padding: "0.75rem 1rem",
+                    fontWeight: 600,
+                    color: "var(--muted)",
+                    fontSize: "0.75rem",
+                    textTransform: "uppercase",
+                  }}
+                >
                   Society &amp; Units
                 </th>
-                <th style={{ padding: "0.75rem 1rem", fontWeight: 600, color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                <th
+                  style={{
+                    padding: "0.75rem 1rem",
+                    fontWeight: 600,
+                    color: "var(--muted)",
+                    fontSize: "0.75rem",
+                    textTransform: "uppercase",
+                  }}
+                >
                   Contact Info
                 </th>
-                <th style={{ padding: "0.75rem 1rem", fontWeight: 600, color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                <th
+                  style={{
+                    padding: "0.75rem 1rem",
+                    fontWeight: 600,
+                    color: "var(--muted)",
+                    fontSize: "0.75rem",
+                    textTransform: "uppercase",
+                  }}
+                >
                   Interest
                 </th>
-                <th style={{ padding: "0.75rem 1rem", fontWeight: 600, color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                <th
+                  style={{
+                    padding: "0.75rem 1rem",
+                    fontWeight: 600,
+                    color: "var(--muted)",
+                    fontSize: "0.75rem",
+                    textTransform: "uppercase",
+                  }}
+                >
                   Status
                 </th>
-                <th style={{ padding: "0.75rem 1rem", fontWeight: 600, color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase", textAlign: "right" }}>
+                <th
+                  style={{
+                    padding: "0.75rem 1rem",
+                    fontWeight: 600,
+                    color: "var(--muted)",
+                    fontSize: "0.75rem",
+                    textTransform: "uppercase",
+                    textAlign: "right",
+                  }}
+                >
                   Actions
                 </th>
               </tr>
@@ -217,10 +300,23 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
                     {/* Ticket & Prospect */}
                     <td style={{ padding: "0.75rem 1rem" }}>
                       <div style={{ display: "flex", flexDirection: "column" }}>
-                        <span style={{ fontFamily: "monospace", fontWeight: 700, fontSize: "0.75rem", color: "#2563eb" }}>
+                        <span
+                          style={{
+                            fontFamily: "monospace",
+                            fontWeight: 700,
+                            fontSize: "0.75rem",
+                            color: "#2563eb",
+                          }}
+                        >
                           {item.ticketId}
                         </span>
-                        <span style={{ fontWeight: 600, color: "var(--fg, #0f172a)", fontSize: "0.875rem" }}>
+                        <span
+                          style={{
+                            fontWeight: 600,
+                            color: "var(--fg, #0f172a)",
+                            fontSize: "0.875rem",
+                          }}
+                        >
                           {item.fullName}
                         </span>
                         <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
@@ -231,7 +327,9 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
 
                     {/* Society & Units */}
                     <td style={{ padding: "0.75rem 1rem" }}>
-                      <div style={{ fontWeight: 600, color: "var(--fg, #0f172a)" }}>{item.community}</div>
+                      <div style={{ fontWeight: 600, color: "var(--fg, #0f172a)" }}>
+                        {item.community}
+                      </div>
                       <span
                         style={{
                           display: "inline-block",
@@ -261,7 +359,11 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
                         <a
                           href={`tel:${item.phone}`}
                           onClick={(e) => e.stopPropagation()}
-                          style={{ color: "var(--fg, #0f172a)", textDecoration: "none", fontSize: "0.8rem" }}
+                          style={{
+                            color: "var(--fg, #0f172a)",
+                            textDecoration: "none",
+                            fontSize: "0.8rem",
+                          }}
                         >
                           📞 {item.phone}
                         </a>
@@ -283,7 +385,14 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
                       >
                         {item.product}
                       </span>
-                      <span style={{ fontSize: "0.7rem", color: "var(--muted)", display: "block", marginTop: "0.2rem" }}>
+                      <span
+                        style={{
+                          fontSize: "0.7rem",
+                          color: "var(--muted)",
+                          display: "block",
+                          marginTop: "0.2rem",
+                        }}
+                      >
                         {formatRelativeTime(item.createdAt)}
                       </span>
                     </td>
@@ -293,7 +402,13 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
                       <select
                         value={item.status}
                         onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => handleStatusChange(item.id, e.target.value as DemoRequestLead["status"], e as unknown as React.MouseEvent)}
+                        onChange={(e) =>
+                          handleStatusChange(
+                            item.id,
+                            e.target.value as DemoRequestLead["status"],
+                            e as unknown as React.MouseEvent,
+                          )
+                        }
                         style={{
                           fontSize: "0.75rem",
                           fontWeight: 600,
@@ -374,9 +489,19 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
         onClose={() => setSelectedLead(null)}
         title="Demo Request & Prospect Details"
         footer={
-          <div style={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              width: "100%",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "0.5rem",
+            }}
+          >
             <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-              Received: {selectedLead?.createdAt ? new Date(selectedLead.createdAt).toLocaleString() : ""}
+              Received:{" "}
+              {selectedLead?.createdAt ? new Date(selectedLead.createdAt).toLocaleString() : ""}
             </span>
             <div style={{ display: "flex", gap: "0.5rem" }}>
               {selectedLead && onOnboardCommunity && (
@@ -422,18 +547,36 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
             >
               <div>
                 <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Reference Ticket</span>
-                <div style={{ fontSize: "1rem", fontWeight: 700, color: "#2563eb", fontFamily: "monospace" }}>
+                <div
+                  style={{
+                    fontSize: "1rem",
+                    fontWeight: 700,
+                    color: "#2563eb",
+                    fontFamily: "monospace",
+                  }}
+                >
                   {selectedLead.ticketId}
                 </div>
               </div>
               <div>
-                <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block", marginBottom: 2 }}>
+                <span
+                  style={{
+                    fontSize: "0.75rem",
+                    color: "var(--muted)",
+                    display: "block",
+                    marginBottom: 2,
+                  }}
+                >
                   Lead Status
                 </span>
                 <select
                   value={selectedLead.status}
                   onChange={(e) =>
-                    handleStatusChange(selectedLead.id, e.target.value as DemoRequestLead["status"], e as unknown as React.MouseEvent)
+                    handleStatusChange(
+                      selectedLead.id,
+                      e.target.value as DemoRequestLead["status"],
+                      e as unknown as React.MouseEvent,
+                    )
                   }
                   style={{
                     fontSize: "0.8rem",
@@ -451,7 +594,13 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))", gap: "1rem" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))",
+                gap: "1rem",
+              }}
+            >
               <div>
                 <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Prospect Name</span>
                 <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>{selectedLead.fullName}</div>
@@ -463,7 +612,10 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
               <div>
                 <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Official Email</span>
                 <div>
-                  <a href={`mailto:${selectedLead.email}`} style={{ color: "#2563eb", fontWeight: 500 }}>
+                  <a
+                    href={`mailto:${selectedLead.email}`}
+                    style={{ color: "#2563eb", fontWeight: 500 }}
+                  >
                     {selectedLead.email}
                   </a>
                 </div>
@@ -471,13 +623,18 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
               <div>
                 <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Phone Number</span>
                 <div>
-                  <a href={`tel:${selectedLead.phone}`} style={{ color: "var(--fg, #0f172a)", fontWeight: 500 }}>
+                  <a
+                    href={`tel:${selectedLead.phone}`}
+                    style={{ color: "var(--fg, #0f172a)", fontWeight: 500 }}
+                  >
                     {selectedLead.phone}
                   </a>
                 </div>
               </div>
               <div>
-                <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Community / Society</span>
+                <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                  Community / Society
+                </span>
                 <div style={{ fontWeight: 600 }}>{selectedLead.community}</div>
               </div>
               <div>
@@ -487,7 +644,9 @@ export function DemoRequestsCard({ onOnboardCommunity }: DemoRequestsCardProps) 
             </div>
 
             <div>
-              <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Primary Area of Interest</span>
+              <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                Primary Area of Interest
+              </span>
               <div
                 style={{
                   padding: "0.6rem 0.75rem",

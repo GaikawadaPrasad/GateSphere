@@ -141,7 +141,12 @@ export function getAmenityIcon(
   const text = `${name || ""} ${category || ""} ${description || ""}`.toLowerCase();
 
   // Swimming / Aquatics
-  if (text.includes("swim") || text.includes("pool") || text.includes("aqua") || text.includes("jacuzzi")) {
+  if (
+    text.includes("swim") ||
+    text.includes("pool") ||
+    text.includes("aqua") ||
+    text.includes("jacuzzi")
+  ) {
     return "🏊";
   }
 
@@ -357,4 +362,3 @@ export const PHONE_10_DIGIT_RE = /^\d{10}$/;
 export function toPhoneDigits(value: string): string {
   return value.replace(/\D/g, "").slice(0, 10);
 }
-

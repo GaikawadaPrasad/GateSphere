@@ -84,7 +84,9 @@ export default function AuditLogsPage() {
                 {log.community_name}
               </span>
               {log.community_code && (
-                <span style={{ fontSize: "0.725rem", color: "var(--muted)", fontFamily: "monospace" }}>
+                <span
+                  style={{ fontSize: "0.725rem", color: "var(--muted)", fontFamily: "monospace" }}
+                >
                   {log.community_code}
                 </span>
               )}
@@ -99,7 +101,9 @@ export default function AuditLogsPage() {
                 <span style={{ fontWeight: 600, color: "var(--fg)", fontSize: "0.85rem" }}>
                   {matched.name}
                 </span>
-                <span style={{ fontSize: "0.725rem", color: "var(--muted)", fontFamily: "monospace" }}>
+                <span
+                  style={{ fontSize: "0.725rem", color: "var(--muted)", fontFamily: "monospace" }}
+                >
                   {matched.code}
                 </span>
               </div>
@@ -179,9 +183,7 @@ export default function AuditLogsPage() {
               )}
             </div>
             {secondaryInfo && (
-              <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-                {secondaryInfo}
-              </span>
+              <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>{secondaryInfo}</span>
             )}
             {!hasUser && !roleLabel && (
               <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
@@ -404,8 +406,11 @@ export default function AuditLogsPage() {
                     {selectedLog.user_email}
                   </div>
                 )}
-                <div style={{ fontSize: "11px", color: "var(--primary, #2563eb)", fontWeight: 500 }}>
-                  Role: {selectedLog.role_slug ? selectedLog.role_slug.replace(/_/g, " ") : "automated"}
+                <div
+                  style={{ fontSize: "11px", color: "var(--primary, #2563eb)", fontWeight: 500 }}
+                >
+                  Role:{" "}
+                  {selectedLog.role_slug ? selectedLog.role_slug.replace(/_/g, " ") : "automated"}
                 </div>
                 {selectedLog.user_id && (
                   <div style={{ fontSize: "10px", fontFamily: "monospace", color: "var(--muted)" }}>
@@ -428,7 +433,13 @@ export default function AuditLogsPage() {
                 <div style={{ fontSize: "13px", fontWeight: 600, marginTop: "0.15rem" }}>
                   {selectedLog.entity_type || "–"}
                 </div>
-                <div style={{ fontSize: "11px", fontFamily: "monospace", color: "var(--primary, #2563eb)" }}>
+                <div
+                  style={{
+                    fontSize: "11px",
+                    fontFamily: "monospace",
+                    color: "var(--primary, #2563eb)",
+                  }}
+                >
                   {selectedLog.entity_id || "–"}
                 </div>
               </div>

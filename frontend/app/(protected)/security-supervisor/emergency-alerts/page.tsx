@@ -132,11 +132,7 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
         ]}
         actions={
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-            <button
-              className="btn btn-secondary"
-              onClick={fetchAlerts}
-              disabled={isLoading}
-            >
+            <button className="btn btn-secondary" onClick={fetchAlerts} disabled={isLoading}>
               🔄 {isLoading ? "Refreshing…" : "Refresh"}
             </button>
             <button className="btn btn-danger" onClick={() => setIsModalOpen(true)}>
@@ -381,13 +377,25 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
                 fontSize: "0.85rem",
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 <span style={{ color: "var(--muted)" }}>Incident Ref:</span>
                 <strong style={{ fontFamily: "monospace" }}>
                   SOS-{alertToResolve.id.slice(0, 8).toUpperCase()}
                 </strong>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 <span style={{ color: "var(--muted)" }}>Category:</span>
                 <strong style={{ color: "var(--danger)", textTransform: "capitalize" }}>
                   🚨 {alertToResolve.alert_type}
@@ -422,7 +430,14 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
               }}
             />
             {resolutionSummaryError && (
-              <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+              <span
+                style={{
+                  color: "var(--danger, #ef4444)",
+                  fontSize: "0.75rem",
+                  display: "block",
+                  marginTop: "0.25rem",
+                }}
+              >
                 {resolutionSummaryError}
               </span>
             )}

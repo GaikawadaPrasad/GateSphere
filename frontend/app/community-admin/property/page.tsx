@@ -198,7 +198,8 @@ export default function CommunityAdminPropertyPage() {
     } else if (trimmedName.length < 2 || trimmedName.length > 128) {
       errors.tower_name = "Tower name must be between 2 and 128 characters.";
     } else if (!/[A-Za-z]/.test(trimmedName)) {
-      errors.tower_name = "Tower name must contain letters and cannot be purely numeric or symbols.";
+      errors.tower_name =
+        "Tower name must contain letters and cannot be purely numeric or symbols.";
     } else if (!/^[A-Za-z0-9][A-Za-z0-9 \-_.,&()'/]*$/.test(trimmedName)) {
       errors.tower_name =
         "Tower name must start with a letter or number and contain only valid characters.";
@@ -561,7 +562,11 @@ export default function CommunityAdminPropertyPage() {
       }
     }
 
-    if (unitForm.area_sqft !== "" && unitForm.area_sqft !== undefined && unitForm.area_sqft !== null) {
+    if (
+      unitForm.area_sqft !== "" &&
+      unitForm.area_sqft !== undefined &&
+      unitForm.area_sqft !== null
+    ) {
       const aNum = Number(unitForm.area_sqft);
       if (isNaN(aNum) || aNum <= 0 || aNum > 1000000) {
         errors.area_sqft = "Area must be a positive number up to 1,000,000 sq ft.";
@@ -898,7 +903,9 @@ export default function CommunityAdminPropertyPage() {
           className={`badge ${t.total_units && t.total_units > 0 ? "badge-info" : "badge-neutral"}`}
           style={{ fontSize: "0.8rem", fontWeight: 600 }}
         >
-          {t.total_units !== undefined ? `${t.total_units} unit${t.total_units === 1 ? "" : "s"}` : "0 units"}
+          {t.total_units !== undefined
+            ? `${t.total_units} unit${t.total_units === 1 ? "" : "s"}`
+            : "0 units"}
         </span>
       ),
     },
@@ -979,7 +986,9 @@ export default function CommunityAdminPropertyPage() {
           className={`badge ${f.total_units && f.total_units > 0 ? "badge-info" : "badge-neutral"}`}
           style={{ fontSize: "0.8rem", fontWeight: 600 }}
         >
-          {f.total_units !== undefined ? `${f.total_units} unit${f.total_units === 1 ? "" : "s"}` : "0 units"}
+          {f.total_units !== undefined
+            ? `${f.total_units} unit${f.total_units === 1 ? "" : "s"}`
+            : "0 units"}
         </span>
       ),
     },
@@ -1061,7 +1070,7 @@ export default function CommunityAdminPropertyPage() {
     {
       key: "sq_ft",
       header: "Area",
-      render: (u) => (u.sq_ft ?? u.area_sqft ? `${u.sq_ft ?? u.area_sqft} sq ft` : "–"),
+      render: (u) => ((u.sq_ft ?? u.area_sqft) ? `${u.sq_ft ?? u.area_sqft} sq ft` : "–"),
     },
     {
       key: "status",
@@ -2505,9 +2514,7 @@ export default function CommunityAdminPropertyPage() {
               min={1}
               max={300}
               value={editTowerForm.total_floors}
-              onChange={(e) =>
-                setEditTowerForm({ ...editTowerForm, total_floors: e.target.value })
-              }
+              onChange={(e) => setEditTowerForm({ ...editTowerForm, total_floors: e.target.value })}
             />
           </div>
 
@@ -2576,9 +2583,7 @@ export default function CommunityAdminPropertyPage() {
               type="number"
               className="input-field"
               value={editFloorForm.floor_number}
-              onChange={(e) =>
-                setEditFloorForm({ ...editFloorForm, floor_number: e.target.value })
-              }
+              onChange={(e) => setEditFloorForm({ ...editFloorForm, floor_number: e.target.value })}
             />
           </div>
 
@@ -2670,9 +2675,7 @@ export default function CommunityAdminPropertyPage() {
                 type="text"
                 className="input-field"
                 value={editUnitForm.unit_number}
-                onChange={(e) =>
-                  setEditUnitForm({ ...editUnitForm, unit_number: e.target.value })
-                }
+                onChange={(e) => setEditUnitForm({ ...editUnitForm, unit_number: e.target.value })}
               />
             </div>
 
@@ -2868,7 +2871,12 @@ export default function CommunityAdminPropertyPage() {
                 id="edit-gate-type-select"
                 className="select-field"
                 value={editGateForm.gate_type}
-                onChange={(e) => setEditGateForm({ ...editGateForm, gate_type: e.target.value as Gate["gate_type"] })}
+                onChange={(e) =>
+                  setEditGateForm({
+                    ...editGateForm,
+                    gate_type: e.target.value as Gate["gate_type"],
+                  })
+                }
               >
                 <option value="main">Main Gate (Entry & Exit)</option>
                 <option value="service">Service Gate</option>
@@ -2882,7 +2890,9 @@ export default function CommunityAdminPropertyPage() {
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.25rem" }}>
+          <div
+            style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.25rem" }}
+          >
             <input
               id="edit-gate-is-active"
               type="checkbox"
@@ -2953,8 +2963,8 @@ export default function CommunityAdminPropertyPage() {
                 </strong>
               </div>
               <p style={{ fontSize: "0.85rem", color: "#7f1d1d", margin: 0, lineHeight: 1.5 }}>
-                You are about to permanently delete tower <strong>{deletingTower.name}</strong>{" "}
-                ({deletingTower.code || "No code"}).
+                You are about to permanently delete tower <strong>{deletingTower.name}</strong> (
+                {deletingTower.code || "No code"}).
               </p>
               <div
                 style={{
@@ -2975,8 +2985,8 @@ export default function CommunityAdminPropertyPage() {
                     tower will be permanently removed.
                   </li>
                   <li>
-                    Any linked owner/tenant occupancies, broadcast groups, flat billing entries,
-                    and vehicle slot associations will be removed or cascade-deleted.
+                    Any linked owner/tenant occupancies, broadcast groups, flat billing entries, and
+                    vehicle slot associations will be removed or cascade-deleted.
                   </li>
                 </ul>
               </div>
@@ -3048,7 +3058,8 @@ export default function CommunityAdminPropertyPage() {
                 </strong>
               </div>
               <p style={{ fontSize: "0.85rem", color: "#7f1d1d", margin: 0, lineHeight: 1.5 }}>
-                You are about to permanently delete <strong>Floor {deletingFloor.floor_number}</strong>
+                You are about to permanently delete{" "}
+                <strong>Floor {deletingFloor.floor_number}</strong>
                 {deletingFloor.label ? ` (${deletingFloor.label})` : ""}.
               </p>
               <div
@@ -3065,8 +3076,8 @@ export default function CommunityAdminPropertyPage() {
                 <strong>⚠️ Dependency Impact Warning:</strong>
                 <p style={{ margin: "0.25rem 0 0 0" }}>
                   Deleting this floor will permanently remove all{" "}
-                  <strong>{deletingFloor.total_units ?? 0} residential unit(s)</strong> configured on
-                  this floor.
+                  <strong>{deletingFloor.total_units ?? 0} residential unit(s)</strong> configured
+                  on this floor.
                 </p>
               </div>
             </div>
@@ -3154,9 +3165,9 @@ export default function CommunityAdminPropertyPage() {
                 >
                   <strong>🚨 CRITICAL OCCUPANCY WARNING:</strong>
                   <p style={{ margin: "0.25rem 0 0 0" }}>
-                    This unit is currently marked as <strong>OCCUPIED</strong>. Deleting this unit will
-                    remove active resident tenancy mappings, revoke owner/tenant app access, and delete
-                    associated flat maintenance billing entries.
+                    This unit is currently marked as <strong>OCCUPIED</strong>. Deleting this unit
+                    will remove active resident tenancy mappings, revoke owner/tenant app access,
+                    and delete associated flat maintenance billing entries.
                   </p>
                 </div>
               ) : (
@@ -3232,8 +3243,8 @@ export default function CommunityAdminPropertyPage() {
                 </strong>
               </div>
               <p style={{ fontSize: "0.85rem", color: "#7f1d1d", margin: 0, lineHeight: 1.5 }}>
-                You are about to permanently delete security gate <strong>{deletingGate.name}</strong>{" "}
-                ({deletingGate.code}).
+                You are about to permanently delete security gate{" "}
+                <strong>{deletingGate.name}</strong> ({deletingGate.code}).
               </p>
               <div
                 style={{
@@ -3248,8 +3259,8 @@ export default function CommunityAdminPropertyPage() {
               >
                 <strong>⚠️ Checkpoint Warning:</strong>
                 <p style={{ margin: "0.25rem 0 0 0" }}>
-                  This will remove the checkpoint from guard station rosters, QR scanner assignments,
-                  and future visitor logging.
+                  This will remove the checkpoint from guard station rosters, QR scanner
+                  assignments, and future visitor logging.
                 </p>
               </div>
             </div>

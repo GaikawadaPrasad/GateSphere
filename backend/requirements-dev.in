@@ -1,0 +1,12 @@
+# GateSphere backend — dev / test tools (never installed in the runtime image).
+# Lock:  pip-compile --generate-hashes --output-file=requirements-dev.lock.txt requirements-dev.in
+# Versions chosen past the advisories flagged by pip-audit in re-audit #3
+# (black PYSEC-2026-2120/2121 -> >=26.3.1, pytest PYSEC-2026-1845 -> >=9.0.3).
+-r requirements.in
+
+pytest==9.0.3
+pytest-asyncio==1.4.0
+pytest-cov==6.0.0
+ruff==0.8.6
+black==26.3.1
+mypy==1.14.1

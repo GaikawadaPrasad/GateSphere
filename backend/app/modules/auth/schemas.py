@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
+from app.core.constants import PASSWORD_MIN_LENGTH
+
 
 class LoginRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
@@ -35,7 +37,7 @@ class PasswordChangeRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     current_password: str = Field(min_length=1, max_length=256)
-    new_password: str = Field(min_length=8, max_length=256)
+    new_password: str = Field(min_length=PASSWORD_MIN_LENGTH, max_length=256)
 
 
 class ProfileUpdateRequest(BaseModel):
@@ -49,4 +51,3 @@ class ProfileUpdateRequest(BaseModel):
         if self.full_name is None and self.phone is None:
             raise ValueError("At least one profile field must be provided for update")
         return self
-

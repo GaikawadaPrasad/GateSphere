@@ -254,5 +254,3 @@ def test_resident_me_emergency_contact_validation(as_role):
     assert good_res.status_code == 200, good_res.text
     data = good_res.json()["data"]
     assert any(c["name"] == "Jane Doe" for c in data["emergency_contacts"])
-
-

@@ -163,7 +163,8 @@ export default function FacilityManagerDashboardPage() {
     [tickets],
   );
   const slaWarnings = useMemo(
-    () => tickets.filter((t) => t.escalation_state === "at_risk" || t.escalation_state === "breached"),
+    () =>
+      tickets.filter((t) => t.escalation_state === "at_risk" || t.escalation_state === "breached"),
     [tickets],
   );
   const highPriorityOpen = useMemo(
@@ -177,9 +178,7 @@ export default function FacilityManagerDashboardPage() {
       header: "Ticket #",
       sortable: true,
       render: (t) => (
-        <span style={{ fontWeight: 600, color: "var(--primary, #2563eb)" }}>
-          {t.ticket_number}
-        </span>
+        <span style={{ fontWeight: 600, color: "var(--primary, #2563eb)" }}>{t.ticket_number}</span>
       ),
     },
     {
@@ -743,4 +742,3 @@ export default function FacilityManagerDashboardPage() {
     </div>
   );
 }
-

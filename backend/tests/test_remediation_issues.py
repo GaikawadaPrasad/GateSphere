@@ -1,8 +1,10 @@
 """Regression tests for Super Admin / Community Admin issue remediation."""
 
 import uuid
+
 from conftest import csrf_cookie_value
 from fastapi.testclient import TestClient
+
 from app.main import app
 
 DEMO_EMAIL = "super_admin@gatesphere.com"
@@ -52,7 +54,9 @@ def test_new_community_admin_dashboard_apis(client, seed_ids):
     # 1. Provision new Community Admin
     cid = seed_ids["community_id"]
     super_admin = client
-    login_res = super_admin.post("/api/v1/auth/login", json={"email": DEMO_EMAIL, "password": DEMO_PASSWORD})
+    login_res = super_admin.post(
+        "/api/v1/auth/login", json={"email": DEMO_EMAIL, "password": DEMO_PASSWORD}
+    )
     assert login_res.status_code == 200
 
     sa_csrf = csrf_cookie_value(super_admin)

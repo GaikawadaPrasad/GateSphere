@@ -102,7 +102,9 @@ export default function CommunityAdminIncidentsPage() {
       return;
     }
     if (!/[a-zA-Z]{3,}/.test(desc)) {
-      setErrorMessage("Incident description must contain readable text (at least 3 alphabetic letters).");
+      setErrorMessage(
+        "Incident description must contain readable text (at least 3 alphabetic letters).",
+      );
       return;
     }
 
@@ -161,7 +163,10 @@ export default function CommunityAdminIncidentsPage() {
       setIsTransitionModalOpen(false);
       setTransitionReason("");
       setResolutionSummary("");
-      toast.success(`Incident status updated to ${transitionStatus.replace("_", " ")}.`, "Status Updated");
+      toast.success(
+        `Incident status updated to ${transitionStatus.replace("_", " ")}.`,
+        "Status Updated",
+      );
       refetchIncidents();
       refetchDetail();
       refetchHistory();

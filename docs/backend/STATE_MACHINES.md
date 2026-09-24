@@ -73,12 +73,15 @@ protocol may `auto_approved` at creation). Rejecting sets `status=cancelled`.
 | From | To | Trigger |
 |---|---|---|
 | `expected` | `at_gate` | `record_arrival` (needs `approval_status ∈ {approved, auto_approved}`) |
-| `expected`, `at_gate`, `in_transit` | `delivered` \| `collected` | `mark_delivered` — `collected` if the protocol is `leave_at_gate`, else `delivered` |
+| `at_gate`, `in_transit` | `delivered` \| `collected` | `mark_delivered` — `collected` if the protocol is a gate-desk protocol (`leave_at_gate_desk`, legacy `leave_at_gate`/`collect_at_gate`), else `delivered`. Decided by `protocol_type`; the `leave_at_gate` flag is consulted only for legacy non-canonical types |
+| `at_gate` | `collected` | `mark_collected` (`POST …/collect`) — **gate-desk protocol only** (`422 NOT_GATE_DESK_DELIVERY`); resident notified |
 | `expected`, `at_gate` (not delivered/collected/returned/cancelled) | `cancelled` ▸ | `cancel_delivery` |
 | `delivered` ▸, `collected` ▸, `returned` ▸, `cancelled` ▸ | — | |
 
-Protocol routing (`delivery_protocols`): `verify_at_gate` / `resident_approval` /
-`leave_at_gate` / `reject` decide whether `decide_delivery` is needed and the terminal state.
+Protocol routing (`delivery_protocols`, PRD FR-07): `allow_at_gate` / `leave_at_gate_desk` →
+`auto_approved`; `resident_approval_required` (the default when no row exists) → `pending` until
+`decide_delivery`; `direct_rejection` → `rejected` + `cancelled` at creation. A unit-level row
+overrides the community-level row for that unit.
 🔔 resident on create (approval needed) and on decision.
 
 ---

@@ -24,7 +24,9 @@ caller's own. `notifications:create` gates templates + dispatch.
 - **PreferenceUpsert**: `channel`, `is_enabled=true`, `quiet_hours_start?`, `quiet_hours_end?`, `community_id?` (null = account-wide).
 - **DispatchIn**: `recipient_user_id`, `notification_type`, `template_code?`, `title?`, `message?`, `reference_type?`, `reference_id?`, `context: {k: v}`, `channels: [str]?` (default `["in_app"]`), `community_id?` (global caller).
 
-`NotificationRead` embeds `deliveries: [DeliveryRead]`.
+`NotificationRead` embeds `deliveries: [DeliveryRead]`. Delivery `status`: `delivered` (in-app only) ·
+`simulated` (a mocked channel — email / SMS / WhatsApp / push — recorded, no provider involved,
+`delivered_at` null; migration 0046) · `skipped` (channel disabled / quiet hours) · `queued` · `sent` · `failed`.
 
 ## Error codes
 

@@ -23,12 +23,17 @@ import type { ResidentProfile, MoveRecord } from "@/types/residents";
 import { formatDateTime, generateInitialPassword, isValidPersonName } from "@/lib/utils";
 import { onboardingApi } from "@/lib/api";
 import { toast } from "@/store/toast";
-import { UpdateUserCredentialsModal, type CredentialUser } from "@/components/common/UpdateUserCredentialsModal";
+import {
+  UpdateUserCredentialsModal,
+  type CredentialUser,
+} from "@/components/common/UpdateUserCredentialsModal";
 
 export default function CommunityAdminResidentsPage() {
   const queryClient = useQueryClient();
   const { activeCommunityId } = useUiStore();
-  const [activeTab, setActiveTab] = useState<"directory" | "approvals" | "invitations">("directory");
+  const [activeTab, setActiveTab] = useState<"directory" | "approvals" | "invitations">(
+    "directory",
+  );
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [selectedResident, setSelectedResident] = useState<ResidentProfile | null>(null);
@@ -54,13 +59,12 @@ export default function CommunityAdminResidentsPage() {
   const [deleteError, setDeleteError] = useState("");
 
   // Invitations State
-  const {
-    data: rawInvitations,
-    isLoading: invitationsLoading,
-  } = useCommunityInvitations(activeCommunityId || undefined);
+  const { data: rawInvitations, isLoading: invitationsLoading } = useCommunityInvitations(
+    activeCommunityId || undefined,
+  );
   const invitations = useMemo(
     () => (Array.isArray(rawInvitations) ? (rawInvitations as any[]) : []),
-    [rawInvitations]
+    [rawInvitations],
   );
   const [isCreateInviteOpen, setIsCreateInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -435,7 +439,11 @@ export default function CommunityAdminResidentsPage() {
     }
     if (phone.trim()) {
       const phoneDigits = phone.replace(/\D/g, "");
-      if (phoneDigits.length < 7 || phoneDigits.length > 15 || !/^\+?[0-9\s\-()]+$/.test(phone.trim())) {
+      if (
+        phoneDigits.length < 7 ||
+        phoneDigits.length > 15 ||
+        !/^\+?[0-9\s\-()]+$/.test(phone.trim())
+      ) {
         errors.phone = "Invalid phone number format.";
       }
     }
@@ -449,7 +457,8 @@ export default function CommunityAdminResidentsPage() {
       if (trimmedAgreement.length < 3 || trimmedAgreement.length > 50) {
         errors.agreementRef = "Agreement reference must be between 3 and 50 characters.";
       } else if (!/^[A-Z0-9\-_/]+$/.test(trimmedAgreement)) {
-        errors.agreementRef = "Agreement reference must be uppercase letters, numbers, and allowed symbols (e.g. LEASE-2026-081).";
+        errors.agreementRef =
+          "Agreement reference must be uppercase letters, numbers, and allowed symbols (e.g. LEASE-2026-081).";
       }
     }
     setResidentFieldErrors(errors);
@@ -658,7 +667,9 @@ export default function CommunityAdminResidentsPage() {
             }}
           >
             <div>
-              <h3 style={{ fontSize: "1rem", fontWeight: 700, margin: 0 }}>Active Resident Invitations</h3>
+              <h3 style={{ fontSize: "1rem", fontWeight: 700, margin: 0 }}>
+                Active Resident Invitations
+              </h3>
               <p style={{ fontSize: "13px", color: "var(--muted)", margin: "0.2rem 0 0 0" }}>
                 Generate secure onboarding invitation links for new residents to join their unit.
               </p>
@@ -756,8 +767,7 @@ export default function CommunityAdminResidentsPage() {
                     row.tower_name ||
                     towers?.find(
                       (t: any) =>
-                        t.id ===
-                        communityUnits?.find((u: any) => u.id === row.unit_id)?.tower_id,
+                        t.id === communityUnits?.find((u: any) => u.id === row.unit_id)?.tower_id,
                     )?.name ||
                     "Tower";
                   return (
@@ -806,17 +816,28 @@ export default function CommunityAdminResidentsPage() {
                         if (row.token) {
                           const link = `${window.location.origin}/invitations/${row.token}`;
                           navigator.clipboard.writeText(link);
-                          toast.success("Invitation activation link copied to clipboard!", "Copied");
+                          toast.success(
+                            "Invitation activation link copied to clipboard!",
+                            "Copied",
+                          );
                         } else if (row.status === "pending") {
                           try {
-                            const res: any = await onboardingApi.regenerateInvitation(activeCommunityId!, row.id);
+                            const res: any = await onboardingApi.regenerateInvitation(
+                              activeCommunityId!,
+                              row.id,
+                            );
                             const url =
                               res?.accept_url ||
                               res?.data?.accept_url ||
-                              (res?.token ? `${window.location.origin}/invitations/${res.token}` : null);
+                              (res?.token
+                                ? `${window.location.origin}/invitations/${res.token}`
+                                : null);
                             if (url) {
                               navigator.clipboard.writeText(url);
-                              toast.success("New link generated and copied to clipboard!", "Copied");
+                              toast.success(
+                                "New link generated and copied to clipboard!",
+                                "Copied",
+                              );
                               fetchInvitations();
                             } else {
                               toast.error("Failed to generate link");
@@ -838,14 +859,22 @@ export default function CommunityAdminResidentsPage() {
                         style={{ fontSize: "12px", padding: "0.25rem 0.6rem" }}
                         onClick={async () => {
                           try {
-                            const res: any = await onboardingApi.regenerateInvitation(activeCommunityId!, row.id);
+                            const res: any = await onboardingApi.regenerateInvitation(
+                              activeCommunityId!,
+                              row.id,
+                            );
                             const url =
                               res?.accept_url ||
                               res?.data?.accept_url ||
-                              (res?.token ? `${window.location.origin}/invitations/${res.token}` : null);
+                              (res?.token
+                                ? `${window.location.origin}/invitations/${res.token}`
+                                : null);
                             if (url) {
                               navigator.clipboard.writeText(url);
-                              toast.success("New link generated and copied to clipboard!", "Copied");
+                              toast.success(
+                                "New link generated and copied to clipboard!",
+                                "Copied",
+                              );
                               fetchInvitations();
                             } else {
                               toast.error("Failed to generate link");
@@ -1033,7 +1062,8 @@ export default function CommunityAdminResidentsPage() {
                 {residentToDelete.unit_number || "–"}).
               </p>
               <p style={{ fontSize: "0.8rem", color: "#991b1b", margin: 0 }}>
-                This will remove their portal access, visitor pre-approvals, and all associated records.
+                This will remove their portal access, visitor pre-approvals, and all associated
+                records.
               </p>
             </div>
 
@@ -1184,7 +1214,8 @@ export default function CommunityAdminResidentsPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
             {/* Header Subtitle */}
             <p style={{ margin: 0, fontSize: "0.825rem", color: "#64748b" }}>
-              Assign residential unit occupancy, resident contact credentials, and portal permissions.
+              Assign residential unit occupancy, resident contact credentials, and portal
+              permissions.
             </p>
 
             {addError && (
@@ -1218,14 +1249,31 @@ export default function CommunityAdminResidentsPage() {
                 gap: "0.85rem",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontWeight: 600, fontSize: "0.825rem", color: "#334155" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.4rem",
+                  fontWeight: 600,
+                  fontSize: "0.825rem",
+                  color: "#334155",
+                }}
+              >
                 <span>🏢</span> Location & Residential Unit
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.85rem" }}>
                 {/* Tower Selection */}
                 <div>
-                  <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#475569", marginBottom: "0.35rem" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.775rem",
+                      fontWeight: 600,
+                      color: "#475569",
+                      marginBottom: "0.35rem",
+                    }}
+                  >
                     Tower / Block
                   </label>
                   <select
@@ -1255,7 +1303,15 @@ export default function CommunityAdminResidentsPage() {
 
                 {/* Unit Selection */}
                 <div>
-                  <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#475569", marginBottom: "0.35rem" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.775rem",
+                      fontWeight: 600,
+                      color: "#475569",
+                      marginBottom: "0.35rem",
+                    }}
+                  >
                     Residential Unit <span style={{ color: "#dc2626" }}>*</span>
                   </label>
                   <select
@@ -1276,17 +1332,27 @@ export default function CommunityAdminResidentsPage() {
                     {filteredUnits && filteredUnits.length > 0 ? (
                       filteredUnits.map((u) => (
                         <option key={u.id} value={u.id}>
-                          Unit {u.unit_number} {u.unit_type ? `(${u.unit_type})` : ""} {u.sq_ft ? `• ${u.sq_ft} sqft` : ""}
+                          Unit {u.unit_number} {u.unit_type ? `(${u.unit_type})` : ""}{" "}
+                          {u.sq_ft ? `• ${u.sq_ft} sqft` : ""}
                         </option>
                       ))
                     ) : (
                       <option value="" disabled>
-                        {targetTowerId ? "No units found in this tower" : "No units found in community"}
+                        {targetTowerId
+                          ? "No units found in this tower"
+                          : "No units found in community"}
                       </option>
                     )}
                   </select>
                   {residentFieldErrors.targetUnitId && (
-                    <span style={{ fontSize: "0.75rem", color: "#dc2626", marginTop: "0.25rem", display: "block" }}>
+                    <span
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "#dc2626",
+                        marginTop: "0.25rem",
+                        display: "block",
+                      }}
+                    >
                       {residentFieldErrors.targetUnitId}
                     </span>
                   )}
@@ -1306,14 +1372,31 @@ export default function CommunityAdminResidentsPage() {
                 gap: "0.85rem",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontWeight: 600, fontSize: "0.825rem", color: "#334155" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.4rem",
+                  fontWeight: 600,
+                  fontSize: "0.825rem",
+                  color: "#334155",
+                }}
+              >
                 <span>👤</span> Resident Identity &amp; Contact
               </div>
 
               {/* Name & Email */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.85rem" }}>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#475569", marginBottom: "0.35rem" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.775rem",
+                      fontWeight: 600,
+                      color: "#475569",
+                      marginBottom: "0.35rem",
+                    }}
+                  >
                     Full Name <span style={{ color: "#dc2626" }}>*</span>
                   </label>
                   <input
@@ -1336,13 +1419,28 @@ export default function CommunityAdminResidentsPage() {
                     }}
                   />
                   {residentFieldErrors.fullName && (
-                    <span style={{ fontSize: "0.75rem", color: "#dc2626", marginTop: "0.25rem", display: "block" }}>
+                    <span
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "#dc2626",
+                        marginTop: "0.25rem",
+                        display: "block",
+                      }}
+                    >
                       {residentFieldErrors.fullName}
                     </span>
                   )}
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#475569", marginBottom: "0.35rem" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.775rem",
+                      fontWeight: 600,
+                      color: "#475569",
+                      marginBottom: "0.35rem",
+                    }}
+                  >
                     Email Address <span style={{ color: "#dc2626" }}>*</span>
                   </label>
                   <input
@@ -1361,7 +1459,14 @@ export default function CommunityAdminResidentsPage() {
                     }}
                   />
                   {residentFieldErrors.email && (
-                    <span style={{ fontSize: "0.75rem", color: "#dc2626", marginTop: "0.25rem", display: "block" }}>
+                    <span
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "#dc2626",
+                        marginTop: "0.25rem",
+                        display: "block",
+                      }}
+                    >
                       {residentFieldErrors.email}
                     </span>
                   )}
@@ -1371,7 +1476,15 @@ export default function CommunityAdminResidentsPage() {
               {/* Phone & Password */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.85rem" }}>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#475569", marginBottom: "0.35rem" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.775rem",
+                      fontWeight: 600,
+                      color: "#475569",
+                      marginBottom: "0.35rem",
+                    }}
+                  >
                     Phone Number
                   </label>
                   <input
@@ -1389,7 +1502,14 @@ export default function CommunityAdminResidentsPage() {
                     }}
                   />
                   {residentFieldErrors.phone && (
-                    <span style={{ fontSize: "0.75rem", color: "#dc2626", marginTop: "0.25rem", display: "block" }}>
+                    <span
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "#dc2626",
+                        marginTop: "0.25rem",
+                        display: "block",
+                      }}
+                    >
                       {residentFieldErrors.phone}
                     </span>
                   )}
@@ -1413,7 +1533,9 @@ export default function CommunityAdminResidentsPage() {
                 </div>
               </div>
               <p style={{ margin: 0, fontSize: "11.5px", color: "var(--muted)" }}>
-                💡 Providing credentials allows this resident to sign in to the <strong>Resident Portal</strong> to approve visitors, receive delivery alerts, and book amenities.
+                💡 Providing credentials allows this resident to sign in to the{" "}
+                <strong>Resident Portal</strong> to approve visitors, receive delivery alerts, and
+                book amenities.
               </p>
             </div>
 
@@ -1429,13 +1551,30 @@ export default function CommunityAdminResidentsPage() {
                 gap: "0.85rem",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontWeight: 600, fontSize: "0.825rem", color: "#334155" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.4rem",
+                  fontWeight: 600,
+                  fontSize: "0.825rem",
+                  color: "#334155",
+                }}
+              >
                 <span>📋</span> Occupancy Role &amp; Details
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.85rem" }}>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#475569", marginBottom: "0.35rem" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.775rem",
+                      fontWeight: 600,
+                      color: "#475569",
+                      marginBottom: "0.35rem",
+                    }}
+                  >
                     Occupancy Role <span style={{ color: "#dc2626" }}>*</span>
                   </label>
                   <select
@@ -1460,8 +1599,21 @@ export default function CommunityAdminResidentsPage() {
                 </div>
 
                 <div>
-                  <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#475569", marginBottom: "0.35rem" }}>
-                    Agreement Reference {occupancyRole === "tenant" ? <span style={{ color: "#dc2626" }}>*</span> : "(Optional)"}
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.775rem",
+                      fontWeight: 600,
+                      color: "#475569",
+                      marginBottom: "0.35rem",
+                    }}
+                  >
+                    Agreement Reference{" "}
+                    {occupancyRole === "tenant" ? (
+                      <span style={{ color: "#dc2626" }}>*</span>
+                    ) : (
+                      "(Optional)"
+                    )}
                   </label>
                   <input
                     type="text"
@@ -1488,7 +1640,14 @@ export default function CommunityAdminResidentsPage() {
                     }}
                   />
                   {residentFieldErrors.agreementRef && (
-                    <span style={{ fontSize: "0.75rem", color: "#dc2626", marginTop: "0.25rem", display: "block" }}>
+                    <span
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "#dc2626",
+                        marginTop: "0.25rem",
+                        display: "block",
+                      }}
+                    >
                       {residentFieldErrors.agreementRef}
                     </span>
                   )}
@@ -1518,18 +1677,38 @@ export default function CommunityAdminResidentsPage() {
                   onClick={(e) => e.stopPropagation()}
                 />
                 <div>
-                  <div style={{ fontSize: "0.825rem", fontWeight: 600, color: isPrimary ? "#166534" : "#334155" }}>
+                  <div
+                    style={{
+                      fontSize: "0.825rem",
+                      fontWeight: 600,
+                      color: isPrimary ? "#166534" : "#334155",
+                    }}
+                  >
                     Primary Unit Contact
                   </div>
-                  <div style={{ fontSize: "0.75rem", color: isPrimary ? "#15803d" : "#64748b", marginTop: "0.1rem" }}>
-                    Receives all visitor approvals, entry alerts, delivery checkpoints, and invoices for this unit.
+                  <div
+                    style={{
+                      fontSize: "0.75rem",
+                      color: isPrimary ? "#15803d" : "#64748b",
+                      marginTop: "0.1rem",
+                    }}
+                  >
+                    Receives all visitor approvals, entry alerts, delivery checkpoints, and invoices
+                    for this unit.
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Modal Actions */}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.6rem", marginTop: "0.25rem" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "0.6rem",
+                marginTop: "0.25rem",
+              }}
+            >
               <button
                 type="button"
                 className="btn btn-secondary"
@@ -1624,7 +1803,8 @@ export default function CommunityAdminResidentsPage() {
         >
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
             <p style={{ margin: 0, fontSize: "0.825rem", color: "#64748b" }}>
-              Send an onboarding invitation link for a new owner or tenant to register their account.
+              Send an onboarding invitation link for a new owner or tenant to register their
+              account.
             </p>
 
             {inviteError && (
@@ -1643,7 +1823,15 @@ export default function CommunityAdminResidentsPage() {
             )}
 
             <div>
-              <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#334155", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.775rem",
+                  fontWeight: 600,
+                  color: "#334155",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Invited Email Address *
               </label>
               <input
@@ -1658,7 +1846,15 @@ export default function CommunityAdminResidentsPage() {
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
               <div>
-                <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#334155", marginBottom: "0.35rem" }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.775rem",
+                    fontWeight: 600,
+                    color: "#334155",
+                    marginBottom: "0.35rem",
+                  }}
+                >
                   Resident Full Name
                 </label>
                 <input
@@ -1670,7 +1866,15 @@ export default function CommunityAdminResidentsPage() {
                 />
               </div>
               <div>
-                <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#334155", marginBottom: "0.35rem" }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.775rem",
+                    fontWeight: 600,
+                    color: "#334155",
+                    marginBottom: "0.35rem",
+                  }}
+                >
                   Phone Number
                 </label>
                 <input
@@ -1685,7 +1889,15 @@ export default function CommunityAdminResidentsPage() {
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
               <div>
-                <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#334155", marginBottom: "0.35rem" }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.775rem",
+                    fontWeight: 600,
+                    color: "#334155",
+                    marginBottom: "0.35rem",
+                  }}
+                >
                   Filter Tower
                 </label>
                 <select
@@ -1705,7 +1917,15 @@ export default function CommunityAdminResidentsPage() {
                 </select>
               </div>
               <div>
-                <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#334155", marginBottom: "0.35rem" }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.775rem",
+                    fontWeight: 600,
+                    color: "#334155",
+                    marginBottom: "0.35rem",
+                  }}
+                >
                   Target Unit *
                 </label>
                 <select
@@ -1717,7 +1937,7 @@ export default function CommunityAdminResidentsPage() {
                   <option value="">Select Unit</option>
                   {(inviteTowerId
                     ? (communityUnits || []).filter((u) => u.tower_id === inviteTowerId)
-                    : (communityUnits || [])
+                    : communityUnits || []
                   ).map((u) => (
                     <option key={u.id} value={u.id}>
                       Unit {u.unit_number}
@@ -1729,7 +1949,15 @@ export default function CommunityAdminResidentsPage() {
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
               <div>
-                <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#334155", marginBottom: "0.35rem" }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.775rem",
+                    fontWeight: 600,
+                    color: "#334155",
+                    marginBottom: "0.35rem",
+                  }}
+                >
                   Occupancy Role
                 </label>
                 <select
@@ -1743,21 +1971,39 @@ export default function CommunityAdminResidentsPage() {
                   <option value="family">Family</option>
                 </select>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", paddingTop: "1.2rem" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  paddingTop: "1.2rem",
+                }}
+              >
                 <input
                   type="checkbox"
                   id="inviteIsPrimary"
                   checked={inviteIsPrimary}
                   onChange={(e) => setInviteIsPrimary(e.target.checked)}
                 />
-                <label htmlFor="inviteIsPrimary" style={{ fontSize: "13px", fontWeight: 600, color: "#334155", cursor: "pointer" }}>
+                <label
+                  htmlFor="inviteIsPrimary"
+                  style={{ fontSize: "13px", fontWeight: 600, color: "#334155", cursor: "pointer" }}
+                >
                   Primary Contact for Unit
                 </label>
               </div>
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: "0.775rem", fontWeight: 600, color: "#334155", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.775rem",
+                  fontWeight: 600,
+                  color: "#334155",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Welcome Note (Optional)
               </label>
               <textarea
@@ -1769,7 +2015,14 @@ export default function CommunityAdminResidentsPage() {
               />
             </div>
 
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "0.75rem",
+                marginTop: "0.5rem",
+              }}
+            >
               <button
                 type="button"
                 className="btn btn-secondary"
@@ -1842,8 +2095,8 @@ export default function CommunityAdminResidentsPage() {
               <div>
                 <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Target Unit</div>
                 <div style={{ fontWeight: 600, marginTop: "0.2rem" }}>
-                  Unit {selectedInvitation.unit_number || "–"}{" "}
-                  ({selectedInvitation.tower_name || "Tower"})
+                  Unit {selectedInvitation.unit_number || "–"} (
+                  {selectedInvitation.tower_name || "Tower"})
                 </div>
               </div>
 
@@ -1926,11 +2179,16 @@ export default function CommunityAdminResidentsPage() {
                       style={{ flexShrink: 0 }}
                       onClick={async () => {
                         try {
-                          const res: any = await onboardingApi.regenerateInvitation(activeCommunityId!, selectedInvitation.id);
+                          const res: any = await onboardingApi.regenerateInvitation(
+                            activeCommunityId!,
+                            selectedInvitation.id,
+                          );
                           const url =
                             res?.accept_url ||
                             res?.data?.accept_url ||
-                            (res?.token ? `${window.location.origin}/invitations/${res.token}` : null);
+                            (res?.token
+                              ? `${window.location.origin}/invitations/${res.token}`
+                              : null);
                           if (url) {
                             navigator.clipboard.writeText(url);
                             toast.success("New link generated and copied to clipboard!", "Copied");

@@ -184,7 +184,17 @@ class DomesticStaffService(UnitScopedAccess):
             id_type_norm = payload.id_type.strip().lower()
             if id_type_norm in ("aadhaar", "aadhar"):
                 clean_id_number = re.sub(r"[\s-]", "", clean_id_number)
-            elif id_type_norm in ("pan", "pan card", "pan_card", "voter id", "voter_id", "passport", "driving license", "driving_license", "dl"):
+            elif id_type_norm in (
+                "pan",
+                "pan card",
+                "pan_card",
+                "voter id",
+                "voter_id",
+                "passport",
+                "driving license",
+                "driving_license",
+                "dl",
+            ):
                 clean_id_number = re.sub(r"[\s-]", "", clean_id_number).upper()
 
         obj = DomesticStaff(
@@ -208,14 +218,21 @@ class DomesticStaffService(UnitScopedAccess):
         self, *, community_id: uuid.UUID | None, q: str | None, offset: int, limit: int
     ):
         from app.modules.users.models import Role, UserRole
+
         slugs = await self.db.scalars(
             select(Role.slug)
             .join(UserRole, UserRole.role_id == Role.id)
             .where(UserRole.user_id == self.actor.id)
         )
         slug_set = set(slugs.all())
-        if not self.actor.is_superadmin and "resident" not in slug_set and not slug_set.intersection(_CROSS_UNIT_ROLE_SLUGS):
-            raise ForbiddenError("You do not have permission to view the staff registry", code="PERMISSION_DENIED")
+        if (
+            not self.actor.is_superadmin
+            and "resident" not in slug_set
+            and not slug_set.intersection(_CROSS_UNIT_ROLE_SLUGS)
+        ):
+            raise ForbiddenError(
+                "You do not have permission to view the staff registry", code="PERMISSION_DENIED"
+            )
 
         if community_id is not None:
             cid = self.scope.require(community_id)
@@ -245,8 +262,10 @@ class DomesticStaffService(UnitScopedAccess):
         self, staff_id: uuid.UUID, payload: schemas.StaffUpdate
     ) -> DomesticStaff:
         if not self.actor.is_superadmin and not await self._actor_has_cross_unit_role():
-            raise ForbiddenError("Only administrators can update staff profiles directly", code="PERMISSION_DENIED")
-            
+            raise ForbiddenError(
+                "Only administrators can update staff profiles directly", code="PERMISSION_DENIED"
+            )
+
         obj = await self._staff_in_scope(staff_id)
         patch = payload.model_dump(exclude_unset=True)
         _enum("staff_type", patch.get("staff_type"))
@@ -269,7 +288,17 @@ class DomesticStaffService(UnitScopedAccess):
                 id_type_norm = target_id_type.strip().lower()
                 if id_type_norm in ("aadhaar", "aadhar"):
                     clean_id = re.sub(r"[\s-]", "", clean_id)
-                elif id_type_norm in ("pan", "pan card", "pan_card", "voter id", "voter_id", "passport", "driving license", "driving_license", "dl"):
+                elif id_type_norm in (
+                    "pan",
+                    "pan card",
+                    "pan_card",
+                    "voter id",
+                    "voter_id",
+                    "passport",
+                    "driving license",
+                    "driving_license",
+                    "dl",
+                ):
                     clean_id = re.sub(r"[\s-]", "", clean_id).upper()
             obj.id_number_hash = digest_opt(clean_id)
         for k, v in patch.items():

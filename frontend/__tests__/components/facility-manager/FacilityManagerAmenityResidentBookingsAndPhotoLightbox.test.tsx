@@ -99,9 +99,7 @@ vi.mock("@/lib/api", () => ({
     entries: vi.fn().mockResolvedValue([]),
   },
   communitiesApi: {
-    communityUnits: vi.fn().mockResolvedValue([
-      { id: "unit-1", unit_number: "A-107" },
-    ]),
+    communityUnits: vi.fn().mockResolvedValue([{ id: "unit-1", unit_number: "A-107" }]),
   },
   useUiStore: vi.fn().mockReturnValue({ activeCommunityId: "c-1" }),
 }));
@@ -125,7 +123,7 @@ describe("Bug 027: Facility Manager Upcoming Resident Bookings Table & Clickable
     render(
       <QueryClientProvider client={queryClient}>
         <FacilityManagerAmenitiesPage />
-      </QueryClientProvider>
+      </QueryClientProvider>,
     );
 
     // Expect table headers for Resident / Booked By and Unit / Tower
@@ -154,7 +152,7 @@ describe("Bug 027: Facility Manager Upcoming Resident Bookings Table & Clickable
     render(
       <QueryClientProvider client={queryClient}>
         <SecurityGuardVisitorsPage />
-      </QueryClientProvider>
+      </QueryClientProvider>,
     );
 
     await waitFor(() => {

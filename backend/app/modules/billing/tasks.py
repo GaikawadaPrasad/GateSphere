@@ -12,10 +12,11 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.core.celery_app import celery
 from app.core.jobs import job_session, run, system_actor, system_scope
+from app.modules.audit.service import record_audit_async
 from app.modules.billing.models import (
     BillingRule,
     ChargeHead,
@@ -26,7 +27,6 @@ from app.modules.billing.models import (
 from app.modules.communities.models import Community, Unit
 from app.modules.notifications import events as notif_events
 from app.modules.residents.models import ResidentProfile, UnitOccupancy
-from sqlalchemy import func
 
 log = structlog.get_logger(__name__)
 
@@ -65,6 +65,7 @@ async def _sweep_overdue_invoices() -> dict:
                 elif rule.late_fee_mode == "percentage":
                     late_fee_add = _money(inv.balance_due * rule.late_fee_value / Decimal("100"))
 
+            previous_status = inv.status
             inv.status = "overdue"
             if late_fee_add > Decimal("0"):
                 inv.late_fee = _money(inv.late_fee + late_fee_add)
@@ -80,7 +81,13 @@ async def _sweep_overdue_invoices() -> dict:
                 community_id=inv.community_id,
                 entity_type="maintenance_invoice",
                 entity_id=inv.id,
-                new={"status": "overdue", "balance_due": inv.balance_due, "late_fee": inv.late_fee},
+                old={"status": previous_status},
+                new={
+                    "status": "overdue",
+                    "balance_due": str(inv.balance_due),
+                    "late_fee": str(inv.late_fee),
+                },
+                role_slug="system",
             )
             if inv.billed_to_user_id:
                 await notif_events.emit(
@@ -116,7 +123,9 @@ async def _generate_monthly_invoices() -> dict:
 
     async with job_session() as db:
         actor = await system_actor(db)
-        communities = (await db.scalars(select(Community).where(Community.is_active.is_(True)))).all()
+        communities = (
+            await db.scalars(select(Community).where(Community.is_active.is_(True)))
+        ).all()
         for comm in communities:
             rule = await db.scalar(select(BillingRule).where(BillingRule.community_id == comm.id))
             due_day = rule.due_day if rule else 10
@@ -238,6 +247,22 @@ async def _generate_monthly_invoices() -> dict:
                         narration=f"Monthly Maintenance Invoice {inv_number} posted",
                     )
                 )
+                await record_audit_async(
+                    db,
+                    module="billing",
+                    action="invoice.generated",
+                    actor=actor,
+                    community_id=comm.id,
+                    entity_type="maintenance_invoice",
+                    entity_id=inv.id,
+                    new={
+                        "invoice_number": inv_number,
+                        "unit_id": str(unit.id),
+                        "total_amount": str(total_amt),
+                        "status": "posted",
+                    },
+                    role_slug="system",
+                )
                 generated += 1
 
     log.info("billing.monthly_invoices_generated", generated=generated)
@@ -295,4 +320,3 @@ def generate_monthly_invoices() -> dict:
 @celery.task(name="app.modules.billing.tasks.send_dues_reminders")
 def send_dues_reminders() -> dict:
     return run(_send_dues_reminders())
-

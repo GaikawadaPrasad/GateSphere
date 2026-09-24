@@ -28,6 +28,9 @@ from app.core.security import require_auth_async, user_permissions_async
 from app.db.session import get_async_db
 from app.modules.users.models import User, UserRole
 
+# `app.community_ids` value meaning "every community" to the RLS policies (migration 0045).
+RLS_GLOBAL_SCOPE = "*"
+
 
 @dataclass(frozen=True)
 class TenantScope:
@@ -58,13 +61,15 @@ class TenantScope:
 
 
 async def bind_rls_scope_async(db: AsyncSession, scope: TenantScope) -> None:
-    """Set the request-scoped GUC the RLS policies read (migration 0003).
+    """Set the transaction-scoped GUC the RLS policies read (migrations 0003 / 0045).
 
-    No-op for a global scope. Safe to call once per request after the scope is known.
+    Policies are fail-closed (0045): an unset/empty GUC sees no rows. A global scope binds
+    the explicit sentinel `RLS_GLOBAL_SCOPE`. Safe to call once per request after the
+    scope is known.
     """
     from sqlalchemy import text
 
-    value = "" if scope.is_global else ",".join(str(c) for c in scope.community_ids)
+    value = RLS_GLOBAL_SCOPE if scope.is_global else ",".join(str(c) for c in scope.community_ids)
     await db.execute(text("SELECT set_config('app.community_ids', :v, true)"), {"v": value})
 
 

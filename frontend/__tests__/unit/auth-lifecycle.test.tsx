@@ -39,9 +39,10 @@ function clearCookies() {
 }
 
 function wrapperFor(client: QueryClient) {
-  return ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={client}>{children}</QueryClientProvider>
-  );
+  function Wrapper({ children }: { children: ReactNode }) {
+    return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  }
+  return Wrapper;
 }
 
 function newClient() {
@@ -146,7 +147,9 @@ describe("redirectToLoginOnUnauthorized", () => {
 
     await Promise.all([
       client.fetchQuery({ queryKey: ["notifications"], queryFn: unauthorized }).catch(() => null),
-      client.fetchQuery({ queryKey: ["communities", "x"], queryFn: unauthorized }).catch(() => null),
+      client
+        .fetchQuery({ queryKey: ["communities", "x"], queryFn: unauthorized })
+        .catch(() => null),
       client.fetchQuery({ queryKey: ["unread"], queryFn: unauthorized }).catch(() => null),
     ]);
 

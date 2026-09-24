@@ -81,7 +81,6 @@ export function KpiCard({
 
   const displaySubtitle = subtitle || subtext;
 
-
   return (
     <div
       className="card"

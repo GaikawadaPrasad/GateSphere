@@ -36,13 +36,15 @@ export default function AssessmentDetailPage() {
             (assessment.proposed_by_name &&
               currentUser.full_name &&
               assessment.proposed_by_name.trim().toLowerCase() ===
-                currentUser.full_name.trim().toLowerCase())
+                currentUser.full_name.trim().toLowerCase()),
         )
       : false;
 
   const handleApprove = async () => {
     if (isSelfProposal) {
-      alert("Maker-Checker Violation: You cannot approve your own proposal. Another committee member must review and approve.");
+      alert(
+        "Maker-Checker Violation: You cannot approve your own proposal. Another committee member must review and approve.",
+      );
       return;
     }
 
@@ -368,13 +370,23 @@ export default function AssessmentDetailPage() {
                     <div style={{ fontWeight: 700, marginBottom: "0.3rem" }}>
                       🔒 Maker-Checker Segregation of Duties
                     </div>
-                    You submitted this assessment proposal. Under statutory enterprise governance rules, the same individual cannot both propose and approve a special levy. Please have another Association Committee executive, the Treasurer, or President review and cast the vote.
+                    You submitted this assessment proposal. Under statutory enterprise governance
+                    rules, the same individual cannot both propose and approve a special levy.
+                    Please have another Association Committee executive, the Treasurer, or President
+                    review and cast the vote.
                   </div>
                 </div>
               ) : !showRejectBox ? (
                 <div>
-                  <p style={{ fontSize: "0.775rem", color: "var(--muted)", margin: "0.35rem 0 1rem" }}>
-                    As an independent Association Committee member, review the project budget and cast the formal governance approval.
+                  <p
+                    style={{
+                      fontSize: "0.775rem",
+                      color: "var(--muted)",
+                      margin: "0.35rem 0 1rem",
+                    }}
+                  >
+                    As an independent Association Committee member, review the project budget and
+                    cast the formal governance approval.
                   </p>
 
                   <label
@@ -418,7 +430,15 @@ export default function AssessmentDetailPage() {
                 </div>
               ) : (
                 <div>
-                  <label style={{ fontSize: "0.775rem", fontWeight: 600, color: "#dc2626", marginTop: "0.5rem", display: "block" }}>
+                  <label
+                    style={{
+                      fontSize: "0.775rem",
+                      fontWeight: 600,
+                      color: "#dc2626",
+                      marginTop: "0.5rem",
+                      display: "block",
+                    }}
+                  >
                     Reason for Rejection / Modification Request
                   </label>
                   <textarea
@@ -474,12 +494,19 @@ export default function AssessmentDetailPage() {
               >
                 <div>
                   <strong>Status:</strong>{" "}
-                  <span style={{ textTransform: "capitalize", fontWeight: 600 }}>{assessment.status}</span>
+                  <span style={{ textTransform: "capitalize", fontWeight: 600 }}>
+                    {assessment.status}
+                  </span>
                 </div>
                 {assessment.approved_at && (
                   <div style={{ marginTop: "0.5rem", color: "var(--muted)", fontSize: "0.775rem" }}>
                     Approved on: {formatDate(assessment.approved_at)}
-                    {assessment.approved_by_name && <span> by <strong>{assessment.approved_by_name}</strong></span>}
+                    {assessment.approved_by_name && (
+                      <span>
+                        {" "}
+                        by <strong>{assessment.approved_by_name}</strong>
+                      </span>
+                    )}
                   </div>
                 )}
                 {assessment.approval_notes && (

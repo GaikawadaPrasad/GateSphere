@@ -92,13 +92,13 @@ class DeliveryCollect(_Write):
     remarks: str | None = Field(default=None, max_length=2000)
 
 
-
 class DeliveryRead(_Read):
     community_id: uuid.UUID
     unit_id: uuid.UUID
     unit_number: str | None = None
     resident_user_id: uuid.UUID | None
     protocol_id: uuid.UUID | None
+    protocol_type: str | None = None
     delivery_type: str
     provider_name: str | None
     executive_name: str | None

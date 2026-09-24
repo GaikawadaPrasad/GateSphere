@@ -236,4 +236,3 @@ async def test_pan_and_voter_id_validation_rules():
             id_number="123",
         )
     assert "Voter ID must be 10 characters" in str(exc.value)
-

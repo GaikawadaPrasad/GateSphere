@@ -71,7 +71,9 @@ export function getStoredDemoRequests(): DemoRequestLead[] {
   }
 }
 
-export function saveDemoRequest(lead: Omit<DemoRequestLead, "id" | "createdAt" | "status">): DemoRequestLead {
+export function saveDemoRequest(
+  lead: Omit<DemoRequestLead, "id" | "createdAt" | "status">,
+): DemoRequestLead {
   const newLead: DemoRequestLead = {
     ...lead,
     id: `lead-${Date.now()}`,

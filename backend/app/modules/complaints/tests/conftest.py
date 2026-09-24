@@ -115,4 +115,3 @@ async def resident_occupant(db, community, unit) -> User:
     db.add(occ)
     await db.flush()
     return u
-

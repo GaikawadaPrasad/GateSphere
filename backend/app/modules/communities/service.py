@@ -157,7 +157,10 @@ class CommunityService:
         self, community_id: uuid.UUID, payload: schemas.CommunityAdminProvision
     ) -> schemas.CommunityAdminRead:
         if not self.scope.is_global:
-            raise ForbiddenError("Only a platform admin can provision community admin credentials", code="GLOBAL_ONLY")
+            raise ForbiddenError(
+                "Only a platform admin can provision community admin credentials",
+                code="GLOBAL_ONLY",
+            )
         comm = await self.get_community(community_id)
         admin_user = await self.communities.provision_community_admin(
             comm.id,

@@ -30,12 +30,7 @@ describe("Security Supervisor Dashboard Components", () => {
   describe("KPI Cards & Skeleton Loading", () => {
     it("renders KpiCardSkeleton when isLoading is true", () => {
       const { container } = render(
-        <KpiCard
-          title="Guards On Active Shift"
-          value="4"
-          icon="👮"
-          isLoading={true}
-        />
+        <KpiCard title="Guards On Active Shift" value="4" icon="👮" isLoading={true} />,
       );
       const skeletons = container.querySelectorAll(".skeleton");
       expect(skeletons.length).toBeGreaterThan(0);
@@ -49,7 +44,7 @@ describe("Security Supervisor Dashboard Components", () => {
           subtext="Currently on duty"
           icon="👮"
           isLoading={false}
-        />
+        />,
       );
       expect(screen.getByText("Guards On Active Shift")).toBeInTheDocument();
       expect(screen.getByText("4")).toBeInTheDocument();
@@ -66,7 +61,7 @@ describe("Security Supervisor Dashboard Components", () => {
           isLoading={false}
           enableClientPagination={true}
           pageSize={5}
-        />
+        />,
       );
 
       // Page 1 should display 5 items
@@ -94,12 +89,12 @@ describe("Security Supervisor Dashboard Components", () => {
           emptyTitle="No Recent Gate Events"
           emptyDescription="Gate entry and exit events will appear here in real-time."
           emptyIcon="🛡️"
-        />
+        />,
       );
 
       expect(screen.getByText("No Recent Gate Events")).toBeInTheDocument();
       expect(
-        screen.getByText("Gate entry and exit events will appear here in real-time.")
+        screen.getByText("Gate entry and exit events will appear here in real-time."),
       ).toBeInTheDocument();
     });
   });

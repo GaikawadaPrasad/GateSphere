@@ -28,15 +28,16 @@ function LoginForm() {
   // If already authenticated with a valid active session, forward directly to the destination
   React.useEffect(() => {
     if (currentUser && !isUserLoading) {
-      if (typeof window !== "undefined" && sessionStorage.getItem("gatesphere_logged_out") === "true") {
+      if (
+        typeof window !== "undefined" &&
+        sessionStorage.getItem("gatesphere_logged_out") === "true"
+      ) {
         // Do not auto-redirect; let the user see the login screen because they explicitly logged out.
         return;
       }
       const nextParam = params.get("next");
       const target =
-        nextParam && nextParam !== "/unauthorized"
-          ? nextParam
-          : getRoleLandingRoute(currentUser);
+        nextParam && nextParam !== "/unauthorized" ? nextParam : getRoleLandingRoute(currentUser);
       window.location.replace(target);
     }
   }, [currentUser, isUserLoading, params]);
@@ -67,9 +68,7 @@ function LoginForm() {
       const user = await login.mutateAsync(values);
       const nextParam = params.get("next");
       const target =
-        nextParam && nextParam !== "/unauthorized"
-          ? nextParam
-          : getRoleLandingRoute(user);
+        nextParam && nextParam !== "/unauthorized" ? nextParam : getRoleLandingRoute(user);
 
       // Hard navigation ensures edge middleware sees the session cookie and cleans up stale memory
       window.location.replace(target);

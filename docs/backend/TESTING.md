@@ -81,3 +81,34 @@ coexist in one cookie jar and logout is isolated — see `docs/backend/AUTHENTIC
 
 `tests/test_cross_tenant_idor.py` (API-level sweep) + `tests/test_tenant_isolation.py`
 (DB RLS) + per-module `test_*_api.py` cross-community cases.
+
+## RLS is fail-closed (migration 0045)
+
+`tests/test_tenant_isolation.py` also asserts: an unset / empty `app.community_ids` sees **zero**
+rows; the `*` sentinel sees every community; child tables without `community_id` inherit their
+parent's isolation; a tenant-scoped reader cannot see platform (`NULL`-community) audit rows;
+`gatesphere_app` cannot UPDATE / DELETE / TRUNCATE `audit_logs` and has no legacy password.
+
+## Frontend E2E (Playwright) — real backend, nothing mocked
+
+The Next.js middleware checks the session cookie server-side, so browser-side API mocking cannot
+exercise a signed-in page. The suite (`frontend/e2e/`) therefore runs against a live backend with
+the deterministic seed; `global-setup.ts` signs each role in once through the real login endpoint
+and saves `e2e/.auth/<role>.json` (gitignored — live cookies).
+
+```bash
+# backend (any stack with the seed loaded; keep the login limiter roomy for 4 role sign-ins)
+alembic upgrade head && python -m app.scripts.seed --reset
+RATE_LIMIT_LOGIN=100/60 uvicorn app.main:app --port 8000
+# frontend — rewrites are resolved at BUILD time, so point the build at that backend
+cd frontend && BACKEND_INTERNAL_URL=http://127.0.0.1:8000 npm run build
+npx playwright install chromium && npx playwright test      # PORT=… moves server + baseURL
+```
+
+Journeys: sign-in (redirect, validation, uniform error, real session), visitor approval
+(guard logs → resident approves in the portal → `approved` server-side), delivery protocol
+(resident sets *Leave at gate desk* → auto-approved → guard *Collected at desk* → `collected`),
+invoice payment (staff posts → resident pays in the portal → `paid`, balance 0), tenant
+isolation (community admin gets `404` for another community's unit via URL manipulation).
+Not yet covered by E2E: amenity booking conflict, complaint lifecycle, gate entry (covered by
+backend API tests only). CI job: `frontend-e2e`.

@@ -199,11 +199,7 @@ export function EditCommunityModal({
             >
               🗑️ Delete
             </button>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={onClose}
-            >
+            <button type="button" className="btn btn-secondary" onClick={onClose}>
               Cancel
             </button>
             <button
@@ -234,9 +230,9 @@ export function EditCommunityModal({
               ⚠️ Are you sure you want to delete this community?
             </h4>
             <p style={{ color: "#b91c1c", fontSize: "0.85rem" }}>
-              Deleting <strong>{community?.name}</strong> ({community?.code}) will
-              permanently remove all associated gates, towers, units, resident profiles, tickets,
-              and logs. This action <strong>cannot be undone</strong>.
+              Deleting <strong>{community?.name}</strong> ({community?.code}) will permanently
+              remove all associated gates, towers, units, resident profiles, tickets, and logs. This
+              action <strong>cannot be undone</strong>.
             </p>
           </div>
           {editError && (
@@ -361,7 +357,10 @@ export function EditCommunityModal({
                   if (!editTouched.state) setEditTouched((t) => ({ ...t, state: true }));
                   // Clear city if not in new state
                   const newCities = getCitiesForState(newState);
-                  if (editCity && !newCities.some((c) => c.toLowerCase() === editCity.trim().toLowerCase())) {
+                  if (
+                    editCity &&
+                    !newCities.some((c) => c.toLowerCase() === editCity.trim().toLowerCase())
+                  ) {
                     setEditCity("");
                     setEditCustomCity("");
                     setIsEditCustomCity(false);
@@ -369,8 +368,7 @@ export function EditCommunityModal({
                 }}
                 onBlur={() => setEditTouched((t) => ({ ...t, state: true }))}
                 style={{
-                  borderColor:
-                    editTouched.state && editErrors.state ? "var(--danger)" : undefined,
+                  borderColor: editTouched.state && editErrors.state ? "var(--danger)" : undefined,
                 }}
               >
                 <option value="">Select State / UT…</option>
@@ -417,12 +415,13 @@ export function EditCommunityModal({
                 }}
                 onBlur={() => setEditTouched((t) => ({ ...t, city: true }))}
                 style={{
-                  borderColor:
-                    editTouched.city && editErrors.city ? "var(--danger)" : undefined,
+                  borderColor: editTouched.city && editErrors.city ? "var(--danger)" : undefined,
                 }}
                 disabled={!editState}
               >
-                <option value="">{editState ? `Select city in ${editState}…` : "Select State / UT first…"}</option>
+                <option value="">
+                  {editState ? `Select city in ${editState}…` : "Select State / UT first…"}
+                </option>
                 {getCitiesForState(editState).map((c) => (
                   <option key={c} value={c}>
                     {c}
@@ -442,7 +441,10 @@ export function EditCommunityModal({
                     if (!editTouched.city) setEditTouched((t) => ({ ...t, city: true }));
                   }}
                   onBlur={() => setEditTouched((t) => ({ ...t, city: true }))}
-                  style={{ marginTop: "0.4rem", borderColor: editTouched.city && editErrors.city ? "var(--danger)" : undefined }}
+                  style={{
+                    marginTop: "0.4rem",
+                    borderColor: editTouched.city && editErrors.city ? "var(--danger)" : undefined,
+                  }}
                 />
               )}
               {editTouched.city && editErrors.city && (
@@ -463,9 +465,7 @@ export function EditCommunityModal({
                 onChange={(e) => setEditIsActive(e.target.checked)}
                 style={{ width: "auto", margin: 0 }}
               />
-              <span style={{ fontSize: "0.875rem", fontWeight: 500 }}>
-                Active Community Status
-              </span>
+              <span style={{ fontSize: "0.875rem", fontWeight: 500 }}>Active Community Status</span>
             </label>
           </div>
         </form>

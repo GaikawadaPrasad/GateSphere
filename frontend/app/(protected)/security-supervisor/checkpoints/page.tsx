@@ -161,11 +161,7 @@ export default function SecuritySupervisorCheckpointsPage() {
           { label: "Checkpoints" },
         ]}
         actions={
-          <button
-            className="btn btn-secondary"
-            onClick={loadData}
-            disabled={isLoading}
-          >
+          <button className="btn btn-secondary" onClick={loadData} disabled={isLoading}>
             🔄 {isLoading ? "Refreshing…" : "Refresh"}
           </button>
         }
@@ -333,7 +329,14 @@ export default function SecuritySupervisorCheckpointsPage() {
             required
           />
           {overrideReasonError && (
-            <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+            <span
+              style={{
+                color: "var(--danger, #ef4444)",
+                fontSize: "0.75rem",
+                display: "block",
+                marginTop: "0.25rem",
+              }}
+            >
               {overrideReasonError}
             </span>
           )}

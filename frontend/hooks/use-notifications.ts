@@ -63,7 +63,6 @@ export function useDispatchNotification() {
   });
 }
 
-
 export function useMarkNotificationRead() {
   const queryClient = useQueryClient();
   return useMutation({

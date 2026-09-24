@@ -48,7 +48,9 @@ export function Modal({ isOpen, onClose, title, children, footer, maxWidth, size
         backdropFilter: "blur(4px)",
         padding: "1rem",
       }}
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div
         className="modal-content"
@@ -64,7 +66,6 @@ export function Modal({ isOpen, onClose, title, children, footer, maxWidth, size
           margin: "0 auto",
           maxHeight: "calc(100vh - 2rem)",
         }}
-
       >
         <div
           style={{

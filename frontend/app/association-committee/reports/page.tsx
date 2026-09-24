@@ -61,7 +61,10 @@ export default function GovernanceReportsPage() {
   }, [residentsList]);
 
   const invoiceMap = useMemo(() => {
-    const map = new Map<string, { invoice_number: string; unit_number?: string; total_amount: string; due_date?: string }>();
+    const map = new Map<
+      string,
+      { invoice_number: string; unit_number?: string; total_amount: string; due_date?: string }
+    >();
     if (Array.isArray(invoicesList)) {
       invoicesList.forEach((inv) => {
         if (inv.id) map.set(inv.id, inv);
@@ -90,7 +93,10 @@ export default function GovernanceReportsPage() {
       unitDisplay = `Unit ${invoice.unit_number}`;
     }
 
-    const invoiceNumber = p.invoice_number || invoice?.invoice_number || (firstAlloc ? `Inv #${firstAlloc.invoice_id.slice(0, 8)}` : "Maintenance Dues");
+    const invoiceNumber =
+      p.invoice_number ||
+      invoice?.invoice_number ||
+      (firstAlloc ? `Inv #${firstAlloc.invoice_id.slice(0, 8)}` : "Maintenance Dues");
 
     return {
       resident,
@@ -197,7 +203,16 @@ export default function GovernanceReportsPage() {
                 </span>
               )}
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap", fontSize: "0.75rem", color: "var(--muted)" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem",
+                flexWrap: "wrap",
+                fontSize: "0.75rem",
+                color: "var(--muted)",
+              }}
+            >
               <span style={{ fontWeight: 500, color: "var(--primary)" }}>{payer.unitDisplay}</span>
               {payer.email && <span>· {payer.email}</span>}
               {payer.phone && <span>· {payer.phone}</span>}
@@ -232,9 +247,7 @@ export default function GovernanceReportsPage() {
             <div style={{ fontWeight: 600, fontSize: "0.825rem", color: "var(--fg)" }}>
               {payer.invoiceNumber}
             </div>
-            <div style={{ fontSize: "0.725rem", color: "var(--muted)" }}>
-              Maintenance Dues
-            </div>
+            <div style={{ fontSize: "0.725rem", color: "var(--muted)" }}>Maintenance Dues</div>
           </div>
         );
       },
@@ -682,7 +695,8 @@ export default function GovernanceReportsPage() {
               maxWidth: 580,
               maxHeight: "90vh",
               overflowY: "auto",
-              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+              boxShadow:
+                "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -720,30 +734,64 @@ export default function GovernanceReportsPage() {
                 marginBottom: "1rem",
               }}
             >
-              <div style={{ fontSize: "0.75rem", color: "var(--muted)", fontWeight: 600, textTransform: "uppercase", marginBottom: "0.5rem" }}>
+              <div
+                style={{
+                  fontSize: "0.75rem",
+                  color: "var(--muted)",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  marginBottom: "0.5rem",
+                }}
+              >
                 Payer Identity & Residential Unit
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.5rem" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  flexWrap: "wrap",
+                  gap: "0.5rem",
+                }}
+              >
                 <div>
                   <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--fg)" }}>
                     {activePayer.name}
                   </div>
-                  <div style={{ fontSize: "0.825rem", color: "var(--primary)", fontWeight: 600, marginTop: "0.15rem" }}>
+                  <div
+                    style={{
+                      fontSize: "0.825rem",
+                      color: "var(--primary)",
+                      fontWeight: 600,
+                      marginTop: "0.15rem",
+                    }}
+                  >
                     {activePayer.unitDisplay}
                   </div>
                   {activePayer.email && (
-                    <div style={{ fontSize: "0.775rem", color: "var(--muted)", marginTop: "0.2rem" }}>
+                    <div
+                      style={{ fontSize: "0.775rem", color: "var(--muted)", marginTop: "0.2rem" }}
+                    >
                       ✉️ {activePayer.email}
                     </div>
                   )}
                   {activePayer.phone && (
-                    <div style={{ fontSize: "0.775rem", color: "var(--muted)", marginTop: "0.1rem" }}>
+                    <div
+                      style={{ fontSize: "0.775rem", color: "var(--muted)", marginTop: "0.1rem" }}
+                    >
                       📞 {activePayer.phone}
                     </div>
                   )}
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.3rem" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "flex-end",
+                    gap: "0.3rem",
+                  }}
+                >
                   <span
                     style={{
                       fontSize: "0.725rem",
@@ -776,32 +824,96 @@ export default function GovernanceReportsPage() {
             </div>
 
             {/* Transaction & Settlement Details */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", fontSize: "0.85rem", marginBottom: "1.25rem" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", padding: "0.4rem 0", borderBottom: "1px solid var(--border-light)" }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.6rem",
+                fontSize: "0.85rem",
+                marginBottom: "1.25rem",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  padding: "0.4rem 0",
+                  borderBottom: "1px solid var(--border-light)",
+                }}
+              >
                 <span style={{ color: "var(--muted)" }}>Payment Reference</span>
-                <span style={{ fontWeight: 600, fontFamily: "monospace" }}>{selectedPayment.payment_reference}</span>
+                <span style={{ fontWeight: 600, fontFamily: "monospace" }}>
+                  {selectedPayment.payment_reference}
+                </span>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", padding: "0.4rem 0", borderBottom: "1px solid var(--border-light)" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  padding: "0.4rem 0",
+                  borderBottom: "1px solid var(--border-light)",
+                }}
+              >
                 <span style={{ color: "var(--muted)" }}>Receipt Number</span>
-                <span style={{ fontWeight: 600, color: "#059669" }}>{selectedPayment.receipt_number || "Direct Allocation"}</span>
+                <span style={{ fontWeight: 600, color: "#059669" }}>
+                  {selectedPayment.receipt_number || "Direct Allocation"}
+                </span>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", padding: "0.4rem 0", borderBottom: "1px solid var(--border-light)" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  padding: "0.4rem 0",
+                  borderBottom: "1px solid var(--border-light)",
+                }}
+              >
                 <span style={{ color: "var(--muted)" }}>Allocated Invoice</span>
                 <span style={{ fontWeight: 600 }}>{activePayer.invoiceNumber}</span>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", padding: "0.4rem 0", borderBottom: "1px solid var(--border-light)" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  padding: "0.4rem 0",
+                  borderBottom: "1px solid var(--border-light)",
+                }}
+              >
                 <span style={{ color: "var(--muted)" }}>Payment Method</span>
-                <span style={{ fontWeight: 600, textTransform: "uppercase" }}>{selectedPayment.payment_method}</span>
+                <span style={{ fontWeight: 600, textTransform: "uppercase" }}>
+                  {selectedPayment.payment_method}
+                </span>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", padding: "0.4rem 0", borderBottom: "1px solid var(--border-light)" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  padding: "0.4rem 0",
+                  borderBottom: "1px solid var(--border-light)",
+                }}
+              >
                 <span style={{ color: "var(--muted)" }}>Transaction Timestamp</span>
                 <span style={{ fontWeight: 500 }}>{formatDate(selectedPayment.paid_at)}</span>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", padding: "0.4rem 0", borderBottom: "1px solid var(--border-light)" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  padding: "0.4rem 0",
+                  borderBottom: "1px solid var(--border-light)",
+                }}
+              >
                 <span style={{ color: "var(--muted)" }}>Verification Status</span>
                 <StatusBadge status={selectedPayment.payment_status} />
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", padding: "0.5rem 0", borderTop: "2px solid var(--border)", marginTop: "0.25rem" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  padding: "0.5rem 0",
+                  borderTop: "2px solid var(--border)",
+                  marginTop: "0.25rem",
+                }}
+              >
                 <span style={{ fontWeight: 700, color: "var(--fg)" }}>Total Amount Settled</span>
                 <span style={{ fontWeight: 700, color: "#059669", fontSize: "1.1rem" }}>
                   {formatCurrency(parseFloat(selectedPayment.amount || "0"))}

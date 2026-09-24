@@ -188,8 +188,13 @@ class EmergencyContactCreate(_Write):
     @classmethod
     def validate_contact_name(cls, v: str) -> str:
         trimmed = v.strip()
-        if not re.match(r"^[a-zA-Z\s.\-',()]+$", trimmed) or len(re.findall(r"[a-zA-Z]", trimmed)) < 2:
-            raise ValueError("Contact name must contain only alphabetic letters, spaces, and standard punctuation (min 2 letters).")
+        if (
+            not re.match(r"^[a-zA-Z\s.\-',()]+$", trimmed)
+            or len(re.findall(r"[a-zA-Z]", trimmed)) < 2
+        ):
+            raise ValueError(
+                "Contact name must contain only alphabetic letters, spaces, and standard punctuation (min 2 letters)."
+            )
         return trimmed
 
 
@@ -280,7 +285,11 @@ class ResidentMeUpdate(_Write):
         trimmed = v.strip()
         if not trimmed:
             return None
-        if not re.match(r"^[a-zA-Z\s.\-',()]+$", trimmed) or len(re.findall(r"[a-zA-Z]", trimmed)) < 2:
-            raise ValueError("Name must contain only alphabetic letters, spaces, and standard punctuation (min 2 letters).")
+        if (
+            not re.match(r"^[a-zA-Z\s.\-',()]+$", trimmed)
+            or len(re.findall(r"[a-zA-Z]", trimmed)) < 2
+        ):
+            raise ValueError(
+                "Name must contain only alphabetic letters, spaces, and standard punctuation (min 2 letters)."
+            )
         return trimmed
-

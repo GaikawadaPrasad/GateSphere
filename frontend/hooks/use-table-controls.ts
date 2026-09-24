@@ -162,8 +162,8 @@ export function useTableControls<T extends Record<string, any>>({
     // 1. Manual column header sort override if set
     if (sortKey && sortDir) {
       return [...filteredData].sort((a, b) => {
-        let aVal = a[sortKey];
-        let bVal = b[sortKey];
+        const aVal = a[sortKey];
+        const bVal = b[sortKey];
 
         if (aVal === null || aVal === undefined) return 1;
         if (bVal === null || bVal === undefined) return -1;

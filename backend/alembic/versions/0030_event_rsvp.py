@@ -65,8 +65,7 @@ def upgrade() -> None:
     op.create_index("ix_event_rsvps_response", "event_rsvps", ["response"])
     # tenant RLS, same policy shape as migration 0003
     op.execute("ALTER TABLE event_rsvps ENABLE ROW LEVEL SECURITY")
-    op.execute(
-        """
+    op.execute("""
         CREATE POLICY tenant_isolation ON event_rsvps USING (
             coalesce(current_setting('app.community_ids', true), '') = ''
             OR community_id IS NULL
@@ -74,8 +73,7 @@ def upgrade() -> None:
                 string_to_array(current_setting('app.community_ids', true), ',')
             )
         )
-        """
-    )
+        """)
 
 
 def downgrade() -> None:

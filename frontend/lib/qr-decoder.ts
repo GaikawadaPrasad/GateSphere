@@ -4,7 +4,6 @@ function getJsQR(): typeof jsQR {
   return typeof jsQR === "function" ? jsQR : (jsQR as any)?.default || jsQR;
 }
 
-
 export interface ParsedQrData {
   raw: string;
   token?: string;
@@ -60,7 +59,8 @@ export function parseQrPayload(raw: string): ParsedQrData {
   if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
     try {
       const url = new URL(trimmed);
-      const token = url.searchParams.get("token") || url.searchParams.get("pass_token") || undefined;
+      const token =
+        url.searchParams.get("token") || url.searchParams.get("pass_token") || undefined;
       const pin = url.searchParams.get("pin") || undefined;
       if (token || pin) {
         return {
@@ -161,11 +161,7 @@ export function parseQrPayload(raw: string): ParsedQrData {
   }
 
   // 7. Numeric PIN / OTP (e.g. "987654", "OTP-8819", "PIN-654321")
-  if (
-    trimmed.startsWith("OTP-") ||
-    trimmed.startsWith("PIN-") ||
-    /^\d{4,8}$/.test(trimmed)
-  ) {
+  if (trimmed.startsWith("OTP-") || trimmed.startsWith("PIN-") || /^\d{4,8}$/.test(trimmed)) {
     const numericOnly = trimmed.replace(/\D/g, "");
     if (numericOnly.length >= 4 && numericOnly.length <= 8) {
       return {
@@ -190,7 +186,7 @@ export function parseQrPayload(raw: string): ParsedQrData {
 export function decodeQrFromImageData(
   data: Uint8ClampedArray,
   width: number,
-  height: number
+  height: number,
 ): string | null {
   try {
     const jsQR = getJsQR();
@@ -225,7 +221,7 @@ export function decodeQrFromCanvas(canvas: HTMLCanvasElement): string | null {
  */
 export function decodeQrFromVideo(
   video: HTMLVideoElement,
-  offscreenCanvas?: HTMLCanvasElement
+  offscreenCanvas?: HTMLCanvasElement,
 ): string | null {
   if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) return null;
 
@@ -249,7 +245,7 @@ export function decodeQrFromVideo(
  * Decodes QR code from an uploaded File / Blob (PNG, JPG, WEBP, etc.)
  */
 export async function decodeQrFromFile(
-  file: File | Blob
+  file: File | Blob,
 ): Promise<{ success: boolean; data?: string; parsed?: ParsedQrData; error?: string }> {
   try {
     // 1. Try Native BarcodeDetector if supported in browser
@@ -345,7 +341,8 @@ export async function decodeQrFromFile(
 
     return {
       success: false,
-      error: "No QR code could be detected in this image. Please ensure the QR code is clearly visible and not blurry.",
+      error:
+        "No QR code could be detected in this image. Please ensure the QR code is clearly visible and not blurry.",
     };
   } catch (err: any) {
     return {

@@ -51,7 +51,8 @@ function renderText(text: string) {
 export function ChatbotWidget() {
   const router = useRouter();
   const pathname = usePathname();
-  const isPublicRoute = PUBLIC_ROUTES.has(pathname) || Boolean(pathname?.startsWith("/invitations"));
+  const isPublicRoute =
+    PUBLIC_ROUTES.has(pathname) || Boolean(pathname?.startsWith("/invitations"));
   const { data: user } = useMe({ enabled: !isPublicRoute });
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);

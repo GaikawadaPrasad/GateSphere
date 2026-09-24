@@ -44,6 +44,8 @@ export function redirectToLoginOnUnauthorized(client: QueryClient): () => void {
     if (window.location.pathname.startsWith("/login")) return;
     redirecting = true;
     void client.cancelQueries();
-    hardNavigate(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+    hardNavigate(
+      `/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`,
+    );
   });
 }

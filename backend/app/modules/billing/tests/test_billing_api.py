@@ -222,7 +222,9 @@ def test_payment_enrichment(as_role, seed_ids):
         f"{P}/invoices",
         json={
             "unit_id": unit_id,
-            "items": [{"description": "Monthly Maintenance", "quantity": "1", "unit_rate": "1500.00"}],
+            "items": [
+                {"description": "Monthly Maintenance", "quantity": "1", "unit_rate": "1500.00"}
+            ],
         },
     ).json()["data"]
     admin.post(f"{P}/invoices/{inv['id']}/post")
@@ -287,7 +289,10 @@ def test_maker_checker_special_assessment(as_role, seed_ids):
     )
     assert res_self_approve.status_code == 403, res_self_approve.text
     err_json = res_self_approve.json()
-    assert err_json["error"]["code"] == "MAKER_CHECKER_VIOLATION" or "Maker-Checker" in err_json["error"]["message"]
+    assert (
+        err_json["error"]["code"] == "MAKER_CHECKER_VIOLATION"
+        or "Maker-Checker" in err_json["error"]["message"]
+    )
 
     # 3. Another executive (Member 2) reviews and approves -> Must succeed
     res_other_approve = comm_member2.post(
@@ -335,20 +340,14 @@ def test_duplicate_payment_is_rejected_without_double_posting(as_role, seed_ids)
         assert dup.status_code == 422, dup.text
         assert dup.json()["error"]["code"] in ("INVOICE_NOT_PAYABLE", "OVER_ALLOCATION")
         with SessionLocal() as db:
-            count = (
-                db.query(PaymentAllocation).filter_by(invoice_id=inv["id"]).count()
-            )
+            count = db.query(PaymentAllocation).filter_by(invoice_id=inv["id"]).count()
             assert count == 1
     finally:
         with SessionLocal() as db:
             for row in db.query(PaymentAllocation).filter_by(invoice_id=inv["id"]).all():
                 db.delete(row)
-            SOURCE_IDS = [uuid.UUID(inv["id"])] + (
-                [uuid.UUID(pay_id)] if pay_id else []
-            )
-            for row in (
-                db.query(LedgerEntry).filter(LedgerEntry.source_id.in_(SOURCE_IDS)).all()
-            ):
+            SOURCE_IDS = [uuid.UUID(inv["id"])] + ([uuid.UUID(pay_id)] if pay_id else [])
+            for row in db.query(LedgerEntry).filter(LedgerEntry.source_id.in_(SOURCE_IDS)).all():
                 db.delete(row)
             if pay_id is not None:
                 pay = db.get(Payment, pay_id)
@@ -360,4 +359,3 @@ def test_duplicate_payment_is_rejected_without_double_posting(as_role, seed_ids)
             if obj is not None:
                 db.delete(obj)
             db.commit()
-

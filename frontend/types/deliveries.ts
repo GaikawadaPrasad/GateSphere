@@ -1,10 +1,4 @@
-export type DeliveryType =
-  | "food"
-  | "courier"
-  | "grocery"
-  | "medicine"
-  | "ecommerce"
-  | "other";
+export type DeliveryType = "food" | "courier" | "grocery" | "medicine" | "ecommerce" | "other";
 
 export type DeliveryStatus =
   | "expected"
@@ -15,11 +9,7 @@ export type DeliveryStatus =
   | "collected_at_gate"
   | "cancelled";
 
-export type DeliveryApprovalStatus =
-  | "pending"
-  | "approved"
-  | "rejected"
-  | "auto_approved";
+export type DeliveryApprovalStatus = "pending" | "approved" | "rejected" | "auto_approved";
 
 export type ProtocolType =
   | "direct_entry"
@@ -50,6 +40,8 @@ export interface DeliveryItem {
   unit_number?: string | null;
   resident_user_id?: string | null;
   protocol_id?: string | null;
+  /** Protocol the delivery was routed by (community- or unit-level), resolved server-side. */
+  protocol_type?: string | null;
   delivery_type: DeliveryType | string;
   provider_name?: string | null;
   executive_name?: string | null;

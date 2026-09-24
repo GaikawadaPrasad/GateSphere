@@ -29,6 +29,9 @@ from app.modules.users.models import Permission, Role, RolePermission, User, Use
 
 _WITH_ROLES = (selectinload(User.roles).selectinload(UserRole.role),)
 
+# UserUpdate fields that affect the account in *every* community it belongs to.
+_ACCOUNT_WIDE_FIELDS = frozenset({"email", "password", "is_active"})
+
 
 class UserService:
     def __init__(
@@ -69,6 +72,22 @@ class UserService:
             return False  # unaffiliated users are only visible to platform super_admins
         grant_cids = {ur.community_id for ur in user.roles if ur.community_id is not None}
         return bool(grant_cids & self.scope.community_ids)
+
+    def _require_account_owned(self, user: User) -> None:
+        """Account-wide credentials (email / password / active flag) apply in every
+        community the user belongs to. A community-scoped admin may change them only when
+        every one of the user's grants lies inside the admin's own scope — otherwise an
+        admin of community A could take over (or lock out) a user's access to community B
+        or a platform-level role (re-audit #3, S-05 residual)."""
+        if self.scope.is_global:
+            return
+        grant_cids = {ur.community_id for ur in user.roles}
+        if user.is_superadmin or None in grant_cids or not grant_cids <= self.scope.community_ids:
+            raise ForbiddenError(
+                "This account belongs to other communities; only a platform admin can "
+                "change its email, password or active status",
+                code="ACCOUNT_SHARED",
+            )
 
     async def _get_visible(self, user_id: uuid.UUID) -> User:
         user = await self.db.scalar(
@@ -206,6 +225,8 @@ class UserService:
         if not self.scope.is_global and not user.roles:
             raise ForbiddenError("Cannot modify an unaffiliated user", code="UNAFFILIATED_TAKEOVER")
         patch = payload.model_dump(exclude_unset=True)
+        if _ACCOUNT_WIDE_FIELDS & patch.keys():
+            self._require_account_owned(user)
         was_active = user.is_active
 
         if patch.get("email"):

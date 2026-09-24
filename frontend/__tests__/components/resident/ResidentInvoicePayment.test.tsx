@@ -204,7 +204,7 @@ describe("Resident Dashboard - Invoice Payment Modal & Receipt Flow", () => {
     render(
       <QueryClientProvider client={queryClient}>
         <OwnerTenantDashboardView initialTab="payments" />
-      </QueryClientProvider>
+      </QueryClientProvider>,
     );
 
     // Wait for Invoices & Bills table to load
@@ -234,7 +234,9 @@ describe("Resident Dashboard - Invoice Payment Modal & Receipt Flow", () => {
     expect(within(modal).getByText("Billing Period")).toBeInTheDocument();
 
     // 3. Charge Descriptions & Breakdown Items
-    expect(within(modal).getByText("Monthly Maintenance & Security Operations")).toBeInTheDocument();
+    expect(
+      within(modal).getByText("Monthly Maintenance & Security Operations"),
+    ).toBeInTheDocument();
     expect(within(modal).getByText("Clubhouse & Gym Upkeep")).toBeInTheDocument();
     expect(within(modal).getByText("GST 18%")).toBeInTheDocument();
 
@@ -245,7 +247,9 @@ describe("Resident Dashboard - Invoice Payment Modal & Receipt Flow", () => {
     expect(within(modal).getByText("Net Outstanding Balance Due")).toBeInTheDocument();
 
     // 5. Action Buttons (including Download Invoice)
-    expect(within(modal).getByRole("button", { name: /Simulate Instant Payment/i })).toBeInTheDocument();
+    expect(
+      within(modal).getByRole("button", { name: /Simulate Instant Payment/i }),
+    ).toBeInTheDocument();
     expect(within(modal).getByRole("button", { name: /Download Invoice/i })).toBeInTheDocument();
     expect(within(modal).getByRole("button", { name: /Cancel/i })).toBeInTheDocument();
   });
@@ -254,7 +258,7 @@ describe("Resident Dashboard - Invoice Payment Modal & Receipt Flow", () => {
     render(
       <QueryClientProvider client={queryClient}>
         <OwnerTenantDashboardView initialTab="payments" />
-      </QueryClientProvider>
+      </QueryClientProvider>,
     );
 
     await waitFor(() => {
@@ -290,7 +294,7 @@ describe("Resident Dashboard - Invoice Payment Modal & Receipt Flow", () => {
     render(
       <QueryClientProvider client={queryClient}>
         <OwnerTenantDashboardView initialTab="payments" />
-      </QueryClientProvider>
+      </QueryClientProvider>,
     );
 
     // Wait for invoice table
@@ -307,7 +311,9 @@ describe("Resident Dashboard - Invoice Payment Modal & Receipt Flow", () => {
     });
 
     const paymentModal = document.querySelector(".modal-content") as HTMLElement;
-    const simulateBtn = within(paymentModal).getByRole("button", { name: /Simulate Instant Payment/i });
+    const simulateBtn = within(paymentModal).getByRole("button", {
+      name: /Simulate Instant Payment/i,
+    });
     fireEvent.click(simulateBtn);
 
     // Verify Receipt Modal opens with complete confirmation details
@@ -316,15 +322,21 @@ describe("Resident Dashboard - Invoice Payment Modal & Receipt Flow", () => {
     });
 
     const receiptModal = document.querySelector(".modal-content") as HTMLElement;
-    expect(within(receiptModal).getByText("Payment Processed & Settled Successfully")).toBeInTheDocument();
+    expect(
+      within(receiptModal).getByText("Payment Processed & Settled Successfully"),
+    ).toBeInTheDocument();
     expect(within(receiptModal).getByText("RCP-2026-9999")).toBeInTheDocument();
     expect(within(receiptModal).getByText("PAY-2026-TXN-9999")).toBeInTheDocument();
     expect(within(receiptModal).getByText("₹0.00 (Settled in Full)")).toBeInTheDocument();
 
     // Check action buttons in Receipt Modal
-    const downloadReceiptBtn = within(receiptModal).getByRole("button", { name: /Download Receipt/i });
+    const downloadReceiptBtn = within(receiptModal).getByRole("button", {
+      name: /Download Receipt/i,
+    });
     const viewInvoiceBtn = within(receiptModal).getByRole("button", { name: /View Invoice/i });
-    const downloadInvoiceBtn = within(receiptModal).getByRole("button", { name: /Download Invoice/i });
+    const downloadInvoiceBtn = within(receiptModal).getByRole("button", {
+      name: /Download Invoice/i,
+    });
     const printBtn = within(receiptModal).getByRole("button", { name: /Print Receipt/i });
 
     expect(downloadReceiptBtn).toBeInTheDocument();
@@ -356,7 +368,7 @@ describe("Resident Dashboard - Invoice Payment Modal & Receipt Flow", () => {
     render(
       <QueryClientProvider client={queryClient}>
         <OwnerTenantDashboardView initialTab="payments" />
-      </QueryClientProvider>
+      </QueryClientProvider>,
     );
 
     // Wait for invoices table
@@ -401,8 +413,12 @@ describe("Resident Dashboard - Invoice Payment Modal & Receipt Flow", () => {
     // Verify paid invoice banner inside modal
     const invoiceModal = document.querySelector(".modal-content") as HTMLElement;
     expect(within(invoiceModal).getByText(/Invoice Paid & Cleared:/i)).toBeInTheDocument();
-    expect(within(invoiceModal).getAllByRole("button", { name: /View Receipt/i }).length).toBeGreaterThan(0);
-    expect(within(invoiceModal).getAllByRole("button", { name: /Download Receipt/i }).length).toBeGreaterThan(0);
+    expect(
+      within(invoiceModal).getAllByRole("button", { name: /View Receipt/i }).length,
+    ).toBeGreaterThan(0);
+    expect(
+      within(invoiceModal).getAllByRole("button", { name: /Download Receipt/i }).length,
+    ).toBeGreaterThan(0);
   });
 
   it("displays latest updated Open Service Tickets and Booked Amenities counts based on actual records", async () => {
@@ -502,7 +518,7 @@ describe("Resident Dashboard - Invoice Payment Modal & Receipt Flow", () => {
     render(
       <QueryClientProvider client={queryClient}>
         <OwnerTenantDashboardView />
-      </QueryClientProvider>
+      </QueryClientProvider>,
     );
 
     // Verify Open Service Tickets count = 2 (tkt-1 and tkt-2, excluding resolved tkt-3)

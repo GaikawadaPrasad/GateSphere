@@ -6,22 +6,19 @@ import { Modal } from "@/components/common/Modal";
 import { BrandButton } from "@/components/common/BrandButton";
 import { toast } from "@/store/toast";
 
-const QrCodeSvg = dynamic(
-  () => import("@/components/common/QrCodeSvg").then((m) => m.QrCodeSvg),
-  {
-    ssr: false,
-    loading: () => (
-      <div
-        className="skeleton"
-        style={{
-          width: 180,
-          height: 180,
-          borderRadius: 12,
-        }}
-      />
-    ),
-  },
-);
+const QrCodeSvg = dynamic(() => import("@/components/common/QrCodeSvg").then((m) => m.QrCodeSvg), {
+  ssr: false,
+  loading: () => (
+    <div
+      className="skeleton"
+      style={{
+        width: 180,
+        height: 180,
+        borderRadius: 12,
+      }}
+    />
+  ),
+});
 
 export interface FamilyMemberPassData {
   id: string;
@@ -52,8 +49,7 @@ export const FamilyMemberPassModal: React.FC<FamilyMemberPassModalProps> = ({
     member.pin ||
     `${(Math.abs(member.id.split("").reduce((acc, char) => (acc << 5) - acc + char.charCodeAt(0), 0)) % 900000) + 100000}`;
   const passToken =
-    member.pass_token ||
-    `GSE-FAM-${member.id.replace(/-/g, "").slice(0, 10).toUpperCase()}`;
+    member.pass_token || `GSE-FAM-${member.id.replace(/-/g, "").slice(0, 10).toUpperCase()}`;
   const qrPayload = `GSE:FAMILY:${member.id}:${pin}`;
 
   const shareText = `*GateSphere Permanent Family Member Pass*\n👤 Name: ${member.name} (${member.relation})\n🏠 Unit: ${member.unit_number || "Resident Unit"}\n🔑 Permanent Gate PIN: ${pin}\n🎫 Pass Code: ${passToken}\n⚡ Pre-approved permanent household access. Scan or quote PIN at the security gate.`;
@@ -65,7 +61,9 @@ export const FamilyMemberPassModal: React.FC<FamilyMemberPassModalProps> = ({
       title="Permanent Family Gate Pass (QR / OTP)"
       size="md"
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", alignItems: "center" }}>
+      <div
+        style={{ display: "flex", flexDirection: "column", gap: "1.25rem", alignItems: "center" }}
+      >
         {/* Status Header Banner */}
         <div
           style={{
@@ -118,7 +116,14 @@ export const FamilyMemberPassModal: React.FC<FamilyMemberPassModalProps> = ({
           }}
         >
           <QrCodeSvg value={qrPayload} size={190} />
-          <div style={{ fontSize: "11px", color: "var(--muted)", marginTop: "0.6rem", fontWeight: 600 }}>
+          <div
+            style={{
+              fontSize: "11px",
+              color: "var(--muted)",
+              marginTop: "0.6rem",
+              fontWeight: 600,
+            }}
+          >
             Scan at Live Security Gate Scanner
           </div>
         </div>
@@ -176,7 +181,14 @@ export const FamilyMemberPassModal: React.FC<FamilyMemberPassModalProps> = ({
           }}
         >
           <div>
-            <div style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>
+            <div
+              style={{
+                fontSize: "11px",
+                color: "var(--muted)",
+                textTransform: "uppercase",
+                fontWeight: 600,
+              }}
+            >
               Member Name
             </div>
             <div style={{ fontWeight: 700, fontSize: "13.5px", color: "var(--brand-heading)" }}>
@@ -184,7 +196,14 @@ export const FamilyMemberPassModal: React.FC<FamilyMemberPassModalProps> = ({
             </div>
           </div>
           <div>
-            <div style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>
+            <div
+              style={{
+                fontSize: "11px",
+                color: "var(--muted)",
+                textTransform: "uppercase",
+                fontWeight: 600,
+              }}
+            >
               Relationship
             </div>
             <div style={{ fontWeight: 700, fontSize: "13.5px", color: "var(--brand-heading)" }}>
@@ -192,7 +211,14 @@ export const FamilyMemberPassModal: React.FC<FamilyMemberPassModalProps> = ({
             </div>
           </div>
           <div>
-            <div style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>
+            <div
+              style={{
+                fontSize: "11px",
+                color: "var(--muted)",
+                textTransform: "uppercase",
+                fontWeight: 600,
+              }}
+            >
               Assigned Unit
             </div>
             <div style={{ fontWeight: 600, fontSize: "13px", color: "var(--brand-heading)" }}>
@@ -200,7 +226,14 @@ export const FamilyMemberPassModal: React.FC<FamilyMemberPassModalProps> = ({
             </div>
           </div>
           <div>
-            <div style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>
+            <div
+              style={{
+                fontSize: "11px",
+                color: "var(--muted)",
+                textTransform: "uppercase",
+                fontWeight: 600,
+              }}
+            >
               Pass Type
             </div>
             <div style={{ fontWeight: 700, fontSize: "12.5px", color: "#16A34A" }}>
@@ -209,10 +242,24 @@ export const FamilyMemberPassModal: React.FC<FamilyMemberPassModalProps> = ({
           </div>
           {member.phone && (
             <div style={{ gridColumn: "span 2" }}>
-              <div style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", fontWeight: 600 }}>
+              <div
+                style={{
+                  fontSize: "11px",
+                  color: "var(--muted)",
+                  textTransform: "uppercase",
+                  fontWeight: 600,
+                }}
+              >
                 Mobile Number
               </div>
-              <div style={{ fontWeight: 600, fontSize: "13px", color: "var(--brand-heading)", fontFamily: "monospace" }}>
+              <div
+                style={{
+                  fontWeight: 600,
+                  fontSize: "13px",
+                  color: "var(--brand-heading)",
+                  fontFamily: "monospace",
+                }}
+              >
                 📞 {member.phone}
               </div>
             </div>
@@ -220,7 +267,15 @@ export const FamilyMemberPassModal: React.FC<FamilyMemberPassModalProps> = ({
         </div>
 
         {/* Quick Action Share Buttons */}
-        <div style={{ width: "100%", display: "flex", gap: "0.5rem", justifyContent: "space-between", flexWrap: "wrap" }}>
+        <div
+          style={{
+            width: "100%",
+            display: "flex",
+            gap: "0.5rem",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+          }}
+        >
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
             <BrandButton
               type="button"

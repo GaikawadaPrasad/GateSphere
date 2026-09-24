@@ -7,6 +7,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
+from app.core.constants import PASSWORD_MIN_LENGTH
+
 
 class _Write(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
@@ -26,7 +28,7 @@ _Phone = Field(default=None, max_length=20, pattern=r"^[+0-9][0-9 \-]{4,19}$")
 class UserCreate(_Write):
     email: EmailStr
     full_name: str = Field(min_length=1, max_length=255)
-    password: str = Field(min_length=10, max_length=200)
+    password: str = Field(min_length=PASSWORD_MIN_LENGTH, max_length=200)
     phone: str | None = _Phone
     role_slug: str | None = None
     community_id: uuid.UUID | None = None
@@ -35,7 +37,7 @@ class UserCreate(_Write):
 class UserUpdate(_Write):
     full_name: str | None = Field(default=None, max_length=255)
     email: EmailStr | None = None
-    password: str | None = Field(default=None, min_length=8, max_length=200)
+    password: str | None = Field(default=None, min_length=PASSWORD_MIN_LENGTH, max_length=200)
     phone: str | None = _Phone
     is_active: bool | None = None
 

@@ -259,7 +259,14 @@ export function AssociationCommitteeSidebar() {
 
         {/* Toggle button when collapsed */}
         {!sidebarOpen && (
-          <div style={{ padding: "0.75rem", display: "flex", justifyContent: "center", borderTop: "1px solid var(--sidebar-border)" }}>
+          <div
+            style={{
+              padding: "0.75rem",
+              display: "flex",
+              justifyContent: "center",
+              borderTop: "1px solid var(--sidebar-border)",
+            }}
+          >
             <button
               type="button"
               onClick={toggleSidebar}

@@ -124,7 +124,10 @@ export default function SecurityGuardEmergencyPage() {
     setErrorMessage(null);
     try {
       // Security Guards resolve / dismiss the incident with a resolution summary
-      await gateApi.resolveAlert(alertToDismiss.id, "Resolved and dismissed by Security Guard on duty");
+      await gateApi.resolveAlert(
+        alertToDismiss.id,
+        "Resolved and dismissed by Security Guard on duty",
+      );
       setAlertsList((prev) =>
         prev.map((a) => (a.id === alertToDismiss.id ? { ...a, status: "resolved" } : a)),
       );
@@ -133,7 +136,10 @@ export default function SecurityGuardEmergencyPage() {
       }
       setIsDismissModalOpen(false);
       setAlertToDismiss(null);
-      toast.success("Emergency SOS alert resolved and cleared from gate console.", "Alert Dismissed");
+      toast.success(
+        "Emergency SOS alert resolved and cleared from gate console.",
+        "Alert Dismissed",
+      );
     } catch {
       try {
         await gateApi.cancelAlert(alertToDismiss.id);
@@ -148,7 +154,9 @@ export default function SecurityGuardEmergencyPage() {
         toast.success("Emergency SOS alert cancelled.", "Alert Dismissed");
       } catch (cancelErr: unknown) {
         const msg =
-          cancelErr instanceof Error ? cancelErr.message : "Failed to dismiss emergency alert. Please retry.";
+          cancelErr instanceof Error
+            ? cancelErr.message
+            : "Failed to dismiss emergency alert. Please retry.";
         setErrorMessage(msg);
         toast.error(msg, "Error");
       }
@@ -191,10 +199,25 @@ export default function SecurityGuardEmergencyPage() {
         const raw = (a as any).message || "";
         const match = raw.match(/Location:\s*([^—\n]+)/i);
         const titleRaw = (a as any).title || "";
-        const titleMatch = titleRaw.match(/Location:\s*([^—\n]+)/i) || titleRaw.match(/SOS EMERGENCY:\s*(.+)/i);
-        const loc = match?.[1]?.trim() || titleMatch?.[1]?.trim() || (a as any).location_coordinates || "Main Gate / Facility";
+        const titleMatch =
+          titleRaw.match(/Location:\s*([^—\n]+)/i) || titleRaw.match(/SOS EMERGENCY:\s*(.+)/i);
+        const loc =
+          match?.[1]?.trim() ||
+          titleMatch?.[1]?.trim() ||
+          (a as any).location_coordinates ||
+          "Main Gate / Facility";
         return (
-          <span style={{ fontWeight: 700, color: "var(--primary-dark, #1e3a8a)", background: "var(--primary-subtle, #eff6ff)", padding: "0.2rem 0.5rem", borderRadius: "var(--radius-sm, 4px)", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
+          <span
+            style={{
+              fontWeight: 700,
+              color: "var(--primary-dark, #1e3a8a)",
+              background: "var(--primary-subtle, #eff6ff)",
+              padding: "0.2rem 0.5rem",
+              borderRadius: "var(--radius-sm, 4px)",
+              fontSize: "0.85rem",
+              whiteSpace: "nowrap",
+            }}
+          >
             📍 {loc}
           </span>
         );
@@ -203,7 +226,9 @@ export default function SecurityGuardEmergencyPage() {
     {
       key: "message",
       header: "Details",
-      render: (a) => <span>{(a as any).message?.split(" — Location:")[0] || (a as any).message || "—"}</span>,
+      render: (a) => (
+        <span>{(a as any).message?.split(" — Location:")[0] || (a as any).message || "—"}</span>
+      ),
     },
     {
       key: "triggered_at",
@@ -225,7 +250,12 @@ export default function SecurityGuardEmergencyPage() {
           <button
             type="button"
             className="btn btn-secondary"
-            style={{ fontSize: "0.75rem", padding: "0.2rem 0.55rem", color: "#DC2626", borderColor: "#FCA5A5" }}
+            style={{
+              fontSize: "0.75rem",
+              padding: "0.2rem 0.55rem",
+              color: "#DC2626",
+              borderColor: "#FCA5A5",
+            }}
             onClick={() => {
               setAlertToDismiss(a);
               setIsDismissModalOpen(true);
@@ -246,11 +276,7 @@ export default function SecurityGuardEmergencyPage() {
         subtitle="Immediate emergency alert dispatch, active alert status monitoring, and Security Supervisor escalation"
         breadcrumbs={[{ label: "GateSphere" }, { label: "Security Guard" }, { label: "Emergency" }]}
         actions={
-          <button
-            className="btn btn-secondary"
-            onClick={handleRefresh}
-            disabled={isLoading}
-          >
+          <button className="btn btn-secondary" onClick={handleRefresh} disabled={isLoading}>
             🔄 {isLoading ? "Refreshing…" : "Refresh"}
           </button>
         }
@@ -330,7 +356,9 @@ export default function SecurityGuardEmergencyPage() {
                   const match = raw.match(/Location:\s*([^—\n]+)/i);
                   if (match && match[1]?.trim()) return match[1].trim();
                   const rawTitle = (activeSos as any)?.title || "";
-                  const titleMatch = rawTitle.match(/Location:\s*([^—\n]+)/i) || rawTitle.match(/SOS EMERGENCY:\s*(.+)/i);
+                  const titleMatch =
+                    rawTitle.match(/Location:\s*([^—\n]+)/i) ||
+                    rawTitle.match(/SOS EMERGENCY:\s*(.+)/i);
                   if (titleMatch && titleMatch[1]?.trim()) return titleMatch[1].trim();
                   return (activeSos as any)?.location_coordinates || "Main Gate / Facility";
                 })()}
@@ -338,7 +366,11 @@ export default function SecurityGuardEmergencyPage() {
             </div>
             <div>
               <span style={{ opacity: 0.8, fontSize: "0.75rem", display: "block" }}>Details</span>
-              <strong>{(activeSos as any).message?.split(" — Location:")[0] || (activeSos as any).message || "—"}</strong>
+              <strong>
+                {(activeSos as any).message?.split(" — Location:")[0] ||
+                  (activeSos as any).message ||
+                  "—"}
+              </strong>
             </div>
             <div>
               <span style={{ opacity: 0.8, fontSize: "0.75rem", display: "block" }}>Time Sent</span>
@@ -681,7 +713,8 @@ export default function SecurityGuardEmergencyPage() {
               Are you sure you want to dismiss this emergency alert?
             </p>
             <p style={{ fontSize: "0.85rem", color: "#b91c1c" }}>
-              This will stand down active panic response for this incident and mark the alert as cancelled in the security command logs.
+              This will stand down active panic response for this incident and mark the alert as
+              cancelled in the security command logs.
             </p>
           </div>
 

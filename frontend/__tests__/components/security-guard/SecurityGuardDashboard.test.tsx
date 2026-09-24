@@ -58,19 +58,19 @@ const mockDeliveries: MockDelivery[] = Array.from({ length: 15 }, (_, i) => ({
 const deliveryColumns: Column<MockDelivery>[] = [
   { key: "provider_name", header: "Provider", sortable: true },
   { key: "tracking_reference", header: "Tracking Ref", sortable: true },
-  { key: "status", header: "Status", sortable: true, render: (d) => <StatusBadge status={d.status} /> },
+  {
+    key: "status",
+    header: "Status",
+    sortable: true,
+    render: (d) => <StatusBadge status={d.status} />,
+  },
 ];
 
 describe("Security Guard Dashboard Components", () => {
   describe("KPI Cards & Skeleton Loading", () => {
     it("renders KpiCardSkeleton when isLoading is true", () => {
       const { container } = render(
-        <KpiCard
-          title="Active Visitors Inside"
-          value="15"
-          icon="👥"
-          isLoading={true}
-        />
+        <KpiCard title="Active Visitors Inside" value="15" icon="👥" isLoading={true} />,
       );
       const skeletons = container.querySelectorAll(".skeleton");
       expect(skeletons.length).toBeGreaterThan(0);
@@ -84,7 +84,7 @@ describe("Security Guard Dashboard Components", () => {
           subtext="24 Expected Today"
           icon="👥"
           isLoading={false}
-        />
+        />,
       );
       expect(screen.getByText("Active Visitors Inside")).toBeInTheDocument();
       expect(screen.getByText("15")).toBeInTheDocument();
@@ -101,7 +101,7 @@ describe("Security Guard Dashboard Components", () => {
           trend="danger"
           trendValue="ALERT"
           isLoading={false}
-        />
+        />,
       );
       expect(screen.getByText("Emergency Status")).toBeInTheDocument();
       expect(screen.getByText("ACTIVE SOS")).toBeInTheDocument();
@@ -118,7 +118,7 @@ describe("Security Guard Dashboard Components", () => {
           isLoading={false}
           enableClientPagination={true}
           pageSize={5}
-        />
+        />,
       );
 
       // Page 1: Check first 5 items
@@ -146,12 +146,14 @@ describe("Security Guard Dashboard Components", () => {
           emptyTitle="No Pending Approvals"
           emptyDescription="All visitors have been cleared or there are no pending gate entry requests."
           emptyIcon="🚪"
-        />
+        />,
       );
 
       expect(screen.getByText("No Pending Approvals")).toBeInTheDocument();
       expect(
-        screen.getByText("All visitors have been cleared or there are no pending gate entry requests.")
+        screen.getByText(
+          "All visitors have been cleared or there are no pending gate entry requests.",
+        ),
       ).toBeInTheDocument();
     });
   });
@@ -165,7 +167,7 @@ describe("Security Guard Dashboard Components", () => {
           isLoading={false}
           enableClientPagination={true}
           pageSize={10}
-        />
+        />,
       );
 
       expect(screen.getByText("Courier Carrier 1")).toBeInTheDocument();
@@ -195,7 +197,8 @@ describe("Security Guard Dashboard Components", () => {
         else if (digits.startsWith("0") && digits.length === 11) digits = digits.slice(1);
 
         if (digits.length === 10) {
-          if (!/^[6-9]\d{9}$/.test(digits)) return "Valid 10-digit mobile number must start with 6, 7, 8, or 9.";
+          if (!/^[6-9]\d{9}$/.test(digits))
+            return "Valid 10-digit mobile number must start with 6, 7, 8, or 9.";
         } else if (cleaned.startsWith("+") && cleaned.length >= 11 && cleaned.length <= 15) {
           return undefined;
         } else {
@@ -206,13 +209,13 @@ describe("Security Guard Dashboard Components", () => {
 
       // Invalid 16-digit number (from bug screenshot)
       expect(validatePhone("9987654327899287")).toBe(
-        "Mobile number must be a valid 10-digit number (e.g. 9876543210 or +91 9876543210)."
+        "Mobile number must be a valid 10-digit number (e.g. 9876543210 or +91 9876543210).",
       );
       // Invalid alphabetic characters
       expect(validatePhone("98765abcde")).toBe("Mobile number must contain digits only.");
       // Short number
       expect(validatePhone("12345")).toBe(
-        "Mobile number must be a valid 10-digit number (e.g. 9876543210 or +91 9876543210)."
+        "Mobile number must be a valid 10-digit number (e.g. 9876543210 or +91 9876543210).",
       );
       // Valid Indian 10-digit mobile
       expect(validatePhone("9876543210")).toBeUndefined();
@@ -221,10 +224,14 @@ describe("Security Guard Dashboard Components", () => {
 
     it("validates Govt ID numbers according to selected ID type", () => {
       const validateId = (idType: string, raw: string) => {
-        const cleanVal = raw.trim().toUpperCase().replace(/[\s\-]/g, "");
+        const cleanVal = raw
+          .trim()
+          .toUpperCase()
+          .replace(/[\s\-]/g, "");
         if (!cleanVal) return undefined;
         if (idType === "aadhaar") {
-          if (!/^\d{12}$/.test(cleanVal)) return "Aadhaar number must be exactly 12 numeric digits.";
+          if (!/^\d{12}$/.test(cleanVal))
+            return "Aadhaar number must be exactly 12 numeric digits.";
         } else if (idType === "pan") {
           if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(cleanVal)) {
             return "PAN must be 10 characters in format ABCDE1234F (5 letters, 4 digits, 1 letter).";
@@ -235,18 +242,18 @@ describe("Security Guard Dashboard Components", () => {
 
       // Invalid 29-digit Aadhaar (from bug screenshot)
       expect(validateId("aadhaar", "46354676815376877861918637867")).toBe(
-        "Aadhaar number must be exactly 12 numeric digits."
+        "Aadhaar number must be exactly 12 numeric digits.",
       );
       // Invalid Aadhaar with letters
       expect(validateId("aadhaar", "12345678901A")).toBe(
-        "Aadhaar number must be exactly 12 numeric digits."
+        "Aadhaar number must be exactly 12 numeric digits.",
       );
       // Valid Aadhaar
       expect(validateId("aadhaar", "1234 5678 9012")).toBeUndefined();
 
       // Invalid PAN format
       expect(validateId("pan", "12345ABCDE")).toBe(
-        "PAN must be 10 characters in format ABCDE1234F (5 letters, 4 digits, 1 letter)."
+        "PAN must be 10 characters in format ABCDE1234F (5 letters, 4 digits, 1 letter).",
       );
       // Valid PAN
       expect(validateId("pan", "ABCDE1234F")).toBeUndefined();
@@ -265,7 +272,7 @@ describe("Security Guard Dashboard Components", () => {
       const syncUnitSelection = (
         currentUnitId: string,
         filterText: string,
-        units: typeof mockUnits
+        units: typeof mockUnits,
       ) => {
         const trimmed = filterText.trim().toLowerCase();
         if (!trimmed) {
@@ -274,12 +281,8 @@ describe("Security Guard Dashboard Components", () => {
             selectedUnitId: currentUnitId,
           };
         }
-        const matches = units.filter((u) =>
-          u.unit_number.toLowerCase().includes(trimmed)
-        );
-        const exactMatch = matches.find(
-          (u) => u.unit_number.toLowerCase() === trimmed
-        );
+        const matches = units.filter((u) => u.unit_number.toLowerCase().includes(trimmed));
+        const exactMatch = matches.find((u) => u.unit_number.toLowerCase() === trimmed);
 
         let newSelectedId = currentUnitId;
         if (exactMatch) {
@@ -297,7 +300,7 @@ describe("Security Guard Dashboard Components", () => {
       };
 
       // 1. Initial state: No flat pre-selected
-      let unitState = { selectedUnitId: "", filterText: "" };
+      const unitState = { selectedUnitId: "", filterText: "" };
 
       // 2. Guard filters for "A-105"
       const res1 = syncUnitSelection(unitState.selectedUnitId, "A-105", mockUnits);
@@ -328,4 +331,3 @@ describe("Security Guard Dashboard Components", () => {
     });
   });
 });
-

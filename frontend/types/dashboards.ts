@@ -71,4 +71,3 @@ export interface SuperAdminDashboardMetrics {
   collectionRate: number; // percentage (0-100)
   communityBreakdown?: Record<string, CommunityMetricsBreakdown>;
 }
-

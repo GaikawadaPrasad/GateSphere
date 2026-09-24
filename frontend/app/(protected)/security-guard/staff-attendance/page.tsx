@@ -25,7 +25,10 @@ export default function SecurityGuardStaffAttendancePage() {
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [actionMessage, setActionMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -41,7 +44,10 @@ export default function SecurityGuardStaffAttendancePage() {
       const unitMap: Record<string, string[]> = {};
       (assignments || []).forEach((a: any) => {
         const sid = a.staff_id;
-        const unitLabel = a.unit?.unit_number || a.unit_id ? `Unit ${a.unit?.unit_number || a.unit_id.slice(0, 6)}` : "Assigned";
+        const unitLabel =
+          a.unit?.unit_number || a.unit_id
+            ? `Unit ${a.unit?.unit_number || a.unit_id.slice(0, 6)}`
+            : "Assigned";
         if (!unitMap[sid]) unitMap[sid] = [];
         if (!unitMap[sid].includes(unitLabel)) unitMap[sid].push(unitLabel);
       });
@@ -72,12 +78,21 @@ export default function SecurityGuardStaffAttendancePage() {
             phone: s.phone,
             assigned_units: unitMap[s.id] || [],
             check_in_time: openAtt
-              ? new Date(openAtt.check_in_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+              ? new Date(openAtt.check_in_at).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
               : closedAtt
-              ? new Date(closedAtt.check_in_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-              : undefined,
+                ? new Date(closedAtt.check_in_at).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : undefined,
             check_out_time: closedAtt?.check_out_at
-              ? new Date(closedAtt.check_out_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+              ? new Date(closedAtt.check_out_at).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
               : undefined,
             status: isInside ? "Checked In" : "Checked Out",
           };
@@ -101,7 +116,13 @@ export default function SecurityGuardStaffAttendancePage() {
       setStaff((prev) =>
         prev.map((s) =>
           s.id === id
-            ? { ...s, status: "Checked In", attendance_id: res?.id, check_in_time: now, check_out_time: undefined }
+            ? {
+                ...s,
+                status: "Checked In",
+                attendance_id: res?.id,
+                check_in_time: now,
+                check_out_time: undefined,
+              }
             : s,
         ),
       );
@@ -153,7 +174,9 @@ export default function SecurityGuardStaffAttendancePage() {
       render: (s) => (
         <div>
           <div style={{ fontWeight: 600, color: "var(--fg)" }}>🪪 {s.name}</div>
-          {s.phone && <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>📞 {s.phone}</div>}
+          {s.phone && (
+            <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>📞 {s.phone}</div>
+          )}
         </div>
       ),
     },
@@ -236,11 +259,7 @@ export default function SecurityGuardStaffAttendancePage() {
           { label: "Staff Attendance" },
         ]}
         actions={
-          <button
-            className="btn btn-secondary"
-            onClick={loadData}
-            disabled={isLoading}
-          >
+          <button className="btn btn-secondary" onClick={loadData} disabled={isLoading}>
             🔄 {isLoading ? "Refreshing…" : "Refresh"}
           </button>
         }
@@ -252,7 +271,8 @@ export default function SecurityGuardStaffAttendancePage() {
             padding: "0.75rem 1rem",
             marginBottom: "1.25rem",
             borderRadius: "var(--radius)",
-            background: actionMessage.type === "success" ? "var(--success-light)" : "var(--danger-light)",
+            background:
+              actionMessage.type === "success" ? "var(--success-light)" : "var(--danger-light)",
             border: `1px solid ${actionMessage.type === "success" ? "var(--success-border)" : "var(--danger-border)"}`,
             color: actionMessage.type === "success" ? "#065f46" : "#991b1b",
             display: "flex",

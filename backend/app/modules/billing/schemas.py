@@ -77,8 +77,15 @@ class RuleUpdate(_Write):
     @model_validator(mode="after")
     def check_at_least_one_field(self) -> RuleUpdate:
         if all(
-            getattr(self, field) is None 
-            for field in ("due_day", "grace_days", "late_fee_mode", "late_fee_value", "tax_percent", "allow_advance_payment")
+            getattr(self, field) is None
+            for field in (
+                "due_day",
+                "grace_days",
+                "late_fee_mode",
+                "late_fee_value",
+                "tax_percent",
+                "allow_advance_payment",
+            )
         ):
             raise ValueError("At least one billing rule field must be provided for update")
         return self

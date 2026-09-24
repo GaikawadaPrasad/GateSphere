@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 
+from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from app.db.session import SessionLocal
@@ -143,7 +145,6 @@ def test_community_admin_cannot_create_or_view_unaffiliated_user(as_role, auth_c
         _cleanup_email(email_unaff)
 
 
-
 def test_community_admin_can_create_community_auditor(as_role, seed_ids):
     admin = as_role("community_admin")
     email = f"auditor-{uuid.uuid4().hex[:8]}@example.com"
@@ -223,7 +224,92 @@ def test_incompatible_role_grant_blocked(as_role, seed_ids):
         assert grant_res.status_code == 422, grant_res.text
         err = grant_res.json()["error"]
         assert err["code"] == "INCOMPATIBLE_ROLE"
-        assert grant_res.json()["message"] == "First revoke the Security Guard role, then Vendor/Technician can be granted."
+        assert (
+            grant_res.json()["message"]
+            == "First revoke the Security Guard role, then Vendor/Technician can be granted."
+        )
     finally:
         _cleanup_email(email)
 
+
+def test_community_admin_cannot_change_credentials_of_multi_community_user(
+    as_role: Callable[[str], TestClient], auth_client: TestClient, seed_ids: dict[str, str]
+) -> None:
+    """Re-audit #3 S-05 residual: a scoped admin may not change the email / password /
+    active flag of an account that also holds a grant in another community."""
+    email = f"shared-{uuid.uuid4().hex[:8]}@example.com"
+    try:
+        r = auth_client.post(
+            P,
+            json={
+                "email": email,
+                "full_name": "Shared Guard",
+                "password": "Sup3rSecret!!",
+                "role_slug": "security_guard",
+                "community_id": seed_ids["community_id"],
+            },
+        )
+        assert r.status_code == 201, r.text
+        uid = r.json()["data"]["id"]
+        g = auth_client.post(
+            f"{P}/{uid}/roles",
+            json={"role_slug": "security_guard", "community_id": seed_ids["other_community_id"]},
+        )
+        assert g.status_code == 201, g.text
+
+        ca = as_role("community_admin")
+        for body in (
+            {"password": "An0therSecret!!"},
+            {"email": f"x-{email}"},
+            {"is_active": False},
+        ):
+            resp = ca.patch(f"{P}/{uid}", json=body)
+            assert resp.status_code == 403, (body, resp.text)
+            assert resp.json()["error"]["code"] == "ACCOUNT_SHARED"
+        # A non-credential field in the admin's own community is still editable.
+        assert ca.patch(f"{P}/{uid}", json={"full_name": "Renamed"}).status_code == 200
+        # The platform admin can still change credentials.
+        assert auth_client.patch(f"{P}/{uid}", json={"is_active": False}).status_code == 200
+    finally:
+        _cleanup_email(email)
+
+
+def test_community_admin_can_change_credentials_of_own_community_user(
+    as_role: Callable[[str], TestClient], seed_ids: dict[str, str]
+) -> None:
+    email = f"owned-{uuid.uuid4().hex[:8]}@example.com"
+    ca = as_role("community_admin")
+    try:
+        r = ca.post(
+            P,
+            json={
+                "email": email,
+                "full_name": "Own Guard",
+                "password": "Sup3rSecret!!",
+                "role_slug": "security_guard",
+                "community_id": seed_ids["community_id"],
+            },
+        )
+        assert r.status_code == 201, r.text
+        uid = r.json()["data"]["id"]
+        assert ca.patch(f"{P}/{uid}", json={"password": "An0therSecret!!"}).status_code == 200
+    finally:
+        _cleanup_email(email)
+
+
+def test_password_minimum_is_consistent_across_create_and_update(
+    auth_client: TestClient, seed_ids: dict[str, str]
+) -> None:
+    """Re-audit #3 S-12: create and update enforce the same minimum length."""
+    email = f"pwpolicy-{uuid.uuid4().hex[:8]}@example.com"
+    try:
+        short = "Abcdef12!"  # 9 chars — below PASSWORD_MIN_LENGTH
+        body = {"email": email, "full_name": "Pw Policy", "role_slug": "security_guard"}
+        body["community_id"] = seed_ids["community_id"]
+        assert auth_client.post(P, json={**body, "password": short}).status_code == 422
+        r = auth_client.post(P, json={**body, "password": "Sup3rSecret!!"})
+        assert r.status_code == 201, r.text
+        uid = r.json()["data"]["id"]
+        assert auth_client.patch(f"{P}/{uid}", json={"password": short}).status_code == 422
+    finally:
+        _cleanup_email(email)

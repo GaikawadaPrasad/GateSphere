@@ -150,7 +150,12 @@ export function CommunityTable({
                 e.stopPropagation();
                 onViewCredentials(comm);
               }}
-              style={{ padding: "0.25rem 0.6rem", fontSize: "0.75rem", height: 28, background: "#f8fafc" }}
+              style={{
+                padding: "0.25rem 0.6rem",
+                fontSize: "0.75rem",
+                height: 28,
+                background: "#f8fafc",
+              }}
               title="View Community Admin Credentials"
             >
               🔑 Credentials

@@ -20,10 +20,12 @@ from collections.abc import AsyncIterator, Coroutine
 from contextlib import asynccontextmanager
 from typing import Any, TypeVar
 
-from sqlalchemy import select
+from sqlalchemy import event, select
+from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session, SessionTransaction
 
-from app.core.tenancy import TenantScope
+from app.core.tenancy import RLS_GLOBAL_SCOPE, TenantScope
 from app.db.session import AsyncSessionLocal
 from app.modules.users.models import User
 
@@ -37,9 +39,20 @@ def run(coro: Coroutine[Any, Any, _T]) -> _T:
     return asyncio.run(coro)
 
 
+def _bind_global_rls_scope(
+    session: Session, transaction: SessionTransaction, connection: Connection
+) -> None:
+    # RLS is fail-closed (migration 0045): a system job sees every community only by
+    # binding the explicit global sentinel. Transaction-local, re-applied on every begin.
+    connection.exec_driver_sql(
+        "SELECT set_config('app.community_ids', %(v)s, true)", {"v": RLS_GLOBAL_SCOPE}
+    )
+
+
 @asynccontextmanager
 async def job_session() -> AsyncIterator[AsyncSession]:
     db = AsyncSessionLocal()
+    event.listen(db.sync_session, "after_begin", _bind_global_rls_scope)
     try:
         yield db
         await db.commit()

@@ -13,7 +13,10 @@ import { DataTable, type Column } from "@/components/tables/DataTable";
 import { FilterPanel } from "@/components/common/FilterPanel";
 import { AddOperationalStaffModal } from "@/components/community-admin/AddOperationalStaffModal";
 import { OperationalStaffDetailsModal } from "@/components/community-admin/OperationalStaffDetailsModal";
-import { UpdateUserCredentialsModal, type CredentialUser } from "@/components/common/UpdateUserCredentialsModal";
+import {
+  UpdateUserCredentialsModal,
+  type CredentialUser,
+} from "@/components/common/UpdateUserCredentialsModal";
 import { formatDateTime } from "@/lib/utils";
 import { toast } from "@/store/toast";
 
@@ -32,29 +35,29 @@ export function OperationalStaffView({ embeddedInTab = false }: OperationalStaff
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [credentialStaff, setCredentialStaff] = useState<CredentialUser | null>(null);
 
-  const { data: staffList = [], isLoading, refetch } = useOperationalStaff(
-    activeCommunityId || undefined
-  );
+  const {
+    data: staffList = [],
+    isLoading,
+    refetch,
+  } = useOperationalStaff(activeCommunityId || undefined);
   const updateMutation = useUpdateOperationalStaff();
 
   // Metrics
   const metrics = useMemo(() => {
     const total = staffList.length;
     const committeeMembers = staffList.filter((u) =>
-      u.roles.some((r) => r.role_slug === "association_committee")
+      u.roles.some((r) => r.role_slug === "association_committee"),
     ).length;
     const facilityManagers = staffList.filter((u) =>
-      u.roles.some((r) => r.role_slug === "facility_manager")
+      u.roles.some((r) => r.role_slug === "facility_manager"),
     ).length;
     const supervisors = staffList.filter((u) =>
-      u.roles.some((r) => r.role_slug === "security_supervisor")
+      u.roles.some((r) => r.role_slug === "security_supervisor"),
     ).length;
     const guards = staffList.filter((u) =>
-      u.roles.some((r) => r.role_slug === "security_guard")
+      u.roles.some((r) => r.role_slug === "security_guard"),
     ).length;
-    const auditors = staffList.filter((u) =>
-      u.roles.some((r) => r.role_slug === "auditor")
-    ).length;
+    const auditors = staffList.filter((u) => u.roles.some((r) => r.role_slug === "auditor")).length;
 
     return { total, committeeMembers, facilityManagers, supervisors, guards, auditors };
   }, [staffList]);
@@ -97,7 +100,7 @@ export function OperationalStaffView({ embeddedInTab = false }: OperationalStaff
       });
       toast.success(
         `${user.full_name} is now ${nextActive ? "Active" : "Deactivated"}.`,
-        "Status Changed"
+        "Status Changed",
       );
       refetch();
     } catch (err: any) {
@@ -124,18 +127,18 @@ export function OperationalStaffView({ embeddedInTab = false }: OperationalStaff
                   primaryRole === "facility_manager"
                     ? "#ede9fe"
                     : primaryRole === "security_supervisor"
-                    ? "#fef3c7"
-                    : primaryRole === "auditor"
-                    ? "#f1f5f9"
-                    : "#e0f2fe",
+                      ? "#fef3c7"
+                      : primaryRole === "auditor"
+                        ? "#f1f5f9"
+                        : "#e0f2fe",
                 color:
                   primaryRole === "facility_manager"
                     ? "#6d28d9"
                     : primaryRole === "security_supervisor"
-                    ? "#b45309"
-                    : primaryRole === "auditor"
-                    ? "#334155"
-                    : "#0369a1",
+                      ? "#b45309"
+                      : primaryRole === "auditor"
+                        ? "#334155"
+                        : "#0369a1",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -166,10 +169,10 @@ export function OperationalStaffView({ embeddedInTab = false }: OperationalStaff
           roleSlug === "facility_manager"
             ? { background: "#f3e8ff", color: "#6b21a8", border: "1px solid #d8b4fe" }
             : roleSlug === "security_supervisor"
-            ? { background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a" }
-            : roleSlug === "auditor"
-            ? { background: "#f1f5f9", color: "#334155", border: "1px solid #cbd5e1" }
-            : { background: "#e0f2fe", color: "#075985", border: "1px solid #bae6fd" };
+              ? { background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a" }
+              : roleSlug === "auditor"
+                ? { background: "#f1f5f9", color: "#334155", border: "1px solid #cbd5e1" }
+                : { background: "#e0f2fe", color: "#075985", border: "1px solid #bae6fd" };
 
         return (
           <span
@@ -226,7 +229,14 @@ export function OperationalStaffView({ embeddedInTab = false }: OperationalStaff
       header: "Actions",
       align: "right",
       render: (u) => (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "0.5rem" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "flex-end",
+            gap: "0.5rem",
+          }}
+        >
           <button
             type="button"
             className="btn btn-secondary"
@@ -313,10 +323,19 @@ export function OperationalStaffView({ embeddedInTab = false }: OperationalStaff
         }}
       >
         <div className="card" style={{ padding: "1rem" }}>
-          <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase" }}>
+          <div
+            style={{
+              fontSize: "0.75rem",
+              fontWeight: 600,
+              color: "var(--muted)",
+              textTransform: "uppercase",
+            }}
+          >
             Total Personnel
           </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.25rem" }}>
+          <div
+            style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.25rem" }}
+          >
             <span style={{ fontSize: "1.75rem", fontWeight: 800, color: "var(--fg)" }}>
               {metrics.total}
             </span>
@@ -325,10 +344,19 @@ export function OperationalStaffView({ embeddedInTab = false }: OperationalStaff
         </div>
 
         <div className="card" style={{ padding: "1rem" }}>
-          <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase" }}>
+          <div
+            style={{
+              fontSize: "0.75rem",
+              fontWeight: 600,
+              color: "var(--muted)",
+              textTransform: "uppercase",
+            }}
+          >
             🏛️ Association Committee
           </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.25rem" }}>
+          <div
+            style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.25rem" }}
+          >
             <span style={{ fontSize: "1.75rem", fontWeight: 800, color: "#0284c7" }}>
               {metrics.committeeMembers}
             </span>
@@ -337,10 +365,19 @@ export function OperationalStaffView({ embeddedInTab = false }: OperationalStaff
         </div>
 
         <div className="card" style={{ padding: "1rem" }}>
-          <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase" }}>
+          <div
+            style={{
+              fontSize: "0.75rem",
+              fontWeight: 600,
+              color: "var(--muted)",
+              textTransform: "uppercase",
+            }}
+          >
             🏢 Facility Managers
           </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.25rem" }}>
+          <div
+            style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.25rem" }}
+          >
             <span style={{ fontSize: "1.75rem", fontWeight: 800, color: "#7c3aed" }}>
               {metrics.facilityManagers}
             </span>
@@ -349,10 +386,19 @@ export function OperationalStaffView({ embeddedInTab = false }: OperationalStaff
         </div>
 
         <div className="card" style={{ padding: "1rem" }}>
-          <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase" }}>
+          <div
+            style={{
+              fontSize: "0.75rem",
+              fontWeight: 600,
+              color: "var(--muted)",
+              textTransform: "uppercase",
+            }}
+          >
             🛡️ Security Supervisors
           </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.25rem" }}>
+          <div
+            style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.25rem" }}
+          >
             <span style={{ fontSize: "1.75rem", fontWeight: 800, color: "#d97706" }}>
               {metrics.supervisors}
             </span>
@@ -361,10 +407,19 @@ export function OperationalStaffView({ embeddedInTab = false }: OperationalStaff
         </div>
 
         <div className="card" style={{ padding: "1rem" }}>
-          <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase" }}>
+          <div
+            style={{
+              fontSize: "0.75rem",
+              fontWeight: 600,
+              color: "var(--muted)",
+              textTransform: "uppercase",
+            }}
+          >
             👮 Security Guards
           </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.25rem" }}>
+          <div
+            style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.25rem" }}
+          >
             <span style={{ fontSize: "1.75rem", fontWeight: 800, color: "#2563eb" }}>
               {metrics.guards}
             </span>
@@ -373,10 +428,19 @@ export function OperationalStaffView({ embeddedInTab = false }: OperationalStaff
         </div>
 
         <div className="card" style={{ padding: "1rem" }}>
-          <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase" }}>
+          <div
+            style={{
+              fontSize: "0.75rem",
+              fontWeight: 600,
+              color: "var(--muted)",
+              textTransform: "uppercase",
+            }}
+          >
             📋 Statutory Auditors
           </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.25rem" }}>
+          <div
+            style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginTop: "0.25rem" }}
+          >
             <span style={{ fontSize: "1.75rem", fontWeight: 800, color: "#475569" }}>
               {metrics.auditors}
             </span>

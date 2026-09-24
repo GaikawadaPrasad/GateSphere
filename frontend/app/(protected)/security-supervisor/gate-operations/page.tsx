@@ -36,11 +36,7 @@ export default function SecuritySupervisorGateOperationsPage() {
     const ref = ((e as any).reference_type || "").toLowerCase();
     const evType = (e.event_type || "").toLowerCase();
     const gateStr = (e.gate_id || "").toLowerCase();
-    const matchSearch =
-      !search ||
-      ref.includes(q) ||
-      evType.includes(q) ||
-      gateStr.includes(q);
+    const matchSearch = !search || ref.includes(q) || evType.includes(q) || gateStr.includes(q);
     const matchType = typeFilter === "all" || e.event_type === typeFilter;
     return matchSearch && matchType;
   });
@@ -93,11 +89,7 @@ export default function SecuritySupervisorGateOperationsPage() {
           { label: "Gate Operations" },
         ]}
         actions={
-          <button
-            className="btn btn-secondary"
-            onClick={loadData}
-            disabled={isLoading}
-          >
+          <button className="btn btn-secondary" onClick={loadData} disabled={isLoading}>
             🔄 {isLoading ? "Refreshing…" : "Refresh"}
           </button>
         }

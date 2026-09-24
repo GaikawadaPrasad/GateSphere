@@ -17,9 +17,7 @@ const createTestQueryClient = () =>
 
 function renderWithClient(ui: React.ReactElement) {
   const testQueryClient = createTestQueryClient();
-  return render(
-    <QueryClientProvider client={testQueryClient}>{ui}</QueryClientProvider>
-  );
+  return render(<QueryClientProvider client={testQueryClient}>{ui}</QueryClientProvider>);
 }
 
 // Mock QueryClient & hooks
@@ -131,12 +129,7 @@ describe("Super Admin Dashboard Components", () => {
   describe("CreateCommunityModal", () => {
     it("validates required fields before submission", async () => {
       const { container } = renderWithClient(
-        <CreateCommunityModal
-          isOpen={true}
-          onClose={vi.fn()}
-          initialName=""
-          initialCode=""
-        />
+        <CreateCommunityModal isOpen={true} onClose={vi.fn()} initialName="" initialCode="" />,
       );
 
       const form = container.querySelector("form");
@@ -154,7 +147,7 @@ describe("Super Admin Dashboard Components", () => {
           onClose={vi.fn()}
           initialName="Green Meadows"
           initialCode="GM-01"
-        />
+        />,
       );
 
       expect(screen.getByText(/1\. Community/i)).toBeInTheDocument();
@@ -167,7 +160,7 @@ describe("Super Admin Dashboard Components", () => {
   describe("Unit Number Auto-Generation Logic", () => {
     it("correctly auto-generates unit numbers based on floor number and unit index", async () => {
       const { generateUnitNumber } = await import("@/components/super-admin/CreateCommunityModal");
-      
+
       // Floor 1 with 4 units -> 101, 102, 103, 104
       expect(generateUnitNumber(1, 1)).toBe("101");
       expect(generateUnitNumber(1, 2)).toBe("102");

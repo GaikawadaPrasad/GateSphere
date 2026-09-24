@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { onboardingApi } from "@/lib/api";
+import { PASSWORD_MIN_LENGTH } from "@/constants/password";
 
 interface InvitationDetails {
   token: string;
@@ -67,8 +68,8 @@ export default function AcceptInvitationPage() {
       errors.phone = "Invalid phone number format.";
     }
     if (password) {
-      if (password.length < 8) {
-        errors.password = "Password must be at least 8 characters long.";
+      if (password.length < PASSWORD_MIN_LENGTH) {
+        errors.password = `Password must be at least ${PASSWORD_MIN_LENGTH} characters long.`;
       } else if (!/^(?=.*[A-Za-z])(?=.*\d)/.test(password)) {
         errors.password = "Password must contain at least one letter and one digit.";
       }
@@ -132,7 +133,13 @@ export default function AcceptInvitationPage() {
           <h1 style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--text-main, #0f172a)" }}>
             GateSphere Community Invitation
           </h1>
-          <p style={{ fontSize: "0.875rem", color: "var(--text-muted, #64748b)", marginTop: "0.25rem" }}>
+          <p
+            style={{
+              fontSize: "0.875rem",
+              color: "var(--text-muted, #64748b)",
+              marginTop: "0.25rem",
+            }}
+          >
             Join your residential community portal
           </p>
         </div>
@@ -181,10 +188,13 @@ export default function AcceptInvitationPage() {
               Invitation Accepted!
             </h2>
             <p style={{ fontSize: "0.875rem", color: "#475569", margin: "0.5rem 0 1.5rem" }}>
-              Your account has been set up successfully. You can now sign in to access your community dashboard.
+              Your account has been set up successfully. You can now sign in to access your
+              community dashboard.
             </p>
             <Link href="/login">
-              <button className="btn btn-primary" style={{ width: "100%" }}>Proceed to Sign In</button>
+              <button className="btn btn-primary" style={{ width: "100%" }}>
+                Proceed to Sign In
+              </button>
             </Link>
           </div>
         )}
@@ -246,7 +256,14 @@ export default function AcceptInvitationPage() {
                   }}
                 />
                 {fieldErrors.fullName && (
-                  <span style={{ fontSize: "0.75rem", color: "#ef4444", marginTop: "0.25rem", display: "block" }}>
+                  <span
+                    style={{
+                      fontSize: "0.75rem",
+                      color: "#ef4444",
+                      marginTop: "0.25rem",
+                      display: "block",
+                    }}
+                  >
                     {fieldErrors.fullName}
                   </span>
                 )}
@@ -276,7 +293,14 @@ export default function AcceptInvitationPage() {
                   }}
                 />
                 {fieldErrors.phone && (
-                  <span style={{ fontSize: "0.75rem", color: "#ef4444", marginTop: "0.25rem", display: "block" }}>
+                  <span
+                    style={{
+                      fontSize: "0.75rem",
+                      color: "#ef4444",
+                      marginTop: "0.25rem",
+                      display: "block",
+                    }}
+                  >
                     {fieldErrors.phone}
                   </span>
                 )}
@@ -306,7 +330,14 @@ export default function AcceptInvitationPage() {
                   }}
                 />
                 {fieldErrors.password && (
-                  <span style={{ fontSize: "0.75rem", color: "#ef4444", marginTop: "0.25rem", display: "block" }}>
+                  <span
+                    style={{
+                      fontSize: "0.75rem",
+                      color: "#ef4444",
+                      marginTop: "0.25rem",
+                      display: "block",
+                    }}
+                  >
                     {fieldErrors.password}
                   </span>
                 )}
@@ -337,14 +368,26 @@ export default function AcceptInvitationPage() {
                     }}
                   />
                   {fieldErrors.confirmPassword && (
-                    <span style={{ fontSize: "0.75rem", color: "#ef4444", marginTop: "0.25rem", display: "block" }}>
+                    <span
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "#ef4444",
+                        marginTop: "0.25rem",
+                        display: "block",
+                      }}
+                    >
                       {fieldErrors.confirmPassword}
                     </span>
                   )}
                 </div>
               )}
 
-              <button type="submit" disabled={submitting} className="btn btn-primary" style={{ marginTop: "0.5rem", width: "100%" }}>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="btn btn-primary"
+                style={{ marginTop: "0.5rem", width: "100%" }}
+              >
                 {submitting ? "Accepting..." : "Accept Invitation & Activate Account"}
               </button>
             </form>

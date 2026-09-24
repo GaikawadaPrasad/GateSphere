@@ -22,8 +22,7 @@ def upgrade() -> None:
         "payments", sa.Column("receipt_issued_at", sa.DateTime(timezone=True), nullable=True)
     )
     # backfill existing rows: RCP-<YYYY>-<nnnnnn> numbered per community by paid_at
-    op.execute(
-        """
+    op.execute("""
         WITH numbered AS (
             SELECT id,
                    'RCP-' || to_char(coalesce(paid_at, created_at), 'YYYY') || '-' ||
@@ -38,8 +37,7 @@ def upgrade() -> None:
         SET receipt_number = n.rcpt, receipt_issued_at = n.issued
         FROM numbered n
         WHERE p.id = n.id
-        """
-    )
+        """)
     op.create_unique_constraint(
         "uq_payment_receipt_number",
         "payments",

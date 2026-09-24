@@ -193,10 +193,7 @@ export default function AdminRbacPage() {
       <PageHeader
         title="Role-Based Access Control (RBAC)"
         subtitle="View and manage role permissions, system scopes, and security policy matrix"
-        breadcrumbs={[
-          { label: "Admin", href: "/admin/community" },
-          { label: "RBAC Management" },
-        ]}
+        breadcrumbs={[{ label: "Admin", href: "/admin/community" }, { label: "RBAC Management" }]}
       />
 
       <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem" }}>
@@ -286,13 +283,16 @@ export default function AdminRbacPage() {
                 <code>community_id</code> predicate.
               </li>
               <li>
-                <strong>Auditor Role:</strong> Strict <code>GET-only</code> read access. Any state-changing mutation returns <code>403 Forbidden</code>.
+                <strong>Auditor Role:</strong> Strict <code>GET-only</code> read access. Any
+                state-changing mutation returns <code>403 Forbidden</code>.
               </li>
               <li>
-                <strong>Resident Own-Unit Control:</strong> Plain residents access only their unit records via <code>actor_unit_scope()</code>.
+                <strong>Resident Own-Unit Control:</strong> Plain residents access only their unit
+                records via <code>actor_unit_scope()</code>.
               </li>
               <li>
-                <strong>Security Guard Scope:</strong> Scoped to gate operations and visitor logs only.
+                <strong>Security Guard Scope:</strong> Scoped to gate operations and visitor logs
+                only.
               </li>
             </ul>
           </div>
@@ -341,7 +341,9 @@ export default function AdminRbacPage() {
           }
         >
           <p style={{ fontSize: "0.9rem", color: "var(--fg)", lineHeight: 1.5 }}>
-            Are you sure you want to delete <strong>{deletingUser.full_name}</strong> ({deletingUser.email})? This action will immediately revoke their access and delete their user profile.
+            Are you sure you want to delete <strong>{deletingUser.full_name}</strong> (
+            {deletingUser.email})? This action will immediately revoke their access and delete their
+            user profile.
           </p>
         </Modal>
       )}
@@ -362,4 +364,3 @@ export default function AdminRbacPage() {
     </div>
   );
 }
-

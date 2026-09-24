@@ -551,7 +551,14 @@ export default function SecuritySupervisorDashboardPage() {
               required
             />
             {locationError && (
-              <span style={{ color: "var(--danger, #ef4444)", fontSize: "0.75rem", display: "block", marginTop: "0.25rem" }}>
+              <span
+                style={{
+                  color: "var(--danger, #ef4444)",
+                  fontSize: "0.75rem",
+                  display: "block",
+                  marginTop: "0.25rem",
+                }}
+              >
                 {locationError}
               </span>
             )}

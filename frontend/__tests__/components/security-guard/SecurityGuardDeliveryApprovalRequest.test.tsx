@@ -18,9 +18,9 @@ vi.mock("@/lib/api", () => ({
   },
   communitiesApi: {
     list: vi.fn().mockResolvedValue([{ id: "comm-1", name: "GateSphere Grand" }]),
-    communityUnits: vi.fn().mockResolvedValue([
-      { id: "unit-1", unit_number: "A-101", floor: "1st Floor" },
-    ]),
+    communityUnits: vi
+      .fn()
+      .mockResolvedValue([{ id: "unit-1", unit_number: "A-101", floor: "1st Floor" }]),
   },
   authApi: {
     me: vi.fn().mockResolvedValue({ community_ids: ["comm-1"] }),
@@ -84,7 +84,7 @@ describe("SecurityGuardDeliveriesPage - Send Delivery Approval Request", () => {
     // Verify success banner appears
     await waitFor(() => {
       expect(
-        screen.getByText(/Delivery approval request notification sent to resident/i)
+        screen.getByText(/Delivery approval request notification sent to resident/i),
       ).toBeInTheDocument();
     });
   });

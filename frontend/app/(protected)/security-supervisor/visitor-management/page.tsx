@@ -34,7 +34,10 @@ export default function SecuritySupervisorVisitorManagementPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
-  const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [actionMessage, setActionMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
   const [selectedVisitor, setSelectedVisitor] = useState<SupervisorVisitorRow | null>(null);
   const [previewPhoto, setPreviewPhoto] = useState<{
     url: string;
@@ -51,7 +54,9 @@ export default function SecuritySupervisorVisitorManagementPage() {
         authApi.me().catch(() => null),
       ]);
       const data = Array.isArray(res) ? res : (res as any)?.data || [];
-      const directory = Array.isArray(directoryRes) ? directoryRes : (directoryRes as any)?.data || [];
+      const directory = Array.isArray(directoryRes)
+        ? directoryRes
+        : (directoryRes as any)?.data || [];
 
       let cid = me?.community_ids?.[0] || (me as any)?.community_id;
       if (!cid && me?.roles && Array.isArray(me.roles)) {
@@ -84,17 +89,11 @@ export default function SecuritySupervisorVisitorManagementPage() {
             directoryVisitor?.full_name ||
             "Visitor";
           const phone =
-            v.phone ||
-            v.visitor?.phone ||
-            v.visitor_phone ||
-            directoryVisitor?.phone ||
-            "—";
-          const unit = unitMap.get(v.unit_id) || (v.unit_id ? `Unit #${v.unit_id.slice(0, 6)}` : "—");
+            v.phone || v.visitor?.phone || v.visitor_phone || directoryVisitor?.phone || "—";
+          const unit =
+            unitMap.get(v.unit_id) || (v.unit_id ? `Unit #${v.unit_id.slice(0, 6)}` : "—");
           const photoUrl =
-            v.photo_url ||
-            v.visitor?.photo_url ||
-            directoryVisitor?.photo_url ||
-            undefined;
+            v.photo_url || v.visitor?.photo_url || directoryVisitor?.photo_url || undefined;
 
           return {
             id: v.id,
@@ -132,9 +131,6 @@ export default function SecuritySupervisorVisitorManagementPage() {
     loadData();
   }, []);
 
-
-  
-
   const filteredVisitors = visitors.filter((v) => {
     const q = search.toLowerCase();
     const matchSearch =
@@ -154,7 +150,9 @@ export default function SecuritySupervisorVisitorManagementPage() {
       header: "Pass Code",
       sortable: true,
       render: (v) => (
-        <span style={{ fontWeight: 600, fontFamily: "monospace", color: "var(--primary, #2563eb)" }}>
+        <span
+          style={{ fontWeight: 600, fontFamily: "monospace", color: "var(--primary, #2563eb)" }}
+        >
           {v.pass_code}
         </span>
       ),
@@ -270,17 +268,29 @@ export default function SecuritySupervisorVisitorManagementPage() {
       header: "Actions",
       align: "right",
       render: (v) => (
-        <div style={{ display: "flex", gap: "0.4rem", justifyContent: "flex-end", alignItems: "center" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: "0.4rem",
+            justifyContent: "flex-end",
+            alignItems: "center",
+          }}
+        >
           <button
             type="button"
             className="btn btn-secondary"
-            style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem", display: "inline-flex", alignItems: "center", gap: "0.2rem" }}
+            style={{
+              fontSize: "0.75rem",
+              padding: "0.25rem 0.6rem",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.2rem",
+            }}
             onClick={() => setSelectedVisitor(v)}
             title="View full visitor details"
           >
             👁️ View
           </button>
-          
         </div>
       ),
     },
@@ -298,14 +308,14 @@ export default function SecuritySupervisorVisitorManagementPage() {
         ]}
         actions={
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-            <button
-              className="btn btn-secondary"
-              onClick={loadData}
-              disabled={isLoading}
-            >
+            <button className="btn btn-secondary" onClick={loadData} disabled={isLoading}>
               🔄 {isLoading ? "Refreshing…" : "Refresh"}
             </button>
-            <Link href="/security-supervisor/blacklist" className="btn btn-danger" style={{ fontSize: "0.85rem" }}>
+            <Link
+              href="/security-supervisor/blacklist"
+              className="btn btn-danger"
+              style={{ fontSize: "0.85rem" }}
+            >
               🚫 Blacklist Registry & Restricted Entry
             </Link>
           </div>
@@ -318,7 +328,8 @@ export default function SecuritySupervisorVisitorManagementPage() {
             padding: "0.75rem 1rem",
             marginBottom: "1.25rem",
             borderRadius: "var(--radius)",
-            background: actionMessage.type === "success" ? "var(--success-light)" : "var(--danger-light)",
+            background:
+              actionMessage.type === "success" ? "var(--success-light)" : "var(--danger-light)",
             border: `1px solid ${actionMessage.type === "success" ? "var(--success-border)" : "var(--danger-border)"}`,
             color: actionMessage.type === "success" ? "#065f46" : "#991b1b",
             display: "flex",
@@ -394,8 +405,9 @@ export default function SecuritySupervisorVisitorManagementPage() {
           title="Visitor Pass & Entry Details"
           size="md"
           footer={
-            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", width: "100%" }}>
-              
+            <div
+              style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", width: "100%" }}
+            >
               <button
                 type="button"
                 className="btn btn-secondary"
@@ -432,7 +444,12 @@ export default function SecuritySupervisorVisitorManagementPage() {
                       }
                     }}
                     title="Click to view full photograph"
-                    style={{ position: "relative", display: "inline-block", flexShrink: 0, cursor: "pointer" }}
+                    style={{
+                      position: "relative",
+                      display: "inline-block",
+                      flexShrink: 0,
+                      cursor: "pointer",
+                    }}
                   >
                     <img
                       src={selectedVisitor.photo_url}
@@ -487,18 +504,43 @@ export default function SecuritySupervisorVisitorManagementPage() {
                   </div>
                 )}
                 <div>
-                  <h4 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700, color: "var(--fg)" }}>
+                  <h4
+                    style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700, color: "var(--fg)" }}
+                  >
                     {selectedVisitor.name}
                   </h4>
-                  <p style={{ margin: "0.2rem 0 0", fontSize: "0.85rem", color: "var(--muted)", fontFamily: "monospace" }}>
+                  <p
+                    style={{
+                      margin: "0.2rem 0 0",
+                      fontSize: "0.85rem",
+                      color: "var(--muted)",
+                      fontFamily: "monospace",
+                    }}
+                  >
                     {selectedVisitor.phone}
                   </p>
                   {selectedVisitor.photo_url ? (
-                    <span style={{ fontSize: "0.75rem", color: "#16a34a", fontWeight: 600, display: "block", marginTop: "0.2rem" }}>
+                    <span
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "#16a34a",
+                        fontWeight: 600,
+                        display: "block",
+                        marginTop: "0.2rem",
+                      }}
+                    >
                       ✓ Verified Photo Attached
                     </span>
                   ) : (
-                    <span style={{ fontSize: "0.75rem", color: "#d97706", fontWeight: 600, display: "block", marginTop: "0.2rem" }}>
+                    <span
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "#d97706",
+                        fontWeight: 600,
+                        display: "block",
+                        marginTop: "0.2rem",
+                      }}
+                    >
                       ⚠️ No Photo Attached
                     </span>
                   )}
@@ -580,7 +622,9 @@ export default function SecuritySupervisorVisitorManagementPage() {
               }}
             >
               <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
-                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                <div
+                  style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}
+                >
                   Destination Unit
                 </div>
                 <div style={{ fontWeight: 600, color: "var(--fg)", marginTop: "0.15rem" }}>
@@ -589,34 +633,63 @@ export default function SecuritySupervisorVisitorManagementPage() {
               </div>
 
               <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
-                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                <div
+                  style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}
+                >
                   Visitor Type
                 </div>
-                <div style={{ fontWeight: 600, color: "var(--fg)", marginTop: "0.15rem", textTransform: "capitalize" }}>
+                <div
+                  style={{
+                    fontWeight: 600,
+                    color: "var(--fg)",
+                    marginTop: "0.15rem",
+                    textTransform: "capitalize",
+                  }}
+                >
                   {selectedVisitor.type}
                 </div>
               </div>
 
               <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
-                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                <div
+                  style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}
+                >
                   Pass Code
                 </div>
-                <div style={{ fontWeight: 600, color: "var(--primary, #2563eb)", marginTop: "0.15rem", fontFamily: "monospace" }}>
+                <div
+                  style={{
+                    fontWeight: 600,
+                    color: "var(--primary, #2563eb)",
+                    marginTop: "0.15rem",
+                    fontFamily: "monospace",
+                  }}
+                >
                   {selectedVisitor.pass_code}
                 </div>
               </div>
 
               <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
-                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                <div
+                  style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}
+                >
                   Vehicle Number
                 </div>
-                <div style={{ fontWeight: 600, color: "var(--fg)", marginTop: "0.15rem", fontFamily: "monospace" }}>
+                <div
+                  style={{
+                    fontWeight: 600,
+                    color: "var(--fg)",
+                    marginTop: "0.15rem",
+                    fontFamily: "monospace",
+                  }}
+                >
                   🚗 {selectedVisitor.vehicle_number}
                 </div>
               </div>
 
               <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
-                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                <div
+                  style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}
+                >
                   Party Size
                 </div>
                 <div style={{ fontWeight: 600, color: "var(--fg)", marginTop: "0.15rem" }}>
@@ -625,16 +698,34 @@ export default function SecuritySupervisorVisitorManagementPage() {
               </div>
 
               <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
-                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                <div
+                  style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}
+                >
                   Expected At
                 </div>
-                <div style={{ fontWeight: 500, color: "var(--fg)", marginTop: "0.15rem", fontSize: "0.8rem" }}>
+                <div
+                  style={{
+                    fontWeight: 500,
+                    color: "var(--fg)",
+                    marginTop: "0.15rem",
+                    fontSize: "0.8rem",
+                  }}
+                >
                   {selectedVisitor.expected_at}
                 </div>
               </div>
 
-              <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px", gridColumn: "span 2" }}>
-                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+              <div
+                style={{
+                  background: "#f8fafc",
+                  padding: "0.6rem 0.8rem",
+                  borderRadius: "6px",
+                  gridColumn: "span 2",
+                }}
+              >
+                <div
+                  style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}
+                >
                   Purpose of Visit
                 </div>
                 <div style={{ fontWeight: 500, color: "var(--fg)", marginTop: "0.15rem" }}>
@@ -643,19 +734,37 @@ export default function SecuritySupervisorVisitorManagementPage() {
               </div>
 
               <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
-                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                <div
+                  style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}
+                >
                   Valid Until
                 </div>
-                <div style={{ fontWeight: 500, color: "var(--fg)", marginTop: "0.15rem", fontSize: "0.8rem" }}>
+                <div
+                  style={{
+                    fontWeight: 500,
+                    color: "var(--fg)",
+                    marginTop: "0.15rem",
+                    fontSize: "0.8rem",
+                  }}
+                >
                   {selectedVisitor.valid_until}
                 </div>
               </div>
 
               <div style={{ background: "#f8fafc", padding: "0.6rem 0.8rem", borderRadius: "6px" }}>
-                <div style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                <div
+                  style={{ color: "var(--muted)", fontSize: "0.75rem", textTransform: "uppercase" }}
+                >
                   Pass Created
                 </div>
-                <div style={{ fontWeight: 500, color: "var(--fg)", marginTop: "0.15rem", fontSize: "0.8rem" }}>
+                <div
+                  style={{
+                    fontWeight: 500,
+                    color: "var(--fg)",
+                    marginTop: "0.15rem",
+                    fontSize: "0.8rem",
+                  }}
+                >
                   {selectedVisitor.created_at}
                 </div>
               </div>

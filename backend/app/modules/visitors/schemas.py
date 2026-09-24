@@ -84,8 +84,15 @@ class BlacklistCreate(_Write):
 
     @model_validator(mode="after")
     def _require_identifier(self) -> Self:
-        if not self.phone and not self.id_number and not self.visitor_id and not self.vehicle_number:
-            raise ValueError("Provide at least a phone number, ID number, vehicle number, or visitor ID")
+        if (
+            not self.phone
+            and not self.id_number
+            and not self.visitor_id
+            and not self.vehicle_number
+        ):
+            raise ValueError(
+                "Provide at least a phone number, ID number, vehicle number, or visitor ID"
+            )
         return self
 
 

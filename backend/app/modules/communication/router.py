@@ -49,7 +49,8 @@ async def require_participate_async(
             ).all()
         )
         if "auditor" in roles and not any(
-            r in (
+            r
+            in (
                 "resident",
                 "community_admin",
                 "association_committee",
@@ -128,9 +129,7 @@ async def get_announcement(
     announcement_id: uuid.UUID, svc: Svc = Depends(communication_service)
 ) -> dict:
     return ok(
-        schemas.AnnouncementRead.model_validate(
-            await svc.get_visible_announcement(announcement_id)
-        )
+        schemas.AnnouncementRead.model_validate(await svc.get_visible_announcement(announcement_id))
     )
 
 
@@ -194,9 +193,7 @@ async def list_polls(
     rows, total = await svc.list_polls(
         community_id=community_id, offset=params.offset, limit=params.page_size
     )
-    return paginated(
-        [schemas.PollRead.model_validate(r) for r in rows], total=total, params=params
-    )
+    return paginated([schemas.PollRead.model_validate(r) for r in rows], total=total, params=params)
 
 
 @router.post(
@@ -213,11 +210,9 @@ async def create_poll(
     )
 
 
-
 @router.get("/polls/{poll_id}", response_model=Envelope[schemas.PollRead], dependencies=[VIEW])
 async def get_poll(poll_id: uuid.UUID, svc: Svc = Depends(communication_service)) -> dict:
     return ok(schemas.PollRead.model_validate(await svc.get_poll(poll_id)))
-
 
 
 # -- event RSVP (GAP-2) ------------------------------------- #
