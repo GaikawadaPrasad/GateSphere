@@ -2,7 +2,7 @@
  * Navigation configurations for GateSphere Role Dashboards
  * - Auditor (12 Modules)
  * - Domestic Staff (9 Modules)
- * - Owner / Tenant (14 Modules)
+ * - Owner / Tenant (15 Modules)
  */
 
 export interface NavItem {
@@ -282,6 +282,14 @@ export const OWNER_TENANT_NAV: DashboardNavConfig = {
       icon: "🔨",
       accentColor: "#16A34A",
       description: "Community upkeep & scheduled work",
+    },
+    {
+      id: "notices",
+      label: "Community Notices",
+      href: "/owner-tenant/notices",
+      icon: "📢",
+      accentColor: "#4F8EF7",
+      description: "Circulars, events & society updates",
     },
     {
       id: "complaints",

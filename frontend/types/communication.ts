@@ -2,6 +2,22 @@ export type AnnouncementPriority = "low" | "normal" | "urgent" | "emergency";
 export type AnnouncementType = "notice" | "event" | "emergency" | "maintenance" | "poll";
 /** `GET /communication/announcements?status=` filter (admin tabs). */
 export type AnnouncementListStatus = "all" | "published" | "draft" | "expired";
+/** What a notice is about — mirrors backend `ANNOUNCEMENT_CATEGORIES`. */
+export type AnnouncementCategory =
+  | "general"
+  | "maintenance"
+  | "security"
+  | "amenities"
+  | "billing"
+  | "events";
+export const ANNOUNCEMENT_CATEGORY_LABELS: Record<AnnouncementCategory, string> = {
+  general: "General",
+  maintenance: "Maintenance / Upkeep",
+  security: "Security",
+  amenities: "Amenities",
+  billing: "Billing & Dues",
+  events: "Events",
+};
 export type TargetAudienceType = "all" | "tower" | "resident_group" | "unit";
 
 /** Matches backend TargetIn schema */
@@ -20,6 +36,7 @@ export interface Announcement {
   community_id: string;
   created_by_user_id?: string | null;
   announcement_type: AnnouncementType;
+  category?: AnnouncementCategory;
   title: string;
   body: string;
   priority: AnnouncementPriority;
@@ -36,6 +53,7 @@ export interface Announcement {
 /** Matches backend AnnouncementCreate schema exactly — extra="forbid" */
 export interface AnnouncementCreate {
   announcement_type?: AnnouncementType;
+  category?: AnnouncementCategory;
   title: string;
   body: string;
   priority?: AnnouncementPriority;

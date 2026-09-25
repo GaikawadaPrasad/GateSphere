@@ -277,3 +277,47 @@ def test_event_rsvp_flow(as_role, seed_ids):
     assert (
         admin.post(f"{P}/announcements/{nid}/rsvp", json={"response": "going"}).status_code == 422
     )
+
+
+def test_announcement_category_drives_resident_maintenance_and_notices_tabs(as_role):
+    """The resident Maintenance tab lists only `maintenance` notices; Community Notices lists
+    everything else. Category is set by the publisher and validated server-side."""
+    import uuid
+
+    admin, resident = as_role("community_admin"), as_role("resident")
+    tag = uuid.uuid4().hex[:8]
+    ids = {}
+    for category in ("maintenance", "general"):
+        r = admin.post(
+            f"{P}/announcements",
+            json={
+                "announcement_type": "notice",
+                "category": category,
+                "title": f"{category} notice {tag}",
+                "body": "body",
+                "targets": [{"target_all_community": True}],
+            },
+        )
+        assert r.status_code == 201, r.text
+        assert r.json()["data"]["category"] == category
+        ids[category] = r.json()["data"]["id"]
+        assert admin.post(f"{P}/announcements/{ids[category]}/publish").status_code == 200
+
+    def listed(**params):
+        r = resident.get(f"{P}/announcements", params={"page_size": 100, **params})
+        assert r.status_code == 200, r.text
+        return {a["id"]: a["category"] for a in r.json()["data"]}
+
+    maintenance = listed(category="maintenance")
+    assert ids["maintenance"] in maintenance and ids["general"] not in maintenance
+    assert set(maintenance.values()) == {"maintenance"}
+    notices = listed(exclude_category="maintenance")
+    assert ids["general"] in notices and ids["maintenance"] not in notices
+    assert "maintenance" not in notices.values()
+
+    bad = admin.post(
+        f"{P}/announcements",
+        json={"announcement_type": "notice", "category": "gossip", "title": "x", "body": "y"},
+    )
+    assert bad.status_code == 422 and bad.json()["error"]["code"] == "INVALID_ENUM"
+    assert resident.get(f"{P}/announcements", params={"category": "gossip"}).status_code == 422

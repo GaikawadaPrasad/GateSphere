@@ -679,6 +679,48 @@ def seed_communication(db: Session, communities: list[Community]) -> None:
             ann.targets.append(AnnouncementTarget(target_all_community=True))
             db.add(ann)
 
+        # Scheduled-upkeep notices for the resident Maintenance tab (`category=maintenance`),
+        # idempotent by title.
+        maintenance_notices = [
+            (
+                "Water supply shutdown — overhead tank cleaning",
+                "Water supply to all towers will be off from 10:00 to 14:00 on Saturday for "
+                "the half-yearly overhead tank cleaning. Please store water in advance.",
+                "high",
+            ),
+            (
+                "Lift maintenance — Tower A",
+                "Lift 2 in Tower A is under scheduled AMC servicing on Tuesday, 11:00–16:00. "
+                "Lift 1 remains operational.",
+                "normal",
+            ),
+            (
+                "Power backup (DG) testing",
+                "The diesel generator will be load-tested on Thursday at 15:00. Expect a brief "
+                "power interruption of about 2 minutes in common areas.",
+                "low",
+            ),
+        ]
+        for title, body, priority in maintenance_notices:
+            if db.scalar(
+                select(Announcement.id).where(
+                    Announcement.community_id == c.id, Announcement.title == title
+                )
+            ):
+                continue
+            ann = Announcement(
+                community_id=c.id,
+                announcement_type="notice",
+                category="maintenance",
+                title=title,
+                body=body,
+                priority=priority,
+                is_published=True,
+                publish_at=datetime.now(UTC),
+            )
+            ann.targets.append(AnnouncementTarget(target_all_community=True))
+            db.add(ann)
+
 
 def seed_incidents(db: Session, communities: list[Community]) -> None:
     from app.modules.incidents.models import IncidentStatusHistory, SecurityIncident

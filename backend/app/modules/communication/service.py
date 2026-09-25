@@ -284,6 +284,7 @@ class CommunicationService(UnitScopedAccess):
     ) -> Announcement:
         cid = self._one_community(community_id)
         _enum("announcement_type", payload.announcement_type)
+        _enum("category", payload.category)
         _enum("priority", payload.priority)
         await self._validate_targets(cid, payload.targets)
         import html
@@ -292,6 +293,7 @@ class CommunicationService(UnitScopedAccess):
             community_id=cid,
             created_by_user_id=self.actor.id,
             announcement_type=payload.announcement_type,
+            category=payload.category,
             title=html.escape(payload.title),
             body=html.escape(payload.body),
             priority=payload.priority,
@@ -380,6 +382,7 @@ class CommunicationService(UnitScopedAccess):
             )
         patch = payload.model_dump(exclude_unset=True)
         _enum("priority", patch.get("priority"))
+        _enum("category", patch.get("category"))
         targets = patch.pop("targets", None)
         for k, v in patch.items():
             setattr(ann, k, v)
@@ -523,6 +526,8 @@ class CommunicationService(UnitScopedAccess):
         status: str | None = None,
         offset: int,
         limit: int,
+        category: str | None = None,
+        exclude_category: str | None = None,
     ) -> tuple[list[Announcement], int]:
         """``status`` (all/published/draft/expired) wins over the legacy ``published_only``.
 
@@ -543,6 +548,12 @@ class CommunicationService(UnitScopedAccess):
             stmt = stmt.where(Announcement.expires_at <= now)
         elif status is None and published_only:
             stmt = stmt.where(Announcement.is_published.is_(True))
+        _enum("category", category)
+        _enum("category", exclude_category)
+        if category:
+            stmt = stmt.where(Announcement.category == category)
+        if exclude_category:
+            stmt = stmt.where(Announcement.category != exclude_category)
         preds = await self._viewer_predicates()
         if preds:
             stmt = stmt.where(*preds)

@@ -28,6 +28,9 @@ from app.db.base_class import Base, TenantMixin, TimestampMixin, pk
 
 ANNOUNCEMENT_TYPES = ("notice", "emergency", "poll", "event", "survey")
 PRIORITIES = ("low", "normal", "high", "urgent", "emergency")
+# What a notice is *about* (independent of its type): lets each resident screen show only
+# its own notices — e.g. the Maintenance tab lists `maintenance` only.
+ANNOUNCEMENT_CATEGORIES = ("general", "maintenance", "security", "amenities", "billing", "events")
 POLL_STATUS = ("draft", "open", "closed")
 RSVP_RESPONSES = ("going", "maybe", "not_going")
 
@@ -41,6 +44,9 @@ class Announcement(Base, TimestampMixin, TenantMixin):
         ForeignKey("users.id", ondelete="SET NULL")
     )
     announcement_type: Mapped[str] = mapped_column(String(15), default="notice")
+    category: Mapped[str] = mapped_column(
+        String(15), default="general", server_default="general", index=True
+    )
     title: Mapped[str] = mapped_column(String(200))
     body: Mapped[str] = mapped_column(Text)
     priority: Mapped[str] = mapped_column(String(10), default="normal")

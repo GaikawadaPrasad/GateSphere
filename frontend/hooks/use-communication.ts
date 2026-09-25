@@ -2,13 +2,21 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { communicationApi } from "@/lib/api";
-import type { AnnouncementCreate, AnnouncementListStatus } from "@/types/communication";
+import type {
+  AnnouncementCategory,
+  AnnouncementCreate,
+  AnnouncementListStatus,
+} from "@/types/communication";
 
 export function useAnnouncements(
   params?: {
     community_id?: string;
     published_only?: boolean;
     status?: AnnouncementListStatus;
+    /** Only this category (e.g. `maintenance` for the resident Maintenance tab). */
+    category?: AnnouncementCategory;
+    /** Everything except this category (Community Notices = all but `maintenance`). */
+    exclude_category?: AnnouncementCategory;
     page?: number;
     page_size?: number;
   },
