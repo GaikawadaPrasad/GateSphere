@@ -660,12 +660,15 @@ export function useResidentComplaints() {
         );
 
       const profile = await api.get<any>("/residents/me");
-      const unitId = profile?.occupancies?.[0]?.unit_id;
+      const activeOccupancy = profile?.occupancies?.find((o: any) => o.is_active) || profile?.occupancies?.[0];
+      const unitId = activeOccupancy?.unit_id || profile?.unit_id;
       if (!unitId) {
         throw new Error("No active unit occupancy found for resident profile");
       }
+      const commId = activeOccupancy?.community_id || profile?.community_id;
       let categoryId = payload.category_id;
-      const categories = await api.get<any[]>("/complaints/categories").catch(() => []);
+      const catUrl = commId ? `/complaints/categories?community_id=${commId}` : "/complaints/categories";
+      const categories = await api.get<any[]>(catUrl).catch(() => []);
       if (!isUuid(categoryId) && Array.isArray(categories) && categories.length > 0) {
         if (payload.category) {
           const catLower = payload.category.toLowerCase().trim();
@@ -682,7 +685,7 @@ export function useResidentComplaints() {
       }
       return await api.post("/complaints/tickets", {
         unit_id: unitId,
-        category_id: categoryId,
+        category_id: isUuid(categoryId) ? categoryId : undefined,
         subject: (payload.subject || "").trim() || "Maintenance Request",
         description: (payload.description || "").trim() || "Reported by resident",
         priority: payload.priority || "medium",
@@ -695,6 +698,10 @@ export function useResidentComplaints() {
       });
       await queryClient.invalidateQueries({
         queryKey: ["resident", "overview"],
+        refetchType: "all",
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["complaints"],
         refetchType: "all",
       });
     },

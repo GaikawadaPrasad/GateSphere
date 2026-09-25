@@ -72,7 +72,7 @@ class SlaRead(_Read):
 # -- tickets ------------------------------------------------- #
 class TicketCreate(_Write):
     unit_id: uuid.UUID
-    category_id: uuid.UUID
+    category_id: uuid.UUID | None = None
     subject: str = Field(min_length=1, max_length=200)
     description: str | None = Field(default=None, max_length=8000)
     priority: str | None = None  # defaults to the category's priority

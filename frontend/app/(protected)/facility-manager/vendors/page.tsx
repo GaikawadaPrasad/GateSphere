@@ -34,6 +34,7 @@ export default function FacilityManagerVendorsPage() {
   const [newPassword, setNewPassword] = useState("");
   const [newCommunityId, setNewCommunityId] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [vendorFieldErrors, setVendorFieldErrors] = useState<Record<string, string>>({});
 
   const loadData = async () => {
     setIsLoading(true);
@@ -89,18 +90,37 @@ export default function FacilityManagerVendorsPage() {
     setNewPhone("");
     setNewPassword("vendor@Gate2026!");
     setNewCommunityId("");
+    setVendorFieldErrors({});
     setIsCreateModalOpen(true);
   };
 
   const handleCreateVendor = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName.trim() || !newEmail.trim()) return;
-    const finalPassword = newPassword.trim() || generateInitialPassword(newName, "vendor");
+    const errors: Record<string, string> = {};
+    const trimmedName = newName.trim();
+    if (!trimmedName || trimmedName.length < 2) {
+      errors.name = "Full name must be at least 2 characters long.";
+    } else if (/^\d+$/.test(trimmedName) || !/[a-zA-Z]/.test(trimmedName)) {
+      errors.name = "Full name must contain alphabetic characters and cannot be purely numeric.";
+    }
+    const trimmedEmail = newEmail.trim();
+    if (!trimmedEmail) {
+      errors.email = "Email is required.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      errors.email = "Please enter a valid email address.";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setVendorFieldErrors(errors);
+      return;
+    }
+
+    const finalPassword = newPassword.trim() || generateInitialPassword(trimmedName, "vendor");
     setIsCreating(true);
     try {
       await vendorsApi.create({
-        full_name: newName.trim(),
-        email: newEmail.trim(),
+        full_name: trimmedName,
+        email: trimmedEmail,
         password: finalPassword,
         phone: newPhone.trim() || undefined,
         community_id: newCommunityId || undefined,
@@ -111,6 +131,7 @@ export default function FacilityManagerVendorsPage() {
       setNewPhone("");
       setNewPassword("");
       setNewCommunityId("");
+      setVendorFieldErrors({});
       await loadData();
     } catch (err: any) {
       alert(err?.message || "Failed to create vendor.");
@@ -279,9 +300,21 @@ export default function FacilityManagerVendorsPage() {
                   const val = e.target.value;
                   setNewName(val);
                   setNewPassword(generateInitialPassword(val, "vendor"));
+                  if (vendorFieldErrors.name) {
+                    setVendorFieldErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.name;
+                      return next;
+                    });
+                  }
                 }}
                 required
               />
+              {vendorFieldErrors.name && (
+                <p style={{ color: "var(--danger, #dc2626)", fontSize: "0.75rem", marginTop: "0.25rem" }}>
+                  {vendorFieldErrors.name}
+                </p>
+              )}
             </div>
             <div>
               <label
@@ -299,9 +332,23 @@ export default function FacilityManagerVendorsPage() {
                 className="input-field"
                 placeholder="vendor@example.com"
                 value={newEmail}
-                onChange={(e) => setNewEmail(e.target.value)}
+                onChange={(e) => {
+                  setNewEmail(e.target.value);
+                  if (vendorFieldErrors.email) {
+                    setVendorFieldErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.email;
+                      return next;
+                    });
+                  }
+                }}
                 required
               />
+              {vendorFieldErrors.email && (
+                <p style={{ color: "var(--danger, #dc2626)", fontSize: "0.75rem", marginTop: "0.25rem" }}>
+                  {vendorFieldErrors.email}
+                </p>
+              )}
             </div>
           </div>
 

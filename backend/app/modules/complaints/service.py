@@ -232,7 +232,7 @@ class ComplaintService(UnitScopedAccess):
     async def create_ticket(self, payload: schemas.TicketCreate) -> ServiceTicket:
         unit = await self._unit_in_scope(payload.unit_id)
         await self._assert_unit_visible(unit.id)  # a resident raises tickets for their own unit
-        cat = await self.categories.get(payload.category_id)
+        cat = await self.categories.get(payload.category_id) if payload.category_id else None
         if cat is None or cat.community_id != unit.community_id:
             cats = await self.list_categories(community_id=unit.community_id)
             cat = cats[0] if cats else None
@@ -268,6 +268,19 @@ class ComplaintService(UnitScopedAccess):
             new={"ticket_number": ticket.ticket_number, "priority": priority},
         )
         await self.tickets.enrich_tickets([ticket])
+        await notif_events.emit_to_roles(
+            self.db,
+            self.scope,
+            self.actor,
+            self.ctx,
+            community_id=unit.community_id,
+            role_slugs=["facility_manager", "community_admin"],
+            notification_type="complaint_raised",
+            title=f"New Complaint: {ticket.ticket_number}",
+            message=f"Resident raised ticket {ticket.ticket_number} ({ticket.subject})",
+            reference_type="service_ticket",
+            reference_id=ticket.id,
+        )
         return ticket
 
     async def get_ticket(self, ticket_id: uuid.UUID) -> ServiceTicket:

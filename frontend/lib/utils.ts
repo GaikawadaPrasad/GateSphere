@@ -362,3 +362,66 @@ export const PHONE_10_DIGIT_RE = /^\d{10}$/;
 export function toPhoneDigits(value: string): string {
   return value.replace(/\D/g, "").slice(0, 10);
 }
+
+/**
+ * Triggers a browser file download of CSV data formatted from records or matrix rows.
+ */
+export function downloadCsv(
+  filename: string,
+  rows: Record<string, any>[] | (string | number | boolean | null | undefined)[][],
+  headers?: string[],
+): void {
+  if (typeof window === "undefined" || typeof document === "undefined") return;
+
+  let csvContent = "";
+  if (Array.isArray(rows) && rows.length > 0) {
+    if (Array.isArray(rows[0])) {
+      const allRows = headers ? [headers, ...(rows as any[][])] : (rows as any[][]);
+      csvContent = allRows
+        .map((row) =>
+          row
+            .map((field) => {
+              const str = String(field ?? "");
+              return str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r")
+                ? `"${str.replace(/"/g, '""')}"`
+                : str;
+            })
+            .join(","),
+        )
+        .join("\r\n");
+    } else {
+      const keys = headers || Object.keys(rows[0] as Record<string, any>);
+      const headerRow = keys
+        .map((k) => (k.includes(",") || k.includes('"') ? `"${k.replace(/"/g, '""')}"` : k))
+        .join(",");
+      const dataRows = (rows as Record<string, any>[]).map((row) =>
+        keys
+          .map((k) => {
+            const val = row[k];
+            const str = String(val ?? "");
+            return str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r")
+              ? `"${str.replace(/"/g, '""')}"`
+              : str;
+          })
+          .join(","),
+      );
+      csvContent = [headerRow, ...dataRows].join("\r\n");
+    }
+  } else if (headers && headers.length > 0) {
+    csvContent = headers.join(",");
+  } else {
+    csvContent = "No records found";
+  }
+
+  // Prepend UTF-8 BOM for Excel compatibility
+  const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", filename.endsWith(".csv") ? filename : `${filename}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+

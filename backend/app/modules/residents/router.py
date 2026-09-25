@@ -37,9 +37,25 @@ DELETE = Depends(require_permission_async("residents:delete"))
 async def require_household_view(
     scope: TenantScope = Depends(get_tenant_scope_async),
     user: User = Depends(require_auth_async),
+    db: AsyncSession = Depends(get_async_db),
 ) -> TenantScope:
     if scope.can("residents:view"):
         return scope
+    if not user.is_superadmin:
+        roles = list(
+            (
+                await db.scalars(
+                    select(Role.slug)
+                    .join(UserRole, UserRole.role_id == Role.id)
+                    .where(UserRole.user_id == user.id)
+                )
+            ).all()
+        )
+        if "resident" not in roles:
+            raise ForbiddenError(
+                "Permission denied: residents:view required",
+                code="PERMISSION_DENIED",
+            )
     return scope
 
 

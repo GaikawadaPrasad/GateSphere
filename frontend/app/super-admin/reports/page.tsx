@@ -2,14 +2,38 @@
 
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useSuperAdminDashboardMetrics } from "@/hooks/use-dashboards";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, downloadCsv } from "@/lib/utils";
 import { useUiStore } from "@/store/ui";
 import { ScopeBanner } from "@/components/common/ScopeBanner";
 import { Skeleton } from "@/components/common/LoadingSkeleton";
+import { toast } from "@/store/toast";
 
 export default function ReportsPage() {
   const { activeCommunityId } = useUiStore();
   const { data: metrics, isLoading } = useSuperAdminDashboardMetrics(activeCommunityId);
+
+  const handleExportCsv = () => {
+    if (!metrics) {
+      toast.error("No metrics available to export.", "Export Empty");
+      return;
+    }
+    const rows = [
+      { Metric: "Total Communities", Value: metrics.totalCommunities ?? 0 },
+      { Metric: "Total Units", Value: metrics.totalUnits ?? 0 },
+      { Metric: "Total Verified Residents", Value: metrics.totalResidents ?? 0 },
+      { Metric: "Global Occupancy Rate (%)", Value: `${metrics.occupancyRate ?? 0}%` },
+      { Metric: "Current Visitors Inside", Value: metrics.visitorsInside ?? 0 },
+      { Metric: "Vehicles on Premises", Value: metrics.vehiclesInside ?? 0 },
+      { Metric: "Domestic Staff Inside", Value: metrics.staffInside ?? 0 },
+      { Metric: "Active Panic Alerts", Value: metrics.activePanicAlerts ?? 0 },
+      { Metric: "Total Billed (INR)", Value: metrics.totalBilled ?? 0 },
+      { Metric: "Total Collected (INR)", Value: metrics.totalCollected ?? 0 },
+      { Metric: "Total Outstanding (INR)", Value: metrics.totalOutstanding ?? 0 },
+      { Metric: "Collection Efficiency (%)", Value: `${metrics.collectionRate ?? 0}%` },
+    ];
+    downloadCsv(`gatesphere_platform_analytics_${Date.now()}.csv`, rows);
+    toast.success("Platform analytics exported successfully.", "Export Complete");
+  };
 
   return (
     <div>
@@ -24,6 +48,16 @@ export default function ReportsPage() {
           { label: "Super Admin", href: "/super-admin/dashboard" },
           { label: "Reports & Analytics" },
         ]}
+        actions={
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={handleExportCsv}
+            disabled={isLoading || !metrics}
+          >
+            📥 Export Analytics CSV
+          </button>
+        }
       />
 
       {/* Active Scope Banner */}

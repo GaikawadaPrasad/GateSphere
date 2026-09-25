@@ -212,7 +212,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   return (
     <div className="file-upload-container flex flex-col gap-2">
       {label && (
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+        <label className="block text-sm font-medium text-black dark:text-white">
           {label}
         </label>
       )}

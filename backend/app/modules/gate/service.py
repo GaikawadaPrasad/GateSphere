@@ -438,7 +438,12 @@ class GateService:
             self.actor,
             self.ctx,
             community_id=cid,
-            role_slugs=["security_supervisor", "security_guard", "community_admin"],
+            role_slugs=[
+                "security_supervisor",
+                "security_guard",
+                "community_admin",
+                "facility_manager",
+            ],
             notification_type="gate.panic_alert",
             title=notif_title,
             message=notif_message,
