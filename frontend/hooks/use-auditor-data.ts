@@ -202,22 +202,57 @@ export function useAuditorVisitorRecords(
     queryKey: ["auditor", "visitor-records", communityId],
     enabled: opts?.enabled ?? true,
     queryFn: async () => {
-      const res = await api.get<any[]>(
-        `/visitors/requests?page_size=100${communityId ? `&community_id=${communityId}` : ""}`,
-      );
-      if (!Array.isArray(res)) return [];
-      return res.map((r: any) => ({
-        id: r.id,
-        visitor_name: r.visitor?.full_name || r.visitor_name || "Guest Visitor",
-        phone: r.visitor?.phone || r.phone || "–",
-        unit: r.unit_id ? `Unit (${r.unit_id.slice(0, 4)})` : "Residential Unit",
-        host_name: r.host_user_id ? "Resident Host" : "Self-Registered",
-        request_type: r.visitor_type ? r.visitor_type.toUpperCase() : "GUEST",
-        status: r.status || "approved",
-        entry_time: r.entries?.[0]?.entry_at || r.created_at,
-        exit_time: r.entries?.[0]?.exit_at,
-        policy_compliant: true,
-      }));
+      const [res, uRes] = await Promise.allSettled([
+        api.get<any[]>(
+          `/visitors/requests?page_size=100${communityId ? `&community_id=${communityId}` : ""}`,
+        ),
+        communityId
+          ? api.get<any[]>(`/communities/${communityId}/units?page_size=100`)
+          : Promise.resolve([]),
+      ]);
+
+      const requests = res.status === "fulfilled" && Array.isArray(res.value) ? res.value : [];
+      const units = uRes.status === "fulfilled" && Array.isArray(uRes.value) ? uRes.value : [];
+
+      const unitMap = new Map<string, string>();
+      for (const u of units) {
+        if (u?.id) {
+          const tPrefix = u.tower_name ? `${u.tower_name} · ` : "";
+          unitMap.set(u.id, `${tPrefix}Unit ${u.unit_number}`);
+        }
+      }
+
+      return requests.map((r: any) => {
+        const rawUnitNum = r.unit_number || r.unit?.unit_number;
+        const towerPrefix = (r.tower_name || r.unit?.tower_name) ? `${r.tower_name || r.unit?.tower_name} · ` : "";
+        const formattedUnit = rawUnitNum
+          ? `${towerPrefix}Unit ${rawUnitNum}`
+          : unitMap.get(r.unit_id) || (r.unit_id ? `Unit #${r.unit_id.slice(0, 6)}` : "Residential Unit");
+
+        const primaryEntry = r.entries && r.entries.length > 0 ? r.entries[0] : null;
+        const entryAt = primaryEntry?.entry_at || r.entry_at || null;
+        const exitAt = primaryEntry?.exit_at || r.exit_at || null;
+
+        let displayStatus = r.status || "pending";
+        if (exitAt) {
+          displayStatus = "completed";
+        } else if (entryAt) {
+          displayStatus = "entered";
+        }
+
+        return {
+          id: r.id,
+          visitor_name: r.visitor?.full_name || r.visitor_name || "Guest Visitor",
+          phone: r.visitor?.phone || r.phone || "–",
+          unit: formattedUnit,
+          host_name: r.host_name || r.host_user?.full_name || (r.host_user_id ? "Resident Host" : "Self-Registered"),
+          request_type: r.visitor_type ? r.visitor_type.toUpperCase().replace(/_/g, " ") : "GUEST",
+          status: displayStatus,
+          entry_time: entryAt,
+          exit_time: exitAt,
+          policy_compliant: true,
+        };
+      });
     },
   });
 }
