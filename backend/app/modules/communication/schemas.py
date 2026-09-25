@@ -8,10 +8,16 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
 
-from app.modules.communication.models import ANNOUNCEMENT_TYPES, POLL_STATUS, PRIORITIES
+from app.modules.communication.models import (
+    ANNOUNCEMENT_CATEGORIES,
+    ANNOUNCEMENT_TYPES,
+    POLL_STATUS,
+    PRIORITIES,
+)
 
 ALLOWED = {
     "announcement_type": set(ANNOUNCEMENT_TYPES),
+    "category": set(ANNOUNCEMENT_CATEGORIES),
     "priority": set(PRIORITIES),
     "poll_status": set(POLL_STATUS),
 }
@@ -99,6 +105,7 @@ class GroupMemberRead(_Read):
 # -- announcements ----------------------------------------- #
 class AnnouncementCreate(_Write):
     announcement_type: str = "notice"
+    category: str = "general"
     title: str = Field(min_length=1, max_length=200)
     body: str = Field(min_length=1, max_length=20000)
     priority: str = "normal"
@@ -110,6 +117,7 @@ class AnnouncementCreate(_Write):
 
 
 class AnnouncementUpdate(_Write):
+    category: str | None = None
     title: str | None = Field(default=None, max_length=200)
     body: str | None = Field(default=None, max_length=20000)
     priority: str | None = None
@@ -124,6 +132,7 @@ class AnnouncementRead(_Read):
     community_id: uuid.UUID
     created_by_user_id: uuid.UUID | None
     announcement_type: str
+    category: str
     title: str
     body: str
     priority: str

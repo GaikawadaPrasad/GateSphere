@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { DashboardShell } from "@/components/layout/DashboardShell";
@@ -98,6 +98,7 @@ export type OwnerTenantTab =
   | "deliveries"
   | "amenities"
   | "maintenance"
+  | "notices"
   | "complaints"
   | "vehicles"
   | "domestic-staff"
@@ -322,7 +323,11 @@ export function OwnerTenantDashboardView({
     myOccupancy?.unit_id,
     on("overview", "domestic-staff"),
   );
-  const announcements = useAnnouncements(undefined, on("maintenance"));
+  // Maintenance tab: scheduled-upkeep notices only. Community Notices: everything else
+  // (general circulars, events with RSVP, polls). Filtered server-side by `category`.
+  const announcements = useAnnouncements({ category: "maintenance" }, on("maintenance"));
+  const communityNotices = useAnnouncements({ exclude_category: "maintenance" }, on("notices"));
+  const noticeFeed = activeTab === "notices" ? communityNotices : announcements;
   const myNotifications = useMyNotifications({ page_size: 20 }, on("notifications"));
   const queryClient = useQueryClient();
   const markNotificationRead = useMarkNotificationRead();
@@ -576,19 +581,31 @@ export function OwnerTenantDashboardView({
     }
   };
 
+  // Which RSVP button is in flight: only that button shows a spinner and only that event's
+  // buttons are disabled (a shared `isPending` put every RSVP button on the page into
+  // "Loading…"). The ref is the synchronous double-click guard (AGENTS.md §5.4).
+  const [rsvpBusy, setRsvpBusy] = useState<{ id: string; response: string } | null>(null);
+  const rsvpInFlight = useRef<Set<string>>(new Set());
+
   const handleEventRsvp = async (
     announcementId: string,
     response: "going" | "maybe" | "not_going",
   ) => {
+<<<<<<< Updated upstream
     const pendingKey = `${announcementId}_${response}`;
     setRsvpPendingKey(pendingKey);
+=======
+    if (rsvpInFlight.current.has(announcementId)) return;
+    rsvpInFlight.current.add(announcementId);
+    setRsvpBusy({ id: announcementId, response });
+>>>>>>> Stashed changes
     try {
       await eventRsvp.mutateAsync({
         announcementId,
         response,
         guests: 1,
       });
-      await announcements.refetch();
+      await queryClient.invalidateQueries({ queryKey: ["announcements"], refetchType: "active" });
       const labels: Record<string, string> = {
         going: "Going",
         maybe: "Maybe",
@@ -601,7 +618,12 @@ export function OwnerTenantDashboardView({
     } catch (err: any) {
       toast.error(err?.message || "Failed to record event RSVP.", "RSVP Error");
     } finally {
+<<<<<<< Updated upstream
       setRsvpPendingKey(null);
+=======
+      rsvpInFlight.current.delete(announcementId);
+      setRsvpBusy(null);
+>>>>>>> Stashed changes
     }
   };
 
@@ -1819,10 +1841,15 @@ export function OwnerTenantDashboardView({
         "Reserve clubhouse, sports courts, pool, and community spaces with instant slot booking.",
     },
     maintenance: {
+      title: "Maintenance & Scheduled Upkeep",
+      eyebrow: "Community Maintenance",
+      description:
+        "Planned water, power, lift, and common-area maintenance that may affect your home.",
+    },
+    notices: {
       title: "Community Notices & Announcements",
       eyebrow: "Society Communications",
-      description:
-        "Stay informed with official circulars, maintenance notices, and society updates.",
+      description: "Official circulars, community events, and society updates.",
     },
     complaints: {
       title: "Complaints & Service Desk",
@@ -3572,34 +3599,40 @@ export function OwnerTenantDashboardView({
         </div>
       )}
 
-      {/* TAB 8: MAINTENANCE */}
-      {activeTab === "maintenance" && (
+      {/* TAB 8: MAINTENANCE (category=maintenance) + COMMUNITY NOTICES (all other categories) */}
+      {(activeTab === "maintenance" || activeTab === "notices") && (
         <div className="gs-card">
           <h3 className="card-h3" style={{ marginBottom: "0.5rem" }}>
-            Scheduled Community Upkeep Notices
+            {activeTab === "notices"
+              ? "Community Notices & Events"
+              : "Scheduled Community Upkeep Notices"}
           </h3>
           <p style={{ color: "var(--brand-body)", marginBottom: "1.25rem", fontSize: "14px" }}>
-            Scheduled maintenance affecting water, power, elevators, and clubhouse areas.
+            {activeTab === "notices"
+              ? "Official circulars, community events, and society updates from your association."
+              : "Scheduled maintenance affecting water, power, elevators, and clubhouse areas."}
           </p>
-          {announcements.isLoading ? (
+          {noticeFeed.isLoading ? (
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
               {[1, 2, 3].map((n) => (
                 <CardSkeleton key={n} lines={2} />
               ))}
             </div>
-          ) : announcements.isError ? (
+          ) : noticeFeed.isError ? (
             <ErrorState
               title="Failed to Load Notices"
-              message={announcements.error?.message || "Could not retrieve announcements."}
-              onRetry={() => announcements.refetch()}
+              message={noticeFeed.error?.message || "Could not retrieve noticeFeed."}
+              onRetry={() => noticeFeed.refetch()}
             />
-          ) : (announcements.data || []).length === 0 ? (
+          ) : (noticeFeed.data || []).length === 0 ? (
             <p style={{ color: "var(--brand-body)", fontSize: "14px" }}>
-              No community notices published yet.
+              {activeTab === "notices"
+                ? "No community notices published yet."
+                : "No scheduled maintenance right now — upkeep notices will appear here."}
             </p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              {(announcements.data || []).map((m: any) => (
+              {(noticeFeed.data || []).map((m: any) => (
                 <div
                   key={m.id}
                   style={{
@@ -3705,7 +3738,12 @@ export function OwnerTenantDashboardView({
                         </span>
                         <BrandButton
                           size="sm"
+<<<<<<< Updated upstream
                           isLoading={rsvpPendingKey === `${m.id}_going`}
+=======
+                          isLoading={rsvpBusy?.id === m.id && rsvpBusy?.response === "going"}
+                          disabled={rsvpBusy?.id === m.id}
+>>>>>>> Stashed changes
                           onClick={() => handleEventRsvp(m.id, "going")}
                         >
                           ✓ Going
@@ -3713,7 +3751,12 @@ export function OwnerTenantDashboardView({
                         <BrandButton
                           size="sm"
                           variant="outline"
+<<<<<<< Updated upstream
                           isLoading={rsvpPendingKey === `${m.id}_maybe`}
+=======
+                          isLoading={rsvpBusy?.id === m.id && rsvpBusy?.response === "maybe"}
+                          disabled={rsvpBusy?.id === m.id}
+>>>>>>> Stashed changes
                           onClick={() => handleEventRsvp(m.id, "maybe")}
                         >
                           ? Maybe
@@ -3722,7 +3765,12 @@ export function OwnerTenantDashboardView({
                           size="sm"
                           variant="outline"
                           style={{ borderColor: "#FECACA", color: "#DC2626" }}
+<<<<<<< Updated upstream
                           isLoading={rsvpPendingKey === `${m.id}_not_going`}
+=======
+                          isLoading={rsvpBusy?.id === m.id && rsvpBusy?.response === "not_going"}
+                          disabled={rsvpBusy?.id === m.id}
+>>>>>>> Stashed changes
                           onClick={() => handleEventRsvp(m.id, "not_going")}
                         >
                           ✕ Decline

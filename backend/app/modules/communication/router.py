@@ -86,6 +86,8 @@ async def list_announcements(
     community_id: uuid.UUID | None = None,
     published_only: bool = True,
     status: schemas.AnnouncementListStatus | None = None,
+    category: str | None = None,
+    exclude_category: str | None = None,
     params: PageParams = Depends(page_params),
     svc: Svc = Depends(communication_service),
 ) -> dict:
@@ -93,6 +95,8 @@ async def list_announcements(
         community_id=community_id,
         published_only=published_only,
         status=status,
+        category=category,
+        exclude_category=exclude_category,
         offset=params.offset,
         limit=params.page_size,
     )

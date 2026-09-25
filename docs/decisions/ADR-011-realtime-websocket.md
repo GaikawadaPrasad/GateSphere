@@ -37,4 +37,8 @@ requests per minute while nothing changed. The product owner asked for WebSocket
 - Redis outage ⇒ hints dropped, clients poll — availability unaffected (§9.1).
 - A hint for a module you can view but whose specific row you can't see still costs one
   scoped refetch (no ids are sent, by design).
-- Production reverse proxies must pass WebSocket upgrades on `/api/`.
+- Hosts whose rewrites can't carry WebSocket upgrades (Vercel) connect the socket straight to
+  the API origin (`NEXT_PUBLIC_REALTIME_URL`, derived at build time from
+  `BACKEND_INTERNAL_URL`); the ticket makes this safe without cross-site cookies. The API's
+  `FRONTEND_ORIGIN`/`CORS_ORIGINS` must include the UI origin. After 5 failed attempts the
+  client stops retrying for the page session (polling covers it).

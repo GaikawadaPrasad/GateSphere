@@ -166,7 +166,7 @@ must update this page in the same PR.
 
 | Table | Key columns | Notes |
 |-------|-------------|-------|
-| `announcements` | `community_id`, `created_by_user_id`, `announcement_type` (notice/emergency/poll/event/survey), `title`, `body`, `priority`, `publish_at`, `expires_at`, `event_start_at`, `event_end_at`, `is_published` | Permanent record once published. |
+| `announcements` | `community_id`, `created_by_user_id`, `announcement_type` (notice/emergency/poll/event/survey), `category` (general/maintenance/security/amenities/billing/events — CHECK, indexed, migration `0051`), `title`, `body`, `priority`, `publish_at`, `expires_at`, `event_start_at`, `event_end_at`, `is_published` | Permanent record once published. |
 | `announcement_targets` | `announcement_id`, `tower_id`, `unit_id`, `resident_group_id`, `role_id`, `target_all_community` | `CHECK` a valid target combination; target must belong to the announcement's community. Validate the initiator is authorized for the scope **before** publish. |
 | `resident_groups` | `community_id`, `name`, `description`, `created_by_user_id`, `is_active` | |
 | `resident_group_members` | `group_id`, `user_id`, `added_at` | |

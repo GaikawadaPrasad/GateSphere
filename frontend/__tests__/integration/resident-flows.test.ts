@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import { RESIDENT_NAV_ITEMS } from "@/config/dashboard-navigation";
 import { formatCurrency } from "@/lib/utils";
 
-describe("Resident / Owner-Tenant 14 Modules Flow Verification", () => {
-  it("contains exactly 14 modules in the Resident navigation specification", () => {
-    expect(RESIDENT_NAV_ITEMS).toHaveLength(14);
+describe("Resident / Owner-Tenant 15 Modules Flow Verification", () => {
+  it("contains exactly 15 modules in the Resident navigation specification", () => {
+    expect(RESIDENT_NAV_ITEMS).toHaveLength(15);
     const moduleSlugs = RESIDENT_NAV_ITEMS.map((item) => item.id);
     expect(moduleSlugs).toContain("overview");
     expect(moduleSlugs).toContain("profile");
@@ -14,6 +14,7 @@ describe("Resident / Owner-Tenant 14 Modules Flow Verification", () => {
     expect(moduleSlugs).toContain("deliveries");
     expect(moduleSlugs).toContain("amenities");
     expect(moduleSlugs).toContain("maintenance");
+    expect(moduleSlugs).toContain("notices");
     expect(moduleSlugs).toContain("complaints");
     expect(moduleSlugs).toContain("vehicles");
     expect(moduleSlugs).toContain("domestic-staff");

@@ -18,8 +18,10 @@ import { useResidents } from "@/hooks/use-residents";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { Modal } from "@/components/common/Modal";
+import { ANNOUNCEMENT_CATEGORY_LABELS } from "@/types/communication";
 import type {
   Announcement,
+  AnnouncementCategory,
   AnnouncementType,
   ResidentGroup,
   AnnouncementPriority,
@@ -88,6 +90,7 @@ export default function CommunityAdminCommunicationPage() {
     title: string;
     body: string;
     announcement_type: AnnouncementType;
+    category: AnnouncementCategory;
     priority: AnnouncementPriority;
     target_type: TargetAudienceType; // UI only — not sent to backend
     target_id: string; // UI only — not sent to backend
@@ -95,6 +98,7 @@ export default function CommunityAdminCommunicationPage() {
     title: "",
     body: "",
     announcement_type: "notice",
+    category: "general",
     priority: "normal",
     target_type: "all",
     target_id: "",
@@ -161,6 +165,7 @@ export default function CommunityAdminCommunicationPage() {
       await createAnnouncement.mutateAsync({
         payload: {
           announcement_type: form.announcement_type,
+          category: form.category,
           title: form.title.trim(),
           body: form.body.trim(),
           priority: form.priority,
@@ -175,6 +180,7 @@ export default function CommunityAdminCommunicationPage() {
         title: "",
         body: "",
         announcement_type: "notice",
+        category: "general",
         priority: "normal",
         target_type: "all",
         target_id: "",
@@ -615,6 +621,7 @@ export default function CommunityAdminCommunicationPage() {
                   title: "URGENT COMMUNITY ALERT: ",
                   body: "",
                   announcement_type: "emergency",
+                  category: "security",
                   priority: "urgent",
                   target_type: "all",
                   target_id: "",
@@ -761,6 +768,9 @@ export default function CommunityAdminCommunicationPage() {
                     ...form,
                     announcement_type: newType,
                     priority: newType === "emergency" ? "urgent" : form.priority,
+                    // An event is filed under Events unless the admin chose otherwise.
+                    category:
+                      newType === "event" && form.category === "general" ? "events" : form.category,
                   });
                 }}
               >
@@ -770,6 +780,37 @@ export default function CommunityAdminCommunicationPage() {
                 <option value="poll">📊 Poll</option>
                 <option value="survey">📝 Survey</option>
               </select>
+            </div>
+
+            <div>
+              <label
+                htmlFor="announcement-category"
+                style={{
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  display: "block",
+                  marginBottom: "0.25rem",
+                }}
+              >
+                Category
+              </label>
+              <select
+                id="announcement-category"
+                className="select-field"
+                value={form.category}
+                onChange={(e) =>
+                  setForm({ ...form, category: e.target.value as AnnouncementCategory })
+                }
+              >
+                {Object.entries(ANNOUNCEMENT_CATEGORY_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <p style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.25rem" }}>
+                &ldquo;Maintenance / Upkeep&rdquo; notices appear on the resident Maintenance page.
+              </p>
             </div>
 
             <div>

@@ -28,6 +28,12 @@ const HEARTBEAT_MS = 25_000;
 const MAX_BACKOFF_MS = 30_000;
 /** Close codes that mean "don't hammer the server": wait long before retrying. */
 const SLOW_RETRY_CODES = new Set([4403, 4429]);
+/**
+ * Circuit breaker: after this many consecutive attempts that never reached `open`
+ * (host can't carry WebSockets, misconfigured URL, blocked by a proxy), stop for this page
+ * session — polling already keeps the UI fresh, and endless retries only flood the console.
+ */
+const MAX_FAILED_ATTEMPTS = 5;
 
 function debug(...args: unknown[]) {
   if (process.env.NODE_ENV !== "production") console.debug("[realtime]", ...args);
@@ -47,6 +53,7 @@ class RealtimeClient {
   private wanted = false;
   private community: string | null = null;
   private attempt = 0;
+  private failedWithoutOpen = 0;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private heartbeat: ReturnType<typeof setInterval> | null = null;
   private hintListeners = new Set<HintListener>();
@@ -77,6 +84,7 @@ class RealtimeClient {
     this.wanted = false;
     this.clearTimers();
     this.attempt = 0;
+    this.failedWithoutOpen = 0;
     const ws = this.ws;
     this.ws = null;
     if (ws && ws.readyState <= WebSocket.OPEN) ws.close(1000);
@@ -121,6 +129,7 @@ class RealtimeClient {
         this.stop(); // signed out — the global 401 handler takes over
         return;
       }
+      this.failedWithoutOpen += 1;
       this.scheduleRetry();
       return;
     }
@@ -128,8 +137,11 @@ class RealtimeClient {
 
     const ws = new WebSocket(socketUrl(ticket));
     this.ws = ws;
+    let opened = false;
     ws.onopen = () => {
+      opened = true;
       this.attempt = 0;
+      this.failedWithoutOpen = 0;
       this.setStatus("open");
       this.heartbeat = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) ws.send('{"type":"ping"}');
@@ -157,6 +169,7 @@ class RealtimeClient {
       this.clearTimers();
       this.setStatus("closed");
       debug("closed", ev.code);
+      if (!opened) this.failedWithoutOpen += 1;
       this.scheduleRetry(SLOW_RETRY_CODES.has(ev.code) ? 60_000 : undefined);
     };
     ws.onerror = () => debug("socket error");
@@ -165,6 +178,11 @@ class RealtimeClient {
   private scheduleRetry(fixedMs?: number) {
     if (!this.wanted) return;
     this.setStatus("closed");
+    if (this.failedWithoutOpen >= MAX_FAILED_ATTEMPTS) {
+      // Give up for this page session; `useLivePollInterval` keeps polling meanwhile.
+      debug(`giving up after ${this.failedWithoutOpen} failed attempts; polling only`);
+      return;
+    }
     const exp = Math.min(MAX_BACKOFF_MS, 1_000 * 2 ** this.attempt);
     const delay = fixedMs ?? exp / 2 + Math.random() * (exp / 2); // jitter
     this.attempt += 1;

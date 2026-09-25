@@ -1289,3 +1289,26 @@ dropdowns (facility-manager maintenance still lists all units). Empty result now
 empty reload no longer leaves a stale list. Test: `test_units_occupied_filter_*` (ground truth in
 plain SQL). Live: guard community 28 units → 8 in the dropdown. Note: the dev backend needed a
 container restart to pick up the change (uvicorn reload missed it).
+
+---
+
+## 2026-09-25 — Maintenance notices, RSVP state, WebSockets on Vercel
+
+- **Announcement category** (migration `0051`, CHECK + index; `general` default): general,
+  maintenance, security, amenities, billing, events. `GET /communication/announcements` gains
+  `?category=` / `?exclude_category=`. Resident **Maintenance** tab now lists only
+  `category=maintenance`; new **Community Notices** tab (`/owner-tenant/notices`) lists the rest
+  (circulars, events + RSVP, polls). Admin publish form has a Category select (events default to
+  Events, emergency quick-action → Security). Seed adds 3 maintenance notices per community.
+- **RSVP**: the three buttons shared `eventRsvp.isPending`, so one click showed "Loading…" on
+  every RSVP button on the page — now per-button (`rsvpBusy`) + ref double-click guard; only
+  the clicked button spins, that event's other two are disabled.
+- **WebSockets on Vercel**: Vercel rewrites don't forward WebSocket upgrades, so
+  `wss://<vercel>/api/v1/realtime/ws` always failed and the client retried forever (console
+  flood). `next.config.mjs` now derives `NEXT_PUBLIC_REALTIME_URL=wss://<api>/api/v1/realtime/ws`
+  from an https `BACKEND_INTERNAL_URL` at build time (direct to Render); the client circuit-breaks
+  after 5 failed attempts. Needs a Vercel redeploy and Render `FRONTEND_ORIGIN` = the Vercel
+  origin. Not verified against the live Vercel/Render deployment from here.
+- **Verified:** backend communication tests 19/19 (new category test); migration round-trip;
+  frontend vitest 168/168 (+ circuit-breaker/URL tests), tsc clean, eslint 0 errors; live UI:
+  Maintenance shows only maintenance notices, one RSVP click → 1 spinner / 2 disabled.

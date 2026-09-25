@@ -57,7 +57,18 @@ TRUSTED_PROXY_HOPS=1   # Render load balancer; rate-limit by the real client IP
 ```
 BACKEND_INTERNAL_URL=https://<render-api-domain>   # used by next.config rewrite
 NEXT_TELEMETRY_DISABLED=1
+# Optional — derived automatically from BACKEND_INTERNAL_URL at build time:
+# NEXT_PUBLIC_REALTIME_URL=wss://<render-api-domain>/api/v1/realtime/ws
 ```
+
+**Realtime WebSocket (ADR-011).** Vercel rewrites do **not** forward WebSocket upgrades, so
+the browser connects straight to the Render API (`wss://<render-api-domain>/api/v1/realtime/ws`),
+derived from `BACKEND_INTERNAL_URL` in `next.config.mjs`. The socket authenticates with a
+single-use ticket (fetched same-origin through the rewrite), so no cross-site cookie is needed.
+Requirements: Render's `FRONTEND_ORIGIN` (or `CORS_ORIGINS`) must list the exact Vercel origin
+— the socket rejects any other `Origin` with close code 4403. **Redeploy the Vercel frontend
+after changing `BACKEND_INTERNAL_URL`**: the URL is baked in at build time. If the socket still
+cannot connect, the client stops retrying after 5 attempts and the UI stays on polling.
 Keep the API same-origin where possible (custom domain + Vercel rewrite) so session cookies
 stay first-party. Otherwise cookies must be `SameSite=None; Secure` and CORS origins exact.
 
