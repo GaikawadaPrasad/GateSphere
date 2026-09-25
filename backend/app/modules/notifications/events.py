@@ -22,6 +22,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.realtime import queue_community_event
 from app.core.tenancy import TenantScope
 from app.modules.notifications import schemas
 from app.modules.notifications.models import NotificationDeadLetter
@@ -143,6 +144,15 @@ async def emit_many(
                 )
                 for uid in ids
             )
+        # One community-wide hint for the whole broadcast, not one per recipient.
+        queue_community_event(
+            db,
+            community_id=community_id,
+            module="notifications",
+            entity_type="notification",
+            action="notification.broadcast",
+            actor_id=None,
+        )
     except Exception as exc:
         log.warning("broadcast emit failed", extra={"type": notification_type}, exc_info=True)
         await _dead_letter(

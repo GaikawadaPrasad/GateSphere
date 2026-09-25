@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useCachedMe } from "@/hooks/use-auth";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { authApi, type CurrentUser } from "@/lib/api";
 
 export default function VendorProfilePage() {
+  const getMe = useCachedMe();
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [companyName, setCompanyName] = useState("GateSphere Authorized Maintenance Vendor");
   const [contactPerson, setContactPerson] = useState("");
@@ -19,7 +21,7 @@ export default function VendorProfilePage() {
     async function loadProfile() {
       setIsLoading(true);
       try {
-        const user = await authApi.me("vendor_technician");
+        const user = await getMe();
         if (user) {
           setCurrentUser(user);
           setContactPerson(user.full_name || "");

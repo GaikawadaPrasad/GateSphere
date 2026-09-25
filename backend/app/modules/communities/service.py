@@ -412,6 +412,7 @@ class CommunityService:
         floor_id: uuid.UUID | None = None,
         unit_type: str | None = None,
         active: bool | None = None,
+        occupied: bool | None = None,
     ) -> tuple[list[Unit], int]:
         cid = self.scope.require(community_id)
         if unit_type is not None:
@@ -424,6 +425,7 @@ class CommunityService:
             floor_id=floor_id,
             unit_type=unit_type,
             active=active,
+            occupied=occupied,
         )
         if rows:
             tower_ids = {u.tower_id for u in rows if u.tower_id}

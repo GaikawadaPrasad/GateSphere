@@ -108,6 +108,8 @@ export type OwnerTenantTab =
 import { toast } from "@/store/toast";
 import { PASSWORD_MIN_LENGTH } from "@/constants/password";
 import { DeliveryProtocolSettings } from "@/components/deliveries/DeliveryProtocolSettings";
+import { ReportViolationModal } from "@/components/vehicles/ReportViolationModal";
+import { useLivePollInterval } from "@/hooks/use-realtime";
 
 interface OwnerTenantDashboardViewProps {
   initialTab?: OwnerTenantTab;
@@ -268,6 +270,7 @@ export function OwnerTenantDashboardView({
 
   // Vehicle self-registration modal state
   const [registerVehicleModalOpen, setRegisterVehicleModalOpen] = useState(false);
+  const [reportParkingOpen, setReportParkingOpen] = useState(false);
   const [vehRegNumber, setVehRegNumber] = useState("");
   const [vehType, setVehType] = useState("car");
   const [vehMake, setVehMake] = useState("");
@@ -295,26 +298,32 @@ export function OwnerTenantDashboardView({
   const [emergencyNote, setEmergencyNote] = useState<string>("");
   const [emergencyLocationDetail, setEmergencyLocationDetail] = useState<string>("");
 
-  // Data queries
+  // Data queries — each module page renders this view with one tab, so a query only runs
+  // on the tab(s) that display it (everything else stays idle: no request at all).
+  // `profile` is small and feeds the unit id every modal needs, so it is always on.
+  const on = (...tabs: OwnerTenantTab[]) => ({ enabled: tabs.includes(activeTab) });
   const {
     data: stats,
     isLoading: statsLoading,
     isError: statsError,
     refetch: refetchStats,
-  } = useResidentOverview(activeCommunityId);
-  const visitors = useResidentVisitors();
-  const deliveries = useResidentDeliveries();
-  const amenities = useResidentAmenities();
-  const complaints = useResidentComplaints();
-  const payments = useResidentPayments();
-  const family = useResidentFamilyMembers();
+  } = useResidentOverview(activeCommunityId, on("overview", "payments"));
+  const visitors = useResidentVisitors(on("overview", "visitors", "notifications"));
+  const deliveries = useResidentDeliveries(on("overview", "deliveries", "notifications"));
+  const amenities = useResidentAmenities(on("overview", "amenities"));
+  const complaints = useResidentComplaints(on("overview", "complaints"));
+  const payments = useResidentPayments(on("overview", "payments"));
+  const family = useResidentFamilyMembers(on("family-members"));
   const profile = useResidentProfile();
   const myOccupancy = profile.data?.occupancies?.[0];
-  const deliveryProtocols = useResidentDeliveryProtocols();
-  const vehicles = useResidentVehicles();
-  const domesticStaff = useResidentDomesticStaff(myOccupancy?.unit_id);
-  const announcements = useAnnouncements();
-  const myNotifications = useMyNotifications({ page_size: 20 });
+  const deliveryProtocols = useResidentDeliveryProtocols(on("deliveries"));
+  const vehicles = useResidentVehicles(on("vehicles", "property"));
+  const domesticStaff = useResidentDomesticStaff(
+    myOccupancy?.unit_id,
+    on("overview", "domestic-staff"),
+  );
+  const announcements = useAnnouncements(undefined, on("maintenance"));
+  const myNotifications = useMyNotifications({ page_size: 20 }, on("notifications"));
   const queryClient = useQueryClient();
   const markNotificationRead = useMarkNotificationRead();
   const markAllNotificationsRead = useMarkAllNotificationsRead();
@@ -355,6 +364,9 @@ export function OwnerTenantDashboardView({
   const complaintList = complaints.data || [];
   const invoiceList = payments.data || [];
 
+  // SOS status is only shown on the emergency tab. Realtime `gate` hints refresh it; the
+  // 5 s poll is the fallback while the socket is down (60 s safety net while it is up).
+  const alertsPoll = useLivePollInterval(5_000, 60_000);
   const { data: myAlerts = [], refetch: refetchAlerts } = useQuery({
     queryKey: ["resident", "alerts"],
     queryFn: async () => {
@@ -365,13 +377,14 @@ export function OwnerTenantDashboardView({
         return [];
       }
     },
-    refetchInterval: 5000,
+    enabled: activeTab === "emergency",
+    refetchInterval: alertsPoll,
   });
   const activeResidentAlert = (myAlerts as any[]).find(
     (a: any) => a.status === "active" || a.status === "acknowledged",
   );
 
-  const ledger = useResidentLedger(myOccupancy?.unit_id);
+  const ledger = useResidentLedger(myOccupancy?.unit_id, on("payments"));
   const ledgerList = ledger.data || [];
   const nextDueInvoice = invoiceList.find((i) => i.balance_due > 0);
 
@@ -475,20 +488,8 @@ export function OwnerTenantDashboardView({
   const handleManualRefresh = async () => {
     try {
       setIsRefreshing(true);
-      await Promise.allSettled([
-        refetchStats?.(),
-        visitors.refetch(),
-        deliveries.refetch(),
-        amenities.bookings.refetch(),
-        amenities.amenities.refetch(),
-        complaints.refetch(),
-        payments.refetch(),
-        ledger.refetch(),
-        vehicles.refetch(),
-        domesticStaff.refetch(),
-        family.refetch(),
-        profile.refetch(),
-      ]);
+      // Only what this tab shows: `.refetch()` would bypass `enabled` and load every tab.
+      await queryClient.invalidateQueries({ queryKey: ["resident"], refetchType: "active" });
       toast.success("Resident operational data and alerts refreshed.", "Data Updated");
     } finally {
       setIsRefreshing(false);
@@ -507,9 +508,7 @@ export function OwnerTenantDashboardView({
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
 
       // Synchronize action in notification inbox
-      const notifsList = Array.isArray(myNotifications.data)
-        ? (myNotifications.data as any[])
-        : [];
+      const notifsList = Array.isArray(myNotifications.data) ? (myNotifications.data as any[]) : [];
       for (const n of notifsList) {
         if (n.reference_id === deliveryId) {
           updateActionedNotification(n.id, approved ? "approved" : "rejected");
@@ -645,9 +644,7 @@ export function OwnerTenantDashboardView({
       if (pendingVisitor) setDismissedVisitorId(pendingVisitor.id);
 
       // Synchronize action in notification inbox
-      const notifsList = Array.isArray(myNotifications.data)
-        ? (myNotifications.data as any[])
-        : [];
+      const notifsList = Array.isArray(myNotifications.data) ? (myNotifications.data as any[]) : [];
       for (const n of notifsList) {
         if (
           n.reference_id === requestId ||
@@ -3925,6 +3922,9 @@ export function OwnerTenantDashboardView({
                 >
                   + Register Vehicle
                 </BrandButton>
+                <BrandButton variant="outline" size="sm" onClick={() => setReportParkingOpen(true)}>
+                  🅿️ Report Parking Issue
+                </BrandButton>
               </div>
             </div>
 
@@ -4002,34 +4002,47 @@ export function OwnerTenantDashboardView({
             <p style={{ color: "var(--brand-body)", fontSize: "13.5px", marginBottom: "1rem" }}>
               Active parking space allocations assigned to your residential unit.
             </p>
-            <DataTable
-              columns={[
-                {
-                  key: "slot_code",
-                  header: "Slot Number",
-                  render: (a) => (
-                    <span style={{ fontWeight: 800, color: "var(--brand-primary)" }}>
-                      🅿️ {a.slot_code}
-                    </span>
-                  ),
-                },
-                { key: "slot_type", header: "Slot Category" },
-                {
-                  key: "status",
-                  header: "Status",
-                  render: (a) => <StatusBadge status={a.status} />,
-                },
-                {
-                  key: "valid_from",
-                  header: "Allocated Date",
-                  render: (a) => formatDate(a.valid_from),
-                },
-              ]}
-              data={vehicles.allocationsList || []}
-              isLoading={vehicles.isLoading}
-              emptyTitle="No parking slots assigned"
-              emptyDescription="No parking slot allocation found for this unit."
-            />
+            {vehicles.isError ? (
+              <ErrorState
+                title="Failed to Load Parking Slots"
+                message={vehicles.error?.message}
+                onRetry={() => vehicles.refetch()}
+              />
+            ) : (
+              <DataTable
+                columns={[
+                  {
+                    key: "slot_code",
+                    header: "Slot Number",
+                    render: (a) => (
+                      <span style={{ fontWeight: 800, color: "var(--brand-primary)" }}>
+                        🅿️ {a.slot_code}
+                      </span>
+                    ),
+                  },
+                  { key: "slot_type", header: "Slot Category" },
+                  {
+                    key: "vehicle",
+                    header: "Vehicle",
+                    render: (a) => <span style={{ fontFamily: "monospace" }}>{a.vehicle}</span>,
+                  },
+                  {
+                    key: "status",
+                    header: "Status",
+                    render: (a) => <StatusBadge status={a.status} />,
+                  },
+                  {
+                    key: "valid_from",
+                    header: "Allocated Date",
+                    render: (a) => formatDate(a.valid_from),
+                  },
+                ]}
+                data={vehicles.allocationsList || []}
+                isLoading={vehicles.isLoading}
+                emptyTitle="No parking slots assigned"
+                emptyDescription="No parking slot allocation found for this unit."
+              />
+            )}
           </div>
 
           {/* CARD 3: PARKING VIOLATIONS & GATE FLAGS LOG */}
@@ -4041,49 +4054,115 @@ export function OwnerTenantDashboardView({
               Log of misparked vehicles, unauthorized parking, or security gate flags reported by
               guards.
             </p>
-            <DataTable
-              columns={[
-                {
-                  key: "plate_number",
-                  header: "Vehicle Plate",
-                  render: (v) => (
-                    <span style={{ fontFamily: "monospace", fontWeight: 700 }}>
-                      {v.plate_number}
-                    </span>
-                  ),
-                },
-                { key: "violation_type", header: "Violation Type" },
-                { key: "slot_code", header: "Location / Slot" },
-                { key: "notes", header: "Guard Security Notes" },
-                {
-                  key: "penalty_amount",
-                  header: "Penalty / Fine",
-                  render: (v) =>
-                    v.penalty_amount > 0 ? (
-                      <span style={{ fontWeight: 700, color: "#DC2626" }}>
-                        {formatCurrency(v.penalty_amount)}
+            {vehicles.isError ? (
+              <ErrorState
+                title="Failed to Load Violations"
+                message={vehicles.error?.message}
+                onRetry={() => vehicles.refetch()}
+              />
+            ) : (
+              <DataTable
+                columns={[
+                  {
+                    key: "plate_number",
+                    header: "Vehicle Plate",
+                    render: (v) => (
+                      <span style={{ fontFamily: "monospace", fontWeight: 700 }}>
+                        {v.plate_number}
                       </span>
-                    ) : (
-                      <span style={{ color: "var(--brand-body)" }}>Warning Only</span>
                     ),
-                },
-                {
-                  key: "status",
-                  header: "Status",
-                  render: (v) => <StatusBadge status={v.status} />,
-                },
-                {
-                  key: "created_at",
-                  header: "Reported Time",
-                  render: (v) => formatDate(v.created_at),
-                },
-              ]}
-              data={vehicles.violationsList || []}
-              isLoading={vehicles.isLoading}
-              emptyTitle="No Parking Violations"
-              emptyDescription="No parking violations or gate flags recorded for your unit."
-            />
+                  },
+                  { key: "violation_type", header: "Violation Type" },
+                  { key: "slot_code", header: "Location / Slot" },
+                  { key: "notes", header: "Guard Security Notes" },
+                  {
+                    key: "penalty_amount",
+                    header: "Penalty / Fine",
+                    render: (v) =>
+                      v.penalty_amount > 0 ? (
+                        <span style={{ fontWeight: 700, color: "#DC2626" }}>
+                          {formatCurrency(v.penalty_amount)}
+                        </span>
+                      ) : (
+                        <span style={{ color: "var(--brand-body)" }}>Warning Only</span>
+                      ),
+                  },
+                  {
+                    key: "status",
+                    header: "Status",
+                    render: (v) => <StatusBadge status={v.status} />,
+                  },
+                  {
+                    key: "created_at",
+                    header: "Reported Time",
+                    render: (v) => formatDate(v.created_at),
+                  },
+                ]}
+                data={vehicles.violationsList || []}
+                isLoading={vehicles.isLoading}
+                emptyTitle="No Parking Violations"
+                emptyDescription="No parking violations or gate flags recorded for your unit."
+              />
+            )}
           </div>
+
+          {/* CARD 4: GATE ENTRY / EXIT HISTORY (own vehicles only — scoped server-side) */}
+          <div className="gs-card">
+            <h3 className="card-h3" style={{ marginBottom: "0.25rem" }}>
+              Vehicle Gate History
+            </h3>
+            <p style={{ color: "var(--brand-body)", fontSize: "13.5px", marginBottom: "1rem" }}>
+              Recent entries and exits of your registered vehicles, as logged by gate security.
+            </p>
+            {vehicles.isError ? (
+              <ErrorState
+                title="Failed to Load Gate History"
+                message={vehicles.error?.message}
+                onRetry={() => vehicles.refetch()}
+              />
+            ) : (
+              <DataTable
+                columns={[
+                  {
+                    key: "plate",
+                    header: "Vehicle",
+                    render: (e) => (
+                      <span style={{ fontFamily: "monospace", fontWeight: 700 }}>{e.plate}</span>
+                    ),
+                  },
+                  { key: "entry_at", header: "Entered", render: (e) => formatDate(e.entry_at) },
+                  {
+                    key: "exit_at",
+                    header: "Exited",
+                    render: (e) => (e.exit_at ? formatDate(e.exit_at) : "—"),
+                  },
+                  {
+                    key: "status",
+                    header: "Status",
+                    render: (e) => (
+                      <StatusBadge
+                        status={e.status}
+                        label={e.status === "inside" ? "Inside" : "Exited"}
+                      />
+                    ),
+                  },
+                ]}
+                data={vehicles.entriesList || []}
+                isLoading={vehicles.isLoading}
+                emptyTitle="No gate movements yet"
+                emptyDescription="Entries and exits of your registered vehicles will appear here."
+              />
+            )}
+          </div>
+
+          <ReportViolationModal
+            isOpen={reportParkingOpen}
+            onClose={() => setReportParkingOpen(false)}
+            communityId={vehicles.communityId}
+            slots={vehicles.slotsList || []}
+            allowFine={false}
+            onReported={() => vehicles.refetch()}
+          />
         </div>
       )}
 
@@ -5291,7 +5370,7 @@ export function OwnerTenantDashboardView({
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))",
                   gap: "0.75rem",
                 }}
               >
@@ -5425,7 +5504,7 @@ export function OwnerTenantDashboardView({
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
                   gap: "0.75rem",
                   marginBottom: "0.75rem",
                 }}
@@ -7480,7 +7559,7 @@ export function OwnerTenantDashboardView({
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))",
               gap: "0.85rem",
               background: "#FFFFFF",
               border: "1px solid var(--border-light)",
@@ -8216,7 +8295,7 @@ export function OwnerTenantDashboardView({
                 position: "relative",
                 zIndex: 1,
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))",
                 gap: "0.85rem",
                 fontSize: "13px",
               }}
@@ -8512,9 +8591,7 @@ export function OwnerTenantDashboardView({
                 >
                   {f.label}
                 </div>
-                <div style={{ fontSize: "13px", fontWeight: 600, color: "#0F172A" }}>
-                  {f.value}
-                </div>
+                <div style={{ fontSize: "13px", fontWeight: 600, color: "#0F172A" }}>{f.value}</div>
               </div>
             ))}
           </div>
@@ -9553,7 +9630,10 @@ export function OwnerTenantDashboardView({
           onSubmit={async (e) => {
             e.preventDefault();
             const errors: Record<string, string> = {};
-            const cleanPlate = vehRegNumber.trim().toUpperCase().replace(/[\s\-]/g, "");
+            const cleanPlate = vehRegNumber
+              .trim()
+              .toUpperCase()
+              .replace(/[\s\-]/g, "");
 
             if (!cleanPlate) {
               errors.registration_number = "License plate / registration number is required.";

@@ -166,6 +166,9 @@ class ParkingViolation(Base, TimestampMixin, TenantMixin):
 
     id: Mapped[uuid.UUID] = pk()
     vehicle_id: Mapped[uuid.UUID | None] = mapped_column()
+    # The offending plate as observed — kept even when it matches no registered vehicle
+    # (an unauthorized car is usually unregistered). Auto-matched to `vehicle_id` if known.
+    registration_number: Mapped[str | None] = mapped_column(String(20), index=True)
     parking_slot_id: Mapped[uuid.UUID | None] = mapped_column()
     reported_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL")

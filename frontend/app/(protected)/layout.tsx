@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useMe } from "@/hooks/use-auth";
+import { BrandLoader } from "@/components/common/BrandLoader";
 
 /**
  * Auth shell for every protected route. `middleware.ts` does the coarse
@@ -17,15 +18,8 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     if (isFetched && !user) router.replace("/login");
   }, [isFetched, user, router]);
 
-  if (isLoading) {
-    return (
-      <main className="container" aria-busy="true" aria-live="polite">
-        <span className="sr-only">Loading…</span>
-        <div className="card">Loading…</div>
-      </main>
-    );
-  }
-  if (!user) return null;
+  if (isLoading) return <BrandLoader message="Securing your session…" />;
+  if (!user) return <BrandLoader message="Redirecting to sign in…" />;
 
   return <>{children}</>;
 }

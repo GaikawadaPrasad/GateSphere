@@ -4,16 +4,20 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { communicationApi } from "@/lib/api";
 import type { AnnouncementCreate, AnnouncementListStatus } from "@/types/communication";
 
-export function useAnnouncements(params?: {
-  community_id?: string;
-  published_only?: boolean;
-  status?: AnnouncementListStatus;
-  page?: number;
-  page_size?: number;
-}) {
+export function useAnnouncements(
+  params?: {
+    community_id?: string;
+    published_only?: boolean;
+    status?: AnnouncementListStatus;
+    page?: number;
+    page_size?: number;
+  },
+  opts?: { enabled?: boolean },
+) {
   return useQuery({
     queryKey: ["announcements", params],
     queryFn: () => communicationApi.announcements(params),
+    enabled: opts?.enabled ?? true,
     staleTime: 30_000,
   });
 }

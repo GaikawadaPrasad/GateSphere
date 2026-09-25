@@ -16,12 +16,12 @@ global caller on the collection routes.
 | `GET /vehicles/parking/allocations` | `vehicles:view` | – | `200` list | `?active_only=true` |
 | `POST /vehicles/parking/allocations` | `vehicles:approve` | `AllocationCreate` | `201` single | `409 SLOT_TAKEN` / `VEHICLE_HAS_SLOT`; `422 UNIT_SLOT_LIMIT` |
 | `POST /vehicles/parking/allocations/{allocation_id}/release` | `vehicles:update` | – | `200` single | `422 ALREADY_RELEASED` |
-| `GET /vehicles/parking/violations` | `vehicles:view` | – | `200` list | `?violation_status=` |
-| `POST /vehicles/parking/violations` | `vehicles:create` | `ViolationCreate` | `201` single | |
-| `POST /vehicles/parking/violations/{violation_id}/status?new_status=` | `vehicles:update` | – | `200` single | `422 INVALID_TRANSITION` |
-| `GET /vehicles/entries` | `vehicles:view` | – | `200` list | `?plate=`, `?open_only=true` |
-| `POST /vehicles/entries` | `vehicles:create` | `EntryCreate` | `201` single | unknown plate → `is_flagged`; `409 ALREADY_INSIDE` |
-| `PATCH /vehicles/entries/{entry_id}/exit` | `vehicles:update` | – | `200` single | `422 NOT_INSIDE` |
+| `GET /vehicles/parking/violations` | `vehicles:view` | – | `200` list | `?violation_status=`, `?plate=` (partial). Resident: own-unit vehicles + ones they reported |
+| `POST /vehicles/parking/violations` | `vehicles:create` | `ViolationCreate` | `201` single | `registration_number` normalized + auto-matched to a registered vehicle (owner notified `vehicles.violation_reported`); foreign `vehicle_id`/`parking_slot_id` → `404`; `fine_amount` by a resident → `403 STAFF_ONLY` |
+| `POST /vehicles/parking/violations/{violation_id}/status?new_status=` | `vehicles:update` + staff | – | `200` single | `422 INVALID_TRANSITION`; resident → `403 STAFF_ONLY` |
+| `GET /vehicles/entries` | `vehicles:view` | – | `200` list | `?plate=` (partial), `?open_only=true`, `?flagged_only=true`. Resident: own-unit vehicles only |
+| `POST /vehicles/entries` | `vehicles:create` + staff | `EntryCreate` | `201` single | plate normalized (`ka 01-ab 1234`→`KA01AB1234`); blacklisted-visitor plate → `403 PLATE_BLACKLISTED` (policy `block`) or flagged (`warn`); unknown/deactivated plate → `is_flagged` + supervisors notified; `409 ALREADY_INSIDE`; resident → `403 STAFF_ONLY` |
+| `PATCH /vehicles/entries/{entry_id}/exit` | `vehicles:update` + staff | – | `200` single | `422 NOT_INSIDE`; resident → `403 STAFF_ONLY` |
 | `GET /vehicles` | `vehicles:view` | – | `200` list | `?q=` (plate) |
 | `POST /vehicles` | `vehicles:create` | `VehicleCreate` | `201` single | owner XOR; `409 VEHICLE_EXISTS`; `422 INVALID_ENUM` |
 | `GET /vehicles/{vehicle_id}` | `vehicles:view` | – | `200` single | `404` outside scope |

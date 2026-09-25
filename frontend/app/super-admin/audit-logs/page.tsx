@@ -330,7 +330,7 @@ export default function AuditLogsPage() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
                 gap: "0.85rem",
                 padding: "0.85rem",
                 background: "var(--surface-muted, #f8fafc)",

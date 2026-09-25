@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLivePollInterval } from "@/hooks/use-realtime";
 import { api } from "@/lib/api";
 import { deriveTicketEscalationState, isValidPersonName } from "@/lib/utils";
 
@@ -133,9 +134,15 @@ export interface InvoiceItem {
   }[];
 }
 
-export function useResidentOverview(communityId?: string | null) {
+/** Tab gating: a dashboard passes `{ enabled: false }` for data its current tab doesn't show. */
+export interface QueryGate {
+  enabled?: boolean;
+}
+
+export function useResidentOverview(communityId?: string | null, opts?: QueryGate) {
   return useQuery({
     queryKey: ["resident", "overview", communityId],
+    enabled: opts?.enabled ?? true,
     staleTime: 5_000,
     queryFn: async () => {
       const stats = await api.get<any>(
@@ -159,11 +166,13 @@ export function useResidentOverview(communityId?: string | null) {
   });
 }
 
-export function useResidentVisitors() {
+export function useResidentVisitors(opts?: QueryGate) {
+  const livePoll = useLivePollInterval(10000);
   const queryClient = useQueryClient();
 
   const query = useQuery<VisitorRequest[]>({
     queryKey: ["resident", "visitors"],
+    enabled: opts?.enabled ?? true,
     queryFn: async () => {
       const res = await api.get<any[]>("/visitors/requests?page_size=100");
       if (!Array.isArray(res)) return [];
@@ -187,7 +196,7 @@ export function useResidentVisitors() {
         exit_time: r.entries?.[0]?.exit_at,
       }));
     },
-    refetchInterval: 10000,
+    refetchInterval: livePoll,
   });
 
   const decideMutation = useMutation({
@@ -357,11 +366,13 @@ export function useResidentVisitors() {
   return { ...query, decide: decideMutation, createPass: createPassMutation };
 }
 
-export function useResidentDeliveries() {
+export function useResidentDeliveries(opts?: QueryGate) {
+  const livePoll = useLivePollInterval(10000);
   const queryClient = useQueryClient();
 
   const query = useQuery<DeliveryItem[]>({
     queryKey: ["resident", "deliveries"],
+    enabled: opts?.enabled ?? true,
     queryFn: async () => {
       const res = await api.get<any[]>("/deliveries?page_size=100");
       if (!Array.isArray(res)) return [];
@@ -384,7 +395,7 @@ export function useResidentDeliveries() {
         parcel_count: d.parcel_count || 1,
       }));
     },
-    refetchInterval: 10000,
+    refetchInterval: livePoll,
   });
 
   const updateProtocol = useMutation({
@@ -490,11 +501,12 @@ export function useAmenitySlots(amenityId?: string) {
   });
 }
 
-export function useResidentAmenities() {
+export function useResidentAmenities(opts?: QueryGate) {
   const queryClient = useQueryClient();
 
   const amenitiesQuery = useQuery<Amenity[]>({
     queryKey: ["resident", "amenities-list"],
+    enabled: opts?.enabled ?? true,
     queryFn: async () => {
       const res = await api.get<any[]>("/amenities");
       if (!Array.isArray(res)) return [];
@@ -513,6 +525,7 @@ export function useResidentAmenities() {
 
   const bookingsQuery = useQuery<AmenityBooking[]>({
     queryKey: ["resident", "my-bookings"],
+    enabled: opts?.enabled ?? true,
     queryFn: async () => {
       const [bookingsRes, amenitiesRes] = await Promise.all([
         api.get<any[]>("/amenities/bookings?page_size=100"),
@@ -613,11 +626,12 @@ export function useResidentAmenities() {
   };
 }
 
-export function useResidentComplaints() {
+export function useResidentComplaints(opts?: QueryGate) {
   const queryClient = useQueryClient();
 
   const query = useQuery<ComplaintTicket[]>({
     queryKey: ["resident", "complaints"],
+    enabled: opts?.enabled ?? true,
     queryFn: async () => {
       const [res, categoriesRes] = await Promise.all([
         api.get<any[]>("/complaints/tickets?page_size=100"),
@@ -660,14 +674,17 @@ export function useResidentComplaints() {
         );
 
       const profile = await api.get<any>("/residents/me");
-      const activeOccupancy = profile?.occupancies?.find((o: any) => o.is_active) || profile?.occupancies?.[0];
+      const activeOccupancy =
+        profile?.occupancies?.find((o: any) => o.is_active) || profile?.occupancies?.[0];
       const unitId = activeOccupancy?.unit_id || profile?.unit_id;
       if (!unitId) {
         throw new Error("No active unit occupancy found for resident profile");
       }
       const commId = activeOccupancy?.community_id || profile?.community_id;
       let categoryId = payload.category_id;
-      const catUrl = commId ? `/complaints/categories?community_id=${commId}` : "/complaints/categories";
+      const catUrl = commId
+        ? `/complaints/categories?community_id=${commId}`
+        : "/complaints/categories";
       const categories = await api.get<any[]>(catUrl).catch(() => []);
       if (!isUuid(categoryId) && Array.isArray(categories) && categories.length > 0) {
         if (payload.category) {
@@ -778,9 +795,10 @@ export interface LedgerEntryItem {
   created_at: string;
 }
 
-export function useResidentLedger(unitId?: string) {
+export function useResidentLedger(unitId?: string, opts?: QueryGate) {
   return useQuery<LedgerEntryItem[]>({
     queryKey: ["resident", "ledger", unitId],
+    enabled: opts?.enabled ?? true,
     queryFn: async () => {
       let targetUnitId = unitId;
       if (!targetUnitId) {
@@ -806,11 +824,12 @@ export function useResidentLedger(unitId?: string) {
   });
 }
 
-export function useResidentPayments() {
+export function useResidentPayments(opts?: QueryGate) {
   const queryClient = useQueryClient();
 
   const query = useQuery<InvoiceItem[]>({
     queryKey: ["resident", "invoices"],
+    enabled: opts?.enabled ?? true,
     queryFn: async () => {
       const res = await api.get<any[]>("/billing/invoices?page_size=100");
       if (!Array.isArray(res)) return [];
@@ -904,11 +923,12 @@ export interface FamilyMember {
   created_at?: string;
 }
 
-export function useResidentFamilyMembers() {
+export function useResidentFamilyMembers(opts?: QueryGate) {
   const queryClient = useQueryClient();
 
   const query = useQuery<FamilyMember[]>({
     queryKey: ["resident", "family-members"],
+    enabled: opts?.enabled ?? true,
     queryFn: async () => {
       const me = await api.get<any>("/residents/me");
       if (me && Array.isArray(me.family_members)) {
@@ -1111,9 +1131,10 @@ export interface DeliveryProtocolItem {
   is_active: boolean;
 }
 
-export function useResidentDeliveryProtocols() {
+export function useResidentDeliveryProtocols(opts?: QueryGate) {
   return useQuery<DeliveryProtocolItem[]>({
     queryKey: ["resident", "delivery-protocols"],
+    enabled: opts?.enabled ?? true,
     queryFn: async () => {
       const res = await api.get<any[]>("/deliveries/protocols");
       if (!Array.isArray(res)) return [];
@@ -1136,38 +1157,57 @@ export interface ResidentVehicle {
   slot: string;
   rfid_tag: string;
   violations: number;
+  is_active: boolean;
 }
 
-export function useResidentVehicles() {
+export interface ResidentVehicleEntry {
+  id: string;
+  plate: string;
+  entry_at: string;
+  exit_at: string | null;
+  status: string;
+}
+
+export function useResidentVehicles(opts?: QueryGate) {
   const queryClient = useQueryClient();
 
   const query = useQuery<{
+    communityId: string | null;
     vehicles: ResidentVehicle[];
     allocations: any[];
     violations: any[];
+    entries: ResidentVehicleEntry[];
+    slots: any[];
   }>({
     queryKey: ["resident", "vehicles"],
+    enabled: opts?.enabled ?? true,
     queryFn: async () => {
       const me = await api.get<any>("/residents/me").catch(() => null);
-      const communityId = me?.community_id;
+      const communityId: string | null = me?.community_id ?? null;
       const params = {
         ...(communityId ? { community_id: communityId } : {}),
         page_size: 100,
       };
-      const [vehiclesRes, allocationsRes, slotsRes, violationsRes] = await Promise.all([
-        api.get<any[]>("/vehicles", params).catch(() => []),
-        api.get<any[]>("/vehicles/parking/allocations", params).catch(() => []),
-        api.get<any[]>("/vehicles/parking/slots", params).catch(() => []),
-        api.get<any[]>("/vehicles/parking/violations", params).catch(() => []),
+      // The backend scopes every one of these to the resident's own unit(s). A failure
+      // propagates so the tab renders its error state — never a misleading empty list.
+      const [vehiclesRes, allocationsRes, slotsRes, violationsRes, entriesRes] = await Promise.all([
+        api.get<any[]>("/vehicles", params),
+        api.get<any[]>("/vehicles/parking/allocations", params),
+        api.get<any[]>("/vehicles/parking/slots", params),
+        api.get<any[]>("/vehicles/parking/violations", params),
+        api.get<any[]>("/vehicles/entries", { ...params, page_size: 20 }),
       ]);
 
       const rawVehicles = Array.isArray(vehiclesRes) ? vehiclesRes : [];
       const rawAllocations = Array.isArray(allocationsRes) ? allocationsRes : [];
       const rawSlots = Array.isArray(slotsRes) ? slotsRes : [];
       const rawViolations = Array.isArray(violationsRes) ? violationsRes : [];
+      const rawEntries = Array.isArray(entriesRes) ? entriesRes : [];
 
-      const slotMap = new Map<string, string>();
-      for (const s of rawSlots) if (s?.id) slotMap.set(s.id, s.slot_code);
+      const slotById = new Map<string, any>();
+      for (const s of rawSlots) if (s?.id) slotById.set(s.id, s);
+      const plateById = new Map<string, string>();
+      for (const v of rawVehicles) if (v?.id) plateById.set(v.id, v.registration_number);
 
       const allocationByVehicle = new Map<string, any>();
       for (const a of rawAllocations) {
@@ -1176,7 +1216,7 @@ export function useResidentVehicles() {
 
       const violationCountByVehicle = new Map<string, number>();
       for (const v of rawViolations) {
-        if (v?.vehicle_id) {
+        if (v?.vehicle_id && (v.status === "open" || v.status === "acknowledged")) {
           violationCountByVehicle.set(
             v.vehicle_id,
             (violationCountByVehicle.get(v.vehicle_id) || 0) + 1,
@@ -1188,38 +1228,61 @@ export function useResidentVehicles() {
         const alloc = allocationByVehicle.get(v.id);
         return {
           id: v.id,
-          plate: v.registration_number || v.plate_number || "—",
+          plate: v.registration_number || "—",
           make_model: [v.make, v.model].filter(Boolean).join(" ") || v.vehicle_type || "Vehicle",
           vehicle_type: v.vehicle_type || "car",
-          slot: alloc ? slotMap.get(alloc.slot_id) || "Allocated" : "Not Allocated",
+          slot: alloc ? slotById.get(alloc.slot_id)?.slot_code || "Allocated" : "Not Allocated",
           rfid_tag: v.sticker_number || "Not Issued",
           violations: violationCountByVehicle.get(v.id) || 0,
+          is_active: v.is_active !== false,
         };
       });
 
       const parsedViolations = rawViolations.map((v: any) => ({
         id: v.id,
-        violation_type: v.violation_type || "Parking Violation",
-        plate_number: v.plate_number || v.vehicle?.registration_number || "—",
-        slot_code: v.slot_id ? slotMap.get(v.slot_id) || "Unassigned Slot" : "General Parking",
-        notes: v.notes || v.reason || "Misparked / Flagged by security",
-        penalty_amount: Number(v.penalty_amount ?? 0),
+        violation_type: String(v.violation_type || "other").replace(/_/g, " "),
+        plate_number:
+          v.registration_number || (v.vehicle_id ? plateById.get(v.vehicle_id) : undefined) || "—",
+        slot_code: v.parking_slot_id
+          ? slotById.get(v.parking_slot_id)?.slot_code || "Slot"
+          : "General Parking",
+        notes: v.description || "—",
+        penalty_amount: Number(v.fine_amount ?? 0),
         status: v.status || "open",
-        created_at: v.created_at || v.reported_at || new Date().toISOString(),
+        created_at: v.occurred_at || v.created_at,
       }));
 
-      const parsedAllocations = rawAllocations.map((a: any) => ({
-        id: a.id,
-        slot_code: slotMap.get(a.slot_id) || a.slot_code || "Allocated Slot",
-        slot_type: a.slot_type || "Reserved Resident Slot",
-        status: a.status || "active",
-        valid_from: a.valid_from || a.created_at,
+      const parsedAllocations = rawAllocations
+        .filter((a: any) => a.status === "active")
+        .map((a: any) => {
+          const slot = slotById.get(a.slot_id);
+          return {
+            id: a.id,
+            slot_code: slot?.slot_code || "Allocated Slot",
+            slot_type: slot
+              ? `${slot.slot_type}${slot.level ? ` · ${slot.level}` : ""}`
+              : "Resident slot",
+            vehicle: plateById.get(a.vehicle_id) || "—",
+            status: a.status,
+            valid_from: a.allocated_from,
+          };
+        });
+
+      const entries: ResidentVehicleEntry[] = rawEntries.map((e: any) => ({
+        id: e.id,
+        plate: e.registration_number,
+        entry_at: e.entry_at,
+        exit_at: e.exit_at,
+        status: e.status,
       }));
 
       return {
+        communityId,
         vehicles: vehiclesList,
         allocations: parsedAllocations,
         violations: parsedViolations,
+        entries,
+        slots: rawSlots,
       };
     },
   });
@@ -1247,6 +1310,9 @@ export function useResidentVehicles() {
     vehiclesList: query.data?.vehicles || [],
     allocationsList: query.data?.allocations || [],
     violationsList: query.data?.violations || [],
+    entriesList: query.data?.entries || [],
+    slotsList: query.data?.slots || [],
+    communityId: query.data?.communityId ?? null,
     registerVehicle: registerVehicleMutation,
   };
 }
@@ -1263,9 +1329,11 @@ export interface AssignedDomesticStaff {
   last_check_in?: string;
 }
 
-export function useResidentDomesticStaff(unitId?: string) {
+export function useResidentDomesticStaff(unitId?: string, opts?: QueryGate) {
+  const livePoll = useLivePollInterval(15000);
   return useQuery<AssignedDomesticStaff[]>({
     queryKey: ["resident", "domestic-staff", unitId],
+    enabled: opts?.enabled ?? true,
     queryFn: async () => {
       let targetUnitId = unitId;
       if (!targetUnitId) {
@@ -1309,7 +1377,7 @@ export function useResidentDomesticStaff(unitId?: string) {
         };
       });
     },
-    refetchInterval: 15000,
+    refetchInterval: livePoll,
   });
 }
 

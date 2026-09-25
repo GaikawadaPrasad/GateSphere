@@ -113,7 +113,7 @@ must update this page in the same PR.
 | `vehicles` | `community_id`, `resident_profile_id` XOR `visitor_id`, `unit_id`, `vehicle_type`, `registration_number`, `make`, `model`, `color`, `sticker_number`, `is_active` | UQ `(community_id, registration_number)`. Ownership per rule: resident XOR visitor. |
 | `parking_slots` | `community_id`, `tower_id`, `slot_code`, `slot_type`, `level`, `status`, `is_guest_slot`, `reserved_for_unit_id` | |
 | `parking_allocations` | `community_id`, `slot_id`, `vehicle_id`, `unit_id`, `allocated_from`, `allocated_to`, `status`, `allocated_by_user_id` | Partial-UQ one active allocation per slot (unless multi-slot enabled); one active allocation per vehicle. `CHECK from < to`. |
-| `parking_violations` | `community_id`, `vehicle_id`, `parking_slot_id`, `reported_by_user_id`, `violation_type`, `description`, `occurred_at`, `evidence_url`, `fine_amount`, `status`, `resolved_at` | |
+| `parking_violations` | `community_id`, `vehicle_id`, `registration_number` (observed plate, indexed — kept for unregistered cars; migration `0050`), `parking_slot_id`, `reported_by_user_id`, `violation_type`, `description`, `occurred_at`, `evidence_url`, `fine_amount`, `status`, `resolved_at` | |
 | `vehicle_entries` | `community_id`, `vehicle_id`, `registration_number`, `gate_id`, `entry_at`, `exit_at`, `entry_guard_user_id`, `exit_guard_user_id`, `source_type`, `reference_id`, `status` | Automated plate logging; unknown plates flagged. |
 | `parking_rules` | one active row per community: `allow_multi_slot_vehicle`, `allow_guest_parking`, `max_active_slots_per_unit`, `violation_grace_minutes` | Config-as-data. |
 

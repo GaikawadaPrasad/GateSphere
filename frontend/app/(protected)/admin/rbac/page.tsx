@@ -196,7 +196,7 @@ export default function AdminRbacPage() {
         breadcrumbs={[{ label: "Admin", href: "/admin/community" }, { label: "RBAC Management" }]}
       />
 
-      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem" }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "1.5rem" }}>
         <button
           type="button"
           className={`btn ${activeTab === "roles" ? "btn-primary" : "btn-secondary"}`}

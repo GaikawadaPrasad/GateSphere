@@ -2,9 +2,16 @@
 
 - Vehicle owner is resident XOR visitor (also a DB CHECK).
 - One active allocation per slot and per vehicle; `max_active_slots_per_unit` from
-  `parking_rules` (config-as-data) caps a unit.
-- Gate entry logs by plate; an unknown plate is flagged. One open entry per plate.
-- Violations: open -> acknowledged -> resolved / waived.
+  `parking_rules` (config-as-data) caps a unit. Blocked / other-unit-reserved slots and
+  deactivated vehicles cannot be allocated.
+- Gate entry logs by plate; an unknown plate is flagged (supervisors notified). One open
+  entry per plate. A plate linked to a blacklisted visitor is intercepted *before* the
+  entry is recorded (`visitor_policies.blacklist_mode`: block rejects, warn flags).
+- Violations: open -> acknowledged -> resolved / waived. The observed plate is kept and
+  auto-matched to a registered vehicle; the owning resident is notified.
+- Gate operations (entry/exit), allocation release, violation transitions and fines are
+  staff-only: a unit-restricted actor (plain resident) gets 403 `STAFF_ONLY`. A resident
+  sees only their own unit's vehicles, allocations, gate history and violations.
 """
 
 from __future__ import annotations
@@ -17,10 +24,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.context import RequestContext
-from app.core.errors import BusinessRuleError, ConflictError, NotFoundError
+from app.core.errors import BusinessRuleError, ConflictError, ForbiddenError, NotFoundError
 from app.core.tenancy import TenantScope
 from app.modules.audit.service import record_audit_async
 from app.modules.communities.repository import gate_in_scope
+from app.modules.notifications import events as notif_events
 from app.modules.residents.access import UnitScopedAccess
 from app.modules.residents.models import ResidentProfile
 from app.modules.uploads.guard import ensure_confirmed_async
@@ -42,7 +50,7 @@ from app.modules.vehicles.repository import (
     VehicleRepository,
     ViolationRepository,
 )
-from app.modules.vehicles.schemas import ALLOWED
+from app.modules.vehicles.schemas import ALLOWED, plate_search_term
 
 _DEFAULT_RULE = {
     "allow_multi_slot_vehicle": False,
@@ -102,6 +110,24 @@ class VehicleService(UnitScopedAccess):
             **kw,
         )
 
+    async def _require_staff(self, community_id: uuid.UUID, what: str) -> None:
+        """Gate / parking operations belong to community staff, never a plain resident —
+        `vehicles:create/update` is granted to residents for their *own* registry only."""
+        if await self.is_unit_restricted(community_id):
+            raise ForbiddenError(f"Only community staff can {what}", code="STAFF_ONLY")
+
+    async def _vehicle_in(self, community_id: uuid.UUID, vehicle_id: uuid.UUID) -> Vehicle:
+        vehicle = await self.vehicles.get(vehicle_id)
+        if vehicle is None or vehicle.community_id != community_id:
+            raise NotFoundError("Vehicle not found")
+        return vehicle
+
+    async def _slot_in(self, community_id: uuid.UUID, slot_id: uuid.UUID) -> ParkingSlot:
+        slot = await self.slots.get(slot_id)
+        if slot is None or slot.community_id != community_id:
+            raise NotFoundError("Slot not found")
+        return slot
+
     def _one_community(self, community_id: uuid.UUID | None) -> uuid.UUID:
         if community_id is not None:
             return self.scope.require(community_id)
@@ -147,7 +173,7 @@ class VehicleService(UnitScopedAccess):
     ) -> Vehicle:
         cid = self._one_community(community_id)
         _enum("vehicle_type", payload.vehicle_type)
-        plate = payload.registration_number.upper()
+        plate = payload.registration_number  # normalized by the schema
         if await self.vehicles.by_plate(cid, plate):
             raise ConflictError("That plate is already registered", code="VEHICLE_EXISTS")
 
@@ -200,10 +226,11 @@ class VehicleService(UnitScopedAccess):
     async def update_vehicle(
         self, vehicle_id: uuid.UUID, payload: schemas.VehicleUpdate
     ) -> Vehicle:
-        obj = await self.get_vehicle(vehicle_id)
-        if await self.is_unit_restricted():
-            await self._assert_unit_visible(obj.unit_id)
+        obj = await self.get_vehicle(vehicle_id)  # own-unit check for a resident
         patch = payload.model_dump(exclude_unset=True)
+        if "unit_id" in patch and await self.is_unit_restricted(obj.community_id):
+            # A resident may only move a vehicle between units they occupy.
+            await self._assert_unit_visible(patch["unit_id"], obj.community_id)
         _enum("vehicle_type", patch.get("vehicle_type"))
         for k, v in patch.items():
             setattr(obj, k, v)
@@ -217,7 +244,7 @@ class VehicleService(UnitScopedAccess):
         cid = self._one_community(community_id)
         stmt = select(Vehicle).where(Vehicle.community_id == cid)
         if q:
-            stmt = stmt.where(Vehicle.registration_number.ilike(f"%{q.upper()}%"))
+            stmt = stmt.where(Vehicle.registration_number.ilike(f"%{plate_search_term(q)}%"))
         stmt = await self._scope_unit_column(stmt, Vehicle.unit_id)
         stmt = stmt.order_by(Vehicle.registration_number)
         return await self.vehicles.list(
@@ -268,9 +295,18 @@ class VehicleService(UnitScopedAccess):
         slot = await self.slots.get(payload.slot_id)
         if slot is None:
             raise NotFoundError("Slot not found")
-        vehicle = await self.vehicles.get(payload.vehicle_id)
-        if vehicle is None or vehicle.community_id != slot.community_id:
-            raise NotFoundError("Vehicle not found")
+        vehicle = await self._vehicle_in(slot.community_id, payload.vehicle_id)
+        if not vehicle.is_active:
+            raise BusinessRuleError("Vehicle is deactivated", code="VEHICLE_INACTIVE")
+        if slot.status == "blocked":
+            raise BusinessRuleError("Slot is blocked", code="SLOT_BLOCKED")
+        unit_id = payload.unit_id or vehicle.unit_id
+        if slot.reserved_for_unit_id is not None and slot.reserved_for_unit_id != unit_id:
+            raise BusinessRuleError(
+                "Slot is reserved for another unit",
+                code="SLOT_RESERVED",
+                fields={"slot_id": "reserved for another unit"},
+            )
         rule = await self._rule(slot.community_id)
         if await self.allocations.active_for_slot(slot.id):
             raise ConflictError("Slot is already allocated", code="SLOT_TAKEN")
@@ -278,7 +314,6 @@ class VehicleService(UnitScopedAccess):
             vehicle.id
         ):
             raise ConflictError("Vehicle already has a slot", code="VEHICLE_HAS_SLOT")
-        unit_id = payload.unit_id or vehicle.unit_id
         if unit_id is not None:
             in_use = await self.allocations.active_count_for_unit(unit_id)
             if in_use >= rule.max_active_slots_per_unit:
@@ -301,6 +336,7 @@ class VehicleService(UnitScopedAccess):
         obj = await self.allocations.get(allocation_id)
         if obj is None:
             raise NotFoundError("Allocation not found")
+        await self._require_staff(obj.community_id, "release a parking allocation")
         if obj.status != "active":
             raise BusinessRuleError("Allocation already released", code="ALREADY_RELEASED")
         obj.status = "released"
@@ -337,11 +373,25 @@ class VehicleService(UnitScopedAccess):
         self, payload: schemas.EntryCreate, *, community_id: uuid.UUID | None
     ) -> VehicleEntry:
         cid = self._one_community(community_id)
+        await self._require_staff(cid, "log a gate entry")
         _enum("source_type", payload.source_type)
-        plate = payload.registration_number.upper()
+        plate = payload.registration_number  # normalized by the schema
+        # Blacklist interception comes first — before any gate transaction is recorded.
+        hit = await self.vehicles.plate_blacklist_hit(cid, plate)
+        blacklist_warn = False
+        if hit is not None:
+            if await self.vehicles.blacklist_mode(cid) == "block":
+                raise ForbiddenError(
+                    f"Vehicle {plate} is linked to a blacklisted visitor: {hit.reason}",
+                    code="PLATE_BLACKLISTED",
+                    fields={"reason": hit.reason, "risk_level": hit.risk_level},
+                )
+            blacklist_warn = True
         if await self.entries.open_for_plate(cid, plate):
             raise ConflictError("That vehicle is already inside", code="ALREADY_INSIDE")
         vehicle = await self.vehicles.by_plate(cid, plate)
+        if vehicle is not None and not vehicle.is_active:
+            vehicle = None  # a deactivated registration no longer vouches for the plate
         obj = VehicleEntry(
             community_id=cid,
             vehicle_id=vehicle.id if vehicle else None,
@@ -351,18 +401,38 @@ class VehicleService(UnitScopedAccess):
             source_type=payload.source_type,
             reference_id=payload.reference_id,
             status="inside",
-            is_flagged=vehicle is None,
+            is_flagged=vehicle is None or blacklist_warn,
         )
         await self.entries.add(obj)
         await self._audit(
-            "entry.create", cid, "vehicle_entry", obj.id, new={"flagged": obj.is_flagged}
+            "entry.create",
+            cid,
+            "vehicle_entry",
+            obj.id,
+            new={"plate": plate, "flagged": obj.is_flagged, "blacklist_warn": blacklist_warn},
         )
+        if obj.is_flagged:
+            reason = "linked to a blacklisted visitor" if blacklist_warn else "not registered"
+            await notif_events.emit_to_roles(
+                self.db,
+                self.scope,
+                self.actor,
+                self.ctx,
+                community_id=cid,
+                role_slugs=["security_supervisor"],
+                notification_type="vehicles.entry_flagged",
+                title="Flagged vehicle entered",
+                message=f"Vehicle {plate} entered the premises — {reason}.",
+                reference_type="vehicle_entry",
+                reference_id=obj.id,
+            )
         return obj
 
     async def record_exit(self, entry_id: uuid.UUID) -> VehicleEntry:
         obj = await self.entries.get(entry_id)
         if obj is None:
             raise NotFoundError("Entry not found")
+        await self._require_staff(obj.community_id, "log a gate exit")
         if obj.status != "inside":
             raise BusinessRuleError("Entry is not open", code="NOT_INSIDE")
         obj.status = "exited"
@@ -380,15 +450,24 @@ class VehicleService(UnitScopedAccess):
         open_only: bool,
         offset: int,
         limit: int,
+        flagged_only: bool = False,
     ) -> tuple[list[VehicleEntry], int]:
         stmt = select(VehicleEntry)
         if community_id is not None:
             self.scope.require(community_id)
             stmt = stmt.where(VehicleEntry.community_id == community_id)
         if plate:
-            stmt = stmt.where(VehicleEntry.registration_number == plate.upper())
+            stmt = stmt.where(
+                VehicleEntry.registration_number.ilike(f"%{plate_search_term(plate)}%")
+            )
         if open_only:
             stmt = stmt.where(VehicleEntry.status == "inside")
+        if flagged_only:
+            stmt = stmt.where(VehicleEntry.is_flagged.is_(True))
+        # A resident sees only the gate history of vehicles registered to their unit(s).
+        unit_scope = await self._unit_scope(community_id)
+        if unit_scope is not None:
+            stmt = stmt.where(VehicleEntry.vehicle_id.in_(self.vehicles.ids_for_units(unit_scope)))
         stmt = stmt.order_by(VehicleEntry.entry_at.desc())
         return await self.entries.list(
             offset=offset, limit=limit, extra=stmt
@@ -400,10 +479,22 @@ class VehicleService(UnitScopedAccess):
     ) -> ParkingViolation:
         cid = self._one_community(community_id)
         _enum("violation_type", payload.violation_type)
+        if payload.fine_amount is not None:
+            await self._require_staff(cid, "levy a parking fine")
         await ensure_confirmed_async(self.db, payload.evidence_url)
+        # Every referenced row must live in this community (no cross-tenant references).
+        vehicle: Vehicle | None = None
+        if payload.vehicle_id is not None:
+            vehicle = await self._vehicle_in(cid, payload.vehicle_id)
+        elif payload.registration_number is not None:
+            vehicle = await self.vehicles.by_plate(cid, payload.registration_number)
+        if payload.parking_slot_id is not None:
+            await self._slot_in(cid, payload.parking_slot_id)
+        plate = vehicle.registration_number if vehicle else payload.registration_number
         obj = ParkingViolation(
             community_id=cid,
-            vehicle_id=payload.vehicle_id,
+            vehicle_id=vehicle.id if vehicle else None,
+            registration_number=plate,
             parking_slot_id=payload.parking_slot_id,
             reported_by_user_id=self.actor.id,
             violation_type=payload.violation_type,
@@ -412,7 +503,30 @@ class VehicleService(UnitScopedAccess):
             fine_amount=payload.fine_amount,
         )
         await self.violations.add(obj)
-        await self._audit("violation.report", cid, "parking_violation", obj.id)
+        await self._audit(
+            "violation.report",
+            cid,
+            "parking_violation",
+            obj.id,
+            new={"plate": plate, "type": obj.violation_type, "fine": str(obj.fine_amount or "")},
+        )
+        if vehicle is not None:
+            await notif_events.emit(
+                self.db,
+                self.scope,
+                self.actor,
+                self.ctx,
+                recipient_user_id=await self.vehicles.owner_user_id(vehicle),
+                community_id=cid,
+                notification_type="vehicles.violation_reported",
+                title="Parking violation reported",
+                message=(
+                    f"A '{obj.violation_type.replace('_', ' ')}' parking violation was "
+                    f"reported for your vehicle {vehicle.registration_number}."
+                ),
+                reference_type="parking_violation",
+                reference_id=obj.id,
+            )
         return obj
 
     async def transition_violation(
@@ -421,17 +535,26 @@ class VehicleService(UnitScopedAccess):
         obj = await self.violations.get(violation_id)
         if obj is None:
             raise NotFoundError("Violation not found")
+        await self._require_staff(obj.community_id, "change a violation's status")
         _enum("violation_status", new_status)
         if new_status not in _VIOLATION_TRANSITIONS[obj.status]:
             raise BusinessRuleError(
                 f"Cannot move a '{obj.status}' violation to '{new_status}'",
                 code="INVALID_TRANSITION",
             )
+        old_status = obj.status
         obj.status = new_status
         if new_status in ("resolved", "waived"):
             obj.resolved_at = datetime.now(UTC)
         await self.db.flush()
-        await self._audit(f"violation.{new_status}", obj.community_id, "parking_violation", obj.id)
+        await self._audit(
+            f"violation.{new_status}",
+            obj.community_id,
+            "parking_violation",
+            obj.id,
+            old={"status": old_status},
+            new={"status": new_status},
+        )
         return obj
 
     async def list_violations(
@@ -441,6 +564,7 @@ class VehicleService(UnitScopedAccess):
         violation_status: str | None,
         offset: int,
         limit: int,
+        plate: str | None = None,
     ) -> tuple[list[ParkingViolation], int]:
         _enum("violation_status", violation_status)
         stmt = select(ParkingViolation)
@@ -449,16 +573,20 @@ class VehicleService(UnitScopedAccess):
             stmt = stmt.where(ParkingViolation.community_id == community_id)
         if violation_status:
             stmt = stmt.where(ParkingViolation.status == violation_status)
-        if await self.is_unit_restricted():
-            scope = await self._unit_scope()
-            if scope:
-                my_veh_ids = select(Vehicle.id).where(Vehicle.unit_id.in_(scope))
+        if plate:
+            stmt = stmt.where(
+                ParkingViolation.registration_number.ilike(f"%{plate_search_term(plate)}%")
+            )
+        # A resident sees violations against their unit's vehicles, plus ones they reported.
+        unit_scope = await self._unit_scope(community_id)
+        if unit_scope is not None:
+            mine = ParkingViolation.reported_by_user_id == self.actor.id
+            if unit_scope:
                 stmt = stmt.where(
-                    ParkingViolation.vehicle_id.in_(my_veh_ids)
-                    | (ParkingViolation.reported_by_user_id == self.actor.id)
+                    ParkingViolation.vehicle_id.in_(self.vehicles.ids_for_units(unit_scope)) | mine
                 )
             else:
-                stmt = stmt.where(ParkingViolation.reported_by_user_id == self.actor.id)
+                stmt = stmt.where(mine)
         stmt = stmt.order_by(ParkingViolation.occurred_at.desc())
         return await self.violations.list(
             offset=offset, limit=limit, extra=stmt

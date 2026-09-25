@@ -1,0 +1,29 @@
+%% Module: realtime (cross-cutting, AGENTS.md §5.7, ADR-011)
+%% Files: app/core/realtime.py, app/modules/realtime/{router,service,hub,repository,schemas}.py
+flowchart TD
+    subgraph EMIT["Emit (inside the request / job transaction)"]
+        A1["record_audit_async (every audited change)"] --> Q1["queue_community_event → db.info"]
+        A2["NotificationService.dispatch"] --> Q2["queue_user_event → db.info"]
+        A3["events.emit_many (broadcast)"] --> Q1
+    end
+    Q1 & Q2 --> CM{"commit ok?"}
+    CM -->|"yes (get_async_db / job_session)"| PUB["publish_pending → Redis PUBLISH (worker thread, dedup)"]
+    CM -->|rollback| DROP["discard_pending"]
+
+    T["POST /realtime/ticket (require_auth_async + CSRF)"] --> TK["issue_ticket: setex gs:rt:ticket:sha256, 30 s"]
+    T -->|redis down| E503["503 REALTIME_UNAVAILABLE"]
+
+    W["WS /realtime/ws?ticket="] --> O{"Origin in CORS allow-list?"}
+    O -->|no| C4403["close 4403"]
+    O -->|yes| CT{"consume_ticket (GETDEL) + live_session_user?"}
+    CT -->|no| C4401["close 4401"]
+    CT -->|yes| LIM{"fewer than 10 sockets for user?"}
+    LIM -->|no| C4429["close 4429"]
+    LIM -->|yes| ACC["accept; auto-subscribe single community; send hello"]
+    ACC --> SUB["subscribe → authorize_community (membership + perms + unit scope)"]
+    SUB -->|"denied / unknown"| EF["error FORBIDDEN_SCOPE"]
+    ACC --> REV["every 5 min: session revoked or expired → close 4401"]
+
+    PUB --> HUB["Hub: psubscribe gs:rt:community:* and gs:rt:user:*"]
+    HUB --> F{"client_payload: actor? view perm? resident module? community match?"}
+    F -->|forward| OUT["bounded outbox → invalidate frame (overflow → resync)"]

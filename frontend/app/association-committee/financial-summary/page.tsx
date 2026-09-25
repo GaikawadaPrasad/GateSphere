@@ -328,8 +328,9 @@ export default function FinancialSummaryPage() {
       <div
         style={{
           display: "flex",
+          flexWrap: "wrap", // tabs wrap on phones instead of running off-screen
           borderBottom: "1px solid var(--border)",
-          gap: "1.5rem",
+          columnGap: "1.5rem",
           marginBottom: "1.5rem",
         }}
       >
@@ -424,7 +425,7 @@ export default function FinancialSummaryPage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
               gap: "1rem",
             }}
           >
@@ -535,7 +536,7 @@ export default function FinancialSummaryPage() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))",
                 gap: "1rem",
               }}
             >

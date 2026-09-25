@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 from app.core.constants import PASSWORD_MIN_LENGTH
 
@@ -45,6 +45,16 @@ class ProfileUpdateRequest(BaseModel):
 
     full_name: str | None = Field(default=None, min_length=1, max_length=255)
     phone: str | None = Field(default=None, max_length=20, pattern=r"^[+0-9][0-9 \-]{4,19}$")
+
+    @field_validator("full_name")
+    @classmethod
+    def validate_full_name(cls, v: str | None) -> str | None:
+        if v is not None:
+            trimmed = v.strip()
+            if trimmed.isdigit() or not any(c.isalpha() for c in trimmed):
+                raise ValueError("Full name must contain alphabetic characters and cannot be purely numeric.")
+            return trimmed
+        return v
 
     @model_validator(mode="after")
     def check_at_least_one_field(self) -> ProfileUpdateRequest:

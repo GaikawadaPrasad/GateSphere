@@ -8,15 +8,8 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { EmptyState } from "@/components/common/EmptyState";
-import { useQueryClient } from "@tanstack/react-query";
-import {
-  gateApi,
-  dashboardsApi,
-  visitorsApi,
-  deliveriesApi,
-  domesticStaffApi,
-  blacklistApi,
-} from "@/lib/api";
+import { gateApi, dashboardsApi, deliveriesApi, blacklistApi } from "@/lib/api";
+import { useRealtimeRefresh } from "@/hooks/use-realtime";
 import type { SecurityStats } from "@/types/dashboards";
 import type { GuardRoster, GateEvent, PanicAlert } from "@/types/gate";
 import { formatDateTime } from "@/lib/utils";
@@ -33,7 +26,6 @@ const EMERGENCY_TYPES = [
 
 export default function SecuritySupervisorDashboardPage() {
   const router = useRouter();
-  const queryClient = useQueryClient();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Emergency Modal
@@ -54,32 +46,24 @@ export default function SecuritySupervisorDashboardPage() {
   const [recentEvents, setRecentEvents] = useState<GateEvent[]>([]);
   const [activeAlerts, setActiveAlerts] = useState<PanicAlert[]>([]);
 
-  const loadData = async () => {
-    setIsLoading(true);
-    const [
-      statsRes,
-      visitorsRes,
-      deliveriesRes,
-      staffRes,
-      blacklistRes,
-      rostersRes,
-      eventsRes,
-      alertsRes,
-    ] = await Promise.allSettled([
-      dashboardsApi.security(),
-      visitorsApi.requests(),
-      deliveriesApi.list(),
-      domesticStaffApi.attendance({ open_only: true }),
-      blacklistApi.list(),
-      gateApi.rosters(),
-      gateApi.events({ page_size: 5 }),
-      gateApi.alerts(),
-    ]);
-    if (statsRes.status === "fulfilled") setSecurityStats(statsRes.value);
-    if (visitorsRes.status === "fulfilled") {
-      setPendingVisitorCount(
-        (visitorsRes.value || []).filter((v: any) => v.status === "pending").length,
-      );
+  // `showLoading` only on first load: a realtime-triggered refresh keeps data on screen.
+  const loadData = async (showLoading = true) => {
+    if (showLoading) setIsLoading(true);
+    // Pending approvals and staff inside come from the server-side aggregate
+    // (`/dashboards/security`) — no need to download every request / attendance row.
+    const [statsRes, deliveriesRes, blacklistRes, rostersRes, eventsRes, alertsRes] =
+      await Promise.allSettled([
+        dashboardsApi.security(),
+        deliveriesApi.list(),
+        blacklistApi.list(),
+        gateApi.rosters(),
+        gateApi.events({ page_size: 5 }),
+        gateApi.alerts(),
+      ]);
+    if (statsRes.status === "fulfilled") {
+      setSecurityStats(statsRes.value);
+      setPendingVisitorCount(statsRes.value?.pending_visitor_approvals ?? 0);
+      setStaffInsideCount(statsRes.value?.staff_inside ?? 0);
     }
     if (deliveriesRes.status === "fulfilled") {
       setDeliveriesTodayCount((deliveriesRes.value || []).length);
@@ -87,7 +71,6 @@ export default function SecuritySupervisorDashboardPage() {
         (deliveriesRes.value || []).filter((d: any) => d.status === "at_gate").length,
       );
     }
-    if (staffRes.status === "fulfilled") setStaffInsideCount((staffRes.value || []).length);
     if (blacklistRes.status === "fulfilled")
       setBlacklistCount((blacklistRes.value || []).filter((b: any) => b.is_active).length);
     if (rostersRes.status === "fulfilled")
@@ -97,17 +80,18 @@ export default function SecuritySupervisorDashboardPage() {
       setActiveAlerts(
         (alertsRes.value || []).filter((a) => a.status === "active" || a.status === "acknowledged"),
       );
-    setIsLoading(false);
+    if (showLoading) setIsLoading(false);
   };
 
   useEffect(() => {
     loadData();
   }, []);
+  // Live: refresh on realtime hints for the modules this dashboard shows (poll if offline).
+  useRealtimeRefresh(["gate", "visitors", "deliveries", "domestic_staff"], () => loadData(false));
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await queryClient.invalidateQueries();
-    await loadData();
+    await loadData(false);
     setIsRefreshing(false);
     toast.success("Security dashboard refreshed");
   };
@@ -188,7 +172,7 @@ export default function SecuritySupervisorDashboardPage() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
           gap: "1.25rem",
           marginBottom: "1.75rem",
         }}

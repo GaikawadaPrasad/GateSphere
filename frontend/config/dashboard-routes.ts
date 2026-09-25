@@ -77,6 +77,10 @@ export const ROUTE_TITLE_MAP: Record<string, { title: string; subtitle: string }
     title: "Domestic Staff Monitoring",
     subtitle: "Staff attendance, registered access permissions, and check-in logs",
   },
+  "/security-supervisor/vehicles": {
+    title: "Vehicle & Parking Oversight",
+    subtitle: "Vehicle gate movements, flagged plates, parking violations, and slot occupancy",
+  },
   "/security-supervisor/blacklist": {
     title: "Blacklist Management",
     subtitle: "Restricted entry registry, violation tracking, and attempted entry alerts",
@@ -121,6 +125,10 @@ export const ROUTE_TITLE_MAP: Record<string, { title: string; subtitle: string }
   "/security-guard/deliveries": {
     title: "Delivery Check",
     subtitle: "Verify courier, check resident protocol, or mark left at gate desk",
+  },
+  "/security-guard/vehicles": {
+    title: "Vehicle Gate Desk",
+    subtitle: "Plate entry/exit logging, registration check, and parking violation reports",
   },
   "/security-guard/cab-taxi": {
     title: "Cab & Taxi Verification",

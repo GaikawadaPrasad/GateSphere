@@ -462,7 +462,11 @@ export default function CommunityAdminBillingPage() {
     {
       key: "unit_number",
       header: "Unit",
-      render: (i) => <span>{i.tower_name ? `${i.tower_name}, ` : ""}Unit {i.unit_number || i.unit_id?.slice(0, 8)}</span>,
+      render: (i) => (
+        <span>
+          {i.tower_name ? `${i.tower_name}, ` : ""}Unit {i.unit_number || i.unit_id?.slice(0, 8)}
+        </span>
+      ),
     },
     {
       key: "total_amount",
@@ -806,7 +810,7 @@ export default function CommunityAdminBillingPage() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
           gap: "1rem",
         }}
       >
@@ -977,7 +981,7 @@ export default function CommunityAdminBillingPage() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))",
                   gap: "1rem",
                 }}
               >
@@ -1113,7 +1117,8 @@ export default function CommunityAdminBillingPage() {
                 {units && units.length > 0 ? (
                   units.map((u) => (
                     <option key={u.id} value={u.id}>
-                      {u.tower_name ? `${u.tower_name}, ` : ""}Unit {u.unit_number} {u.unit_type ? `(${u.unit_type})` : ""} {u.sq_ft ? `• ${u.sq_ft} sqft` : ""}
+                      {u.tower_name ? `${u.tower_name}, ` : ""}Unit {u.unit_number}{" "}
+                      {u.unit_type ? `(${u.unit_type})` : ""} {u.sq_ft ? `• ${u.sq_ft} sqft` : ""}
                     </option>
                   ))
                 ) : (
@@ -1594,7 +1599,8 @@ export default function CommunityAdminBillingPage() {
                 <option value="">Select a unit...</option>
                 {units?.map((u) => (
                   <option key={u.id} value={u.id}>
-                    {u.tower_name ? `${u.tower_name}, ` : ""}Unit {u.unit_number} {u.unit_type ? `(${u.unit_type})` : ""}
+                    {u.tower_name ? `${u.tower_name}, ` : ""}Unit {u.unit_number}{" "}
+                    {u.unit_type ? `(${u.unit_type})` : ""}
                   </option>
                 ))}
               </select>

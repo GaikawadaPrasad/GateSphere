@@ -3,7 +3,7 @@ import { AUDITOR_NAV_ITEMS } from "@/config/dashboard-navigation";
 import { isAuditor, can } from "@/lib/permissions";
 import type { CurrentUser } from "@/types/auth";
 
-describe("Auditor Role & 11 Modules Read-Only Integrity Test", () => {
+describe("Auditor Role & 12 Modules Read-Only Integrity Test", () => {
   const auditor: CurrentUser = {
     id: "auditor-01",
     email: "compliance@gatesphere.com",
@@ -26,14 +26,15 @@ describe("Auditor Role & 11 Modules Read-Only Integrity Test", () => {
     roles: [{ id: "r-auditor", role_slug: "auditor", community_id: "comm-1" }],
   };
 
-  it("contains exactly 11 modules in the Auditor navigation specification", () => {
-    expect(AUDITOR_NAV_ITEMS).toHaveLength(11);
+  it("contains exactly 12 modules in the Auditor navigation specification", () => {
+    expect(AUDITOR_NAV_ITEMS).toHaveLength(12);
     const moduleSlugs = AUDITOR_NAV_ITEMS.map((item) => item.id);
     expect(moduleSlugs).toContain("overview");
     expect(moduleSlugs).toContain("audit-logs");
     expect(moduleSlugs).toContain("user-activity");
     expect(moduleSlugs).toContain("gate-activity");
     expect(moduleSlugs).toContain("visitor-records");
+    expect(moduleSlugs).toContain("vehicle-records");
     expect(moduleSlugs).toContain("maintenance-records");
     expect(moduleSlugs).toContain("vendor-activity");
     expect(moduleSlugs).toContain("incident-records");
@@ -42,7 +43,7 @@ describe("Auditor Role & 11 Modules Read-Only Integrity Test", () => {
     expect(moduleSlugs).toContain("audit-search");
   });
 
-  it("prohibits any write, delete, or update action across all 11 modules for the auditor role", () => {
+  it("prohibits any write, delete, or update action across all 12 modules for the auditor role", () => {
     expect(isAuditor(auditor)).toBe(true);
 
     const writeActions = [

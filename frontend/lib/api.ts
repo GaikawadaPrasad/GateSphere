@@ -52,6 +52,15 @@ import type {
   BlacklistEntry,
 } from "@/types/visitors";
 import type { DeliveryItem, DeliveryProtocol, DeliveryCreatePayload } from "@/types/deliveries";
+import type {
+  ParkingAllocation,
+  ParkingSlot,
+  ParkingViolation,
+  RecordEntryPayload,
+  ReportViolationPayload,
+  Vehicle,
+  VehicleEntry,
+} from "@/types/vehicles";
 
 export type {
   CurrentUser,
@@ -1351,6 +1360,60 @@ export const vehiclesApi = {
       { new_status: newStatus },
     ),
   delete: (id: string) => apiSend<void>("PATCH", `/vehicles/${id}`, { is_active: false }),
+
+  // -- typed, paginated reads for the gate / oversight / audit screens ---------------
+  registryPage: (params: {
+    community_id?: string;
+    q?: string;
+    page?: number;
+    page_size?: number;
+  }) => apiGetPaginated<Vehicle[]>("/vehicles", params),
+  entriesPage: (params: {
+    community_id?: string;
+    plate?: string;
+    open_only?: boolean;
+    flagged_only?: boolean;
+    page?: number;
+    page_size?: number;
+  }) => apiGetPaginated<VehicleEntry[]>("/vehicles/entries", params),
+  violationsPage: (params: {
+    community_id?: string;
+    violation_status?: string;
+    plate?: string;
+    page?: number;
+    page_size?: number;
+  }) => apiGetPaginated<ParkingViolation[]>("/vehicles/parking/violations", params),
+  slotsPage: (params: { community_id?: string; page?: number; page_size?: number }) =>
+    apiGetPaginated<ParkingSlot[]>("/vehicles/parking/slots", params),
+  allocationsPage: (params: {
+    community_id?: string;
+    active_only?: boolean;
+    page?: number;
+    page_size?: number;
+  }) => apiGetPaginated<ParkingAllocation[]>("/vehicles/parking/allocations", params),
+  recordEntry: (data: RecordEntryPayload, communityId?: string) =>
+    apiSend<VehicleEntry>(
+      "POST",
+      "/vehicles/entries",
+      data,
+      communityId ? { community_id: communityId } : undefined,
+    ),
+  recordExit: (entryId: string) =>
+    apiSend<VehicleEntry>("PATCH", `/vehicles/entries/${entryId}/exit`),
+  report: (data: ReportViolationPayload, communityId?: string) =>
+    apiSend<ParkingViolation>(
+      "POST",
+      "/vehicles/parking/violations",
+      data,
+      communityId ? { community_id: communityId } : undefined,
+    ),
+  setViolationStatus: (violationId: string, newStatus: string) =>
+    apiSend<ParkingViolation>(
+      "POST",
+      `/vehicles/parking/violations/${violationId}/status`,
+      undefined,
+      { new_status: newStatus },
+    ),
 };
 
 export const incidentsApi = {

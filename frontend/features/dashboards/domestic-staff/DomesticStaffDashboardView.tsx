@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import dynamic from "next/dynamic";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { DashboardShell } from "@/components/layout/DashboardShell";
 import { StatMetric } from "@/components/common/StatMetric";
@@ -65,6 +66,7 @@ export function DomesticStaffDashboardView({
   initialTab = "overview",
 }: DomesticStaffDashboardViewProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const activeTab = initialTab;
   const [sosModalOpen, setSosModalOpen] = useState(false);
   const [editProfileOpen, setEditProfileOpen] = useState(false);
@@ -75,6 +77,9 @@ export function DomesticStaffDashboardView({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // One tab per module page: each query runs only on the tabs that show it. The profile
+  // is small and used across tabs and modals, so it always loads.
+  const on = (...tabs: DomesticStaffTab[]) => ({ enabled: tabs.includes(activeTab) });
   const {
     data: profile,
     isLoading: profileLoading,
@@ -86,25 +91,25 @@ export function DomesticStaffDashboardView({
     isLoading: homesLoading,
     isError: homesError,
     refetch: refetchHomes,
-  } = useAssignedHomes();
+  } = useAssignedHomes(on("overview", "assigned-homes", "schedule", "emergency"));
   const {
     data: attendance = [],
     isLoading: attLoading,
     isError: attError,
     refetch: refetchAtt,
-  } = useStaffAttendance();
+  } = useStaffAttendance(on("overview", "attendance", "entry-exit"));
   const {
     data: visits = [],
     isLoading: visitsLoading,
     isError: visitsError,
     refetch: refetchVisits,
-  } = useStaffVisits();
+  } = useStaffVisits(on("overview", "visits"));
   const updateProfile = useUpdateStaffProfile();
   const panicMutation = useSendStaffPanic();
-  const myNotifications = useMyNotifications({ page_size: 20 });
+  const myNotifications = useMyNotifications({ page_size: 20 }, on("notifications"));
   const markNotificationRead = useMarkNotificationRead();
   const markAllNotificationsRead = useMarkAllNotificationsRead();
-  const { data: passData } = useStaffPass();
+  const { data: passData } = useStaffPass(on("entry-exit"));
 
   const openAttendance = attendance.find((a) => a.status === "open");
   const activeHome = homes[0];
@@ -153,12 +158,10 @@ export function DomesticStaffDashboardView({
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
     try {
+      // Only what this tab shows (`.refetch()` would bypass `enabled` and load every tab).
       await Promise.all([
-        refetchProfile(),
-        refetchHomes(),
-        refetchAtt(),
-        refetchVisits(),
-        myNotifications.refetch(),
+        queryClient.invalidateQueries({ queryKey: ["staff"], refetchType: "active" }),
+        queryClient.invalidateQueries({ queryKey: ["notifications"], refetchType: "active" }),
       ]);
       toast.success("Staff operations, schedule, and attendance data updated.", "Refreshed");
     } catch {
@@ -366,7 +369,7 @@ export function DomesticStaffDashboardView({
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))",
               gap: "1.25rem",
               marginBottom: "2rem",
             }}
@@ -437,7 +440,7 @@ export function DomesticStaffDashboardView({
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))",
               gap: "1rem",
               marginBottom: "2rem",
             }}

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import { LinesSkeleton } from "@/components/common/LoadingSkeleton";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SearchInput } from "@/components/forms/SearchInput";
 import { StatusBadge } from "@/components/common/StatusBadge";
@@ -382,15 +383,7 @@ export default function FacilityManagerIncidentsPage() {
                         >
                           <strong style={{ fontSize: "0.8rem" }}>Logged Actions</strong>
                           {!incidentActions[inc.id] ? (
-                            <p
-                              style={{
-                                fontSize: "0.8rem",
-                                color: "var(--muted)",
-                                margin: "0.4rem 0 0",
-                              }}
-                            >
-                              Loading…
-                            </p>
+                            <LinesSkeleton rows={2} label="Loading incident actions…" />
                           ) : incidentActions[inc.id].length === 0 ? (
                             <p
                               style={{

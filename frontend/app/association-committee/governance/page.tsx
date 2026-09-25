@@ -97,7 +97,7 @@ export default function GovernanceOverviewPage() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
           gap: "1rem",
           marginBottom: "1.75rem",
         }}
@@ -201,7 +201,7 @@ export default function GovernanceOverviewPage() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))",
             gap: "1rem",
             marginTop: "0.5rem",
           }}

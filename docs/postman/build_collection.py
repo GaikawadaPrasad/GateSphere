@@ -215,6 +215,10 @@ def _api_routes(routes):
         elif isinstance(r, APIRoute) or (
             hasattr(r, "dependant") and hasattr(r, "methods") and hasattr(r, "endpoint")
         ):
+            # WebSocket routes (e.g. /realtime/ws) are not HTTP requests Newman can run —
+            # they are covered by app/modules/realtime/tests instead.
+            if getattr(r, "endpoint", None) is None or not getattr(r, "methods", None):
+                continue
             yield r
 
 

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
@@ -314,6 +314,10 @@ async def list_community_units(
     floor_id: uuid.UUID | None = None,
     unit_type: str | None = None,
     active: bool | None = None,
+    occupied: bool | None = Query(
+        default=None,
+        description="true = only units with a current resident (visitor / delivery routing)",
+    ),
     params: PageParams = Depends(page_params),
     svc: CommunityService = Depends(community_service),
 ) -> dict:
@@ -325,6 +329,7 @@ async def list_community_units(
         floor_id=floor_id,
         unit_type=unit_type,
         active=active,
+        occupied=occupied,
     )
     return paginated([schemas.UnitRead.model_validate(r) for r in rows], total=total, params=params)
 

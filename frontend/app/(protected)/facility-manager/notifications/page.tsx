@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useRealtimeRefresh } from "@/hooks/use-realtime";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Pagination } from "@/components/tables/Pagination";
@@ -37,12 +38,8 @@ export default function FacilityManagerNotificationsPage() {
     loadData(true);
   }, [unreadOnly]);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      loadData(false);
-    }, 10000);
-    return () => clearInterval(interval);
-  }, [unreadOnly]);
+  // New notifications arrive as realtime hints; poll every 10 s only while the socket is down.
+  useRealtimeRefresh(["notifications"], () => loadData(false), 10_000);
 
   useEffect(() => {
     setPage(1);
@@ -72,10 +69,20 @@ export default function FacilityManagerNotificationsPage() {
       if (n.category === categoryFilter) return true;
       const type = (n.notification_type || "").toLowerCase();
       const ref = (n.reference_type || "").toLowerCase();
-      if (categoryFilter === "amenity" && (type.includes("amenity") || ref.includes("amenity"))) return true;
-      if (categoryFilter === "incident" && (type.includes("incident") || ref.includes("incident"))) return true;
-      if (categoryFilter === "ticket" && (type.includes("ticket") || type.includes("complaint") || ref.includes("ticket"))) return true;
-      if (categoryFilter === "billing" && (type.includes("billing") || type.includes("invoice") || ref.includes("billing"))) return true;
+      if (categoryFilter === "amenity" && (type.includes("amenity") || ref.includes("amenity")))
+        return true;
+      if (categoryFilter === "incident" && (type.includes("incident") || ref.includes("incident")))
+        return true;
+      if (
+        categoryFilter === "ticket" &&
+        (type.includes("ticket") || type.includes("complaint") || ref.includes("ticket"))
+      )
+        return true;
+      if (
+        categoryFilter === "billing" &&
+        (type.includes("billing") || type.includes("invoice") || ref.includes("billing"))
+      )
+        return true;
       if (categoryFilter === "system" && type.includes("system")) return true;
       return false;
     });
@@ -125,7 +132,10 @@ export default function FacilityManagerNotificationsPage() {
       />
 
       <div className="card">
-        <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div
+          className="card-header"
+          style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
+        >
           <h3 className="card-title">Inbox Notifications</h3>
           <span style={{ fontSize: "0.775rem", color: "var(--muted)" }}>
             {filteredNotifications.length} total
@@ -162,8 +172,7 @@ export default function FacilityManagerNotificationsPage() {
                     <StatusBadge status={n.category || n.notification_type || "system"} />
                     <div>
                       <div style={{ fontWeight: 600, color: "var(--fg)", fontSize: "0.9rem" }}>
-                        {n.title}{" "}
-                        {!n.is_read && <span style={{ color: "var(--primary)" }}>●</span>}
+                        {n.title} {!n.is_read && <span style={{ color: "var(--primary)" }}>●</span>}
                       </div>
                       <div
                         style={{ fontSize: "0.8rem", color: "var(--muted)", marginTop: "0.2rem" }}
@@ -207,4 +216,3 @@ export default function FacilityManagerNotificationsPage() {
     </div>
   );
 }
-

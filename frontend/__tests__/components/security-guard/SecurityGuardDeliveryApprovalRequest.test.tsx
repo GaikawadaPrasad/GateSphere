@@ -34,6 +34,13 @@ vi.mock("@/store/toast", () => ({
   },
 }));
 
+// Pages resolve the current user from the shared auth cache (`useCachedMe`); route it to the
+// `authApi.me` mock above so no QueryClientProvider is needed here.
+vi.mock("@/hooks/use-auth", async () => {
+  const { authApi } = await import("@/lib/api");
+  return { useCachedMe: () => () => authApi.me() };
+});
+
 describe("SecurityGuardDeliveriesPage - Send Delivery Approval Request", () => {
   beforeEach(() => {
     vi.clearAllMocks();

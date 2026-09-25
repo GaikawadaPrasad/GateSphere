@@ -75,7 +75,15 @@ export function OperationalStaffView({ embeddedInTab = false }: OperationalStaff
     ).length;
     const auditors = staffList.filter((u) => u.roles.some((r) => r.role_slug === "auditor")).length;
 
-    return { total, committeeMembers, facilityManagers, supervisors, guards, vendorTechnicians, auditors };
+    return {
+      total,
+      committeeMembers,
+      facilityManagers,
+      supervisors,
+      guards,
+      vendorTechnicians,
+      auditors,
+    };
   }, [staffList]);
 
   // Filtered staff
@@ -377,7 +385,8 @@ export function OperationalStaffView({ embeddedInTab = false }: OperationalStaff
             🛡️ Operational, Security &amp; Vendor Personnel
           </h2>
           <p style={{ fontSize: "0.85rem", color: "var(--muted)", margin: "0.2rem 0 0" }}>
-            Provision and audit Facility Managers, Security Guards, Vendor Technicians, and Statutory Auditors.
+            Provision and audit Facility Managers, Security Guards, Vendor Technicians, and
+            Statutory Auditors.
           </p>
         </div>
 
@@ -397,7 +406,7 @@ export function OperationalStaffView({ embeddedInTab = false }: OperationalStaff
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))",
           gap: "0.85rem",
         }}
       >
@@ -806,7 +815,9 @@ export function OperationalStaffView({ embeddedInTab = false }: OperationalStaff
                 header: "Dispatched Time",
                 sortable: true,
                 render: (v) => (
-                  <span style={{ fontSize: "0.8rem", color: "var(--muted)", fontFamily: "monospace" }}>
+                  <span
+                    style={{ fontSize: "0.8rem", color: "var(--muted)", fontFamily: "monospace" }}
+                  >
                     {v.created_at ? formatDateTime(v.created_at) : "—"}
                   </span>
                 ),
@@ -821,7 +832,11 @@ export function OperationalStaffView({ embeddedInTab = false }: OperationalStaff
                       <button
                         type="button"
                         className="btn btn-secondary"
-                        style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem", background: "#f8fafc" }}
+                        style={{
+                          fontSize: "0.75rem",
+                          padding: "0.25rem 0.5rem",
+                          background: "#f8fafc",
+                        }}
                         onClick={() =>
                           setCredentialStaff({
                             id: v.matchedVendor.id,

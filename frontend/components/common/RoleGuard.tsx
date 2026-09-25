@@ -4,6 +4,7 @@ import { useMe } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import type { ReactNode } from "react";
+import { BrandLoader } from "@/components/common/BrandLoader";
 
 interface RoleGuardProps {
   children: ReactNode;
@@ -75,22 +76,11 @@ export function RoleGuard({
     router,
   ]);
 
-  if (isLoading) {
-    return (
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: "50vh",
-        }}
-      >
-        <div className="skeleton" style={{ width: 180, height: 24, borderRadius: 8 }} />
-      </div>
-    );
-  }
+  // Nothing to lay out until the session is known: show the branded loader (not a blank
+  // screen or a lone grey bar). It also covers the moment before the login redirect lands.
+  if (isLoading) return <BrandLoader message="Securing your session…" />;
 
-  if (!user) return null;
+  if (!user) return <BrandLoader message="Redirecting to sign in…" />;
 
   if (requireSuperAdmin && !isSuper) {
     return fallback;

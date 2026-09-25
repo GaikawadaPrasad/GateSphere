@@ -20,6 +20,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.context import RequestContext
 from app.core.errors import BusinessRuleError, NotFoundError
+from app.core.realtime import queue_user_event
 from app.core.tenancy import TenantScope
 from app.modules.audit.service import record_audit_async
 from app.modules.notifications import schemas
@@ -253,6 +254,12 @@ class NotificationService:
             reference_id=payload.reference_id,
         )
         await self.notifications.add(note)
+        queue_user_event(
+            self.db,
+            user_id=payload.recipient_user_id,
+            notification_type=payload.notification_type,
+            actor_id=getattr(self.actor, "id", None),
+        )
 
         now = datetime.now(UTC)
         for ch in channels:

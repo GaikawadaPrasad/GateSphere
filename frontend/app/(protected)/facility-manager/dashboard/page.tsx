@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useCachedMe } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { KpiCard } from "@/components/dashboard/KpiCard";
@@ -9,7 +10,7 @@ import { Modal } from "@/components/common/Modal";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { Skeleton } from "@/components/common/LoadingSkeleton";
 import { EmptyState } from "@/components/common/EmptyState";
-import { complaintsApi, amenitiesApi, communitiesApi, authApi } from "@/lib/api";
+import { complaintsApi, amenitiesApi, communitiesApi } from "@/lib/api";
 import { deriveTicketEscalationState, formatDate } from "@/lib/utils";
 
 interface DashboardTicket {
@@ -29,6 +30,7 @@ interface DashboardTicket {
 }
 
 export default function FacilityManagerDashboardPage() {
+  const getMe = useCachedMe();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -58,7 +60,7 @@ export default function FacilityManagerDashboardPage() {
           complaintsApi.categories(),
           amenitiesApi.list(),
           amenitiesApi.bookings(),
-          authApi.me(),
+          getMe(),
         ]);
 
       if (categoriesRes.status === "fulfilled") {
@@ -74,7 +76,10 @@ export default function FacilityManagerDashboardPage() {
       if (commId) {
         try {
           const uList = await communitiesApi.communityUnits(commId);
-          const mappedUnits = (uList || []).map((u: any) => ({ id: u.id, unit_number: u.unit_number }));
+          const mappedUnits = (uList || []).map((u: any) => ({
+            id: u.id,
+            unit_number: u.unit_number,
+          }));
           setUnits(mappedUnits);
           for (const u of mappedUnits) {
             if (u.id) unitMap.set(u.id, u.unit_number);
@@ -102,23 +107,11 @@ export default function FacilityManagerDashboardPage() {
               t.unit?.unit_number ||
               null;
             const resName =
-              t.raised_by_name ||
-              t.resident_name ||
-              t.user?.full_name ||
-              t.creator_name ||
-              null;
+              t.raised_by_name || t.resident_name || t.user?.full_name || t.creator_name || null;
             const resPhone =
-              t.raised_by_phone ||
-              t.phone ||
-              t.contact_phone ||
-              t.user?.phone ||
-              null;
+              t.raised_by_phone || t.phone || t.contact_phone || t.user?.phone || null;
             const resEmail =
-              t.raised_by_email ||
-              t.email ||
-              t.contact_email ||
-              t.user?.email ||
-              null;
+              t.raised_by_email || t.email || t.contact_email || t.user?.email || null;
 
             return {
               id: t.id,
@@ -481,7 +474,7 @@ export default function FacilityManagerDashboardPage() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
           gap: "1.25rem",
           marginBottom: "1.75rem",
         }}
@@ -648,7 +641,8 @@ export default function FacilityManagerDashboardPage() {
                 SLA Performance is Optimal
               </div>
               <div style={{ fontSize: "0.75rem", color: "#15803d", marginTop: "0.1rem" }}>
-                All open service tickets and maintenance tasks are well within response and resolution limits.
+                All open service tickets and maintenance tasks are well within response and
+                resolution limits.
               </div>
             </div>
           </div>
@@ -676,7 +670,8 @@ export default function FacilityManagerDashboardPage() {
             <div>
               <h3 className="card-title">⚠️ SLA Warnings & Escalations ({slaWarnings.length})</h3>
               <p style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.15rem" }}>
-                Tickets exceeding or approaching response/resolution limits — immediate triage recommended
+                Tickets exceeding or approaching response/resolution limits — immediate triage
+                recommended
               </p>
             </div>
             <button
@@ -875,7 +870,7 @@ export default function FacilityManagerDashboardPage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))",
               gap: "1rem",
               marginBottom: "1rem",
             }}

@@ -412,8 +412,9 @@ export default function GovernanceReportsPage() {
       <div
         style={{
           display: "flex",
+          flexWrap: "wrap", // tabs wrap on phones instead of running off-screen
           borderBottom: "1px solid var(--border)",
-          gap: "1.5rem",
+          columnGap: "1.5rem",
           marginBottom: "1.5rem",
         }}
       >
@@ -525,7 +526,7 @@ export default function GovernanceReportsPage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
               gap: "1rem",
               marginBottom: "1.5rem",
             }}

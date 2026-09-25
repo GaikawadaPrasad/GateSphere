@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useCachedMe } from "@/hooks/use-auth";
+import { useRealtimeRefresh } from "@/hooks/use-realtime";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SearchInput } from "@/components/forms/SearchInput";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { Modal } from "@/components/common/Modal";
-import { visitorsApi, communitiesApi, authApi } from "@/lib/api";
+import { visitorsApi, communitiesApi } from "@/lib/api";
 import type { Unit } from "@/types/communities";
 import { isValidPersonName, formatDateTime } from "@/lib/utils";
 import { toast } from "@/store/toast";
@@ -29,6 +31,7 @@ export interface CabMovement {
 }
 
 export default function SecurityGuardCabTaxiPage() {
+  const getMe = useCachedMe();
   const [cabs, setCabs] = useState<CabMovement[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<
@@ -55,6 +58,8 @@ export default function SecurityGuardCabTaxiPage() {
   // Log Cab Arrival Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [units, setUnits] = useState<Unit[]>([]);
+  // Distinguishes "still loading" from "no occupied units" in the destination dropdown.
+  const [unitsLoaded, setUnitsLoaded] = useState(false);
   const [selectedUnitId, setSelectedUnitId] = useState("");
   const [driverName, setDriverName] = useState("");
   const [driverPhone, setDriverPhone] = useState("");
@@ -72,7 +77,7 @@ export default function SecurityGuardCabTaxiPage() {
         visitorsApi.requests({ page_size: 100 }),
         visitorsApi.directory({ page_size: 100 }),
         visitorsApi.entries({ page_size: 100 }),
-        authApi.me().catch(() => null),
+        getMe().catch(() => null),
       ]);
 
       const requests = Array.isArray(requestsRes) ? requestsRes : (requestsRes as any)?.data || [];
@@ -89,7 +94,10 @@ export default function SecurityGuardCabTaxiPage() {
       const unitMap = new Map<string, string>();
       if (cid) {
         try {
-          const uRes: any = await communitiesApi.communityUnits(cid, { page_size: 100 });
+          const uRes: any = await communitiesApi.communityUnits(cid, {
+            page_size: 100,
+            occupied: true,
+          });
           const uList = Array.isArray(uRes) ? uRes : uRes?.data || uRes?.items || [];
           for (const u of uList) {
             if (u?.id) unitMap.set(u.id, u.unit_number);
@@ -176,15 +184,13 @@ export default function SecurityGuardCabTaxiPage() {
 
   useEffect(() => {
     loadData(true);
-    const interval = setInterval(() => {
-      loadData(false);
-    }, 5000);
-    return () => clearInterval(interval);
   }, []);
+  // Cab movements are visitor records: refresh on `visitors` hints (5 s poll only if offline).
+  useRealtimeRefresh(["visitors"], () => loadData(false), 5_000);
 
   const loadUnits = async () => {
     try {
-      const me = await authApi.me();
+      const me = await getMe();
       let cid = me?.community_ids?.[0] || (me as any)?.community_id;
       if (!cid && me?.roles && Array.isArray(me.roles)) {
         cid = me.roles.find((r: any) => r.community_id)?.community_id;
@@ -195,9 +201,14 @@ export default function SecurityGuardCabTaxiPage() {
         if (list.length > 0) cid = list[0].id;
       }
       if (cid) {
-        const res: any = await communitiesApi.communityUnits(cid, { page_size: 100 });
+        const res: any = await communitiesApi.communityUnits(cid, {
+          page_size: 100,
+          occupied: true,
+        });
         const uList = Array.isArray(res) ? res : res?.data || res?.items || [];
-        if (Array.isArray(uList) && uList.length > 0) {
+        // Always replace the list — an empty result (nobody lives anywhere yet) must not
+        // leave a stale list of units on screen.
+        if (Array.isArray(uList)) {
           const sorted = [...uList].sort((a: any, b: any) =>
             (a.unit_number || "").localeCompare(b.unit_number || "", undefined, {
               numeric: true,
@@ -212,6 +223,8 @@ export default function SecurityGuardCabTaxiPage() {
       }
     } catch (err) {
       console.error("Failed to load units for security guard cab modal:", err);
+    } finally {
+      setUnitsLoaded(true);
     }
   };
 
@@ -1301,7 +1314,9 @@ export default function SecurityGuardCabTaxiPage() {
               required
             >
               {units.length === 0 ? (
-                <option value="">Loading units…</option>
+                <option value="">
+                  {unitsLoaded ? "No occupied units — onboard residents first" : "Loading units…"}
+                </option>
               ) : (
                 units.map((u) => (
                   <option key={u.id} value={u.id}>

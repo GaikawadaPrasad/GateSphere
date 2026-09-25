@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
 from app.core.files import ManagedFileUrl
 from app.modules.vehicles.models import (
@@ -30,6 +32,28 @@ ALLOWED = {
 }
 
 
+_PLATE_SEPARATORS = re.compile(r"[\s\-]")
+_PLATE_SHAPE = re.compile(r"^[A-Z0-9]{3,15}$")
+
+
+def normalize_plate(value: str) -> str:
+    """Canonical plate form — upper-case, spaces/hyphens removed — so `ka 01-ab 1234`
+    registered by a resident matches `KA01AB1234` typed by a guard (FR-08 auto-match)."""
+    plate = _PLATE_SEPARATORS.sub("", value).upper()
+    if not _PLATE_SHAPE.match(plate):
+        raise ValueError("must be 3-15 letters/digits (spaces and hyphens are ignored)")
+    return plate
+
+
+def plate_search_term(value: str) -> str:
+    """A free-text plate search reduced to letters/digits — matches the stored canonical
+    form and can't smuggle `%`/`_` wildcards into the ILIKE."""
+    return re.sub(r"[^A-Za-z0-9]", "", value).upper()
+
+
+Plate = Annotated[str, Field(min_length=3, max_length=20), AfterValidator(normalize_plate)]
+
+
 class _Write(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
@@ -45,7 +69,7 @@ class _Read(BaseModel):
 # -- vehicles ------------------------------------------------------- #
 class VehicleCreate(_Write):
     vehicle_type: str
-    registration_number: str = Field(min_length=3, max_length=20)
+    registration_number: Plate
     resident_profile_id: uuid.UUID | None = None
     visitor_id: uuid.UUID | None = None
     unit_id: uuid.UUID | None = None
@@ -142,7 +166,7 @@ class AllocationRead(_Read):
 
 # -- gate entries ------------------------------------------ #
 class EntryCreate(_Write):
-    registration_number: str = Field(min_length=3, max_length=20)
+    registration_number: Plate
     gate_id: uuid.UUID | None = None
     source_type: str = "unknown"
     reference_id: uuid.UUID | None = None
@@ -164,6 +188,10 @@ class EntryRead(_Read):
 class ViolationCreate(_Write):
     violation_type: str
     vehicle_id: uuid.UUID | None = None
+    # Observed plate — required in practice for an unregistered car; auto-matched to a
+    # registered vehicle when one exists. Ignored in favour of the vehicle's own plate
+    # when `vehicle_id` is given.
+    registration_number: Plate | None = None
     parking_slot_id: uuid.UUID | None = None
     description: str | None = Field(default=None, max_length=2000)
     evidence_url: ManagedFileUrl | None = None
@@ -173,6 +201,7 @@ class ViolationCreate(_Write):
 class ViolationRead(_Read):
     community_id: uuid.UUID
     vehicle_id: uuid.UUID | None
+    registration_number: str | None
     parking_slot_id: uuid.UUID | None
     reported_by_user_id: uuid.UUID | None
     violation_type: str

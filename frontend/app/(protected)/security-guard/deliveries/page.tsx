@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useCachedMe } from "@/hooks/use-auth";
+import { useRealtimeRefresh } from "@/hooks/use-realtime";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SearchInput } from "@/components/forms/SearchInput";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { Modal } from "@/components/common/Modal";
-import { deliveriesApi, communitiesApi, authApi } from "@/lib/api";
+import { deliveriesApi, communitiesApi } from "@/lib/api";
 import type { Unit } from "@/types/communities";
 import { isValidPersonName } from "@/lib/utils";
 import { toast } from "@/store/toast";
@@ -29,6 +31,7 @@ interface DeliveryRow {
 }
 
 export default function SecurityGuardDeliveriesPage() {
+  const getMe = useCachedMe();
   const [deliveries, setDeliveries] = useState<DeliveryRow[]>([]);
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -41,6 +44,8 @@ export default function SecurityGuardDeliveriesPage() {
   // Log Delivery Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [units, setUnits] = useState<Unit[]>([]);
+  // Distinguishes "still loading" from "no occupied units" in the destination dropdown.
+  const [unitsLoaded, setUnitsLoaded] = useState(false);
   const [selectedUnitId, setSelectedUnitId] = useState("");
   const [deliveryType, setDeliveryType] = useState("courier");
   const [providerName, setProviderName] = useState("");
@@ -94,15 +99,13 @@ export default function SecurityGuardDeliveriesPage() {
   useEffect(() => {
     loadUnits();
     loadData(true);
-    const interval = setInterval(() => {
-      loadData(false);
-    }, 5000);
-    return () => clearInterval(interval);
   }, []);
+  // Refresh on realtime `deliveries` hints; poll every 5 s only while the socket is down.
+  useRealtimeRefresh(["deliveries"], () => loadData(false), 5_000);
 
   const loadUnits = async () => {
     try {
-      const me = await authApi.me();
+      const me = await getMe();
       let cid = me?.community_ids?.[0] || (me as any)?.community_id;
       if (!cid && me?.roles && Array.isArray(me.roles)) {
         cid = me.roles.find((r: any) => r.community_id)?.community_id;
@@ -113,9 +116,14 @@ export default function SecurityGuardDeliveriesPage() {
         if (list.length > 0) cid = list[0].id;
       }
       if (cid) {
-        const res: any = await communitiesApi.communityUnits(cid, { page_size: 100 });
+        const res: any = await communitiesApi.communityUnits(cid, {
+          page_size: 100,
+          occupied: true,
+        });
         const uList = Array.isArray(res) ? res : res?.data || res?.items || [];
-        if (Array.isArray(uList) && uList.length > 0) {
+        // Always replace the list — an empty result (nobody lives anywhere yet) must not
+        // leave a stale list of units on screen.
+        if (Array.isArray(uList)) {
           const sorted = [...uList].sort((a: any, b: any) =>
             (a.unit_number || "").localeCompare(b.unit_number || "", undefined, {
               numeric: true,
@@ -130,6 +138,8 @@ export default function SecurityGuardDeliveriesPage() {
       }
     } catch (err) {
       console.error("Failed to load units for security guard delivery modal:", err);
+    } finally {
+      setUnitsLoaded(true);
     }
   };
 
@@ -633,7 +643,9 @@ export default function SecurityGuardDeliveriesPage() {
               required
             >
               {units.length === 0 ? (
-                <option value="">Loading units…</option>
+                <option value="">
+                  {unitsLoaded ? "No occupied units — onboard residents first" : "Loading units…"}
+                </option>
               ) : (
                 units.map((u) => (
                   <option key={u.id} value={u.id}>

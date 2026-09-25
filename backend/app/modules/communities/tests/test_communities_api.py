@@ -242,3 +242,47 @@ def test_create_community_rejects_admin_phone_not_10_digits(auth_client, unique_
         )
         assert r.status_code == 422, (bad, r.text)
         assert "admin_phone" in (r.json().get("error") or {}).get("fields", {}), r.text
+
+
+def test_units_occupied_filter_lists_only_units_with_a_current_resident(as_role):
+    """Visitor / delivery / cab routing dropdowns use `?occupied=true`: a guard must only be
+    offered flats someone actually lives in (active, un-ended occupancy of a resident who
+    has not moved out or been suspended)."""
+    from sqlalchemy import text
+
+    from app.db.session import SessionLocal
+
+    guard = as_role("security_guard")
+    cid = guard.get("/api/v1/auth/me").json()["data"]["community_ids"][0]
+    with SessionLocal() as db:  # ground truth, computed independently in plain SQL
+        rows = db.execute(
+            text("""
+                SELECT u.id::text,
+                       EXISTS (
+                         SELECT 1 FROM unit_occupancies o
+                         JOIN resident_profiles p ON p.id = o.resident_profile_id
+                         WHERE o.unit_id = u.id AND o.community_id = u.community_id
+                           AND o.is_active
+                           AND (o.end_date IS NULL OR o.end_date >= CURRENT_DATE)
+                           AND p.profile_status NOT IN ('moved_out', 'suspended')
+                       ) AS occupied
+                FROM units u WHERE u.community_id = :cid
+                """),
+            {"cid": cid},
+        ).all()
+    occupied = {uid for uid, occ in rows if occ}
+    vacant = {uid for uid, occ in rows if not occ}
+    assert occupied and vacant, "seed should have both occupied and vacant units"
+
+    def ids(**params):
+        r = guard.get(f"{P}/{cid}/units", params={"page_size": 100, **params})
+        assert r.status_code == 200, r.text
+        return {u["id"] for u in r.json()["data"]}, r.json()["meta"]["total"]
+
+    got, total = ids(occupied=True)
+    assert total == len(occupied)
+    assert got <= occupied and not (got & vacant)
+    got_vacant, total_vacant = ids(occupied=False)
+    assert total_vacant == len(vacant) and not (got_vacant & occupied)
+    _, total_all = ids()
+    assert total_all == len(rows)  # no filter = unchanged behaviour

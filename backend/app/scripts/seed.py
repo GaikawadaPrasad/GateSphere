@@ -1264,6 +1264,263 @@ def reset_data(db: Session) -> None:
     log.info("seed.reset", tables=len(names))
 
 
+def seed_parking_operations(db: Session, communities: list[Community]) -> None:
+    """FR-08 / FR-17: a full vehicle & parking picture for the guard, supervisor, resident
+    and auditor screens — resident + visitor vehicles tied to units, guest/EV/blocked slots,
+    an active allocation, registered and flagged (unknown-plate) gate movements, and
+    violations in every status.
+
+    Idempotent — skips a community once its marker vehicle `KA<sfx>PK<sfx>02` exists. Rows
+    are written directly (no service side effects), like `seed_operations`.
+    """
+    from datetime import UTC, datetime, timedelta
+    from decimal import Decimal
+
+    from app.modules.communities.models import Gate
+    from app.modules.residents.models import ResidentProfile, UnitOccupancy
+    from app.modules.vehicles.models import (
+        ParkingAllocation,
+        ParkingSlot,
+        ParkingViolation,
+        Vehicle,
+        VehicleEntry,
+    )
+    from app.modules.visitors.models import Visitor
+
+    now = datetime.now(UTC)
+    guard = db.scalar(select(User).where(User.email == f"security_guard@{DEMO_DOMAIN}"))
+    supervisor = db.scalar(select(User).where(User.email == f"security_supervisor@{DEMO_DOMAIN}"))
+    demo_resident_id = db.scalar(select(User.id).where(User.email == f"resident@{DEMO_DOMAIN}"))
+
+    for c in communities:
+        sfx = c.code[-2:]
+        if db.scalar(
+            select(Vehicle.id).where(
+                Vehicle.community_id == c.id, Vehicle.registration_number == f"KA{sfx}PK{sfx}02"
+            )
+        ):
+            continue
+
+        occupancies = db.execute(
+            select(UnitOccupancy.unit_id, ResidentProfile.id, ResidentProfile.user_id)
+            .join(ResidentProfile, ResidentProfile.id == UnitOccupancy.resident_profile_id)
+            .where(UnitOccupancy.community_id == c.id, UnitOccupancy.is_active.is_(True))
+            .order_by(UnitOccupancy.created_at)
+        ).all()
+        if not occupancies:
+            continue
+        # The demo `resident@` account must never open onto an empty vehicles tab.
+        occupancies = sorted(occupancies, key=lambda o: o.user_id != demo_resident_id)
+        home = occupancies[0]
+        neighbour = occupancies[1] if len(occupancies) > 1 else home
+        unit_of_profile = {o[1]: o.unit_id for o in occupancies}
+        gate = db.scalar(select(Gate).where(Gate.community_id == c.id).order_by(Gate.code))
+        gate_id = gate.id if gate else None
+        guard_id = guard.id if guard else None
+
+        # Earlier seed vehicles were registered without a unit — tie them to their owner's
+        # unit so own-unit scoping (resident view) can see them.
+        for veh in db.scalars(
+            select(Vehicle).where(Vehicle.community_id == c.id, Vehicle.unit_id.is_(None))
+        ).all():
+            if veh.resident_profile_id in unit_of_profile:
+                veh.unit_id = unit_of_profile[veh.resident_profile_id]
+
+        def _vehicle(plate: str, vtype: str, make: str, model: str, color: str, _cid=c.id, **owner):
+            v = Vehicle(
+                community_id=_cid,
+                registration_number=plate,
+                vehicle_type=vtype,
+                make=make,
+                model=model,
+                color=color,
+                **owner,
+            )
+            db.add(v)
+            return v
+
+        car = _vehicle(
+            f"KA{sfx}PK{sfx}02",
+            "car",
+            "Hyundai",
+            "Creta",
+            "White",
+            resident_profile_id=home[1],
+            unit_id=home.unit_id,
+            sticker_number=f"STK-{sfx}-002",
+        )
+        bike = _vehicle(
+            f"KA{sfx}PK{sfx}03",
+            "bike",
+            "Honda",
+            "Activa",
+            "Grey",
+            resident_profile_id=home[1],
+            unit_id=home.unit_id,
+            sticker_number=f"STK-{sfx}-003",
+        )
+        other_car = _vehicle(
+            f"KA{sfx}PK{sfx}04",
+            "ev_car",
+            "Tata",
+            "Nexon EV",
+            "Blue",
+            resident_profile_id=neighbour[1],
+            unit_id=neighbour.unit_id,
+            sticker_number=f"STK-{sfx}-004",
+        )
+        visitor = db.scalar(
+            select(Visitor).where(Visitor.community_id == c.id).order_by(Visitor.phone)
+        )
+        if visitor is not None:
+            _vehicle(f"KA{sfx}VS{sfx}05", "car", "Maruti", "Swift", "Red", visitor_id=visitor.id)
+        db.flush()
+
+        # -- slots: guest bays, an EV bay, and one blocked for maintenance -------------
+        slot_specs = [
+            ("V-01", "visitor", {"is_guest_slot": True}),
+            ("V-02", "visitor", {"is_guest_slot": True}),
+            ("E-01", "ev", {}),
+            ("P-06", "car", {"status": "blocked"}),
+        ]
+        for code, stype, extra in slot_specs:
+            _get_or_create(
+                db,
+                ParkingSlot,
+                community_id=c.id,
+                slot_code=code,
+                defaults={
+                    "slot_type": stype,
+                    "level": "G" if stype == "visitor" else "B1",
+                    **extra,
+                },
+            )
+        home_slot = db.scalar(
+            select(ParkingSlot).where(
+                ParkingSlot.community_id == c.id, ParkingSlot.slot_code == "P-02"
+            )
+        )
+        ev_slot = db.scalar(
+            select(ParkingSlot).where(
+                ParkingSlot.community_id == c.id, ParkingSlot.slot_code == "E-01"
+            )
+        )
+        for slot, veh, unit_id in (
+            (home_slot, car, home.unit_id),
+            (ev_slot, other_car, neighbour.unit_id),
+        ):
+            if slot is None or slot.status != "available":
+                continue
+            db.add(
+                ParkingAllocation(
+                    community_id=c.id,
+                    slot_id=slot.id,
+                    vehicle_id=veh.id,
+                    unit_id=unit_id,
+                    status="active",
+                    allocated_by_user_id=supervisor.id if supervisor else None,
+                )
+            )
+            slot.status = "allocated"
+
+        # -- gate movements: registered + flagged unknown plates -------------------------
+        movements = [
+            (car, car.registration_number, "resident", now - timedelta(hours=2), None),
+            (
+                bike,
+                bike.registration_number,
+                "resident",
+                now - timedelta(days=1, hours=3),
+                now - timedelta(days=1),
+            ),
+            (None, f"MH{sfx}ZZ{sfx}77", "unknown", now - timedelta(minutes=40), None),
+            (
+                None,
+                f"TN{sfx}QQ{sfx}88",
+                "visitor",
+                now - timedelta(hours=6),
+                now - timedelta(hours=5),
+            ),
+        ]
+        for veh, plate, source, entry_at, exit_at in movements:
+            db.add(
+                VehicleEntry(
+                    community_id=c.id,
+                    vehicle_id=veh.id if veh else None,
+                    registration_number=plate,
+                    gate_id=gate_id,
+                    entry_at=entry_at,
+                    exit_at=exit_at,
+                    entry_guard_user_id=guard_id,
+                    exit_guard_user_id=guard_id if exit_at else None,
+                    source_type=source,
+                    status="exited" if exit_at else "inside",
+                    is_flagged=veh is None,
+                )
+            )
+
+        # -- violations in every status --------------------------------------------------
+        violations = [
+            (
+                None,
+                f"MH{sfx}ZZ{sfx}77",
+                home_slot,
+                "unauthorized",
+                "Unregistered car parked in allocated slot P-02.",
+                None,
+                "open",
+                None,
+            ),
+            (
+                bike,
+                bike.registration_number,
+                None,
+                "wrong_slot",
+                "Two-wheeler parked in a visitor bay.",
+                Decimal("500.00"),
+                "acknowledged",
+                None,
+            ),
+            (
+                other_car,
+                other_car.registration_number,
+                None,
+                "blocking",
+                "Blocking the ramp exit at B1.",
+                Decimal("1000.00"),
+                "resolved",
+                now - timedelta(days=2),
+            ),
+            (
+                car,
+                car.registration_number,
+                None,
+                "no_sticker",
+                "Sticker not visible on windscreen; verified with resident.",
+                None,
+                "waived",
+                now - timedelta(days=5),
+            ),
+        ]
+        for veh, plate, slot, vtype, desc, fine, status, resolved_at in violations:
+            db.add(
+                ParkingViolation(
+                    community_id=c.id,
+                    vehicle_id=veh.id if veh else None,
+                    registration_number=plate,
+                    parking_slot_id=slot.id if slot else None,
+                    reported_by_user_id=guard_id,
+                    violation_type=vtype,
+                    description=desc,
+                    fine_amount=fine,
+                    status=status,
+                    occurred_at=(resolved_at or now) - timedelta(hours=3),
+                    resolved_at=resolved_at,
+                )
+            )
+        db.flush()
+
+
 def main(*, reset: bool = False) -> None:
     with SessionLocal() as db:
         if reset:
@@ -1285,6 +1542,7 @@ def main(*, reset: bool = False) -> None:
         seed_incidents(db, communities)
         seed_notifications(db, communities)
         seed_operations(db, communities)
+        seed_parking_operations(db, communities)
         seed_audit_trail(db, communities)
         db.commit()
     log.info("seed.done")

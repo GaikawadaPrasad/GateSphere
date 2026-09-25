@@ -56,6 +56,7 @@ flowchart TD
         R_DASH["/dashboards"]
         R_NOT["/notifications"]
         R_UP["/uploads"]
+        R_RT["/realtime (POST /ticket · WS /ws)"]
     end
 
     %% ---------------------------------------------------------------- domain services
@@ -99,6 +100,8 @@ flowchart TD
         direction TB
         EVT["Notification event bus<br/>notifications/events.py::emit / emit_to_roles<br/>SAVEPOINT-isolated, best-effort<br/>→ NotificationService.dispatch"]
         NOTIF["notifications + notification_deliveries<br/>in_app real · sms/whatsapp/email/push SIMULATED"]
+        RTQ["Realtime hints — app/core/realtime.py<br/>queued by record_audit_async (every audited change) + notification dispatch<br/>published to Redis pub/sub AFTER commit (get_async_db / job_session), dropped on rollback"]
+        RTHUB["WS hub — modules/realtime/hub.py (1 psubscribe per worker)<br/>per-connection bounded outbox · actor excluded · :view-filtered · residents: user channel + community-wide modules"]
         S3[("S3 / MinIO<br/>app/services/storage.py (boto3, off-thread)<br/>presigned PUT/GET · HEAD · magic-byte sniff")]
     end
 
@@ -203,3 +206,9 @@ flowchart TD
 
     classDef pub fill:#fff3cd,stroke:#b8860b;
     class R_AUTH,R_ONB pub;
+
+    %% realtime (AGENTS.md §5.7)
+    RTQ -->|"PUBLISH gs:rt:community:* / gs:rt:user:*"| REDIS
+    REDIS -->|psubscribe| RTHUB
+    R_RT --> RTHUB
+    RTHUB -->|"invalidate hints (no data)"| Client

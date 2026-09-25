@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useCachedMe } from "@/hooks/use-auth";
 import dynamic from "next/dynamic";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
-import { vendorTicketsApi, authApi, type CurrentUser } from "@/lib/api";
+import { vendorTicketsApi, type CurrentUser } from "@/lib/api";
 
 const QrCodeSvg = dynamic(
   () => import("@/components/common/QrCodeSvg").then((mod) => mod.QrCodeSvg),
@@ -31,6 +32,7 @@ const QrCodeSvg = dynamic(
 );
 
 export default function VendorEntryPassPage() {
+  const getMe = useCachedMe();
   const [activeTicket, setActiveTicket] = useState<any | null>(null);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -39,10 +41,7 @@ export default function VendorEntryPassPage() {
     async function loadPass() {
       setIsLoading(true);
       try {
-        const [ticketsRes, meRes] = await Promise.allSettled([
-          vendorTicketsApi.list(),
-          authApi.me("vendor_technician"),
-        ]);
+        const [ticketsRes, meRes] = await Promise.allSettled([vendorTicketsApi.list(), getMe()]);
 
         if (meRes.status === "fulfilled" && meRes.value) {
           setCurrentUser(meRes.value);

@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
+import { useCachedMe } from "@/hooks/use-auth";
+import { useRealtimeRefresh } from "@/hooks/use-realtime";
 import { Modal } from "@/components/common/Modal";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { FileUpload } from "@/components/common/FileUpload";
-import { visitorsApi, communitiesApi, authApi, blacklistApi } from "@/lib/api";
+import { visitorsApi, communitiesApi, blacklistApi } from "@/lib/api";
 import { useUiStore } from "@/store/ui";
 import type { Unit } from "@/types/communities";
 import { isValidPersonName } from "@/lib/utils";
@@ -35,6 +37,7 @@ const GOVT_ID_TYPES = [
 ];
 
 export function WalkInVisitorModal({ isOpen, onClose, onEntryAdmitted }: WalkInVisitorModalProps) {
+  const getMe = useCachedMe();
   // Form inputs
   const [visitorName, setVisitorName] = useState("");
   const [visitorPhone, setVisitorPhone] = useState("");
@@ -79,7 +82,6 @@ export function WalkInVisitorModal({ isOpen, onClose, onEntryAdmitted }: WalkInV
   // Active request being tracked
   const [activeRequest, setActiveRequest] = useState<any | null>(null);
   const [isAdmitting, setIsAdmitting] = useState(false);
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Reset on open/close
   useEffect(() => {
@@ -102,12 +104,7 @@ export function WalkInVisitorModal({ isOpen, onClose, onEntryAdmitted }: WalkInV
       setUnitsError(null);
       setActiveRequest(null);
       loadUnits();
-    } else {
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     }
-    return () => {
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-    };
   }, [isOpen]);
 
   const validateField = (
@@ -243,7 +240,7 @@ export function WalkInVisitorModal({ isOpen, onClose, onEntryAdmitted }: WalkInV
     try {
       let cid: string | null = activeCommunityId || null;
       if (!cid) {
-        const me = await authApi.me();
+        const me = await getMe();
         cid = me?.community_ids?.[0] || (me as any)?.community_id || null;
         if (!cid && me?.roles && Array.isArray(me.roles)) {
           const matchedRole = me.roles.find((r: any) => r.community_id);
@@ -258,7 +255,10 @@ export function WalkInVisitorModal({ isOpen, onClose, onEntryAdmitted }: WalkInV
         }
       }
       if (cid) {
-        const res: any = await communitiesApi.communityUnits(cid, { page_size: 100 });
+        const res: any = await communitiesApi.communityUnits(cid, {
+          page_size: 100,
+          occupied: true,
+        });
         const uList = Array.isArray(res) ? res : res?.data || res?.items || [];
         if (Array.isArray(uList) && uList.length > 0) {
           const sorted = [...uList].sort((a: any, b: any) =>
@@ -283,27 +283,21 @@ export function WalkInVisitorModal({ isOpen, onClose, onEntryAdmitted }: WalkInV
     }
   };
 
-  // Start polling request status while in 'waiting_approval'
-  useEffect(() => {
-    if (step === "waiting_approval" && activeRequest?.id) {
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-
-      pollIntervalRef.current = setInterval(async () => {
-        try {
-          const req: any = await visitorsApi.getRequest(activeRequest.id);
-          if (req) {
-            setActiveRequest((prev: any) => ({ ...prev, ...req }));
-          }
-        } catch {
-          // ignore polling errors
-        }
-      }, 3000);
-    }
-
-    return () => {
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-    };
-  }, [step, activeRequest?.id]);
+  // While waiting for the resident's decision: re-read the request when a realtime
+  // `visitors` hint arrives (the resident's approve/reject); poll every 3 s only offline.
+  const waitingId = step === "waiting_approval" ? activeRequest?.id : undefined;
+  useRealtimeRefresh(
+    ["visitors"],
+    () => {
+      if (!waitingId) return;
+      visitorsApi
+        .getRequest(waitingId)
+        .then((req: any) => req && setActiveRequest((prev: any) => ({ ...prev, ...req })))
+        .catch(() => undefined); // transient: the next hint / poll retries
+    },
+    3_000,
+    Boolean(waitingId),
+  );
 
   const checkBlacklist = async (phoneToCheck?: string, idToCheck?: string) => {
     const rawP = (phoneToCheck !== undefined ? phoneToCheck : visitorPhone).trim();
@@ -555,7 +549,7 @@ export function WalkInVisitorModal({ isOpen, onClose, onEntryAdmitted }: WalkInV
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))",
                 gap: "1rem",
                 marginBottom: "1rem",
               }}
@@ -667,7 +661,7 @@ export function WalkInVisitorModal({ isOpen, onClose, onEntryAdmitted }: WalkInV
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))",
                 gap: "1rem",
                 marginBottom: "1rem",
               }}
@@ -766,7 +760,7 @@ export function WalkInVisitorModal({ isOpen, onClose, onEntryAdmitted }: WalkInV
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))",
                 gap: "1rem",
                 marginBottom: "1rem",
               }}
@@ -855,7 +849,7 @@ export function WalkInVisitorModal({ isOpen, onClose, onEntryAdmitted }: WalkInV
                   ) : filteredUnits.length === 0 ? (
                     <option value="">
                       {units.length === 0
-                        ? "No units registered in community"
+                        ? "No occupied units — onboard residents first"
                         : `No units match "${unitFilter}"`}
                     </option>
                   ) : (
@@ -956,7 +950,7 @@ export function WalkInVisitorModal({ isOpen, onClose, onEntryAdmitted }: WalkInV
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))",
                 gap: "1rem",
                 marginBottom: "1.25rem",
               }}
@@ -1191,7 +1185,7 @@ export function WalkInVisitorModal({ isOpen, onClose, onEntryAdmitted }: WalkInV
                 borderRadius: "8px",
                 padding: "1rem 1.25rem",
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))",
                 gap: "1rem",
                 fontSize: "0.9rem",
                 marginBottom: "1.5rem",

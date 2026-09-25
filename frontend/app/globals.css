@@ -1925,3 +1925,250 @@ svg text[font-family*="Syne"] {
   }
 }
 
+/* ======================================================================================
+   Accessibility helpers
+   ====================================================================================== */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ======================================================================================
+   Branded loading screen (components/common/BrandLoader.tsx)
+   ====================================================================================== */
+.gs-brand-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  padding: 1.5rem 1rem;
+  text-align: center;
+  color: #0f1724;
+  /* Invisible for the first 150 ms: a fast cache hit never flashes the loader. */
+  opacity: 0;
+  animation: gsLoaderIn 260ms ease-out 150ms forwards;
+}
+.gs-brand-loader--screen {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: radial-gradient(circle at 50% 38%, rgba(79, 142, 247, 0.14), transparent 55%),
+    linear-gradient(180deg, #f8fafc 0%, #f4f6f9 100%);
+}
+.gs-brand-loader--inline {
+  min-height: 60vh;
+  width: 100%;
+}
+.gs-brand-loader__mark {
+  position: relative;
+  width: 104px;
+  height: 104px;
+  display: grid;
+  place-items: center;
+}
+.gs-brand-loader__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(79, 142, 247, 0.22) 0%, rgba(79, 142, 247, 0) 70%);
+  animation: gsLoaderPulse 1.8s ease-in-out infinite;
+}
+.gs-brand-loader__orbit {
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  border: 3px solid rgba(79, 142, 247, 0.15);
+  border-top-color: #4f8ef7;
+  border-right-color: #8b5cf6;
+  animation: gsLoaderSpin 1.1s linear infinite;
+}
+.gs-brand-loader__logo {
+  position: relative;
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 14px rgba(15, 23, 36, 0.18));
+}
+.gs-brand-loader__wordmark {
+  font-family: "Outfit", var(--font-sans, system-ui), sans-serif;
+  font-size: 1.45rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  background: linear-gradient(90deg, #0f1724 0%, #1e3a8a 60%, #4f8ef7 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.gs-brand-loader__bar {
+  position: relative;
+  width: min(11rem, 60vw);
+  height: 4px;
+  border-radius: 999px;
+  background: #e8edf5;
+  overflow: hidden;
+}
+.gs-brand-loader__bar span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #4f8ef7, #8b5cf6);
+  animation: gsLoaderBar 1.2s ease-in-out infinite;
+}
+.gs-brand-loader__message {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #475569; /* 7.5:1 on #f4f6f9 */
+  max-width: 22rem;
+}
+@keyframes gsLoaderIn {
+  to {
+    opacity: 1;
+  }
+}
+@keyframes gsLoaderSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes gsLoaderPulse {
+  0%,
+  100% {
+    transform: scale(0.92);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+}
+@keyframes gsLoaderBar {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(260%);
+  }
+}
+
+/* ======================================================================================
+   Skeletons — layout that matches the real page at every width
+   ====================================================================================== */
+.gs-skel-cards {
+  display: none;
+}
+@media (max-width: 768px) {
+  .gs-skel-table {
+    display: none;
+  }
+  .gs-skel-cards {
+    display: flex;
+  }
+}
+.gs-page-skeleton {
+  min-width: 0;
+  max-width: 100%;
+}
+.gs-page-skeleton__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.gs-page-skeleton__panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: 1.25rem;
+}
+.gs-page-skeleton__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border-light, #f1f5f9);
+}
+
+/* ======================================================================================
+   Mobile text safety net — nothing may overlap or run off-screen at phone widths
+   ====================================================================================== */
+/* Mobile table cards: a value (badge, long role label, email, id) stays inside its column. */
+.data-table-card-value,
+.data-table-card-main-title {
+  overflow-wrap: anywhere;
+}
+.data-table-card-value > * {
+  max-width: 100%;
+}
+/* Desktop table cells often set inline `white-space: nowrap`; in a phone card it would
+   push the value off-screen. */
+.data-table-card-value [style*="white-space: nowrap"],
+.data-table-card-value[style*="white-space: nowrap"] {
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+}
+.data-table-card-value .badge,
+.data-table-card-top .badge {
+  white-space: normal;
+  line-height: 1.25;
+  text-align: left;
+  border-radius: 10px; /* a full pill looks broken once the label wraps to 2+ lines */
+}
+@media (max-width: 640px) {
+  /* Badges may wrap instead of spilling over neighbouring text. */
+  .badge {
+    max-width: 100%;
+    white-space: normal;
+  }
+  /* Long unbroken strings (emails, ids, plates, references) wrap inside cards. */
+  .card,
+  .gs-card,
+  .card-title,
+  .card-h3,
+  .page-body h1,
+  .page-body h2,
+  .page-body h3,
+  .page-body p {
+    overflow-wrap: anywhere;
+  }
+  /* Tab / segmented-button rows wrap rather than pushing past the screen edge. */
+  [role="tablist"] {
+    flex-wrap: wrap;
+  }
+}
+
+/* ======================================================================================
+   Reduced motion
+   ====================================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton,
+  [data-skeleton],
+  .gs-brand-loader__ring,
+  .gs-brand-loader__orbit,
+  .gs-brand-loader__bar span {
+    animation: none !important;
+  }
+  .gs-brand-loader {
+    opacity: 1;
+    animation: none;
+  }
+}
+
+/* Two-column form rows (inline `grid-template-columns: 1fr 1fr`) stack on phones so labels,
+   inputs and field errors never collide. Scoped to forms and modals. */
+@media (max-width: 480px) {
+  form [style*="grid-template-columns: 1fr 1fr"],
+  .modal-content [style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
