@@ -24371,6 +24371,80 @@
               }
             }
           ]
+        },
+        {
+          "name": "POST /realtime/ticket",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Session-Role",
+                "value": "super_admin"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrf}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/realtime/ticket",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "realtime",
+                "ticket"
+              ]
+            },
+            "description": "**POST /api/v1/realtime/ticket**\n\n- Module: `realtime`\n- Auth: session cookie\n- Required: `session`\n- Session: `superadmin`\n\nAuto-generated from the live route table by `docs/postman/build_collection.py`. Fill the request body / path variables before running individually; the `_Workflow` folder wires the ids for a full run.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_session_helper'));",
+                  "ensureSession('superadmin');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ok = pm.response.code < 300;",
+                  "pm.test('POST /api/v1/realtime/ticket -> 2xx or a documented 4xx', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201].concat([400,401,403,404,405,409,422]));",
+                  "});",
+                  "if (ok && pm.response.headers.get('content-type') || '' ) {",
+                  "  try {",
+                  "    const b = pm.response.json();",
+                  "    pm.test('canonical envelope', function () {",
+                  "      pm.expect(b).to.have.property('success');",
+                  "    });",
+                  "    const id = b && b.data && (b.data.id || (b.data.data && b.data.data.id));",
+                  "    if (id && pm.response.code === 201) {",
+                  "      pm.collectionVariables.set('_last_POST /api/v1/realtime/ticket_id', id);",
+                  "    }",
+                  "  } catch (e) {}",
+                  "}"
+                ]
+              }
+            }
+          ]
         }
       ]
     },

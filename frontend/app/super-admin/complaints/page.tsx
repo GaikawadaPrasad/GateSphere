@@ -268,7 +268,7 @@ export default function ComplaintsPage() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
                 gap: "1rem",
               }}
             >
@@ -371,7 +371,7 @@ export default function ComplaintsPage() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))",
                 gap: "0.75rem",
                 paddingTop: "0.75rem",
                 borderTop: "1px solid var(--border)",

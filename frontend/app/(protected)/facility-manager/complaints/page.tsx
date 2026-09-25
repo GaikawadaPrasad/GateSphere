@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { LinesSkeleton } from "@/components/common/LoadingSkeleton";
+import { useRealtimeRefresh } from "@/hooks/use-realtime";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SearchInput } from "@/components/forms/SearchInput";
 import { StatusBadge } from "@/components/common/StatusBadge";
@@ -108,11 +110,7 @@ export default function FacilityManagerComplaintsPage() {
 
       if (ticketsRes.status === "fulfilled") {
         const res = ticketsRes.value as any;
-        const rawList: any[] = Array.isArray(res)
-          ? res
-          : Array.isArray(res?.data)
-            ? res.data
-            : [];
+        const rawList: any[] = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
         const items = [...rawList].sort(
           (a: any, b: any) =>
             new Date(b.updated_at || b.created_at).getTime() -
@@ -138,12 +136,8 @@ export default function FacilityManagerComplaintsPage() {
     return () => clearTimeout(handler);
   }, [search, statusFilter, priorityFilter, pageSize]);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      loadData(page, false, false);
-    }, 15000);
-    return () => clearInterval(interval);
-  }, [page, search, statusFilter, priorityFilter, pageSize]);
+  // Refresh on realtime `complaints` hints; poll every 15 s only while the socket is down.
+  useRealtimeRefresh(["complaints"], () => loadData(page, false, false), 15_000);
 
   const handleStatusChange = async (id: string, status: string) => {
     try {
@@ -750,7 +744,7 @@ export default function FacilityManagerComplaintsPage() {
             </div>
           )}
           {historyLoading ? (
-            <p style={{ color: "var(--muted)", fontSize: "0.85rem" }}>Loading…</p>
+            <LinesSkeleton rows={3} label="Loading ticket history…" />
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
               {/* Status History */}

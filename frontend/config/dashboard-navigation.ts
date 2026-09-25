@@ -1,6 +1,6 @@
 /**
  * Navigation configurations for GateSphere Role Dashboards
- * - Auditor (11 Modules)
+ * - Auditor (12 Modules)
  * - Domestic Staff (9 Modules)
  * - Owner / Tenant (14 Modules)
  */
@@ -62,6 +62,14 @@ export const AUDITOR_NAV: DashboardNavConfig = {
       icon: "🛡️",
       accentColor: "#1D4ED8",
       description: "Live entry/exit records & anomalies",
+    },
+    {
+      id: "vehicle-records",
+      label: "Vehicle Records",
+      href: "/auditor/vehicle-records",
+      icon: "🚗",
+      accentColor: "#4F8EF7",
+      description: "Vehicle movements, violations & parking (read-only)",
     },
     {
       id: "visitor-records",
@@ -364,6 +372,14 @@ export const SECURITY_GUARD_NAV: DashboardNavConfig = {
       icon: "📦",
       accentColor: "#D97706",
       description: "Courier arrival & handoff logging",
+    },
+    {
+      id: "vehicles",
+      label: "Vehicle Gate Desk",
+      href: "/security-guard/vehicles",
+      icon: "🚗",
+      accentColor: "#4F8EF7",
+      description: "Plate entry/exit logging & parking violations",
     },
     {
       id: "cab-taxi",

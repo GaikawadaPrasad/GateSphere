@@ -34,14 +34,21 @@ AsyncSessionLocal = async_sessionmaker(
 
 
 async def get_async_db() -> AsyncIterator[AsyncSession]:
-    """FastAPI dependency — commit on success, rollback on exception, always close."""
+    """FastAPI dependency — commit on success, rollback on exception, always close.
+
+    Realtime change hints queued during the request are published only after the commit
+    succeeds (and dropped on rollback) — see `app.core.realtime`."""
+    from app.core.realtime import discard_pending, publish_pending
+
     async with AsyncSessionLocal() as db:
         try:
             yield db
             await db.commit()
         except Exception:
+            discard_pending(db)
             await db.rollback()
             raise
+        await publish_pending(db)
 
 
 # --- sync (seed script + tests only) --------------------------------------

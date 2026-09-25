@@ -7,6 +7,8 @@ flowchart TD
     C["Client (session)"] --> DEP["deps.vehicle_service — async_tenant_context + require_auth_async"]
     DEP --> G{"require_permission_async<br/>vehicles:view / :create / :update"}
     G -->|deny| E403["403 PERMISSION_DENIED"]
+    STAFF{"_require_staff: is_unit_restricted (plain resident)?"}
+    STAFF -->|yes| E403S["403 STAFF_ONLY"]
 
     G --> RULES & VEH & SLOTS & ALLOC & ENTRY & VIOL
 
@@ -17,8 +19,8 @@ flowchart TD
     subgraph VEH["Vehicles"]
         direction TB
         V_L["GET /vehicles → list_vehicles (?q by plate)"]
-        V_C["POST /vehicles → register_vehicle<br/>plate.upper(); by_plate → 409 VEHICLE_EXISTS; INSERT vehicles (resident XOR visitor)"]
-        V_GU["GET/PATCH /vehicles/{vehicle_id} → get_vehicle / update_vehicle"]
+        V_C["POST /vehicles → register_vehicle<br/>schema normalize_plate (upper, strip space/hyphen); by_plate → 409 VEHICLE_EXISTS; INSERT vehicles (resident XOR visitor)"]
+        V_GU["GET/PATCH /vehicles/{vehicle_id} → get_vehicle / update_vehicle<br/>resident: own unit (404); new unit_id must be one they occupy"]
     end
 
     subgraph SLOTS["Parking slots"]
@@ -30,30 +32,39 @@ flowchart TD
         direction TB
         AL_L["GET /vehicles/parking/allocations → list_allocations (?active_only)"]
         AL_C["POST /vehicles/parking/allocations → allocate"]
-        AL_C --> AL1["slots.get(slot_id) 404; vehicles.get(vehicle_id) same community 404; _rule(community)"]
-        AL1 --> AL2{"active_for_slot(slot)?"} -->|yes| AL_E1["409 SLOT_TAKEN"]
+        AL_C --> AL1["slots.get(slot_id) 404; _vehicle_in(community) 404"]
+        AL1 --> AL0{"vehicle inactive / slot blocked / reserved for other unit?"}
+        AL0 -->|yes| AL_E0["422 VEHICLE_INACTIVE / SLOT_BLOCKED / SLOT_RESERVED"]
+        AL0 -->|no| AL2{"active_for_slot(slot)?"} -->|yes| AL_E1["409 SLOT_TAKEN"]
         AL2 -->|no| AL3{"NOT allow_multi_slot AND active_for_vehicle?"} -->|yes| AL_E2["409 VEHICLE_HAS_SLOT"]
         AL3 -->|no| AL4{"active_count_for_unit &gt;= max_active_slots_per_unit?"} -->|yes| AL_E3["422 UNIT_SLOT_LIMIT"]
         AL4 -->|no| AL5["INSERT parking_allocations; parking_slots.status = allocated; audit allocation.create"]
-        AL_R["POST /vehicles/parking/allocations/{id}/release → release<br/>status active else 422 ALREADY_RELEASED → status=released; slot.status=available; audit"]
+        AL_R["POST /vehicles/parking/allocations/{id}/release → release (staff only)<br/>status active else 422 ALREADY_RELEASED → status=released; slot.status=available; audit"]
     end
 
     subgraph ENTRY["Gate entries (plate-based)"]
         direction TB
-        E_L["GET /vehicles/entries → list_entries (?plate, ?open_only)"]
-        E_C["POST /vehicles/entries → record_entry  [vehicles:create]<br/>plate.upper(); open_for_plate → 409 ALREADY_INSIDE;<br/>vehicle by_plate (may be None); _gate_in_scope;<br/>INSERT vehicle_entries status=inside, is_flagged = (vehicle is None); audit entry.create"]
-        E_X["PATCH /vehicles/entries/{id}/exit → record_exit<br/>status inside else 422 NOT_INSIDE → status=exited, exit_at, exit_guard; audit"]
+        E_L["GET /vehicles/entries → list_entries (?plate partial, ?open_only, ?flagged_only)<br/>resident: vehicle_id IN own-unit vehicles"]
+        E_C["POST /vehicles/entries → record_entry  [vehicles:create + staff]"]
+        E_C --> E_B{"plate_blacklist_hit (blacklisted visitor's vehicle_number)?"}
+        E_B -->|"yes + blacklist_mode=block"| E_BE["403 PLATE_BLACKLISTED (nothing recorded)"]
+        E_B -->|"no / warn"| E_C2["open_for_plate → 409 ALREADY_INSIDE; by_plate (inactive = unknown); _gate_in_scope<br/>INSERT vehicle_entries is_flagged = unknown OR warn; audit entry.create"]
+        E_C2 -->|flagged| E_N["emit_to_roles security_supervisor: vehicles.entry_flagged"]
+        E_X["PATCH /vehicles/entries/{id}/exit → record_exit (staff only)<br/>status inside else 422 NOT_INSIDE → status=exited, exit_at, exit_guard; audit"]
     end
 
     subgraph VIOL["Violations (state machine open→acknowledged→resolved | waived)"]
         direction TB
-        VI_L["GET /vehicles/parking/violations → list_violations (?violation_status)"]
-        VI_C["POST /vehicles/parking/violations → report_violation<br/>ensure_confirmed_async(evidence_url); INSERT parking_violations; audit violation.report"]
-        VI_T["POST /vehicles/parking/violations/{id}/status → transition_violation"]
+        VI_L["GET /vehicles/parking/violations → list_violations (?violation_status, ?plate)<br/>resident: own-unit vehicles OR reported by me"]
+        VI_C["POST /vehicles/parking/violations → report_violation<br/>fine by resident → 403 STAFF_ONLY; ensure_confirmed_async(evidence_url);<br/>_vehicle_in / _slot_in (404); plate auto-match by_plate;<br/>INSERT parking_violations (registration_number); audit violation.report"]
+        VI_C -->|matched vehicle| VI_N["emit owner resident: vehicles.violation_reported"]
+        VI_T["POST /vehicles/parking/violations/{id}/status → transition_violation (staff only)"]
         VI_T --> VI_T1{"target ∈ _VIOLATION_TRANSITIONS[current]?"} -->|no| VI_E["422 INVALID_TRANSITION"]
         VI_T1 -->|yes| VI_T2["status = target; resolved/waived → resolved_at; audit violation.&lt;status&gt;"]
     end
 
     RULES & VEH & SLOTS & ALLOC & ENTRY & VIOL --> REPO["Vehicle/Slot/Allocation/Entry/Rule/Violation Repository (AsyncTenantRepository)"]
+    E_C & E_X & AL_R & VI_T -.-> STAFF
     VI_C --> UP["uploads.guard.ensure_confirmed_async (vehicle_evidence)"]
-    REPO --> DB[("PostgreSQL: vehicles, parking_rules, parking_slots, parking_allocations,<br/>vehicle_entries, parking_violations, audit_logs")]
+    REPO --> DB[("PostgreSQL: vehicles, parking_rules, parking_slots, parking_allocations,<br/>vehicle_entries, parking_violations, audit_logs; reads visitors + visitor_blacklist + visitor_policies")]
+    E_N & VI_N --> NTF["notifications.events (SAVEPOINT, never breaks the op)"]

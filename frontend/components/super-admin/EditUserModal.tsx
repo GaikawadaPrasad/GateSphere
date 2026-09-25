@@ -174,6 +174,7 @@ export function EditUserModal({
 
       toast.success(`Updated profile and access for ${fullName.trim()}.`, "User Updated");
       await queryClient.invalidateQueries({ queryKey: ["users"], refetchType: "all" });
+      await queryClient.invalidateQueries({ queryKey: ["auth", "me"], refetchType: "all" });
       onSuccess();
       onClose();
     } catch (err: any) {

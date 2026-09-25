@@ -250,6 +250,7 @@ class UnitRepository(AsyncTenantRepository[Unit]):
         floor_id: uuid.UUID | None = None,
         unit_type: str | None = None,
         active: bool | None = None,
+        occupied: bool | None = None,
     ) -> tuple[list[Unit], int]:
         stmt = select(Unit).where(Unit.community_id == community_id)
         if tower_id is not None:
@@ -260,6 +261,9 @@ class UnitRepository(AsyncTenantRepository[Unit]):
             stmt = stmt.where(Unit.unit_type == unit_type)
         if active is not None:
             stmt = stmt.where(Unit.is_active.is_(active))
+        if occupied is not None:
+            has_resident = self._occupied_clause()
+            stmt = stmt.where(has_resident if occupied else ~has_resident)
         stmt = stmt.order_by(Unit.unit_number)
         return (
             await self.list(offset=offset, limit=limit, extra=stmt),
@@ -275,6 +279,26 @@ class UnitRepository(AsyncTenantRepository[Unit]):
                 Unit.tower_id == tower_id,
                 Unit.unit_number == number,
             )
+        )
+
+    @staticmethod
+    def _occupied_clause():
+        """EXISTS an active, un-ended occupancy of a resident who hasn't moved out / been
+        suspended — i.e. somebody actually lives in the unit to receive a visitor/parcel."""
+        # Imported here: `residents` depends on `communities`, not the other way round.
+        from datetime import date
+
+        from sqlalchemy import exists, or_
+
+        from app.modules.residents.models import ResidentProfile, UnitOccupancy
+
+        return exists().where(
+            UnitOccupancy.unit_id == Unit.id,
+            UnitOccupancy.community_id == Unit.community_id,
+            UnitOccupancy.is_active.is_(True),
+            or_(UnitOccupancy.end_date.is_(None), UnitOccupancy.end_date >= date.today()),
+            ResidentProfile.id == UnitOccupancy.resident_profile_id,
+            ResidentProfile.profile_status.notin_(("moved_out", "suspended")),
         )
 
     async def counts_by_floors(self, floor_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:

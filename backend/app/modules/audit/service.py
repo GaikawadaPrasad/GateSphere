@@ -16,6 +16,7 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.context import RequestContext
+from app.core.realtime import queue_community_event
 from app.modules.audit.models import AuditLog
 from app.modules.users.models import User
 
@@ -103,4 +104,14 @@ async def record_audit_async(
     )
     db.add(row)
     await db.flush()
+    # Every audited state change doubles as a realtime "this module changed" hint,
+    # published after commit (AGENTS.md §5.7).
+    queue_community_event(
+        db,
+        community_id=community_id,
+        module=module,
+        entity_type=entity_type,
+        action=action,
+        actor_id=actor.id if actor is not None else None,
+    )
     return row

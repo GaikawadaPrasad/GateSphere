@@ -168,6 +168,12 @@ export function Sidebar() {
           href: "/security-supervisor/domestic-staff",
           icon: "👔",
         },
+        {
+          id: "vehicles",
+          label: "Vehicles & Parking",
+          href: "/security-supervisor/vehicles",
+          icon: "🚗",
+        },
         { id: "blacklist", label: "Blacklist", href: "/security-supervisor/blacklist", icon: "🚫" },
         { id: "incidents", label: "Incidents", href: "/security-supervisor/incidents", icon: "⚠️" },
         {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { LinesSkeleton } from "@/components/common/LoadingSkeleton";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { KpiCard } from "@/components/dashboard/KpiCard";
@@ -298,7 +299,7 @@ export default function SecurityGuardDashboardPage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))",
               gap: "1rem",
               fontSize: "0.9rem",
             }}
@@ -361,7 +362,7 @@ export default function SecurityGuardDashboardPage() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))",
           gap: "1.25rem",
           marginBottom: "1.75rem",
         }}
@@ -446,7 +447,7 @@ export default function SecurityGuardDashboardPage() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))",
             gap: "1rem",
           }}
         >
@@ -556,7 +557,7 @@ export default function SecurityGuardDashboardPage() {
             <h3 className="card-title">Current Duty Assignment</h3>
           </div>
           {isLoadingStats ? (
-            <p style={{ padding: "0.5rem 0", color: "var(--muted)" }}>Loading…</p>
+            <LinesSkeleton rows={2} label="Loading duty assignment…" />
           ) : !activeRoster ? (
             <p style={{ padding: "0.5rem 0", color: "var(--muted)" }}>
               No active shift assignment found on today&apos;s roster.
@@ -624,7 +625,7 @@ export default function SecurityGuardDashboardPage() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))",
                 gap: "0.6rem",
               }}
             >

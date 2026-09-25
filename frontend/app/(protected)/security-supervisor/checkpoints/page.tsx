@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useCachedMe } from "@/hooks/use-auth";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
-import { checkpointsApi, gateApi, communitiesApi, authApi } from "@/lib/api";
+import { checkpointsApi, gateApi, communitiesApi } from "@/lib/api";
 import { toast } from "@/store/toast";
 
 interface CheckpointItem {
@@ -19,6 +20,7 @@ interface CheckpointItem {
 }
 
 export default function SecuritySupervisorCheckpointsPage() {
+  const getMe = useCachedMe();
   const [checkpoints, setCheckpoints] = useState<CheckpointItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -39,7 +41,7 @@ export default function SecuritySupervisorCheckpointsPage() {
       const [assignmentsRes, rostersRes, meRes] = await Promise.allSettled([
         gateApi.assignments(),
         gateApi.rosters(),
-        authApi.me(),
+        getMe(),
       ]);
 
       const guards: { id: string; name: string }[] = [];

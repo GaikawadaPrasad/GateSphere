@@ -21,6 +21,7 @@ from app.modules.notifications.router import router as notifications_router
 from app.modules.onboarding.router import router as onboarding_router
 from app.modules.rbac.router import router as rbac_router
 from app.modules.residents.router import router as residents_router
+from app.modules.realtime.router import router as realtime_router
 from app.modules.uploads.router import router as uploads_router
 from app.modules.users.router import router as users_router
 from app.modules.vehicles.router import router as vehicles_router
@@ -49,5 +50,6 @@ for r in (
     uploads_router,
     rbac_router,
     onboarding_router,
+    realtime_router,
 ):
     api_router.include_router(r)

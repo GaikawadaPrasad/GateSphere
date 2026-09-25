@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { api, apiGetPaginated } from "@/lib/api";
 import { deriveTicketEscalationState } from "@/lib/utils";
 
 export interface AuditLogItem {
@@ -31,9 +31,10 @@ export interface AuditorStats {
   incident_count: number;
 }
 
-export function useAuditorOverview(communityId?: string | null) {
+export function useAuditorOverview(communityId?: string | null, opts?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["auditor", "overview", communityId],
+    enabled: opts?.enabled ?? true,
     queryFn: async () => {
       const fetchOverview = communityId
         ? api.get<any>(`/dashboards/overview?community_id=${communityId}`).catch(() => ({}))
@@ -42,33 +43,26 @@ export function useAuditorOverview(communityId?: string | null) {
         ? api.get<any>(`/dashboards/financial?community_id=${communityId}`).catch(() => ({}))
         : Promise.resolve({});
 
-      const [overview, financial, logs, incidents, gateEvents, invoices] = await Promise.all([
+      // Counts come from `meta.total` of 1-row pages (accurate beyond 100 rows, ~no payload);
+      // gate events are fetched as a list because anomalies are derived from event types.
+      const cq = communityId ? `&community_id=${communityId}` : "";
+      const total = (path: string) =>
+        apiGetPaginated<unknown[]>(`${path}?page_size=1${cq}`)
+          .then((r) => r.meta?.total ?? 0)
+          .catch(() => 0);
+      const [overview, financial, totalLogs, incidentTotal, gateEvents] = await Promise.all([
         fetchOverview,
         fetchFinancial,
-        api
-          .get<
-            any[]
-          >(`/audit/logs?page_size=100${communityId ? `&community_id=${communityId}` : ""}`)
-          .catch(() => []),
-        api
-          .get<
-            any[]
-          >(`/incidents?page_size=100${communityId ? `&community_id=${communityId}` : ""}`)
-          .catch(() => []),
-        api
-          .get<
-            any[]
-          >(`/gate/events?page_size=100${communityId ? `&community_id=${communityId}` : ""}`)
-          .catch(() => []),
-        api
-          .get<
-            any[]
-          >(`/billing/invoices?page_size=100${communityId ? `&community_id=${communityId}` : ""}`)
-          .catch(() => []),
+        total("/audit/logs"),
+        total("/incidents"),
+        api.get<any[]>(`/gate/events?page_size=100${cq}`).catch(() => []),
       ]);
+      // Invoice list only as a fallback when the financial dashboard has no totals.
+      const invoices =
+        financial && Number(financial.total_billed) > 0
+          ? []
+          : await api.get<any[]>(`/billing/invoices?page_size=100${cq}`).catch(() => []);
 
-      const totalLogs = Array.isArray(logs) ? logs.length : 0;
-      const incidentTotal = Array.isArray(incidents) ? incidents.length : 0;
       const gateAnomalyCount = Array.isArray(gateEvents)
         ? gateEvents.filter(
             (e: any) =>
@@ -114,17 +108,21 @@ export function useAuditorOverview(communityId?: string | null) {
   });
 }
 
-export function useAuditorLogs(filters: {
-  module?: string;
-  action?: string;
-  user_id?: string;
-  community_id?: string | null;
-  q?: string;
-  page?: number;
-  pageSize?: number;
-}) {
+export function useAuditorLogs(
+  filters: {
+    module?: string;
+    action?: string;
+    user_id?: string;
+    community_id?: string | null;
+    q?: string;
+    page?: number;
+    pageSize?: number;
+  },
+  opts?: { enabled?: boolean },
+) {
   return useQuery({
     queryKey: ["auditor", "logs", filters],
+    enabled: opts?.enabled ?? true,
     queryFn: async () => {
       const params = new URLSearchParams();
       if (filters.module) params.set("module", filters.module);
@@ -162,9 +160,10 @@ export function useAuditorLogs(filters: {
   });
 }
 
-export function useAuditorGateActivity(communityId?: string | null) {
+export function useAuditorGateActivity(communityId?: string | null, opts?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["auditor", "gate-activity", communityId],
+    enabled: opts?.enabled ?? true,
     queryFn: async () => {
       const res = await api.get<any[]>(
         `/gate/events?page_size=100${communityId ? `&community_id=${communityId}` : ""}`,
@@ -195,9 +194,13 @@ export function useAuditorGateActivity(communityId?: string | null) {
   });
 }
 
-export function useAuditorVisitorRecords(communityId?: string | null) {
+export function useAuditorVisitorRecords(
+  communityId?: string | null,
+  opts?: { enabled?: boolean },
+) {
   return useQuery({
     queryKey: ["auditor", "visitor-records", communityId],
+    enabled: opts?.enabled ?? true,
     queryFn: async () => {
       const res = await api.get<any[]>(
         `/visitors/requests?page_size=100${communityId ? `&community_id=${communityId}` : ""}`,
@@ -219,9 +222,13 @@ export function useAuditorVisitorRecords(communityId?: string | null) {
   });
 }
 
-export function useAuditorFinancialLedger(communityId?: string | null) {
+export function useAuditorFinancialLedger(
+  communityId?: string | null,
+  opts?: { enabled?: boolean },
+) {
   return useQuery({
     queryKey: ["auditor", "financial", communityId],
+    enabled: opts?.enabled ?? true,
     queryFn: async () => {
       const invoices = await api.get<any[]>(
         `/billing/invoices?page_size=100${communityId ? `&community_id=${communityId}` : ""}`,
@@ -243,9 +250,10 @@ export function useAuditorFinancialLedger(communityId?: string | null) {
   });
 }
 
-export function useAuditorComplaints(communityId?: string | null) {
+export function useAuditorComplaints(communityId?: string | null, opts?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["auditor", "complaints", communityId],
+    enabled: opts?.enabled ?? true,
     queryFn: async () => {
       const res = await api.get<any[]>(
         `/complaints/tickets?page_size=100${communityId ? `&community_id=${communityId}` : ""}`,
@@ -265,9 +273,10 @@ export function useAuditorComplaints(communityId?: string | null) {
   });
 }
 
-export function useAuditorVendors(communityId?: string | null) {
+export function useAuditorVendors(communityId?: string | null, opts?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["auditor", "vendors", communityId],
+    enabled: opts?.enabled ?? true,
     queryFn: async () => {
       const res = await api.get<any[]>(
         `/domestic-staff?page_size=100${communityId ? `&community_id=${communityId}` : ""}`,
@@ -289,9 +298,10 @@ export function useAuditorVendors(communityId?: string | null) {
   });
 }
 
-export function useAuditorIncidents(communityId?: string | null) {
+export function useAuditorIncidents(communityId?: string | null, opts?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["auditor", "incidents", communityId],
+    enabled: opts?.enabled ?? true,
     queryFn: async () => {
       const res = await api.get<any[]>(
         `/incidents?page_size=100${communityId ? `&community_id=${communityId}` : ""}`,

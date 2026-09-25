@@ -218,7 +218,7 @@ export default function BillingPage() {
       />
 
       {/* Tabs */}
-      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.25rem" }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "1.25rem" }}>
         <button
           type="button"
           className={`btn ${activeTab === "invoices" ? "btn-primary" : "btn-secondary"}`}

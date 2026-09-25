@@ -5,6 +5,7 @@
 import { QueryClient } from "@tanstack/react-query";
 import { ApiError } from "./api";
 import { hardNavigate } from "./navigation";
+import { realtime } from "./realtime";
 
 export function makeQueryClient(): QueryClient {
   return new QueryClient({
@@ -18,7 +19,9 @@ export function makeQueryClient(): QueryClient {
           }
           return failureCount < 2;
         },
-        refetchOnWindowFocus: true,
+        // With a live realtime socket the cache is already kept fresh by change hints, so a
+        // tab focus would only re-download unchanged data. Refetch on focus only as fallback.
+        refetchOnWindowFocus: () => realtime.getStatus() !== "open",
         refetchOnMount: false,
         refetchOnReconnect: true,
         staleTime: 30_000,

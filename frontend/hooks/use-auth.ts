@@ -14,6 +14,32 @@ export const authKeys = {
   me: ["auth", "me"] as const,
 };
 
+async function fetchCurrentUser(): Promise<CurrentUser | null> {
+  if (!hasSessionCookie()) return null;
+  try {
+    return await authApi.me();
+  } catch (err: any) {
+    if (err?.isUnauthenticated || err?.status === 401) {
+      return null;
+    }
+    if (err?.code === "AMBIGUOUS_SESSION") {
+      const activeRole = getActiveRole();
+      if (activeRole) {
+        try {
+          return await authApi.me(activeRole);
+        } catch (retryErr: any) {
+          if (retryErr?.isUnauthenticated || retryErr?.status === 401) return null;
+        }
+      }
+      return null;
+    }
+    // Re-throw genuine errors (e.g. 500) so UI exposes error state (FE-014)
+    throw err;
+  }
+}
+
+const ME_STALE_MS = 60_000;
+
 /**
  * Current user. `null` when unauthenticated (a 401 is an expected result, not an error state).
  * With no session cookie at all we already know the answer, so `/auth/me` is not called —
@@ -22,30 +48,8 @@ export const authKeys = {
 export function useMe(options?: { enabled?: boolean }) {
   return useQuery<CurrentUser | null>({
     queryKey: authKeys.me,
-    queryFn: async () => {
-      if (!hasSessionCookie()) return null;
-      try {
-        return await authApi.me();
-      } catch (err: any) {
-        if (err?.isUnauthenticated || err?.status === 401) {
-          return null;
-        }
-        if (err?.code === "AMBIGUOUS_SESSION") {
-          const activeRole = getActiveRole();
-          if (activeRole) {
-            try {
-              return await authApi.me(activeRole);
-            } catch (retryErr: any) {
-              if (retryErr?.isUnauthenticated || retryErr?.status === 401) return null;
-            }
-          }
-          return null;
-        }
-        // Re-throw genuine errors (e.g. 500) so UI exposes error state (FE-014)
-        throw err;
-      }
-    },
-    staleTime: 60_000,
+    queryFn: fetchCurrentUser,
+    staleTime: ME_STALE_MS,
     retry: (failureCount, error: any) => {
       if (error?.isUnauthenticated || error?.status === 401 || error?.status === 400) {
         return false;
@@ -54,6 +58,22 @@ export function useMe(options?: { enabled?: boolean }) {
     },
     enabled: options?.enabled,
   });
+}
+
+/**
+ * For imperative loaders (`useEffect` + `async`): returns a function resolving the current
+ * user from the shared `["auth","me"]` cache — the layout already loaded it, so this costs
+ * no request. Never call `authApi.me()` directly from a page: it bypasses the cache and
+ * adds a `/auth/me` round trip to every load.
+ */
+export function useCachedMe(): () => Promise<CurrentUser | null> {
+  const qc = useQueryClient();
+  return () =>
+    qc.ensureQueryData({
+      queryKey: authKeys.me,
+      queryFn: fetchCurrentUser,
+      staleTime: ME_STALE_MS,
+    });
 }
 
 export function useLogin() {

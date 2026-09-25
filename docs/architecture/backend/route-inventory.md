@@ -187,11 +187,11 @@ is emitted by `docs/architecture/backend/gen_route_inventory.py`; keep in sync w
 | GET/PATCH | `/vehicles/{vehicle_id}` | session | `:view` / `:update` | T | `vehicles` (update) | |
 | GET/POST | `/vehicles/parking/slots` | session | `:view` / `:create` | T | `parking_slots` (insert) | `409 SLOT_EXISTS` |
 | GET/POST | `/vehicles/parking/allocations` | session | `:view` / `:create` | T | `parking_allocations` (insert), `parking_slots.status='allocated'` | `409 SLOT_TAKEN`/`VEHICLE_HAS_SLOT`; `422 UNIT_SLOT_LIMIT` (`parking_rules.max_active_slots_per_unit`) |
-| POST | `/vehicles/parking/allocations/{id}/release` | session | `:update` | T | `parking_allocations.status='released'`, `parking_slots.status='available'` | `422 ALREADY_RELEASED` |
-| GET/POST | `/vehicles/entries` | session | `:view` / `:create` | T | `vehicle_entries` (insert; `is_flagged` if plate unknown) | `409 ALREADY_INSIDE` (one open per plate) |
-| PATCH | `/vehicles/entries/{id}/exit` | session | `:update` | T | `vehicle_entries.status='exited'` | `422 NOT_INSIDE` |
-| GET/POST | `/vehicles/parking/violations` | session | `:view` / `:create` | T | `parking_violations` (insert) | `evidence_url` → `ensure_confirmed` |
-| POST | `/vehicles/parking/violations/{id}/status` | session | `:update` | T (machine `open→acknowledged→resolved`/`waived`) | `parking_violations.status` | `422 INVALID_TRANSITION` |
+| POST | `/vehicles/parking/allocations/{id}/release` | session | `:update` + staff (`STAFF_ONLY`) | T | `parking_allocations.status='released'`, `parking_slots.status='available'` | `422 ALREADY_RELEASED` |
+| GET/POST | `/vehicles/entries` | session | `:view` / `:create` + staff | T (resident list: own-unit vehicles) | `vehicle_entries` (insert; `is_flagged` if plate unknown/deactivated) → notify `security_supervisor` | `403 PLATE_BLACKLISTED` (blacklist screened first), `409 ALREADY_INSIDE`, `403 STAFF_ONLY` |
+| PATCH | `/vehicles/entries/{id}/exit` | session | `:update` + staff | T | `vehicle_entries.status='exited'` | `422 NOT_INSIDE` |
+| GET/POST | `/vehicles/parking/violations` | session | `:view` / `:create` | T (resident list: own vehicles + reported) | `parking_violations` (insert, plate auto-matched) → notify vehicle owner | `evidence_url` → `ensure_confirmed`; foreign vehicle/slot `404`; fine by resident `403 STAFF_ONLY` |
+| POST | `/vehicles/parking/violations/{id}/status` | session | `:update` + staff | T (machine `open→acknowledged→resolved`/`waived`) | `parking_violations.status` | `422 INVALID_TRANSITION` |
 
 ## billing — `app/modules/billing/`  (FR-09)
 
@@ -306,6 +306,16 @@ is emitted by `docs/architecture/backend/gen_route_inventory.py`; keep in sync w
 | POST | `/uploads` | session | – | T (community-scoped kinds) | `managed_files` (insert, `pending`) | → `storage.presigned_put` (S3/MinIO); returns `upload_url` + `file_url` + `confirm_url` |
 | POST | `/uploads/{file_id}/confirm` | session | – | creator OR community member (`_assert_can_access`) | `managed_files.status` (`confirmed`/`rejected`) | → `storage.object_head` + `object_bytes` (magic-byte `sniff.detect`); reject → `storage.delete_object`; `422 UPLOAD_REJECTED`/`NO_OBJECT` |
 | GET | `/uploads/download?key=` | session | – | via `managed_files` row (`_assert_can_access`, must be `confirmed`) | – | → `storage.presigned_get` (1h); `404` for unknown key / unconfirmed / out-of-scope — **not** a blind presign |
+
+## realtime — `app/modules/realtime/`  (AGENTS.md §5.7, ADR-011)
+
+| Method | Path | Auth | Perm | Scope | Mutation | Notes / integration |
+|---|---|---|---|---|---|---|
+| POST | `/realtime/ticket` | session + CSRF | – | – | Redis `gs:rt:ticket:*` (30 s, single use) | `503 REALTIME_UNAVAILABLE` when Redis is down |
+| WS | `/realtime/ws?ticket=` | ticket (GETDEL) + Origin allow-list | per-subscribe `:view` | membership re-checked on every `subscribe`; foreign → `FORBIDDEN_SCOPE` | – | Redis pub/sub `gs:rt:community:*` / `gs:rt:user:*` → invalidate hints (no data); actor excluded; residents: user channel + community-wide modules; close 4401/4403/4429 |
+
+Hints are emitted by `record_audit_async` (every audited change) and notification dispatch,
+published **after commit** by `get_async_db` / `job_session` (`app/core/realtime.py`).
 
 ---
 

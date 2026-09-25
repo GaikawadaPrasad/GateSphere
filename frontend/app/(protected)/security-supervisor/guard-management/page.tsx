@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useCachedMe } from "@/hooks/use-auth";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
 import { DataTable, type Column } from "@/components/tables/DataTable";
-import { authApi, gateApi, guardsApi } from "@/lib/api";
+import { gateApi, guardsApi } from "@/lib/api";
 import { PasswordField } from "@/components/forms/PasswordField";
 import { generateInitialPassword, isValidPersonName } from "@/lib/utils";
 import { toast } from "@/store/toast";
@@ -24,6 +25,7 @@ interface GuardRosterItem {
 }
 
 export default function SecuritySupervisorGuardManagementPage() {
+  const getMe = useCachedMe();
   const [roster, setRoster] = useState<GuardRosterItem[]>([]);
   const [guardsList, setGuardsList] = useState<{ id: string; name: string }[]>([]);
   const [communityId, setCommunityId] = useState<string | undefined>(undefined);
@@ -207,7 +209,7 @@ export default function SecuritySupervisorGuardManagementPage() {
         gateApi.rosters(),
         gateApi.assignments(),
         guardsApi.list(),
-        authApi.me().catch(() => null),
+        getMe().catch(() => null),
       ]);
 
       if (meData.status === "fulfilled" && meData.value) {

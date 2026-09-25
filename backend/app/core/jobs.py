@@ -25,6 +25,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session, SessionTransaction
 
+from app.core.realtime import discard_pending, publish_pending
 from app.core.tenancy import RLS_GLOBAL_SCOPE, TenantScope
 from app.db.session import AsyncSessionLocal
 from app.modules.users.models import User
@@ -57,8 +58,11 @@ async def job_session() -> AsyncIterator[AsyncSession]:
         yield db
         await db.commit()
     except Exception:
+        discard_pending(db)
         await db.rollback()
         raise
+    else:
+        await publish_pending(db)  # realtime hints for sweep-driven changes (after commit)
     finally:
         await db.close()
 

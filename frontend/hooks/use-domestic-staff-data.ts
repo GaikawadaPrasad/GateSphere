@@ -91,7 +91,7 @@ export function useStaffProfile() {
   });
 }
 
-export function useStaffPass() {
+export function useStaffPass(opts?: { enabled?: boolean }) {
   return useQuery<{
     pass_code: string;
     staff_id: string;
@@ -101,6 +101,7 @@ export function useStaffPass() {
     expires_at: string;
   }>({
     queryKey: ["staff", "pass"],
+    enabled: opts?.enabled ?? true,
     staleTime: 10_000,
     queryFn: async () => {
       const res = await api.get<any>("/domestic-staff/me/pass");
@@ -126,9 +127,10 @@ export function useUpdateStaffProfile() {
   });
 }
 
-export function useAssignedHomes() {
+export function useAssignedHomes(opts?: { enabled?: boolean }) {
   return useQuery<AssignedHome[]>({
     queryKey: ["staff", "assigned-homes"],
+    enabled: opts?.enabled ?? true,
     staleTime: 5_000,
     queryFn: async () => {
       const res = await api.get<any[]>("/domestic-staff/me/assignments?page_size=100");
@@ -154,9 +156,10 @@ export function useAssignedHomes() {
   });
 }
 
-export function useStaffAttendance() {
+export function useStaffAttendance(opts?: { enabled?: boolean }) {
   return useQuery<AttendanceRecord[]>({
     queryKey: ["staff", "attendance"],
+    enabled: opts?.enabled ?? true,
     staleTime: 5_000,
     queryFn: async () => {
       const res = await api.get<any[]>("/domestic-staff/me/attendance?page_size=100");
@@ -201,9 +204,10 @@ export function useStaffAttendance() {
   });
 }
 
-export function useStaffVisits() {
+export function useStaffVisits(opts?: { enabled?: boolean }) {
   return useQuery<StaffVisit[]>({
     queryKey: ["staff", "visits"],
+    enabled: opts?.enabled ?? true,
     staleTime: 5_000,
     queryFn: async () => {
       const res = await api.get<any[]>("/domestic-staff/me/visits?page_size=100");

@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useCachedMe } from "@/hooks/use-auth";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SearchInput } from "@/components/forms/SearchInput";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DataTable, type Column } from "@/components/tables/DataTable";
-import { visitorsApi, communitiesApi, authApi, type VisitorRecord } from "@/lib/api";
+import { visitorsApi, communitiesApi, type VisitorRecord } from "@/lib/api";
 import { Modal } from "@/components/common/Modal";
 import { formatDateTime } from "@/lib/utils";
 import { toast } from "@/store/toast";
@@ -30,6 +31,7 @@ interface SupervisorVisitorRow {
 }
 
 export default function SecuritySupervisorVisitorManagementPage() {
+  const getMe = useCachedMe();
   const [visitors, setVisitors] = useState<SupervisorVisitorRow[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -51,7 +53,7 @@ export default function SecuritySupervisorVisitorManagementPage() {
       const [res, directoryRes, me] = await Promise.all([
         visitorsApi.requests({ page_size: 100 }),
         visitorsApi.directory({ page_size: 100 }).catch(() => []),
-        authApi.me().catch(() => null),
+        getMe().catch(() => null),
       ]);
       const data = Array.isArray(res) ? res : (res as any)?.data || [];
       const directory = Array.isArray(directoryRes)
@@ -66,7 +68,10 @@ export default function SecuritySupervisorVisitorManagementPage() {
       const unitMap = new Map<string, string>();
       if (cid) {
         try {
-          const uRes: any = await communitiesApi.communityUnits(cid, { page_size: 100 });
+          const uRes: any = await communitiesApi.communityUnits(cid, {
+            page_size: 100,
+            occupied: true,
+          });
           const uList = Array.isArray(uRes) ? uRes : uRes?.data || uRes?.items || [];
           for (const u of uList) {
             if (u?.id) unitMap.set(u.id, u.unit_number);

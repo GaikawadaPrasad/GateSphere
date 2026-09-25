@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { gateApi } from "@/lib/api";
+import { useLivePollInterval } from "@/hooks/use-realtime";
 import type { ListQueryParams } from "@/types/api";
 
 export const gateKeys = {
@@ -12,20 +13,22 @@ export const gateKeys = {
 };
 
 export function useGateEvents(params?: ListQueryParams) {
+  const livePoll = useLivePollInterval(15_000);
   return useQuery({
     queryKey: gateKeys.events(params),
     queryFn: () => gateApi.events(params),
     staleTime: 10_000,
-    refetchInterval: 15_000,
+    refetchInterval: livePoll,
   });
 }
 
 export function usePanicAlerts(params?: ListQueryParams) {
+  const livePoll = useLivePollInterval(10_000, 60_000); // SOS keeps a safety net
   return useQuery({
     queryKey: gateKeys.alerts(params),
     queryFn: () => gateApi.alerts(params),
     staleTime: 5_000,
-    refetchInterval: 10_000,
+    refetchInterval: livePoll,
   });
 }
 

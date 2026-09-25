@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useCachedMe } from "@/hooks/use-auth";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SearchInput } from "@/components/forms/SearchInput";
 import { StatusBadge } from "@/components/common/StatusBadge";
@@ -11,7 +12,7 @@ import { WalkInVisitorModal } from "@/components/common/WalkInVisitorModal";
 import { Modal } from "@/components/common/Modal";
 import { FileUpload } from "@/components/common/FileUpload";
 import { formatDateTime } from "@/lib/utils";
-import { communitiesApi, authApi } from "@/lib/api";
+import { communitiesApi } from "@/lib/api";
 import { toast } from "@/store/toast";
 import { QrScannerModal } from "@/components/common/QrScannerModal";
 import { parseQrPayload, type ParsedQrData } from "@/lib/qr-decoder";
@@ -36,6 +37,7 @@ interface VisitorRow {
 }
 
 export default function SecurityGuardVisitorsPage() {
+  const getMe = useCachedMe();
   const [visitors, setVisitors] = useState<VisitorRow[]>([]);
   const [search, setSearch] = useState("");
   const [viewTab, setViewTab] = useState<"entered" | "expected" | "all">("entered");
@@ -78,7 +80,7 @@ export default function SecurityGuardVisitorsPage() {
         visitorsApi.requests({ page_size: 100 }),
         visitorsApi.directory({ page_size: 100 }),
         visitorsApi.entries({ page_size: 100 }),
-        authApi.me().catch(() => null),
+        getMe().catch(() => null),
       ]);
 
       const requests = Array.isArray(requestsRes) ? requestsRes : (requestsRes as any)?.data || [];
@@ -95,7 +97,10 @@ export default function SecurityGuardVisitorsPage() {
       const unitMap = new Map<string, string>();
       if (cid) {
         try {
-          const uRes: any = await communitiesApi.communityUnits(cid, { page_size: 100 });
+          const uRes: any = await communitiesApi.communityUnits(cid, {
+            page_size: 100,
+            occupied: true,
+          });
           const uList = Array.isArray(uRes) ? uRes : uRes?.data || uRes?.items || [];
           for (const u of uList) {
             if (u?.id) unitMap.set(u.id, u.unit_number);
@@ -288,7 +293,8 @@ export default function SecurityGuardVisitorsPage() {
       setViewTab("entered");
       await loadData();
     } catch (err: any) {
-      const errMsg = err?.message || "Failed to verify visitor pass. Please check the OTP / QR code.";
+      const errMsg =
+        err?.message || "Failed to verify visitor pass. Please check the OTP / QR code.";
       setVerifyError(errMsg);
       toast.error(errMsg);
     } finally {
@@ -323,7 +329,8 @@ export default function SecurityGuardVisitorsPage() {
   const tabFilteredVisitors = visitors.filter((v) => {
     const isEntered = v.status === "entered" || v.status === "completed" || Boolean(v.entryId);
     if (viewTab === "entered") return isEntered;
-    if (viewTab === "expected") return !isEntered && (v.status === "approved" || v.status === "pending");
+    if (viewTab === "expected")
+      return !isEntered && (v.status === "approved" || v.status === "pending");
     return true; // "all"
   });
 
@@ -479,7 +486,13 @@ export default function SecurityGuardVisitorsPage() {
             <button
               type="button"
               className="btn btn-primary"
-              style={{ fontSize: "0.8rem", padding: "0.3rem 0.65rem", display: "inline-flex", alignItems: "center", gap: "0.25rem" }}
+              style={{
+                fontSize: "0.8rem",
+                padding: "0.3rem 0.65rem",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.25rem",
+              }}
               onClick={() => handleMarkEntry(v)}
             >
               🔑 Verify OTP / QR
@@ -694,7 +707,14 @@ export default function SecurityGuardVisitorsPage() {
             <button
               type="button"
               className="btn btn-secondary"
-              style={{ fontSize: "0.82rem", padding: "0.45rem 0.8rem", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "0.3rem" }}
+              style={{
+                fontSize: "0.82rem",
+                padding: "0.45rem 0.8rem",
+                fontWeight: 700,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.3rem",
+              }}
               onClick={() => {
                 setVerifyOtp("");
                 setVerifyToken("");
@@ -708,7 +728,14 @@ export default function SecurityGuardVisitorsPage() {
             <button
               type="button"
               className="btn btn-primary"
-              style={{ fontSize: "0.82rem", padding: "0.45rem 0.85rem", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "0.3rem" }}
+              style={{
+                fontSize: "0.82rem",
+                padding: "0.45rem 0.85rem",
+                fontWeight: 700,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.3rem",
+              }}
               onClick={() => {
                 setVerifyOtp("");
                 setVerifyToken("");
@@ -1216,7 +1243,14 @@ export default function SecurityGuardVisitorsPage() {
             </div>
 
             <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 <label style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--fg)" }}>
                   Entry OTP / PIN (6 digits) <span style={{ color: "#dc2626" }}>*</span>
                 </label>
@@ -1337,7 +1371,10 @@ export default function SecurityGuardVisitorsPage() {
           title="🔑 Verify Visitor Pass (QR / Entry OTP)"
           size="md"
         >
-          <form onSubmit={handleVerifyPassEntry} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <form
+            onSubmit={handleVerifyPassEntry}
+            style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
+          >
             {verifyError && (
               <div
                 style={{
@@ -1371,7 +1408,14 @@ export default function SecurityGuardVisitorsPage() {
             )}
 
             <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 <label style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--fg)" }}>
                   Entry OTP / PIN (6 digits) or QR Token <span style={{ color: "#dc2626" }}>*</span>
                 </label>
@@ -1423,9 +1467,17 @@ export default function SecurityGuardVisitorsPage() {
                 border: verifyPhotoUrl ? "1px solid #86efac" : "2px solid #f59e0b",
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "0.4rem",
+                }}
+              >
                 <span style={{ fontWeight: 700, fontSize: "0.875rem", color: "#1e293b" }}>
-                  📷 Visitor Face Photograph <span style={{ color: "#dc2626", fontWeight: 900 }}>* (Mandatory)</span>
+                  📷 Visitor Face Photograph{" "}
+                  <span style={{ color: "#dc2626", fontWeight: 900 }}>* (Mandatory)</span>
                 </span>
                 {verifyPhotoUrl ? (
                   <span style={{ fontSize: "0.75rem", color: "#16a34a", fontWeight: 700 }}>
@@ -1449,7 +1501,15 @@ export default function SecurityGuardVisitorsPage() {
             </div>
 
             <div>
-              <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--fg)", display: "block", marginBottom: "0.35rem" }}>
+              <label
+                style={{
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  color: "var(--fg)",
+                  display: "block",
+                  marginBottom: "0.35rem",
+                }}
+              >
                 Vehicle Number (Optional)
               </label>
               <input
@@ -1462,7 +1522,14 @@ export default function SecurityGuardVisitorsPage() {
               />
             </div>
 
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "0.75rem",
+                marginTop: "0.5rem",
+              }}
+            >
               <button
                 type="button"
                 className="btn btn-secondary"

@@ -197,7 +197,11 @@ export default function SecurityGuardEmergencyPage() {
       header: "Location / Unit",
       render: (a) => {
         const loc = a.unit_number
-          ? [a.tower_name, a.floor_number != null ? `Floor ${a.floor_number}` : null, `Unit ${a.unit_number}`]
+          ? [
+              a.tower_name,
+              a.floor_number != null ? `Floor ${a.floor_number}` : null,
+              `Unit ${a.unit_number}`,
+            ]
               .filter(Boolean)
               .join(" · ")
           : "Main Gate / Facility";
@@ -210,7 +214,9 @@ export default function SecurityGuardEmergencyPage() {
               padding: "0.2rem 0.5rem",
               borderRadius: "var(--radius-sm, 4px)",
               fontSize: "0.85rem",
-              whiteSpace: "nowrap",
+              display: "inline-block",
+              maxWidth: "100%",
+              overflowWrap: "anywhere",
             }}
           >
             📍 {loc}
@@ -340,7 +346,7 @@ export default function SecurityGuardEmergencyPage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))",
               gap: "1rem",
               fontSize: "0.9rem",
             }}

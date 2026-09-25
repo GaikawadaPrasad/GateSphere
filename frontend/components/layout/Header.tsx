@@ -49,7 +49,10 @@ export function Header() {
   const [notifFilter, setNotifFilter] = useState<"all" | "unread">("all");
   const notifDropdownRef = useRef<HTMLDivElement>(null);
 
-  const { data: allNotifications = [] } = useMyNotifications();
+  // The badge uses the (tiny) unread count; the list loads only when the dropdown opens.
+  const { data: allNotifications = [] } = useMyNotifications(undefined, {
+    enabled: isNotifOpen,
+  });
   const { data: unreadCount = 0 } = useUnreadNotificationCount();
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();

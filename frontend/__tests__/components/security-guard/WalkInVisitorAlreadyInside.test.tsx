@@ -46,6 +46,13 @@ vi.mock("@/store/ui", () => ({
   }),
 }));
 
+// Pages resolve the current user from the shared auth cache (`useCachedMe`); route it to the
+// `authApi.me` mock above so no QueryClientProvider is needed here.
+vi.mock("@/hooks/use-auth", async () => {
+  const { authApi } = await import("@/lib/api");
+  return { useCachedMe: () => () => authApi.me() };
+});
+
 describe("WalkInVisitorModal - Anti-Passback Validation", () => {
   const onClose = vi.fn();
   const onEntryAdmitted = vi.fn();

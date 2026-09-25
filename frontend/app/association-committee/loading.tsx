@@ -1,0 +1,6 @@
+import { PageSkeleton } from "@/components/common/LoadingSkeleton";
+
+/** Route transition placeholder shaped like the page about to render (see `PageSkeleton`). */
+export default function AssociationCommitteeLoading() {
+  return <PageSkeleton variant="list" />;
+}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { LinesSkeleton } from "@/components/common/LoadingSkeleton";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
@@ -164,8 +165,8 @@ export default function SecuritySupervisorEmergencyAlertsPage() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: "center", padding: "2rem" }}>
-                    Loading…
+                  <td colSpan={8} style={{ padding: "1rem" }}>
+                    <LinesSkeleton rows={3} label="Loading emergency alerts…" />
                   </td>
                 </tr>
               ) : alerts.length === 0 ? (

@@ -27,7 +27,13 @@ import { useUiStore } from "@/store/ui";
 import { useMe } from "@/hooks/use-auth";
 import { useCommunityDetails } from "@/hooks/use-communities";
 import { toast } from "@/store/toast";
-import { formatDate, formatDateTime, formatRelativeTime, formatCurrency, downloadCsv } from "@/lib/utils";
+import {
+  formatDate,
+  formatDateTime,
+  formatRelativeTime,
+  formatCurrency,
+  downloadCsv,
+} from "@/lib/utils";
 import { Modal } from "@/components/common/Modal";
 
 export type AuditorTab =
@@ -65,22 +71,41 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
 
   const { data: community } = useCommunityDetails(effectiveCommunityId || undefined);
 
-  const { data: stats, isLoading: statsLoading } = useAuditorOverview(effectiveCommunityId);
-  const { data: rawLogs = [], isLoading: logsLoading } = useAuditorLogs({
-    community_id: effectiveCommunityId,
-  });
-  const { data: gateEvents = [], isLoading: gateLoading } =
-    useAuditorGateActivity(effectiveCommunityId);
-  const { data: visitorRecords = [], isLoading: visitorsLoading } =
-    useAuditorVisitorRecords(effectiveCommunityId);
-  const { data: financialRecords = [], isLoading: finLoading } =
-    useAuditorFinancialLedger(effectiveCommunityId);
-  const { data: complaintRecords = [], isLoading: complaintsLoading } =
-    useAuditorComplaints(effectiveCommunityId);
-  const { data: vendorRecords = [], isLoading: vendorsLoading } =
-    useAuditorVendors(effectiveCommunityId);
-  const { data: incidentRecords = [], isLoading: incidentsLoading } =
-    useAuditorIncidents(effectiveCommunityId);
+  // Each auditor module page renders this view with one tab — only that tab's data loads.
+  const on = (...tabs: AuditorTab[]) => ({ enabled: tabs.includes(activeTab) });
+  const { data: stats, isLoading: statsLoading } = useAuditorOverview(
+    effectiveCommunityId,
+    on("overview"),
+  );
+  const logsQuery = useAuditorLogs(
+    { community_id: effectiveCommunityId },
+    on("overview", "audit-logs", "user-activity", "audit-search", "reports"),
+  );
+  const { data: rawLogs = [], isLoading: logsLoading } = logsQuery;
+  const { data: gateEvents = [], isLoading: gateLoading } = useAuditorGateActivity(
+    effectiveCommunityId,
+    on("overview", "gate-activity", "reports"),
+  );
+  const { data: visitorRecords = [], isLoading: visitorsLoading } = useAuditorVisitorRecords(
+    effectiveCommunityId,
+    on("visitor-records", "reports"),
+  );
+  const { data: financialRecords = [], isLoading: finLoading } = useAuditorFinancialLedger(
+    effectiveCommunityId,
+    on("financial-records", "reports"),
+  );
+  const { data: complaintRecords = [], isLoading: complaintsLoading } = useAuditorComplaints(
+    effectiveCommunityId,
+    on("maintenance-records", "reports"),
+  );
+  const { data: vendorRecords = [], isLoading: vendorsLoading } = useAuditorVendors(
+    effectiveCommunityId,
+    on("vendor-activity"),
+  );
+  const { data: incidentRecords = [], isLoading: incidentsLoading } = useAuditorIncidents(
+    effectiveCommunityId,
+    on("incident-records", "reports"),
+  );
 
   // Table controls for Audit Logs
   const logControls = useTableControls<AuditLogItem>({
@@ -317,16 +342,18 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
           <BrandButton
             variant="outline"
             size="sm"
-            onClick={() => {
-              if (rawLogs.length === 0) {
+            onClick={async () => {
+              // Tabs that don't show logs don't load them — fetch on demand for the export.
+              const logs = rawLogs.length ? rawLogs : ((await logsQuery.refetch()).data ?? []);
+              if (logs.length === 0) {
                 toast.error("No audit logs found to export.", "Export Empty");
                 return;
               }
-              const rows = rawLogs.map((l) => ({
+              const rows = logs.map((l) => ({
                 "Log ID": l.id,
                 "Occurred At": l.occurred_at ? formatDateTime(l.occurred_at) : "–",
-                "Module": l.module?.toUpperCase() || "SYSTEM",
-                "Action": l.action || "–",
+                Module: l.module?.toUpperCase() || "SYSTEM",
+                Action: l.action || "–",
                 "Actor Email": l.actor_email || "–",
                 "Actor Role": l.actor_role || "–",
                 "IP Address": l.ip_address || "–",
@@ -396,7 +423,7 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))",
               gap: "1.25rem",
               marginBottom: "2rem",
             }}
@@ -1163,7 +1190,7 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
               gap: "1.25rem",
             }}
           >
@@ -1179,17 +1206,20 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
                   }
                   const rows = financialRecords.map((r: any) => ({
                     "Invoice Number": r.invoice_number || "–",
-                    "Unit": r.unit_number || "–",
+                    Unit: r.unit_number || "–",
                     "Total Amount (INR)": r.total_amount ?? 0,
                     "Amount Paid (INR)": r.amount_paid ?? 0,
                     "Balance Due (INR)": r.balance_due ?? 0,
-                    "Status": (r.status || "–").toUpperCase(),
+                    Status: (r.status || "–").toUpperCase(),
                     "Issue Date": r.issue_date ? formatDate(r.issue_date) : "–",
                     "Due Date": r.due_date ? formatDate(r.due_date) : "–",
                     "Receipt Number": r.receipt_number || "–",
                   }));
                   downloadCsv(`gatesphere_financial_dues_audit_${Date.now()}.csv`, rows);
-                  toast.success("Financial ledger report downloaded successfully.", "Download Complete");
+                  toast.success(
+                    "Financial ledger report downloaded successfully.",
+                    "Download Complete",
+                  );
                 },
               },
               {
@@ -1205,7 +1235,7 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
                       "On-Duty Guard / Actor": e.actor_name || "–",
                       "Person / Entity Type": e.person_type || "–",
                       "Pass / Reference Code": e.reference_code || "–",
-                      "Timestamp": e.occurred_at ? formatDateTime(e.occurred_at) : "–",
+                      Timestamp: e.occurred_at ? formatDateTime(e.occurred_at) : "–",
                       "Compliance Status": e.anomaly_flag ? "FLAGGED ANOMALY" : "COMPLIANT",
                     })),
                     ...(visitorRecords || []).map((v: any) => ({
@@ -1215,8 +1245,11 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
                       "On-Duty Guard / Actor": v.host_name || "Resident Host",
                       "Person / Entity Type": `${v.visitor_name} (${v.phone || "No phone"})`,
                       "Pass / Reference Code": v.unit || "–",
-                      "Timestamp": v.entry_time ? formatDateTime(v.entry_time) : "–",
-                      "Compliance Status": v.status === "approved" ? "APPROVED & COMPLIANT" : (v.status || "PENDING").toUpperCase(),
+                      Timestamp: v.entry_time ? formatDateTime(v.entry_time) : "–",
+                      "Compliance Status":
+                        v.status === "approved"
+                          ? "APPROVED & COMPLIANT"
+                          : (v.status || "PENDING").toUpperCase(),
                     })),
                   ];
                   if (combined.length === 0) {
@@ -1224,7 +1257,10 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
                     return;
                   }
                   downloadCsv(`gatesphere_gate_compliance_report_${Date.now()}.csv`, combined);
-                  toast.success("Gate & visitor compliance report downloaded successfully.", "Download Complete");
+                  toast.success(
+                    "Gate & visitor compliance report downloaded successfully.",
+                    "Download Complete",
+                  );
                 },
               },
               {
@@ -1239,14 +1275,19 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
                   const rows = complaintRecords.map((t: any) => ({
                     "Ticket Number": t.ticket_number || "–",
                     "Subject / Scope": t.subject || "–",
-                    "Priority": (t.priority || "medium").toUpperCase(),
+                    Priority: (t.priority || "medium").toUpperCase(),
                     "Current Status": (t.status || "open").toUpperCase(),
                     "SLA Escalation State": (t.escalation_state || "on_track").toUpperCase(),
                     "Raised Timestamp": t.created_at ? formatDateTime(t.created_at) : "–",
-                    "Resolution Due At": t.resolution_due_at ? formatDateTime(t.resolution_due_at) : "–",
+                    "Resolution Due At": t.resolution_due_at
+                      ? formatDateTime(t.resolution_due_at)
+                      : "–",
                   }));
                   downloadCsv(`gatesphere_service_sla_performance_${Date.now()}.csv`, rows);
-                  toast.success("Service SLA performance report downloaded successfully.", "Download Complete");
+                  toast.success(
+                    "Service SLA performance report downloaded successfully.",
+                    "Download Complete",
+                  );
                 },
               },
               {
@@ -1261,13 +1302,16 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
                   const rows = incidentRecords.map((i: any) => ({
                     "Incident Number": i.incident_number || "–",
                     "Incident Type": (i.type || "security").toUpperCase(),
-                    "Location": i.location || "Community Premises",
-                    "Severity": (i.severity || "medium").toUpperCase(),
-                    "Status": (i.status || "resolved").toUpperCase(),
+                    Location: i.location || "Community Premises",
+                    Severity: (i.severity || "medium").toUpperCase(),
+                    Status: (i.status || "resolved").toUpperCase(),
                     "Reported Timestamp": i.created_at ? formatDateTime(i.created_at) : "–",
                   }));
                   downloadCsv(`gatesphere_security_incident_audit_trail_${Date.now()}.csv`, rows);
-                  toast.success("Security & incident audit report downloaded successfully.", "Download Complete");
+                  toast.success(
+                    "Security & incident audit report downloaded successfully.",
+                    "Download Complete",
+                  );
                 },
               },
             ].map((rep, idx) => (
@@ -1279,11 +1323,7 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
                 <p style={{ fontSize: "13px", color: "var(--brand-body)", marginBottom: "1rem" }}>
                   {rep.desc}
                 </p>
-                <BrandButton
-                  size="sm"
-                  variant="outline"
-                  onClick={rep.onDownload}
-                >
+                <BrandButton size="sm" variant="outline" onClick={rep.onDownload}>
                   Download CSV
                 </BrandButton>
               </div>
@@ -1342,7 +1382,7 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
                 gap: "0.85rem",
                 padding: "0.85rem",
                 background: "#F8FAFC",

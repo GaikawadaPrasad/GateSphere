@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { LinesSkeleton } from "@/components/common/LoadingSkeleton";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { complaintsApi, amenitiesApi, incidentsApi } from "@/lib/api";
 
@@ -150,8 +151,8 @@ export default function FacilityManagerReportsPage() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={4} style={{ textAlign: "center", padding: "2rem" }}>
-                    Loading…
+                  <td colSpan={4} style={{ padding: "1rem" }}>
+                    <LinesSkeleton rows={3} label="Loading report…" />
                   </td>
                 </tr>
               ) : loadError ? (
@@ -203,7 +204,9 @@ export default function FacilityManagerReportsPage() {
           <h3 className="card-title">Incident Summary</h3>
         </div>
         {isLoading ? (
-          <p style={{ padding: "1rem", color: "var(--muted)" }}>Loading…</p>
+          <div style={{ padding: "0 1rem" }}>
+            <LinesSkeleton rows={2} />
+          </div>
         ) : (
           <div
             style={{
@@ -238,7 +241,9 @@ export default function FacilityManagerReportsPage() {
           <h3 className="card-title">Amenity Booking Activity</h3>
         </div>
         {isLoading ? (
-          <p style={{ padding: "1rem", color: "var(--muted)" }}>Loading…</p>
+          <div style={{ padding: "0 1rem" }}>
+            <LinesSkeleton rows={2} />
+          </div>
         ) : (
           <div
             style={{

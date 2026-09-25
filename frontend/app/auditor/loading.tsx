@@ -1,27 +1,6 @@
-import { KpiCardSkeleton, TableSkeleton } from "@/components/common/LoadingSkeleton";
+import { PageSkeleton } from "@/components/common/LoadingSkeleton";
 
+/** Route transition placeholder shaped like the page about to render (see `PageSkeleton`). */
 export default function AuditorLoading() {
-  return (
-    <div>
-      <div style={{ marginBottom: "1.75rem" }}>
-        <div className="skeleton" style={{ width: 240, height: 32, marginBottom: "0.5rem" }} />
-        <div className="skeleton" style={{ width: "100%", maxWidth: 360, height: 16 }} />
-      </div>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-          gap: "1.25rem",
-          marginBottom: "2rem",
-        }}
-      >
-        {Array.from({ length: 4 }).map((_, i) => (
-          <KpiCardSkeleton key={i} />
-        ))}
-      </div>
-
-      <TableSkeleton rows={6} cols={6} />
-    </div>
-  );
+  return <PageSkeleton variant="list" />;
 }

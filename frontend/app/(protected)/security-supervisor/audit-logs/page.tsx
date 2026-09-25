@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useCachedMe } from "@/hooks/use-auth";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { gateApi, communitiesApi, authApi } from "@/lib/api";
+import { gateApi, communitiesApi } from "@/lib/api";
 
 interface DisplayAuditLog {
   id: string;
@@ -16,6 +17,7 @@ interface DisplayAuditLog {
 }
 
 export default function SecuritySupervisorAuditLogsPage() {
+  const getMe = useCachedMe();
   const [logs, setLogs] = useState<DisplayAuditLog[]>([]);
   const [filterType, setFilterType] = useState<string>("all");
   const [isLoading, setIsLoading] = useState(true);
@@ -23,7 +25,7 @@ export default function SecuritySupervisorAuditLogsPage() {
 
   const fetchLogs = async () => {
     try {
-      const me = await authApi.me().catch(() => null);
+      const me = await getMe().catch(() => null);
       const cid = me?.community_ids?.[0];
 
       const [eventsRes, gatesRes] = await Promise.allSettled([
@@ -264,7 +266,11 @@ export default function SecuritySupervisorAuditLogsPage() {
                       </td>
                       <td style={{ fontSize: "0.85rem", fontWeight: 500 }}>{log.gate}</td>
                       <td
-                        style={{ color: "var(--muted)", fontSize: "0.8rem", fontFamily: "monospace" }}
+                        style={{
+                          color: "var(--muted)",
+                          fontSize: "0.8rem",
+                          fontFamily: "monospace",
+                        }}
                       >
                         {log.reference}
                       </td>

@@ -1108,10 +1108,14 @@ tenant tables to a new RLS migration) → extend `seed.py` → `tests/test_<m>_{
 
 ### Still open (feature work)
 
-1. **Frontend** — design system (Tailwind + shadcn/ui + Recharts + TanStack Table), community
-   switcher UI, and the live Security Gate dashboard's refresh (backend supports **short
-   polling** of `GET /gate/events` + `GET /gate/alerts` + `GET /dashboards/security`, per
-   TRD §3.1 — no SSE/WebSocket endpoint is built; add one only if polling proves insufficient).
+1. **Frontend** — design system (Tailwind + shadcn/ui + Recharts + TanStack Table) and the
+   community switcher UI. Live refresh is **realtime-first** since 2026-09-25
+   ([ADR-011](docs/decisions/ADR-011-realtime-websocket.md)): one WebSocket per tab carries
+   change hints (`/api/v1/realtime/*`); polling is only the fallback while it is down
+   (`useLivePollInterval` / `useRealtimeRefresh` — never a bare `setInterval` or a fixed
+   `refetchInterval`). Dashboard views that render per-tab module pages gate every query on
+   the active tab (`{ enabled }`), and pages read the user via `useCachedMe`, never
+   `authApi.me()`.
 2. **Remaining notification channels** — all channels except `in_app` are still simulated
    (marked delivered without a real provider). Wiring real email/SMS providers is deferred
    (SMS/WhatsApp provider is explicitly out of PRD/SRS scope).

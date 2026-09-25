@@ -1,6 +1,7 @@
 """Vehicle & Parking API (FR-08). HTTP boundary only — see service.py.
 
-Canonical envelope. RBAC: `vehicles:{view,create,update,approve}`.
+Canonical envelope. RBAC: `vehicles:{view,create,update,approve}`; gate ops, release,
+violation transitions and fines are additionally staff-only (service `STAFF_ONLY`).
 Contract: docs/backend/api/vehicles.md.
 """
 
@@ -8,7 +9,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 
 from app.core.responses import PageParams, ok, page_params, paginated
 from app.core.responses import Response as Envelope
@@ -136,8 +137,9 @@ async def release(allocation_id: uuid.UUID, svc: Svc = Depends(vehicle_service))
 @router.get("/entries", response_model=Envelope[list[schemas.EntryRead]], dependencies=[VIEW])
 async def list_entries(
     community_id: uuid.UUID | None = None,
-    plate: str | None = None,
+    plate: str | None = Query(default=None, max_length=20),
     open_only: bool = False,
+    flagged_only: bool = False,
     params: PageParams = Depends(page_params),
     svc: Svc = Depends(vehicle_service),
 ) -> dict:
@@ -145,6 +147,7 @@ async def list_entries(
         community_id=community_id,
         plate=plate,
         open_only=open_only,
+        flagged_only=flagged_only,
         offset=params.offset,
         limit=params.page_size,
     )
@@ -190,12 +193,14 @@ async def record_exit(entry_id: uuid.UUID, svc: Svc = Depends(vehicle_service)) 
 async def list_violations(
     community_id: uuid.UUID | None = None,
     violation_status: str | None = None,
+    plate: str | None = Query(default=None, max_length=20),
     params: PageParams = Depends(page_params),
     svc: Svc = Depends(vehicle_service),
 ) -> dict:
     rows, total = await svc.list_violations(
         community_id=community_id,
         violation_status=violation_status,
+        plate=plate,
         offset=params.offset,
         limit=params.page_size,
     )

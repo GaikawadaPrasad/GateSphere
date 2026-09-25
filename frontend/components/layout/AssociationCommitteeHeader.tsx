@@ -8,6 +8,7 @@ import { useCommunityDetails } from "@/hooks/use-communities";
 import { useUiStore } from "@/store/ui";
 import {
   useMyNotifications,
+  useUnreadNotificationCount,
   useMarkNotificationRead,
   useMarkAllNotificationsRead,
 } from "@/hooks/use-notifications";
@@ -41,10 +42,12 @@ export function AssociationCommitteeHeader() {
     }
   }, [user?.id]);
 
-  const { data: notificationsData, isLoading: notifLoading } = useMyNotifications({
-    unread_only: false,
-    page_size: 20,
-  });
+  // Loaded only while the dropdown is open (no list download on every page).
+  const { data: notificationsData, isLoading: notifLoading } = useMyNotifications(
+    { unread_only: false, page_size: 20 },
+    { enabled: isOpen },
+  );
+  const { data: unreadTotal = 0 } = useUnreadNotificationCount();
 
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();
@@ -110,7 +113,8 @@ export function AssociationCommitteeHeader() {
     is_read: Boolean(n.is_read || readIds.has(n.id)),
   }));
 
-  const unreadCount = notifications.filter((n) => !n.is_read).length;
+  // Badge: server unread count while closed; the loaded list once the dropdown is open.
+  const unreadCount = isOpen ? notifications.filter((n) => !n.is_read).length : unreadTotal;
 
   const filteredNotifications =
     filterTab === "unread" ? notifications.filter((n) => !n.is_read) : notifications;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useCachedMe } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -8,7 +9,7 @@ import { KpiCard } from "@/components/dashboard/KpiCard";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
 import { DataTable, type Column } from "@/components/tables/DataTable";
-import { complaintsApi, vendorTicketsApi, authApi, type CurrentUser } from "@/lib/api";
+import { complaintsApi, vendorTicketsApi, type CurrentUser } from "@/lib/api";
 
 const QrCodeSvg = dynamic(
   () => import("@/components/common/QrCodeSvg").then((mod) => mod.QrCodeSvg),
@@ -35,6 +36,7 @@ const QrCodeSvg = dynamic(
 );
 
 export default function VendorDashboardPage() {
+  const getMe = useCachedMe();
   const router = useRouter();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isPassModalOpen, setIsPassModalOpen] = useState(false);
@@ -45,10 +47,7 @@ export default function VendorDashboardPage() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [ticketsRes, meRes] = await Promise.allSettled([
-        vendorTicketsApi.list(),
-        authApi.me("vendor_technician"),
-      ]);
+      const [ticketsRes, meRes] = await Promise.allSettled([vendorTicketsApi.list(), getMe()]);
 
       if (ticketsRes.status === "fulfilled" && Array.isArray(ticketsRes.value)) {
         setTickets(ticketsRes.value);
@@ -151,21 +150,23 @@ export default function VendorDashboardPage() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
           gap: "1.25rem",
           marginBottom: "1.75rem",
         }}
       >
         <KpiCard
           title="Assigned Tickets"
-          value={isLoading ? "…" : String(assignedTickets.length)}
+          value={String(assignedTickets.length)}
+          isLoading={isLoading}
           subtext={`${highPriorityCount} High / Critical`}
           icon="🎫"
           onClick={() => router.push("/vendor-technician/assigned-tickets")}
         />
         <KpiCard
           title="Jobs In Progress"
-          value={isLoading ? "…" : String(inProgressTickets.length)}
+          value={String(inProgressTickets.length)}
+          isLoading={isLoading}
           subtext={
             inProgressTickets[0]?.subject ||
             (inProgressTickets.length === 0 ? "None active" : "Multiple active")
@@ -186,7 +187,8 @@ export default function VendorDashboardPage() {
         />
         <KpiCard
           title="Completed Jobs"
-          value={isLoading ? "…" : String(completedTickets.length)}
+          value={String(completedTickets.length)}
+          isLoading={isLoading}
           subtext="Resolved & Signed Off"
           icon="✅"
           onClick={() => router.push("/vendor-technician/service-history")}

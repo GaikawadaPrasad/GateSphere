@@ -3,20 +3,26 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { notificationsApi } from "@/lib/api";
 import { useMe } from "@/hooks/use-auth";
+import { useLivePollInterval } from "@/hooks/use-realtime";
 import type { NotificationPreference } from "@/types/notifications";
 
-export function useMyNotifications(params?: {
-  unread_only?: boolean;
-  page?: number;
-  page_size?: number;
-}) {
+export function useMyNotifications(
+  params?: {
+    unread_only?: boolean;
+    page?: number;
+    page_size?: number;
+  },
+  opts?: { enabled?: boolean },
+) {
   const { data: user } = useMe();
+  // New notifications arrive as realtime hints on the user's channel; poll only as fallback.
+  const livePoll = useLivePollInterval(30_000);
   return useQuery({
     queryKey: ["notifications", params],
     queryFn: () => notificationsApi.list(params),
-    enabled: !!user,
+    enabled: !!user && (opts?.enabled ?? true),
     staleTime: 10_000,
-    refetchInterval: !!user ? 30_000 : false,
+    refetchInterval: user ? livePoll : false,
     refetchIntervalInBackground: false,
     retry: (failureCount, error: any) => {
       if (error?.status === 401 || error?.status === 403) return false;
@@ -32,12 +38,13 @@ export function useMyNotifications(params?: {
  */
 export function useUnreadNotificationCount() {
   const { data: user } = useMe();
+  const livePoll = useLivePollInterval(30_000);
   return useQuery({
     queryKey: ["notifications", "unread-count"],
     queryFn: () => notificationsApi.unreadCount(),
     enabled: !!user,
     staleTime: 10_000,
-    refetchInterval: !!user ? 30_000 : false,
+    refetchInterval: user ? livePoll : false,
     refetchIntervalInBackground: false,
     retry: (failureCount, error: any) => {
       if (error?.status === 401 || error?.status === 403) return false;

@@ -23,6 +23,7 @@ own community — anything outside → `404`.
 | `POST /communities/floors` | `communities:create` | `FloorCreate` (`tower_id`, `floor_number`, `label?`) | `201` single | `404` if tower outside scope; `409 FLOOR_NUMBER_TAKEN` |
 | `GET /communities/floors/{floor_id}` | `communities:view` | – | `200` single | |
 | `GET /communities/floors/{floor_id}/units` | `communities:view` | – | `200` list | |
+| `GET /communities/{community_id}/units` | `communities:view` | – | `200` list | `?tower_id` `?floor_id` `?unit_type` `?active`; **`?occupied=true`** = only units with a current resident (active, un-ended occupancy; profile not `moved_out`/`suspended`) — used by visitor / delivery / cab destination dropdowns; `false` = vacant only |
 | `POST /communities/units` | `communities:create` | `UnitCreate` (`floor_id`, `unit_number`, `unit_type?`, `bedrooms?`, `area_sqft?`) | `201` single | inherits `community_id`+`tower_id` from the floor; `409 UNIT_NUMBER_TAKEN` |
 | `GET /communities/units/{unit_id}` | `communities:view` | – | `200` single | |
 | `PATCH /communities/units/{unit_id}` | `communities:update` | `UnitUpdate` | `200` single | |

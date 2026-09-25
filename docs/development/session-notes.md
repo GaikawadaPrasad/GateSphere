@@ -1189,3 +1189,103 @@ Full forensic audit + hardening. Per-stage detail in `docs/backend/audit/STAGE_*
   "no single global auth token". All 21 Mermaid diagrams validate.
 
 `pytest` (Docker, fresh DB): **278 passed**. `ruff` + `black` clean. `frontend tsc` clean.
+
+---
+
+## 2026-09-25 — FR-08 Vehicle & Parking for Guard / Supervisor / Resident / Auditor (branch `feature-superadmin`)
+
+**Security fixes (backend `vehicles` service)** — residents hold `vehicles:create/update` for their
+own registry, which previously also let them: log gate entries/exits, release *any* allocation,
+change (waive) violation status, levy fines, list the whole community's gate log, and move a
+vehicle into another unit. Now: `_require_staff` → `403 STAFF_ONLY` on entry/exit/release/
+transition/fine; `list_entries` scoped to own-unit vehicles; `update_vehicle` checks the new
+`unit_id`; `report_violation` rejects foreign `vehicle_id`/`parking_slot_id` (`404`).
+**Workflow:** plate normalized at the schema edge (`normalize_plate`); blacklist plate screen
+before entry (`PLATE_BLACKLISTED`, honours `visitor_policies.blacklist_mode`); deactivated vehicle
+= unknown plate; flagged entry → notify `security_supervisor`; violation keeps observed plate
+(`parking_violations.registration_number`, migration **0050**, backfilled) auto-matched to a
+vehicle whose owner is notified; allocation rejects blocked / other-unit-reserved slots and
+inactive vehicles; `?flagged_only` on entries, `?plate` on violations; audit old→new status.
+**Seed:** `seed_parking_operations` (idempotent, marker `KA<sfx>PK<sfx>02`) — unit-linked resident
++ visitor vehicles, guest/EV/blocked slots, allocations, registered + flagged movements,
+violations in all 4 statuses; backfills `unit_id` on older seed vehicles.
+**Frontend:** `types/vehicles.ts`, `hooks/use-vehicles.ts` (TanStack, hierarchical keys, ref
+double-submit guard), `components/vehicles/*` (entries table, violations table, RHF+Zod report
+modal, `VehicleOversightView`). Pages: `/security-guard/vehicles`, `/security-supervisor/vehicles`,
+`/auditor/vehicle-records` (read-only); resident tab fixed (wrong field names, errors were
+swallowed into empty lists) + gate history + "Report Parking Issue". Nav added in
+`config/roles.ts`, `config/dashboard-navigation.ts`, `components/layout/Sidebar.tsx`.
+**Verified:** vehicles tests 29 pass (8 new unit + 8 new API); cross-tenant IDOR +4 cases pass;
+full backend `pytest` 448 pass / 1 fail (pre-existing `test_db_commit_before_response`, 224
+routes across all modules); alembic upgrade→downgrade→upgrade OK; `tsc` clean; vitest 150+4 pass.
+**Pre-existing, not addressed:** `alembic check` drift on `units` unique constraint; layering
+ratchet baseline already exceeded on HEAD (220 vs 218 → now 219); a denied-entry audit row is
+rolled back with the 403 (same as visitors' blacklist path). `make test-api` (Newman) not re-run;
+collection regenerated — identical (no route/body change).
+
+---
+
+## 2026-09-25 — Realtime WebSocket + removal of unnecessary dashboard API calls (ADR-011)
+
+**Realtime (backend):** `app/core/realtime.py` queues change hints on the DB session —
+`record_audit_async` (every audited change → community hint) and notification dispatch (→ user
+hint); `get_async_db` / `job_session` publish to Redis pub/sub after commit, discard on
+rollback. New `app/modules/realtime/` — `POST /realtime/ticket` (single-use 30 s ticket) and
+`WS /realtime/ws` (Origin allow-list, per-subscribe membership + `:view` check, actor excluded,
+residents only get community-wide modules, session re-check every 5 min, bounded outbox,
+max 10 sockets/user). Per-recipient `notification.dispatch` audit rows are silent (found by
+the tests: they made every client refetch on any notification).
+**Realtime (frontend):** `lib/realtime.ts` (one socket per tab, backoff + jitter, heartbeat),
+`hooks/use-realtime.ts` (module → query-key map, 750 ms debounced active-only invalidation,
+stale-only while a local mutation is in flight, one refresh after reconnect;
+`useLivePollInterval`, `useRealtimeRefresh`), mounted in `app/providers.tsx`. Works through the
+Next `/api` rewrite (verified live).
+**Unnecessary calls removed:** resident / auditor / domestic-staff dashboard views now gate each
+query on the active tab (each module page previously loaded every tab's data); "Refresh"
+buttons no longer `.refetch()` disabled queries; auditor overview uses `meta.total` of 1-row
+pages instead of 100-row lists; supervisor dashboard dropped 2 redundant list calls (uses
+`/dashboards/security` aggregates) and a blanket `invalidateQueries()`; header notification
+lists load only when the dropdown opens; all fixed `refetchInterval`s / `setInterval` pollers
+(guard SOS 4 s, deliveries/cab 5 s, visitors 10 s, notifications 30 s, FM pages) poll only while
+the socket is down; refetch-on-focus only while it is down; 13 direct `authApi.me()` calls now
+use the cached `useCachedMe()`.
+**Verified:** backend pytest 455 pass / 1 pre-existing fail (`test_db_commit_before_response`);
+realtime tests 7/7; frontend vitest 164/164 (+10 new), tsc clean, eslint 0 errors; live E2E via
+the Next proxy: guard logs entry → supervisor receives `vehicles` hint (~0.5 s incl. the POST,
+dev stack). Postman regenerated (+`/realtime/ticket`; generator now skips WebSocket routes).
+**Not done:** browser-level request-count measurement (counts in the PR are code-derived);
+production reverse-proxy WebSocket config (Render/Vercel) not verified.
+
+---
+
+## 2026-09-25 — Mobile text overlap, skeletons, branded loading screen
+
+**How found:** Playwright audit of every role page (10 roles, ~110 routes) at 360/375/414 px —
+measures horizontal overflow and overlapping *visible* text (per-line rects, clipped to
+ancestor overflow so line-clamped/hidden text isn't counted) and screenshots each page.
+**Root causes fixed:**
+- Shared `DataTable` mobile cards: `.badge` is `white-space: nowrap`, so long labels (role
+  names, statuses, ids, emails) spilled into the neighbouring column — cards now wrap values
+  (`overflow-wrap: anywhere`, wrapping badges with a softer radius). Fixes most list pages.
+- 47 `repeat(auto-fit, minmax(Npx, 1fr))` grids → `minmax(min(100%, Npx), 1fr)` (no overflow on
+  320–360 px phones, identical on larger screens).
+- Tab rows that couldn't wrap (super-admin billing, RBAC, association-committee reports);
+  global ≤640 px wrap for `[role=tablist]`; 2-column form rows stack ≤480 px in forms/modals.
+**Loading:** new `components/common/BrandLoader.tsx` (logo + pulsing ring + progress bar,
+fades in after 150 ms, `role=status`, reduced-motion aware) replaces the "Loading…" card in
+`app/(protected)/layout.tsx` and the grey bar in `RoleGuard` (also shown during the login
+redirect instead of a blank screen). `TableSkeleton` now renders the mobile card layout at
+≤768 px (CSS-switched, no flicker); new `PageSkeleton` (dashboard/list) used by all 19
+route `loading.tsx` files (7 added); bare "Loading…" panel texts → `LinesSkeleton`; KPI "…"
+placeholders → skeletons. Added `.sr-only` + `prefers-reduced-motion` rules to globals.css.
+**Verified:** vitest 166/166, tsc clean, eslint 0 errors; Playwright audit results below.
+
+**Follow-up (same day) — destination unit dropdowns show occupied units only.**
+`GET /communities/{id}/units?occupied=true` (new filter, `UnitRepository._occupied_clause`:
+active un-ended occupancy of a resident not `moved_out`/`suspended`). Used by the walk-in
+visitor modal, guard deliveries, cab/taxi (2), guard visitors and supervisor visitor-management
+dropdowns (facility-manager maintenance still lists all units). Empty result now says
+"No occupied units — onboard residents first" instead of an endless "Loading units…", and an
+empty reload no longer leaves a stale list. Test: `test_units_occupied_filter_*` (ground truth in
+plain SQL). Live: guard community 28 units → 8 in the dropdown. Note: the dev backend needed a
+container restart to pick up the change (uvicorn reload missed it).

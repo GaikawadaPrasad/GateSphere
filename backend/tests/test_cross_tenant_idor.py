@@ -125,3 +125,59 @@ def test_community_admin_cannot_create_invoice_in_foreign_community(as_role):
         f"community_admin created/negotiated an invoice into a foreign community "
         f"(status {r.status_code})"
     )
+
+
+def _foreign_for(email: str) -> str:
+    """A community id `email` holds no role grant in."""
+    from app.modules.communities.models import Community
+
+    with SessionLocal() as db:
+        user = db.scalar(select(User).where(User.email == email))
+        mine = set(
+            db.scalars(select(UserRole.community_id).where(UserRole.user_id == user.id)).all()
+        )
+        for c in db.scalars(select(Community)).all():
+            if c.id not in mine:
+                return str(c.id)
+    pytest.skip("seed has only one community — cross-tenant sweep needs two")
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        ("violation_status", "post", "/api/v1/vehicles/parking/violations/{id}/status"),
+        ("entry_exit", "patch", "/api/v1/vehicles/entries/{id}/exit"),
+        ("allocation_release", "post", "/api/v1/vehicles/parking/allocations/{id}/release"),
+    ],
+    ids=lambda c: c[0],
+)
+def test_security_supervisor_cannot_act_on_foreign_parking_rows(as_role, case):
+    """FR-08 write-by-id paths: a foreign community's row is a 404, never 403/200."""
+    from app.modules.vehicles.models import ParkingAllocation, ParkingViolation, VehicleEntry
+
+    label, method, tmpl = case
+    model = {
+        "violation_status": ParkingViolation,
+        "entry_exit": VehicleEntry,
+        "allocation_release": ParkingAllocation,
+    }[label]
+    obj_id = _first_id(model, _foreign_for(f"security_supervisor@{DOMAIN}"))
+    if obj_id is None:
+        pytest.skip(f"no seeded {label} row in the foreign community")
+    sup = as_role("security_supervisor")
+    kw = {"params": {"new_status": "waived"}} if label == "violation_status" else {}
+    r = getattr(sup, method)(tmpl.format(id=obj_id), **kw)
+    assert r.status_code == 404, f"{label}: status {r.status_code} — tenant isolation leak"
+
+
+def test_guard_cannot_reference_foreign_vehicle_in_violation(as_role):
+    from app.modules.vehicles.models import Vehicle
+
+    foreign_vehicle = _first_id(Vehicle, _foreign_for(f"security_guard@{DOMAIN}"))
+    if foreign_vehicle is None:
+        pytest.skip("no seeded vehicle in the foreign community")
+    r = as_role("security_guard").post(
+        "/api/v1/vehicles/parking/violations",
+        json={"violation_type": "blocking", "vehicle_id": foreign_vehicle},
+    )
+    assert r.status_code == 404, r.text
