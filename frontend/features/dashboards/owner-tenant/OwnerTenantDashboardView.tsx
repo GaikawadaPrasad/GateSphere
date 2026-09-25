@@ -358,6 +358,7 @@ export function OwnerTenantDashboardView({
   const panicMutation = useSendResidentPanic();
   const submitStaffRating = useSubmitStaffRating();
   const eventRsvp = useEventRsvp();
+  const [rsvpPendingKey, setRsvpPendingKey] = useState<string | null>(null);
 
   const visitorList = visitors.data || [];
   const deliveryList = deliveries.data || [];
@@ -425,7 +426,9 @@ export function OwnerTenantDashboardView({
     pendingVisitor && dismissedVisitorId === pendingVisitor.id,
   );
   const pendingDelivery = deliveryList.find(
-    (d) => d.status === "at_gate" || d.approval_status === "pending",
+    (d) =>
+      d.approval_status === "pending" &&
+      !["collected", "delivered", "cancelled", "rejected", "approved"].includes(d.status),
   );
 
   // Table controls
@@ -577,6 +580,8 @@ export function OwnerTenantDashboardView({
     announcementId: string,
     response: "going" | "maybe" | "not_going",
   ) => {
+    const pendingKey = `${announcementId}_${response}`;
+    setRsvpPendingKey(pendingKey);
     try {
       await eventRsvp.mutateAsync({
         announcementId,
@@ -595,6 +600,8 @@ export function OwnerTenantDashboardView({
       );
     } catch (err: any) {
       toast.error(err?.message || "Failed to record event RSVP.", "RSVP Error");
+    } finally {
+      setRsvpPendingKey(null);
     }
   };
 
@@ -3252,7 +3259,11 @@ export function OwnerTenantDashboardView({
                   key: "actions",
                   header: "Gate Clearance",
                   render: (i) => {
-                    if (i.status === "at_gate" || i.approval_status === "pending") {
+                    const isAwaitingResidentApproval =
+                      i.approval_status === "pending" &&
+                      !["collected", "delivered", "cancelled", "rejected", "approved"].includes(i.status);
+
+                    if (isAwaitingResidentApproval) {
                       return (
                         <div style={{ display: "flex", gap: "0.4rem" }}>
                           <BrandButton
@@ -3276,9 +3287,9 @@ export function OwnerTenantDashboardView({
                     }
                     return (
                       <span style={{ fontSize: "12px", color: "var(--brand-muted)" }}>
-                        {i.approval_status === "approved" || i.status === "delivered"
+                        {i.approval_status === "approved" || i.status === "delivered" || i.status === "collected"
                           ? "✓ Cleared"
-                          : i.approval_status === "rejected" || i.status === "rejected"
+                          : i.approval_status === "rejected" || i.status === "rejected" || i.status === "cancelled"
                             ? "✕ Denied"
                             : "—"}
                       </span>
@@ -3694,7 +3705,7 @@ export function OwnerTenantDashboardView({
                         </span>
                         <BrandButton
                           size="sm"
-                          isLoading={eventRsvp.isPending}
+                          isLoading={rsvpPendingKey === `${m.id}_going`}
                           onClick={() => handleEventRsvp(m.id, "going")}
                         >
                           ✓ Going
@@ -3702,7 +3713,7 @@ export function OwnerTenantDashboardView({
                         <BrandButton
                           size="sm"
                           variant="outline"
-                          isLoading={eventRsvp.isPending}
+                          isLoading={rsvpPendingKey === `${m.id}_maybe`}
                           onClick={() => handleEventRsvp(m.id, "maybe")}
                         >
                           ? Maybe
@@ -3711,7 +3722,7 @@ export function OwnerTenantDashboardView({
                           size="sm"
                           variant="outline"
                           style={{ borderColor: "#FECACA", color: "#DC2626" }}
-                          isLoading={eventRsvp.isPending}
+                          isLoading={rsvpPendingKey === `${m.id}_not_going`}
                           onClick={() => handleEventRsvp(m.id, "not_going")}
                         >
                           ✕ Decline

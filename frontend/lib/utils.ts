@@ -6,6 +6,17 @@ export function cn(...inputs: (string | boolean | null | undefined)[]): string {
   return inputs.filter(Boolean).join(" ");
 }
 
+export function getSecureRandomInt(min: number, max: number): number {
+  const range = max - min + 1;
+  if (range <= 0) return min;
+  if (typeof window !== "undefined" && window.crypto) {
+    const array = new Uint32Array(1);
+    window.crypto.getRandomValues(array);
+    return min + (array[0] % range);
+  }
+  return min + Math.floor(Math.random() * range);
+}
+
 export function formatCurrency(val: number | string | null | undefined): string {
   if (val === null || val === undefined || val === "") return "₹0.00";
   const num = typeof val === "number" ? val : parseFloat(val);
