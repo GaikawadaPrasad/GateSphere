@@ -4,7 +4,7 @@ import { useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useMe } from "@/hooks/use-auth";
 import { useUiStore } from "@/store/ui";
-import { useCommunityDetails } from "@/hooks/use-communities";
+import { useCommunities, useCommunityDetails } from "@/hooks/use-communities";
 
 interface CommunityScopeGuardProps {
   children: ReactNode;
@@ -15,9 +15,23 @@ export function CommunityScopeGuard({ children }: CommunityScopeGuardProps) {
   const { data: user, isLoading: authLoading } = useMe();
   const { activeCommunityId, setActiveCommunity } = useUiStore();
 
+  // Primary: community id from the user's own assignments
   const assignedCommunityId =
     user?.community_ids?.[0] ||
     user?.roles?.find((r) => r.role_slug === "community_admin")?.community_id ||
+    null;
+
+  // Fallback: when the user has no community_ids yet (edge-case during provisioning),
+  // fetch the communities list so the first result can be used as the active scope.
+  // `enabled` is false when assignedCommunityId is already available, avoiding extra calls.
+  const { data: communitiesList, isLoading: communitiesLoading } = useCommunities(undefined, {
+    enabled: !authLoading && !!user && !assignedCommunityId,
+  });
+
+  // Resolve the best available community ID from all sources
+  const resolvedCommunityId =
+    assignedCommunityId ||
+    communitiesList?.[0]?.id ||
     null;
 
   useEffect(() => {
@@ -44,15 +58,26 @@ export function CommunityScopeGuard({ children }: CommunityScopeGuardProps) {
       return;
     }
 
-    // Lock UI store to assigned community scope
-    if (assignedCommunityId && activeCommunityId !== assignedCommunityId) {
-      setActiveCommunity(assignedCommunityId);
+    // Lock UI store to resolved community scope so all child pages have a community ID
+    // before they mount and their data-fetching hooks (useTowers, useResidents, etc.) fire.
+    if (resolvedCommunityId && activeCommunityId !== resolvedCommunityId) {
+      setActiveCommunity(resolvedCommunityId);
     }
-  }, [user, authLoading, assignedCommunityId, activeCommunityId, setActiveCommunity, router]);
+  }, [user, authLoading, resolvedCommunityId, activeCommunityId, setActiveCommunity, router]);
 
-  const { isLoading: communityLoading } = useCommunityDetails(assignedCommunityId || undefined);
+  // Prefetch community details eagerly so they are in cache when child pages need them.
+  const { isLoading: communityLoading } = useCommunityDetails(resolvedCommunityId || undefined);
 
-  if (authLoading || (assignedCommunityId && communityLoading)) {
+  // Wait until auth resolves and, if we have a community to load, until that details fetch
+  // completes. This prevents child pages mounting with activeCommunityId = null and all their
+  // queries being skipped (enabled: Boolean(communityId) = false).
+  const isCommunityResolvePending =
+    !authLoading &&
+    !!user &&
+    !resolvedCommunityId &&
+    (communitiesLoading || (!assignedCommunityId && !communitiesList));
+
+  if (authLoading || (resolvedCommunityId && communityLoading) || isCommunityResolvePending) {
     return (
       <div
         style={{
@@ -72,7 +97,7 @@ export function CommunityScopeGuard({ children }: CommunityScopeGuardProps) {
 
   if (!user) return null;
 
-  if (!assignedCommunityId && !user.is_superadmin) {
+  if (!resolvedCommunityId && !user.is_superadmin) {
     return (
       <div className="page-body" style={{ maxWidth: 600, marginTop: "4rem" }}>
         <div className="card" style={{ textAlign: "center", padding: "3rem 2rem" }}>
