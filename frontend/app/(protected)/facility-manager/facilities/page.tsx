@@ -81,9 +81,14 @@ export default function FacilityManagerFacilitiesPage() {
   const handleEditFacility = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingFacility) return;
+    const trimmedEditName = editName.trim();
     const cap = parseInt(editCapacity);
-    if (!editName.trim() || editName.trim().length < 2) {
+    if (!trimmedEditName || trimmedEditName.length < 2) {
       alert("Facility name must be at least 2 characters.");
+      return;
+    }
+    if (/^\d+$/.test(trimmedEditName) || !/[a-zA-Z]/.test(trimmedEditName)) {
+      alert("Facility name must contain alphabetic characters and cannot be purely numeric.");
       return;
     }
     if (isNaN(cap) || cap < 1) {
@@ -103,7 +108,7 @@ export default function FacilityManagerFacilitiesPage() {
       else if (rawType.includes("park") || rawType.includes("ground")) amenityType = "park";
       else if (rawType.includes("hall")) amenityType = "hall";
       await facilitiesApi.update(editingFacility.id, {
-        name: editName.trim(),
+        name: trimmedEditName,
         amenity_type: amenityType,
         location_text: editLocation || undefined,
         capacity: cap,
@@ -131,8 +136,11 @@ export default function FacilityManagerFacilitiesPage() {
   const handleAddFacility = async (e: React.FormEvent) => {
     e.preventDefault();
     const errors: Record<string, string> = {};
-    if (!name.trim() || name.trim().length < 2) {
+    const trimmedName = name.trim();
+    if (!trimmedName || trimmedName.length < 2) {
       errors.name = "Facility name must be at least 2 characters long.";
+    } else if (/^\d+$/.test(trimmedName) || !/[a-zA-Z]/.test(trimmedName)) {
+      errors.name = "Facility name must contain alphabetic characters and cannot be purely numeric.";
     }
     const cap = parseInt(capacity);
     if (isNaN(cap) || cap < 1) {
@@ -396,9 +404,23 @@ export default function FacilityManagerFacilitiesPage() {
               className="input-field"
               placeholder="e.g. Squash Court 2"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (facilityFieldErrors.name) {
+                  setFacilityFieldErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.name;
+                    return next;
+                  });
+                }
+              }}
               required
             />
+            {facilityFieldErrors.name && (
+              <p style={{ color: "var(--danger, #dc2626)", fontSize: "0.75rem", marginTop: "0.25rem" }}>
+                {facilityFieldErrors.name}
+              </p>
+            )}
           </div>
 
           <div

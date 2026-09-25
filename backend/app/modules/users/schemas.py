@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from app.core.constants import PASSWORD_MIN_LENGTH
 
@@ -33,6 +33,14 @@ class UserCreate(_Write):
     role_slug: str | None = None
     community_id: uuid.UUID | None = None
 
+    @field_validator("full_name")
+    @classmethod
+    def validate_full_name(cls, v: str) -> str:
+        trimmed = v.strip()
+        if trimmed.isdigit() or not any(c.isalpha() for c in trimmed):
+            raise ValueError("Full name must contain alphabetic characters and cannot be purely numeric.")
+        return trimmed
+
 
 class UserUpdate(_Write):
     full_name: str | None = Field(default=None, max_length=255)
@@ -40,6 +48,16 @@ class UserUpdate(_Write):
     password: str | None = Field(default=None, min_length=PASSWORD_MIN_LENGTH, max_length=200)
     phone: str | None = _Phone
     is_active: bool | None = None
+
+    @field_validator("full_name")
+    @classmethod
+    def validate_full_name(cls, v: str | None) -> str | None:
+        if v is not None:
+            trimmed = v.strip()
+            if trimmed.isdigit() or not any(c.isalpha() for c in trimmed):
+                raise ValueError("Full name must contain alphabetic characters and cannot be purely numeric.")
+            return trimmed
+        return v
 
 
 class RoleGrantIn(_Write):

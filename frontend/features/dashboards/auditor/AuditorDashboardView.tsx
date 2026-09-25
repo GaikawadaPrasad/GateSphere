@@ -27,7 +27,7 @@ import { useUiStore } from "@/store/ui";
 import { useMe } from "@/hooks/use-auth";
 import { useCommunityDetails } from "@/hooks/use-communities";
 import { toast } from "@/store/toast";
-import { formatDate, formatDateTime, formatRelativeTime, formatCurrency } from "@/lib/utils";
+import { formatDate, formatDateTime, formatRelativeTime, formatCurrency, downloadCsv } from "@/lib/utils";
 import { Modal } from "@/components/common/Modal";
 
 export type AuditorTab =
@@ -318,22 +318,21 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
             variant="outline"
             size="sm"
             onClick={() => {
-              const csvContent =
-                "data:text/csv;charset=utf-8," +
-                encodeURIComponent(
-                  "id,occurred_at,module,action,actor\n" +
-                    rawLogs
-                      .map(
-                        (l) => `${l.id},${l.occurred_at},${l.module},${l.action},${l.actor_email}`,
-                      )
-                      .join("\n"),
-                );
-              const link = document.createElement("a");
-              link.setAttribute("href", csvContent);
-              link.setAttribute("download", `gatesphere_audit_export_${Date.now()}.csv`);
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
+              if (rawLogs.length === 0) {
+                toast.error("No audit logs found to export.", "Export Empty");
+                return;
+              }
+              const rows = rawLogs.map((l) => ({
+                "Log ID": l.id,
+                "Occurred At": l.occurred_at ? formatDateTime(l.occurred_at) : "–",
+                "Module": l.module?.toUpperCase() || "SYSTEM",
+                "Action": l.action || "–",
+                "Actor Email": l.actor_email || "–",
+                "Actor Role": l.actor_role || "–",
+                "IP Address": l.ip_address || "–",
+              }));
+              downloadCsv(`gatesphere_audit_export_${Date.now()}.csv`, rows);
+              toast.success("Audit logs exported to CSV successfully.", "Export Complete");
             }}
           >
             📥 Export CSV
@@ -1173,21 +1172,103 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
                 title: "Financial Ledger & Dues Audit",
                 desc: "Complete invoice, payment, and refund ledger for current quarter.",
                 icon: "💳",
+                onDownload: () => {
+                  if (!financialRecords || financialRecords.length === 0) {
+                    toast.error("No financial records found to export.", "Export Empty");
+                    return;
+                  }
+                  const rows = financialRecords.map((r: any) => ({
+                    "Invoice Number": r.invoice_number || "–",
+                    "Unit": r.unit_number || "–",
+                    "Total Amount (INR)": r.total_amount ?? 0,
+                    "Amount Paid (INR)": r.amount_paid ?? 0,
+                    "Balance Due (INR)": r.balance_due ?? 0,
+                    "Status": (r.status || "–").toUpperCase(),
+                    "Issue Date": r.issue_date ? formatDate(r.issue_date) : "–",
+                    "Due Date": r.due_date ? formatDate(r.due_date) : "–",
+                    "Receipt Number": r.receipt_number || "–",
+                  }));
+                  downloadCsv(`gatesphere_financial_dues_audit_${Date.now()}.csv`, rows);
+                  toast.success("Financial ledger report downloaded successfully.", "Download Complete");
+                },
               },
               {
                 title: "Gate Entry & Exit Compliance",
                 desc: "Comprehensive log of all visitors, staff, and delivery movements.",
                 icon: "🛡️",
+                onDownload: () => {
+                  const combined = [
+                    ...(gateEvents || []).map((e: any) => ({
+                      "Record Type": "Gate Checkpoint Event",
+                      "Event Type": (e.event_type || "–").toUpperCase(),
+                      "Gate Checkpoint": e.gate_name || "–",
+                      "On-Duty Guard / Actor": e.actor_name || "–",
+                      "Person / Entity Type": e.person_type || "–",
+                      "Pass / Reference Code": e.reference_code || "–",
+                      "Timestamp": e.occurred_at ? formatDateTime(e.occurred_at) : "–",
+                      "Compliance Status": e.anomaly_flag ? "FLAGGED ANOMALY" : "COMPLIANT",
+                    })),
+                    ...(visitorRecords || []).map((v: any) => ({
+                      "Record Type": "Visitor Access Pass",
+                      "Event Type": (v.request_type || "GUEST").toUpperCase(),
+                      "Gate Checkpoint": "Visitor Main Gate",
+                      "On-Duty Guard / Actor": v.host_name || "Resident Host",
+                      "Person / Entity Type": `${v.visitor_name} (${v.phone || "No phone"})`,
+                      "Pass / Reference Code": v.unit || "–",
+                      "Timestamp": v.entry_time ? formatDateTime(v.entry_time) : "–",
+                      "Compliance Status": v.status === "approved" ? "APPROVED & COMPLIANT" : (v.status || "PENDING").toUpperCase(),
+                    })),
+                  ];
+                  if (combined.length === 0) {
+                    toast.error("No gate or visitor records found to export.", "Export Empty");
+                    return;
+                  }
+                  downloadCsv(`gatesphere_gate_compliance_report_${Date.now()}.csv`, combined);
+                  toast.success("Gate & visitor compliance report downloaded successfully.", "Download Complete");
+                },
               },
               {
                 title: "Service SLA Performance",
                 desc: "Maintenance ticket resolution metrics, breaches, and vendor ratings.",
                 icon: "🔧",
+                onDownload: () => {
+                  if (!complaintRecords || complaintRecords.length === 0) {
+                    toast.error("No service ticket records found to export.", "Export Empty");
+                    return;
+                  }
+                  const rows = complaintRecords.map((t: any) => ({
+                    "Ticket Number": t.ticket_number || "–",
+                    "Subject / Scope": t.subject || "–",
+                    "Priority": (t.priority || "medium").toUpperCase(),
+                    "Current Status": (t.status || "open").toUpperCase(),
+                    "SLA Escalation State": (t.escalation_state || "on_track").toUpperCase(),
+                    "Raised Timestamp": t.created_at ? formatDateTime(t.created_at) : "–",
+                    "Resolution Due At": t.resolution_due_at ? formatDateTime(t.resolution_due_at) : "–",
+                  }));
+                  downloadCsv(`gatesphere_service_sla_performance_${Date.now()}.csv`, rows);
+                  toast.success("Service SLA performance report downloaded successfully.", "Download Complete");
+                },
               },
               {
                 title: "Security & Incident Audit Trail",
                 desc: "Emergency SOS dispatches, checkpoint overrides, and guard logs.",
                 icon: "🚨",
+                onDownload: () => {
+                  if (!incidentRecords || incidentRecords.length === 0) {
+                    toast.error("No incident records found to export.", "Export Empty");
+                    return;
+                  }
+                  const rows = incidentRecords.map((i: any) => ({
+                    "Incident Number": i.incident_number || "–",
+                    "Incident Type": (i.type || "security").toUpperCase(),
+                    "Location": i.location || "Community Premises",
+                    "Severity": (i.severity || "medium").toUpperCase(),
+                    "Status": (i.status || "resolved").toUpperCase(),
+                    "Reported Timestamp": i.created_at ? formatDateTime(i.created_at) : "–",
+                  }));
+                  downloadCsv(`gatesphere_security_incident_audit_trail_${Date.now()}.csv`, rows);
+                  toast.success("Security & incident audit report downloaded successfully.", "Download Complete");
+                },
               },
             ].map((rep, idx) => (
               <div key={idx} className="gs-card card-hover" style={{ background: "#F8FAFC" }}>
@@ -1201,14 +1282,9 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
                 <BrandButton
                   size="sm"
                   variant="outline"
-                  onClick={() =>
-                    toast.success(
-                      `Generating ${rep.title} export. File will download shortly.`,
-                      "Report Export Initiated",
-                    )
-                  }
+                  onClick={rep.onDownload}
                 >
-                  Download CSV / PDF
+                  Download CSV
                 </BrandButton>
               </div>
             ))}

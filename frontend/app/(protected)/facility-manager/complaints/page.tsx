@@ -63,8 +63,8 @@ export default function FacilityManagerComplaintsPage() {
     comments: string | null;
   } | null>(null);
 
-  const loadData = async (targetPage = page, loadCategories = false) => {
-    setIsLoading(true);
+  const loadData = async (targetPage = page, loadCategories = false, showSpinner = true) => {
+    if (showSpinner) setIsLoading(true);
     setLoadError(null);
     try {
       const q = search.trim() || undefined;
@@ -133,10 +133,17 @@ export default function FacilityManagerComplaintsPage() {
 
   useEffect(() => {
     const handler = setTimeout(() => {
-      loadData(1, Object.keys(categoryMap).length === 0);
+      loadData(1, Object.keys(categoryMap).length === 0, true);
     }, 300);
     return () => clearTimeout(handler);
   }, [search, statusFilter, priorityFilter, pageSize]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadData(page, false, false);
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [page, search, statusFilter, priorityFilter, pageSize]);
 
   const handleStatusChange = async (id: string, status: string) => {
     try {

@@ -202,6 +202,11 @@ def test_family_members_authorization_and_scoping(as_role, seed_ids, resident_un
     assert auditor.delete(f"{P}/family-members/{member_id}").status_code == 403
 
     # 6. Guard cannot create or delete family members -> 403
+    # Nor can roles lacking residents:view list family, get family pass, or list emergency contacts (TC-047-N, TC-053-N, TC-067-N)
+    assert guard.get(f"{P}/units/{resident_unit_id}/family-members").status_code == 403
+    assert guard.get(f"{P}/family-members/{member_id}/pass").status_code == 403
+    assert guard.get(f"{P}/{profile_id}/emergency-contacts").status_code == 403
+
     guard_add = guard.post(
         f"{P}/family-members",
         json={

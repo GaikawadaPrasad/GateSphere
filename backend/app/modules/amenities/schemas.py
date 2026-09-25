@@ -6,7 +6,7 @@ import uuid
 from datetime import date, datetime, time
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.modules.amenities.models import AMENITY_TYPES, BOOKING_STATUS, RULE_TYPES
 
@@ -38,6 +38,14 @@ class AmenityCreate(_Write):
     capacity: int = Field(default=1, ge=1, le=100000)
     booking_required: bool = True
 
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        trimmed = v.strip()
+        if trimmed.isdigit() or not any(c.isalpha() for c in trimmed):
+            raise ValueError("Facility name must contain alphabetic characters and cannot be purely numeric.")
+        return trimmed
+
 
 class AmenityUpdate(_Write):
     name: str | None = Field(default=None, max_length=120)
@@ -46,6 +54,16 @@ class AmenityUpdate(_Write):
     capacity: int | None = Field(default=None, ge=1, le=100000)
     booking_required: bool | None = None
     is_active: bool | None = None
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str | None) -> str | None:
+        if v is not None:
+            trimmed = v.strip()
+            if trimmed.isdigit() or not any(c.isalpha() for c in trimmed):
+                raise ValueError("Facility name must contain alphabetic characters and cannot be purely numeric.")
+            return trimmed
+        return v
 
 
 class AmenityRead(_Read):

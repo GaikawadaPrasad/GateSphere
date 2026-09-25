@@ -15,8 +15,8 @@ export default function FacilityManagerNotificationsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const loadData = async () => {
-    setIsLoading(true);
+  const loadData = async (showSpinner = true) => {
+    if (showSpinner) setIsLoading(true);
     setLoadError(null);
     try {
       const data = await notificationsApi.list({
@@ -34,7 +34,14 @@ export default function FacilityManagerNotificationsPage() {
 
   useEffect(() => {
     setPage(1);
-    loadData();
+    loadData(true);
+  }, [unreadOnly]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadData(false);
+    }, 10000);
+    return () => clearInterval(interval);
   }, [unreadOnly]);
 
   useEffect(() => {
