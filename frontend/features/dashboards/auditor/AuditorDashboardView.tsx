@@ -802,7 +802,13 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
                 header: "Gate Entry (Date & Time)",
                 render: (i) => (
                   <span style={{ fontSize: "12px", fontFamily: "monospace", fontWeight: 600 }}>
-                    {formatDateTime(i.entry_time)}
+                    {i.entry_time ? (
+                      formatDateTime(i.entry_time)
+                    ) : (
+                      <span style={{ color: "var(--brand-muted)", fontWeight: 400 }}>
+                        — (Awaiting Gate Entry)
+                      </span>
+                    )}
                   </span>
                 ),
               },
@@ -811,7 +817,9 @@ export function AuditorDashboardView({ initialTab = "overview" }: AuditorDashboa
                 header: "Gate Exit (Date & Time)",
                 render: (i) => (
                   <span style={{ fontSize: "12px", fontFamily: "monospace" }}>
-                    {i.exit_time ? (
+                    {!i.entry_time ? (
+                      <span style={{ color: "var(--brand-muted)", fontWeight: 400 }}>—</span>
+                    ) : i.exit_time ? (
                       formatDateTime(i.exit_time)
                     ) : (
                       <span style={{ color: "#D97706", fontWeight: 600 }}>
