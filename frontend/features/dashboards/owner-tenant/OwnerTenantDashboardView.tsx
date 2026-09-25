@@ -9665,6 +9665,7 @@ export function OwnerTenantDashboardView({
         size="md"
       >
         <form
+          noValidate
           onSubmit={async (e) => {
             e.preventDefault();
             const errors: Record<string, string> = {};
@@ -9724,6 +9725,7 @@ export function OwnerTenantDashboardView({
         >
           <div>
             <label
+              htmlFor="reg-vehicle-plate"
               style={{
                 display: "block",
                 fontSize: "13px",
@@ -9732,13 +9734,15 @@ export function OwnerTenantDashboardView({
                 marginBottom: "0.35rem",
               }}
             >
-              License Plate / Registration Number *
+              License Plate / Registration Number <span style={{ color: "#EF4444" }}>*</span>
             </label>
             <input
+              id="reg-vehicle-plate"
               type="text"
               className="input-field"
               placeholder="e.g. KA01AB1234"
               value={vehRegNumber}
+              autoComplete="off"
               onChange={(e) => {
                 setVehRegNumber(e.target.value.toUpperCase());
                 if (vehErrors.registration_number) {
@@ -9752,11 +9756,13 @@ export function OwnerTenantDashboardView({
               style={{
                 borderColor: vehErrors.registration_number ? "#EF4444" : undefined,
                 textTransform: "uppercase",
+                fontFamily: "monospace",
+                fontWeight: 600,
               }}
-              required
             />
             {vehErrors.registration_number && (
               <span
+                role="alert"
                 style={{
                   color: "#EF4444",
                   fontSize: "12px",
@@ -9772,6 +9778,7 @@ export function OwnerTenantDashboardView({
 
           <div>
             <label
+              htmlFor="reg-vehicle-type"
               style={{
                 display: "block",
                 fontSize: "13px",
@@ -9780,13 +9787,13 @@ export function OwnerTenantDashboardView({
                 marginBottom: "0.35rem",
               }}
             >
-              Vehicle Type *
+              Vehicle Type <span style={{ color: "#EF4444" }}>*</span>
             </label>
             <select
-              className="input-field"
+              id="reg-vehicle-type"
+              className="select-field"
               value={vehType}
               onChange={(e) => setVehType(e.target.value)}
-              required
             >
               <option value="car">Car (Sedan / Hatchback / SUV)</option>
               <option value="bike">Motorcycle / Bike</option>
@@ -9799,9 +9806,16 @@ export function OwnerTenantDashboardView({
             </select>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))",
+              gap: "0.85rem",
+            }}
+          >
             <div>
               <label
+                htmlFor="reg-vehicle-make"
                 style={{
                   display: "block",
                   fontSize: "13px",
@@ -9813,6 +9827,7 @@ export function OwnerTenantDashboardView({
                 Make / Brand
               </label>
               <input
+                id="reg-vehicle-make"
                 type="text"
                 className="input-field"
                 placeholder="e.g. Honda, Hyundai"
@@ -9832,6 +9847,7 @@ export function OwnerTenantDashboardView({
               />
               {vehErrors.make && (
                 <span
+                  role="alert"
                   style={{
                     color: "#EF4444",
                     fontSize: "12px",
@@ -9846,6 +9862,7 @@ export function OwnerTenantDashboardView({
             </div>
             <div>
               <label
+                htmlFor="reg-vehicle-model"
                 style={{
                   display: "block",
                   fontSize: "13px",
@@ -9857,6 +9874,7 @@ export function OwnerTenantDashboardView({
                 Model
               </label>
               <input
+                id="reg-vehicle-model"
                 type="text"
                 className="input-field"
                 placeholder="e.g. City, Creta"
@@ -9876,6 +9894,7 @@ export function OwnerTenantDashboardView({
               />
               {vehErrors.model && (
                 <span
+                  role="alert"
                   style={{
                     color: "#EF4444",
                     fontSize: "12px",
@@ -9892,6 +9911,7 @@ export function OwnerTenantDashboardView({
 
           <div>
             <label
+              htmlFor="reg-vehicle-color"
               style={{
                 display: "block",
                 fontSize: "13px",
@@ -9903,6 +9923,7 @@ export function OwnerTenantDashboardView({
               Color
             </label>
             <input
+              id="reg-vehicle-color"
               type="text"
               className="input-field"
               placeholder="e.g. White, Silver, Black"
@@ -9922,6 +9943,7 @@ export function OwnerTenantDashboardView({
             />
             {vehErrors.color && (
               <span
+                role="alert"
                 style={{
                   color: "#EF4444",
                   fontSize: "12px",
